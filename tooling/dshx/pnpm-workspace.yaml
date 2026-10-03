@@ -14,5 +14,12 @@ catalog:
   zod: 4.4.3
 
 allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': set this to true or false
+  '@google/genai': set this to true or false
+  core-js-pure: set this to true or false
   esbuild: true
+  koffi: set this to true or false
   lightningcss: true
+  node-pty: set this to true or false
+  protobufjs: set this to true or false
+  workerd: set this to true or false

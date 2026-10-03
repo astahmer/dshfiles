@@ -11,6 +11,8 @@ import type { InspectOptions, InspectResult, SlotSummary } from '../inspect/inde
 import { checkProjectManifest } from '../project/index.js'
 import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
 
+import { slotOwnerImports } from '../client/slot-reference.js'
+
 export interface AddUiOptions {
   readonly project: ResolvedDshxConfig
   readonly slot?: string
@@ -297,7 +299,21 @@ function modifyClientSource(source: string, file: string, contributionFile: stri
 function newClientSource(clientFile: string, contributionFile: string, slotName: string): string {
   const importPath = relativeImport(clientFile, contributionFile)
   const identifier = contributionIdentifier(slotName)
-  return `import { defineClient } from '@dshfiles/dshx/client'\nimport { generatedSlot as ${identifier} } from ${JSON.stringify(importPath)}\n\nexport default defineClient({\n  slots: [${identifier}],\n})\n`
+  // A slot's declaration lives in the package that owns it, so without a
+  // type-only import of that owner the slot name does not typecheck here. The
+  // reference is the same table `inspect slots --explain` prints.
+  const owners = slotOwnerImports(slotName)
+  const ownerImports = owners.map(owner => `import type {} from '${owner}'`).join('\n')
+  return [
+    `import { defineClient } from '@dshfiles/dshx/client'`,
+    ownerImports,
+    `import { generatedSlot as ${identifier} } from ${JSON.stringify(importPath)}`,
+    '',
+    'export default defineClient({',
+    `  slots: [${identifier}],`,
+    '})',
+    '',
+  ].join('\n')
 }
 
 function updateManifest(source: string, provider: string, compatibility: DshCompatibility): { source: string; manifest: Record<string, unknown> } {

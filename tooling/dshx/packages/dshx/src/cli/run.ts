@@ -1040,6 +1040,52 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   return code
 }
 
+/**
+ * Explain a Client slot from the static reference.
+ *
+ * Answers offline, so the question "can I even use this slot, and what do I have to
+ * import to see it" does not require a running Host.
+ */
+const runSlotExplanation = async (
+  args: CliArgs,
+  io: CliIO,
+): Promise<number> => {
+  const { CLIENT_SLOT_REFERENCES, findClientSlot } = await import('../client/slot-reference.js')
+  if (args.json) {
+    const slots = args.root === undefined
+      ? CLIENT_SLOT_REFERENCES
+      : CLIENT_SLOT_REFERENCES.filter(slot => slot.name === args.root)
+    write(io.stdout, `${JSON.stringify({ slots }, null, 2)}\n`)
+    return slots.length === 0 ? 1 : 0
+  }
+  const requested = args.root
+  if (requested === undefined) {
+    for (const slot of CLIENT_SLOT_REFERENCES) {
+      write(io.stdout, `${slot.name}\n`)
+    }
+    write(io.stderr, 'Pass --root <slot-name> to see one slot in detail.\n')
+    return 0
+  }
+  const slot = findClientSlot(requested)
+  if (slot === undefined) {
+    write(io.stderr, `No reference entry for slot "${requested}".\n`)
+    return 1
+  }
+  write(io.stdout, `${slot.name}\n`)
+  write(io.stdout, `  purpose    ${slot.purpose}\n`)
+  if (slot.ownerProps !== undefined) write(io.stdout, `  ownerProps ${slot.ownerProps}\n`)
+  if (slot.declaredBy.length > 0) {
+    write(io.stdout, '  declaredBy\n')
+    for (const owner of slot.declaredBy) write(io.stdout, `    ${owner}\n`)
+    write(io.stdout, '  import these type-only so the slot appears in your typed union:\n')
+    for (const owner of slot.declaredBy) write(io.stdout, `    import type {} from '${owner}'\n`)
+  }
+  if (slot.replaces.length > 0) {
+    write(io.stdout, `  reusing id "${slot.replaces[0]}" replaces the shipped occupant instead of adding a second one.\n`)
+  }
+  return 0
+}
+
 export async function runCli(argv: readonly string[], options: CliRunOptions = {}): Promise<number> {
   const io = options.io ?? defaultIO()
   if (argv[0] === 'create') {
@@ -1056,6 +1102,10 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     write(io.stderr, 'Run "dshx --help" for usage.\n')
     return 2
   }
+  // The slot reference is static, so it answers before a project is resolved and
+  // before a Host is contacted.
+  if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
+
   if (args.help) {
     const runtime = options.runtime ?? {}
     if (

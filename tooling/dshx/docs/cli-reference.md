@@ -145,3 +145,24 @@ dshx-hub plugin curate PLUGIN_ID --if-revision 5 --input content.json
 On `revision_conflict`, fetch the current plugin, merge the intended content, and retry with the new revision. For batch results, keep successful items and inspect each rejected item's error independently.
 
 `status`, filtered `plugin list`, and scoped `audit` are planning inputs; they do not prescribe another command. Examples are compositions, not a required state machine. Use `dshx-hub <command> --help` for the exact flags and read/write contract, and see [Framework Hub Operations](../apps/framework-hub/OPERATIONS.md) for the server API and merge rules.
+
+### `dshx inspect slots --explain`
+
+Explains a Client slot from the static reference, without a project or a running
+Host. A slot's declaration lives in the package that owns it, so a plugin cannot
+see the slot in its own typed union until it imports that owner — invisible from
+the plugin side, because it reads as "the slot does not exist".
+
+```bash
+dshx inspect slots --explain                          # every known Client slot
+dshx inspect slots --explain --root sidebar.panellist  # one slot in detail
+dshx inspect slots --explain --json                   # machine-readable
+```
+
+Each entry reports the declaring package, the type-only imports that make the
+slot typecheck, the owner props the occupant receives, and — where it matters —
+the shipped id whose reuse replaces the existing occupant instead of adding a
+second copy of a surface the Host already owns.
+
+`dshx add ui --slot <name>` reads the same table and writes those imports, so the
+generated entry compiles as written.

@@ -26,6 +26,7 @@ export interface CliArgs {
   readonly platformArgs?: readonly string[]
   readonly cwd?: string
   readonly root?: string
+  readonly explain: boolean
   readonly verbose: boolean
   readonly json: boolean
   readonly runtime: boolean
@@ -84,6 +85,7 @@ const valueOptions = new Set([
   '--at-seq',
 ])
 const booleanOptions = new Set([
+  '--explain',
   '--help',
   '-h',
   '--version',
@@ -108,6 +110,10 @@ const sharedArgs = {
     type: 'string',
     description: 'Limit Slot inspection to a root Slot.',
     valueHint: 'slot',
+  },
+  explain: {
+    type: 'boolean',
+    description: 'Explain a Client slot offline: declaring package, imports, owner props.',
   },
   verbose: {
     type: 'boolean',
@@ -292,6 +298,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 
   const cwd = parsed.cwd
   const root = parsed.root
+  const explain = parsed.explain
   const verbose = parsed.verbose ?? false
   const json = parsed.json ?? false
   const runtime = parsed.runtime ?? false
@@ -401,6 +408,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError('add name options are only valid with add tool or add command.')
   if (event !== undefined && command !== 'add') throw new CliUsageError('--event is only valid with add hook.')
   if (root !== undefined && (command !== 'inspect' || inspectTarget !== 'slots')) throw new CliUsageError('--root is only valid with inspect slots.')
+  if (explain === true && (command !== 'inspect' || inspectTarget !== 'slots')) throw new CliUsageError('--explain is only valid with inspect slots.')
   if ((json || open || port !== undefined) && command === undefined) throw new CliUsageError('An option requires a command.')
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
@@ -416,6 +424,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command === 'add' && addTarget !== 'hook' && event !== undefined) throw new CliUsageError('--event is only valid with add hook.')
   if (help || version)
     return {
+      explain: false,
       ...(command === undefined ? {} : { command }),
       ...(inspectTarget === undefined ? {} : { inspectTarget }),
       ...(addTarget === undefined ? {} : { addTarget }),
@@ -453,6 +462,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command === undefined) throw new CliUsageError('A command is required: build, check, dev, test, package, inspect, or add.')
   return {
     command,
+    explain: explain === true,
     ...(inspectTarget === undefined ? {} : { inspectTarget }),
     ...(addTarget === undefined ? {} : { addTarget }),
     ...(platformArgs.length === 0 ? {} : { platformArgs }),
