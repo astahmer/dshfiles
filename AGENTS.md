@@ -19,6 +19,34 @@ has different APIs, different boundaries, and a different plugin model. Do not
 assume a BB plugin's architecture carries over. Read its `README.md` for the
 *behavior* worth keeping, then reimplement against the DSH API.
 
+### When no plugin covers the need
+
+Adopting is the default, not a mandate. When the survey finds nothing that
+covers what we actually want, do not stall, and do not settle for a plugin
+that covers part of it. Pick one of these three and say which:
+
+1. **Adopt anyway** — good enough, or the gap is cosmetic.
+2. **Fork or port** — an existing project already does the hard part. Fork it,
+   keep an upstream bookmark so merges stay possible, and change only what our
+   version needs. Pin the fork locally; do not assume it is published.
+3. **Build it with dshx** — from scratch, when a fork would carry more debt
+   than the feature is worth.
+
+Two rules make the choice cheap to revisit:
+
+- **Verify against the installed runtime, not the README.** A plugin's claims
+  are not evidence. Read its peer ranges against our DSH version, resolve the
+  imports it actually uses, and read the Service contract it calls. Peer ranges
+  are usually honest: a plugin capped below our version is a real signal.
+- **Check whether the Host can do it at all before building UI for it.** Read
+  the Service and Event contracts first. If the seam has no such method — no
+  `reorder`, no `remove` — a plugin cannot add one, and the honest answer is a
+  Host change, not a clever client-side fake. Say so instead of shipping
+  something that mutates durable state to work around it.
+
+Report which option you chose and why. A fork nobody asked for is a liability;
+a workaround nobody flagged is worse.
+
 ## Git
 
 This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
@@ -85,6 +113,44 @@ example: `dsh-codex-switch@0.1.0-alpha.8` (all 8 published versions are alpha)
 installs without error, then logs `llm-openai-codex: failed to import` at every
 boot. Check for this shape before investing in a plugin.
 
+### Local paths work; the rules are narrower than the errors suggest
+
+`pnpm add <path>` is fine. Both confusing errors come from the same place — pnpm
+resolving the *directory name* as a package name:
+
+- `Package name <path> is invalid, it should have a @scope` — the directory is
+  not named `@scope/name`. This is about the folder, not the `name` field alone.
+- `dependency with an invalid name: "<parent dir>/"` — an ancestor directory
+  contains an `@`, so pnpm splits the path at the wrong segment.
+
+Install a local bundle from a directory whose own path is already the scoped
+package name: `plugins/@dshfiles/ai-accounts`. Do not fight this by renaming
+`package.json` alone.
+
+### pnpm majors must not be mixed
+
+The profile's `node_modules` records the store it was built with
+(`~/.dsh/profiles/web/node_modules/.modules.yaml`). If the pnpm the Host resolves
+disagrees, every install fails with `ERR_PNPM_UNEXPECTED_STORE` — which reads
+like a permissions problem and is not one.
+
+On this machine the split is:
+
+| pnpm | Where | Store |
+|---|---|---|
+| 12.x | `~/.local/share/pnpm/bin`, `~/.nix-profile/bin` | `v11` — matches the profile |
+| 10.x | fnm's corepack shim | `v10` — **the Host resolves this one** |
+
+The Host was launched with an inherited `PATH`, so changing your shell `PATH`
+does not change what `plugin_manager` runs. Fix it at the source: pin
+`packageManager` to the matching major, or remove the older shim from the
+resolvable path, then restart the Host. Check first:
+
+```sh
+head -3 ~/.dsh/profiles/web/node_modules/.modules.yaml   # storeDir + packageManager
+which -a pnpm                                            # what the Host will find
+```
+
 ## Writing our own plugins
 
 New plugins use **[dshx](https://dshx.io/en)**
@@ -97,10 +163,41 @@ pnpm dev          # client HMR + host auto-restart
 dshx inspect slots --root sidebar    # read the live composition
 ```
 
-dshx is **v0.1.4-preview, 14 stars**, and DSH's own docs warn its APIs will
-change before stabilization. Treat its typed surface as a strong default, not a
+dshx is **v0.1.4-preview**, and its typed surface is a strong default, not a
 guarantee. Its most reliable value is `dshx inspect` — read the real runtime
 instead of guessing whether a slot or service exists.
+
+### We fork dshx
+
+Upstream declares `dshRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2'`, so it does
+not claim DSH 0.2. The range is advisory — an unsupported range renders as a red
+warning and never throws — but the *code* does drift, and a fork is cheaper than
+reimplementing the build tool.
+
+Our fork lives at `forks/dshx-fork`, with an upstream bookmark named
+`dshx-upstream` so merges stay possible:
+
+```sh
+cd forks/dshx-fork
+jj bookmark list                       # confirm dshx-upstream tracks origin
+jj fetch
+jj rebase -d dshx-upstream             # replay our commits onto new upstream
+pnpm install && pnpm --filter @becomeopc/dshx build
+```
+
+What `PROTOCOL_2_COMPATIBILITY` changed, in case upstream moves again:
+
+- `dsh-client-runtime` no longer exists; its types moved to
+  `dsh-client-ui-conversation/client`, and `ChatConversationViewNode`,
+  `ChatNodeOwnerProps`, and `UseChatNodeTurnData` moved to
+  `dsh-client-ui-chat/client`.
+- Settings inverted. 0.1 had a plugin register a namespace object
+  (`SettingsScope` / `SettingsProvider` / `.register()`); 0.2 identifies a
+  namespace by its Loader entry id and reads it through `ctx.settings.describe()`
+  and `update()`. The Host binds a scope façade and the Client binds through
+  `ConfigForms`.
+- `SettingsScopeBinder` is gone with no replacement; `ConfigForms.get(entryId)`
+  plus `ConfigForms.describe()` is the protocol-2 equivalent.
 
 Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
 package row, `lib/` for the host half, `lib/client.js` for the browser half.
