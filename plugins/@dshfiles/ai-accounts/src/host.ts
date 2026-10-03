@@ -186,15 +186,32 @@ const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: st
 const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
   readonly reasoningDefaults?: Readonly<Record<string, string>>
+  /** Ids this account never offers. */
+  readonly hiddenModelIds?: readonly string[]
+  /** Ids offered ahead of the rest. */
+  readonly favoriteModelIds?: readonly string[]
+  /** Explicit ordering; unlisted ids keep provider order after these. */
+  readonly modelOrder?: readonly string[]
   readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider>
   readonly provider: string
   readonly displayName: string
   readonly additionalModelIds: readonly string[]
 }): ResolvedPiAiProviderProfile => {
-  const models = params.upstream.getModels().map(model => ({
-    ...model,
-    provider: params.provider,
-  }))
+  const hidden = new Set(params.hiddenModelIds ?? [])
+  const favorites = new Set(params.favoriteModelIds ?? [])
+  const order = params.modelOrder ?? []
+  const rank = (id: string): number => {
+    const listed = order.indexOf(id)
+    if (listed >= 0) return listed
+    // Unlisted models follow the explicit ones, favorites first among them, then
+    // the provider's own order, so adding a model never reshuffles the rest.
+    return order.length + (favorites.has(id) ? 0 : 1)
+  }
+  const models = params.upstream
+    .getModels()
+    .filter(model => !hidden.has(model.id))
+    .map(model => ({ ...model, provider: params.provider }))
+    .sort((left, right) => rank(left.id) - rank(right.id))
   const template = models.find(model => model.id.startsWith('gpt-'))
   for (const id of params.additionalModelIds) {
     if (template === undefined || models.some(model => model.id === id)) continue
@@ -496,6 +513,20 @@ export default definePlugin({
     // replacement, so the request cannot be edited here. The adapter's own
     // default is the seam DSH materializes defaults through, so a pin applies
     // whenever the caller did not choose an effort.
+    // Curation comes from the same file, so a hidden model cannot outlive the
+    // account that hid it.
+    const curation = readAccountFileSync().accounts.map(
+      account =>
+        [
+          account.instanceId,
+          {
+            hiddenModelIds: account.hiddenModelIds,
+            favoriteModelIds: account.favoriteModelIds,
+            modelOrder: account.modelOrder,
+          },
+        ] as const,
+    )
+
     const reasoningPins = readAccountFileSync().accounts.map(
       account =>
         [
@@ -515,6 +546,7 @@ export default definePlugin({
           displayName: route.displayName,
           reasoningDefaults:
             reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
+          ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
           additionalModelIds:
             route.kind === CODEX_KIND
               ? (config.codexAccounts.find(

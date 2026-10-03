@@ -65,6 +65,9 @@ const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
   providerIcon: PROVIDER_ICONS[0],
   additionalModelIds: [],
   reasoningDefaults: {},
+  hiddenModelIds: [],
+  favoriteModelIds: [],
+  modelOrder: [],
 })
 
 const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
@@ -198,6 +201,108 @@ const ReasoningDefaults = (props: {
           </select>
         </div>
       ))}
+    </div>
+  )
+}
+
+
+/**
+ * Model curation: hide, favorite, and reorder an account's models.
+ *
+ * Reordering is explicit rather than a full sort, so a model the provider adds
+ * later appears after the curated ones instead of displacing them.
+ */
+const ModelCuration = (props: {
+  readonly account: AccountDraft
+  readonly catalog: readonly { id: string; name: string }[] | undefined
+  readonly onChange: (next: Partial<AccountDraft>) => void
+}): JSX.Element | null => {
+  const catalog = props.catalog ?? []
+  if (catalog.length === 0) return null
+  const { hiddenModelIds, favoriteModelIds, modelOrder } = props.account
+  const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
+  const ordered = [
+    ...listed,
+    ...catalog.filter(model => !listed.includes(model.id)).map(model => model.id),
+  ]
+  const move = (id: string, delta: number) => {
+    const index = ordered.indexOf(id)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= ordered.length) return
+    const next = [...ordered]
+    const [moved] = next.splice(index, 1)
+    if (moved === undefined) return
+    next.splice(target, 0, moved)
+    props.onChange({ modelOrder: next })
+  }
+  return (
+    <div className={styles.curation}>
+      <span className={styles.fieldLabel}>Models</span>
+      <span className={styles.fieldHint}>
+        Starred models appear first, hidden ones drop out of the picker entirely.
+      </span>
+      <ul className={styles.modelList}>
+        {ordered.map((id, index) => {
+          const model = catalog.find(candidate => candidate.id === id)
+          const hidden = hiddenModelIds.includes(id)
+          const favorite = favoriteModelIds.includes(id)
+          return (
+            <li className={styles.modelRow} key={id}>
+              <button
+                type="button"
+                className={favorite ? styles.starOn : styles.starOff}
+                aria-label={favorite ? `Unstar ${model?.name ?? id}` : `Star ${model?.name ?? id}`}
+                aria-pressed={favorite}
+                onClick={() =>
+                  props.onChange({
+                    favoriteModelIds: favorite
+                      ? favoriteModelIds.filter(candidate => candidate !== id)
+                      : [...favoriteModelIds, id],
+                  })
+                }
+              >
+                ★
+              </button>
+              <span className={hidden ? styles.modelHidden : styles.modelName} title={id}>
+                {model?.name ?? id}
+              </span>
+              <button
+                type="button"
+                className={styles.moveButton}
+                aria-label={`Move ${model?.name ?? id} up`}
+                disabled={index === 0}
+                onClick={() => move(id, -1)}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className={styles.moveButton}
+                aria-label={`Move ${model?.name ?? id} down`}
+                disabled={index === ordered.length - 1}
+                onClick={() => move(id, 1)}
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                className={styles.moveButton}
+                aria-label={hidden ? `Show ${model?.name ?? id}` : `Hide ${model?.name ?? id}`}
+                aria-pressed={!hidden}
+                onClick={() =>
+                  props.onChange({
+                    hiddenModelIds: hidden
+                      ? hiddenModelIds.filter(candidate => candidate !== id)
+                      : [...hiddenModelIds, id],
+                  })
+                }
+              >
+                {hidden ? 'Show' : 'Hide'}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
@@ -581,6 +686,12 @@ export const AccountsPanel = (): JSX.Element => {
                   Remove
                 </button>
               </div>
+
+              <ModelCuration
+                account={draft}
+                catalog={catalog?.models}
+                onChange={next => setDraft({ ...draft, ...next })}
+              />
 
               <ReasoningDefaults
                 account={draft}

@@ -49,6 +49,15 @@ export const accountProfileSchema = z.object({
    * default, so an account only lists the models it wants to pin.
    */
   reasoningDefaults: z.record(z.string().max(160), z.string().max(32)).default({}),
+  /** Model ids this account never shows, so the picker stays short. */
+  hiddenModelIds: z.array(z.string().max(160)).max(500).default([]),
+  /** Model ids to surface first. */
+  favoriteModelIds: z.array(z.string().max(160)).max(500).default([]),
+  /**
+   * Explicit picker order. Ids absent from this list keep the provider's own
+   * order after the listed ones, so adding a model never reshuffles the rest.
+   */
+  modelOrder: z.array(z.string().max(160)).max(500).default([]),
 })
 
 /** What the page may write: identity and health are observed, never authored. */
@@ -66,6 +75,9 @@ export const accountDraftSchema = accountProfileSchema.pick({
   providerIcon: true,
   additionalModelIds: true,
   reasoningDefaults: true,
+  hiddenModelIds: true,
+  favoriteModelIds: true,
+  modelOrder: true,
 })
 
 export const accountsFileSchema = z.object({
