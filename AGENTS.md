@@ -26,9 +26,10 @@ covers what we actually want, do not stall, and do not settle for a plugin
 that covers part of it. Pick one of these three and say which:
 
 1. **Adopt anyway** — good enough, or the gap is cosmetic.
-2. **Fork or port** — an existing project already does the hard part. Fork it,
-   keep an upstream bookmark so merges stay possible, and change only what our
-   version needs. Pin the fork locally; do not assume it is published.
+2. **Fork or port** — an existing project already does the hard part. Preserve
+   its license and source provenance, then vendor the code inside this repo.
+   Keep an upstream remote only when ongoing sync is an explicit goal. A hard
+   fork has no remote dependency, remote bookmark, fetch, or rebase workflow.
 3. **Build it with dshx** — from scratch, when a fork would carry more debt
    than the feature is worth.
 
@@ -199,22 +200,23 @@ dshx is **v0.1.4-preview**, and its typed surface is a strong default, not a
 guarantee. Its most reliable value is `dshx inspect` — read the real runtime
 instead of guessing whether a slot or service exists.
 
-### We fork dshx
+### We maintain a local dshx hard fork
 
-Upstream declares `dshRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2'`, so it does
-not claim DSH 0.2. The range is advisory — an unsupported range renders as a red
-warning and never throws — but the *code* does drift, and a fork is cheaper than
-reimplementing the build tool.
+The complete source lives at `tooling/dshx`, inside this repository's single
+Jujutsu/Git boundary. It is a maintained hard fork for DSH 0.2 compatibility;
+the original package peer range did not claim DSH 0.2, and reimplementing its
+build and inspection tools would duplicate useful work.
 
-Our fork lives at `forks/dshx-fork`, with an upstream bookmark named
-`dshx-upstream` so merges stay possible:
+The fork is owned here as `@dshfiles/dshx`. It must not fetch or install
+`@becomeopc/dshx` from a registry. Plugins use the local workspace package or a
+local path. `tooling/dshx/FORK.md` records the source baseline, license, and
+attribution. Do not add a nested `.jj`/`.git`, upstream remote, or upstream
+bookmark; review DSH changes manually when the native contracts move.
 
 ```sh
-cd forks/dshx-fork
-jj bookmark list                       # confirm dshx-upstream tracks origin
-jj fetch
-jj rebase -d dshx-upstream             # replay our commits onto new upstream
-pnpm install && pnpm --filter @becomeopc/dshx build
+cd tooling/dshx
+pnpm install --frozen-lockfile
+pnpm --filter @dshfiles/dshx build
 ```
 
 What `PROTOCOL_2_COMPATIBILITY` changed, in case upstream moves again:

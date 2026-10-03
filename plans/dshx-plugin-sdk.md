@@ -4,9 +4,9 @@ Research snapshot: 2026-10-03. Status: proposed architecture, before implementat
 
 ## Context — current state
 
-**Choose option 2: evolve the existing DSHX fork.** It already does the difficult build, dependency, profile, inspection, and transport work. Keep its upstream bookmark and add a coherent author-facing API inside its existing package. A separate SDK stacked above DSHX would duplicate integration ownership. No DSH fork, replacement Cordis container, or independent plugin runtime is needed for the first slices.
+**Decision: option 2, a locally owned DSHX hard fork.** DSHX already does the difficult build, dependency, profile, inspection, and transport work. The source is maintained at `tooling/dshx` under the `dshfiles` repository's single JJ boundary, with package identity `@dshfiles/dshx`. There is no upstream remote, tracking bookmark, or registry dependency on `@becomeopc/dshx`. DSH and Cordis keep runtime ownership; a second SDK/runtime would duplicate integration ownership.
 
-This is a research/design deliverable. Examples marked proposed are not available APIs or verified running plugins. The evidence ledger is [dshx-sdk-evidence.md](./dshx-sdk-evidence.md); its source links, symbols, versions, and fingerprints make the findings reviewable.
+This document records the target architecture and decisions. Implemented surfaces and proof status are tracked in [dshx-sdk-progress.md](./dshx-sdk-progress.md). Examples still marked proposed are design targets, not available APIs. The evidence ledger is [dshx-sdk-evidence.md](./dshx-sdk-evidence.md); source links, versions, and fingerprints describe the research snapshot.
 
 ### What was actually inspected
 
@@ -16,15 +16,14 @@ This is a research/design deliverable. Examples marked proposed are not availabl
 - Installed BB SDK `0.4.47` declarations/runtime exports and current installed BB authoring references. These disagree in age; newer guide claims are identified as guide evidence, not proof that the older SDK implements them.
 - OpenCode `dev` source: the actual v2 Promise and Effect plugin definitions, capability contexts, registration handles, core adapter, lifecycle owner, and lifecycle design status. This is evolving source, not an assertion that “OpenCode 2” is a released stable contract.
 
-The fork is **not yet in this checkout**. Inspected location:
+The source fork and first consumer now live in this checkout:
 
 ```text
-/Users/astahmer/Documents/deepseek-harness/default-workspace/
-  forks/dshx-fork/
-  @dshfiles/ai-accounts/
+tooling/dshx/
+plugins/@dshfiles/ai-accounts/
 ```
 
-`/Users/astahmer/dev/dshfiles` contained setup/instructions only when research started. The other agent's move/build/install claims are therefore not treated as completed work here. Its working files were not changed. The profile manifest inspected does not list `@dshfiles/ai-accounts`; this is an observation of saved metadata, not a complete activation diagnosis.
+The SDK package is built from the vendored source and the AI Accounts plugin links to that local package. Its typecheck/build and a clean disposable-profile boot have passed. Those checks do not prove that the still-running `web` GUI has loaded the settings page; see the progress ledger for the exact boundary.
 
 Official fnm Node `22.23.3` was selected explicitly for `dsh --version`, which returned `0.2.0-rc.2`. The ordinary shell initially resolved Node `24.20.0`, different from `.node-version`. `--dump-config` unexpectedly prepares/writes the profile's generated `cordis.yml` and was stopped by the filesystem sandbox. No claim is made that the current live slot tree or plugin activation was verified. Source/contracts are sufficient for this architecture deliverable; live composition checks remain slice acceptance gates.
 
