@@ -76,7 +76,9 @@ export const aiAccountsTool = defineTool({
         identity: account.identity,
         plan: account.plan,
         state: account.state,
-        home: account.effectiveHomePath,
+        home: account.kind === 'codex'
+          ? (account.shadowHomePath === '' ? account.homePath : account.shadowHomePath)
+          : account.apiBaseUrl,
         mode: account.mode,
       })),
     }

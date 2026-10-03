@@ -86,6 +86,18 @@ and immutable filters, date and text search, and clear markers for the working
 copy revision and editing state. Keep Jujutsu as the source of truth. See
 [`14-jujutsu-revision-graph.png`](screenshots/14-jujutsu-revision-graph.png).
 
+The existing BB Jujutsu plugin README adds useful behavior beyond the screenshot:
+show bookmarks, tags, workspace labels, relative time, shortest unique change
+IDs, evolved-revision markers, and the last recorded Git push. Search revision
+descriptions and IDs as well as bookmarks and tags; group by day; let users hide
+immutable history while preserving ancestry in the graph. Expand revisions to
+edit their descriptions and inspect changed files with addition/deletion counts.
+The Source Control view follows the working copy through configurable `@-1`
+ancestor groups and supports full diffs, describe, split, and squash. Dragging a
+revision or bookmark should preview the proposed move and require confirmation
+before a rebase or bookmark mutation. The BB README is a behavior reference;
+implement against DSH's real Host services and events.
+
 ## Product decisions to carry forward
 
 - Reuse the project/folder picker instead of rebuilding project selection in

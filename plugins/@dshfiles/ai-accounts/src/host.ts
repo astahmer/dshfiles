@@ -1,10 +1,23 @@
 import z from '@deepseek-ai/schemastery'
-import { aiAccountsApi, type AccountsSnapshot } from './api.js'
-import { buildAccountsSnapshot } from './account-snapshot.js'
+import { aiAccountsApi, type AccountsFile } from './api.js'
+import {
+  buildAccountsFile,
+  readAccountFile,
+  readAccountFileSync,
+  readAccountIdentity,
+  removeAccount,
+  setDistribution,
+  upsertAccount,
+} from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import {
+  COMMANDCODE_KIND as CC_KIND,
+  DEFAULT_COMMANDCODE_KEY_ENV,
+  createCommandCodeProvider,
+} from './commandcode-provider.js'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -66,6 +79,7 @@ declare module '@deepseek-ai/cordis' {
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
+export const COMMANDCODE_KIND = CC_KIND
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -111,11 +125,18 @@ export interface CodexAccountConfig {
   readonly enabled: boolean
 }
 
-export interface OpenCodeAccountConfig {
+export interface KeyedAccountConfig {
   readonly instanceId: string
   readonly displayName: string
+  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND
+  /** Environment variable holding this account's key. */
+  readonly apiKeyEnv: string
+  /** Alternate API base, for a self-hosted or staging Command Code. */
+  readonly apiBaseUrl: string
   readonly enabled: boolean
 }
+
+export type OpenCodeAccountConfig = KeyedAccountConfig
 
 export interface AiAccountsConfig {
   readonly codexAccounts: readonly CodexAccountConfig[]
@@ -134,14 +155,16 @@ interface CodexRoute {
   readonly layout: CodexHomeLayout
 }
 
-interface OpenCodeRoute {
-  readonly kind: typeof OPENCODE_KIND
+interface KeyedRoute {
+  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND
   readonly instanceId: string
   readonly displayName: string
+  readonly apiKeyEnv: string
+  readonly apiBaseUrl: string
   readonly enabled: boolean
 }
 
-type Route = CodexRoute | OpenCodeRoute
+type Route = CodexRoute | KeyedRoute
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
@@ -209,11 +232,14 @@ const buildRoutes = (config: AiAccountsConfig): Map<string, Route> => {
     })
   }
   for (const account of config.opencodeAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, OPENCODE_KIND)
+    const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
+    const instanceId = normalizeInstanceId(account.instanceId, kind)
     routes.set(instanceId, {
-      kind: OPENCODE_KIND,
+      kind,
       instanceId,
-      displayName: displayNameFor(account.displayName, OPENCODE_KIND, instanceId),
+      displayName: displayNameFor(account.displayName, kind, instanceId),
+      apiKeyEnv: account.apiKeyEnv,
+      apiBaseUrl: account.apiBaseUrl,
       enabled: account.enabled,
     })
   }
@@ -248,27 +274,89 @@ export const Config = z.object({
   codexShadowRoot: z.string().default('').volatile(),
 })
 
-/** Live state the settings API and the status tool both read. */
+/** Live state the page and the status tool both read. */
 let activeAccounts: {
   config: AiAccountsConfig
   pool: ReturnType<typeof createAccountPool>
 } | undefined
 
-/** The one snapshot operation: what accounts exist, and how healthy they are. */
-export const accountsSnapshot = async (): Promise<AccountsSnapshot> => {
-  if (activeAccounts === undefined) {
-    return { distribution: 'sticky', distributions: [...DISTRIBUTIONS], cooldownMs: 0, accounts: [] }
-  }
-  return buildAccountsSnapshot({
-    config: activeAccounts.config,
-    statuses: activeAccounts.pool.describe(),
-    distributions: [...DISTRIBUTIONS],
-  })
-}
+/**
+ * The one read operation. Profiles come from the accounts file, joined with the
+ * pool's live health and each home's observed login, so the page and the agent's
+ * `ai_accounts` tool can never describe different state.
+ */
+const accountsFile = async (): Promise<AccountsFile> =>
+  buildAccountsFile(await readAccountFile(), activeAccounts?.pool.describe() ?? [])
+
+export const accountsSnapshot = accountsFile
 
 const accountsHostApi = aiAccountsApi.host({
-  snapshot: async () => accountsSnapshot(),
+  read: async () => {
+    // A changed file means changed routes, so rebuild before answering.
+    await refreshRoutes()
+    return accountsFile()
+  },
+  save: async ({ input }) => {
+    await upsertAccount(input.draft)
+    await refreshRoutes()
+    return accountsFile()
+  },
+  remove: async ({ input }) => {
+    await removeAccount(input.instanceId)
+    await refreshRoutes()
+    return accountsFile()
+  },
+  setDistribution: async ({ input }) => {
+    await setDistribution(input.distribution)
+    activeAccounts?.pool.setDistribution(input.distribution)
+    return accountsFile()
+  },
+  identity: async ({ input }) => readAccountIdentity(input.instanceId),
 })
+
+/**
+ * Rebuild provider routes from the accounts file.
+ *
+ * Routes are derived state, so editing a profile changes the model picker. The
+ * pool is reused across a rebuild so a rate-limited account stays cooling rather
+ * than being reset by an unrelated save, and only accounts whose identity or
+ * enabled flag actually changed are re-registered, because the adapter registry
+ * rejects a duplicate route for one already taken.
+ */
+const refreshRoutes = async (): Promise<void> => {
+  if (activeAccounts === undefined) return
+  const file = await readAccountFile()
+  const config: AiAccountsConfig = {
+    codexAccounts: file.accounts
+      .filter(account => account.kind === 'codex')
+      .map(account => ({
+        instanceId: account.instanceId,
+        displayName: account.displayName,
+        homePath: account.homePath,
+        shadowHomePath: account.shadowHomePath,
+        additionalModelIds: account.additionalModelIds,
+        enabled: account.enabled,
+      })),
+    opencodeAccounts: file.accounts
+      // Codex is handled separately; every other kind is a keyed API provider.
+      .filter((account): account is typeof account & { kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND } =>
+        account.kind !== 'codex')
+      .map(account => ({
+        instanceId: account.instanceId,
+        displayName: account.displayName,
+        kind: account.kind,
+        apiKeyEnv: account.apiKeyEnv,
+        apiBaseUrl: account.apiBaseUrl,
+        enabled: account.enabled,
+      })),
+    opencodeApiKey: '',
+    distribution: file.distribution,
+    cooldownMs: file.cooldownMs,
+    codexShadowRoot: file.shadowRoot,
+  }
+  activeAccounts.config = config
+  activeAccounts.pool.setDistribution(file.distribution)
+}
 
 export default definePlugin({
   id: 'llm-ai-accounts',
@@ -277,7 +365,8 @@ export default definePlugin({
   tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
-    const config = readConfig(api.config)
+    const file = readAccountFileSync()
+    const config = readConfig({ distribution: file.distribution, cooldownMs: file.cooldownMs, codexShadowRoot: file.shadowRoot, codexAccounts: file.accounts, opencodeAccounts: file.accounts })
     const routes = buildRoutes(config)
     if (routes.size === 0) return
     const enabled = [...routes].filter(([, route]) => route.enabled)
@@ -285,11 +374,20 @@ export default definePlugin({
 
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
+    // Each keyed provider is built with its own base and key variable, so two
+    // Command Code accounts can point at different deployments.
+    const keyedUpstream = (route: KeyedRoute) =>
+      route.kind === COMMANDCODE_KIND
+        ? createCommandCodeProvider({
+            baseUrl: route.apiBaseUrl,
+            keyEnv: route.apiKeyEnv,
+          })
+        : opencodeUpstream
     const profiles = new Map<string, ResolvedPiAiProviderProfile>(
       enabled.map(([id, route]) => [
         id,
         buildProfile({
-          upstream: route.kind === CODEX_KIND ? codexUpstream : opencodeUpstream,
+          upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
           provider: id,
           displayName: route.displayName,
           additionalModelIds:
@@ -323,10 +421,17 @@ export default definePlugin({
           await materializeCodexShadowHome(route.layout)
           return readCodexAccessToken(route.layout.effectiveHomePath)
         }
-        const key = config.opencodeApiKey.trim()
+        // Keyed providers read the variable their own account names, so several
+        // subscriptions live in the vault without any value in the accounts file.
+        const named = route.apiKeyEnv.trim().length > 0
+          ? route.apiKeyEnv.trim()
+          : route.kind === COMMANDCODE_KIND
+            ? DEFAULT_COMMANDCODE_KEY_ENV
+            : 'OPENCODE_API_KEY'
+        const key = ((process.env[named] ?? '') || config.opencodeApiKey).trim()
         if (key.length === 0) {
           throw new LlmError(
-            `No OpenCode Go key configured for '${provider}'. Set ai-accounts.opencodeApiKey, or export OPENCODE_API_KEY.`,
+            `No key for '${provider}'. Export ${named}, or set a shared key on the entry.`,
             'MISSING_CREDENTIAL',
           )
         }
@@ -484,18 +589,22 @@ const readConfig = (input: Record<string, unknown>): AiAccountsConfig => {
       enabled: record.enabled !== false,
     }
   }
-  const toOpenCode = (value: unknown): OpenCodeAccountConfig => {
+  const toKeyed = (value: unknown): KeyedAccountConfig => {
     const record = (value ?? {}) as Record<string, unknown>
+    const kind = record.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
     return {
-      instanceId: typeof record.instanceId === 'string' ? record.instanceId : OPENCODE_KIND,
+      instanceId: typeof record.instanceId === 'string' ? record.instanceId : kind,
       displayName: typeof record.displayName === 'string' ? record.displayName : '',
+      kind,
+      apiKeyEnv: typeof record.apiKeyEnv === 'string' ? record.apiKeyEnv : '',
+      apiBaseUrl: typeof record.apiBaseUrl === 'string' ? record.apiBaseUrl : '',
       enabled: record.enabled !== false,
     }
   }
   const distribution = raw.distribution
   return {
     codexAccounts: accounts.length === 0 ? defaultConfig.codexAccounts : accounts.map(toCodex),
-    opencodeAccounts: opencode.map(toOpenCode),
+    opencodeAccounts: opencode.map(toKeyed),
     opencodeApiKey:
       typeof raw.opencodeApiKey === 'string' && raw.opencodeApiKey.length > 0
         ? raw.opencodeApiKey

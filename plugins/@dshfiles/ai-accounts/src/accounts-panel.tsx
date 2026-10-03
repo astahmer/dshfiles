@@ -1,0 +1,554 @@
+import { useApi } from '@dshfiles/dshx/client'
+import {
+  PROVIDER_ICONS,
+  aiAccountsApi,
+  type AccountDraft,
+  type AccountProfile,
+  type AccountsFile,
+} from './api.js'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import styles from './accounts.module.css'
+
+/**
+ * The accounts panel, in the shape of the reference account page: a list of
+ * toggleable providers on one side, the selected provider's editable settings
+ * on the other.
+ *
+ * Every write goes through the Host, which also owns the file, so the page and an
+ * agent share one source of truth. Nothing here holds a credential: an account
+ * shows whether it holds a login, who that login belongs to, and the exact
+ * command that creates one.
+ */
+
+const KIND_LABEL: Record<AccountProfile['kind'], string> = {
+  codex: 'Codex',
+  'opencode-go': 'OpenCode Go',
+  commandcode: 'Command Code',
+}
+
+const STATE_LABEL: Record<AccountProfile['state'], string> = {
+  healthy: 'Authenticated',
+  cooling: 'Rate limited',
+  disabled: 'Off',
+  unconfigured: 'Not signed in',
+}
+
+const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = [
+  'sticky',
+  'priority',
+  'round-robin',
+  'balanced',
+]
+
+const DISTRIBUTION_HINT: Record<AccountsFile['distribution'], string> = {
+  sticky: 'One account per conversation, so the upstream prompt cache stays warm. A rate-limited account is skipped and the retry lands on the next one.',
+  priority: 'Drain one account until it is rate-limited, then the next in order.',
+  'round-robin': 'Rotate on every request so spend spreads evenly.',
+  balanced: 'Weighted random, biased toward the least recently used account.',
+}
+
+/** A blank account of the requested kind, with the shared Codex home default. */
+const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
+  instanceId: '',
+  kind,
+  displayName: '',
+  enabled: true,
+  homePath: '~/.codex',
+  shadowHomePath: '',
+  apiKeyEnv: '',
+  apiBaseUrl: '',
+  badge: '',
+  accentColor: '#2563EB',
+  providerIcon: PROVIDER_ICONS[0],
+  additionalModelIds: [],
+})
+
+const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
+  profile.instanceId === draft.instanceId
+  && profile.kind === draft.kind
+  && profile.displayName === draft.displayName
+  && profile.enabled === draft.enabled
+  && profile.homePath === draft.homePath
+  && profile.shadowHomePath === draft.shadowHomePath
+  && profile.apiKeyEnv === draft.apiKeyEnv
+  && profile.badge === draft.badge
+  && profile.accentColor === draft.accentColor
+  && profile.providerIcon === draft.providerIcon
+  && profile.additionalModelIds.join() === draft.additionalModelIds.join()
+
+const Field = (props: {
+  readonly label: string
+  readonly hint?: string
+  readonly children: JSX.Element
+}): JSX.Element => (
+  <label className={styles.field}>
+    <span className={styles.fieldLabel}>{props.label}</span>
+    {props.children}
+    {props.hint === undefined ? null : <span className={styles.fieldHint}>{props.hint}</span>}
+  </label>
+)
+
+export const AccountsPanel = (): JSX.Element => {
+  const accounts = useApi(aiAccountsApi)
+  const [file, setFile] = useState<AccountsFile | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<AccountDraft | null>(null)
+  const [addingKind, setAddingKind] = useState<AccountProfile['kind'] | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    const next = await accounts.read()
+    setFile(next)
+    setSelectedId(current => current ?? next.accounts[0]?.instanceId ?? null)
+  }, [accounts])
+
+  useEffect(() => {
+    void load().catch(() => setNotice('The account host did not answer.'))
+  }, [load])
+
+  const selected = useMemo(
+    () => file?.accounts.find(account => account.instanceId === selectedId) ?? null,
+    [file, selectedId],
+  )
+
+  // The editor follows the selection, and keeps unsaved edits across re-reads.
+  useEffect(() => {
+    if (selected === null) {
+      setDraft(null)
+      return
+    }
+    setDraft(current =>
+      current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current)
+        ? current
+        : { ...selected },
+    )
+  }, [selected])
+
+  const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
+
+  const save = async (next: AccountDraft) => {
+    setSaving(true)
+    setNotice(null)
+    try {
+      setFile(await accounts.save({ draft: next }))
+      setSelectedId(next.instanceId)
+      setNotice(`Saved ${next.instanceId}.`)
+    } catch (error) {
+      setNotice(`Could not save: ${String(error)}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleEnabled = async (profile: AccountProfile) => {
+    setFile(await accounts.save({ draft: { ...profile, enabled: !profile.enabled } }))
+  }
+
+  const remove = async (profile: AccountProfile) => {
+    setFile(await accounts.remove({ instanceId: profile.instanceId }))
+    setSelectedId(current => (current === profile.instanceId ? null : current))
+    setNotice(`Removed ${profile.instanceId}.`)
+  }
+
+  /**
+   * While an account has no login, poll for one: the user signs in with the
+   * command shown, and the card refreshes as soon as Codex writes the file.
+   */
+  useEffect(() => {
+    if (selected === null || selected.signedIn || selected.kind !== 'codex') return
+    let cancelled = false
+    const check = async () => {
+      const identity = await accounts.identity({ instanceId: selected.instanceId })
+      if (cancelled || !identity.signedIn) return
+      setFile(await accounts.read())
+    }
+    const timer = setInterval(() => void check().catch(() => undefined), 2500)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [accounts, selected])
+
+  if (file === null) {
+    return <div className={styles.notice}>{notice ?? 'Loading accounts…'}</div>
+  }
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div>
+          <h1 className={styles.title}>AI Accounts</h1>
+          <p className={styles.subtitle}>
+            Each account is its own model route. Editing a profile here updates the picker;
+            credentials stay in each provider&apos;s own home.
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <select
+            className={styles.distribution}
+            value={file.distribution}
+            onChange={event => {
+              const distribution = event.target.value as AccountsFile['distribution']
+              void accounts
+                .setDistribution({ distribution })
+                .then(setFile)
+                .catch(error => setNotice(`Could not change distribution: ${String(error)}`))
+            }}
+            aria-label="Request distribution"
+          >
+            {DISTRIBUTIONS.map(value => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => setAddingKind('codex')}
+          >
+            + Codex
+          </button>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => setAddingKind('opencode-go')}
+          >
+            + OpenCode
+          </button>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => setAddingKind('commandcode')}
+          >
+            + Command Code
+          </button>
+        </div>
+      </header>
+
+      <p className={styles.distributionHint}>{DISTRIBUTION_HINT[file.distribution]}</p>
+      {notice === null ? null : <p className={styles.notice}>{notice}</p>}
+
+      <div className={styles.split}>
+        <div className={styles.list}>
+          {file.accounts.length === 0 ? (
+            <p className={styles.empty}>No accounts yet. Add one to publish its model route.</p>
+          ) : null}
+          {file.accounts.map(profile => (
+            <button
+              type="button"
+              key={profile.instanceId}
+              className={
+                profile.instanceId === selectedId
+                  ? `${styles.card} ${styles.cardSelected}`
+                  : styles.card
+              }
+              onClick={() => setSelectedId(profile.instanceId)}
+            >
+              <span
+                className={styles.cardGlyph}
+                style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }}
+                aria-hidden
+              >
+                {profile.providerIcon.slice(0, 2).toUpperCase()}
+              </span>
+              <span className={styles.cardBody}>
+                <span className={styles.cardTitle}>
+                  <span className={styles.cardName}>{profile.displayName}</span>
+                  {profile.badge === '' ? null : (
+                    <span className={styles.badge}>{profile.badge}</span>
+                  )}
+                </span>
+                <span className={styles.cardRoute}>{profile.instanceId}</span>
+                <span
+                  className={
+                    profile.state === 'healthy'
+                      ? styles.stateOk
+                      : profile.state === 'cooling'
+                        ? styles.stateWarn
+                        : styles.stateIdle
+                  }
+                >
+                  {STATE_LABEL[profile.state]}
+                  {profile.plan === null ? '' : ` · ${profile.plan}`}
+                </span>
+              </span>
+              <span
+                className={styles.switch}
+                role="switch"
+                aria-checked={profile.enabled}
+                aria-label={`Enable ${profile.displayName}`}
+                tabIndex={0}
+                onClick={event => {
+                  event.stopPropagation()
+                  void toggleEnabled(profile)
+                }}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  void toggleEnabled(profile)
+                }}
+              >
+                <span className={profile.enabled ? styles.knobOn : styles.knobOff} />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.detail}>
+          {addingKind === null && draft === null ? (
+            <p className={styles.empty}>Select an account to edit it.</p>
+          ) : null}
+
+          {addingKind === null && draft !== null ? (
+            <>
+              <h2 className={styles.detailTitle}>{draft.displayName || draft.instanceId}</h2>
+              <p className={styles.detailSub}>
+                {KIND_LABEL[draft.kind]} · {draft.kind === 'codex' ? 'Shared state, private auth' : 'API key from the environment'}
+              </p>
+
+              <Field label="Route slug" hint="Letters, digits, dash and underscore. Appears as the provider in the model picker.">
+                <input
+                  className={styles.input}
+                  value={draft.instanceId}
+                  onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
+                />
+              </Field>
+
+              <Field label="Display name">
+                <input
+                  className={styles.input}
+                  value={draft.displayName}
+                  placeholder={KIND_LABEL[draft.kind]}
+                  onChange={event => setDraft({ ...draft, displayName: event.target.value })}
+                />
+              </Field>
+
+              <Field label="Badge" hint="Short tag shown beside the name, e.g. work.">
+                <input
+                  className={styles.input}
+                  value={draft.badge}
+                  onChange={event => setDraft({ ...draft, badge: event.target.value })}
+                />
+              </Field>
+
+              <Field label="Accent color">
+                <input
+                  className={styles.input}
+                  value={draft.accentColor}
+                  onChange={event => setDraft({ ...draft, accentColor: event.target.value })}
+                />
+              </Field>
+
+              <Field label="Icon">
+                <select
+                  className={styles.input}
+                  value={draft.providerIcon}
+                  onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}
+                >
+                  {PROVIDER_ICONS.map(icon => (
+                    <option key={icon} value={icon}>
+                      {icon}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {draft.kind === 'codex' ? (
+                <>
+                  <Field label="CODEX_HOME path" hint="Where shared sessions, skills and plugins live.">
+                    <input
+                      className={styles.input}
+                      value={draft.homePath}
+                      onChange={event => setDraft({ ...draft, homePath: event.target.value })}
+                    />
+                  </Field>
+                  <Field
+                    label="Shadow home path"
+                    hint="Account-specific home. Keeps auth.json separate while sharing state. Leave empty for one under the shadow root."
+                  >
+                    <input
+                      className={styles.input}
+                      value={draft.shadowHomePath}
+                      onChange={event => setDraft({ ...draft, shadowHomePath: event.target.value })}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field
+                    label="API key environment variable"
+                    hint="Named, not valued: the key never enters this file."
+                  >
+                    <input
+                      className={styles.input}
+                      value={draft.apiKeyEnv}
+                      placeholder={
+                        draft.kind === 'commandcode'
+                          ? 'COMMANDCODE_API_KEY'
+                          : 'OPENCODE_API_KEY'
+                      }
+                      onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
+                    />
+                  </Field>
+                  {draft.kind === 'commandcode' ? (
+                    <Field
+                      label="API base URL"
+                      hint="Leave empty for Command Code's own deployment."
+                    >
+                      <input
+                        className={styles.input}
+                        value={draft.apiBaseUrl}
+                        placeholder="https://api.commandcode.ai"
+                        onChange={event => setDraft({ ...draft, apiBaseUrl: event.target.value })}
+                      />
+                    </Field>
+                  ) : null}
+                </>
+              )}
+
+              <div className={styles.detailActions}>
+                <button
+                  type="button"
+                  className={styles.primary}
+                  disabled={!dirty || saving || draft.instanceId.trim().length === 0}
+                  onClick={() => void save(draft)}
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => setDraft(selected === null ? null : { ...selected })}
+                  disabled={!dirty}
+                >
+                  Revert
+                </button>
+                <button
+                  type="button"
+                  className={styles.danger}
+                  onClick={() => selected !== null && void remove(selected)}
+                >
+                  Remove
+                </button>
+              </div>
+
+              {selected !== null && selected.kind === 'codex' ? (
+                <div className={styles.status}>
+                  <div>
+                    <span className={styles.statusLabel}>Home</span>
+                    <span className={styles.statusValue}>
+                      {selected.homePath === '' ? '~/.codex' : selected.homePath}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Mode</span>
+                    <span className={styles.statusValue}>
+                      {selected.mode === 'authOverlay' ? 'Shared state, private auth' : 'Direct'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Account</span>
+                    <span className={styles.statusValue}>
+                      {selected.identity ?? (selected.signedIn ? 'signed in' : 'not signed in')}
+                    </span>
+                  </div>
+                  {selected.signedIn ? null : (
+                    <p className={styles.loginHint}>
+                      Sign in with <code>{selected.loginHint}</code>
+                    </p>
+                  )}
+                  {selected.detail === null ? null : (
+                    <p className={styles.warnText}>{selected.detail}</p>
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {addingKind !== null ? (
+            <>
+              <h2 className={styles.detailTitle}>New {KIND_LABEL[addingKind]} account</h2>
+              <p className={styles.detailSub}>
+                Give it a route slug; each account becomes its own provider in the picker.
+              </p>
+              <NewAccountForm
+                kind={addingKind}
+                onCancel={() => setAddingKind(null)}
+                onCreate={async draft => {
+                  setAddingKind(null)
+                  setSelectedId(draft.instanceId)
+                  await save(draft)
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const NewAccountForm = (props: {
+  readonly kind: AccountProfile['kind']
+  readonly onCancel: () => void
+  readonly onCreate: (draft: AccountDraft) => Promise<void>
+}): JSX.Element => {
+  const [draft, setDraft] = useState<AccountDraft>(() => blankAccount(props.kind))
+  const invalid = draft.instanceId.trim().length === 0
+  return (
+    <>
+      <Field label="Route slug" hint="For example codex_work.">
+        <input
+          className={styles.input}
+          value={draft.instanceId}
+          placeholder="codex_work"
+          onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
+        />
+      </Field>
+      <Field label="Display name">
+        <input
+          className={styles.input}
+          value={draft.displayName}
+          placeholder={KIND_LABEL[props.kind]}
+          onChange={event => setDraft({ ...draft, displayName: event.target.value })}
+        />
+      </Field>
+      {props.kind === 'codex' ? (
+        <Field label="CODEX_HOME path" hint="Where shared sessions and skills live.">
+          <input
+            className={styles.input}
+            value={draft.homePath}
+            onChange={event => setDraft({ ...draft, homePath: event.target.value })}
+          />
+        </Field>
+      ) : (
+        <Field label="API key environment variable">
+          <input
+            className={styles.input}
+            value={draft.apiKeyEnv}
+            placeholder="OPENCODE_API_KEY"
+            onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
+          />
+        </Field>
+      )}
+      <div className={styles.detailActions}>
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={invalid}
+          onClick={() => void props.onCreate(draft)}
+        >
+          Create
+        </button>
+        <button type="button" className={styles.secondary} onClick={props.onCancel}>
+          Cancel
+        </button>
+      </div>
+    </>
+  )
+}
+
+import { aiAccountsApi as api } from './api.js'
