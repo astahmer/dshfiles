@@ -1,6 +1,7 @@
 import z from '@deepseek-ai/schemastery'
 import { aiAccountsApi, type AccountsSnapshot } from './api.js'
 import { buildAccountsSnapshot } from './account-snapshot.js'
+import { aiAccountsTool } from './accounts-tool.js'
 import { defineHost, definePlugin } from '@becomeopc/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -273,6 +274,7 @@ export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer'],
   apis: [accountsHostApi],
+  tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
     const config = readConfig(api.config)
