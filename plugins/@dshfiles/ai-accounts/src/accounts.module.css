@@ -159,3 +159,73 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
+
+.usageCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.usageWindow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.usageRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.usageLabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.usagePercent {
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.usageTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-base);
+  overflow: hidden;
+}
+
+.usageBar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+.barOk {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.barLow {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.barCritical {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+.usageReset {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.usageBanked {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}

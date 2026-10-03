@@ -2,6 +2,8 @@ import { useApi } from '@dshfiles/dshx/client'
 import {
   PROVIDER_ICONS,
   aiAccountsApi,
+  type AccountsUsage,
+  type UsageCard,
   type AccountDraft,
   type AccountProfile,
   type AccountsFile,
@@ -88,8 +90,58 @@ const Field = (props: {
   </label>
 )
 
+
+/** Percent remaining, coloured by how much is left rather than by provider. */
+const remainingTone = (percent: number): string =>
+  percent <= 10
+    ? String(styles.barCritical)
+    : percent <= 30
+      ? String(styles.barLow)
+      : String(styles.barOk)
+
+const formatReset = (resetsAt: number | null): string | null => {
+  if (resetsAt === null || Number.isNaN(resetsAt)) return null
+  const minutes = Math.max(0, Math.round((resetsAt - Date.now()) / 60_000))
+  if (minutes < 60) return `Resets in ${String(minutes)}m`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `Resets in ${String(hours)}h`
+  return `Resets in ${String(Math.round(hours / 24))}d`
+}
+
+const UsageCardView = (props: {
+  readonly usage: UsageCard | undefined
+}): JSX.Element | null => {
+  const usage = props.usage
+  if (usage === undefined || usage.status !== 'ok' || usage.windows.length === 0) return null
+  return (
+    <div className={styles.usageCard}>
+      {usage.windows.map(window => (
+        <div className={styles.usageWindow} key={window.label}>
+          <div className={styles.usageRow}>
+            <span className={styles.usageLabel}>{window.label}</span>
+            <span className={styles.usagePercent}>{window.percentRemaining}% left</span>
+          </div>
+          <div className={styles.usageTrack}>
+            <div
+              className={`${styles.usageBar} ${remainingTone(window.percentRemaining)}`}
+              style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
+            />
+          </div>
+          {formatReset(window.resetsAt) === null ? null : (
+            <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>
+          )}
+        </div>
+      ))}
+      {usage.bankedResets > 0 ? (
+        <div className={styles.usageBanked}>{String(usage.bankedResets)} banked resets</div>
+      ) : null}
+    </div>
+  )
+}
+
 export const AccountsPanel = (): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
+  const [usage, setUsage] = useState<AccountsUsage | null>(null)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
@@ -106,6 +158,25 @@ export const AccountsPanel = (): JSX.Element => {
   useEffect(() => {
     void load().catch(() => setNotice('The account host did not answer.'))
   }, [load])
+
+  // Quota moves on its own, so refresh on an interval rather than per render.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      void accounts
+        .usage()
+        .then(next => {
+          if (!cancelled) setUsage(next)
+        })
+        .catch(() => undefined)
+    }
+    refresh()
+    const timer = setInterval(refresh, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [accounts])
 
   const selected = useMemo(
     () => file?.accounts.find(account => account.instanceId === selectedId) ?? null,
@@ -434,6 +505,10 @@ export const AccountsPanel = (): JSX.Element => {
                   Remove
                 </button>
               </div>
+
+              <UsageCardView
+                usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage}
+              />
 
               {selected !== null && selected.kind === 'codex' ? (
                 <div className={styles.status}>

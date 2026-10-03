@@ -69,6 +69,37 @@ export const accountsFileSchema = z.object({
   accounts: z.array(accountProfileSchema).max(64),
 })
 
+export const usageCardSchema = z.object({
+  status: z.enum(['ok', 'unauthenticated', 'unsupported', 'rate-limited', 'error']),
+  message: z.string().max(300).nullable(),
+  identity: z.string().max(320).nullable(),
+  plan: z.string().max(64).nullable(),
+  windows: z
+    .array(
+      z.object({
+        label: z.string().max(32),
+        percentRemaining: z.number(),
+        resetsAt: z.number().nullable(),
+      }),
+    )
+    .max(6),
+  bankedResets: z.number().int().min(0).max(20),
+})
+
+export const accountsUsageSchema = z.object({
+  /** Read when the panel opened, so a full sweep is not made on every render. */
+  readAt: z.number(),
+  cards: z.array(
+    z.object({
+      instanceId: z.string().min(1).max(64),
+      usage: usageCardSchema,
+    }),
+  ),
+})
+
+export type UsageCard = z.infer<typeof usageCardSchema>
+export type AccountsUsage = z.infer<typeof accountsUsageSchema>
+
 export const identityResultSchema = z.object({
   instanceId: z.string().min(1).max(64),
   email: z.string().max(320).nullable(),
@@ -123,5 +154,11 @@ export const aiAccountsApi = defineApi({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: identityResultSchema,
     }),
+    /**
+     * Live subscription quota for every account. Each card is read with its own
+     * credential and a short timeout, so one unreachable provider degrades one
+     * card rather than the panel.
+     */
+    usage: method({ input: z.void(), output: accountsUsageSchema }),
   },
 })

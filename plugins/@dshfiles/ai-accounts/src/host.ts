@@ -1,5 +1,11 @@
 import z from '@deepseek-ai/schemastery'
-import { aiAccountsApi, type AccountsFile } from './api.js'
+import {
+  aiAccountsApi,
+  type AccountProfile,
+  type AccountsFile,
+  type AccountsUsage,
+  type UsageCard,
+} from './api.js'
 import {
   buildAccountsFile,
   readAccountFile,
@@ -10,6 +16,7 @@ import {
   upsertAccount,
 } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
+import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -312,7 +319,60 @@ const accountsHostApi = aiAccountsApi.host({
     return accountsFile()
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
+  usage: async () => readAccountsUsage(),
 })
+
+/**
+ * One account's live quota.
+ *
+ * A keyed provider reports against its own key, and Codex against the login in
+ * its own home. A provider with no reachable quota endpoint is reported as
+ * unsupported rather than failing the sweep.
+ */
+const readAccountUsage = async (account: AccountProfile): Promise<UsageCard> => {
+  if (account.kind === 'codex') {
+    return readCodexUsage(
+      resolveCodexHomeLayout({
+        homePath: account.homePath,
+        shadowHomePath: account.shadowHomePath,
+      }).effectiveHomePath,
+    )
+  }
+  if (account.kind === 'commandcode') return unsupported()
+  const keyEnv = account.apiKeyEnv.trim()
+  return readOpenCodeUsage(
+    keyEnv.length === 0 ? '' : (process.env[keyEnv] ?? ''),
+  )
+}
+
+const unsupported = (): UsageCard => ({
+  status: 'unsupported',
+  message: null,
+  identity: null,
+  plan: null,
+  windows: [],
+  bankedResets: 0,
+})
+
+/**
+ * Live quota for every account, read with each account's own credential.
+ *
+ * One sweep covers the whole panel: the Client renders it as cards and refreshes
+ * on an interval, so a provider that is slow or down costs its own card rather
+ * than the panel.
+ */
+const readAccountsUsage = async (): Promise<AccountsUsage> => {
+  // Read the observed file so a Codex account uses the same shadow home the
+  // panel already shows, not a re-derived guess.
+  const file = await accountsFile()
+  const cards = await Promise.all(
+    file.accounts.map(async account => ({
+      instanceId: account.instanceId,
+      usage: await readAccountUsage(account),
+    })),
+  )
+  return { readAt: Date.now(), cards }
+}
 
 /**
  * Rebuild provider routes from the accounts file.
