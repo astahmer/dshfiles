@@ -208,10 +208,16 @@ the original package peer range did not claim DSH 0.2, and reimplementing its
 build and inspection tools would duplicate useful work.
 
 The fork is owned here as `@dshfiles/dshx`. It must not fetch or install
-`@becomeopc/dshx` from a registry. Plugins use the local workspace package or a
-local path. `tooling/dshx/FORK.md` records the source baseline, license, and
-attribution. Do not add a nested `.jj`/`.git`, upstream remote, or upstream
-bookmark; review DSH changes manually when the native contracts move.
+`@becomeopc/dshx` from a registry, and it has **no upstream remote at all**.
+Upstream went quiet for about a month and did not support the DSH generation
+this profile runs, so waiting on it cost more than owning the divergence. Do not
+re-add `origin`, do not fetch, and do not merge: if upstream ever ships DSH 0.2
+support worth having, add the remote deliberately at that moment and cherry-pick,
+then remove it again. `tooling/dshx/FORK.md` records the source baseline, license,
+attribution, and that recipe. Do not add a nested `.jj`/`.git`; review DSH changes
+manually when the native contracts move.
+
+Plugins link the local path, so the CLI a plugin builds with is always this tree.
 
 ```sh
 cd tooling/dshx

@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import { defineClient, defineLocale, defineSlot } from '@becomeopc/dshx/client'
+import { defineClient, defineLocale, defineSlot } from '@dshfiles/dshx/client'
 import { AccountsSection } from './accounts-section.js'
 import { aiAccountsLocale, AI_ACCOUNTS_LOCALE_NAMESPACE } from './locales.js'
 

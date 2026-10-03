@@ -1,4 +1,4 @@
-import { defineConfig } from '@becomeopc/dshx'
+import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/ai-accounts',

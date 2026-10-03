@@ -1,4 +1,4 @@
-import { defineTool } from '@becomeopc/dshx/host'
+import { defineTool } from '@dshfiles/dshx/host'
 
 /**
  * Read-only account report.

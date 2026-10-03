@@ -1,4 +1,4 @@
-import { defineApi, method } from '@becomeopc/dshx/api'
+import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
 /**

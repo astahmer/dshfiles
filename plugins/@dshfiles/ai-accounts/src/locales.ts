@@ -1,4 +1,4 @@
-import { defineLocale } from '@becomeopc/dshx/client'
+import { defineLocale } from '@dshfiles/dshx/client'
 
 export const AI_ACCOUNTS_LOCALE_NAMESPACE = 'settings.aiAccounts'
 

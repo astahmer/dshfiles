@@ -1,4 +1,4 @@
-import { useApiQuery } from '@becomeopc/dshx/client'
+import { useApiQuery } from '@dshfiles/dshx/client'
 import { aiAccountsApi, type AccountsSnapshot } from './api.js'
 import { accountsPage } from './accounts-view.js'
 import styles from './accounts.module.css'

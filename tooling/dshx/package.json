@@ -1,0 +1,108 @@
+{
+  "name": "dshx-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @dshfiles/dshx build && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx-plugin-marketplace build",
+    "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src packages/plugin-marketplace/src packages/plugin-marketplace/tests scripts && pnpm --filter @dshfiles/dshx-framework-hub lint && pnpm --filter @dshfiles/dshx-hub-cli lint",
+    "format:check": "prettier --check README.md README.zh-CN.md ROADMAP.md DECISIONS.md CHANGELOG.md CONTRIBUTING.md SECURITY.md RELEASING.md docs packages/*/README.md package.json pnpm-workspace.yaml .github renovate.json5 prettier.core.json && prettier --check eslint.config.js packages/dshx/src packages/create-dshx/src packages/plugin-marketplace/src packages/plugin-marketplace/tests packages/plugin-marketplace/*.ts scripts --config prettier.core.json",
+    "deps:check": "knip",
+    "audit:prod": "pnpm audit --prod --audit-level high",
+    "version:check": "node scripts/check-version-policy.mjs",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx-plugin-marketplace typecheck && pnpm --filter @dshfiles/dshx-plugin-marketplace test && pnpm --filter @dshfiles/dshx-plugin-marketplace check",
+    "check:ci": "pnpm run version:check && pnpm run lint && pnpm run format:check && pnpm run deps:check && pnpm run audit:prod && pnpm --filter @dshfiles/dshx-hub-ops-prompt lint && pnpm --filter @dshfiles/dshx build && pnpm -r --filter './packages/**' --filter './apps/**' typecheck && pnpm -r --filter './packages/**' --filter './apps/**' test",
+    "check:all": "pnpm run version:check && pnpm run lint && pnpm run format:check && pnpm run deps:check && pnpm run audit:prod && pnpm run check && pnpm run hub:check && pnpm run smoke:packages && pnpm run smoke:dsh && pnpm run smoke:marketplace",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "preview:enter": "changeset pre enter preview",
+    "release": "pnpm run release:preview",
+    "release:plan": "changeset publish-plan",
+    "release:preview:check": "node scripts/check-preview-release.mjs",
+    "release:preview": "pnpm run release:preview:check && changeset publish",
+    "phase-a:build": "pnpm run build && pnpm --filter @dshx/phase-a-fixture build",
+    "framework-hub:dev": "pnpm --filter @dshfiles/dshx-framework-hub dev",
+    "framework-hub:build": "pnpm --filter @dshfiles/dshx-framework-hub build",
+    "framework-hub:test": "pnpm --filter @dshfiles/dshx-framework-hub test",
+    "hub-cli:build": "pnpm --filter @dshfiles/dshx-hub-cli build",
+    "hub-cli:test": "pnpm --filter @dshfiles/dshx-hub-cli test",
+    "hub:check": "pnpm --filter @dshfiles/dshx-hub-ops-prompt typecheck && pnpm --filter @dshfiles/dshx-hub-ops-prompt lint && pnpm --filter @dshfiles/dshx-hub-ops-prompt test && pnpm --filter @dshfiles/dshx-hub-ops-prompt build && pnpm --filter @dshfiles/dshx-framework-hub typecheck && pnpm --filter @dshfiles/dshx-framework-hub lint && pnpm --filter @dshfiles/dshx-framework-hub test && pnpm --filter @dshfiles/dshx-framework-hub build && pnpm --filter @dshfiles/dshx-hub-cli typecheck && pnpm --filter @dshfiles/dshx-hub-cli lint && pnpm --filter @dshfiles/dshx-hub-cli test && pnpm --filter @dshfiles/dshx-hub-cli build && pnpm --filter @dshfiles/dshx-plugin-marketplace typecheck && pnpm --filter @dshfiles/dshx-plugin-marketplace test && pnpm --filter @dshfiles/dshx-plugin-marketplace build",
+    "hub:deploy:check": "pnpm run check:all && pnpm --filter @dshfiles/dshx-framework-hub deploy:check",
+    "hub:deploy": "pnpm run hub:deploy:check && pnpm --filter @dshfiles/dshx-framework-hub db:migrate:remote && pnpm --filter @dshfiles/dshx-framework-hub deploy:worker && node scripts/smoke-hub.mjs https://dshx.io",
+    "hub:smoke:published": "node scripts/smoke-hub.mjs https://dshx.io --require-marketplace-plugin",
+    "hub:content:maintain": "node scripts/maintain-hub-catalog-content.ts",
+    "hub:catalog:import:public": "pnpm hub-cli:build && node scripts/import-dshmk-catalog.ts",
+    "seo:indexnow": "node scripts/submit-indexnow.mjs",
+    "smoke:packages": "node scripts/smoke-packages.mjs",
+    "test": "pnpm --filter @dshfiles/dshx test",
+    "typecheck": "pnpm --filter @dshfiles/dshx typecheck",
+    "compatibility:matrix": "pnpm --filter @dshfiles/dshx build && node scripts/compatibility-matrix.mjs",
+    "smoke:dsh": "pnpm run build && node scripts/smoke-dsh.mjs",
+    "smoke:marketplace": "pnpm --filter @dshfiles/dshx-plugin-marketplace build && pnpm --dir packages/plugin-marketplace exec vitest run --config vitest.smoke.config.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@changesets/cli": "^3.0.1",
+    "@eslint/js": "^9.32.0",
+    "@playwright/cli": "0.1.18",
+    "@types/node": "catalog:",
+    "eslint": "^9.32.0",
+    "globals": "^15.15.0",
+    "knip": "6.32.2",
+    "prettier": "catalog:",
+    "publint": "0.3.24",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "catalog:"
+  },
+  "pnpm": {
+    "overrides": {
+      "@esbuild-kit/core-utils>esbuild": "0.25.12",
+      "postcss>nanoid": "3.3.18",
+      "@deepseek-ai/cordis": "4.0.4",
+      "@deepseek-ai/cordis-plugin-include": "1.0.9",
+      "@deepseek-ai/cordis-plugin-loader": "1.0.5"
+    },
+    "packageExtensions": {
+      "@deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-ui-chat@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-ui-conversation@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      },
+      "@deepseek-ai/dsh-client-locale@0.2.0-rc.2": {
+        "dependencies": {
+          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
+        }
+      }
+    }
+  }
+}

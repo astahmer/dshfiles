@@ -46,7 +46,7 @@
     "@deepseek-ai/dsh-host-webserver": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
-    "@becomeopc/dshx": "link:../../../forks/dshx-fork/packages/dshx",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
     "@deepseek-ai/dsh-llm": "0.2.0-rc.2",

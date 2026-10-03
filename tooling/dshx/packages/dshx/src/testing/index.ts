@@ -1,0 +1,101 @@
+/** Node-only utilities using native Cordis and DSH registries, never a substitute plugin runtime. */
+import { Context, type Fiber } from '@deepseek-ai/cordis'
+import { CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { createHostModule, createHostPlugin } from '../host/runtime.js'
+import { createClientModule, createClientPlugin } from '../client/runtime.js'
+import { createClientModuleLoader } from './client-module.js'
+
+export interface MountedPlugin {
+  readonly ctx: Context
+  readonly fiber: Fiber
+  dispose(): Promise<void>
+  reload(): Promise<void>
+}
+
+export interface TestHost {
+  readonly ctx: Context
+  readonly commands: Pick<CommandRuntime, 'find'> & {
+    get(name: string): ReturnType<CommandRuntime['find']>
+  }
+  readonly tools: ToolRuntime
+  mount(definition: unknown, options?: { readonly packageId?: string; readonly native?: boolean }): Promise<MountedPlugin>
+  dispose(): Promise<void>
+}
+
+function mounted(fiber: Fiber): MountedPlugin {
+  if (fiber.state !== 2) throw new Error(`Plugin failed to activate (native fiber state ${fiber.state}). Check its required services and startup error.`)
+  return {
+    ctx: fiber.ctx,
+    fiber,
+    dispose: fiber.dispose,
+    reload: () => fiber.restart(),
+  }
+}
+
+/** Native commands, tools and prompts without model calls, a profile, or a DSH process. */
+export async function createTestHost(): Promise<TestHost> {
+  const ctx = new Context()
+  const providers = [ctx.plugin(CommandRuntime), ctx.plugin(SystemPrompt), ctx.plugin(ToolRuntime)]
+  await Promise.all(providers)
+  const commands = ctx.commands
+  const agent = { ctx } as Parameters<CommandRuntime['find']>[0]
+  return {
+    ctx,
+    tools: ctx.tools,
+    commands: {
+      find: (agent, name) => commands.find(agent, name),
+      get: name => commands.find(agent, name),
+    },
+    async mount(definition, options = {}) {
+      const metadata = { packageId: options.packageId ?? '@test/plugin' }
+      const plugin = options.native ? createHostModule(definition as Record<string, unknown>, metadata) : createHostPlugin(definition, metadata)
+      const fiber = ctx.plugin(plugin)
+      await fiber
+      return mounted(fiber)
+    },
+    dispose: () => ctx.fiber.dispose(),
+  }
+}
+
+export interface TestClient {
+  readonly ctx: Context
+  /** The real renderer-owned registry, including declaration-collapse behavior. */
+  readonly slots: SlotRegistry
+  mount(definition: unknown, options?: { readonly packageId?: string; readonly native?: boolean }): Promise<MountedPlugin>
+  dispose(): Promise<void>
+}
+
+/**
+ * Native slots in Node, without React mounting. Declare test-owned root children
+ * through client.slots.register before asserting contributions. For browser rendering,
+ * use your normal React test library and the real application's standard props.
+ */
+export async function createTestClient(): Promise<TestClient> {
+  const ctx = new Context()
+  const load = createClientModuleLoader()
+  const native = load('@deepseek-ai/dsh-client-ui-renderer/client') as typeof import('@deepseek-ai/dsh-client-ui-renderer/client')
+  await ctx.plugin(native.SlotRegistry)
+  return {
+    ctx,
+    slots: ctx.slots,
+    async mount(definition, options = {}) {
+      const metadata = { packageId: options.packageId ?? '@test/plugin' }
+      const plugin = options.native ? createClientModule(definition as Record<string, unknown>, metadata) : createClientPlugin(definition, metadata)
+      const fiber = ctx.plugin(plugin as Parameters<Context['plugin']>[0])
+      await fiber
+      return mounted(fiber)
+    },
+    dispose: () => ctx.fiber.dispose(),
+  }
+}
+
+export async function mountPlugin(
+  host: TestHost | TestClient,
+  definition: unknown,
+  options?: { readonly packageId?: string; readonly native?: boolean },
+): Promise<MountedPlugin> {
+  return host.mount(definition, options)
+}
