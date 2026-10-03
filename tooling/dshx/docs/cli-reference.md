@@ -166,3 +166,23 @@ second copy of a surface the Host already owns.
 
 `dshx add ui --slot <name>` reads the same table and writes those imports, so the
 generated entry compiles as written.
+
+### `dshx add panel` / `dshx add api`
+
+Scaffold the two contributions that follow a slot in every real plugin.
+
+```bash
+dshx add panel --id usage      # panel component, its stylesheet, the client entry shape
+dshx add api   --id usage      # zod contract plus the Host handler that serves it
+dshx add tool  --name report   # a tool with the fields it needs to be offered
+```
+
+`add ui` covers one slot. These cover the rest: a panel is a sidebar row **and** a
+main view, and emitting only the row leaves a button that goes nowhere; an API is a
+contract **and** the handler, and emitting only one leaves the other uncalled. The
+generated panel includes the type-only imports that make `sidebar.panellist` and
+`main` typecheck, and the generated tool declares `output.schema` and
+`output.render`, without which a registered tool is never offered to the model with a
+usable shape.
+
+Presets refuse to overwrite an existing file, and `--dry-run` reports the paths.

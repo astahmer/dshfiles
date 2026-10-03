@@ -17,7 +17,7 @@ export type CliCommand =
   | 'commands'
   | 'config'
 export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events'
-export type CliAddTarget = 'ui' | 'tool' | 'command' | 'hook'
+export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
 
 export interface CliArgs {
   readonly command?: CliCommand
@@ -231,7 +231,7 @@ export const dshxCommand = defineCommand({
     add: defineCommand({
       meta: {
         name: 'add',
-        description: 'Scaffold a UI, Tool, Command, or Hook contribution.',
+        description: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
       },
       args: sharedArgs,
     }),
@@ -415,9 +415,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
     throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
   if (command === 'add' && addTarget === undefined && !help && !version) throw new CliUsageError('Add requires a target: ui, tool, command, or hook.')
-  if (command === 'add' && addTarget !== 'ui' && addTarget !== 'tool' && addTarget !== 'command' && addTarget !== 'hook')
+  if (command === 'add' && addTarget !== 'ui' && addTarget !== 'panel' && addTarget !== 'api' && addTarget !== 'tool' && addTarget !== 'command' && addTarget !== 'hook')
     throw new CliUsageError('Only add ui, add tool, add command, and add hook are supported.')
-  if (command === 'add' && addTarget !== 'ui' && (slot !== undefined || provider !== undefined || id !== undefined || order !== undefined))
+  if (command === 'add' && addTarget !== 'ui' && addTarget !== 'panel' && addTarget !== 'api' && (slot !== undefined || provider !== undefined || order !== undefined))
     throw new CliUsageError('Slot options are only valid with add ui.')
   if (command === 'add' && addTarget !== 'tool' && addTarget !== 'command' && (name !== undefined || description !== undefined))
     throw new CliUsageError('Name and description options are only valid with add tool or add command.')

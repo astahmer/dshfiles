@@ -1,3 +1,5 @@
+import { access, mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Readable, Writable } from 'node:stream'
 import { createRequire } from 'node:module'
@@ -884,6 +886,78 @@ function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record
   }
 }
 
+/**
+ * Scaffold a panel or an API preset.
+ *
+ * Both emit a whole shape rather than a fragment: a panel is a row and a view,
+ * and an API is a contract plus the handler that serves it. Emitting only half of
+ * either is what produces a row that goes nowhere or a handler nothing calls.
+ */
+const exists = async (path: string): Promise<boolean> => {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function runAddPreset(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
+  const io = options.io ?? defaultIO()
+  const preset = args.addTarget === 'panel' ? 'panel' : 'api'
+  let id = args.id ?? args.name
+  if (id === undefined && io.stdin.isTTY && !args.json) id = (await promptLine(io, `${preset} id: `)).trim()
+  if (id === undefined || id === '') {
+    const item = {
+      code: 'DSHX6301',
+      severity: 'error' as const,
+      message: `A ${preset} id is required.`,
+      file: project.packageFile,
+      hint: `Pass --id <slug>, or run in a TTY and enter a ${preset} id.`,
+    }
+    printDiagnostic(io, item)
+    return 2
+  }
+  const { presetFiles } = await import('../scaffold/presets.js')
+  const files = presetFiles({ preset, id, packageId: project.packageId })
+  const planned = files.map(file => ({
+    path: resolvePath(project.root, file.path),
+    create: file.content,
+  }))
+  if (!args.dryRun) {
+    for (const file of planned) {
+      if (await exists(file.path)) {
+        const item = {
+          code: 'DSHX6302',
+          severity: 'error' as const,
+          message: `${file.path} already exists.`,
+          file: file.path,
+          hint: 'Remove it or choose another id; the preset refuses to overwrite.',
+        }
+        printDiagnostic(io, item)
+        return 1
+      }
+    }
+    for (const file of planned) {
+      await mkdir(dirname(file.path), { recursive: true })
+      await writeFile(file.path, file.create, 'utf8')
+    }
+  }
+  if (args.json) {
+    write(
+      io.stdout,
+      `${JSON.stringify({ project: projectSummary(project), preset, id, generatedFiles: files.map(file => file.path), dryRun: args.dryRun }, null, 2)}\n`,
+    )
+    return 0
+  }
+  write(io.stdout, `${args.dryRun ? 'Planned' : 'Generated'} ${preset} ${id}\n`)
+  for (const file of planned) write(io.stdout, `  ${file.path}\n`)
+  if (preset === 'panel') {
+    write(io.stdout, 'Register the row and the view in src/client.tsx: see docs/cli-reference.md for the shape.\n')
+  }
+  return 0
+}
+
 async function runAddHook(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
   const runtime = options.runtime ?? {}
@@ -1120,7 +1194,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>\nadd targets: ui, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1173,6 +1247,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       if (args.addTarget === 'tool') return await runAddTool(args, options, project)
       if (args.addTarget === 'command') return await runAddCommand(args, options, project)
       if (args.addTarget === 'hook') return await runAddHook(args, options, project)
+      if (args.addTarget === 'panel' || args.addTarget === 'api') return await runAddPreset(args, options, project)
       return await runAddUi(args, options, project)
     }
     return await runDev(args, options, project)
