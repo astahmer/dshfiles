@@ -67,8 +67,8 @@ import { readCodexAccessToken } from './read-codex-token.js'
  * `ProviderDriverKind` / `ProviderInstanceId` pair, and it is what lets
  * `registerAdapter` take every route in a single call.
  *
- * Account layout and the shadow-home trick follow T3 Code; quota reporting is
- * inspired by the ai-accounts plugin we own for BB, reimplemented on DSH seams.
+ * Account layout and the shadow-home trick follow T3 Code's
+ * `provider/Drivers/CodexHomeLayout.ts`.
  */
 
 export const CODEX_KIND = 'codex'

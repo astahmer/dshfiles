@@ -13,10 +13,11 @@ Two kinds of work live here, and the distinction matters:
 - **Owning** a plugin that does not exist anywhere. Justified when a capability
   is genuinely unclaimed, not merely inconvenient to find.
 
-Reference material for the BB (Command Code) plugins we ported from lives in
-`../bb-plugins`. It is a **source of ideas and working code, not a spec** — DSH
-has different APIs, different boundaries, and a different plugin model. Do not
-assume a BB plugin's architecture carries over. Read its `README.md` for the
+Reference material we have ported from lives in `../bb-plugins`. It is a
+**source of ideas and working code, not a spec** — DSH has different APIs,
+different boundaries, and a different plugin model. Do not assume that project's
+architecture carries over, and do not carry its product names into ours: our
+plugins are named for what they do here. Read its `README.md` for the
 *behavior* worth keeping, then reimplement against the DSH API.
 
 ### When no plugin covers the need
