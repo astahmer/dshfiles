@@ -11,14 +11,6 @@
     "typescript"
   ],
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/liyown/dshx.git",
-    "directory": "packages/create-dshx"
-  },
-  "bugs": {
-    "url": "https://github.com/liyown/dshx/issues"
-  },
   "homepage": "https://dshx.io/docs",
   "publishConfig": {
     "access": "public"

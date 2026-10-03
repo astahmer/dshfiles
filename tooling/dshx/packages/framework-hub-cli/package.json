@@ -11,14 +11,6 @@
     "cli"
   ],
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/liyown/dshx.git",
-    "directory": "packages/framework-hub-cli"
-  },
-  "bugs": {
-    "url": "https://github.com/liyown/dshx/issues"
-  },
   "homepage": "https://dshx.io",
   "publishConfig": {
     "access": "public"

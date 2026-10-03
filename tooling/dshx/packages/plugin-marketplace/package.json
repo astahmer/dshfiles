@@ -13,14 +13,6 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/liyown/dshx.git",
-    "directory": "packages/plugin-marketplace"
-  },
-  "bugs": {
-    "url": "https://github.com/liyown/dshx/issues"
-  },
   "homepage": "https://dshx.io/plugins/dshx-plugin-marketplace",
   "publishConfig": {
     "access": "public"

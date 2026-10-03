@@ -14,14 +14,6 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/dshfiles/dshx-fork.git",
-    "directory": "packages/dshx"
-  },
-  "bugs": {
-    "url": "https://github.com/dshfiles/dshx-fork/issues"
-  },
   "homepage": "./README.md",
   "publishConfig": {
     "access": "public"
