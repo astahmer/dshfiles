@@ -414,6 +414,9 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
 export function platformHelp(args: CliArgs): string | undefined {
   const group = args.command
   const nested = args.platformArgs?.[0]
+  if (group === 'status') return 'Usage: dshx status [--url <launch-url>] [--json]\nChecks authenticated Session, plugin, and bundle APIs.\n'
+  if (group === 'info') return 'Usage: dshx info [--json]\nShows local DSHX and Node versions; it does not require a running DSH Host.\n'
+  if (group === 'doctor') return 'Usage: dshx doctor [--url <launch-url>] [--json]\nChecks local runtime facts and the DSH APIs available to this launch URL.\n'
   if (group === 'sessions') {
     if (nested === 'history') return 'Usage: dshx sessions history <session-id> [--max <count>] [--json]\n'
     return 'Usage: dshx sessions <list|show|history|create|fork|cancel|export> [session-id] [options]\nOptions: --cwd <path> --agent-preset <id> --at-seq <n> --max <count> --output <path> --url <launch-url> --json\n'

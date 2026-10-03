@@ -14,6 +14,7 @@ import {
 } from '../compiler/client/capabilities.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
+import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -412,6 +413,9 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
     ]
   }
   const manifest = value
+  // A Host-provided package in `dependencies` resolves a second copy and only
+  // fails at boot, so it is refused here where the fix can be spelled out.
+  diagnostics.push(...projectHostProvidedDependencyDiagnostics(manifest, config.packageFile))
   if (typeof manifest.name !== 'string' || manifest.name.trim() === '') {
     diagnostics.push(
       issue(

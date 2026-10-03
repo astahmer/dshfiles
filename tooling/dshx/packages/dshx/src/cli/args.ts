@@ -347,6 +347,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (fix && command !== 'check') throw new CliUsageError('DSHX4147: --fix is only valid with check.')
   if (runtime && command !== 'check') throw new CliUsageError('--runtime is only valid with check.')
   if (url !== undefined && !platformCommand) throw new CliUsageError('--url is only valid with DSH platform commands.')
+  if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create')) throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
   if (session !== undefined && command !== 'commands') throw new CliUsageError('--session is only valid with commands.')
   if (namespace !== undefined && command !== 'config') throw new CliUsageError('--namespace is only valid with config.')
   if (line !== undefined && command !== 'commands') throw new CliUsageError('--line is only valid with commands run.')
@@ -374,6 +375,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     const [action, commandName, ...extra] = platformArgs
     if (!['list', 'info', 'run'].includes(action ?? '')) throw new CliUsageError('commands requires list, info, or run.')
     if (session === undefined) throw new CliUsageError(`commands ${action} requires --session <id>.`)
+    if (line !== undefined && action !== 'run') throw new CliUsageError('--line is only valid with commands run.')
+    if (action === 'run' && line !== undefined && platformArgs.length > 1) throw new CliUsageError('Use either a command line argument or --line, not both.')
     if (action === 'info' && !commandName) throw new CliUsageError('commands info requires a command name.')
     if (action === 'run' && line === undefined && platformArgs.length < 2) throw new CliUsageError('commands run requires a slash-prefixed line or --line.')
     if (action !== 'run' && (commandName !== undefined || extra.length > 0)) throw new CliUsageError(`commands ${action} accepts no extra positional arguments.`)
@@ -382,6 +385,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     const [action, namespaceArg, path, ...extra] = platformArgs
     if (!['list', 'get', 'set', 'unset'].includes(action ?? '')) throw new CliUsageError('config requires list, get, set, or unset.')
     const selectedNamespace = namespace ?? namespaceArg
+    if (namespace !== undefined && namespaceArg !== undefined) throw new CliUsageError('Select a config namespace either positionally or with --namespace, not both.')
+    if (action === 'list' && namespace !== undefined) throw new CliUsageError('config list accepts no --namespace.')
     if (action !== 'list' && selectedNamespace === undefined) throw new CliUsageError(`config ${action} requires a settings namespace.`)
     if (action === 'get' && extra.length > 0) throw new CliUsageError('config get accepts one optional path.')
     if ((action === 'set' || action === 'unset') && path === undefined) throw new CliUsageError(`config ${action} requires a settings path.`)

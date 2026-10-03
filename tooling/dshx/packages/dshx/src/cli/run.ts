@@ -47,6 +47,8 @@ import type { DshProjectCompatibilityAssessment } from '../compat/index.js'
 import { CliUsageError, parseCliArgs, type CliArgs } from './args.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
+import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../platform/client.js'
+import { runPlatformCli } from './platform.js'
 
 export interface CliIO {
   readonly stdin: Readable & { isTTY?: boolean; setRawMode?: (mode: boolean) => void }
@@ -78,6 +80,7 @@ export interface CliRuntime {
   readonly addTool?: (options: AddToolOptions) => Promise<AddToolResult>
   readonly addCommand?: (options: AddCommandOptions) => Promise<AddCommandResult>
   readonly addHook?: (options: AddHookOptions) => Promise<AddHookResult>
+  readonly connectPlatform?: (options?: ConnectDshPlatformClientOptions) => Promise<DshPlatformClient>
 }
 
 export interface CliRunOptions {
@@ -1054,9 +1057,20 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     return 2
   }
   if (args.help) {
+    const runtime = options.runtime ?? {}
+    if (
+      args.command === 'status' || args.command === 'info' || args.command === 'doctor' || args.command === 'sessions' ||
+      args.command === 'plugins' || args.command === 'bundles' || args.command === 'commands' || args.command === 'config'
+    ) {
+      return runPlatformCli(args, {
+        io,
+        dshxVersion: options.version ?? VERSION,
+        ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
+      })
+    }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>\nadd targets: ui, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>\nadd targets: ui, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1064,8 +1078,18 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     write(io.stdout, `${options.version ?? VERSION}\n`)
     return 0
   }
+  const runtime = options.runtime ?? {}
+  if (
+    args.command === 'status' || args.command === 'info' || args.command === 'doctor' || args.command === 'sessions' ||
+    args.command === 'plugins' || args.command === 'bundles' || args.command === 'commands' || args.command === 'config'
+  ) {
+    return runPlatformCli(args, {
+      io,
+      dshxVersion: options.version ?? VERSION,
+      ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
+    })
+  }
   try {
-    const runtime = options.runtime ?? {}
     const project = await (runtime.resolveConfig ?? resolveDshxConfig)(
       args.cwd === undefined ? (options.cwd === undefined ? {} : { cwd: options.cwd }) : { cwd: args.cwd },
     )

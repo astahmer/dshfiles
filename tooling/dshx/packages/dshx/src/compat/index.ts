@@ -193,6 +193,43 @@ export function assessProjectCompatibility(manifest: Readonly<Record<string, unk
   }
 }
 
+/**
+ * Packages the Host already provides to every plugin.
+ *
+ * A plugin that lists one of these in `dependencies` resolves a second copy
+ * outside the profile's own tree. The build still succeeds and the failure only
+ * appears at boot, as `failed to import`, which is the worst time to learn it.
+ */
+const HOST_PROVIDED_SCOPE = '@deepseek-ai/'
+
+/**
+ * Reject a Host-provided package declared as a runtime dependency.
+ *
+ * The correct shape is a `peerDependencies` range plus the concrete version in
+ * `devDependencies` for local typechecking, which is what the DSH range check
+ * above already asks for.
+ */
+export function projectHostProvidedDependencyDiagnostics(
+  manifest: Readonly<Record<string, unknown>>,
+  packageFile: string,
+): readonly DshxDiagnostic[] {
+  const section = manifest['dependencies']
+  if (section === null || typeof section !== 'object' || Array.isArray(section)) return []
+  const offenders = Object.keys(section as Record<string, unknown>)
+    .filter(name => name.startsWith(HOST_PROVIDED_SCOPE))
+    .sort()
+  if (offenders.length === 0) return []
+  return [
+    {
+      code: 'DSHX5107',
+      severity: 'error',
+      message: `The Host already provides ${offenders.map(name => `"${name}"`).join(', ')}; a plugin must not depend on a second copy.`,
+      file: packageFile,
+      hint: `Move ${offenders.map(name => `"${name}"`).join(' and ')} to peerDependencies with the range your plugin supports, and keep the concrete version in devDependencies for typechecking.`,
+    },
+  ]
+}
+
 /** Actionable package declaration diagnostics shared by build, dev, and check. */
 export function projectCompatibilityDiagnostics(
   assessment: DshProjectCompatibilityAssessment,

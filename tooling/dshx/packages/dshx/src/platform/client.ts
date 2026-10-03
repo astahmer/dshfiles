@@ -91,7 +91,7 @@ const streamFrameSchema = z.object({
 
 const snapshotSchema = z.object({
   type: z.literal('snapshot'),
-  cursor: z.number().safe().nonnegative(),
+  cursor: z.number().safe().min(-1),
 })
 
 const historyRecordSchema = z.object({
@@ -213,7 +213,7 @@ export class DshPlatformError extends Error {
 
 function parseJson(body: string, context: string): unknown {
   try {
-    return JSON.parse(body) as unknown
+    return JSON.parse(body)
   } catch {
     throw new DshPlatformError('invalid-response', `${context} returned invalid JSON.`)
   }
