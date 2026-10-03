@@ -71,9 +71,11 @@ need normal local execution; the restricted shell cannot exercise those OS
 integrations. Other upstream workspace apps retain their older dependency
 generation and have not been claimed as verified by these core checks.
 
-`patches/dshx/0001-native-sdk-foundation.patch` preserves our compatibility and
-SDK changes relative to the pinned upstream, independently of the ignored
-nested checkout. Further slices will have separate patches.
+The user clarified that this is a maintained source hardfork. The temporary
+patch export has been removed; source files and their own Jujutsu/Git history
+are the implementation. See `forks/dshx-fork/FORK.md`. The fork remains an
+independent source repository while the account-plugin agent edits the parent
+repository history. No patch application or upstream DSHX installation is needed.
 
 ## Remaining work toward the full goal
 

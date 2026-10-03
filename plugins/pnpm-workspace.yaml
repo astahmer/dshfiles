@@ -1,0 +1,34 @@
+packages:
+  - '@dshfiles/*'
+
+peerDependencyRules:
+  allowedVersions:
+    '@deepseek-ai/cordis': 4.0.4
+    cordis-plugin-include: 1.0.9
+    cordis-plugin-loader: 1.0.5
+
+# One cordis module identity across the plugin and the fork that types it.
+# Two copies silently split the Events interface, which makes every `ctx.on`
+# event name fail to typecheck.
+dedupePeerDependents: true
+
+allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': set this to true or false
+  '@google/genai': set this to true or false
+  koffi: set this to true or false
+  node-pty: set this to true or false
+  protobufjs: set this to true or false
+
+# Keep one copy of the DSH type packages in this workspace so a cordis module
+# augmentation is visible from both the plugin and the fork that types it.
+publicHoistPattern:
+  - '@deepseek-ai/*'
+  - '@becomeopc/*'
+
+# One copy of the DSH type packages across this workspace and the fork it links
+# to. Two copies silently split cordis's Events interface, which makes every
+# `ctx.on` event name fail to typecheck in the plugin.
+overrides:
+  '@deepseek-ai/cordis': 4.0.4
+  '@deepseek-ai/cordis-plugin-include': 1.0.9
+  '@deepseek-ai/cordis-plugin-loader': 1.0.5

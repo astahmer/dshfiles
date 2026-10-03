@@ -1,2 +1,4 @@
 .direnv/
 forks/
+.fork-history/
+.pnpm-store/
