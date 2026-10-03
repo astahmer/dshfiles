@@ -1,4 +1,6 @@
 import z from '@deepseek-ai/schemastery'
+import { aiAccountsApi, type AccountsSnapshot } from './api.js'
+import { buildAccountsSnapshot } from './account-snapshot.js'
 import { defineHost, definePlugin } from '@becomeopc/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -245,9 +247,32 @@ export const Config = z.object({
   codexShadowRoot: z.string().default('').volatile(),
 })
 
+/** Live state the settings API and the status tool both read. */
+let activeAccounts: {
+  config: AiAccountsConfig
+  pool: ReturnType<typeof createAccountPool>
+} | undefined
+
+/** The one snapshot operation: what accounts exist, and how healthy they are. */
+export const accountsSnapshot = async (): Promise<AccountsSnapshot> => {
+  if (activeAccounts === undefined) {
+    return { distribution: 'sticky', distributions: [...DISTRIBUTIONS], cooldownMs: 0, accounts: [] }
+  }
+  return buildAccountsSnapshot({
+    config: activeAccounts.config,
+    statuses: activeAccounts.pool.describe(),
+    distributions: [...DISTRIBUTIONS],
+  })
+}
+
+const accountsHostApi = aiAccountsApi.host({
+  snapshot: async () => accountsSnapshot(),
+})
+
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm'],
+  inject: ['llm', 'connection', 'webServer'],
+  apis: [accountsHostApi],
   setup: api => {
     const ctx = api.raw.ctx
     const config = readConfig(api.config)
@@ -279,6 +304,7 @@ export default definePlugin({
       distribution: config.distribution,
       cooldownMs: config.cooldownMs,
     })
+    activeAccounts = { config, pool }
     for (const [id, route] of routes) {
       pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
     }
@@ -482,44 +508,4 @@ const readConfig = (input: Record<string, unknown>): AiAccountsConfig => {
         ? raw.codexShadowRoot
         : defaultConfig.codexShadowRoot,
   }
-}
-
-/** Account status for a management surface: which homes hold a login. */
-export const describeAccounts = async (
-  codexAccounts: readonly CodexAccountConfig[],
-  shadowRoot: string,
-): Promise<
-  ReadonlyArray<{
-    readonly instanceId: string
-    readonly displayName: string
-    readonly mode: string
-    readonly authPath: string
-    readonly loginHint: string
-    readonly signedIn: boolean
-    readonly identity: string | undefined
-    readonly plan: string | undefined
-    readonly error: string | undefined
-  }>
-> => {
-  const rows = []
-  for (const account of codexAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, CODEX_KIND)
-    const layout = resolveCodexHomeLayout({
-      homePath: account.homePath,
-      shadowHomePath: shadowHomeFor(account, instanceId, shadowRoot),
-    })
-    const auth = await describeCodexAuth(layout)
-    rows.push({
-      instanceId,
-      displayName: displayNameFor(account.displayName, CODEX_KIND, instanceId),
-      mode: layout.mode,
-      authPath: authJsonPath(layout),
-      loginHint: codexLoginHint(layout),
-      signedIn: auth.signedIn,
-      identity: auth.identity,
-      plan: auth.plan,
-      error: auth.error,
-    })
-  }
-  return rows
 }
