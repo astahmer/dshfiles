@@ -9,7 +9,7 @@ const exec = promisify(execFile)
 const workspace = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const packages = [
   {
-    name: '@becomeopc/dshx',
+    name: '@dshfiles/dshx',
     directory: 'packages/dshx',
     bin: 'dshx',
     // Host and tooling entries intentionally execute inside a complete DSH
@@ -23,14 +23,14 @@ const packages = [
     bin: 'create-dshx',
   },
   {
-    name: '@becomeopc/dshx-hub-cli',
+    name: '@dshfiles/dshx-hub-cli',
     directory: 'packages/framework-hub-cli',
     bin: 'dshx-hub',
   },
   // The marketplace root is a Host bundle and is loaded by the real Profile
   // smoke rather than executed in this provider-incomplete archive consumer.
   {
-    name: '@becomeopc/dshx-plugin-marketplace',
+    name: '@dshfiles/dshx-plugin-marketplace',
     directory: 'packages/plugin-marketplace',
     imports: [],
   },
@@ -118,19 +118,19 @@ function typeEntrypoints(exportsField) {
 }
 
 function containsPrivateDshxImport(code) {
-  return /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)["']@becomeopc\/dshx\//.test(code)
+  return /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)["']@dshfiles\/dshx\//.test(code)
 }
 
 async function verifyTypeConsumers(install) {
   const source = [
-    "import { defineConfig } from '@becomeopc/dshx'",
-    "import { defineHost } from '@becomeopc/dshx/host'",
-    "import { defineClient } from '@becomeopc/dshx/client'",
-    "import { defineLocale, type LocaleKeyOf, type PropsLocaleOf } from '@becomeopc/dshx/client'",
-    "import { defineApi, method } from '@becomeopc/dshx/api'",
-    "import { defineSettings } from '@becomeopc/dshx/settings'",
-    "import { defineConversation } from '@becomeopc/dshx/experimental/conversation'",
-    "import { buildClient } from '@becomeopc/dshx/tooling'",
+    "import { defineConfig } from '@dshfiles/dshx'",
+    "import { defineHost } from '@dshfiles/dshx/host'",
+    "import { defineClient } from '@dshfiles/dshx/client'",
+    "import { defineLocale, type LocaleKeyOf, type PropsLocaleOf } from '@dshfiles/dshx/client'",
+    "import { defineApi, method } from '@dshfiles/dshx/api'",
+    "import { defineSettings } from '@dshfiles/dshx/settings'",
+    "import { defineConversation } from '@dshfiles/dshx/experimental/conversation'",
+    "import { buildClient } from '@dshfiles/dshx/tooling'",
     "const locale = defineLocale('smoke.copy', { zh: { ready: '就绪' }, en: { ready: 'Ready' } })",
     'type LocaleKey = LocaleKeyOf<typeof locale>',
     'type LocaleProps = PropsLocaleOf<typeof locale>',
@@ -153,7 +153,7 @@ async function verifyTypeConsumers(install) {
 }
 
 async function verifyRemovedSubpaths(install) {
-  const removed = ['@becomeopc/dshx/compiler', '@becomeopc/dshx/compat', '@becomeopc/dshx/cli', '@becomeopc/dshx/conversation']
+  const removed = ['@dshfiles/dshx/compiler', '@dshfiles/dshx/compat', '@dshfiles/dshx/cli', '@dshfiles/dshx/conversation']
   const source = `
 for (const request of ${JSON.stringify(removed)}) {
   try { await import(request); throw new Error(request + ' unexpectedly resolved') }
@@ -169,7 +169,7 @@ for (const request of ${JSON.stringify(removed)}) {
 }
 
 async function verifyCreatorMatrix(root, install, packed) {
-  const dshx = packed.find(item => item.spec.name === '@becomeopc/dshx')
+  const dshx = packed.find(item => item.spec.name === '@dshfiles/dshx')
   if (!packed.some(item => item.spec.name === 'create-dshx') || dshx === undefined) {
     throw new Error('Creator matrix requires packed Core and Creator archives')
   }
@@ -186,7 +186,7 @@ async function verifyCreatorMatrix(root, install, packed) {
       const project = join(matrixRoot, name)
       const manifestFile = join(project, 'package.json')
       const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
-      manifest.devDependencies['@becomeopc/dshx'] = `file:${dshx.path}`
+      manifest.devDependencies['@dshfiles/dshx'] = `file:${dshx.path}`
       await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`)
       projects.push({ name, project, style })
     }

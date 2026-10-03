@@ -23,7 +23,7 @@ allowBuilds:
 # augmentation is visible from both the plugin and the fork that types it.
 publicHoistPattern:
   - '@deepseek-ai/*'
-  - '@becomeopc/*'
+  - '@dshfiles/*'
 
 # One copy of the DSH type packages across this workspace and the fork it links
 # to. Two copies silently split cordis's Events interface, which makes every

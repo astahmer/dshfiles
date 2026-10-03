@@ -10,23 +10,12 @@ dependency on an upstream DSHX installation.
 DSH and Cordis remain the native runtime. Original MIT licensing and attribution
 remain in this tree.
 
-## No upstream dependency
+## Independent maintenance
 
-We track upstream for attribution only. There is no `origin` remote, no fetch, and
-no expectation of merging: at the fork point upstream had been quiet for about a
-month and did not support the DSH generation this profile runs, so waiting on it
-cost more than owning the divergence. `dshx-upstream` is a local bookmark, not a
-remote-tracking branch, and nothing here fetches from GitHub.
-
-If upstream ever ships DSH 0.2 support worth adopting, re-add the remote at that
-point rather than keeping a standing dependency:
-
-```sh
-git remote add origin https://github.com/liyown/dshx
-git fetch origin
-git log --oneline HEAD..origin/main   # then cherry-pick what is worth having
-git remote remove origin
-```
+There is no upstream remote or bookmark and no fetch or merge workflow. This
+fork is maintained from this source tree against the installed DSH and Cordis
+contracts. The upstream link above records code provenance only; original MIT
+licensing and attribution remain in this tree.
 
 Source baseline: `8048a780a263cbd788b71d316f2ec84a272158f8`.
 Initial protocol-2 integration: `c9ea7e6eef5b04aef2360d60102309cbde53d36b`.

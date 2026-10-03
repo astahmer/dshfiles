@@ -34,7 +34,7 @@ describe('SDK CLI workflows', () => {
     try {
       const io = streams()
       await runCli(['create', 'demo', '--template', 'basic', '--no-install', '--yes'], { io, cwd: root })
-      await mkdir(resolve(root, 'demo/node_modules/@becomeopc'), { recursive: true })
+      await mkdir(resolve(root, 'demo/node_modules/@dshfiles'), { recursive: true })
       await symlink(fileURLToPath(new URL('..', import.meta.url)), resolve(root, 'demo/node_modules/@dshfiles/dshx'))
       const project = await resolveDshxConfig({ cwd: resolve(root, 'demo') })
       const testProject = vi.fn(async () => 7)

@@ -18,7 +18,7 @@ const packageDirectory = resolve(packageArgument);
 const metadata = JSON.parse(
   await readFile(join(packageDirectory, "package.json"), "utf8"),
 );
-assert.equal(metadata.name, "@becomeopc/dshx-hub-cli");
+assert.equal(metadata.name, "@dshfiles/dshx-hub-cli");
 
 const temporary = await realpath(
   await mkdtemp(join(tmpdir(), "dshx-ops-package-smoke-")),

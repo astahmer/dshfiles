@@ -98,6 +98,21 @@ revision or bookmark should preview the proposed move and require confirmation
 before a rebase or bookmark mutation. The BB README is a behavior reference;
 implement against DSH's real Host services and events.
 
+## Status
+
+| Feature | State | Where |
+|---|---|---|
+| Provider accounts (Codex, OpenCode Go, Command Code) | built with dshx | `plugins/@dshfiles/ai-accounts` |
+| Queue reordering | built with dshx | `plugins/@dshfiles/queue-reorder` |
+| Thread sidebar and lifecycle | not started | — |
+| Sidebar header links | partial: our accounts panel is a sidebar row | `plugins/@dshfiles/ai-accounts` |
+| MCP server management and catalog | not started | — |
+| Secret catalog | not started | — |
+| Reusable project and folder picker | not started | — |
+| Sidebar and footer customization | partial: accounts uses `sidebar.panellist` | `plugins/@dshfiles/ai-accounts` |
+| Settings search | not started | — |
+| Jujutsu plugin | not started | — |
+
 ## Product decisions to carry forward
 
 - Reuse the project/folder picker instead of rebuilding project selection in

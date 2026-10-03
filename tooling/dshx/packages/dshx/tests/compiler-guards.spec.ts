@@ -14,7 +14,7 @@ describe('private runtime import guard', () => {
   })
 
   it('does not mistake an installed source path for an import', () => {
-    expect(containsPrivateDshxImport('/tmp/node_modules/.pnpm/@becomeopc+dshx/node_modules/@dshfiles/dshx/dist/client/runtime.js')).toBe(false)
+    expect(containsPrivateDshxImport('/tmp/node_modules/.pnpm/@dshfiles+dshx/node_modules/@dshfiles/dshx/dist/client/runtime.js')).toBe(false)
     expect(containsPrivateDshxImport('The public API is @dshfiles/dshx/client.')).toBe(false)
   })
 })

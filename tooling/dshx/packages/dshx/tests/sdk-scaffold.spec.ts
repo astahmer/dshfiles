@@ -24,7 +24,7 @@ describe('SDK-first templates', () => {
         await mkdir(resolve(root, file.path, '..'), { recursive: true })
         await writeFile(resolve(root, file.path), file.contents)
       }
-      await mkdir(resolve(root, 'node_modules/@becomeopc'), { recursive: true })
+      await mkdir(resolve(root, 'node_modules/@dshfiles'), { recursive: true })
       await symlink(fileURLToPath(new URL('..', import.meta.url)), resolve(root, 'node_modules/@dshfiles/dshx'))
       await symlink(fileURLToPath(new URL('../node_modules/@deepseek-ai', import.meta.url)), resolve(root, 'node_modules/@deepseek-ai'))
       await symlink(fileURLToPath(new URL('../../../node_modules/vitest', import.meta.url)), resolve(root, 'node_modules/vitest'))

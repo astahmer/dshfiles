@@ -43,6 +43,6 @@ pnpm create dshx@preview my-plugin --package-manager pnpm
 
 Package-manager detection checks the explicit flag, existing lockfiles, the nearest `packageManager` declaration, the invoking package manager, and available commands on `PATH`, in that order.
 
-See the [DSHX documentation](https://dshx.io/docs) and [repository](https://github.com/liyown/dshx) for the full development workflow.
+See the [DSHX documentation](https://dshx.io/docs) for the full development workflow.
 
 MIT © DSHX contributors.

@@ -6,17 +6,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const expected = new Map([
-  ['@becomeopc/dshx', /^0\.1\.4-preview\.\d+$/],
+  ['@dshfiles/dshx', /^0\.1\.4-preview\.\d+$/],
   ['create-dshx', /^0\.1\.4-preview\.\d+$/],
-  ['@becomeopc/dshx-hub-cli', /^0\.1\.2-preview\.\d+$/],
-  ['@becomeopc/dshx-plugin-marketplace', /^0\.1\.0-preview\.\d+$/],
+  ['@dshfiles/dshx-hub-cli', /^0\.1\.2-preview\.\d+$/],
+  ['@dshfiles/dshx-plugin-marketplace', /^0\.1\.0-preview\.\d+$/],
 ])
 
 const packageFiles = new Map([
-  ['@becomeopc/dshx', 'packages/dshx/package.json'],
+  ['@dshfiles/dshx', 'packages/dshx/package.json'],
   ['create-dshx', 'packages/create-dshx/package.json'],
-  ['@becomeopc/dshx-hub-cli', 'packages/framework-hub-cli/package.json'],
-  ['@becomeopc/dshx-plugin-marketplace', 'packages/plugin-marketplace/package.json'],
+  ['@dshfiles/dshx-hub-cli', 'packages/framework-hub-cli/package.json'],
+  ['@dshfiles/dshx-plugin-marketplace', 'packages/plugin-marketplace/package.json'],
 ])
 
 function fail(message) {
@@ -52,7 +52,7 @@ for (const [name, file] of packageFiles) {
   if (manifest.private === true) fail(`${name} is private and cannot be published.`)
   if (manifest.publishConfig?.access !== 'public') fail(`${name} must declare publishConfig.access as public.`)
 }
-if (versions.get('@becomeopc/dshx') !== versions.get('create-dshx')) fail('Core and create-dshx Preview versions must match.')
+if (versions.get('@dshfiles/dshx') !== versions.get('create-dshx')) fail('Core and create-dshx Preview versions must match.')
 
 if (process.exitCode === undefined) {
   const directory = await mkdtemp(join(tmpdir(), 'dshx-preview-plan-'))

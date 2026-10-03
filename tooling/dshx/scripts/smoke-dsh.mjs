@@ -143,7 +143,7 @@ async function configureDsh(root, dshxTarball, dshVersion) {
   const compatibility = classifyCompatibility(dshVersion)?.compatibility
   if (compatibility === undefined) throw new Error(`No adapter can configure DSH ${dshVersion}`)
   const manifest = await packageJson(root)
-  setDependency(manifest, '@becomeopc/dshx', `file:${dshxTarball}`)
+  setDependency(manifest, '@dshfiles/dshx', `file:${dshxTarball}`)
   for (const name of Object.keys(manifest.devDependencies ?? {})) {
     if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) setDependency(manifest, name, dshVersion)
   }
@@ -215,7 +215,7 @@ async function removeHost(root) {
   await writePackageJson(root, manifest)
   await writeFile(
     join(root, 'dshx.config.ts'),
-    `import { defineConfig } from '@becomeopc/dshx'\n\nexport default defineConfig({ profile: 'web', host: false, client: { entry: 'src/client.tsx' } })\n`,
+    `import { defineConfig } from '@dshfiles/dshx'\n\nexport default defineConfig({ profile: 'web', host: false, client: { entry: 'src/client.tsx' } })\n`,
   )
   await rm(join(root, 'src/host.ts'), { force: true })
 }
@@ -250,7 +250,7 @@ async function installConversationProbe(root, dshVersion) {
   if (!source.includes('const runtimeDeck = defineSlot')) throw new Error('Conversation smoke could not locate the Showcase Slot')
   if (!source.includes('slots: [runtimeDeck],')) throw new Error('Conversation smoke could not locate defineClient()')
   const imports = `import type {} from '@deepseek-ai/dsh-commands/types'
-import { defineConversation, type ConversationRenderProps } from '@becomeopc/dshx/experimental/conversation'
+import { defineConversation, type ConversationRenderProps } from '@dshfiles/dshx/experimental/conversation'
 `
   const contribution = `interface CommandLifecycleState {
   readonly commandId: string
@@ -627,7 +627,7 @@ async function installPromptProbe(root, packageId) {
     `import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
-import { defineCommand } from '@becomeopc/dshx/host'
+import { defineCommand } from '@dshfiles/dshx/host'
 
 const sectionName = ${JSON.stringify(`${packageId}:guidance`)}
 const contextName = ${JSON.stringify(`${packageId}:runtime`)}
@@ -689,7 +689,7 @@ async function installSettingsProbe(root) {
   await writeFile(
     join(root, 'src/settings.ts'),
     `import Schema from '@deepseek-ai/schemastery'
-import { defineSettings } from '@becomeopc/dshx/settings'
+import { defineSettings } from '@dshfiles/dshx/settings'
 
 export const runtimeSettings = defineSettings({
   namespace: 'plugin-full-a',
@@ -962,7 +962,7 @@ async function startDev(root, env) {
 }
 
 async function packDshx(destination) {
-  await expectSuccess('pnpm', ['--filter', '@becomeopc/dshx', 'pack', '--pack-destination', destination])
+  await expectSuccess('pnpm', ['--filter', '@dshfiles/dshx', 'pack', '--pack-destination', destination])
   const files = (await import('node:fs/promises')).readdir(destination)
   const names = await files
   const file = names.find(name => name.includes('dshx-') && name.endsWith('.tgz'))
@@ -1015,11 +1015,11 @@ async function main() {
     if (!/apiCapability:\s*true/.test(settingsClientArtifact)) {
       throw new Error('Generated Client artifact did not retain hook-driven API capability metadata')
     }
-    if (settingsClientArtifact.includes('threshold must be at most 10') || settingsClientArtifact.includes('@becomeopc/dshx/settings')) {
+    if (settingsClientArtifact.includes('threshold must be at most 10') || settingsClientArtifact.includes('@dshfiles/dshx/settings')) {
       throw new Error('Generated Client artifact retained Host-only Settings behavior or a private DSHX Settings import')
     }
     const settingsHostArtifact = await readFile(join(projects.fullA, 'dist/index.js'), 'utf8')
-    if (settingsHostArtifact.includes('@becomeopc/dshx/settings') || !settingsHostArtifact.includes('@deepseek-ai/dsh-settings')) {
+    if (settingsHostArtifact.includes('@dshfiles/dshx/settings') || !settingsHostArtifact.includes('@deepseek-ai/dsh-settings')) {
       throw new Error('Generated Host artifact did not inline DSHX Settings helpers over the official runtime service')
     }
 

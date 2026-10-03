@@ -211,11 +211,9 @@ The fork is owned here as `@dshfiles/dshx`. It must not fetch or install
 `@becomeopc/dshx` from a registry, and it has **no upstream remote at all**.
 Upstream went quiet for about a month and did not support the DSH generation
 this profile runs, so waiting on it cost more than owning the divergence. Do not
-re-add `origin`, do not fetch, and do not merge: if upstream ever ships DSH 0.2
-support worth having, add the remote deliberately at that moment and cherry-pick,
-then remove it again. `tooling/dshx/FORK.md` records the source baseline, license,
-attribution, and that recipe. Do not add a nested `.jj`/`.git`; review DSH changes
-manually when the native contracts move.
+add an upstream remote or bookmark, fetch, or merge. `tooling/dshx/FORK.md`
+records the source baseline, license, and attribution. Do not add a nested
+`.jj`/`.git`; review DSH changes manually when the native contracts move.
 
 Plugins link the local path, so the CLI a plugin builds with is always this tree.
 
@@ -224,6 +222,13 @@ cd tooling/dshx
 pnpm install --frozen-lockfile
 pnpm --filter @dshfiles/dshx build
 ```
+
+The fork's own documentation is the source of truth for what it does:
+`tooling/dshx/docs/sdk/getting-started.md` for the authoring API,
+`tooling/dshx/docs/compatibility.md` for what a DSH generation changed, and
+`tooling/dshx/FORK.md` for provenance. There is no separate plan for it here —
+a plan that outgrows the code it describes is a second source of truth, and it
+goes stale silently.
 
 What `PROTOCOL_2_COMPATIBILITY` changed, in case upstream moves again:
 

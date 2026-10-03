@@ -133,10 +133,7 @@ Plain `check` is offline and includes TypeScript `noEmit`; `--runtime` additiona
 
 ## Documentation
 
-- [API chapters](https://github.com/liyown/dshx/blob/main/docs/index.md)
-- [0.1.1 to 0.1.2 migration](https://github.com/liyown/dshx/blob/main/docs/migrations/0.1.1-to-0.1.2.md)
-- [Compatibility](https://github.com/liyown/dshx/blob/main/docs/compatibility.md)
-- [Preview scope](https://github.com/liyown/dshx/blob/main/docs/preview.md)
+- [DSHX documentation](https://dshx.io/docs)
 - [Framework Hub](https://dshx.io)
 
 MIT © DSHX contributors.
