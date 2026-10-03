@@ -1,4 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
+// Supplies the CSS-module declaration this file's stylesheet import needs.
+import type {} from '@dshfiles/dshx/client'
 import {
   PROVIDER_ICONS,
   aiAccountsApi,

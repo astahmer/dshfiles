@@ -1,4 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
+// Brings in the CSS-module and `llm/stream` declarations a plugin would
+// otherwise restate locally.
+import type {} from '@dshfiles/dshx/client'
 import z from '@deepseek-ai/schemastery'
 import {
   aiAccountsApi,
@@ -67,25 +70,6 @@ import { readCodexAccessToken } from './read-codex-token.js'
  * Account layout and the shadow-home trick follow T3 Code; quota reporting is
  * inspired by the ai-accounts plugin we own for BB, reimplemented on DSH seams.
  */
-
-/**
- * DSH 0.2's `dsh-llm` declares this waterfall against cordis's `Events`.
- *
- * A plugin that resolves `dsh-llm` outside the profile's own tree sees a second
- * module identity for cordis, so the augmentation lands on an `Events` the
- * plugin never reads and `ctx.on('llm/stream')` is rejected by the type
- * checker. Restating the declaration here is exact: it mirrors the signature
- * the installed package documents, and TypeScript merges declarations.
- */
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    'llm/stream'(
-      this: unknown,
-      options: GenerateOptions,
-      next: () => AsyncIterable<StreamChunk>,
-    ): AsyncIterable<StreamChunk>
-  }
-}
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'

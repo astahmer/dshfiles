@@ -57,6 +57,10 @@
       "types": "./dist/tooling/index.d.ts",
       "default": "./dist/tooling/index.js"
     },
+    "./platform": {
+      "types": "./dist/platform/index.d.ts",
+      "default": "./dist/platform/index.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
@@ -68,7 +72,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-ambient.mjs",
     "prepack": "pnpm build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
@@ -80,11 +84,14 @@
     "diff": "9.0.0",
     "execa": "catalog:",
     "semver": "7.8.5",
+    "zod": "catalog:",
+    "ws": "8.21.0",
     "typescript": "catalog:",
     "vite": "catalog:",
     "write-file-atomic": "7.0.0",
     "yaml": "catalog:",
-    "create-dshx": "workspace:*"
+    "create-dshx": "workspace:*",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -103,6 +110,7 @@
     "@types/react": "~18.3.31",
     "@types/semver": "^7.7.1",
     "@types/write-file-atomic": "4.0.3",
+    "@types/ws": "8.18.1",
     "react": "^18.3.1",
     "@deepseek-ai/dsh-client-ui-chat": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
@@ -110,7 +118,6 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-runtime": "0.1.1-rc.2",
     "react-dom": "^18.3.1",
     "@deepseek-ai/cordis-plugin-include": "1.0.9",
     "@deepseek-ai/cordis-plugin-loader": "1.0.5"

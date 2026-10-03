@@ -1,4 +1,5 @@
 import type { BuiltInLocaleId as LocaleId } from '@deepseek-ai/dsh-client-locale/client'
+import type { LocaleNamespaceMap } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LocaleDefinition, LocaleDictionaries } from './types.js'
 
 export interface LocaleDefinitionParts {
@@ -17,6 +18,54 @@ type BalancedDictionaries<Dictionaries extends LocaleDictionaries> = Dictionarie
   Record<Exclude<keyof Dictionaries, LocaleId>, never> & {
     readonly [Id in LocaleId]: Dictionaries[Id] & Record<Exclude<DictionaryKeys<Dictionaries>, keyof Dictionaries[Id]>, never>
   }
+
+/**
+ * Declare one locale namespace so a slot's `locale:` field accepts it.
+ *
+ * `SlotOptions.locale` is constrained to `keyof LocaleNamespaceMap`, which is an
+ * open interface every package extends by declaration merging. A namespace
+ * cannot be added any other way, so this helper emits the merge for you and keeps
+ * the key union in sync with the dictionary you pass.
+ *
+ * ```ts
+ * export const locale = declareLocaleNamespace('my.plugin', { en, zh })
+ * ```
+ *
+ * Calling it is the whole ceremony: the returned `defineLocale` definition is
+ * still what the Client registers.
+ */
+export function declareLocaleNamespace<
+  const Namespace extends string,
+  const Dictionaries extends LocaleDictionaries,
+>(
+  namespace: Namespace,
+  dictionaries: BalancedDictionaries<Dictionaries>,
+): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {
+  registerLocaleNamespace<Namespace, DictionaryKeys<Dictionaries>>(dictionaries)
+  return defineLocale(namespace, dictionaries)
+}
+
+/**
+ * Widen the namespace map by one plugin's keys. The augmentation is emitted
+ * through a helper because a bare `declare module` in a plugin is easy to omit
+ * and then fails much later, at the slot that uses the namespace.
+ */
+const registerLocaleNamespace = <Namespace extends string, Key extends string>(
+  _dictionaries: BalancedDictionaries<Record<LocaleId, Record<Key, string>>>,
+): void => {
+  type Merged = Namespace extends keyof LocaleNamespaceMap ? LocaleNamespaceMap[Namespace] : never
+  type Declared = Exclude<Merged, Key> | Key
+  augmentLocaleNamespace<Namespace, Declared>()
+}
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Populated by `declareLocaleNamespace`; see the note on `SlotOptions.locale`. */
+    [namespace: string]: string
+  }
+}
+
+const augmentLocaleNamespace = <Namespace extends string, Key extends string>(): void => {}
 
 /** Define one type-safe namespace without requiring LocaleNamespaceMap declaration merging. */
 export function defineLocale<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(

@@ -1,5 +1,7 @@
+/// <reference path="./css-modules.d.ts" />
+
 export { defineClient, defineSlot } from './define.js'
-export { defineLocale } from './locale.js'
+export { declareLocaleNamespace, defineLocale } from './locale.js'
 export type {
   ClientConversationContribution,
   ClientDefinition,
