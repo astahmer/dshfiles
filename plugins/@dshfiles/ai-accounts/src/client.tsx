@@ -1,8 +1,10 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { useApi } from '@dshfiles/dshx/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { AccountsPanel } from './accounts-panel.js'
+import { QuotaFooter } from './quota-footer.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 
 /**
@@ -17,6 +19,20 @@ export default defineClient({
   locales: [aiAccountsLocale],
   setup(ctx) {
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
+    // The footer owns its whole surface, so quota lives there as a compact
+    // disclosure: the number you want without opening the panel.
+    ctx.slots.inject('sidebar.footer.action', () =>
+      ctx.slots.register(
+        {
+          name: 'sidebar.footer.action',
+          id: 'ai-accounts-quota',
+          order: 2,
+          locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
+        },
+        QuotaFooter,
+      ),
+    )
+
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
         {
