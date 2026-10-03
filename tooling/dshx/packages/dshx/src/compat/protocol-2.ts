@@ -102,6 +102,3 @@ export const PROTOCOL_2_COMPATIBILITY: DshCompatibility = {
     },
   },
 }
-
-/** @deprecated Use PROTOCOL_2_COMPATIBILITY. */
-export const DSH_0_2_COMPATIBILITY = PROTOCOL_2_COMPATIBILITY

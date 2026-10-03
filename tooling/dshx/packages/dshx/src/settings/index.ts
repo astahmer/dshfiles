@@ -13,4 +13,4 @@ export type {
   SettingsState,
   SettingsValue,
 } from './types.js'
-export type { SettingsApplies, SettingsRegisterOptions, SettingsScope } from './protocol-2.js'
+export type { SettingsScope } from './protocol-2.js'

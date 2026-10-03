@@ -96,9 +96,3 @@ export const PROTOCOL_1_COMPATIBILITY: DshCompatibility = {
     },
   },
 }
-
-/** @deprecated Use PROTOCOL_1_COMPATIBILITY. */
-export const DSH_0_1_COMPATIBILITY = PROTOCOL_1_COMPATIBILITY
-
-/** @deprecated Use PROTOCOL_1_COMPATIBILITY. */
-export const RC8_COMPATIBILITY = PROTOCOL_1_COMPATIBILITY

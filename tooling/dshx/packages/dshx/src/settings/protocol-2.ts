@@ -8,10 +8,7 @@
  * `update()`. These aliases keep the `defineSettings` author surface stable
  * across both generations instead of forcing a fork per protocol.
  */
-import type { SettingsForms, SettingsNamespace } from '@deepseek-ai/dsh-settings'
-
-/** 0.2 always applies a section live; the old flag had no surviving value. */
-export type SettingsApplies = 'live'
+import type { SettingsForms } from '@deepseek-ai/dsh-settings'
 
 /**
  * The per-namespace handle `SettingsScope` used to be. A protocol-2 scope is
@@ -29,15 +26,3 @@ export interface SettingsScope<Value extends object = Record<string, unknown>> {
   /** Observe native form revisions; automatically removed with the owning fiber. */
   watch(listener: (value: Value, revision: number) => void): () => boolean
 }
-
-/**
- * The service `ctx.settings` is typed as. Protocol 2 names it `SettingsForms`;
- * the protocol-1 name is kept so author code does not change shape.
- */
-export type SettingsProvider = SettingsForms
-
-/** 0.2 identifies a namespace by its Loader entry id, branded by the host. */
-export type SettingsNamespaceKey = SettingsNamespace
-
-/** Registration options the old scope accepted; 0.2 has no equivalent. */
-export type SettingsRegisterOptions = { readonly page?: unknown }

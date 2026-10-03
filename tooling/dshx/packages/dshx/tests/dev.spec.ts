@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import { DSH_0_1_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_1_COMPATIBILITY } from '../src/compat/index.js'
 import type { BuildHostOptions } from '../src/compiler/host/build.js'
 import type { ResolvedDshxConfig } from '../src/tooling/index.js'
 import { startDevSession } from '../src/dev/index.js'
@@ -89,7 +89,7 @@ function prepared(projectValue: ResolvedDshxConfig): PreparedProjectProfile {
       supportedRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
       support: 'verified',
       diagnostics: [],
-      compatibility: DSH_0_1_COMPATIBILITY,
+      compatibility: PROTOCOL_1_COMPATIBILITY,
     },
   }
 }

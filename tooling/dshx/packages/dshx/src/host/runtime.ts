@@ -4,16 +4,15 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import process from 'node:process'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import type { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
-import type { SettingsProvider } from '../settings/protocol-2.js'
 import type { SettingsScope } from '../settings/protocol-2.js'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { SettingsForms, SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     commands: CommandRuntime
     systemPrompt: SystemPrompt
-    settings: SettingsProvider
+    settings: SettingsForms
     tools: ToolRuntime
   }
 }

@@ -12,8 +12,8 @@ import type {
   DshProjectCompatibilityAssessment,
 } from './types.js'
 
-export { DSH_0_1_COMPATIBILITY, PROTOCOL_1_COMPATIBILITY, RC8_COMPATIBILITY } from './protocol-1.js'
-export { DSH_0_2_COMPATIBILITY, PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
+export { PROTOCOL_1_COMPATIBILITY } from './protocol-1.js'
+export { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
 export type {
   DshCompatibility,
   DshCompatibilityLifecycle,
