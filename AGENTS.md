@@ -134,22 +134,54 @@ The profile's `node_modules` records the store it was built with
 disagrees, every install fails with `ERR_PNPM_UNEXPECTED_STORE` — which reads
 like a permissions problem and is not one.
 
-On this machine the split is:
+Corepack picks the pnpm version from the nearest `packageManager` field, then
+`~/.cache/node/corepack/lastKnownGood.json`. Our profile was built by **pnpm 12**
+(store `v11`); the fnm corepack shim resolves **10.34.5** (store `v10`) by
+default. `lastKnownGood` is the supported fix and needs no PATH surgery:
 
-| pnpm | Where | Store |
-|---|---|---|
-| 12.x | `~/.local/share/pnpm/bin`, `~/.nix-profile/bin` | `v11` — matches the profile |
-| 10.x | fnm's corepack shim | `v10` — **the Host resolves this one** |
+```sh
+python3 - <<'EOF'
+import json, pathlib
+p = pathlib.Path.home() / ".cache/node/corepack/lastKnownGood.json"
+d = json.loads(p.read_text()); d["pnpm"] = "12.0.0"
+p.write_text(json.dumps(d, indent=2) + "\n")
+EOF
+```
 
-The Host was launched with an inherited `PATH`, so changing your shell `PATH`
-does not change what `plugin_manager` runs. Fix it at the source: pin
-`packageManager` to the matching major, or remove the older shim from the
-resolvable path, then restart the Host. Check first:
+Check what the Host will resolve before changing anything:
 
 ```sh
 head -3 ~/.dsh/profiles/web/node_modules/.modules.yaml   # storeDir + packageManager
-which -a pnpm                                            # what the Host will find
+which -a pnpm                                            # what the Host finds first
 ```
+
+### `pnpm add <path>` is blocked; `pnpm install` is not
+
+This pnpm resolves a local path spec through *registry name resolution*, so
+`pnpm add /abs/path` fails with `should have a @scope` or
+`ERR_PNPM_INVALID_DEPENDENCY_NAME` for essentially every layout, including a
+directory named exactly `@scope/name`. `trustPolicy` (values `off`,
+`no-downgrade`) does not change it.
+
+Declaring the dependency and running `pnpm install` works, which is what a
+profile already wants:
+
+```jsonc
+// ~/.dsh/profiles/<name>/package.json
+"dependencies": { "@dshfiles/ai-accounts": "link:/abs/path/@dshfiles/ai-accounts" },
+"dsh": { "profile": { "bundles": [ /* … */, "@dshfiles/ai-accounts" ] } }
+```
+
+```sh
+cd ~/.dsh/profiles/<name> && pnpm install
+```
+
+`plugin_manager install_bundle` shells out to `pnpm add`, so it cannot express
+this. Use `install_bundle` for registry packages, and the manifest plus
+`pnpm install` for a local bundle. Two things make that safe: keep the
+directory's own path equal to its scoped package name, and confirm with
+`plugin_manager list_bundles` that the bundle reports `installed: true` and its
+row is present.
 
 ## Writing our own plugins
 
@@ -198,6 +230,27 @@ What `PROTOCOL_2_COMPATIBILITY` changed, in case upstream moves again:
   `ConfigForms`.
 - `SettingsScopeBinder` is gone with no replacement; `ConfigForms.get(entryId)`
   plus `ConfigForms.describe()` is the protocol-2 equivalent.
+- 0.2 removed the config field earlier generations put on the context, so a
+  plugin reads its own row settings from `apply(ctx, config)`. dshx generated that
+  call and dropped the argument; our fork forwards it to `setup(ctx, config)` and
+  unwraps schemastery's resolvers first.
+- The public `dshx/host` entry never re-exported cordis's `Events`
+  augmentation, so importing `defineHost` from it made `ctx.on` degrade to
+  `keyof Events` and reject every DSH event name. Our fork re-exports it.
+
+Two cordis copies are the failure mode that makes this look like a dshx bug. A
+`declare module` augmentation lands on the `Events` of the copy that is
+resolved, so a plugin and the toolchain typing it must share **one** cordis
+identity — including its `cordis-plugin-include` and `cordis-plugin-loader`
+versions, which are part of the identity. Verify with:
+
+```sh
+node -e "const{createRequire}=require('module');\
+const r=createRequire('$PWD/src/x.ts');\
+console.log(r.resolve('@deepseek-ai/cordis').split('.pnpm/')[1])"
+```
+
+If those disagree, pin the versions and add `dedupePeerDependents: true`.
 
 Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
 package row, `lib/` for the host half, `lib/client.js` for the browser half.
