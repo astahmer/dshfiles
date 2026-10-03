@@ -136,6 +136,9 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
       },
     },
     models: modelsFor(FALLBACK, base),
+    // pi-ai calls this during a catalog refresh and owns persistence of the
+    // result, so it only has to answer with the models it advertises now.
+    fetchModels: async () => modelsFor(await fetchCommandCodeCatalog(options), base),
     api: {
       'openai-completions': openAICompletionsApi(),
       'openai-responses': openAIResponsesApi(),

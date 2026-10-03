@@ -7,6 +7,7 @@ import {
   type AccountDraft,
   type AccountProfile,
   type AccountsFile,
+  type AccountsCatalog,
 } from './api.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './accounts.module.css'
@@ -63,6 +64,7 @@ const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
   accentColor: '#2563EB',
   providerIcon: PROVIDER_ICONS[0],
   additionalModelIds: [],
+  reasoningDefaults: {},
 })
 
 const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
@@ -133,8 +135,69 @@ const UsageCardView = (props: {
         </div>
       ))}
       {usage.bankedResets > 0 ? (
-        <div className={styles.usageBanked}>{String(usage.bankedResets)} banked resets</div>
+        <div className={styles.usageBanked}>
+          {String(usage.bankedResets)} banked reset{usage.bankedResets === 1 ? '' : 's'}
+          {usage.bankedResetExpiries
+            .filter((expiresAt): expiresAt is number => expiresAt !== null)
+            .sort((left, right) => left - right)
+            .map(expiresAt => ` · earliest expires ${new Date(expiresAt).toLocaleDateString()}`)
+            .join('')}
+        </div>
       ) : null}
+    </div>
+  )
+}
+
+
+/**
+ * Per-model default reasoning effort.
+ *
+ * Only models that actually offer levels are listed, and the provider's own
+ * default is the first option, so pinning is an override rather than a
+ * requirement.
+ */
+const ReasoningDefaults = (props: {
+  readonly account: AccountDraft
+  readonly catalog: readonly { id: string; name: string; efforts: readonly { id: string; name: string }[]; defaultEffort: string | null }[] | undefined
+  readonly onChange: (defaults: Record<string, string>) => void
+}): JSX.Element | null => {
+  const catalog = (props.catalog ?? []).filter(model => model.efforts.length > 0)
+  if (catalog.length === 0) return null
+  const pins = props.account.reasoningDefaults
+  return (
+    <div className={styles.reasoning}>
+      <span className={styles.fieldLabel}>Default reasoning effort</span>
+      <span className={styles.fieldHint}>
+        Applied when a request does not choose one. Models not listed keep the provider default.
+      </span>
+      {catalog.map(model => (
+        <div className={styles.reasoningRow} key={model.id}>
+          <span className={styles.reasoningModel} title={model.id}>
+            {model.name}
+          </span>
+          <select
+            className={styles.input}
+            value={pins[model.id] ?? ''}
+            onChange={event => {
+              const next = { ...pins }
+              if (event.target.value === '') delete next[model.id]
+              else next[model.id] = event.target.value
+              props.onChange(next)
+            }}
+          >
+            <option value="">
+              {model.defaultEffort === null
+                ? 'Provider default'
+                : `Provider default (${model.defaultEffort})`}
+            </option>
+            {model.efforts.map(effort => (
+              <option key={effort.id} value={effort.id}>
+                {effort.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
     </div>
   )
 }
@@ -142,6 +205,7 @@ const UsageCardView = (props: {
 export const AccountsPanel = (): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
+  const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
@@ -158,6 +222,18 @@ export const AccountsPanel = (): JSX.Element => {
   useEffect(() => {
     void load().catch(() => setNotice('The account host did not answer.'))
   }, [load])
+
+  // The catalog is per account and only changes when the account does.
+  useEffect(() => {
+    if (selectedId === null) {
+      setCatalog(null)
+      return
+    }
+    void accounts
+      .catalog({ instanceId: selectedId })
+      .then(setCatalog)
+      .catch(() => setCatalog(null))
+  }, [accounts, selectedId])
 
   // Quota moves on its own, so refresh on an interval rather than per render.
   useEffect(() => {
@@ -506,6 +582,12 @@ export const AccountsPanel = (): JSX.Element => {
                 </button>
               </div>
 
+              <ReasoningDefaults
+                account={draft}
+                catalog={catalog?.models}
+                onChange={reasoningDefaults => setDraft({ ...draft, reasoningDefaults })}
+              />
+
               <UsageCardView
                 usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage}
               />
@@ -531,9 +613,24 @@ export const AccountsPanel = (): JSX.Element => {
                     </span>
                   </div>
                   {selected.signedIn ? null : (
-                    <p className={styles.loginHint}>
-                      Sign in with <code>{selected.loginHint}</code>
-                    </p>
+                    <div className={styles.loginHint}>
+                      <span>Sign in with</span>
+                      <code>{selected.loginHint}</code>
+                      <button
+                        type="button"
+                        className={styles.copyButton}
+                        onClick={() => {
+                          void navigator.clipboard
+                            .writeText(selected.loginHint)
+                            .then(() => setNotice('Copied the sign-in command.'))
+                            .catch(() =>
+                              setNotice('Could not copy; select the command and copy it.'),
+                            )
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
                   )}
                   {selected.detail === null ? null : (
                     <p className={styles.warnText}>{selected.detail}</p>

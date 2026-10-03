@@ -229,3 +229,58 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
 }
+
+.loginHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.copyButton {
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.copyButton:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.reasoning {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.reasoningRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reasoningModel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.reasoningRow .input {
+  flex: none;
+  width: auto;
+  min-width: 170px;
+  padding: 4px 7px;
+  font-size: 12px;
+}

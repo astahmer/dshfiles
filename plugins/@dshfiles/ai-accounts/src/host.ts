@@ -1,3 +1,4 @@
+import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import {
   aiAccountsApi,
@@ -17,6 +18,7 @@ import {
 } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
+import { fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -182,6 +184,8 @@ const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: st
 }
 
 const buildProfile = (params: {
+  /** Per-model default effort ids this account pins. */
+  readonly reasoningDefaults?: Readonly<Record<string, string>>
   readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider>
   readonly provider: string
   readonly displayName: string
@@ -196,9 +200,25 @@ const buildProfile = (params: {
     if (template === undefined || models.some(model => model.id === id)) continue
     models.push({ ...template, id, provider: params.provider })
   }
+  // A pinned effort is offered as an override on the model it belongs to, which
+  // is the seam the adapter materializes a default through: an explicit caller
+  // choice still wins, and an unpinned model keeps the provider's own default.
+  const pins = params.reasoningDefaults ?? {}
+  const modelOverrides = Object.fromEntries(
+    Object.entries(pins).flatMap(([modelId, effortId]) => {
+      const model = models.find(candidate => candidate.id === modelId)
+      if (model === undefined) return []
+      const levels = (model as { thinkingLevelMap?: Record<string, string | null> })
+        .thinkingLevelMap
+      if (levels !== undefined && levels[effortId] === null) return []
+      return [[modelId, { reasoningEfforts: { [effortId]: levels?.[effortId] ?? effortId } }]]
+    }),
+  )
+
   return {
     provider: params.provider,
     displayName: params.displayName,
+    ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
     transport: 'sse',
     streamIdleTimeoutMs: 120_000,
     maxRequestImageBytes: 20_971_520,
@@ -282,6 +302,9 @@ export const Config = z.object({
 })
 
 /** Live state the page and the status tool both read. */
+/** The context this plugin activated on, for handlers declared above setup. */
+let hostContext: Context | undefined
+
 let activeAccounts: {
   config: AiAccountsConfig
   pool: ReturnType<typeof createAccountPool>
@@ -319,6 +342,26 @@ const accountsHostApi = aiAccountsApi.host({
     return accountsFile()
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
+  catalog: async ({ input }) => {
+    const llm = hostContext?.get('llm')
+    if (llm === undefined) return { instanceId: input.instanceId, models: [] }
+    const models = await llm.listModels(input.instanceId)
+    const resolved = await Promise.all(
+      models.map(async model => {
+        const info = await llm.resolveModelInfo(input.instanceId, model.id)
+        return {
+          id: model.id,
+          name: model.name,
+          efforts: (info.reasoning?.efforts ?? []).map(effort => ({
+            id: effort.id,
+            name: effort.name,
+          })),
+          defaultEffort: info.reasoning?.defaultEffort ?? null,
+        }
+      }),
+    )
+    return { instanceId: input.instanceId, models: resolved }
+  },
   usage: async () => readAccountsUsage(),
 })
 
@@ -352,6 +395,7 @@ const unsupported = (): UsageCard => ({
   plan: null,
   windows: [],
   bankedResets: 0,
+  bankedResetExpiries: [],
 })
 
 /**
@@ -425,6 +469,7 @@ export default definePlugin({
   tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
+    hostContext = ctx
     const file = readAccountFileSync()
     const config = readConfig({ distribution: file.distribution, cooldownMs: file.cooldownMs, codexShadowRoot: file.shadowRoot, codexAccounts: file.accounts, opencodeAccounts: file.accounts })
     const routes = buildRoutes(config)
@@ -443,6 +488,24 @@ export default definePlugin({
             keyEnv: route.apiKeyEnv,
           })
         : opencodeUpstream
+    // Per-account, per-model default efforts, read from the same file as the
+    // routes so a pin can never outlive the account that declared it.
+    //
+    // The pin is applied as a pi-ai model override rather than in the request
+    // waterfall: a loop-built request arrives deep-frozen and `next()` takes no
+    // replacement, so the request cannot be edited here. The adapter's own
+    // default is the seam DSH materializes defaults through, so a pin applies
+    // whenever the caller did not choose an effort.
+    const reasoningPins = readAccountFileSync().accounts.map(
+      account =>
+        [
+          account.instanceId,
+          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null
+            ? (account.reasoningDefaults as Record<string, string>)
+            : {},
+        ] as const,
+    )
+
     const profiles = new Map<string, ResolvedPiAiProviderProfile>(
       enabled.map(([id, route]) => [
         id,
@@ -450,6 +513,8 @@ export default definePlugin({
           upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
           provider: id,
           displayName: route.displayName,
+          reasoningDefaults:
+            reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
           additionalModelIds:
             route.kind === CODEX_KIND
               ? (config.codexAccounts.find(
@@ -522,6 +587,8 @@ export default definePlugin({
       },
     })
 
+    const disposers: Array<() => void> = []
+
     llm.registerConfigurableProviders(
       enabled.map(([id, route]) => ({
         provider: id,
@@ -535,10 +602,29 @@ export default definePlugin({
       adapter,
     )
 
+    // Offer catalog discovery for each route's settings namespace, so the Models
+    // page can interrogate the endpoint and offer newly advertised models rather
+    // than leaving the picker on whatever shipped with the plugin.
+    for (const [id, route] of enabled) {
+      if (route.kind !== COMMANDCODE_KIND) continue
+      disposers.push(
+        llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
+          const entries = await fetchCommandCodeCatalog({
+            baseUrl: request.baseURL ?? route.apiBaseUrl,
+            keyEnv: request.apiKey ?? route.apiKeyEnv,
+          })
+          return entries.map(entry => ({
+            id: entry.id,
+            contextWindow: 128_000,
+            maxTokens: 8_192,
+            inputModalities: ['text'],
+          }))
+        }),
+      )
+    }
+
 
     ctx.effect(() => {
-      const disposers: Array<() => void> = []
-
       disposers.push(
         ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
           // A conversation's account is bound before the call and credited only

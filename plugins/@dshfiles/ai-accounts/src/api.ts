@@ -44,6 +44,11 @@ export const accountProfileSchema = z.object({
   loginHint: z.string().max(2048),
   detail: z.string().max(400).nullable(),
   additionalModelIds: z.array(z.string().max(120)).max(32),
+  /**
+   * Default reasoning effort per model id. Absent means the provider's own
+   * default, so an account only lists the models it wants to pin.
+   */
+  reasoningDefaults: z.record(z.string().max(160), z.string().max(32)).default({}),
 })
 
 /** What the page may write: identity and health are observed, never authored. */
@@ -60,6 +65,7 @@ export const accountDraftSchema = accountProfileSchema.pick({
   accentColor: true,
   providerIcon: true,
   additionalModelIds: true,
+  reasoningDefaults: true,
 })
 
 export const accountsFileSchema = z.object({
@@ -84,6 +90,8 @@ export const usageCardSchema = z.object({
     )
     .max(6),
   bankedResets: z.number().int().min(0).max(20),
+  /** When each banked reset expires, when the provider reports it. */
+  bankedResetExpiries: z.array(z.number().nullable()).max(20),
 })
 
 export const accountsUsageSchema = z.object({
@@ -97,6 +105,19 @@ export const accountsUsageSchema = z.object({
   ),
 })
 
+export const accountsCatalogSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  models: z.array(
+    z.object({
+      id: z.string().min(1).max(200),
+      name: z.string().max(200),
+      efforts: z.array(z.object({ id: z.string().max(64), name: z.string().max(80) })).max(12),
+      defaultEffort: z.string().max(32).nullable(),
+    }),
+  ),
+})
+
+export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
 
@@ -153,6 +174,25 @@ export const aiAccountsApi = defineApi({
     identity: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: identityResultSchema,
+    }),
+    /**
+     * One account's model catalog with the reasoning levels each model
+     * supports, so the panel can offer a default effort per model instead of
+     * guessing what a model accepts.
+     */
+    catalog: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      output: z.object({
+        instanceId: z.string().min(1).max(64),
+        models: z.array(
+          z.object({
+            id: z.string().min(1).max(200),
+            name: z.string().max(200),
+            efforts: z.array(z.object({ id: z.string().max(64), name: z.string().max(80) })).max(12),
+            defaultEffort: z.string().max(32).nullable(),
+          }),
+        ),
+      }),
     }),
     /**
      * Live subscription quota for every account. Each card is read with its own

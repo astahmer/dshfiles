@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { readCodexResetCredits } from './codex-reset-credits.js'
 import { join } from 'node:path'
 import { z } from 'zod'
 
@@ -31,6 +32,7 @@ export const usageCardSchema = z.object({
   windows: z.array(usageWindowSchema.extend({ label: z.string().max(32) })).max(6),
   /** Windows the provider banked for later, when it reports them. */
   bankedResets: z.number().int().min(0).max(20),
+  bankedResetExpiries: z.array(z.number().nullable()).max(20),
 })
 
 export type UsageWindow = z.infer<typeof usageWindowSchema>
@@ -43,12 +45,21 @@ const error = (message: string): UsageCard => ({
   plan: null,
   windows: [],
   bankedResets: 0,
+  bankedResetExpiries: [],
 })
 
 const empty = (
   status: UsageCard['status'],
   message: string | null = null,
-): UsageCard => ({ status, message, identity: null, plan: null, windows: [], bankedResets: 0 })
+): UsageCard => ({
+  status,
+  message,
+  identity: null,
+  plan: null,
+  windows: [],
+  bankedResets: 0,
+  bankedResetExpiries: [],
+})
 
 /** Codex answers in its own wire shape; map it onto our window model. */
 const codexWindowSchema = z.object({
@@ -69,7 +80,6 @@ const codexUsageSchema = z.object({
       .optional(),
     // Codex reports credits and reset banking alongside the windows.
     credits: z.object({}).loose().optional(),
-    banked_resets: z.number().optional(),
   })
 
 
@@ -100,6 +110,7 @@ const resetAtFrom = (window: z.infer<typeof codexWindowSchema>): number | null =
 
 /** Read one Codex account's live quota using the credential in its own home. */
 export const readCodexUsage = async (codexHome: string): Promise<UsageCard> => {
+  const credits = await readCodexResetCredits(codexHome)
   let auth: z.infer<typeof codexAuthSchema>
   try {
     auth = codexAuthSchema.parse(JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
@@ -144,7 +155,7 @@ export const readCodexUsage = async (codexHome: string): Promise<UsageCard> => {
         resetsAt: resetAtFrom(secondary ?? {}),
       })
     }
-    if (windows.length === 0) return empty('ok')
+    if (windows.length === 0 && credits.available === 0) return empty('ok')
 
     return {
       status: 'ok',
@@ -152,7 +163,8 @@ export const readCodexUsage = async (codexHome: string): Promise<UsageCard> => {
       identity: null,
       plan: body.plan_type ?? null,
       windows,
-      bankedResets: typeof body.banked_resets === 'number' ? body.banked_resets : 0,
+      bankedResets: credits.available,
+      bankedResetExpiries: credits.resets.map(reset => reset.expiresAt ?? null),
     }
   } catch (cause) {
     return error(cause instanceof Error ? cause.message : 'Codex usage could not be read.')
@@ -215,6 +227,7 @@ export const readOpenCodeUsage = async (apiKey: string): Promise<UsageCard> => {
       plan: null,
       windows,
       bankedResets: 0,
+      bankedResetExpiries: [],
     }
   } catch (cause) {
     return error(cause instanceof Error ? cause.message : 'OpenCode usage could not be read.')
