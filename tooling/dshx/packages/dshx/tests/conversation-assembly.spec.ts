@@ -7,18 +7,14 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { runInNewContext } from 'node:vm'
-import type {
-  ChatConversationViewNode,
-  ConversationEventInput,
-  ConversationNodeDefinition,
-  ConversationViewDefinition,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationNodeDefinition, ConversationViewDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { SessionEvent, SessionEventMap, SessionEventType } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
 import { defineConversation } from '../src/conversation/index.js'
 import { getConversationContributionParts } from '../src/conversation/define.js'
 
-type PublicClientRuntime = typeof import('@deepseek-ai/dsh-client-runtime/client')
+type PublicClientRuntime = typeof import('@deepseek-ai/dsh-client-ui-conversation/client')
 type TestAssembler = InstanceType<PublicClientRuntime['ConversationNodeAssembler']>
 
 interface ClientModuleRegistration {
@@ -27,7 +23,7 @@ interface ClientModuleRegistration {
 
 function loadPublicClientRuntime(): PublicClientRuntime {
   const require = createRequire(import.meta.url)
-  const entry = require.resolve('@deepseek-ai/dsh-client-runtime/client')
+  const entry = require.resolve('@deepseek-ai/dsh-client-ui-conversation/client')
   let registration: ClientModuleRegistration | undefined
   runInNewContext(readFileSync(entry, 'utf8'), {
     window: {
@@ -39,12 +35,14 @@ function loadPublicClientRuntime(): PublicClientRuntime {
     },
   })
   if (registration === undefined) {
-    throw new Error('public dsh-client-runtime bundle did not register its module factory')
+    throw new Error('public conversation client bundle did not register its module factory')
   }
-  return registration.factory(id => require(id)) as PublicClientRuntime
+  return registration.factory(id =>
+    id === '@deepseek-ai/dsh-client-ui-primitives' || id === '@deepseek-ai/dsh-client-store' ? {} : require(id),
+  ) as PublicClientRuntime
 }
 
-const { ConversationNodeAssembler, conversationContextKey } = loadPublicClientRuntime()
+const { ConversationNodeAssembler } = loadPublicClientRuntime()
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -122,8 +120,8 @@ function sessionEvent<Type extends SessionEventType>(type: Type, seq: number, da
   } as SessionEvent<Type>
 }
 
-function input<Type extends SessionEventType>(type: Type, seq: number, data: SessionEventMap[Type]): ConversationEventInput {
-  return { event: sessionEvent(type, seq, data), view: undefined }
+function input<Type extends SessionEventType>(type: Type, seq: number, data: SessionEventMap[Type]) {
+  return { type: 'event' as const, event: sessionEvent(type, seq, data) }
 }
 
 const start = input('dshx-test/assembly-start', 10, {
@@ -172,10 +170,12 @@ const reviewComponent = reviewConversation.render(() => null)
 const reviewParts = getConversationContributionParts(reviewComponent)
 
 function assembler(): TestAssembler {
-  return new ConversationNodeAssembler(
+  const value = new ConversationNodeAssembler(
     new TestEventDefinitions([reviewParts.definition as unknown as ConversationNodeDefinition]),
     new TestViewDefinitions([testChatView()]),
   )
+  value.activateTarget('chat')
+  return value
 }
 
 function snapshotOf(value: TestAssembler): TestSnapshot {
@@ -202,7 +202,7 @@ describe('Conversation component official assembler integration', () => {
 
     expect(snapshotOf(paged)).toEqual(snapshotOf(complete))
     expect(snapshotOf(paged)[0]).toMatchObject({
-      key: conversationContextKey('assembly-review', 'review-1'),
+      key: '15:assembly-reviewreview-1',
       kind: 'assembly-review',
       id: 'review-1',
       target: 'chat',
@@ -239,7 +239,7 @@ describe('Conversation component official assembler integration', () => {
     const before = snapshotOf(value)
 
     expect(value.rebuildRegistry()).toBe('immediate')
-    expect(snapshotOf(value)).toEqual([])
+    expect(value.snapshot('chat')).toBeUndefined()
     expect(value.flush()).toBe(true)
     expect(snapshotOf(value)).toEqual(before)
   })

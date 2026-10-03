@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import WebSocket from 'ws'
+import WebSocket, { type RawData } from 'ws'
 
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
@@ -17,47 +17,48 @@ const sessionSummarySchema = z.object({
   parentSessionId: z.string().optional(),
   origin: z.enum(['subagent']).optional(),
   cwd: z.string().optional(),
-  projections: z.unknown().optional(),
+  projections: jsonValueSchema.optional(),
 })
 
 const pluginSchema = z.object({
   entryId: z.string(),
   moduleName: z.string(),
+  meta: jsonValueSchema.optional(),
   enabled: z.boolean(),
-  fiberPhase: z.string().nullable().optional(),
-  displayName: z.string().optional(),
-  description: z.string().optional(),
-  error: z.unknown().optional(),
+  fiberPhase: z.enum(['pending', 'loading', 'active', 'failed', 'unloading']).nullable(),
   readOnlyReason: z.string().optional(),
 })
 
 const bundleSchema = z.object({
   name: z.string(),
-  selected: z.boolean().optional(),
-  enabled: z.boolean().optional(),
-  installed: z.boolean().optional(),
-  optional: z.boolean().optional(),
-  removable: z.boolean().optional(),
-  readOnly: z.boolean().optional(),
+  description: z.string().optional(),
+  enabled: z.boolean(),
+  installed: z.boolean(),
+  optional: z.boolean(),
+  removable: z.boolean(),
+  readOnlyReason: z.enum(['management-required', 'unaddressable']).optional(),
   error: z.unknown().optional(),
-  rows: z.array(z.unknown()).optional(),
-  overrides: z.array(z.unknown()).optional(),
+  rows: z.array(z.object({ rowId: z.string(), moduleName: z.string(), entryId: z.string().optional() })),
+  overrides: z.array(z.string()),
 })
+
+const commandInputSchema = z.object({ hint: z.string(), attachments: z.boolean().optional() })
 
 const commandSchema = z.object({
   definitionId: z.string().optional(),
   name: z.string(),
-  description: z.string().optional(),
-  input: z.unknown().optional(),
+  description: z.string(),
+  input: commandInputSchema.optional(),
 })
 
 const settingsNamespaceSchema = z.object({
   ns: z.string(),
   schema: jsonValueSchema,
   value: jsonValueSchema,
+  autoGenerate: z.boolean(),
   revision: z.number().safe().nonnegative(),
-  applies: z.string().optional(),
-  secrets: z.unknown().optional(),
+  applies: z.literal('live'),
+  secrets: z.array(z.object({ path: z.array(z.string()), set: z.boolean() })),
 })
 
 const settingsDescriptionSchema = z.object({
@@ -94,10 +95,12 @@ const snapshotSchema = z.object({
   cursor: z.number().safe().min(-1),
 })
 
-const historyRecordSchema = z.object({
-  type: z.literal('event'),
-  event: z.object({ seq: z.number().safe().nonnegative() }).passthrough(),
-}).passthrough()
+const historyRecordSchema = z
+  .object({
+    type: z.literal('event'),
+    event: z.object({ seq: z.number().safe().nonnegative() }).passthrough(),
+  })
+  .passthrough()
 
 export interface SessionSummary {
   readonly sessionId: string
@@ -108,27 +111,26 @@ export interface SessionSummary {
   readonly parentSessionId?: string
   readonly origin?: 'subagent'
   readonly cwd?: string
+  readonly projections?: JsonValue
 }
 
 export interface PluginSummary {
   readonly id: string
   readonly moduleName: string
+  readonly meta?: JsonValue
   readonly enabled: boolean
   readonly phase?: string | null
-  readonly displayName?: string
-  readonly description?: string
-  readonly error?: JsonValue
   readonly readOnlyReason?: string
 }
 
 export interface BundleSummary {
   readonly name: string
-  readonly selected?: boolean
-  readonly enabled?: boolean
-  readonly installed?: boolean
-  readonly optional?: boolean
-  readonly removable?: boolean
-  readonly readOnly?: boolean
+  readonly description?: string
+  readonly enabled: boolean
+  readonly installed: boolean
+  readonly optional: boolean
+  readonly removable: boolean
+  readonly readOnlyReason?: string
   readonly error?: JsonValue
   readonly rowCount?: number
 }
@@ -136,16 +138,18 @@ export interface BundleSummary {
 export interface CommandSummary {
   readonly definitionId?: string
   readonly name: string
-  readonly description?: string
+  readonly description: string
+  readonly input?: { readonly hint: string; readonly attachments?: boolean | undefined } | undefined
 }
 
 export interface SettingsNamespace {
   readonly ns: string
   readonly schema: JsonValue
   readonly value: JsonValue
+  readonly autoGenerate: boolean
   readonly revision: number
-  readonly applies?: string
-  readonly secrets?: JsonValue
+  readonly applies: 'live'
+  readonly secrets: readonly { readonly path: readonly string[]; readonly set: boolean }[]
 }
 
 export interface SettingsDescription {
@@ -160,16 +164,17 @@ export interface SessionPage {
 }
 
 export interface ChangeResult {
-  readonly application: string
+  readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
   readonly changed: boolean
-  readonly stage?: string
-  readonly target?: string
+  readonly enabled?: boolean
+  readonly stage: 'install' | 'enable' | 'remove'
+  readonly target: string
+  readonly error?: { readonly code: string; readonly diagnostic?: string; readonly incompatible?: JsonValue }
   readonly warnings: readonly string[]
-  readonly errors: readonly string[]
 }
 
 export interface DshPlatformTransport {
-  rpc(namespace: string, method: string, args: readonly JsonValue[]): Promise<unknown>
+  rpc(namespace: string, method: string, args: readonly JsonValue[], signal?: AbortSignal): Promise<unknown>
   sessionCursor(sessionId: string): Promise<number>
 }
 
@@ -193,11 +198,11 @@ export interface DshPlatformClient {
   }
   readonly commands: {
     list(sessionId: string): Promise<readonly CommandSummary[]>
-    execute(sessionId: string, line: string): Promise<JsonValue | null>
+    execute(sessionId: string, line: string, signal?: AbortSignal): Promise<JsonValue | null>
   }
   readonly config: {
     describe(): Promise<SettingsDescription>
-    mutate(namespace: string, path: string, value: JsonValue | undefined, revision: number): Promise<SettingsDescription>
+    mutate(namespace: string, path: readonly string[], value: JsonValue | undefined, revision: number): Promise<SettingsDescription>
   }
 }
 
@@ -217,6 +222,12 @@ function parseJson(body: string, context: string): unknown {
   } catch {
     throw new DshPlatformError('invalid-response', `${context} returned invalid JSON.`)
   }
+}
+
+async function streamMessageText(data: RawData): Promise<string> {
+  if (Buffer.isBuffer(data)) return data.toString('utf8')
+  if (Array.isArray(data)) return Buffer.concat(data).toString('utf8')
+  return Buffer.from(data).toString('utf8')
 }
 
 function decodeJsonValue(value: unknown, context: string): JsonValue {
@@ -254,6 +265,7 @@ function mapSession(value: unknown): SessionSummary {
     ...(parsed.parentSessionId === undefined ? {} : { parentSessionId: parsed.parentSessionId }),
     ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
     ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
+    ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
   }
 }
 
@@ -262,11 +274,9 @@ function mapPlugin(value: unknown): PluginSummary {
   return {
     id: parsed.entryId,
     moduleName: parsed.moduleName,
+    ...(parsed.meta === undefined ? {} : { meta: parsed.meta }),
     enabled: parsed.enabled,
-    ...(parsed.fiberPhase === undefined ? {} : { phase: parsed.fiberPhase }),
-    ...(parsed.displayName === undefined ? {} : { displayName: parsed.displayName }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
-    ...(parsed.error === undefined ? {} : { error: decodeJsonValue(parsed.error, 'Plugin inventory') }),
+    phase: parsed.fiberPhase,
     ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
   }
 }
@@ -275,12 +285,12 @@ function mapBundle(value: unknown): BundleSummary {
   const parsed = bundleSchema.parse(value)
   return {
     name: parsed.name,
-    ...(parsed.selected === undefined ? {} : { selected: parsed.selected }),
-    ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
-    ...(parsed.installed === undefined ? {} : { installed: parsed.installed }),
-    ...(parsed.optional === undefined ? {} : { optional: parsed.optional }),
-    ...(parsed.removable === undefined ? {} : { removable: parsed.removable }),
-    ...(parsed.readOnly === undefined ? {} : { readOnly: parsed.readOnly }),
+    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    enabled: parsed.enabled,
+    installed: parsed.installed,
+    optional: parsed.optional,
+    removable: parsed.removable,
+    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
     ...(parsed.error === undefined ? {} : { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
     ...(parsed.rows === undefined ? {} : { rowCount: parsed.rows.length }),
   }
@@ -295,29 +305,42 @@ function mapSettings(value: unknown): SettingsDescription {
       ns: item.ns,
       schema: item.schema,
       value: item.value,
+      autoGenerate: item.autoGenerate,
       revision: item.revision,
-      ...(item.applies === undefined ? {} : { applies: item.applies }),
-      ...(item.secrets === undefined ? {} : { secrets: decodeJsonValue(item.secrets, 'Settings description') }),
+      applies: item.applies,
+      secrets: item.secrets,
     })),
   }
 }
 
 function mapChangeResult(value: unknown): ChangeResult {
-  const parsed = z.object({
-    application: z.string(),
-    changed: z.boolean(),
-    stage: z.string().optional(),
-    target: z.string().optional(),
-    warnings: z.array(z.string()).optional(),
-    errors: z.array(z.string()).optional(),
-  }).parse(value)
+  const parsed = z
+    .object({
+      application: z.enum(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
+      changed: z.boolean(),
+      enabled: z.boolean().optional(),
+      stage: z.enum(['install', 'enable', 'remove']),
+      target: z.string(),
+      error: z.object({ code: z.string(), diagnostic: z.string().optional(), incompatible: jsonValueSchema.optional() }).optional(),
+      warnings: z.array(z.string()).optional(),
+    })
+    .parse(value)
   return {
     application: parsed.application,
     changed: parsed.changed,
+    ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
     warnings: parsed.warnings ?? [],
-    errors: parsed.errors ?? [],
-    ...(parsed.stage === undefined ? {} : { stage: parsed.stage }),
-    ...(parsed.target === undefined ? {} : { target: parsed.target }),
+    stage: parsed.stage,
+    target: parsed.target,
+    ...(parsed.error === undefined
+      ? {}
+      : {
+          error: {
+            code: parsed.error.code,
+            ...(parsed.error.diagnostic === undefined ? {} : { diagnostic: parsed.error.diagnostic }),
+            ...(parsed.error.incompatible === undefined ? {} : { incompatible: parsed.error.incompatible }),
+          },
+        }),
   }
 }
 
@@ -329,12 +352,14 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
     const result = z.object({ records: z.array(jsonValueSchema), hasMore: z.boolean() }).parse(
-      await transport.rpc('session', 'page', [{
-        address: { kind: 'session', sessionId },
-        throughSeq,
-        ...(beforeSeq === undefined ? {} : { beforeSeq }),
-        maxMessages,
-      }]),
+      await transport.rpc('session', 'page', [
+        {
+          address: { kind: 'session', sessionId },
+          throughSeq,
+          ...(beforeSeq === undefined ? {} : { beforeSeq }),
+          maxMessages,
+        },
+      ]),
     )
     return { records: result.records, hasMore: result.hasMore }
   }
@@ -345,19 +370,12 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     sessions: {
       list: listSessions,
       create: async input => {
-        const parsed = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(
-          await transport.rpc('session', 'create', [input]),
-        )
-        return parsed.agentPreset === undefined
-          ? { sessionId: parsed.sessionId }
-          : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
+        const parsed = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(await transport.rpc('session', 'create', [input]))
+        return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
-      fork: async (sessionId, atSeq) => z.object({ sessionId: z.string() }).parse(
-        await transport.rpc('session', 'fork', [{ sessionId, ...(atSeq === undefined ? {} : { atSeq }) }]),
-      ),
-      cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(
-        await transport.rpc('session', 'cancel', [{ sessionId }]),
-      ),
+      fork: async (sessionId, atSeq) =>
+        z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', [{ sessionId, ...(atSeq === undefined ? {} : { atSeq }) }])),
+      cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', [{ sessionId }])),
       page,
       history: async (sessionId, maxMessages = 100) => {
         const throughSeq = await transport.sessionCursor(sessionId)
@@ -365,23 +383,28 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       },
       export: async sessionId => {
         const throughSeq = await transport.sessionCursor(sessionId)
-        const records: JsonValue[] = []
+        const pages: JsonValue[][] = []
         let beforeSeq: number | undefined
         let hasMore = true
         while (hasMore) {
           const current = await page(sessionId, throughSeq, beforeSeq, 250)
-          records.push(...current.records)
+          pages.push([...current.records])
           hasMore = current.hasMore
           if (hasMore) {
-            const sequenceValues = current.records.map(record => historyRecordSchema.safeParse(record)).flatMap(result => result.success ? [result.data.event.seq] : [])
-            const nextBeforeSeq = sequenceValues.reduce<number | undefined>((minimum, value) => minimum === undefined || value < minimum ? value : minimum, undefined)
+            const sequenceValues = current.records
+              .map(record => historyRecordSchema.safeParse(record))
+              .flatMap(result => (result.success ? [result.data.event.seq] : []))
+            const nextBeforeSeq = sequenceValues.reduce<number | undefined>(
+              (minimum, value) => (minimum === undefined || value < minimum ? value : minimum),
+              undefined,
+            )
             if (nextBeforeSeq === undefined || nextBeforeSeq === beforeSeq) {
               throw new DshPlatformError('invalid-history-page', 'DSH reported more session history without an earlier event cursor.')
             }
             beforeSeq = nextBeforeSeq
           }
         }
-        return records.reverse()
+        return pages.reverse().flatMap(items => items)
       },
     },
     plugins: {
@@ -404,20 +427,21 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         return values.map(item => ({
           ...(item.definitionId === undefined ? {} : { definitionId: item.definitionId }),
           name: item.name,
-          ...(item.description === undefined ? {} : { description: item.description }),
+          description: item.description,
+          ...(item.input === undefined ? {} : { input: item.input }),
         }))
       },
-      execute: async (sessionId, line) => {
+      execute: async (sessionId, line, signal) => {
         if (!line.startsWith('/')) throw new DshPlatformError('invalid-command', 'DSH commands must start with / at byte 0.')
-        const result = await transport.rpc('commands', 'execute', [sessionId, line, []])
+        const result = await transport.rpc('commands', 'execute', [sessionId, line, []], signal)
         return result === undefined ? null : decodeJsonValue(result, 'Command execution')
       },
     },
     config: {
       describe,
       mutate: async (namespace, path, value, revision) => {
-        const op = value === undefined ? { op: 'unset', path } : { op: 'set', path, value }
-        await transport.rpc('settings', 'mutate', [{ ns: namespace, ops: [op], expectedRevision: revision }])
+        const op = value === undefined ? { op: 'unset', path: [...path] } : { op: 'set', path: [...path], value }
+        await transport.rpc('settings', 'mutate', [namespace, [op], revision])
         return describe()
       },
     },
@@ -445,14 +469,18 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     throw new DshPlatformError('connection-failed', 'Could not reach the local DSH launch URL. Check that dsh is running and the launch URL is current.')
   }
   const cookies = exchange.headers.getSetCookie()
-  const cookie = cookies.map(item => item.split(';', 1)[0]).filter(Boolean).join('; ')
+  const cookie = cookies
+    .map(item => item.split(';', 1)[0])
+    .filter(Boolean)
+    .join('; ')
   if (!exchange.ok && exchange.status !== 302 && exchange.status !== 303) {
-    if (exchange.status === 401 || exchange.status === 403) throw new DshPlatformError('authentication-failed', 'DSH rejected the launch URL. Copy the current tokenized URL printed by dsh.')
+    if (exchange.status === 401 || exchange.status === 403)
+      throw new DshPlatformError('authentication-failed', 'DSH rejected the launch URL. Copy the current tokenized URL printed by dsh.')
     throw new DshPlatformError('authentication-failed', `DSH launch authentication failed with HTTP ${exchange.status}.`)
   }
   if (!cookie) throw new DshPlatformError('authentication-failed', 'DSH did not issue an authenticated session cookie for the launch URL.')
 
-  const rpc = async (namespace: string, method: string, args: readonly JsonValue[]): Promise<unknown> => {
+  const rpc = async (namespace: string, method: string, args: readonly JsonValue[], signal?: AbortSignal): Promise<unknown> => {
     const rpcId = randomUUID()
     let response: Response
     try {
@@ -461,14 +489,17 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
         redirect: 'error',
         headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({ type: 'client-request', rpcId, method: `${namespace}/${method}`, payload: { args } }),
+        ...(signal === undefined ? {} : { signal }),
       })
     } catch {
+      if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH command request was cancelled by the caller.')
       throw new DshPlatformError('rpc-unreachable', 'The DSH API request failed. Confirm the local Host is running and use its current launch URL.')
     }
     if (response.status === 401) throw new DshPlatformError('authentication-expired', 'The DSH session expired. Copy the current tokenized URL printed by dsh.')
     if (!response.ok) throw new DshPlatformError('rpc-http-error', `DSH API returned HTTP ${response.status} for ${namespace}/${method}.`)
     const envelope = rpcResponseSchema.safeParse(parseJson(await response.text(), `DSH ${namespace}/${method}`))
-    if (!envelope.success || envelope.data.rpcId !== rpcId) throw new DshPlatformError('invalid-response', `DSH ${namespace}/${method} returned an invalid RPC response.`)
+    if (!envelope.success || envelope.data.rpcId !== rpcId)
+      throw new DshPlatformError('invalid-response', `DSH ${namespace}/${method} returned an invalid RPC response.`)
     if (!envelope.data.result.ok) {
       const remoteError = envelope.data.result.error
       throw new DshPlatformError(remoteError.code ?? 'remote-error', remoteError.message)
@@ -476,59 +507,74 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     return envelope.data.result.value
   }
 
-  const sessionCursor = async (sessionId: string): Promise<number> => new Promise((resolve, reject) => {
-    const streamId = randomUUID()
-    const url = new URL('/api/remote.mux', parsed.origin)
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socket = new WebSocket(url, { headers: { cookie, origin: parsed.origin } })
-    const timeout = setTimeout(() => finish(new DshPlatformError('stream-timeout', 'DSH did not open the session history stream in time.')), 10_000)
-    let settled = false
-    const finish = (error?: DshPlatformError, cursor?: number): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      socket.removeAllListeners()
-      if (socket.readyState === WebSocket.OPEN) {
-        if (error === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
-        socket.close()
+  const sessionCursor = async (sessionId: string): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const streamId = randomUUID()
+      const url = new URL('/api/remote.mux', parsed.origin)
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      const socket = new WebSocket(url, { headers: { cookie, origin: parsed.origin } })
+      const timeout = setTimeout(() => finish(new DshPlatformError('stream-timeout', 'DSH did not open the session history stream in time.')), 10_000)
+      let settled = false
+      const finish = (error?: DshPlatformError, cursor?: number): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        socket.removeAllListeners()
+        if (socket.readyState === WebSocket.OPEN) {
+          if (error === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
+          socket.close()
+        }
+        if (error !== undefined) reject(error)
+        else if (cursor !== undefined) resolve(cursor)
+        else reject(new DshPlatformError('invalid-response', 'DSH closed the history stream without a snapshot.'))
       }
-      if (error !== undefined) reject(error)
-      else if (cursor !== undefined) resolve(cursor)
-      else reject(new DshPlatformError('invalid-response', 'DSH closed the history stream without a snapshot.'))
-    }
-    socket.once('open', () => {
-      socket.send(JSON.stringify({
-        type: 'open',
-        streamId,
-        endpoint: 'session/follow',
-        payload: { args: [{ address: { kind: 'session', sessionId }, maxMessages: 1 }] },
-      }))
+      socket.once('open', () => {
+        socket.send(
+          JSON.stringify({
+            type: 'open',
+            streamId,
+            endpoint: 'session/follow',
+            payload: { args: [{ address: { kind: 'session', sessionId }, maxMessages: 1 }] },
+          }),
+        )
+      })
+      socket.on('message', data => {
+        void streamMessageText(data)
+          .then(body => {
+            let response: unknown
+            try {
+              response = parseJson(body, 'DSH session stream')
+            } catch {
+              finish(new DshPlatformError('invalid-response', 'DSH sent invalid JSON on the session history stream.'))
+              return
+            }
+            const frame = streamFrameSchema.safeParse(response)
+            if (!frame.success || frame.data.streamId !== streamId) {
+              finish(new DshPlatformError('invalid-response', 'DSH sent an invalid session history frame.'))
+              return
+            }
+            if (frame.data.type === 'error') {
+              finish(new DshPlatformError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'DSH session history stream failed.'))
+              return
+            }
+            if (frame.data.type === 'end') {
+              finish(new DshPlatformError('invalid-response', 'DSH closed the history stream before sending its snapshot.'))
+              return
+            }
+            const snapshot = snapshotSchema.safeParse(frame.data.value)
+            if (!snapshot.success) {
+              finish(new DshPlatformError('invalid-response', 'DSH session history stream did not begin with a snapshot.'))
+              return
+            }
+            finish(undefined, snapshot.data.cursor)
+          })
+          .catch(() => finish(new DshPlatformError('invalid-response', 'Could not read the DSH session history frame.')))
+      })
+      socket.once('error', () =>
+        finish(new DshPlatformError('stream-unreachable', 'Could not open DSH session history. Confirm that the DSH Host is running.')),
+      )
+      socket.once('close', () => finish(new DshPlatformError('stream-closed', 'DSH closed the session history stream before it returned a cursor.')))
     })
-    socket.on('message', data => {
-      const body = Buffer.isBuffer(data) ? data.toString('utf8') : Array.isArray(data) ? Buffer.concat(data).toString('utf8') : data.toString()
-      const frame = streamFrameSchema.safeParse(parseJson(body, 'DSH session stream'))
-      if (!frame.success || frame.data.streamId !== streamId) {
-        finish(new DshPlatformError('invalid-response', 'DSH sent an invalid session history frame.'))
-        return
-      }
-      if (frame.data.type === 'error') {
-        finish(new DshPlatformError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'DSH session history stream failed.'))
-        return
-      }
-      if (frame.data.type === 'end') {
-        finish(new DshPlatformError('invalid-response', 'DSH closed the history stream before sending its snapshot.'))
-        return
-      }
-      const snapshot = snapshotSchema.safeParse(frame.data.value)
-      if (!snapshot.success) {
-        finish(new DshPlatformError('invalid-response', 'DSH session history stream did not begin with a snapshot.'))
-        return
-      }
-      finish(undefined, snapshot.data.cursor)
-    })
-    socket.once('error', () => finish(new DshPlatformError('stream-unreachable', 'Could not open DSH session history. Confirm that the DSH Host is running.')))
-    socket.once('close', () => finish(new DshPlatformError('stream-closed', 'DSH closed the session history stream before it returned a cursor.')))
-  })
 
   return makeTypedClient({ rpc, sessionCursor })
 }

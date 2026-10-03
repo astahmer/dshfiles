@@ -49,7 +49,6 @@ export interface CliArgs {
   readonly noColor?: boolean
   readonly url?: string
   readonly session?: string
-  readonly namespace?: string
   readonly line?: string
   readonly output?: string
   readonly agentPreset?: string
@@ -79,7 +78,6 @@ const valueOptions = new Set([
   '--port',
   '--url',
   '--session',
-  '--namespace',
   '--line',
   '--output',
   '--agent-preset',
@@ -99,6 +97,7 @@ const booleanOptions = new Set([
   '--open',
   '--dry-run',
   '--fix',
+  '--explain',
   '--quiet',
   '--no-color',
 ])
@@ -184,7 +183,6 @@ const sharedArgs = {
   noColor: { type: 'boolean', description: 'Disable terminal colors.' },
   url: { type: 'string', description: 'Tokenized local DSH launch URL (defaults to DSHX_URL).', valueHint: 'url' },
   session: { type: 'string', description: 'Scope a DSH command operation to this Session.', valueHint: 'id' },
-  namespace: { type: 'string', description: 'Select a DSH settings namespace.', valueHint: 'id' },
   line: { type: 'string', description: 'Run one slash-prefixed DSH command line.', valueHint: 'command' },
   output: { type: 'string', description: 'Write an export to this file.', valueHint: 'path' },
   agentPreset: { type: 'string', description: 'Create the Session with this DSH Agent preset.', valueHint: 'id' },
@@ -279,9 +277,21 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   for (const token of parsed._) {
     if (token === undefined) continue
     if (
-      token === 'build' || token === 'check' || token === 'dev' || token === 'inspect' || token === 'add' || token === 'test' || token === 'package' ||
-      token === 'status' || token === 'info' || token === 'doctor' || token === 'sessions' || token === 'plugins' || token === 'bundles' ||
-      token === 'commands' || token === 'config'
+      token === 'build' ||
+      token === 'check' ||
+      token === 'dev' ||
+      token === 'inspect' ||
+      token === 'add' ||
+      token === 'test' ||
+      token === 'package' ||
+      token === 'status' ||
+      token === 'info' ||
+      token === 'doctor' ||
+      token === 'sessions' ||
+      token === 'plugins' ||
+      token === 'bundles' ||
+      token === 'commands' ||
+      token === 'config'
     ) {
       if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
       command = token
@@ -328,7 +338,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const noColor = parsed.noColor ?? false
   const url = parsed.url
   const session = parsed.session
-  const namespace = parsed.namespace
   const line = parsed.line
   const output = parsed.output
   const agentPreset = parsed.agentPreset
@@ -353,7 +362,15 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     port = value
   }
 
-  const platformCommand = command === 'status' || command === 'info' || command === 'doctor' || command === 'sessions' || command === 'plugins' || command === 'bundles' || command === 'commands' || command === 'config'
+  const platformCommand =
+    command === 'status' ||
+    command === 'info' ||
+    command === 'doctor' ||
+    command === 'sessions' ||
+    command === 'plugins' ||
+    command === 'bundles' ||
+    command === 'commands' ||
+    command === 'config'
   if (json && command !== undefined && command !== 'check' && command !== 'inspect' && command !== 'add' && !platformCommand)
     throw new CliUsageError('--json is only valid with check, inspect, or add.')
   if (open && command !== undefined && command !== 'dev') throw new CliUsageError('--open is only valid with dev.')
@@ -362,13 +379,14 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError('DSHX4147: --dry-run is only valid with add commands or check --fix.')
   if (fix && command !== 'check') throw new CliUsageError('DSHX4147: --fix is only valid with check.')
   if (runtime && command !== 'check') throw new CliUsageError('--runtime is only valid with check.')
-  if (url !== undefined && !platformCommand) throw new CliUsageError('--url is only valid with DSH platform commands.')
-  if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create')) throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
+  if (url !== undefined && (!platformCommand || command === 'info')) throw new CliUsageError('--url is not used by this DSH platform command.')
+  if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create'))
+    throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
   if (session !== undefined && command !== 'commands') throw new CliUsageError('--session is only valid with commands.')
-  if (namespace !== undefined && command !== 'config') throw new CliUsageError('--namespace is only valid with config.')
   if (line !== undefined && command !== 'commands') throw new CliUsageError('--line is only valid with commands run.')
   if (output !== undefined && !(command === 'sessions' && platformArgs[0] === 'export')) throw new CliUsageError('--output is only valid with sessions export.')
-  if (agentPreset !== undefined && !(command === 'sessions' && platformArgs[0] === 'create')) throw new CliUsageError('--agent-preset is only valid with sessions create.')
+  if (agentPreset !== undefined && !(command === 'sessions' && platformArgs[0] === 'create'))
+    throw new CliUsageError('--agent-preset is only valid with sessions create.')
   if (max !== undefined && !(command === 'sessions' && platformArgs[0] === 'history')) throw new CliUsageError('--max is only valid with sessions history.')
   if (atSeq !== undefined && !(command === 'sessions' && platformArgs[0] === 'fork')) throw new CliUsageError('--at-seq is only valid with sessions fork.')
   if (command === 'status' || command === 'info' || command === 'doctor') {
@@ -376,7 +394,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   if (command === 'sessions' && !help) {
     const [action, id, ...extra] = platformArgs
-    if (!['list', 'show', 'history', 'create', 'fork', 'cancel', 'export'].includes(action ?? '')) throw new CliUsageError('sessions requires list, show, history, create, fork, cancel, or export.')
+    if (!['list', 'show', 'history', 'create', 'fork', 'cancel', 'export'].includes(action ?? ''))
+      throw new CliUsageError('sessions requires list, show, history, create, fork, cancel, or export.')
     if (['show', 'history', 'fork', 'cancel', 'export'].includes(action ?? '') && !id) throw new CliUsageError(`sessions ${action} requires a Session id.`)
     if (extra.length > 0) throw new CliUsageError(`sessions ${action} accepts no extra positional arguments.`)
     if (['list', 'create'].includes(action ?? '') && id !== undefined) throw new CliUsageError(`sessions ${action} accepts no positional argument.`)
@@ -395,20 +414,19 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (action === 'run' && line !== undefined && platformArgs.length > 1) throw new CliUsageError('Use either a command line argument or --line, not both.')
     if (action === 'info' && !commandName) throw new CliUsageError('commands info requires a command name.')
     if (action === 'run' && line === undefined && platformArgs.length < 2) throw new CliUsageError('commands run requires a slash-prefixed line or --line.')
-    if (action !== 'run' && (commandName !== undefined || extra.length > 0)) throw new CliUsageError(`commands ${action} accepts no extra positional arguments.`)
+    if (action !== 'run' && (commandName !== undefined || extra.length > 0))
+      throw new CliUsageError(`commands ${action} accepts no extra positional arguments.`)
   }
   if (command === 'config' && !help) {
-    const [action, namespaceArg, path, ...extra] = platformArgs
+    const [action, namespace, path, ...extra] = platformArgs
     if (!['list', 'get', 'set', 'unset'].includes(action ?? '')) throw new CliUsageError('config requires list, get, set, or unset.')
-    const selectedNamespace = namespace ?? namespaceArg
-    if (namespace !== undefined && namespaceArg !== undefined) throw new CliUsageError('Select a config namespace either positionally or with --namespace, not both.')
-    if (action === 'list' && namespace !== undefined) throw new CliUsageError('config list accepts no --namespace.')
-    if (action !== 'list' && selectedNamespace === undefined) throw new CliUsageError(`config ${action} requires a settings namespace.`)
+    if (action !== 'list' && namespace === undefined) throw new CliUsageError(`config ${action} requires a settings namespace.`)
     if (action === 'get' && extra.length > 0) throw new CliUsageError('config get accepts one optional path.')
     if ((action === 'set' || action === 'unset') && path === undefined) throw new CliUsageError(`config ${action} requires a settings path.`)
     if (action === 'set' && extra.length === 0) throw new CliUsageError('config set requires a JSON value.')
     if (action === 'unset' && extra.length > 0) throw new CliUsageError('config unset accepts no JSON value.')
-    if (action === 'list' && (namespaceArg !== undefined || path !== undefined || extra.length > 0)) throw new CliUsageError('config list accepts no namespace or path.')
+    if (action === 'list' && (namespace !== undefined || path !== undefined || extra.length > 0))
+      throw new CliUsageError('config list accepts no namespace or path.')
   }
   if (!platformCommand && platformArgs.length > 0) throw new CliUsageError('Unexpected positional arguments.')
   if ((slot !== undefined || provider !== undefined || id !== undefined || order !== undefined) && command !== 'add')
@@ -426,9 +444,23 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
     throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
   if (command === 'add' && addTarget === undefined && !help && !version) throw new CliUsageError('Add requires a target: ui, tool, command, or hook.')
-  if (command === 'add' && addTarget !== 'ui' && addTarget !== 'panel' && addTarget !== 'api' && addTarget !== 'tool' && addTarget !== 'command' && addTarget !== 'hook')
+  if (
+    command === 'add' &&
+    addTarget !== 'ui' &&
+    addTarget !== 'panel' &&
+    addTarget !== 'api' &&
+    addTarget !== 'tool' &&
+    addTarget !== 'command' &&
+    addTarget !== 'hook'
+  )
     throw new CliUsageError('Only add ui, add tool, add command, and add hook are supported.')
-  if (command === 'add' && addTarget !== 'ui' && addTarget !== 'panel' && addTarget !== 'api' && (slot !== undefined || provider !== undefined || order !== undefined))
+  if (
+    command === 'add' &&
+    addTarget !== 'ui' &&
+    addTarget !== 'panel' &&
+    addTarget !== 'api' &&
+    (slot !== undefined || provider !== undefined || order !== undefined)
+  )
     throw new CliUsageError('Slot options are only valid with add ui.')
   if (command === 'add' && addTarget !== 'tool' && addTarget !== 'command' && (name !== undefined || description !== undefined))
     throw new CliUsageError('Name and description options are only valid with add tool or add command.')
@@ -464,7 +496,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(noColor ? { noColor } : {}),
       ...(url === undefined ? {} : { url }),
       ...(session === undefined ? {} : { session }),
-      ...(namespace === undefined ? {} : { namespace }),
       ...(line === undefined ? {} : { line }),
       ...(output === undefined ? {} : { output }),
       ...(agentPreset === undefined ? {} : { agentPreset }),
@@ -502,7 +533,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(noColor ? { noColor } : {}),
     ...(url === undefined ? {} : { url }),
     ...(session === undefined ? {} : { session }),
-    ...(namespace === undefined ? {} : { namespace }),
     ...(line === undefined ? {} : { line }),
     ...(output === undefined ? {} : { output }),
     ...(agentPreset === undefined ? {} : { agentPreset }),

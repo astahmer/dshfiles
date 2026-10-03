@@ -4,7 +4,7 @@ packages:
   - apps/*
 
 catalog:
-  "@types/node": 22.19.20
+  '@types/node': 22.19.20
   execa: 10.0.1
   prettier: 3.9.6
   typescript: 5.9.3
@@ -23,3 +23,33 @@ allowBuilds:
   node-pty: set this to true or false
   protobufjs: set this to true or false
   workerd: set this to true or false
+
+overrides:
+  '@esbuild-kit/core-utils>esbuild': 0.25.12
+  'postcss>nanoid': 3.3.18
+  '@deepseek-ai/cordis': 4.0.4
+  '@deepseek-ai/cordis-plugin-include': 1.0.9
+  '@deepseek-ai/cordis-plugin-loader': 1.0.5
+
+packageExtensions:
+  '@deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-chat@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-conversation@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-locale@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2

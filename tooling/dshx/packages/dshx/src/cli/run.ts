@@ -92,6 +92,8 @@ export interface CliRunOptions {
   readonly version?: string
 }
 
+const outputOptions = new WeakMap<Writable, { readonly quiet: boolean; readonly noColor: boolean }>()
+
 const require = createRequire(import.meta.url)
 
 function packageVersion(): string {
@@ -111,12 +113,14 @@ function defaultIO(): CliIO {
 }
 
 function write(stream: Writable, text: string): void {
+  if (outputOptions.get(stream)?.quiet) return
   stream.write(text)
 }
 
 type TerminalStyle = Parameters<typeof styleText>[0]
 
 function paint(stream: Writable, style: TerminalStyle, text: string): string {
+  if (outputOptions.get(stream)?.noColor) return text
   const terminal = stream as Writable & { isTTY?: boolean }
   if (terminal.isTTY !== true || process.env.NO_COLOR !== undefined || process.env.TERM === 'dumb') return text
   return styleText(style, text)
@@ -792,7 +796,7 @@ async function runAddTool(args: CliArgs, options: CliRunOptions, project: Resolv
   try {
     result =
       runtime.addTool === undefined
-        ? await createToolScaffold(toolOptions, { ...(runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest }) })
+        ? await createToolScaffold(toolOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addTool(toolOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -849,7 +853,7 @@ async function runAddCommand(args: CliArgs, options: CliRunOptions, project: Res
   try {
     result =
       runtime.addCommand === undefined
-        ? await createCommandScaffold(commandOptions, { ...(runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest }) })
+        ? await createCommandScaffold(commandOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addCommand(commandOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -1026,7 +1030,7 @@ async function runAddHook(args: CliArgs, options: CliRunOptions, project: Resolv
   try {
     result =
       runtime.addHook === undefined
-        ? await createHookScaffold(hookOptions, { ...(runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest }) })
+        ? await createHookScaffold(hookOptions, runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest })
         : await runtime.addHook(hookOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
@@ -1157,15 +1161,10 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
  * Answers offline, so the question "can I even use this slot, and what do I have to
  * import to see it" does not require a running Host.
  */
-const runSlotExplanation = async (
-  args: CliArgs,
-  io: CliIO,
-): Promise<number> => {
+const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => {
   const { CLIENT_SLOT_REFERENCES, findClientSlot } = await import('../client/slot-reference.js')
   if (args.json) {
-    const slots = args.root === undefined
-      ? CLIENT_SLOT_REFERENCES
-      : CLIENT_SLOT_REFERENCES.filter(slot => slot.name === args.root)
+    const slots = args.root === undefined ? CLIENT_SLOT_REFERENCES : CLIENT_SLOT_REFERENCES.filter(slot => slot.name === args.root)
     write(io.stdout, `${JSON.stringify({ slots }, null, 2)}\n`)
     return slots.length === 0 ? 1 : 0
   }
@@ -1209,19 +1208,37 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   try {
     args = parseCliArgs(argv)
   } catch (error) {
-    write(io.stderr, `error: ${error instanceof CliUsageError ? error.message : String(error)}\n`)
-    write(io.stderr, 'Run "dshx --help" for usage.\n')
+    const message = (error instanceof CliUsageError ? error.message : String(error)).replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]')
+    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'commands', 'config'])
+    const group = argv.find(token => platformGroups.has(token))
+    if (group !== undefined && argv.includes('--json')) {
+      const actions = new Set(['list', 'show', 'history', 'create', 'fork', 'cancel', 'export', 'info', 'enable', 'disable', 'run', 'get', 'set', 'unset'])
+      const groupIndex = argv.indexOf(group)
+      const action = argv.slice(groupIndex + 1).find(token => actions.has(token))
+      const command = action === undefined ? group : `${group} ${action}`
+      write(io.stdout, `${JSON.stringify({ schemaVersion: 1, command, ok: false, error: { code: 'usage', message } }, null, 2)}\n`)
+    } else {
+      write(io.stderr, `error: ${message}\n`)
+      write(io.stderr, 'Run "dshx --help" for usage.\n')
+    }
     return 2
   }
+  outputOptions.set(io.stdout, { quiet: args.quiet ?? false, noColor: args.noColor ?? false })
+  outputOptions.set(io.stderr, { quiet: false, noColor: args.noColor ?? false })
   // The slot reference is static, so it answers before a project is resolved and
   // before a Host is contacted.
   if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
-
   if (args.help) {
     const runtime = options.runtime ?? {}
     if (
-      args.command === 'status' || args.command === 'info' || args.command === 'doctor' || args.command === 'sessions' ||
-      args.command === 'plugins' || args.command === 'bundles' || args.command === 'commands' || args.command === 'config'
+      args.command === 'status' ||
+      args.command === 'info' ||
+      args.command === 'doctor' ||
+      args.command === 'sessions' ||
+      args.command === 'plugins' ||
+      args.command === 'bundles' ||
+      args.command === 'commands' ||
+      args.command === 'config'
     ) {
       return runPlatformCli(args, {
         io,
@@ -1239,10 +1256,17 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     write(io.stdout, `${options.version ?? VERSION}\n`)
     return 0
   }
+  if (args.command === 'inspect' && args.inspectTarget === 'slots' && args.explain) return runSlotExplanation(args, io)
   const runtime = options.runtime ?? {}
   if (
-    args.command === 'status' || args.command === 'info' || args.command === 'doctor' || args.command === 'sessions' ||
-    args.command === 'plugins' || args.command === 'bundles' || args.command === 'commands' || args.command === 'config'
+    args.command === 'status' ||
+    args.command === 'info' ||
+    args.command === 'doctor' ||
+    args.command === 'sessions' ||
+    args.command === 'plugins' ||
+    args.command === 'bundles' ||
+    args.command === 'commands' ||
+    args.command === 'config'
   ) {
     return runPlatformCli(args, {
       io,

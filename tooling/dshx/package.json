@@ -3,10 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.0.0",
-  "engines": {
-    "node": "^22.19.0 || >=24.0.0"
-  },
   "scripts": {
     "build": "pnpm --filter @dshfiles/dshx build && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx-plugin-marketplace build",
     "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src packages/plugin-marketplace/src packages/plugin-marketplace/tests scripts && pnpm --filter @dshfiles/dshx-framework-hub lint && pnpm --filter @dshfiles/dshx-hub-cli lint",
@@ -59,50 +55,8 @@
     "typescript-eslint": "^8.56.1",
     "vitest": "catalog:"
   },
-  "pnpm": {
-    "overrides": {
-      "@esbuild-kit/core-utils>esbuild": "0.25.12",
-      "postcss>nanoid": "3.3.18",
-      "@deepseek-ai/cordis": "4.0.4",
-      "@deepseek-ai/cordis-plugin-include": "1.0.9",
-      "@deepseek-ai/cordis-plugin-loader": "1.0.5"
-    },
-    "packageExtensions": {
-      "@deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-ui-chat@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-ui-conversation@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      },
-      "@deepseek-ai/dsh-client-locale@0.2.0-rc.2": {
-        "dependencies": {
-          "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2"
-        }
-      }
-    }
-  }
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@12.5.1"
 }

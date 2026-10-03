@@ -74,17 +74,121 @@ All add commands accept `--file`, `--dry-run`, and `--json`. They generate sourc
 
 ## Shared options
 
-| Option                | Commands            | Effect                                        |
-| --------------------- | ------------------- | --------------------------------------------- |
-| `--cwd <path>`        | all                 | Resolve another plugin project                |
-| `--verbose`           | all                 | Include underlying provider/process causes    |
-| `--json`              | check, inspect, add | Stable machine-readable output                |
-| `--runtime`           | check               | Enable Profile/Composition/runtime validation |
-| `--fix`               | check               | Apply deterministic manifest repairs          |
-| `--dry-run`           | check --fix, add    | Produce a plan/diff without writing           |
-| `--open`              | dev                 | Open the development URL                      |
-| `--port <0-65535>`    | dev                 | Select the DSH Web port; `0` allocates one    |
-| `--help`, `--version` | all                 | Print CLI metadata                            |
+| Option                | Commands                                   | Effect                                                             |
+| --------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
+| `--cwd <path>`        | project commands; sessions create          | Resolve another project or create a Session in a working directory |
+| `--verbose`           | all                                        | Include underlying provider/process causes                         |
+| `--json`              | check, inspect, add, DSH platform commands | Stable machine-readable output                                     |
+| `--quiet`             | all                                        | Suppress human success output; preserve JSON and errors            |
+| `--no-color`          | all                                        | Disable terminal styling                                           |
+| `--url <launch-url>`  | DSH platform commands                      | Override `DSHX_URL` for this invocation                            |
+| `--runtime`           | check                                      | Enable Profile/Composition/runtime validation                      |
+| `--fix`               | check                                      | Apply deterministic manifest repairs                               |
+| `--dry-run`           | check --fix, add                           | Produce a plan/diff without writing                                |
+| `--open`              | dev                                        | Open the development URL                                           |
+| `--port <0-65535>`    | dev                                        | Select the DSH Web port; `0` allocates one                         |
+| `--help`, `--version` | all                                        | Print CLI metadata                                                 |
+
+## DSH platform control plane
+
+These commands use DSH's authenticated local Remote APIs through the reusable
+typed client in `packages/dshx/src/platform/`. They do not read session storage,
+edit profile files, or call Cordis internals directly.
+
+```bash
+dshx status [--url <launch-url>] [--json]
+dshx info [--json]
+dshx doctor [--url <launch-url>] [--json]
+
+dshx sessions list
+dshx sessions show <session-id>
+dshx sessions history <session-id> [--max <count>]
+dshx sessions create [--cwd <path>] [--agent-preset <id>]
+dshx sessions fork <session-id> [--at-seq <sequence>]
+dshx sessions cancel <session-id>
+dshx sessions export <session-id> [--output <path>]
+
+dshx plugins list
+dshx plugins info <entry-id>
+dshx plugins enable <entry-id>
+dshx plugins disable <entry-id>
+dshx bundles list
+dshx bundles info <name>
+dshx bundles enable <name>
+dshx bundles disable <name>
+
+dshx commands list --session <session-id>
+dshx commands info <name> --session <session-id>
+dshx commands run '/command args' --session <session-id>
+dshx commands run --line '/command args' --session <session-id>
+
+dshx config list
+dshx config get <namespace> [path]
+dshx config set <namespace> <path> <json-value>
+dshx config unset <namespace> <path>
+```
+
+Add `--json` to get the versioned platform result envelope:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "plugins list",
+  "ok": true,
+  "data": { "items": [] }
+}
+```
+
+Errors use `{ "schemaVersion": 1, "command": "...", "ok": false,
+"error": { "code": "...", "message": "..." } }`. Exit codes are stable:
+`0` success, `1` Host/API or operation failure, `2` usage error, `4` target not
+found, `5` a plugin/bundle change that DSH did not apply, and `130` an
+interrupted command. `--quiet` only suppresses human-readable success output;
+JSON and errors remain visible.
+
+Set `DSHX_URL` to the current tokenized loopback launch URL printed by `dsh`, or
+pass `--url`. DSHX exchanges it for a Host cookie in memory and only permits
+loopback HTTP in this first client. The token is not sent to API endpoints,
+written to disk, or included in output.
+
+`status` checks Host connectivity and reports API-visible Session/plugin/bundle
+counts. `info` reports local DSHX and Node versions without connecting. `doctor`
+also checks local DSH, failed/duplicate plugin entries, bundle errors, settings
+availability, and RPC connectivity. DSH does not expose the selected profile,
+Host version, Client build state, or declared plugin compatibility through the
+inspected Remote APIs; `doctor` labels those facts unknown.
+
+`sessions show` preserves Session metadata and projection hints returned by DSH.
+History reads a cursor-bounded page through `session/follow` and `session/page`;
+export walks all pages in event order.
+
+Plugin and bundle changes use the Host's mutation APIs and report whether the
+change applied immediately, requires restart, failed, or was overridden. Their
+selection is profile-wide. Settings operations only target a namespace from
+`settings/describe`; writes are schema-validated by DSH and include the current
+revision. Secret values are redacted by DSH, and `config set` refuses secret
+paths because command arguments are visible to local process inspection and
+shell history. Change secrets in DSH Settings.
+
+`commands list/info/run` require a Session because the native API is
+Session-scoped. Info includes the command's optional input hint and attachment
+support. Run accepts only slash-prefixed lines and invokes a registered handler
+without a model turn; Ctrl-C aborts the command request through DSH's native
+`AbortSignal` support and exits 130. `sessions cancel` separately cancels
+active Agent work. The CLI currently sends no command attachments. Session
+export reads the bounded paging API and writes a versioned JSON file when
+`--output` is supplied.
+
+Standalone tool invocation, general service enumeration, profile enumeration,
+arbitrary profile/config-file edits, generic event watching, and log following
+are not exposed: the inspected DSH APIs have no safe matching boundary. The
+existing `dshx inspect tools|services|events` remains the development
+introspection surface.
+
+Focused validation passed with TypeScript 7.0.2, Oxlint 1.86.0, Oxfmt 0.71.0,
+and PNPM 12.5.1: the DSHX package build, CLI typecheck, formatting check, lint,
+and 16 focused Vitest tests. The tests use synthetic Host responses. No live
+authenticated DSH call or user-profile mutation was used for validation.
 
 ## `create-dshx`
 
