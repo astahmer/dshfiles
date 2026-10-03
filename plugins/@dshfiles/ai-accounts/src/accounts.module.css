@@ -359,3 +359,88 @@
   cursor: default;
   opacity: 0.45;
 }
+
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyRange {
+  padding: 3px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11px;
+}
+
+.historyRefresh {
+  padding: 3px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.historyRefresh:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyLabel {
+  flex: none;
+  width: 108px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.historySvg {
+  flex: 1;
+  height: 26px;
+  min-width: 0;
+}
+
+.historyLine {
+  fill: none;
+  stroke: var(--dsw-alias-brand-primary);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.historyAxis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+}
+
+.historyEmpty {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}

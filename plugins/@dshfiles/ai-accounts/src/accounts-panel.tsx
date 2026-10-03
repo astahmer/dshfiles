@@ -307,10 +307,73 @@ const ModelCuration = (props: {
   )
 }
 
+
+/**
+ * Quota over time for one account.
+ *
+ * Drawn as an inline sparkline per window rather than a charting library: the
+ * shape is one polyline per labelled window over a fixed time axis, which is
+ * enough to answer "is it draining faster than it resets" without shipping a
+ * dependency or a canvas the theme cannot restyle.
+ */
+const UsageHistoryChart = (props: {
+  readonly points: readonly { at: number; windows: Record<string, number> }[] | undefined
+  readonly days: number
+}): JSX.Element => {
+  const points = props.points ?? []
+  if (points.length < 2) {
+    return (
+      <p className={styles.historyEmpty}>
+        Not enough history yet. Quota is recorded every 15 minutes; check back shortly.
+      </p>
+    )
+  }
+  const labels = [...new Set(points.flatMap(point => Object.keys(point.windows)))]
+  const from = points[0]?.at ?? Date.now()
+  const span = Math.max(1, Date.now() - from)
+  const width = 100
+  const height = 24
+  return (
+    <div className={styles.history}>
+      {labels.map(label => {
+        const line = points
+          .filter(point => point.windows[label] !== undefined)
+          .map(point => {
+            const x = ((point.at - from) / span) * width
+            const remaining = point.windows[label] ?? 0
+            const y = height - (Math.max(0, Math.min(100, remaining)) / 100) * height
+            return `${x.toFixed(2)},${y.toFixed(2)}`
+          })
+          .join(' ')
+        return (
+          <div className={styles.historyRow} key={label}>
+            <span className={styles.historyLabel}>{label}</span>
+            <svg
+              className={styles.historySvg}
+              viewBox={`0 0 ${String(width)} ${String(height)}`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`${label} remaining over the last ${String(props.days)} days`}
+            >
+              <polyline className={styles.historyLine} points={line} />
+            </svg>
+          </div>
+        )
+      })}
+      <div className={styles.historyAxis}>
+        <span>{props.days}d ago</span>
+        <span>now</span>
+      </div>
+    </div>
+  )
+}
+
 export const AccountsPanel = (): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
   const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
+  const [history, setHistory] = useState<readonly { at: number; windows: Record<string, number> }[]>([])
+  const [historyDays, setHistoryDays] = useState(7)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
@@ -339,6 +402,19 @@ export const AccountsPanel = (): JSX.Element => {
       .then(setCatalog)
       .catch(() => setCatalog(null))
   }, [accounts, selectedId])
+
+  // History is read alongside the catalog, and a manual collect fills it in
+  // immediately rather than waiting for the next scheduled sweep.
+  useEffect(() => {
+    if (selectedId === null) {
+      setHistory([])
+      return
+    }
+    void accounts
+      .history({ instanceId: selectedId, days: historyDays })
+      .then(result => setHistory(result.points))
+      .catch(() => setHistory([]))
+  }, [accounts, selectedId, historyDays, usage])
 
   // Quota moves on its own, so refresh on an interval rather than per render.
   useEffect(() => {
@@ -698,6 +774,39 @@ export const AccountsPanel = (): JSX.Element => {
                 catalog={catalog?.models}
                 onChange={reasoningDefaults => setDraft({ ...draft, reasoningDefaults })}
               />
+
+              <div className={styles.historySection}>
+                <div className={styles.historyHead}>
+                  <span className={styles.fieldLabel}>Quota history</span>
+                  <select
+                    className={styles.historyRange}
+                    value={String(historyDays)}
+                    onChange={event => setHistoryDays(Number(event.target.value))}
+                    aria-label="History range"
+                  >
+                    {[1, 3, 7, 14, 30].map(days => (
+                      <option key={days} value={String(days)}>
+                        {days}d
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className={styles.historyRefresh}
+                    onClick={() => {
+                      if (selectedId === null) return
+                      void accounts
+                        .collectUsage()
+                        .then(() => accounts.history({ instanceId: selectedId, days: historyDays }))
+                        .then(result => setHistory(result.points))
+                        .catch(() => setNotice('Could not record usage right now.'))
+                    }}
+                  >
+                    Record now
+                  </button>
+                </div>
+                <UsageHistoryChart points={history} days={historyDays} />
+              </div>
 
               <UsageCardView
                 usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage}

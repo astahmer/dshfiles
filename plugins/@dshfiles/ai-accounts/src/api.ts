@@ -207,10 +207,33 @@ export const aiAccountsApi = defineApi({
       }),
     }),
     /**
+     * Stored quota readings for one account over a window, oldest first, so a
+     * chart reads left to right without re-sorting on the client.
+     */
+    history: method({
+      input: z.object({
+        instanceId: z.string().min(1).max(64),
+        days: z.number().int().min(1).max(90).default(7),
+      }),
+      output: z.object({
+        instanceId: z.string().min(1).max(64),
+        points: z.array(z.object({
+          at: z.number(),
+          windows: z.record(z.string().max(32), z.number()),
+          resetsAt: z.record(z.string().max(32), z.number()),
+          bankedResets: z.number().int().min(0).max(20),
+        })),
+      }),
+    }),
+
+    /**
      * Live subscription quota for every account. Each card is read with its own
      * credential and a short timeout, so one unreachable provider degrades one
      * card rather than the panel.
      */
     usage: method({ input: z.void(), output: accountsUsageSchema }),
+
+    /** Read now and record, so a fresh chart does not wait for the next poll. */
+    collectUsage: method({ input: z.void(), output: z.object({ recorded: z.number() }) }),
   },
 })

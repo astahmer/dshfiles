@@ -18,6 +18,7 @@ import {
 } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
+import { collectUsageHistory, readUsageHistory } from './usage-recorder.js'
 import { fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -89,6 +90,9 @@ declare module '@deepseek-ai/cordis' {
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
 export const COMMANDCODE_KIND = CC_KIND
+
+/** How often quota is recorded when the panel is not driving collection. */
+const HISTORY_INTERVAL_MS = 15 * 60_000
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -380,6 +384,19 @@ const accountsHostApi = aiAccountsApi.host({
     return { instanceId: input.instanceId, models: resolved }
   },
   usage: async () => readAccountsUsage(),
+  history: async ({ input }) => ({
+    instanceId: input.instanceId,
+    points: [...(await readUsageHistory(
+      hostContext as Context,
+      input.instanceId,
+      Date.now() - input.days * 24 * 60 * 60_000,
+    ))],
+  }),
+  collectUsage: async () => {
+    if (hostContext === undefined) return { recorded: 0 }
+    const recorded = await collectUsageHistory(hostContext, (await accountsFile()).accounts)
+    return { recorded }
+  },
 })
 
 /**
