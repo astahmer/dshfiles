@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } 
 import type { JujutsuState, Mutation, Revision } from './api.js'
 import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.js'
 import { jujutsuApi } from './api.js'
+import type { JujutsuTranslate } from './locales.js'
 import styles from './jujutsu.module.css'
 
 interface Preview {
@@ -29,22 +30,22 @@ interface RevisionDetails {
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
 const SELECTED_REPO_KEY = 'dshfiles.jujutsu.selected'
 
-const relativeTime = (value: string): string => {
-  const time = Date.parse(value)
-  if (!Number.isFinite(time)) return 'unknown time'
+const relativeTime = (input: { readonly value: string; readonly t: JujutsuTranslate }): string => {
+  const time = Date.parse(input.value)
+  if (!Number.isFinite(time)) return input.t('unknownTime')
   const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000))
-  if (seconds < 60) return 'now'
-  if (seconds < 3600) return Math.floor(seconds / 60) + 'm'
-  if (seconds < 86_400) return Math.floor(seconds / 3600) + 'h'
-  if (seconds < 604_800) return Math.floor(seconds / 86_400) + 'd'
+  if (seconds < 60) return input.t('relativeNow')
+  if (seconds < 3600) return input.t('relativeMinutes', { count: Math.floor(seconds / 60) })
+  if (seconds < 86_400) return input.t('relativeHours', { count: Math.floor(seconds / 3600) })
+  if (seconds < 604_800) return input.t('relativeDays', { count: Math.floor(seconds / 86_400) })
   return new Date(time).toLocaleDateString()
 }
 
-const dayLabel = (value: string): string => {
-  const time = Date.parse(value)
+const dayLabel = (input: { readonly value: string; readonly t: JujutsuTranslate }): string => {
+  const time = Date.parse(input.value)
   return Number.isFinite(time)
     ? new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
-    : 'Date unavailable'
+    : input.t('dateUnavailable')
 }
 
 const safeSplitPath = (path: string): boolean =>
@@ -56,10 +57,13 @@ const safeSplitPath = (path: string): boolean =>
   !path.startsWith('/') &&
   path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
 
-const groupRows = (revisions: readonly Revision[]): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
+const groupRows = (input: {
+  readonly revisions: readonly Revision[]
+  readonly t: JujutsuTranslate
+}): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
   const groups = new Map<string, Revision[]>()
-  for (const revision of revisions) {
-    const key = dayLabel(revision.authorTime)
+  for (const revision of input.revisions) {
+    const key = dayLabel({ value: revision.authorTime, t: input.t })
     const rows = groups.get(key) ?? []
     rows.push(revision)
     groups.set(key, rows)
@@ -67,8 +71,9 @@ const groupRows = (revisions: readonly Revision[]): readonly { readonly day: str
   return [...groups].map(([day, rows]) => ({ day, rows }))
 }
 
-export const JujutsuPanel = (): JSX.Element => {
+export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Element => {
   const api = useApi(jujutsuApi)
+  const t = props.t
   const [path, setPath] = useState('')
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState<readonly string[]>([])
@@ -131,7 +136,7 @@ export const JujutsuPanel = (): JSX.Element => {
         setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
       })
       .catch(reason => {
-        if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load this repository.')
+        if (!stale) setError(reason instanceof Error ? reason.message : t('loadRepositoryFailed'))
       })
       .finally(() => {
         if (!stale) setBusy(false)
@@ -139,7 +144,7 @@ export const JujutsuPanel = (): JSX.Element => {
     return () => {
       stale = true
     }
-  }, [repoId, reloadKey])
+  }, [repoId, reloadKey, t])
 
   useEffect(() => {
     if (repoId === null || selectedId === null) {
@@ -154,12 +159,12 @@ export const JujutsuPanel = (): JSX.Element => {
         if (!stale) setDetails(result)
       })
       .catch(reason => {
-        if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load revision details.')
+        if (!stale) setError(reason instanceof Error ? reason.message : t('loadDetailsFailed'))
       })
     return () => {
       stale = true
     }
-  }, [repoId, selectedId])
+  }, [repoId, selectedId, t])
 
   useEffect(() => {
     if (state === null) return
@@ -185,7 +190,7 @@ export const JujutsuPanel = (): JSX.Element => {
 
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
 
-  const groups = useMemo(() => groupRows(visibleRevisions), [visibleRevisions])
+  const groups = useMemo(() => groupRows({ revisions: visibleRevisions, t }), [visibleRevisions, t])
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
   const selectedRevision = state?.revisions.find(revision => revision.commitId === selectedId)
   const selectedDescribeText =
@@ -229,7 +234,7 @@ export const JujutsuPanel = (): JSX.Element => {
       localStorage.setItem(REPO_HISTORY_KEY, JSON.stringify(next))
       localStorage.setItem(SELECTED_REPO_KEY, registered.root)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not register this repository.')
+      setError(reason instanceof Error ? reason.message : t('registerFailed'))
     } finally {
       setBusy(false)
     }
@@ -245,7 +250,7 @@ export const JujutsuPanel = (): JSX.Element => {
       const next = await api.prepare({ repoId, action })
       if (previewRequestId.current === requestId) setPreview(next)
     } catch (reason) {
-      if (previewRequestId.current === requestId) setError(reason instanceof Error ? reason.message : 'Could not prepare this action.')
+      if (previewRequestId.current === requestId) setError(reason instanceof Error ? reason.message : t('prepareFailed'))
     }
   }
 
@@ -262,7 +267,7 @@ export const JujutsuPanel = (): JSX.Element => {
       setPreview(null)
       setReloadKey(value => value + 1)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Action was not completed.')
+      setError(reason instanceof Error ? reason.message : t('actionFailed'))
     } finally {
       setBusy(false)
       setReloadKey(value => value + 1)
@@ -289,7 +294,7 @@ export const JujutsuPanel = (): JSX.Element => {
       const result = await api.workingDiff({ repoId })
       setWorkingPatch(result.patch)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not load the working-copy diff.')
+      setError(reason instanceof Error ? reason.message : t('workingDiffFailed'))
     }
   }
 
@@ -298,20 +303,20 @@ export const JujutsuPanel = (): JSX.Element => {
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <div>
-            <h1>Jujutsu</h1>
-            <div className={styles.muted}>{state?.root ?? 'Select a repository to inspect its revision graph.'}</div>
+            <h1>{t('title')}</h1>
+            <div className={styles.muted}>{state?.root ?? t('selectRepositoryHint')}</div>
           </div>
           <button type="button" className={styles.secondary} disabled={busy || repoId === null} onClick={() => setReloadKey(value => value + 1)}>
-            ↻ Refresh
+            {t('refresh')}
           </button>
         </div>
         <form className={styles.repoForm} onSubmit={event => void register(event)}>
           <input
-            aria-label="Repository path"
+            aria-label={t('repositoryPath')}
             list="jj-repositories"
             value={path}
             onChange={event => setPath(event.target.value)}
-            placeholder="/path/to/repository"
+            placeholder={t('repositoryPathPlaceholder')}
           />
           <datalist id="jj-repositories">
             {repoHistory.map(item => (
@@ -319,9 +324,9 @@ export const JujutsuPanel = (): JSX.Element => {
             ))}
           </datalist>
           <button type="submit" disabled={busy || path.trim().length === 0}>
-            {repoId === null ? 'Open repository' : 'Select repository'}
+            {repoId === null ? t('openRepository') : t('selectRepository')}
           </button>
-          <select aria-label="Remote" value={remote} onChange={event => setRemote(event.target.value)} disabled={!state?.remoteNames.length}>
+          <select aria-label={t('remote')} value={remote} onChange={event => setRemote(event.target.value)} disabled={!state?.remoteNames.length}>
             {state?.remoteNames.map(name => (
               <option key={name} value={name}>
                 {name}
@@ -334,9 +339,9 @@ export const JujutsuPanel = (): JSX.Element => {
             disabled={repoId === null || remote === '' || busy}
             onClick={() => void askForConfirmation({ kind: 'fetch', remote })}
           >
-            Fetch
+            {t('fetch')}
           </button>
-          <select aria-label="Bookmark to push" value={bookmark} onChange={event => setBookmark(event.target.value)} disabled={!bookmark}>
+          <select aria-label={t('bookmarkToPush')} value={bookmark} onChange={event => setBookmark(event.target.value)} disabled={!bookmark}>
             {state?.revisions
               .flatMap(row => row.localBookmarks)
               .filter((name, index, all) => all.indexOf(name) === index)
@@ -352,28 +357,30 @@ export const JujutsuPanel = (): JSX.Element => {
             disabled={repoId === null || remote === '' || bookmark === '' || busy}
             onClick={() => void askForConfirmation({ kind: 'push', remote, bookmark })}
           >
-            Push
+            {t('push')}
           </button>
         </form>
         {state !== null && (
           <>
-            <div className={styles.statusLine} title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
-              Last recorded JJ push command:{' '}
+            <div className={styles.statusLine} title={state.lastPushDescription ?? t('lastPushHint')}>
+              {t('lastPushLabel')}{' '}
               {state.lastPushAt
-                ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
+                ? state.lastPushHistoryTruncated
+                  ? t('lastPushScanLimited', { time: relativeTime({ value: state.lastPushAt, t }) })
+                  : relativeTime({ value: state.lastPushAt, t })
                 : state.lastPushHistoryTruncated
-                  ? 'not found before the operation-history limit'
-                  : 'not found in the latest 1,000 operations'}
+                  ? t('lastPushNotFoundLimited')
+                  : t('lastPushNotFound')}
             </div>
-            {state.evolutionHistoryTruncated && <div className={styles.statusLine}>Evolution scan limited; some evolved markers may be missing.</div>}
+            {state.evolutionHistoryTruncated && <div className={styles.statusLine}>{t('evolutionScanLimited')}</div>}
           </>
         )}
-        <nav className={styles.tabs} aria-label="Jujutsu views">
+        <nav className={styles.tabs} aria-label={t('views')}>
           <button type="button" className={tab === 'graph' ? styles.activeTab : ''} onClick={() => setTab('graph')}>
-            Revision graph
+            {t('revisionGraph')}
           </button>
           <button type="button" className={tab === 'source' ? styles.activeTab : ''} onClick={() => setTab('source')}>
-            Source Control
+            {t('sourceControl')}
           </button>
         </nav>
       </header>
@@ -386,31 +393,36 @@ export const JujutsuPanel = (): JSX.Element => {
       {actionOutput && <pre className={styles.output}>{actionOutput}</pre>}
       {busy && (
         <div className={styles.loading} role="status">
-          Working…
+          {t('working')}
         </div>
       )}
 
       {tab === 'graph' && state !== null && (
         <section className={styles.graphView}>
           <div className={styles.filters}>
-            <input aria-label="Filter author" value={authorFilter} onChange={event => setAuthorFilter(event.target.value)} placeholder="Author" />
             <input
-              aria-label="Search revisions"
+              aria-label={t('filterAuthor')}
+              value={authorFilter}
+              onChange={event => setAuthorFilter(event.target.value)}
+              placeholder={t('authorPlaceholder')}
+            />
+            <input
+              aria-label={t('searchRevisions')}
               value={textFilter}
               onChange={event => setTextFilter(event.target.value)}
-              placeholder="Search descriptions, IDs, bookmarks, tags, workspaces"
+              placeholder={t('searchRevisionsPlaceholder')}
             />
             <label>
-              <input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} /> Mine
+              <input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} /> {t('mineOnly')}
             </label>
             <label>
-              <input type="checkbox" checked={hideImmutable} onChange={event => setHideImmutable(event.target.checked)} /> Hide immutable
+              <input type="checkbox" checked={hideImmutable} onChange={event => setHideImmutable(event.target.checked)} /> {t('hideImmutable')}
             </label>
             <label>
-              From <input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} />
+              {t('fromDate')} <input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} />
             </label>
             <label>
-              To <input type="date" value={toDate} onChange={event => setToDate(event.target.value)} />
+              {t('toDate')} <input type="date" value={toDate} onChange={event => setToDate(event.target.value)} />
             </label>
           </div>
           <div className={styles.graphColumns}>
@@ -437,11 +449,11 @@ export const JujutsuPanel = (): JSX.Element => {
                         }}
                       >
                         <div className={styles.revisionTitle}>
-                          {revision.workingCopy && <span className={styles.currentBadge}>Editing</span>}
-                          <span>{revision.description.split('\n')[0] || '(no description)'}</span>
+                          {revision.workingCopy && <span className={styles.currentBadge}>{t('editingBadge')}</span>}
+                          <span>{revision.description.split('\n')[0] || t('noDescription')}</span>
                         </div>
                         <div className={styles.revisionMeta}>
-                          <span>{revision.author || 'Unknown author'}</span>
+                          <span>{revision.author || t('unknownAuthor')}</span>
                           {revision.workspaces.map(workspace => (
                             <span className={styles.workspaceBadge} key={workspace}>
                               {workspace}
@@ -451,19 +463,19 @@ export const JujutsuPanel = (): JSX.Element => {
                             <span
                               className={link.hiddenImmutableCount > 0 ? styles.ancestryBridge : styles.parentLink}
                               key={link.commitId}
-                              title={link.hiddenImmutableCount > 0 ? 'Ancestry continues through hidden immutable revisions.' : 'Direct parent revision.'}
+                              title={link.hiddenImmutableCount > 0 ? t('ancestryBridgeHint') : t('directParentHint')}
                             >
                               {link.hiddenImmutableCount > 0
-                                ? `via ${link.hiddenImmutableCount} immutable → ${link.label}${link.terminal ? ' root' : ''}`
-                                : `parent ${link.label}`}
+                                ? t(link.terminal ? 'ancestryBridgeRoot' : 'ancestryBridge', { count: link.hiddenImmutableCount, label: link.label })
+                                : t('parentLink', { label: link.label })}
                             </span>
                           ))}
-                          {revision.immutable && <span className={styles.immutableBadge}>immutable</span>}
-                          {revision.evolved && <span className={styles.tag}>evolved</span>}
-                          {revision.divergent && <span className={styles.tag}>divergent</span>}
+                          {revision.immutable && <span className={styles.immutableBadge}>{t('immutableBadge')}</span>}
+                          {revision.evolved && <span className={styles.tag}>{t('evolvedBadge')}</span>}
+                          {revision.divergent && <span className={styles.tag}>{t('divergentBadge')}</span>}
                         </div>
                       </button>
-                      <span className={styles.relative}>{relativeTime(revision.authorTime)}</span>
+                      <span className={styles.relative}>{relativeTime({ value: revision.authorTime, t })}</span>
                       <span className={styles.changeId} title={revision.changeId}>
                         {revision.shortestChangeId}
                       </span>
@@ -472,7 +484,7 @@ export const JujutsuPanel = (): JSX.Element => {
                         className={styles.dragHandle}
                         draggable
                         onDragStart={event => startDrag(event, revision)}
-                        title="Drag revision to rebase after preview"
+                        title={t('dragRevisionHint')}
                       >
                         ⠿
                       </button>
@@ -492,7 +504,7 @@ export const JujutsuPanel = (): JSX.Element => {
                         ))}
                         {revision.tags.map(name => (
                           <span className={styles.tag} key={name}>
-                            tag {name}
+                            {t('tagLabel', { name })}
                           </span>
                         ))}
                       </div>
@@ -500,13 +512,13 @@ export const JujutsuPanel = (): JSX.Element => {
                   ))}
                 </div>
               ))}
-              {visibleRevisions.length === 0 && <p className={styles.muted}>No revisions match these filters.</p>}
+              {visibleRevisions.length === 0 && <p className={styles.muted}>{t('noMatchingRevisions')}</p>}
             </div>
             <aside className={styles.details}>
               {selectedRevision ? (
                 <>
                   <div className={styles.titleRow}>
-                    <h2>Revision {selectedRevision.shortestChangeId}</h2>
+                    <h2>{t('revisionHeading', { id: selectedRevision.shortestChangeId })}</h2>
                     <button
                       type="button"
                       className={styles.secondary}
@@ -515,18 +527,18 @@ export const JujutsuPanel = (): JSX.Element => {
                         setSelectedId(null)
                       }}
                     >
-                      Close
+                      {t('close')}
                     </button>
                   </div>
-                  <p>{selectedRevision.description || '(no description)'}</p>
+                  <p>{selectedRevision.description || t('noDescription')}</p>
                   <div className={styles.detailMeta}>
                     {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
                   </div>
                   {details ? (
                     <>
                       <div className={styles.counts}>
-                        {details.files.length} files · +{details.additions} −{details.deletions}
-                        {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
+                        {t('fileCounts', { count: details.files.length, additions: details.additions, deletions: details.deletions })}
+                        {details.truncated && <span className={styles.tag}>{t('diffTruncated')}</span>}
                       </div>
                       <ul className={styles.fileList}>
                         {details.files.map(file => (
@@ -539,21 +551,21 @@ export const JujutsuPanel = (): JSX.Element => {
                         ))}
                       </ul>
                       <details>
-                        <summary>Change evolution</summary>
+                        <summary>{t('changeEvolution')}</summary>
                         <pre>{details.evolution}</pre>
                       </details>
                       <details open>
-                        <summary>Diff</summary>
+                        <summary>{t('diff')}</summary>
                         <pre className={styles.diff}>{details.patch}</pre>
                       </details>
                     </>
                   ) : (
-                    <p className={styles.muted}>Loading revision details…</p>
+                    <p className={styles.muted}>{t('loadingDetails')}</p>
                   )}
                   {!selectedRevision.immutable && (
                     <div className={styles.actionBox}>
                       <label>
-                        New description
+                        {t('newDescription')}
                         <textarea
                           value={selectedDescribeText}
                           onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
@@ -565,13 +577,13 @@ export const JujutsuPanel = (): JSX.Element => {
                         disabled={!selectedDescribeChanged}
                         onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
                       >
-                        Preview describe
+                        {t('previewDescribe')}
                       </button>
                     </div>
                   )}
                 </>
               ) : (
-                <p className={styles.muted}>Select a revision to see its details, diff counts and evolution.</p>
+                <p className={styles.muted}>{t('selectRevisionHint')}</p>
               )}
             </aside>
           </div>
@@ -582,15 +594,15 @@ export const JujutsuPanel = (): JSX.Element => {
         <section className={styles.sourceView}>
           <div className={styles.sourceSummary}>
             <div>
-              <h2>Working copy</h2>
-              <pre>{state.status || 'Clean working copy.'}</pre>
+              <h2>{t('workingCopy')}</h2>
+              <pre>{state.status || t('cleanWorkingCopy')}</pre>
             </div>
             <div className={styles.sourceActions}>
               <button type="button" className={styles.secondary} onClick={() => void loadWorkingDiff()}>
-                Show full diff
+                {t('showFullDiff')}
               </button>
               <label>
-                Ancestor groups{' '}
+                {t('ancestorGroups')}{' '}
                 <select value={ancestorLimit} onChange={event => setAncestorLimit(Number(event.target.value))}>
                   {[1, 2, 3, 4, 5, 8, 10].map(count => (
                     <option key={count} value={count}>
@@ -603,26 +615,26 @@ export const JujutsuPanel = (): JSX.Element => {
           </div>
           {workingPatch !== null && (
             <details open>
-              <summary>Working-copy diff</summary>
+              <summary>{t('workingCopyDiff')}</summary>
               <pre className={styles.diff}>{workingPatch}</pre>
             </details>
           )}
           <div className={styles.sourceColumns}>
             <div className={styles.ancestorList}>
-              <h3>Ancestor groups</h3>
+              <h3>{t('ancestorGroups')}</h3>
               {ancestors.map(({ depth, revision }) => (
                 <button type="button" className={styles.ancestor} key={revision.commitId} onClick={() => setSquashTarget(revision.commitId)}>
                   <span>@-{depth}</span>
-                  <span>{revision.description.split('\n')[0] || '(no description)'}</span>
+                  <span>{revision.description.split('\n')[0] || t('noDescription')}</span>
                   <code>{revision.shortestChangeId}</code>
                 </button>
               ))}
-              {ancestors.length === 0 && <p className={styles.muted}>No visible @-1 ancestors in this graph window.</p>}
+              {ancestors.length === 0 && <p className={styles.muted}>{t('noAncestors')}</p>}
             </div>
             <div className={styles.sourceActions}>
-              <h3>Describe working copy</h3>
+              <h3>{t('describeWorkingCopy')}</h3>
               <textarea
-                aria-label="Working copy description"
+                aria-label={t('workingCopyDescription')}
                 value={workingDescribeText}
                 onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))}
                 rows={3}
@@ -633,10 +645,10 @@ export const JujutsuPanel = (): JSX.Element => {
                   disabled={!workingDescribeChanged}
                   onClick={() => void askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}
                 >
-                  Preview describe
+                  {t('previewDescribe')}
                 </button>
               )}
-              <h3>Split selected files from @</h3>
+              <h3>{t('splitHeading')}</h3>
               <div className={styles.fileChoices}>
                 {state.changedPaths.map(file => {
                   const selectable = safeSplitPath(file)
@@ -649,16 +661,16 @@ export const JujutsuPanel = (): JSX.Element => {
                         onChange={event => setSplitPaths(current => (event.target.checked ? [...current, file] : current.filter(item => item !== file)))}
                       />
                       {file}
-                      {!selectable && <span> — unsafe path format unavailable</span>}
+                      {!selectable && <span>{t('unsafePath')}</span>}
                     </label>
                   )
                 })}
               </div>
               <textarea
-                aria-label="Split description"
+                aria-label={t('splitDescription')}
                 value={splitText}
                 onChange={event => setSplitText(event.target.value)}
-                placeholder="Description for selected changes"
+                placeholder={t('splitDescriptionPlaceholder')}
                 rows={2}
               />
               {workingCopy && (
@@ -667,12 +679,12 @@ export const JujutsuPanel = (): JSX.Element => {
                   disabled={splitPaths.length === 0 || splitText.trim().length === 0}
                   onClick={() => void askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}
                 >
-                  Preview split
+                  {t('previewSplit')}
                 </button>
               )}
-              <h3>Squash working copy into ancestor</h3>
-              <select aria-label="Squash destination" value={squashTarget} onChange={event => setSquashTarget(event.target.value)}>
-                <option value="">Choose an ancestor</option>
+              <h3>{t('squashHeading')}</h3>
+              <select aria-label={t('squashDestination')} value={squashTarget} onChange={event => setSquashTarget(event.target.value)}>
+                <option value="">{t('chooseAncestor')}</option>
                 {ancestors.map(({ depth, revision }) => (
                   <option key={revision.commitId} value={revision.commitId}>
                     @-{depth} · {revision.shortestChangeId}
@@ -680,10 +692,10 @@ export const JujutsuPanel = (): JSX.Element => {
                 ))}
               </select>
               <textarea
-                aria-label="Squash description"
+                aria-label={t('squashDescription')}
                 value={squashText}
                 onChange={event => setSquashText(event.target.value)}
-                placeholder="Resulting description"
+                placeholder={t('squashDescriptionPlaceholder')}
                 rows={2}
               />
               {workingCopy && (
@@ -692,7 +704,7 @@ export const JujutsuPanel = (): JSX.Element => {
                   disabled={!squashTarget || squashText.trim().length === 0}
                   onClick={() => void askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}
                 >
-                  Preview squash
+                  {t('previewSquash')}
                 </button>
               )}
             </div>
@@ -703,15 +715,15 @@ export const JujutsuPanel = (): JSX.Element => {
       {preview && (
         <div className={styles.modalBackdrop} role="presentation">
           <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="jj-preview-title">
-            <h2 id="jj-preview-title">Confirm {preview.title.toLocaleLowerCase()}</h2>
+            <h2 id="jj-preview-title">{t('confirmActionTitle', { action: preview.title.toLocaleLowerCase() })}</h2>
             <strong>{preview.summary}</strong>
             <pre>{preview.detail}</pre>
             <div className={styles.modalActions}>
               <button type="button" className={styles.secondary} disabled={busy} onClick={() => setPreview(null)}>
-                Cancel
+                {t('cancel')}
               </button>
               <button type="button" disabled={busy} onClick={() => void confirm()}>
-                Confirm and run
+                {t('confirmAndRun')}
               </button>
             </div>
           </section>

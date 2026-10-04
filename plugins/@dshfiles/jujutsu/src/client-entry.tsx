@@ -3,18 +3,20 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { JujutsuPanel } from './client.js'
+import { JUJUTSU_LOCALE_NAMESPACE, jujutsuLocale } from './locales.js'
 
 const PANEL_ID = 'dshfiles-jujutsu'
 
 export default defineClient({
   name: '@dshfiles/jujutsu',
-  // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
+  locales: [jujutsuLocale],
   inject: ['slots'],
-  // The panel calls useApi, so the entry must be decorated: a raw component
-  // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(JujutsuPanel)))
+    const translate = ctx.locale.bind(JUJUTSU_LOCALE_NAMESPACE)
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: JUJUTSU_LOCALE_NAMESPACE }, PanelGlyph),
+    )
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: JUJUTSU_LOCALE_NAMESPACE }, decorate(JujutsuPanel)))
   },
 })
 

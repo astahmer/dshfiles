@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import {
   chooseRemovalTarget,
@@ -47,6 +48,7 @@ interface SecretMutationDialogProps {
   readonly onCreate: (input: SecretCreateForm) => void
   readonly onUpdate: (input: SecretUpdateForm) => void
   readonly onRemove: (target: SecretRemoveTarget, row: SecretMetadata) => void
+  readonly t: SecretCatalogTranslate
 }
 
 const optionalText = (value: string): string | undefined => (value.length === 0 ? undefined : value)
@@ -67,8 +69,15 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
   const [removeState, setRemoveState] = useState<RemovalDialogState>({ stage: 'choose' })
   const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
   const row = props.row
+  const t = props.t
+  const titleAlias = row?.alias ?? t('aliasFallback')
 
-  const title = props.mode === 'create' ? 'Add secret alias' : props.mode === 'edit' ? 'Edit ' + (row?.alias ?? 'alias') : 'Remove ' + (row?.alias ?? 'alias')
+  const title =
+    props.mode === 'create'
+      ? t('dialogAddTitle')
+      : props.mode === 'edit'
+        ? t('dialogEditTitle', { alias: titleAlias })
+        : t('dialogRemoveTitle', { alias: titleAlias })
 
   const submitCreate = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -128,7 +137,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
       >
         <header className={styles.dialogHeader}>
           <h2 id="secret-dialog-title">{title}</h2>
-          <button aria-label="Close dialog" disabled={props.pending} onClick={props.onClose} type="button">
+          <button aria-label={t('closeDialog')} disabled={props.pending} onClick={props.onClose} type="button">
             ×
           </button>
         </header>
@@ -140,7 +149,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
         {props.mode === 'create' && (
           <form className={styles.dialogForm} onSubmit={submitCreate}>
             <label>
-              Alias
+              {t('fieldAlias')}
               <input
                 autoComplete="off"
                 maxLength={128}
@@ -151,23 +160,23 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
               />
             </label>
             <label>
-              Target scope
+              {t('fieldTargetScope')}
               <select
                 onChange={event => {
                   if (isSecretScope(event.currentTarget.value)) setScope(event.currentTarget.value)
                 }}
                 value={scope}
               >
-                <option value="global">Global aliases</option>
-                <option value="project">Selected project</option>
+                <option value="global">{t('targetGlobal')}</option>
+                <option value="project">{t('targetProject')}</option>
                 <option disabled={!props.hasProjectFolder} value="local">
-                  Machine-local override
+                  {t('targetLocal')}
                 </option>
               </select>
             </label>
-            {scope !== 'global' && !props.hasProjectFolder && <p className={styles.formHint}>Choose a project folder before adding this alias.</p>}
+            {scope !== 'global' && !props.hasProjectFolder && <p className={styles.formHint}>{t('needsProjectFolder')}</p>}
             <label>
-              Environment
+              {t('fieldEnvironment')}
               <input
                 autoComplete="off"
                 maxLength={256}
@@ -178,7 +187,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
               />
             </label>
             <label>
-              Value creation
+              {t('fieldValueCreation')}
               <select
                 onChange={event => {
                   const nextMode = event.currentTarget.value === 'manual' ? 'manual' : 'generate'
@@ -187,50 +196,50 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                 }}
                 value={valueMode}
               >
-                <option value="generate">Generate on this Host</option>
-                <option value="manual">Enter value</option>
+                <option value="generate">{t('valueGenerate')}</option>
+                <option value="manual">{t('valueManual')}</option>
               </select>
             </label>
             {valueMode === 'generate' ? (
-              <p className={styles.formHint}>The CLI generates the value on this Host; it never enters the form.</p>
+              <p className={styles.formHint}>{t('generateHint')}</p>
             ) : (
               <label>
-                Secret value
+                {t('fieldSecretValue')}
                 <input autoComplete="new-password" onChange={event => setValue(event.currentTarget.value)} required type="password" value={value} />
               </label>
             )}
             <label>
-              Item name
+              {t('fieldItemName')}
               <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} value={name} />
             </label>
             <label>
-              Source URL
+              {t('fieldSourceUrl')}
               <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} value={source} />
             </label>
             <label>
-              Tags
-              <input autoComplete="off" onChange={event => setTags(event.currentTarget.value)} placeholder="Comma-separated" value={tags} />
+              {t('fieldTags')}
+              <input autoComplete="off" onChange={event => setTags(event.currentTarget.value)} placeholder={t('tagsPlaceholder')} value={tags} />
             </label>
             <label>
-              Item type
+              {t('fieldItemType')}
               <select onChange={event => setType(event.currentTarget.value)} value={type || 'login'}>
-                <option value="login">Login</option>
-                <option value="secure-note">Secure Note</option>
+                <option value="login">{t('itemTypeLogin')}</option>
+                <option value="secure-note">{t('itemTypeSecureNote')}</option>
               </select>
             </label>
             <label>
-              Field
-              <input autoComplete="off" onChange={event => setField(event.currentTarget.value)} placeholder="password" value={field} />
+              {t('fieldField')}
+              <input autoComplete="off" onChange={event => setField(event.currentTarget.value)} placeholder={t('fieldPlaceholder')} value={field} />
             </label>
             <footer className={styles.dialogActions}>
               <button disabled={props.pending} onClick={props.onClose} type="button">
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)}
                 type="submit"
               >
-                {props.pending ? 'Adding…' : 'Add alias'}
+                {props.pending ? t('adding') : t('addAlias')}
               </button>
             </footer>
           </form>
@@ -238,32 +247,32 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
         {props.mode === 'edit' && row !== undefined && (
           <form className={styles.dialogForm} onSubmit={submitUpdate}>
             <p className={styles.formHint}>
-              Alias: <strong>{row.alias}</strong> · {row.scope} · {row.environment}. Blank fields keep their current values.
+              {t('editAliasLabel')} <strong>{row.alias}</strong> · {row.scope} · {row.environment}. {t('editKeepHint')}
             </p>
             <label>
-              Item name
-              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} placeholder={row.item || 'Keep current'} value={name} />
+              {t('fieldItemName')}
+              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} placeholder={row.item || t('keepCurrent')} value={name} />
             </label>
             <label>
-              Source URL
-              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} placeholder={row.service || 'Keep current'} value={source} />
+              {t('fieldSourceUrl')}
+              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} placeholder={row.service || t('keepCurrent')} value={source} />
             </label>
             <label>
-              Tags
+              {t('fieldTags')}
               <input
                 autoComplete="off"
                 disabled={clearTags}
                 onChange={event => setTags(event.currentTarget.value)}
-                placeholder="Comma-separated"
+                placeholder={t('tagsPlaceholder')}
                 value={tags}
               />
             </label>
             <label className={styles.inlineField}>
               <input checked={clearTags} onChange={event => setClearTags(event.currentTarget.checked)} type="checkbox" />
-              Clear all tags
+              {t('clearAllTags')}
             </label>
             <label>
-              Replace value (optional)
+              {t('replaceValue')}
               <input
                 autoComplete="new-password"
                 onChange={event => {
@@ -274,21 +283,19 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                 value={value}
               />
             </label>
-            {value.length > 0 && valueReplacementStage === 'confirming' && (
-              <p className={styles.formHint}>Confirm that you want to replace the current secret value. The new value remains masked.</p>
-            )}
+            {value.length > 0 && valueReplacementStage === 'confirming' && <p className={styles.formHint}>{t('confirmReplacementHint')}</p>}
             <footer className={styles.dialogActions}>
               <button disabled={props.pending} onClick={props.onClose} type="button">
-                Cancel
+                {t('cancel')}
               </button>
               <button disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0)} type="submit">
                 {props.pending
-                  ? 'Saving…'
+                  ? t('saving')
                   : value.length > 0
                     ? valueReplacementStage === 'editing'
-                      ? 'Review replacement'
-                      : 'Confirm replacement'
-                    : 'Save changes'}
+                      ? t('reviewReplacement')
+                      : t('confirmReplacement')
+                    : t('saveChanges')}
               </button>
             </footer>
           </form>
@@ -298,10 +305,11 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
             {removeState.stage === 'choose' ? (
               <>
                 <p>
-                  Choose which stored record to remove for <strong>{row.alias}</strong>.
+                  {t('chooseRemovalPrefix')} <strong>{row.alias}</strong>
+                  {t('chooseRemovalSuffix')}
                 </p>
                 <button disabled={props.pending} onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))} type="button">
-                  Remove alias and all environment overrides
+                  {t('removeAliasAndOverrides')}
                 </button>
                 <button
                   className={styles.dangerButton}
@@ -309,27 +317,25 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                   onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))}
                   type="button"
                 >
-                  Delete the Bitwarden item…
+                  {t('deleteVaultItem')}
                 </button>
                 <footer className={styles.dialogActions}>
                   <button disabled={props.pending} onClick={props.onClose} type="button">
-                    Cancel
+                    {t('cancel')}
                   </button>
                 </footer>
               </>
             ) : (
               <>
                 <p className={styles.error} role="alert">
-                  {removeState.target === 'alias'
-                    ? 'Confirm removing alias ' + row.alias + ' and every environment override from its owning config. The Bitwarden item remains.'
-                    : 'Confirm deleting the Bitwarden item resolved by alias ' + row.alias + '. This cannot be undone.'}
+                  {removeState.target === 'alias' ? t('confirmRemoveAlias', { alias: row.alias }) : t('confirmDeleteItem', { alias: row.alias })}
                 </p>
                 <footer className={styles.dialogActions}>
                   <button disabled={props.pending} onClick={() => setRemoveState({ stage: 'choose' })} type="button">
-                    Back
+                    {t('back')}
                   </button>
                   <button className={styles.dangerButton} disabled={props.pending} onClick={finishRemove} type="button">
-                    {props.pending ? 'Removing…' : removeState.target === 'alias' ? 'Confirm remove alias' : 'Confirm delete item'}
+                    {props.pending ? t('removing') : removeState.target === 'alias' ? t('confirmRemoveAliasAction') : t('confirmDeleteItemAction')}
                   </button>
                 </footer>
               </>

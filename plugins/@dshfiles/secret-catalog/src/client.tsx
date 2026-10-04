@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
+import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { createWorkspacePickerPorts } from './workspace-picker-adapter.js'
 
@@ -20,22 +21,26 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/secret-catalog',
-  // setup(ctx) reads ctx.slots and ctx.remote. The `workspaces` store is resolved
-  // through the injected service at render time rather than captured here: a
-  // main-slot entry can mount after setup returned.
+  locales: [secretCatalogLocale],
   inject: ['slots', 'remote', 'workspaces'],
-  // The panel calls useApi, so the entry must be decorated: a raw component
-  // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
-    const label = (): string => 'Secret Catalog'
+    const translate = ctx.locale.bind(SECRET_CATALOG_LOCALE_NAMESPACE)
+    const label = (): string => translate('title')
     const workspaces = (): IWorkspaces => ctx.workspaces
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label, locale: SECRET_CATALOG_LOCALE_NAMESPACE }, PanelGlyph),
+    )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
-        { name: 'main', key: PANEL_ID },
-        decorate(() => (
-          <SecretCatalogPanel directoryPicker={pickerPorts.directoryPicker} workspaces={workspaces()} registerWorkspace={pickerPorts.registerWorkspace} />
+        { name: 'main', key: PANEL_ID, locale: SECRET_CATALOG_LOCALE_NAMESPACE },
+        decorate(props => (
+          <SecretCatalogPanel
+            directoryPicker={pickerPorts.directoryPicker}
+            workspaces={workspaces()}
+            registerWorkspace={pickerPorts.registerWorkspace}
+            t={props.t}
+          />
         )),
       ),
     )

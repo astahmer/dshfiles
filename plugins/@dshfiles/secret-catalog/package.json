@@ -2,6 +2,7 @@
   "name": "@dshfiles/secret-catalog",
   "version": "0.1.0",
   "private": true,
+  "description": "Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.",
   "files": [
     "dist",
     "cordis.patch.yml"
@@ -28,6 +29,7 @@
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-workspace-controller": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
@@ -45,6 +47,7 @@
     "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
@@ -62,7 +65,11 @@
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-api-workspace-controller",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "locales": [
+        "dshfiles.secretCatalog"
       ]
     }
   }

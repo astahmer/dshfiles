@@ -108,32 +108,36 @@ export const formatSettingsDraft = (value: unknown, kind: SettingsEditorKind, ch
   }
 }
 
-export type SettingsDraftParseResult = { readonly ok: true; readonly value: SettingsJsonValue } | { readonly ok: false; readonly message: string }
+export type SettingsDraftErrorKey = 'draftChooseOption' | 'draftChooseBoolean' | 'draftFiniteNumber' | 'draftValidJson' | 'draftJsonValue'
+
+export type SettingsDraftParseResult =
+  | { readonly ok: true; readonly value: SettingsJsonValue }
+  | { readonly ok: false; readonly messageKey: SettingsDraftErrorKey }
 
 export const parseSettingsDraft = (draft: string, kind: SettingsEditorKind, choices: readonly SettingsOption[] = []): SettingsDraftParseResult => {
   if (kind === 'string') return { ok: true, value: draft }
   if (kind === 'choice') {
     const index = z.number().int().nonnegative().safeParse(Number(draft))
-    if (!index.success || draft.trim().length === 0) return { ok: false, message: 'Choose one of the available options.' }
+    if (!index.success || draft.trim().length === 0) return { ok: false, messageKey: 'draftChooseOption' }
     const option = choices[index.data]
-    return option === undefined ? { ok: false, message: 'Choose one of the available options.' } : { ok: true, value: option.value }
+    return option === undefined ? { ok: false, messageKey: 'draftChooseOption' } : { ok: true, value: option.value }
   }
   if (kind === 'boolean') {
     if (draft === 'true') return { ok: true, value: true }
     if (draft === 'false') return { ok: true, value: false }
-    return { ok: false, message: 'Choose true or false.' }
+    return { ok: false, messageKey: 'draftChooseBoolean' }
   }
   if (kind === 'number') {
-    if (draft.trim().length === 0) return { ok: false, message: 'Enter a finite number.' }
+    if (draft.trim().length === 0) return { ok: false, messageKey: 'draftFiniteNumber' }
     const result = z.number().finite().safeParse(Number(draft))
-    return result.success ? { ok: true, value: result.data } : { ok: false, message: 'Enter a finite number.' }
+    return result.success ? { ok: true, value: result.data } : { ok: false, messageKey: 'draftFiniteNumber' }
   }
   let decoded: unknown
   try {
     decoded = JSON.parse(draft)
   } catch {
-    return { ok: false, message: 'Enter valid JSON.' }
+    return { ok: false, messageKey: 'draftValidJson' }
   }
   const result = jsonValueSchema.safeParse(decoded)
-  return result.success ? { ok: true, value: result.data } : { ok: false, message: 'Enter a JSON value.' }
+  return result.success ? { ok: true, value: result.data } : { ok: false, messageKey: 'draftJsonValue' }
 }

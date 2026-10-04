@@ -21,6 +21,7 @@ import {
   type SettingsSearchNamespace,
   type SettingsSearchResult,
 } from './settings-index.js'
+import { SETTINGS_SEARCH_LOCALE_NAMESPACE, settingsSearchLocale, type SettingsSearchTranslate } from './locales.js'
 import styles from './settings-search.module.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
@@ -30,6 +31,7 @@ const MAX_RESULTS = 60
 interface SettingsSearchPanelProps {
   readonly describe: SettingsDescribeFace
   readonly getForm: (entryId: string) => ConfigForm<unknown>
+  readonly t: SettingsSearchTranslate
 }
 
 interface SettingsFieldEditorProps {
@@ -37,12 +39,14 @@ interface SettingsFieldEditorProps {
   readonly namespace: SettingsSearchNamespace
   readonly form: ConfigForm<unknown>
   readonly onBack: () => void
+  readonly t: SettingsSearchTranslate
 }
 
 const snapshotFor = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> => form.getSnapshot()
 
 const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   const form = props.form
+  const t = props.t
   const snapshot = useSyncExternalStore(
     useCallback(listener => form.subscribe(listener), [form]),
     useCallback(() => snapshotFor(form), [form]),
@@ -76,18 +80,18 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   const save = async (): Promise<void> => {
     if (!canWrite || draftRevision === undefined) return
     if (!parsed.ok) {
-      setMessage(parsed.message)
+      setMessage(t(parsed.messageKey))
       return
     }
     setPending(true)
     setMessage(null)
     try {
       const accepted = await form.mutate(setOperationForSettingsTarget(props.result.target, parsed.value), draftRevision)
-      setMessage(accepted ? 'Saved.' : 'The Host refused this change. Your draft is still here.')
+      setMessage(accepted ? t('saved') : t('hostRefusedKeepDraft'))
       setConflict(!accepted)
       if (accepted) setDirty(false)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save this setting.')
+      setMessage(error instanceof Error ? error.message : t('saveFailed'))
     } finally {
       setPending(false)
     }
@@ -99,11 +103,11 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
     setMessage(null)
     try {
       const accepted = await form.mutate(unsetOperationForSettingsTarget(props.result.target), snapshot.revision)
-      setMessage(accepted ? 'Restored the inherited value.' : 'The Host refused this change.')
+      setMessage(accepted ? t('restored') : t('hostRefused'))
       setConflict(!accepted)
       if (accepted) setDirty(false)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not reset this setting.')
+      setMessage(error instanceof Error ? error.message : t('resetFailed'))
     } finally {
       setPending(false)
     }
@@ -127,7 +131,7 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   return (
     <section aria-labelledby="settings-search-editor-title" className={styles.editor}>
       <button className={styles.backButton} onClick={props.onBack} type="button">
-        ← Back to results
+        {t('backToResults')}
       </button>
       <p className={styles.contextNote}>{props.result.context}</p>
       <h2 id="settings-search-editor-title">{props.result.title}</h2>
@@ -135,17 +139,17 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
       <code className={styles.path}>
         {props.result.target.entryId} · {path.join(' · ')}
       </code>
-      {snapshot.status === 'loading' && <p role="status">Loading the current setting…</p>}
-      {snapshot.status === 'unavailable' && <p role="status">This setting is not available from the current Host.</p>}
+      {snapshot.status === 'loading' && <p role="status">{t('loadingSetting')}</p>}
+      {snapshot.status === 'unavailable' && <p role="status">{t('settingUnavailable')}</p>}
       {snapshot.status === 'ready' && (
         <>
           <label className={styles.valueField}>
-            <span>Current value</span>
+            <span>{t('currentValue')}</span>
             {kind === 'boolean' || kind === 'choice' ? (
               <select autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
                 {kind === 'choice' ? (
                   <>
-                    <option value="">Choose an option…</option>
+                    <option value="">{t('chooseOption')}</option>
                     {choices.map((choice, index) => (
                       <option key={String(index)} value={String(index)}>
                         {choice.label}
@@ -166,13 +170,13 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
             )}
           </label>
           <p className={styles.formHint}>
-            {snapshot.writable ? `Host document · revision ${snapshot.revision ?? 'pending'}` : 'The Host settings document is read-only.'}
-            {overridden ? ' · Custom value' : ' · Inherited value'}
+            {snapshot.writable ? t('hostDocumentRevision', { revision: snapshot.revision ?? t('revisionPending') }) : t('readOnly')}
+            {` · ${overridden ? t('customValue') : t('inheritedValue')}`}
           </p>
           {message !== null && <p role="status">{message}</p>}
           {conflict && (
             <button disabled={pending} onClick={reloadLatest} type="button">
-              Reload latest value
+              {t('reloadLatest')}
             </button>
           )}
           <footer className={styles.editorActions}>
@@ -183,7 +187,7 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
               }}
               type="button"
             >
-              {pending ? 'Saving…' : 'Save setting'}
+              {pending ? t('saving') : t('saveSetting')}
             </button>
             <button
               disabled={!canWrite || !overridden}
@@ -192,7 +196,7 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
               }}
               type="button"
             >
-              Restore inherited value
+              {t('restoreInherited')}
             </button>
           </footer>
         </>
@@ -203,6 +207,7 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
 
 const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const describe = props.describe
+  const t = props.t
   const mirror = useSyncExternalStore(
     useCallback(listener => describe.subscribe(listener), [describe]),
     useCallback(() => describe.getSnapshot(), [describe]),
@@ -266,9 +271,9 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
     if (selectedNamespace === undefined || selectedTarget === undefined) {
       return (
         <section className={styles.page}>
-          <p role="status">This settings entry is no longer available.</p>
+          <p role="status">{t('entryUnavailable')}</p>
           <button onClick={() => setSelected(null)} type="button">
-            Back to search
+            {t('backToSearch')}
           </button>
         </section>
       )
@@ -276,8 +281,8 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
     return (
       <div className={styles.page}>
         <header>
-          <h1>Settings Search</h1>
-          <p>Open and edit the matching setting from its Host configuration entry.</p>
+          <h1>{t('title')}</h1>
+          <p>{t('editorSubtitle')}</p>
         </header>
         <SettingsFieldEditor
           key={selectedTarget.id}
@@ -285,6 +290,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
           namespace={selectedNamespace}
           onBack={() => setSelected(null)}
           result={selectedTarget}
+          t={t}
         />
       </div>
     )
@@ -293,11 +299,11 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   return (
     <main className={styles.page}>
       <header>
-        <h1>Settings Search</h1>
-        <p>Find a setting by name, description, entry, or section path. Selecting a result opens its live Host-backed value.</p>
+        <h1>{t('title')}</h1>
+        <p>{t('searchSubtitle')}</p>
       </header>
       <label className={styles.searchLabel}>
-        <span className={styles.srOnly}>Search settings</span>
+        <span className={styles.srOnly}>{t('searchSettings')}</span>
         <input
           autoFocus
           autoComplete="off"
@@ -307,21 +313,19 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
             setActiveIndex(0)
           }}
           onKeyDown={navigateResults}
-          placeholder="Search settings…"
+          placeholder={t('searchPlaceholder')}
           type="search"
           value={query}
         />
       </label>
-      {mirror.status === 'loading' && <p role="status">Loading settings descriptors…</p>}
-      {mirror.error !== null && <p role="alert">Could not read settings: {mirror.error}</p>}
+      {mirror.status === 'loading' && <p role="status">{t('loadingDescriptors')}</p>}
+      {mirror.error !== null && <p role="alert">{t('readFailed', { error: mirror.error })}</p>}
       {trimmedQuery.length > 0 && (
-        <p className={styles.resultCount}>
-          {matched.length} {matched.length === 1 ? 'match' : 'matches'}
-        </p>
+        <p className={styles.resultCount}>{t(matched.length === 1 ? 'matchCountOne' : 'matchCountOther', { count: matched.length })}</p>
       )}
       {trimmedQuery.length === 0 && browseEntryId === null && (
-        <section aria-label="Settings entries" className={styles.namespaceList}>
-          <h2>Categories and entries</h2>
+        <section aria-label={t('settingsEntries')} className={styles.namespaceList}>
+          <h2>{t('categoriesHeading')}</h2>
           {namespaceGroups.map(({ namespace, title, count }) => (
             <button
               className={styles.namespaceButton}
@@ -335,20 +339,20 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
             >
               <strong>{title}</strong>
               <span>
-                {namespace.ns} · {count} searchable {count === 1 ? 'setting' : 'settings'}
+                {namespace.ns} · {t(count === 1 ? 'searchableSettingCountOne' : 'searchableSettingCountOther', { count })}
               </span>
             </button>
           ))}
-          {namespaceGroups.length === 0 && mirror.status === 'ready' && <p>No settings entries are available.</p>}
+          {namespaceGroups.length === 0 && mirror.status === 'ready' && <p>{t('noEntries')}</p>}
         </section>
       )}
       {trimmedQuery.length === 0 && browseEntryId !== null && (
         <button className={styles.backButton} onClick={() => setBrowseEntryId(null)} type="button">
-          ← All categories and entries
+          {t('allCategories')}
         </button>
       )}
       {visibleResults.length > 0 && (
-        <section aria-label="Matching settings" className={styles.results}>
+        <section aria-label={t('matchingSettings')} className={styles.results}>
           {visibleResults.map((result, index) => (
             <button
               aria-current={index === boundedActiveIndex ? 'true' : undefined}
@@ -362,34 +366,42 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
               {result.description.length > 0 && <p>{result.description}</p>}
               {result.options.length > 0 && (
                 <small className={styles.optionLabels}>
-                  Options:{' '}
+                  {t('optionsLabel')}{' '}
                   {result.options
                     .slice(0, 8)
                     .map(option => option.label)
                     .join(', ')}
-                  {result.options.length > 8 ? `, +${result.options.length - 8} more` : ''}
+                  {result.options.length > 8 ? t('moreOptions', { count: result.options.length - 8 }) : ''}
                 </small>
               )}
             </button>
           ))}
         </section>
       )}
-      {trimmedQuery.length > 0 && matched.length === 0 && mirror.status === 'ready' && <p>No settings match this search.</p>}
-      <p className={styles.keyboardHint}>↑ ↓ Navigate · Enter Open · Esc Clear</p>
+      {trimmedQuery.length > 0 && matched.length === 0 && mirror.status === 'ready' && <p>{t('noMatches')}</p>}
+      <p className={styles.keyboardHint}>{t('keyboardHint')}</p>
     </main>
   )
 }
 
 export default defineClient({
   name: '@dshfiles/settings-search',
-  // setup(ctx) reads ctx.slots and ctx.configForms.
+  locales: [settingsSearchLocale],
   inject: ['slots', 'configForms'],
   setup(ctx) {
     const getForm = (entryId: string): ConfigForm<unknown> => ctx.configForms.get<unknown>(entryId)
+    const translate = ctx.locale.bind(SETTINGS_SEARCH_LOCALE_NAMESPACE)
     ctx.slots.inject('settings.section', () =>
-      ctx.slots.register({ name: 'settings.section', id: SETTINGS_SEARCH_ID, order: 0, label: () => 'Search' }, () => (
-        <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} />
-      )),
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          id: SETTINGS_SEARCH_ID,
+          order: 0,
+          label: () => translate('sectionLabel'),
+          locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
+        },
+        props => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={props.t} />,
+      ),
     )
   },
 })

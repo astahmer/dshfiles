@@ -2,6 +2,7 @@
   "name": "@dshfiles/settings-search",
   "version": "0.1.0",
   "private": true,
+  "description": "Search every Settings field by label, section and option, and edit it in place.",
   "files": [
     "dist",
     "cordis.patch.yml"
@@ -32,6 +33,7 @@
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
@@ -45,6 +47,7 @@
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-remotes": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0"
   },
@@ -57,7 +60,11 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "locales": [
+        "dshfiles.settingsSearch"
       ]
     }
   }

@@ -12,6 +12,7 @@ import {
 import { createSecretActionPolicy, filterSecretMetadata, type SecretScopeFilter } from './secret-catalog-model.js'
 import { nextSecretRevealStage, previewSecretValue, type SecretRevealStage } from './secret-reveal-model.js'
 import { secretCatalogApi } from './api.js'
+import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import styles from './secret-catalog.module.css'
 
@@ -19,6 +20,7 @@ interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
   readonly workspaces: IWorkspaces
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
+  readonly t: SecretCatalogTranslate
 }
 
 const scopes: readonly SecretScopeFilter[] = ['all', 'project', 'global', 'local']
@@ -28,10 +30,18 @@ const noopSubscribe = (): (() => void) => () => {}
 const emptyWorkspaceSnapshot = (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> =>
   ({ items: [], phase: 'idle' }) as unknown as ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']>
 
+const scopeLabelKeys = {
+  all: 'scopeAll',
+  project: 'scopeProject',
+  global: 'scopeGlobal',
+  local: 'scopeLocal',
+} satisfies Record<SecretScopeFilter, Parameters<SecretCatalogTranslate>[0]>
+
 type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'remove'; readonly row: SecretMetadata }
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
   const api = useApi(secretCatalogApi)
+  const t = props.t
   // The store is read here, at render, so a slot that mounts later still sees
   // the live list rather than whatever existed while setup was running.
   // `getSnapshot` reads the model's own cache, so it has to keep its receiver:
@@ -54,7 +64,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
   const [mutationPending, setMutationPending] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
-  const [machineName, setMachineName] = useState('Current Host')
+  const [machineName, setMachineName] = useState<string | null>(null)
   const [refreshGeneration, setRefreshGeneration] = useState(0)
   const requestGeneration = useRef(0)
   const revealGeneration = useRef(0)
@@ -85,7 +95,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
         if (generation === requestGeneration.current) setRows(result)
       })
       .catch(() => {
-        if (generation === requestGeneration.current) setError('Secret metadata could not be loaded. Check the secret CLI and refresh.')
+        if (generation === requestGeneration.current) setError(t('loadFailed'))
       })
       .finally(() => {
         if (generation === requestGeneration.current) setLoading(false)
@@ -93,7 +103,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     return () => {
       requestGeneration.current += 1
     }
-  }, [api, clearRevealed, cwd, refreshGeneration])
+  }, [api, clearRevealed, cwd, refreshGeneration, t])
 
   useEffect(() => {
     const clearOnHidden = (): void => {
@@ -120,7 +130,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     void api
       .machine({})
       .then(machine => setMachineName(machine.name))
-      .catch(() => setMachineName('Current Host'))
+      .catch(() => setMachineName(null))
   }, [api])
 
   const filteredRows = useMemo(() => filterSecretMetadata(rows, scope, search), [rows, scope, search])
@@ -150,7 +160,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       setRevealed({ id: row.id, value, stage: 'preview' })
       revealTimer.current = setTimeout(clearRevealed, 15_000)
     } catch {
-      if (generation === revealGeneration.current) setError('Could not reveal this alias.')
+      if (generation === revealGeneration.current) setError(t('revealFailed'))
     } finally {
       if (generation === revealGeneration.current) setBusyRow(null)
     }
@@ -165,9 +175,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     setError(null)
     try {
       await api.copy({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      setNotice('Copied ' + row.alias + ' to the clipboard.')
+      setNotice(t('copied', { alias: row.alias }))
     } catch {
-      setError('Could not copy this alias.')
+      setError(t('copyFailed'))
     } finally {
       setBusyRow(null)
     }
@@ -179,11 +189,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     clearRevealed()
     try {
       await api.create({ ...input, cwd })
-      setNotice('Added alias ' + input.alias + '.')
+      setNotice(t('added', { alias: input.alias }))
       setDialog(null)
       setRefreshGeneration(value => value + 1)
     } catch {
-      setMutationError('Could not add the alias. Check its scope and the secret CLI.')
+      setMutationError(t('addFailed'))
     } finally {
       setMutationPending(false)
     }
@@ -195,11 +205,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     clearRevealed()
     try {
       await api.update({ ...input, cwd })
-      setNotice('Updated alias ' + input.alias + '.')
+      setNotice(t('updated', { alias: input.alias }))
       setDialog(null)
       setRefreshGeneration(value => value + 1)
     } catch {
-      setMutationError('Could not update the alias. Metadata may have saved before a value replacement failed.')
+      setMutationError(t('updateFailed'))
     } finally {
       setMutationPending(false)
     }
@@ -214,19 +224,28 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     try {
       if (target === 'alias') await api.removeAlias({ alias: row.alias, cwd, scope: rowScope })
       if (target === 'vault-item') await api.deleteItem({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      setNotice(
-        target === 'alias'
-          ? 'Removed alias ' + row.alias + ' and its environment overrides from its config.'
-          : 'Deleted the Bitwarden item for ' + row.alias + '.',
-      )
+      setNotice(target === 'alias' ? t('removedAlias', { alias: row.alias }) : t('deletedItem', { alias: row.alias }))
       setDialog(null)
       setRefreshGeneration(value => value + 1)
     } catch {
-      setMutationError(target === 'alias' ? 'Could not remove the alias.' : 'Could not delete the Bitwarden item.')
+      setMutationError(target === 'alias' ? t('removeAliasFailed') : t('deleteItemFailed'))
     } finally {
       setMutationPending(false)
     }
   }
+
+  const revealActionFor = (row: SecretMetadata): string => {
+    if (revealed?.id !== row.id) return t('preview')
+    return revealed.stage === 'preview' ? t('revealFull') : t('hide')
+  }
+
+  const revealedText = (value: string, stage: SecretRevealStage): string => {
+    if (stage === 'full') return value
+    const preview = previewSecretValue(value)
+    return preview.kind === 'excerpt' ? preview.text : t('previewMasked', { mask: preview.mask, count: preview.length })
+  }
+
+  const displayedMachineName = machineName ?? t('currentHost')
 
   const openDialog = (next: ActiveDialog): void => {
     clearRevealed()
@@ -245,10 +264,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       <header className={styles.header}>
         <div>
           <div className={styles.titleRow}>
-            <h1>Secret Catalog</h1>
-            <span className={styles.count}>{rows.length} aliases</span>
+            <h1>{t('title')}</h1>
+            <span className={styles.count}>{t('aliasCount', { count: rows.length })}</span>
           </div>
-          <p>Secret CLI aliases and metadata. Values stay hidden until you reveal one.</p>
+          <p>{t('subtitle')}</p>
         </div>
         <div className={styles.headerActions}>
           <button
@@ -259,30 +278,30 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             }}
             type="button"
           >
-            Refresh
+            {t('refresh')}
           </button>
           <button onClick={() => openDialog({ mode: 'create' })} type="button">
-            + Add Secret
+            {t('addSecret')}
           </button>
           <label className={styles.machine}>
-            Machine
+            {t('machine')}
             <select
-              aria-label="Machine"
+              aria-label={t('machine')}
               disabled
               onChange={event => setMachineName(event.currentTarget.value)}
-              title="The current DSH Host can access this machine only. The secret CLI has no remote machine selector."
-              value={machineName}
+              title={t('machineSelectorHint')}
+              value={displayedMachineName}
             >
-              <option value={machineName}>{machineName}</option>
+              <option value={displayedMachineName}>{displayedMachineName}</option>
             </select>
           </label>
         </div>
       </header>
-      <section className={styles.filters} aria-label="Catalog filters">
+      <section className={styles.filters} aria-label={t('catalogFilters')}>
         <button className={styles.folderSelect} onClick={() => setPickerOpen(true)} type="button">
-          {selection === null ? 'Choose a project folder…' : `${selection.title} · ${selection.canonicalPath}`}
+          {selection === null ? t('chooseProjectFolder') : `${selection.title} · ${selection.canonicalPath}`}
         </button>
-        <nav className={styles.scopes} aria-label="Secret scope">
+        <nav className={styles.scopes} aria-label={t('secretScope')}>
           {scopes.map(value => (
             <button
               aria-pressed={scope === value}
@@ -294,20 +313,20 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               }}
               type="button"
             >
-              {value}
+              {t(scopeLabelKeys[value])}
             </button>
           ))}
         </nav>
       </section>
-      {cwd === null && <p className={styles.notice}>Global aliases are shown. Choose a project folder to include project and machine-local aliases.</p>}
+      {cwd === null && <p className={styles.notice}>{t('globalOnlyNotice')}</p>}
       <input
         className={styles.search}
-        aria-label="Filter aliases"
+        aria-label={t('filterAliases')}
         onChange={event => {
           clearRevealed()
           setSearch(event.currentTarget.value)
         }}
-        placeholder="Filter by variable name, service, or alias…"
+        placeholder={t('filterPlaceholder')}
         value={search}
       />
       {error !== null && (
@@ -324,10 +343,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Variable</th>
-              <th>Description / service</th>
-              <th>Value</th>
-              <th>Actions</th>
+              <th>{t('columnVariable')}</th>
+              <th>{t('columnDescription')}</th>
+              <th>{t('columnValue')}</th>
+              <th>{t('columnActions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -349,9 +368,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 </td>
                 <td className={styles.valueCell}>
                   {revealed?.id === row.id ? (
-                    <output className={styles.revealed}>{revealed.stage === 'preview' ? previewSecretValue(revealed.value) : revealed.value}</output>
+                    <output className={styles.revealed}>{revealedText(revealed.value, revealed.stage)}</output>
                   ) : (
-                    <span aria-label="Hidden secret value" className={styles.mask}>
+                    <span aria-label={t('hiddenValue')} className={styles.mask}>
                       ••••••••••••
                     </span>
                   )}
@@ -359,38 +378,38 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 <td>
                   <div className={styles.actions}>
                     <button
-                      aria-label={`${revealed?.id === row.id ? (revealed.stage === 'preview' ? 'Reveal full' : 'Hide') : 'Preview'} ${row.alias}`}
+                      aria-label={t('revealActionLabel', { action: revealActionFor(row), alias: row.alias })}
                       disabled={!canActOnRow(row) || busyRow === row.id}
                       onClick={() => void onReveal(row)}
-                      title={!canActOnRow(row) ? 'Choose a project folder and resolve duplicate alias/environment rows first.' : undefined}
+                      title={!canActOnRow(row) ? t('actionBlockedHint') : undefined}
                       type="button"
                     >
-                      {revealed?.id === row.id ? (revealed.stage === 'preview' ? 'Reveal full' : 'Hide') : 'Preview'}
+                      {revealActionFor(row)}
                     </button>
                     <button
-                      aria-label={`Copy ${row.alias}`}
+                      aria-label={t('copyAlias', { alias: row.alias })}
                       disabled={!canActOnRow(row) || busyRow === row.id}
                       onClick={() => void onCopy(row)}
-                      title={!canActOnRow(row) ? 'Choose a project folder and resolve duplicate alias/environment rows first.' : undefined}
+                      title={!canActOnRow(row) ? t('actionBlockedHint') : undefined}
                       type="button"
                     >
-                      Copy
+                      {t('copy')}
                     </button>
                     <button
-                      aria-label={'Edit ' + row.alias}
+                      aria-label={t('editAlias', { alias: row.alias })}
                       disabled={!canActOnRow(row) || busyRow === row.id}
                       onClick={() => openDialog({ mode: 'edit', row })}
                       type="button"
                     >
-                      Edit
+                      {t('edit')}
                     </button>
                     <button
-                      aria-label={'Remove ' + row.alias}
+                      aria-label={t('removeAlias', { alias: row.alias })}
                       disabled={!canActOnRow(row) || busyRow === row.id}
                       onClick={() => openDialog({ mode: 'remove', row })}
                       type="button"
                     >
-                      Remove
+                      {t('remove')}
                     </button>
                   </div>
                 </td>
@@ -399,14 +418,14 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             {!loading && filteredRows.length === 0 && (
               <tr>
                 <td className={styles.empty} colSpan={4}>
-                  {rows.length === 0 ? 'No aliases found.' : 'No aliases match these filters.'}
+                  {rows.length === 0 ? t('noAliases') : t('noMatchingAliases')}
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
                 <td className={styles.empty} colSpan={4}>
-                  Loading alias metadata…
+                  {t('loadingMetadata')}
                 </td>
               </tr>
             )}
@@ -424,7 +443,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           }}
           onSelect={selectFolder}
           projects={projects}
-          title="Choose a project folder"
+          title={t('chooseProjectFolderTitle')}
         />
       )}
       {dialog !== null && (
@@ -448,6 +467,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           }}
           pending={mutationPending}
           row={'row' in dialog ? dialog.row : undefined}
+          t={t}
         />
       )}
     </main>

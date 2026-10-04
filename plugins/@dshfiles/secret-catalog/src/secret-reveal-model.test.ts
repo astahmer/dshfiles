@@ -8,7 +8,7 @@ describe('Secret Catalog reveal stages', () => {
   })
 
   it('previews long values at both ends and keeps short values masked', () => {
-    expect(previewSecretValue('SYNTHETIC_SECRET_VALUE_123')).toBe('SYNT…_123')
-    expect(previewSecretValue('SHORT')).toBe('•••••••• (5 chars)')
+    expect(previewSecretValue('SYNTHETIC_SECRET_VALUE_123')).toStrictEqual({ kind: 'excerpt', text: 'SYNT…_123' })
+    expect(previewSecretValue('SHORT')).toStrictEqual({ kind: 'masked', mask: '••••••••', length: 5 })
   })
 })
