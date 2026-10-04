@@ -129,19 +129,11 @@ debugging anything else.
 
 ## Installing plugins
 
-```sh
-dsh plugin --profile web add <package>
-dsh plugin --profile web remove <package>
-dsh plugin --profile web exec <package> <command>
-```
-
-Profiles live in `~/.dsh/profiles/<name>/`. Edit `cordis.patch.yml` for config,
-never `cordis.yml`. Inspect what a profile composes to:
-
-```sh
-dsh --profile web --dump-config          # full composed tree
-dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
-```
+Profiles live in `~/.dsh/profiles/<name>/`. Registry packages go through
+`dsh plugin --profile <name> add <package>`; owned bundles go through
+`pnpm profile:sync --profile <name>`, because `pnpm add <path>` cannot express a
+local bundle. `docs/profile-installs.md` has the pnpm and peer-dependency traps
+behind that rule; read it before touching a profile manifest.
 
 ### Experiment in a scratch profile, promote on evidence
 
@@ -150,137 +142,47 @@ profile is the one every session runs; an experiment that boots badly, changes
 tool behavior, or turns out not to be worth it then has already contaminated the
 setup you actually use.
 
-`~/.dsh/profiles/probe/` exists for this and is deliberately **not** Nix-managed
-(`modules/dsh.nix` wires `web` only), so nothing in the Nix setup can pull an
-experiment back in. It has its own `node_modules` and its own port lifecycle.
+`~/.dsh/profiles/probe/` exists for this and is deliberately **not** Nix-managed,
+so nothing in the Nix setup can pull an experiment back in. It has its own
+`node_modules` and its own port lifecycle.
 
 ```sh
 # 1. write the plugin in this repo, under plugins/@dshfiles/<name>/
 # 2. verify it without touching web
-dsh --profile probe plugin add @dshfiles/<name>
-dsh --profile probe web                     # separate boot, read the stdout lines
+pnpm profile:sync --profile probe
+fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
 # 3. benchmark against the default it claims to beat
-node --test plugins/@dshfiles/<name>/src/*.test.ts
+pnpm --dir plugins/@dshfiles/<name> test
 # 4. only once it earns its place
-dsh --profile web plugin add @dshfiles/<name>
+pnpm profile:sync --profile web
 ```
 
 `dsh web` binds `127.0.0.1:3080` **once per profile**, so `web` and `probe` can
 run side by side — the second boot gets its own port and its own tokenized URL.
-Stop the `probe` server when the experiment ends.
+`profile:boot` stops the server it starts.
 
 Promote on measured evidence, not on the idea sounding right. A plugin that
 cannot state the number it improves is not ready for `web`. When the experiment
 is abandoned, remove it from `probe` — and if it was ever added to `web`, remove
 it from there too.
 
-### Peer dependencies are a real trap
-
-`~/.dsh/profiles/web/pnpm-workspace.yaml` sets `autoInstallPeers: false`, and
-that is correct. Plugins get their `@deepseek-ai/*` packages from the profile's
-own bundle tree at runtime, not from `node_modules`.
-
-Two failure modes to recognize:
-
-- **Turning `autoInstallPeers` on is worse than the bug you are fixing.** It
-  tries to resolve `@deepseek-ai/dsh-type-meta`, which is not on npm at all
-  (404).
-- **The public `@deepseek-ai/*` npm line is a different, older generation**
-  (`0.0.1-rc.x`) from what DSH 0.2.0-rc.2 ships internally. Installing them to
-  satisfy a peer will make the plugin manager reject them as version-incompatible
-  — correctly, because they genuinely are not the same code.
-
-A plugin whose `package.json` has `peerDependencies` on `@deepseek-ai/*` but an
-empty or missing `dependencies` block **cannot work** in this profile. Verified
-example: `dsh-codex-switch@0.1.0-alpha.8` (all 8 published versions are alpha)
-installs without error, then logs `llm-openai-codex: failed to import` at every
-boot. Check for this shape before investing in a plugin.
-
-### Local paths work; the rules are narrower than the errors suggest
-
-`pnpm add <path>` is fine. Both confusing errors come from the same place — pnpm
-resolving the *directory name* as a package name:
-
-- `Package name <path> is invalid, it should have a @scope` — the directory is
-  not named `@scope/name`. This is about the folder, not the `name` field alone.
-- `dependency with an invalid name: "<parent dir>/"` — an ancestor directory
-  contains an `@`, so pnpm splits the path at the wrong segment.
-
-Install a local bundle from a directory whose own path is already the scoped
-package name: `plugins/@dshfiles/ai-accounts`. Do not fight this by renaming
-`package.json` alone.
-
-### pnpm majors must not be mixed
-
-The profile's `node_modules` records the store it was built with
-(`~/.dsh/profiles/web/node_modules/.modules.yaml`). If the pnpm the Host resolves
-disagrees, every install fails with `ERR_PNPM_UNEXPECTED_STORE` — which reads
-like a permissions problem and is not one.
-
-Corepack picks the pnpm version from the nearest `packageManager` field, then
-`~/.cache/node/corepack/lastKnownGood.json`. Our profile was built by **pnpm 12**
-(store `v11`); the fnm corepack shim resolves **10.34.5** (store `v10`) by
-default. `lastKnownGood` is the supported fix and needs no PATH surgery:
-
-```sh
-python3 - <<'EOF'
-import json, pathlib
-p = pathlib.Path.home() / ".cache/node/corepack/lastKnownGood.json"
-d = json.loads(p.read_text()); d["pnpm"] = "12.0.0"
-p.write_text(json.dumps(d, indent=2) + "\n")
-EOF
-```
-
-Check what the Host will resolve before changing anything:
-
-```sh
-head -3 ~/.dsh/profiles/web/node_modules/.modules.yaml   # storeDir + packageManager
-which -a pnpm                                            # what the Host finds first
-```
-
-### `pnpm add <path>` is blocked; `pnpm install` is not
-
-This pnpm resolves a local path spec through *registry name resolution*, so
-`pnpm add /abs/path` fails with `should have a @scope` or
-`ERR_PNPM_INVALID_DEPENDENCY_NAME` for essentially every layout, including a
-directory named exactly `@scope/name`. `trustPolicy` (values `off`,
-`no-downgrade`) does not change it.
-
-Declaring the dependency and running `pnpm install` works, which is what a
-profile already wants:
-
-```jsonc
-// ~/.dsh/profiles/<name>/package.json
-"dependencies": { "@dshfiles/ai-accounts": "link:/abs/path/@dshfiles/ai-accounts" },
-"dsh": { "profile": { "bundles": [ /* … */, "@dshfiles/ai-accounts" ] } }
-```
-
-```sh
-cd ~/.dsh/profiles/<name> && pnpm install
-```
-
-`plugin_manager install_bundle` shells out to `pnpm add`, so it cannot express
-this. Use `install_bundle` for registry packages, and the manifest plus
-`pnpm install` for a local bundle. Two things make that safe: keep the
-directory's own path equal to its scoped package name, and confirm with
-`plugin_manager list_bundles` that the bundle reports `installed: true` and its
-row is present.
-
 ## Writing our own plugins
 
-New plugins use **[dshx](https://dshx.io/en)**
-([liyown/dshx](https://github.com/liyown/dshx)) — TypeScript, React, Vite.
+New plugins use our dshx fork (TypeScript, React, Vite). From the repository
+root, after building it:
 
 ```sh
-pnpm create dshx my-plugin
-cd my-plugin
-pnpm dev          # client HMR + host auto-restart
-dshx inspect slots --root sidebar    # read the live composition
+node tooling/dshx/packages/dshx/dist/cli/bin.js create plugins/@dshfiles/my-plugin
+cd plugins/@dshfiles/my-plugin
+pnpm dev                              # client HMR + host auto-restart
+dshx inspect slots --root sidebar     # read the live composition
 ```
 
-dshx is **v0.1.4-preview**, and its typed surface is a strong default, not a
-guarantee. Its most reliable value is `dshx inspect` — read the real runtime
-instead of guessing whether a slot or service exists.
+Its typed surface is a strong default, not a guarantee. Its most reliable value
+is `dshx inspect` — read the real runtime instead of guessing whether a slot or
+service exists. Every plugin joins the workspace contract
+(`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
+`typecheck` scripts, `strict` and `noUncheckedIndexedAccess`.
 
 ### We maintain a local dshx hard fork
 
@@ -302,6 +204,7 @@ Plugins link the local path, so the CLI a plugin builds with is always this tree
 ```sh
 cd tooling/dshx
 pnpm install --frozen-lockfile
+pnpm --filter create-dshx build    # the CLI imports it, so it builds first
 pnpm --filter @dshfiles/dshx build
 ```
 
@@ -310,28 +213,8 @@ The fork's own documentation is the source of truth for what it does:
 `tooling/dshx/docs/compatibility.md` for what a DSH generation changed, and
 `tooling/dshx/FORK.md` for provenance. There is no separate plan for it here —
 a plan that outgrows the code it describes is a second source of truth, and it
-goes stale silently.
-
-What `PROTOCOL_2_COMPATIBILITY` changed, in case upstream moves again:
-
-- `dsh-client-runtime` no longer exists; its types moved to
-  `dsh-client-ui-conversation/client`, and `ChatConversationViewNode`,
-  `ChatNodeOwnerProps`, and `UseChatNodeTurnData` moved to
-  `dsh-client-ui-chat/client`.
-- Settings inverted. 0.1 had a plugin register a namespace object
-  (`SettingsScope` / `SettingsProvider` / `.register()`); 0.2 identifies a
-  namespace by its Loader entry id and reads it through `ctx.settings.describe()`
-  and `update()`. The Host binds a scope façade and the Client binds through
-  `ConfigForms`.
-- `SettingsScopeBinder` is gone with no replacement; `ConfigForms.get(entryId)`
-  plus `ConfigForms.describe()` is the protocol-2 equivalent.
-- 0.2 removed the config field earlier generations put on the context, so a
-  plugin reads its own row settings from `apply(ctx, config)`. dshx generated that
-  call and dropped the argument; our fork forwards it to `setup(ctx, config)` and
-  unwraps schemastery's resolvers first.
-- The public `dshx/host` entry never re-exported cordis's `Events`
-  augmentation, so importing `defineHost` from it made `ctx.on` degrade to
-  `keyof Events` and reject every DSH event name. Our fork re-exports it.
+goes stale silently. Check `compatibility.md` before assuming a 0.1 API still
+exists.
 
 Two cordis copies are the failure mode that makes this look like a dshx bug. A
 `declare module` augmentation lands on the `Events` of the copy that is
@@ -348,8 +231,8 @@ console.log(r.resolve('@deepseek-ai/cordis').split('.pnpm/')[1])"
 If those disagree, pin the versions and add `dedupePeerDependents: true`.
 
 Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
-package row, `lib/` for the host half, `lib/client.js` for the browser half.
-That part is stable regardless of which build tool produced it.
+package row, `dist/index.js` for the host half, `dist/client.js` for the browser
+half. That part is stable regardless of which build tool produced it.
 
 Top-level Loader ids share one namespace across every bundle in a profile.
 Keep a package's scope in its inserted row id (`@dshfiles/shortcuts` becomes
@@ -360,40 +243,8 @@ development or a runtime check so duplicate top-level ids fail before boot.
 Point an owned plugin's `dshx.config.ts` at `profile: 'vanilla'` when debugging
 it without the rest of the adopted plugin set.
 
-### Creator mode is NOT currently available
-
-`@deepseek-ai/dsh-agent-preset` ships a `skills/` directory that a "creator"
-mode mounts through `skill-filesystem`: `agent-experience`,
-`cordis-plugin-development` (with `references/` and copyable `templates/`),
-`editing-cordis-compositions`, and `cordis-composition-reference`.
-
-**As of DSH 0.2.0-rc.2 on this profile, no preset with `id: creator` is
-declared.** The four declared ids are `standard`, `minimal`, `ptc`, and
-`cordis`, and `agent-preset-registry`'s `default` is `standard`.
-
-This matters because we intend to create DSH plugins *from inside DSH itself*.
-That path depends on `cordis-plugin-development`, which is the single best
-piece of DSH documentation for plugin work — it mandates `plugin_manager` with
-`action: install_bundle`, forbids hand-editing `package.json` /
-`cordis.patch.yml`, and lists concrete verification steps.
-
-Do not assume the skills are reachable. Check first:
-
-```sh
-dsh --profile web --dump-config | grep -A4 "name: '@deepseek-ai/dsh-agent-preset'$"
-```
-
-If `creator` is missing, read the skill directly from the installed package
-instead — the skills are plain files on disk:
-
-```sh
-find ~/.local/share/pnpm/global/v11 -path '*dsh-agent-preset/skills' -type d
-```
-
-Presets are declared as entries in `@deepseek-ai/dsh-agent-preset`; the active
-default comes from `agent-preset-registry`'s `default` config key. Sessions
-store the preset identity they were created with, so changing the default does
-not move existing sessions — start a new one to pick it up.
+Creator mode (DSH's in-app plugin authoring preset) is not declared on this
+profile; `docs/creator-mode.md` says how to check and where its skills live.
 
 ## Shell command batching
 
