@@ -569,7 +569,10 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
         ...(template.hostOnly ? {} : styleDefinition.devDependencies),
         vitest: '^4.1.11',
       },
-      peerDependencies: template.peerDependencies(context),
+      peerDependencies: {
+        ...Object.fromEntries(template.clientProviders.map(provider => [provider, context.dshRange])),
+        ...template.peerDependencies(context),
+      },
     },
     null,
     2,

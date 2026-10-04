@@ -201,7 +201,20 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
       ),
     )
   }
-  checkStringArray(diagnostics, declaration.inject, 'dsh.client.inject', 'DSHX4212', file)
+  const inject = checkStringArray(diagnostics, declaration.inject, 'dsh.client.inject', 'DSHX4212', file)
+  const peers = isObject(manifest.peerDependencies) ? manifest.peerDependencies : {}
+  for (const provider of inject ?? []) {
+    if (provider in peers) continue
+    diagnostics.push(
+      issue(
+        'DSHX4224',
+        'warning',
+        `dsh.client.inject loads ${JSON.stringify(provider)}, but peerDependencies does not declare it.`,
+        file,
+        `Add ${JSON.stringify(provider)}: ${JSON.stringify(compatibility.dshRange)} to peerDependencies so the plugin states every Host package it loads.`,
+      ),
+    )
+  }
   const external = checkStringArray(diagnostics, declaration.external, 'dsh.client.external', 'DSHX4213', file)
   if (declaration.immediately !== undefined && typeof declaration.immediately !== 'boolean') {
     diagnostics.push(

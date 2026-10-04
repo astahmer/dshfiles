@@ -237,6 +237,19 @@ describe('checkProjectManifest', () => {
     expect(diagnostics).not.toContainEqual(expect.objectContaining({ code: 'DSHX4218' }))
   })
 
+  it('warns when an injected Client provider is not a peer dependency', async () => {
+    const root = await temporaryProject()
+    const manifest = fullManifest()
+    ;(manifest.dsh as { client: { inject: string[] } }).client.inject.push('@deepseek-ai/dsh-client-locale')
+    await writeManifest(root, manifest)
+    expect(await checkProjectManifest(await resolveDshxConfig({ cwd: root }))).toContainEqual(
+      expect.objectContaining({ code: 'DSHX4224', severity: 'warning', message: expect.stringContaining('@deepseek-ai/dsh-client-locale') }),
+    )
+
+    await writeManifest(root, { ...manifest, peerDependencies: { '@deepseek-ai/dsh-client-locale': '>=0.2.0-rc.1 <0.3.0-0' } })
+    expect(await checkProjectManifest(await resolveDshxConfig({ cwd: root }))).not.toContainEqual(expect.objectContaining({ code: 'DSHX4224' }))
+  })
+
   it('checks both defineClient service injection and the locale provider package edge', async () => {
     const root = await temporaryProject()
     await writeFile(
