@@ -15,16 +15,32 @@ const jsonValueSchema: z.ZodType<SettingsJsonValue> = z.lazy(() =>
   z.union([z.null(), z.boolean(), z.number().finite(), z.string(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
 )
 
+/**
+ * Resolve one node of a serialized schemastery schema by field path.
+ *
+ * `settings.describe` sends `schema.toJSON()`: a `refs` table keyed by uid where
+ * `uid` is the root and an object node's `dict` maps field name to a uid. So each
+ * step resolves the current node, reads that field's uid from `dict`, and
+ * resolves the uid out of the same table.
+ */
 export const schemaNodeAtPath = (schema: unknown, path: readonly string[]): Record<string, unknown> | null => {
-  let current: unknown = schema
-  for (const segment of path) {
-    const record = objectRecord(current)
-    if (record === null) return null
-    const fields = objectRecord(record.fields) ?? objectRecord(record.properties)
-    if (fields === null || !Object.hasOwn(fields, segment)) return null
-    current = fields[segment]
+  const envelope = objectRecord(schema)
+  if (envelope === null) return null
+  const refs = objectRecord(envelope.refs)
+  if (refs === null || !Number.isInteger(envelope.uid)) return null
+  const resolve = (reference: unknown): Record<string, unknown> | null => {
+    if (objectRecord(reference) !== null) return reference as Record<string, unknown>
+    if (typeof reference !== 'number' || !Number.isInteger(reference)) return null
+    return objectRecord(refs[String(reference)])
   }
-  return objectRecord(current)
+  let current = resolve(envelope.uid)
+  for (const segment of path) {
+    if (current === null) return null
+    const fields = objectRecord(current.dict)
+    if (fields === null || !Object.hasOwn(fields, segment)) return null
+    current = resolve(fields[segment])
+  }
+  return current
 }
 
 export const readSettingsPath = (value: unknown, path: readonly string[]): unknown => {

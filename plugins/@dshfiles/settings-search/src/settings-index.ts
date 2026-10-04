@@ -68,29 +68,41 @@ const enumOptions = (record: Record<string, unknown>): readonly SettingsOption[]
   })
 }
 
-const literalSchemaOptions = (schema: unknown, depth: number): readonly SettingsOption[] => {
+/**
+ * Literal choices reachable from one already-resolved node.
+ *
+ * A union's `list` holds branch *uids*, so each branch is resolved through the
+ * refs table before it is inspected. Bounds stay finite: a self-referential
+ * schema cannot walk forever.
+ */
+const literalSchemaOptions = (schema: SerializedSchema, node: Record<string, unknown>, depth: number): readonly SettingsOption[] => {
   if (depth > 8) return []
-  const record = objectRecord(schema)
-  if (record === null) return []
-  if (record.type === 'const' && Object.hasOwn(record, 'value')) {
-    const option = makeSettingOption(record.value, record)
+  if (node.type === 'const' && Object.hasOwn(node, 'value')) {
+    const option = makeSettingOption(node.value, node)
     return option === null ? [] : [option]
   }
-  if (Array.isArray(record.list)) return record.list.flatMap(value => literalSchemaOptions(value, depth + 1))
-  return enumOptions(record)
+  const branches = unionBranches(node)
+  if (branches === null) return enumOptions(node)
+  return branches.flatMap(reference => {
+    const branch = schemaNode(schema, reference)
+    return branch === null ? [] : literalSchemaOptions(schema, branch, depth + 1)
+  })
 }
 
-const finiteChoiceOptions = (schema: unknown, depth: number): readonly SettingsOption[] | null => {
+/** Choices for a field node, or null when the field is not a finite choice. */
+const finiteChoiceOptions = (schema: SerializedSchema, node: Record<string, unknown>, depth: number): readonly SettingsOption[] | null => {
   if (depth > 8) return null
-  const record = objectRecord(schema)
-  if (record === null) return null
-  if (Array.isArray(record.enum)) return enumOptions(record)
-  if (record.type === 'const' && Object.hasOwn(record, 'value')) {
-    const option = makeSettingOption(record.value, record)
+  if (Array.isArray(node.enum)) return enumOptions(node)
+  if (node.type === 'const' && Object.hasOwn(node, 'value')) {
+    const option = makeSettingOption(node.value, node)
     return option === null ? null : [option]
   }
-  if (record.type !== 'union' || !Array.isArray(record.list) || record.list.length === 0) return null
-  const choices = record.list.map(value => finiteChoiceOptions(value, depth + 1))
+  const branches = unionBranches(node)
+  if (branches === null || node.type !== 'union' || branches.length === 0) return null
+  const choices = branches.map(reference => {
+    const branch = schemaNode(schema, reference)
+    return branch === null ? null : finiteChoiceOptions(schema, branch, depth + 1)
+  })
   if (choices.some(value => value === null)) return null
   return choices.flatMap(value => value ?? [])
 }
@@ -107,19 +119,83 @@ const uniqueOptions = (options: readonly SettingsOption[]): readonly SettingsOpt
     .slice(0, 64)
 }
 
-export const settingsSearchOptions = (schema: unknown): readonly SettingsOption[] => uniqueOptions(literalSchemaOptions(schema, 0))
+/**
+ * Choices for a schema node resolved from a serialized schema.
+ *
+ * A caller holding only a node cannot resolve its union branches without the
+ * refs table, so a branch list of bare uids degrades to no choices rather than
+ * to a wrong list.
+ */
+const choicesForNode = (node: unknown): readonly SettingsOption[] => {
+  const record = objectRecord(node)
+  if (record === null) return []
+  const branches = unionBranches(record)
+  if (branches === null || branches.length === 0) return uniqueOptions(finiteChoiceOptions(EMPTY_SERIALIZED_SCHEMA, record, 0) ?? [])
+  if (branches.every(reference => objectRecord(reference) !== null)) {
+    return uniqueOptions(finiteChoiceOptions(EMPTY_SERIALIZED_SCHEMA, record, 0) ?? [])
+  }
+  return []
+}
 
-export const settingsChoiceOptions = (schema: unknown): readonly SettingsOption[] => uniqueOptions(finiteChoiceOptions(schema, 0) ?? [])
+const EMPTY_SERIALIZED_SCHEMA: SerializedSchema = { uid: 0, refs: {} }
+
+export const settingsSearchOptions = (node: unknown): readonly SettingsOption[] => choicesForNode(node)
+
+export const settingsChoiceOptions = (node: unknown): readonly SettingsOption[] => choicesForNode(node)
+
+/**
+ * A serialized schemastery schema, as `settings.describe` sends it.
+ *
+ * The wire carries `schema.toJSON()`: a `refs` table keyed by numeric uid, where
+ * `uid` names the root node, an object node's `dict` maps field name to that
+ * field's uid, and a union node's `list` names its branches. A child is therefore
+ * an integer reference, never an inline node.
+ *
+ * These helpers resolve one reference to its node and expose the two containers
+ * the walk needs. They deliberately accept either a resolved node or a bare uid
+ * so callers can pass a node they already hold without re-resolving it.
+ */
+interface SerializedSchema {
+  readonly uid: number
+  readonly refs: Readonly<Record<string, unknown>>
+}
+
+const serializedSchema = (value: unknown): SerializedSchema | null => {
+  const record = objectRecord(value)
+  if (record === null) return null
+  if (!Number.isInteger(record.uid)) return null
+  const refs = objectRecord(record.refs)
+  if (refs === null) return null
+  return { uid: record.uid as number, refs }
+}
+
+const schemaNode = (schema: SerializedSchema, reference: unknown): Record<string, unknown> | null => {
+  if (objectRecord(reference) !== null) return reference as Record<string, unknown>
+  if (typeof reference !== 'number' || !Number.isInteger(reference)) return null
+  return objectRecord(schema.refs[String(reference)])
+}
+
+/** An object node's field name → uid map, or null when the node is not an object. */
+const dictFields = (node: Record<string, unknown>): Record<string, unknown> | null =>
+  objectRecord(node.dict)
+
+/** A union node's branch uids, or null when the node is not a union. */
+const unionBranches = (node: Record<string, unknown>): readonly unknown[] | null => (Array.isArray(node.list) ? node.list : null)
+
+const nodeLabel = (node: Record<string, unknown>): string | null => schemaText(node, 'label') ?? schemaText(node, 'title')
+
+/** Ceiling on indexed settings, so a large Host cannot make the walk unbounded. */
+const MAX_INDEXED_SETTINGS = 2000
 
 const normalizeSearchText = (value: string): string => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 export const settingsNamespaceTitle = (namespace: SettingsSearchNamespace): string => {
-  const schema = objectRecord(namespace.schema)
+  const schema = serializedSchema(namespace.schema)
   if (schema === null) return namespace.ns
-  return schemaText(schema, 'label') ?? schemaText(schema, 'title') ?? namespace.ns
+  const root = schemaNode(schema, schema.uid)
+  if (root === null) return namespace.ns
+  return nodeLabel(root) ?? namespace.ns
 }
-
-const fieldMap = (record: Record<string, unknown>): Record<string, unknown> | null => objectRecord(record.fields) ?? objectRecord(record.properties)
 
 const overlapsSecretPath = (path: readonly string[], secrets: readonly SettingsSecretPath[]): boolean =>
   secrets.some(secret => {
@@ -129,7 +205,8 @@ const overlapsSecretPath = (path: readonly string[], secrets: readonly SettingsS
 
 const collectSchemaResults = (
   entryId: string,
-  schema: unknown,
+  schema: SerializedSchema,
+  node: Record<string, unknown>,
   path: readonly string[],
   labels: readonly string[],
   secrets: readonly SettingsSecretPath[],
@@ -137,32 +214,45 @@ const collectSchemaResults = (
   depth: number,
 ): SettingsSearchResult[] => {
   if (depth > 8) return []
-  const record = objectRecord(schema)
-  if (record === null) return []
-  const fields = fieldMap(record)
+  const fields = dictFields(node)
   if (fields === null) return []
-  return Object.entries(fields).flatMap(([fieldName, fieldSchema]) => {
+  return Object.entries(fields).flatMap(([fieldName, fieldReference]) => {
     const fieldPath = [...path, fieldName]
     if (overlapsSecretPath(fieldPath, secrets)) return []
-    const child = objectRecord(fieldSchema)
+    const child = schemaNode(schema, fieldReference)
     if (child === null) return []
-    const label = schemaText(child, 'label') ?? schemaText(child, 'title') ?? fieldName
+    const label = nodeLabel(child) ?? fieldName
     const fieldLabels = [...labels, label]
-    const nested = collectSchemaResults(entryId, fieldSchema, fieldPath, fieldLabels, secrets, category, depth + 1)
+    // Descend from the field's own node, never from the root: re-reading the
+    // root uid here would restart the walk at the top of the schema for every
+    // object-valued field and expand paths without bound.
+    const nested = collectSchemaResults(entryId, schema, child, fieldPath, fieldLabels, secrets, category, depth + 1)
     const result: SettingsSearchResult = {
       id: JSON.stringify([entryId, fieldPath]),
       title: label,
       description: schemaText(child, 'description') ?? '',
       context: [...new Set([category, entryId, ...fieldLabels.slice(0, -1)])].join(' · '),
-      options: settingsSearchOptions(child),
+      options: literalSchemaOptions(schema, child, 0),
       target: { entryId, fieldPath },
     }
     return [result, ...nested]
   })
 }
 
-export const describeSettingsTargets = (namespaces: readonly SettingsSearchNamespace[]): SettingsSearchResult[] =>
-  namespaces.flatMap(namespace => collectSchemaResults(namespace.ns, namespace.schema, [], [], namespace.secrets ?? [], settingsNamespaceTitle(namespace), 0))
+export const describeSettingsTargets = (namespaces: readonly SettingsSearchNamespace[]): SettingsSearchResult[] => {
+  const results: SettingsSearchResult[] = []
+  for (const namespace of namespaces) {
+    const schema = serializedSchema(namespace.schema)
+    if (schema === null) continue
+    const root = schemaNode(schema, schema.uid)
+    if (root === null) continue
+    results.push(...collectSchemaResults(namespace.ns, schema, root, [], [], namespace.secrets ?? [], settingsNamespaceTitle(namespace), 0))
+    // A Host can register many namespaces; the index is a search aid, not a
+    // registry, so it stops adding once the browse and query views are full.
+    if (results.length >= MAX_INDEXED_SETTINGS) break
+  }
+  return results
+}
 
 export const searchSettingsTargets = (results: readonly SettingsSearchResult[], query: string): readonly SettingsSearchResult[] => {
   const term = normalizeSearchText(query.trim())

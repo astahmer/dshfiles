@@ -11,23 +11,24 @@ import {
 } from './settings-editor-model.js'
 import { settingsChoiceOptions } from './settings-index.js'
 
+/**
+ * The wire shape: `schema.toJSON()` is a `refs` table keyed by uid, `uid` is the
+ * root, and an object's `dict` maps field name to that field's uid.
+ */
 const schema = {
-  type: 'object',
-  fields: {
-    appearance: {
-      type: 'object',
-      fields: {
-        scale: { type: 'number' },
-        compact: { type: 'boolean' },
-        title: { type: 'string' },
-      },
-    },
+  uid: 5,
+  refs: {
+    0: { type: 'number', meta: {} },
+    1: { type: 'boolean', meta: {} },
+    2: { type: 'string', meta: {} },
+    3: { type: 'object', meta: {}, dict: { scale: 0, compact: 1, title: 2 } },
+    5: { type: 'object', meta: {}, dict: { appearance: 3 } },
   },
 }
 
 describe('settings field editor model', () => {
   it('resolves only schema-backed field paths and reads nested live values', () => {
-    expect(schemaNodeAtPath(schema, ['appearance', 'compact'])).toEqual({ type: 'boolean' })
+    expect(schemaNodeAtPath(schema, ['appearance', 'compact'])).toEqual({ type: 'boolean', meta: {} })
     expect(schemaNodeAtPath(schema, ['appearance', 'missing'])).toBeNull()
     expect(readSettingsPath({ appearance: { compact: false } }, ['appearance', 'compact'])).toBe(false)
     expect(hasSettingsPath({ appearance: { compact: false } }, ['appearance', 'compact'])).toBe(true)

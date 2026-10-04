@@ -1,43 +1,56 @@
+/*
+ * Every value here is a DSH token, because this panel is rendered inside the
+ * Host's settings dialog and its own colours cannot know whether the Host is in
+ * light or dark. The hardcoded dark palette that was here made the section
+ * heading and its hint nearly invisible on the light dialog.
+ */
 .page {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 20px;
   min-height: 100%;
-  color: var(--text-color, #f5f5f5);
+  color: var(--dsw-alias-label-primary);
 }
+
 .page h1,
 .editor h2 {
   margin: 0;
+  color: var(--dsw-alias-label-primary);
   font-size: 1.35rem;
 }
+
 .page header p,
 .description,
 .formHint,
 .keyboardHint {
-  color: #aaa;
   margin: 6px 0 0;
+  color: var(--dsw-alias-label-secondary);
 }
+
 .searchLabel input,
 .valueField textarea,
 .valueField select {
   box-sizing: border-box;
   width: 100%;
   padding: 11px 13px;
-  background: #222;
-  border: 1px solid #444;
-  border-radius: 7px;
-  color: inherit;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
 }
+
 .searchLabel input:focus,
 .valueField textarea:focus,
 .valueField select:focus {
-  outline: 2px solid #5ea8e8;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
 }
+
 .searchLabel input {
   font-size: 1rem;
 }
+
 .namespaceList,
 .results,
 .editor {
@@ -46,10 +59,13 @@
   gap: 8px;
   overflow: auto;
 }
+
 .namespaceList h2 {
   margin: 4px 0;
+  color: var(--dsw-alias-label-primary);
   font-size: 1rem;
 }
+
 .namespaceButton,
 .result {
   display: flex;
@@ -57,83 +73,106 @@
   align-items: flex-start;
   gap: 4px;
   padding: 11px 13px;
-  border: 1px solid #3c3c3c;
-  border-radius: 7px;
-  background: #202020;
-  color: inherit;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
   text-align: left;
   font: inherit;
   cursor: pointer;
 }
+
+.namespaceButton:hover:not(:disabled),
+.result:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .namespaceButton:disabled {
-  opacity: 0.55;
+  color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
+
 .namespaceButton span,
 .result small {
-  color: #aaa;
+  color: var(--dsw-alias-label-secondary);
 }
-.result[aria-current='true'],
+
+.result[aria-current='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
 .namespaceButton:focus-visible,
 .result:focus-visible {
-  outline: 2px solid #5ea8e8;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
 }
+
 .result p {
-  color: #bdbdbd;
   margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
 }
+
 .result .optionLabels {
+  color: var(--dsw-alias-label-tertiary);
   font-size: 0.82rem;
-  color: #9a9a9a;
 }
+
 .contextNote {
-  padding: 10px 12px;
-  background: #252525;
-  border-left: 3px solid #d8a348;
-  color: #bbb;
   margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--dsw-alias-state-warn-primary);
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
 }
+
 .path {
+  color: var(--dsw-alias-link);
   font-size: 0.78rem;
-  color: #9bc8e8;
   overflow-wrap: anywhere;
 }
+
 .valueField {
   display: flex;
   flex-direction: column;
   gap: 7px;
   font-weight: 600;
 }
+
 .valueField textarea {
   resize: vertical;
   font-weight: 400;
 }
+
 .formHint {
   margin: 0;
 }
+
 .editorActions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
+
 .editorActions button,
 .backButton {
   width: max-content;
   padding: 8px 12px;
-  border: 1px solid #444;
-  border-radius: 7px;
-  background: #292929;
-  color: inherit;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   cursor: pointer;
 }
+
 .editorActions button:disabled {
-  opacity: 0.5;
+  color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
+
 .keyboardHint {
   font-size: 0.85rem;
 }
+
 .srOnly {
   position: absolute;
   width: 1px;
