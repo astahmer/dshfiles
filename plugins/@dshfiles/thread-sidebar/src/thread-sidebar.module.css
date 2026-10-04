@@ -8,9 +8,9 @@
 
 .header {
   display: grid;
-  gap: 0.65rem;
+  gap: var(--dsw-radius-sm);
   padding: 0.75rem 0.8rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .titleRow,
@@ -53,38 +53,97 @@
 .iconButton:hover,
 .groupHeader:hover,
 .actions button:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .projectFilter {
-  justify-content: space-between;
-  gap: 0.5rem;
-  color: color-mix(in srgb, currentColor 72%, transparent);
-  font-size: 0.83rem;
+  position: relative;
 }
 
-.projectFilter select,
+.projectFilter > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font-size: 0.83rem;
+  list-style: none;
+}
+
+.projectFilter > summary::-webkit-details-marker {
+  display: none;
+}
+
+.projectFilter > summary::after {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-0.1rem, -0.1rem);
+  transition: transform 120ms ease;
+}
+
+.projectFilter[open] > summary::after {
+  transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
+}
+
+.projectMenu {
+  position: absolute;
+  z-index: 15;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  min-width: 100%;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv2);
+}
+
+.projectMenu button {
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: var(--dsw-radius-xs);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.projectMenu button:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-nav-item-hover);
+}
+
+.projectMenu button[aria-pressed='true'] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-nav-item-active);
+}
+
 .field input,
 .field textarea {
   min-width: 0;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 0.4rem;
   background: transparent;
   color: inherit;
   font: inherit;
 }
 
-.projectFilter select {
-  max-width: 65%;
-  padding: 0.35rem 0.45rem;
-}
-
 .settings {
   display: grid;
   gap: 0.75rem;
   padding: 0.8rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
-  background: color-mix(in srgb, currentColor 4%, transparent);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-border-l1);
 }
 
 .checkRow {
@@ -93,7 +152,7 @@
 }
 
 .checkRow input {
-  accent-color: var(--dsh-color-accent, Highlight);
+  accent-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
 }
 
 .field {
@@ -110,7 +169,7 @@
 
 .field small,
 .note {
-  color: color-mix(in srgb, currentColor 65%, transparent);
+  color: var(--dsw-alias-label-tertiary);
   font-size: 0.75rem;
   line-height: 1.4;
 }
@@ -120,8 +179,8 @@
   gap: 0.5rem;
   min-width: 0;
   margin: 0;
-  padding: 0.55rem 0.6rem 0.65rem;
-  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  padding: 0.55rem 0.6rem var(--dsw-radius-sm);
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 0.5rem;
 }
 
@@ -137,8 +196,8 @@
 .notice,
 .empty {
   margin: 0;
-  padding: 0.65rem 0.8rem;
-  color: color-mix(in srgb, currentColor 70%, transparent);
+  padding: var(--dsw-radius-sm) 0.8rem;
+  color: var(--dsw-alias-label-tertiary);
   font-size: 0.82rem;
 }
 
@@ -157,7 +216,7 @@
   width: 100%;
   gap: 0.55rem;
   padding: 0.55rem 0.4rem;
-  color: color-mix(in srgb, currentColor 75%, transparent);
+  color: var(--dsw-alias-label-secondary);
   text-align: left;
 }
 
@@ -168,7 +227,7 @@
 .groupHeader::after {
   height: 1px;
   flex: 1;
-  background: color-mix(in srgb, currentColor 16%, transparent);
+  background: var(--dsw-alias-border-l2);
   content: '';
 }
 
@@ -187,7 +246,7 @@
 
 .row:hover,
 .row:focus-within {
-  background: color-mix(in srgb, currentColor 6%, transparent);
+  background: var(--dsw-specific-sidebar-nav-item-hover);
 }
 
 .openButton {
@@ -210,14 +269,14 @@
 
 .rowProject {
   overflow: hidden;
-  color: color-mix(in srgb, currentColor 62%, transparent);
+  color: var(--dsw-alias-label-tertiary);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .parentLabel {
-  color: color-mix(in srgb, currentColor 78%, transparent);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .rowTitle {
@@ -227,12 +286,21 @@
 }
 
 .running {
-  color: var(--dsh-color-accent, Highlight);
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
   font-size: 0.78rem;
 }
 
+/* The reference keeps every row clean and reveals its verbs on hover, so the
+   actions do not compete with the title until the row is actually addressed. */
 .actions {
   gap: 0.1rem;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
 }
 
 .actions button {
@@ -253,11 +321,11 @@
   min-width: 12rem;
   gap: 0.15rem;
   padding: 0.3rem;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 0.65rem;
-  background: var(--dsw-specific-sidebar-fill, Canvas);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-specific-sidebar-fill);
   color: inherit;
-  box-shadow: 0 8px 28px color-mix(in srgb, black 35%, transparent);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 
 .contextMenu button {
@@ -273,17 +341,17 @@
 
 .contextMenu button:hover,
 .contextMenu button:focus-visible {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .toolbar button:focus-visible,
 .iconButton:focus-visible,
-.projectFilter select:focus-visible,
+.projectFilter > summary:focus-visible,
 .groupHeader:focus-visible,
 .openButton:focus-visible,
 .actions button:focus-visible,
 .settings input:focus-visible,
 .settings textarea:focus-visible {
-  outline: 2px solid var(--dsh-color-accent, Highlight);
+  outline: 2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color);
   outline-offset: 2px;
 }

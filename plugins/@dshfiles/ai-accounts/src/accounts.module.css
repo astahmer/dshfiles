@@ -1322,13 +1322,34 @@
   font-size: 10px;
 }
 
+/*
+ * The sidebar footer is a one-line track. Stacking a row per account made this
+ * widget taller than the track itself, so its rows painted over the neighbouring
+ * footer entries. One bounded, scrollable line instead: the tightest window per
+ * account stays reachable without overlapping anything.
+ */
+.footerWide {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.footerWide::-webkit-scrollbar {
+  display: none;
+}
+
 .footerRow {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
 }
 
-.footerWide {
-  flex-direction: column;
-  align-items: stretch;
+.footerWide .footerHistoryLink {
+  flex: 0 0 auto;
 }

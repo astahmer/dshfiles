@@ -7,8 +7,8 @@
   min-height: 0;
   max-width: 100%;
   overflow: hidden;
-  color: var(--dsh-color-text, #eee);
-  background: var(--dsh-color-surface, #252525);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 .rail {
@@ -48,7 +48,7 @@
 .headerLink:hover,
 .selectedLink:hover,
 .moreButton:hover {
-  background: color-mix(in srgb, currentColor 9%, transparent);
+  background: var(--dsw-specific-sidebar-nav-item-hover);
 }
 
 .brandName {
@@ -88,6 +88,7 @@
   gap: 12px;
   justify-content: flex-start;
   padding: 0 10px;
+  color: var(--dsw-alias-label-secondary);
   text-align: left;
 }
 
@@ -102,8 +103,14 @@
   width: 100%;
 }
 
+.headerLink:hover,
+.selectedLink:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
 .selectedLink {
-  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-nav-item-active);
 }
 
 .headerLink > :first-child,
@@ -131,8 +138,8 @@
 .customizeTitle button,
 .customizeRow button {
   min-height: 32px;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
   color: inherit;
   background: transparent;
   cursor: pointer;
@@ -147,10 +154,10 @@
   gap: 12px;
   overflow: auto;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 12px;
-  background: var(--dsh-color-surface-raised, #303030);
-  box-shadow: 0 12px 40px #0008;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 
 .customizeTitle {
@@ -189,7 +196,7 @@
 }
 
 .customizeSection p {
-  color: var(--dsh-color-text-muted, #999);
+  color: var(--dsw-alias-label-tertiary);
   font-size: 0.85em;
 }
 
@@ -199,7 +206,7 @@
   align-items: center;
   gap: 4px;
   min-height: 38px;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
 .customizeLabel {
@@ -233,25 +240,44 @@
   min-width: 0;
 }
 
+/*
+ * More than one `sidebar.footer.action` owner can publish a quota widget, and
+ * each sizes itself. Left unbounded they overlapped each other, so the row is a
+ * single bounded track: one line high, scrolling sideways, children refusing to
+ * squeeze wider than their own content.
+ */
 .footer {
   position: relative;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   min-height: 52px;
+  max-height: 52px;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 4px 8px;
-  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  scrollbar-width: none;
+}
+
+.footer::-webkit-scrollbar {
+  display: none;
 }
 
 .rail .footer {
   flex-direction: column;
+  overflow: visible;
   padding: 4px 0;
 }
 
 .footerItem {
   display: inline-flex;
+  flex: 0 0 auto;
   min-width: 0;
+  align-items: center;
+  /* A published widget keeps its intrinsic width; the track scrolls instead. */
+  max-width: none;
 }
 
 .moreContainer {
@@ -267,6 +293,7 @@
 .moreButton {
   gap: 6px;
   padding: 0 8px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .moreMenu {
@@ -279,10 +306,10 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 10px;
-  background: var(--dsh-color-surface-raised, #303030);
-  box-shadow: 0 10px 32px #0008;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 
 .moreItem {

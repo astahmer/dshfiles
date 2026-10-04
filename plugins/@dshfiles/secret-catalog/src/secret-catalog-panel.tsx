@@ -17,17 +17,32 @@ import styles from './secret-catalog.module.css'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
-  readonly projects: IWorkspaces['list']
+  readonly workspaces: IWorkspaces
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
 }
 
 const scopes: readonly SecretScopeFilter[] = ['all', 'project', 'global', 'local']
 
+const noopSubscribe = (): (() => void) => () => {}
+
+const emptyWorkspaceSnapshot = (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> =>
+  ({ items: [], phase: 'idle' }) as unknown as ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']>
+
 type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'remove'; readonly row: SecretMetadata }
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
   const api = useApi(secretCatalogApi)
-  const workspaceSnapshot = useSyncExternalStore(props.projects.subscribe, props.projects.getSnapshot, props.projects.getSnapshot)
+  // The store is read here, at render, so a slot that mounts later still sees
+  // the live list rather than whatever existed while setup was running.
+  // `getSnapshot` reads the model's own cache, so it has to keep its receiver:
+  // passed bare it runs with an undefined `this` and throws.
+  const workspaceSource = props.workspaces?.list
+  const subscribe = workspaceSource === undefined ? noopSubscribe : workspaceSource.subscribe.bind(workspaceSource)
+  const getSnapshot =
+    workspaceSource === undefined
+      ? emptyWorkspaceSnapshot
+      : (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> => workspaceSource.getSnapshot()
+  const workspaceSnapshot = useSyncExternalStore(subscribe, getSnapshot, emptyWorkspaceSnapshot)
   const [selection, setSelection] = useState<ProjectFolderSelection | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [rows, setRows] = useState<readonly SecretMetadata[]>([])

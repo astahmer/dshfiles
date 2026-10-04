@@ -317,6 +317,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     else changePreferences({ workspaceFilter: value })
   }
 
+  const projectFilterLabel =
+    projectFilterValue === '__all__'
+      ? props.tSidebar('threadSidebarAllProjects')
+      : projectFilterValue === '__unassigned__'
+        ? props.tSidebar('threadSidebarUnassigned')
+        : (displayWorkspaces.find(workspace => workspace.id === projectFilterValue)?.title ?? props.tSidebar('threadSidebarAllProjects'))
+
   return (
     <section className={styles.sidebar} aria-label={props.tSidebar('threadSidebarTitle')}>
       <header className={styles.header}>
@@ -332,18 +339,34 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             ⚙
           </button>
         </div>
-        <label className={styles.projectFilter}>
-          <span>{props.tSidebar('threadSidebarAllProjects')}</span>
-          <select value={projectFilterValue} onChange={event => selectProject(event.currentTarget.value)}>
-            <option value="__all__">{props.tSidebar('threadSidebarAllProjects')}</option>
-            <option value="__unassigned__">{props.tSidebar('threadSidebarUnassigned')}</option>
+        {/* The reference shows one plain label with a chevron, not a doubled
+            label plus a boxed <select>, so the control is a disclosure whose
+            summary carries the label and the native marker carries the arrow. */}
+        <details className={styles.projectFilter}>
+          <summary>{projectFilterLabel}</summary>
+          <div className={styles.projectMenu} role="group">
+            <button type="button" aria-pressed={projectFilterValue === '__all__'} onClick={() => selectProject('__all__')}>
+              {props.tSidebar('threadSidebarAllProjects')}
+            </button>
+            <button
+              type="button"
+              aria-pressed={projectFilterValue === '__unassigned__'}
+              onClick={() => selectProject('__unassigned__')}
+            >
+              {props.tSidebar('threadSidebarUnassigned')}
+            </button>
             {displayWorkspaces.map(workspace => (
-              <option key={workspace.id} value={workspace.id}>
+              <button
+                key={workspace.id}
+                type="button"
+                aria-pressed={projectFilterValue === workspace.id}
+                onClick={() => selectProject(workspace.id)}
+              >
                 {workspace.title}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </details>
       </header>
 
       {settingsOpen ? (

@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -19,16 +20,24 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/secret-catalog',
-  // setup(ctx) reads ctx.slots, ctx.remote and ctx.workspaces.
+  // setup(ctx) reads ctx.slots and ctx.remote. The `workspaces` store is resolved
+  // through the injected service at render time rather than captured here: a
+  // main-slot entry can mount after setup returned.
   inject: ['slots', 'remote', 'workspaces'],
-  setup(ctx) {
+  // The panel calls useApi, so the entry must be decorated: a raw component
+  // renders outside the API context and its useApi throws while rendering.
+  setup(ctx, decorate) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const label = (): string => 'Secret Catalog'
+    const workspaces = (): IWorkspaces => ctx.workspaces
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label }, PanelGlyph))
     ctx.slots.inject('main', () =>
-      ctx.slots.register({ name: 'main', key: PANEL_ID }, () => (
-        <SecretCatalogPanel directoryPicker={pickerPorts.directoryPicker} projects={ctx.workspaces.list} registerWorkspace={pickerPorts.registerWorkspace} />
-      )),
+      ctx.slots.register(
+        { name: 'main', key: PANEL_ID },
+        decorate(() => (
+          <SecretCatalogPanel directoryPicker={pickerPorts.directoryPicker} workspaces={workspaces()} registerWorkspace={pickerPorts.registerWorkspace} />
+        )),
+      ),
     )
   },
 })
