@@ -370,7 +370,7 @@ const UsageHistoryChart = (props: {
   )
 }
 
-export const AccountsPanel = (): JSX.Element => {
+export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
   const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
@@ -515,6 +515,9 @@ export const AccountsPanel = (): JSX.Element => {
           </p>
         </div>
         <div className={styles.headerActions}>
+          <button type="button" className={styles.secondary} onClick={props.onOpenUsageHistory}>
+            Open usage history
+          </button>
           <select
             className={styles.distribution}
             value={file.distribution}

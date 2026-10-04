@@ -14,7 +14,10 @@ import styles from './accounts.module.css'
  * Nothing renders until an account actually reports quota, so an unconfigured
  * profile shows no dangling empty state.
  */
-export const QuotaFooter = (props: { readonly wide: boolean }): JSX.Element | null => {
+export const QuotaFooter = (props: {
+  readonly wide: boolean
+  readonly onOpenUsageHistory: () => void
+}): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
 
@@ -58,31 +61,23 @@ export const QuotaFooter = (props: { readonly wide: boolean }): JSX.Element | nu
   if (rows.length === 0) return null
 
   if (!props.wide) {
-    // Rail: a dot per account, dimming as the tightest window drains.
+    // Rail: a dot per account and a compact, labelled history action.
     return (
       <div className={styles.footerRail} aria-label="Account quota">
-        {rows.map(row => (
-          <span
-            key={row.instanceId}
-            className={toneFor(row.tightest?.percent ?? 0)}
-            title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`}
-          />
-        ))}
+        {rows.map(row => <span key={row.instanceId} className={toneFor(row.tightest?.percent ?? 0)} title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`} />)}
+        <button type="button" className={styles.footerHistoryIcon} aria-label="Open usage history" title="Open usage history" onClick={props.onOpenUsageHistory}>↗</button>
       </div>
     )
   }
 
   return (
-    <div className={styles.footerWide} title="Tightest window per account. Open AI Accounts from the sidebar.">
-      {rows.map(row => (
-        <div className={styles.footerRow} key={row.instanceId}>
-          <span className={styles.footerName}>{row.instanceId}</span>
-          <span className={`${styles.footerBar} ${toneFor(row.tightest?.percent ?? 0)}`} />
-          <span className={styles.footerPercent}>
-            {String(row.tightest?.percent ?? 0)}%
-          </span>
-        </div>
-      ))}
+    <div className={styles.footerWide} title="Tightest window per account.">
+      {rows.map(row => <div className={styles.footerRow} key={row.instanceId}>
+        <span className={styles.footerName}>{row.instanceId}</span>
+        <span className={`${styles.footerBar} ${toneFor(row.tightest?.percent ?? 0)}`} />
+        <span className={styles.footerPercent}>{String(row.tightest?.percent ?? 0)}%</span>
+      </div>)}
+      <button type="button" className={styles.footerHistoryLink} onClick={props.onOpenUsageHistory}>Open usage history</button>
     </div>
   )
 }

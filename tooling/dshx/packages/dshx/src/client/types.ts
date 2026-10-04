@@ -42,13 +42,24 @@ export type PropsLocaleOf<Definition extends LocaleDefinition> = {
 
 export type ClientConversationContribution = ConversationContribution
 
+/**
+ * Wrap a component so it can read this package's `useApi`/`useSettings` context.
+ *
+ * A component registered through `slots: [defineSlot(...)]` is decorated
+ * automatically. A component registered imperatively from `setup(ctx, decorate)`
+ * is not, and calling a capability hook in it throws
+ * `API "…" is unavailable outside a DSHX Client Slot component` on first
+ * render. Pass such a component through this helper at registration.
+ */
+export type ClientComponentDecorator = (component: unknown) => unknown
+
 export interface ClientDefinition {
   readonly name?: string
   readonly inject?: readonly string[]
   readonly locales?: readonly LocaleDefinition[]
   readonly conversations?: readonly ClientConversationContribution[]
   readonly slots?: readonly SlotContribution[]
-  readonly setup?: (ctx: Context) => void | Effect<void>
+  readonly setup?: (ctx: Context, decorate: ClientComponentDecorator) => void | Effect<void>
 }
 
 type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]

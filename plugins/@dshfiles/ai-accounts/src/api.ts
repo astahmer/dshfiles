@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
 /**
  * Wire contract for the accounts page.
@@ -195,6 +196,8 @@ export type AccountProfile = z.infer<typeof accountProfileSchema>
 export type AccountDraft = z.infer<typeof accountDraftSchema>
 export type AccountsFile = z.infer<typeof accountsFileSchema>
 export type AccountKind = z.infer<typeof accountKindSchema>
+export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>
+export type UsageHistoryMeta = z.infer<typeof usageMetaSchema>
 
 /** Icon names the page offers, matching the reference account page. */
 export const PROVIDER_ICONS = [
@@ -268,13 +271,17 @@ export const aiAccountsApi = defineApi({
       }),
       output: z.object({
         instanceId: z.string().min(1).max(64),
-        points: z.array(z.object({
-          at: z.number(),
-          windows: z.record(z.string().max(32), z.number()),
-          resetsAt: z.record(z.string().max(32), z.number()),
-          bankedResets: z.number().int().min(0).max(20),
-        })),
+        points: z.array(usageHistoryPointSchema),
       }),
+    }),
+    /** Schedule and retention are persisted with the history domain. */
+    historySettings: method({ input: z.void(), output: usageMetaSchema }),
+    saveHistorySettings: method({
+      input: z.object({
+        intervalMinutes: z.number().int().min(1).max(60),
+        retentionDays: z.number().int().min(1).max(365),
+      }),
+      output: usageMetaSchema,
     }),
 
     /**

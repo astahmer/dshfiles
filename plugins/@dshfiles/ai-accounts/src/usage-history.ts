@@ -1,5 +1,8 @@
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { z } from 'zod'
+import { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
+
+export { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
+export type { QuotaSnapshot, UsageMeta } from './usage-history-model.js'
 
 /**
  * Durable quota history.
@@ -20,40 +23,13 @@ export const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
 
 const BUCKET_MS = 15 * 60_000
 
-export const quotaSnapshotSchema = z.object({
-  /** Epoch milliseconds when this bucket was written. */
-  at: z.number(),
-  instanceId: z.string().min(1).max(64),
-  /** Percent remaining per window, keyed by the window's label. */
-  windows: z.record(z.string().max(32), z.number()),
-  /** Epoch milliseconds per window label, when the provider reports a reset. */
-  resetsAt: z.record(z.string().max(32), z.number()),
-  bankedResets: z.number().int().min(0).max(20),
-})
-
-export const usageMetaSchema = z.object({
-  /**
-   * Epoch milliseconds of the newest stored snapshot. Kept as a nullable field
-   * rather than optional so a stored record always validates against the same
-   * shape the domain was opened with.
-   */
-  lastReadAt: z.number().nullable().default(null),
-  /** Poll interval in minutes, so the schedule survives a restart. */
-  intervalMinutes: z.number().int().min(1).max(60).default(15),
-  /** Oldest snapshot still worth keeping. */
-  retentionDays: z.number().int().min(1).max(365).default(90),
-})
-
-export type QuotaSnapshot = z.infer<typeof quotaSnapshotSchema>
-export type UsageMeta = z.infer<typeof usageMetaSchema>
-
 export const usageHistoryDomain = defineDomain({
   name: USAGE_HISTORY_DOMAIN,
   version: 1,
   // `initial` is the shape the type is inferred from, so it carries every field.
   global: {
     schema: usageMetaSchema,
-    initial: { lastReadAt: null, intervalMinutes: 15, retentionDays: 90 },
+    initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 15, retentionDays: 90 },
   },
   tables: {
     /** Keyed by `<instanceId>:<bucket>`, so one row per account per window. */

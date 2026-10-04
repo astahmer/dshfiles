@@ -5,8 +5,8 @@ import { declareLocaleNamespace } from '@dshfiles/dshx/client'
  * rather than borrowing the Language row's fixed settings keys.
  */
 const dictionaries = {
-  en: { aiAccountsPanel: 'AI Accounts' },
-  zh: { aiAccountsPanel: 'AI 账号' },
+  en: { aiAccountsPanel: 'AI Accounts', aiAccountsUsageHistory: 'Usage history' },
+  zh: { aiAccountsPanel: 'AI 账号', aiAccountsUsageHistory: '用量历史' },
 }
 
 export const AI_ACCOUNTS_LOCALE_NAMESPACE = 'settings.aiAccounts'
