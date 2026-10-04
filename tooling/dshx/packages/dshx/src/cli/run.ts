@@ -53,7 +53,10 @@ import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../plat
 import { runPlatformCli } from './platform.js'
 
 export interface CliIO {
-  readonly stdin: Readable & { isTTY?: boolean; setRawMode?: (mode: boolean) => void }
+  readonly stdin: Readable & {
+    isTTY?: boolean
+    setRawMode?: (mode: boolean) => void
+  }
   readonly stdout: Writable
   readonly stderr: Writable
 }
@@ -109,7 +112,11 @@ function packageVersion(): string {
 const VERSION = packageVersion()
 
 function defaultIO(): CliIO {
-  return { stdin: process.stdin, stdout: process.stdout, stderr: process.stderr }
+  return {
+    stdin: process.stdin,
+    stdout: process.stdout,
+    stderr: process.stderr,
+  }
 }
 
 function write(stream: Writable, text: string): void {
@@ -207,7 +214,10 @@ function mergeRuntimePluginStatus(report: RuntimePluginReport, bridge: InspectBr
     })
   }
   if (runtime.size === 0) return report
-  return { ...report, plugins: report.plugins.map(plugin => runtime.get(plugin.id) ?? plugin) }
+  return {
+    ...report,
+    plugins: report.plugins.map(plugin => runtime.get(plugin.id) ?? plugin),
+  }
 }
 
 function projectSummary(project: ResolvedDshxConfig): Record<string, unknown> {
@@ -316,13 +326,18 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   const typecheck = await (runtime.typecheckProject ?? typecheckProject)(project.root)
   const diagnostics = [
     ...versionDiagnostics,
-    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, { compatibility })),
+    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
+      compatibility,
+    })),
     ...(await (runtime.checkMigrations ?? checkMigrationDiagnostics)(project)),
     ...typecheck.diagnostics,
   ]
   for (const item of diagnostics) printDiagnostic(io, item)
   if (hasErrors(diagnostics)) return 1
-  const jobs: Array<{ readonly fallback: string; readonly task: Promise<unknown> }> = []
+  const jobs: Array<{
+    readonly fallback: string
+    readonly task: Promise<unknown>
+  }> = []
   // DSH loads every linked package through its root export, including an
   // explicit Client-only package. The compiler's undefined entry is a
   // deliberate no-op Host module that satisfies that loader contract without
@@ -460,8 +475,20 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
   const connectionSpec = compatibility.connection
   const connection: ConnectionReport =
     connectionSpec === undefined
-      ? { provider: 'unavailable', package: '@deepseek-ai/dsh-client-connection', hostApi: false, clientApi: false, status: 'unavailable' }
-      : { provider: 'runtime', package: connectionSpec.packageName, hostApi: connectionSpec.hostRpc, clientApi: connectionSpec.clientRpc, status: 'available' }
+      ? {
+          provider: 'unavailable',
+          package: '@deepseek-ai/dsh-client-connection',
+          hostApi: false,
+          clientApi: false,
+          status: 'unavailable',
+        }
+      : {
+          provider: 'runtime',
+          package: connectionSpec.packageName,
+          hostApi: connectionSpec.hostRpc,
+          clientApi: connectionSpec.clientRpc,
+          status: 'available',
+        }
   if (requireRuntime) {
     runtimePlugins = await (runtime.inspectRuntimePlugins ?? inspectRuntimePlugins)(project, compatibility)
     bridge = await (runtime.inspectBridgeStatus ?? inspectBridgeStatus)(project)
@@ -470,7 +497,9 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
   }
   const typecheck = await (runtime.typecheckProject ?? typecheckProject)(project.root)
   const staticDiagnostics = [
-    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, { compatibility })),
+    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
+      compatibility,
+    })),
     ...(await (runtime.checkMigrations ?? checkMigrationDiagnostics)(project)),
     ...typecheck.diagnostics,
     ...projectCompatibilityDiagnostics(compatibilityAssessment, project.packageFile, project.compatibility),
@@ -511,7 +540,14 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
   const io = options.io ?? defaultIO()
   const runtime = options.runtime ?? {}
   let result = await collectCheck(options, project, args.runtime)
-  let fix: CheckFixResult = { requested: args.fix, dryRun: args.dryRun, applied: false, changedFiles: [], diff: '', diagnostics: [] }
+  let fix: CheckFixResult = {
+    requested: args.fix,
+    dryRun: args.dryRun,
+    applied: false,
+    changedFiles: [],
+    diff: '',
+    diagnostics: [],
+  }
 
   if (args.fix) {
     const compatibility = result.compatibility.compatibility
@@ -544,7 +580,9 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
       }
       if (applied) {
         try {
-          const refreshed = await (runtime.resolveConfig ?? resolveDshxConfig)({ cwd: project.root })
+          const refreshed = await (runtime.resolveConfig ?? resolveDshxConfig)({
+            cwd: project.root,
+          })
           const manifestDiagnostics = await (runtime.checkManifest ?? checkProjectManifest)(refreshed, { compatibility })
           if (manifestDiagnostics.some(item => item.severity === 'error')) {
             await (runtime.rollbackRepairPlan ?? rollbackManifestRepairPlan)(plan)
@@ -649,15 +687,26 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
         const purpose = args.root !== undefined && typeof slot.metadata?.purpose === 'string' ? slot.metadata.purpose : undefined
         write(io.stdout, `  ${slot.name}${details === '' ? '' : ` (${details})`}${purpose === undefined ? '' : `: ${purpose}`}\n`)
       } else if (target === 'tools') {
-        const tool = item as { readonly name: string; readonly provider?: string; readonly description?: string }
+        const tool = item as {
+          readonly name: string
+          readonly provider?: string
+          readonly description?: string
+        }
         const details = [tool.provider, tool.description].filter((value): value is string => value !== undefined).join(' - ')
         write(io.stdout, `  ${tool.name}${details === '' ? '' : `: ${details}`}\n`)
       } else if (target === 'services') {
-        const service = item as { readonly name: string; readonly provider?: string; readonly scope?: string }
+        const service = item as {
+          readonly name: string
+          readonly provider?: string
+          readonly scope?: string
+        }
         const details = [service.provider, service.scope].filter((value): value is string => value !== undefined).join(' / ')
         write(io.stdout, `  ${service.name}${details === '' ? '' : ` (${details})`}\n`)
       } else {
-        const event = item as { readonly name: string; readonly provider?: string }
+        const event = item as {
+          readonly name: string
+          readonly provider?: string
+        }
         const details = event.provider
         write(io.stdout, `  ${event.name}${details === undefined ? '' : ` (${details})`}\n`)
       }
@@ -722,7 +771,11 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
       createUiScaffold(value, {
         ...(runtime.inspectComposition === undefined ? {} : { inspectComposition: runtime.inspectComposition }),
         ...(runtime.checkManifest === undefined ? {} : { checkManifest: runtime.checkManifest }),
-        ...(args.slot === undefined ? { selectSlot: (items: readonly { readonly name: string }[]) => selectSlotInteractively(io, items) } : {}),
+        ...(args.slot === undefined
+          ? {
+              selectSlot: (items: readonly { readonly name: string }[]) => selectSlotInteractively(io, items),
+            }
+          : {}),
       }))
   let result: AddUiResult
   try {
@@ -760,7 +813,11 @@ function toolSummary(project: ResolvedDshxConfig, result: AddToolResult): Record
 }
 
 async function promptLine(io: CliIO, question: string): Promise<string> {
-  const answer = await text({ message: question.replace(/:\s*$/, ''), input: io.stdin, output: io.stdout })
+  const answer = await text({
+    message: question.replace(/:\s*$/, ''),
+    input: io.stdin,
+    output: io.stdout,
+  })
   return isCancel(answer) ? '' : answer
 }
 
@@ -1074,7 +1131,9 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   const initialAssessment = assessProjectCompatibility(project.manifest, installed)
   const diagnostics = [
     ...projectCompatibilityDiagnostics(initialAssessment, project.packageFile, project.compatibility),
-    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, { compatibility: initialAssessment.compatibility })),
+    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
+      compatibility: initialAssessment.compatibility,
+    })),
   ]
   if (hasErrors(diagnostics)) {
     for (const item of diagnostics) printDiagnostic(io, item)
@@ -1091,7 +1150,9 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   const assessment = assessProjectCompatibility(project.manifest, profile.dsh.version)
   const finalDiagnostics = [
     ...projectCompatibilityDiagnostics(assessment, project.packageFile, project.compatibility),
-    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, { compatibility: assessment.compatibility })),
+    ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
+      compatibility: assessment.compatibility,
+    })),
     ...profile.diagnostics,
   ]
   for (const item of finalDiagnostics) printDiagnostic(io, item)
@@ -1202,17 +1263,43 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     const { runCreate } = await import('create-dshx')
     const forwarded = argv.slice(1)
     if (options.cwd !== undefined && !forwarded.includes('--cwd')) forwarded.push('--cwd', options.cwd)
-    return runCreate(forwarded, io, { dshxVersion: `link:${fileURLToPath(new URL('../..', import.meta.url))}` })
+    return runCreate(forwarded, io, {
+      dshxVersion: `link:${fileURLToPath(new URL('../..', import.meta.url))}`,
+    })
   }
   let args: CliArgs
   try {
     args = parseCliArgs(argv)
   } catch (error) {
     const message = (error instanceof CliUsageError ? error.message : String(error)).replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]')
-    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'commands', 'config'])
+    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config'])
     const group = argv.find(token => platformGroups.has(token))
     if (group !== undefined && argv.includes('--json')) {
-      const actions = new Set(['list', 'show', 'history', 'create', 'fork', 'cancel', 'export', 'info', 'enable', 'disable', 'run', 'get', 'set', 'unset'])
+      const actions = new Set([
+        'list',
+        'search',
+        'show',
+        'history',
+        'create',
+        'fork',
+        'cancel',
+        'rename',
+        'archive',
+        'unarchive',
+        'prompt',
+        'export',
+        'info',
+        'check',
+        'enable',
+        'disable',
+        'install',
+        'remove',
+        'run',
+        'get',
+        'set',
+        'unset',
+        'select',
+      ])
       const groupIndex = argv.indexOf(group)
       const action = argv.slice(groupIndex + 1).find(token => actions.has(token))
       const command = action === undefined ? group : `${group} ${action}`
@@ -1223,8 +1310,14 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     return 2
   }
-  outputOptions.set(io.stdout, { quiet: args.quiet ?? false, noColor: args.noColor ?? false })
-  outputOptions.set(io.stderr, { quiet: false, noColor: args.noColor ?? false })
+  outputOptions.set(io.stdout, {
+    quiet: args.quiet ?? false,
+    noColor: args.noColor ?? false,
+  })
+  outputOptions.set(io.stderr, {
+    quiet: false,
+    noColor: args.noColor ?? false,
+  })
   // The slot reference is static, so it answers before a project is resolved and
   // before a Host is contacted.
   if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
@@ -1237,6 +1330,9 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       args.command === 'sessions' ||
       args.command === 'plugins' ||
       args.command === 'bundles' ||
+      args.command === 'presets' ||
+      args.command === 'models' ||
+      args.command === 'skills' ||
       args.command === 'commands' ||
       args.command === 'config'
     ) {
@@ -1248,7 +1344,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1265,6 +1361,9 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     args.command === 'sessions' ||
     args.command === 'plugins' ||
     args.command === 'bundles' ||
+    args.command === 'presets' ||
+    args.command === 'models' ||
+    args.command === 'skills' ||
     args.command === 'commands' ||
     args.command === 'config'
   ) {
@@ -1325,14 +1424,47 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
         io.stdout,
         `${JSON.stringify(
           args.command === 'inspect'
-            ? { project: null, target: args.inspectTarget ?? null, source: 'runtime', items: [], diagnostics: [item] }
+            ? {
+                project: null,
+                target: args.inspectTarget ?? null,
+                source: 'runtime',
+                items: [],
+                diagnostics: [item],
+              }
             : args.command === 'add'
               ? args.addTarget === 'tool' || args.addTarget === 'command'
-                ? { project: null, name: args.name ?? null, changedFiles: [], generatedFiles: [], diagnostics: [item], dryRun: args.dryRun }
+                ? {
+                    project: null,
+                    name: args.name ?? null,
+                    changedFiles: [],
+                    generatedFiles: [],
+                    diagnostics: [item],
+                    dryRun: args.dryRun,
+                  }
                 : args.addTarget === 'hook'
-                  ? { project: null, event: args.event ?? null, changedFiles: [], generatedFiles: [], diagnostics: [item], dryRun: args.dryRun }
-                  : { project: null, slot: null, provider: null, changedFiles: [], generatedFiles: [], manifestChanged: false, diagnostics: [item] }
-              : { project: null, diagnostics: [item], dsh: null, profile: null },
+                  ? {
+                      project: null,
+                      event: args.event ?? null,
+                      changedFiles: [],
+                      generatedFiles: [],
+                      diagnostics: [item],
+                      dryRun: args.dryRun,
+                    }
+                  : {
+                      project: null,
+                      slot: null,
+                      provider: null,
+                      changedFiles: [],
+                      generatedFiles: [],
+                      manifestChanged: false,
+                      diagnostics: [item],
+                    }
+              : {
+                  project: null,
+                  diagnostics: [item],
+                  dsh: null,
+                  profile: null,
+                },
           null,
           2,
         )}\n`,

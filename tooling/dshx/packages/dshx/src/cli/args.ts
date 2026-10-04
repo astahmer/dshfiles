@@ -14,6 +14,9 @@ export type CliCommand =
   | 'sessions'
   | 'plugins'
   | 'bundles'
+  | 'presets'
+  | 'models'
+  | 'skills'
   | 'commands'
   | 'config'
 export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events'
@@ -52,6 +55,8 @@ export interface CliArgs {
   readonly line?: string
   readonly output?: string
   readonly agentPreset?: string
+  readonly mode?: 'queue' | 'steer'
+  readonly reasoningEffort?: string
   readonly max?: number
   readonly atSeq?: number
 }
@@ -81,6 +86,8 @@ const valueOptions = new Set([
   '--line',
   '--output',
   '--agent-preset',
+  '--mode',
+  '--reasoning-effort',
   '--max',
   '--at-seq',
 ])
@@ -127,7 +134,10 @@ const sharedArgs = {
     description: 'Print underlying command failures.',
   },
   json: { type: 'boolean', description: 'Emit stable machine-readable JSON.' },
-  runtime: { type: 'boolean', description: 'Require a linked and reachable DSH runtime when checking.' },
+  runtime: {
+    type: 'boolean',
+    description: 'Require a linked and reachable DSH runtime when checking.',
+  },
   open: { type: 'boolean', description: 'Open the development URL.' },
   port: {
     type: 'string',
@@ -179,15 +189,56 @@ const sharedArgs = {
     description: 'Plan changes without writing files.',
   },
   fix: { type: 'boolean', description: 'Repair safe manifest issues.' },
-  quiet: { type: 'boolean', description: 'Suppress human-readable output; retain exit status.' },
+  quiet: {
+    type: 'boolean',
+    description: 'Suppress human-readable output; retain exit status.',
+  },
   noColor: { type: 'boolean', description: 'Disable terminal colors.' },
-  url: { type: 'string', description: 'Tokenized local DSH launch URL (defaults to DSHX_URL).', valueHint: 'url' },
-  session: { type: 'string', description: 'Scope a DSH command operation to this Session.', valueHint: 'id' },
-  line: { type: 'string', description: 'Run one slash-prefixed DSH command line.', valueHint: 'command' },
-  output: { type: 'string', description: 'Write an export to this file.', valueHint: 'path' },
-  agentPreset: { type: 'string', description: 'Create the Session with this DSH Agent preset.', valueHint: 'id' },
-  max: { type: 'string', description: 'Maximum messages to return in one history page.', valueHint: 'count' },
-  atSeq: { type: 'string', description: 'Fork at this inclusive Session event sequence.', valueHint: 'sequence' },
+  url: {
+    type: 'string',
+    description: 'Tokenized local DSH launch URL (defaults to DSHX_URL).',
+    valueHint: 'url',
+  },
+  session: {
+    type: 'string',
+    description: 'Scope this operation to a DSH Session.',
+    valueHint: 'id',
+  },
+  line: {
+    type: 'string',
+    description: 'Run one slash-prefixed DSH command line.',
+    valueHint: 'command',
+  },
+  output: {
+    type: 'string',
+    description: 'Write an export to this file.',
+    valueHint: 'path',
+  },
+  agentPreset: {
+    type: 'string',
+    description: 'Create the Session with this DSH Agent preset.',
+    valueHint: 'id',
+  },
+  mode: {
+    type: 'string',
+    description: 'Deliver a Session prompt by queueing or steering the active turn.',
+    valueHint: 'queue|steer',
+  },
+  reasoningEffort: {
+    type: 'string',
+    description: 'Select a model reasoning effort reported by DSH.',
+    valueHint: 'id',
+  },
+  max: {
+    type: 'string',
+    description: 'Maximum messages to return in one history page.',
+    valueHint: 'count',
+  },
+  atSeq: {
+    type: 'string',
+    description: 'Fork at this inclusive Session event sequence.',
+    valueHint: 'sequence',
+  },
   help: { type: 'boolean', alias: 'h', description: 'Show command help.' },
   version: {
     type: 'boolean',
@@ -204,8 +255,17 @@ export const dshxCommand = defineCommand({
   },
   args: sharedArgs,
   subCommands: {
-    test: defineCommand({ meta: { name: 'test', description: 'Run project-local Vitest tests.' }, args: sharedArgs }),
-    package: defineCommand({ meta: { name: 'package', description: 'Build, validate, and pack a native plugin bundle.' }, args: sharedArgs }),
+    test: defineCommand({
+      meta: { name: 'test', description: 'Run project-local Vitest tests.' },
+      args: sharedArgs,
+    }),
+    package: defineCommand({
+      meta: {
+        name: 'package',
+        description: 'Build, validate, and pack a native plugin bundle.',
+      },
+      args: sharedArgs,
+    }),
     build: defineCommand({
       meta: {
         name: 'build',
@@ -241,14 +301,62 @@ export const dshxCommand = defineCommand({
       },
       args: sharedArgs,
     }),
-    status: defineCommand({ meta: { name: 'status', description: 'Check the authenticated local DSH Host connection.' }, args: sharedArgs }),
-    info: defineCommand({ meta: { name: 'info', description: 'Show local DSHX and Node runtime information.' }, args: sharedArgs }),
-    doctor: defineCommand({ meta: { name: 'doctor', description: 'Diagnose local DSHX and reachable DSH APIs.' }, args: sharedArgs }),
-    sessions: defineCommand({ meta: { name: 'sessions', description: 'List, inspect, create, fork, cancel, and export DSH Sessions.' }, args: sharedArgs }),
-    plugins: defineCommand({ meta: { name: 'plugins', description: 'List, inspect, enable, and disable DSH plugins.' }, args: sharedArgs }),
-    bundles: defineCommand({ meta: { name: 'bundles', description: 'List, inspect, enable, and disable DSH bundles.' }, args: sharedArgs }),
-    commands: defineCommand({ meta: { name: 'commands', description: 'Inspect and run Session-scoped DSH commands.' }, args: sharedArgs }),
-    config: defineCommand({ meta: { name: 'config', description: 'Read and update one DSH settings namespace.' }, args: sharedArgs }),
+    status: defineCommand({
+      meta: {
+        name: 'status',
+        description: 'Check the authenticated local DSH Host connection.',
+      },
+      args: sharedArgs,
+    }),
+    info: defineCommand({
+      meta: {
+        name: 'info',
+        description: 'Show local DSHX and Node runtime information.',
+      },
+      args: sharedArgs,
+    }),
+    doctor: defineCommand({
+      meta: {
+        name: 'doctor',
+        description: 'Diagnose local DSHX and reachable DSH APIs.',
+      },
+      args: sharedArgs,
+    }),
+    sessions: defineCommand({
+      meta: {
+        name: 'sessions',
+        description: 'List, inspect, create, fork, cancel, and export DSH Sessions.',
+      },
+      args: sharedArgs,
+    }),
+    plugins: defineCommand({
+      meta: {
+        name: 'plugins',
+        description: 'List, inspect, enable, and disable DSH plugins.',
+      },
+      args: sharedArgs,
+    }),
+    bundles: defineCommand({
+      meta: {
+        name: 'bundles',
+        description: 'List, inspect, enable, and disable DSH bundles.',
+      },
+      args: sharedArgs,
+    }),
+    commands: defineCommand({
+      meta: {
+        name: 'commands',
+        description: 'Inspect and run Session-scoped DSH commands.',
+      },
+      args: sharedArgs,
+    }),
+    config: defineCommand({
+      meta: {
+        name: 'config',
+        description: 'Read and update one DSH settings namespace.',
+      },
+      args: sharedArgs,
+    }),
   },
 })
 
@@ -277,6 +385,19 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   for (const token of parsed._) {
     if (token === undefined) continue
     if (
+      command === 'sessions' ||
+      command === 'plugins' ||
+      command === 'bundles' ||
+      command === 'presets' ||
+      command === 'models' ||
+      command === 'skills' ||
+      command === 'commands' ||
+      command === 'config'
+    ) {
+      platformArgs.push(token)
+      continue
+    }
+    if (
       token === 'build' ||
       token === 'check' ||
       token === 'dev' ||
@@ -290,6 +411,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       token === 'sessions' ||
       token === 'plugins' ||
       token === 'bundles' ||
+      token === 'presets' ||
+      token === 'models' ||
+      token === 'skills' ||
       token === 'commands' ||
       token === 'config'
     ) {
@@ -305,10 +429,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (command === 'add' && (token === 'ui' || token === 'tool' || token === 'command' || token === 'hook')) {
       if (addTarget !== undefined) throw new CliUsageError('Only one add target may be specified.')
       addTarget = token
-      continue
-    }
-    if (command === 'sessions' || command === 'plugins' || command === 'bundles' || command === 'commands' || command === 'config') {
-      platformArgs.push(token)
       continue
     }
     throw new CliUsageError(`Unknown argument ${JSON.stringify(token)}.`)
@@ -341,6 +461,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const line = parsed.line
   const output = parsed.output
   const agentPreset = parsed.agentPreset
+  const mode = parsed.mode
+  if (mode !== undefined && mode !== 'queue' && mode !== 'steer') throw new CliUsageError('--mode requires queue or steer.')
+  const reasoningEffort = parsed.reasoningEffort
   let max: number | undefined
   let atSeq: number | undefined
   if (parsed.max !== undefined) {
@@ -369,6 +492,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     command === 'sessions' ||
     command === 'plugins' ||
     command === 'bundles' ||
+    command === 'presets' ||
+    command === 'models' ||
+    command === 'skills' ||
     command === 'commands' ||
     command === 'config'
   if (json && command !== undefined && command !== 'check' && command !== 'inspect' && command !== 'add' && !platformCommand)
@@ -382,29 +508,62 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (url !== undefined && (!platformCommand || command === 'info')) throw new CliUsageError('--url is not used by this DSH platform command.')
   if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create'))
     throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
-  if (session !== undefined && command !== 'commands') throw new CliUsageError('--session is only valid with commands.')
+  if (session !== undefined && command !== 'commands' && command !== 'skills' && !(command === 'models' && platformArgs[0] === 'select'))
+    throw new CliUsageError('--session is only valid with commands, models select, or skills.')
   if (line !== undefined && command !== 'commands') throw new CliUsageError('--line is only valid with commands run.')
   if (output !== undefined && !(command === 'sessions' && platformArgs[0] === 'export')) throw new CliUsageError('--output is only valid with sessions export.')
   if (agentPreset !== undefined && !(command === 'sessions' && platformArgs[0] === 'create'))
     throw new CliUsageError('--agent-preset is only valid with sessions create.')
+  if (mode !== undefined && !(command === 'sessions' && platformArgs[0] === 'prompt')) throw new CliUsageError('--mode is only valid with sessions prompt.')
+  if (reasoningEffort !== undefined && !(command === 'models' && platformArgs[0] === 'select'))
+    throw new CliUsageError('--reasoning-effort is only valid with models select.')
   if (max !== undefined && !(command === 'sessions' && platformArgs[0] === 'history')) throw new CliUsageError('--max is only valid with sessions history.')
   if (atSeq !== undefined && !(command === 'sessions' && platformArgs[0] === 'fork')) throw new CliUsageError('--at-seq is only valid with sessions fork.')
   if (command === 'status' || command === 'info' || command === 'doctor') {
     if (parsed._.length > 1 && !help) throw new CliUsageError(`${command} does not accept positional arguments.`)
   }
   if (command === 'sessions' && !help) {
-    const [action, id, ...extra] = platformArgs
-    if (!['list', 'show', 'history', 'create', 'fork', 'cancel', 'export'].includes(action ?? ''))
-      throw new CliUsageError('sessions requires list, show, history, create, fork, cancel, or export.')
-    if (['show', 'history', 'fork', 'cancel', 'export'].includes(action ?? '') && !id) throw new CliUsageError(`sessions ${action} requires a Session id.`)
-    if (extra.length > 0) throw new CliUsageError(`sessions ${action} accepts no extra positional arguments.`)
-    if (['list', 'create'].includes(action ?? '') && id !== undefined) throw new CliUsageError(`sessions ${action} accepts no positional argument.`)
+    const [action, sessionId, ...extra] = platformArgs
+    const actions = ['list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export']
+    if (!actions.includes(action ?? '')) throw new CliUsageError(`sessions requires ${actions.join(', ')}.`)
+    if (['show', 'history', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export'].includes(action ?? '') && !sessionId)
+      throw new CliUsageError(`sessions ${action} requires a Session id.`)
+    if (action === 'search' && !sessionId) throw new CliUsageError('sessions search requires a query.')
+    if (action === 'prompt' && extra.join(' ').trim().length === 0) throw new CliUsageError('sessions prompt requires message text.')
+    if (action === 'rename' && extra.join(' ').trim().length === 0) throw new CliUsageError('sessions rename requires a title.')
+    if (!['search', 'prompt', 'rename'].includes(action ?? '') && extra.length > 0)
+      throw new CliUsageError(`sessions ${action} accepts no extra positional arguments.`)
+    if (['list', 'create'].includes(action ?? '') && sessionId !== undefined) throw new CliUsageError(`sessions ${action} accepts no positional argument.`)
   }
   if ((command === 'plugins' || command === 'bundles') && !help) {
     const [action, id, ...extra] = platformArgs
-    if (!['list', 'info', 'enable', 'disable'].includes(action ?? '')) throw new CliUsageError(`${command} requires list, info, enable, or disable.`)
-    if (['info', 'enable', 'disable'].includes(action ?? '') && !id) throw new CliUsageError(`${command} ${action} requires an id.`)
+    const actions = command === 'plugins' ? ['list', 'info', 'check', 'enable', 'disable'] : ['list', 'info', 'install', 'remove', 'enable', 'disable']
+    if (!actions.includes(action ?? '')) throw new CliUsageError(`${command} requires ${actions.join(', ')}.`)
+    if (['info', 'check', 'enable', 'disable', 'install', 'remove'].includes(action ?? '') && !id) {
+      const target = (command === 'plugins' && action === 'check') || (command === 'bundles' && action === 'install') ? 'a package spec' : 'an id'
+      throw new CliUsageError(`${command} ${action} requires ${target}.`)
+    }
     if (extra.length > 0 || (action === 'list' && id !== undefined)) throw new CliUsageError(`${command} ${action} accepts no extra positional arguments.`)
+  }
+  if (command === 'presets' && !help) {
+    const [action, id, ...extra] = platformArgs
+    if (!['list', 'show'].includes(action ?? '')) throw new CliUsageError('presets requires list or show.')
+    if (action === 'show' && !id) throw new CliUsageError('presets show requires an Agent preset id.')
+    if (extra.length > 0 || (action === 'list' && id !== undefined)) throw new CliUsageError(`presets ${action} accepts no extra positional arguments.`)
+  }
+  if (command === 'models' && !help) {
+    const [action, provider, model, ...extra] = platformArgs
+    if (!['list', 'select'].includes(action ?? '')) throw new CliUsageError('models requires list or select.')
+    if (action === 'select' && session === undefined) throw new CliUsageError('models select requires --session <id>.')
+    if (action === 'select' && (!provider || !model)) throw new CliUsageError('models select requires a provider and model id.')
+    if (action === 'list' && (provider !== undefined || extra.length > 0)) throw new CliUsageError('models list accepts no positional arguments.')
+    if (action === 'select' && extra.length > 0) throw new CliUsageError('models select accepts one provider and one model id.')
+  }
+  if (command === 'skills' && !help) {
+    const [action, ...extra] = platformArgs
+    if (action !== 'list') throw new CliUsageError('skills currently supports list.')
+    if (session === undefined) throw new CliUsageError('skills list requires --session <id>.')
+    if (extra.length > 0) throw new CliUsageError('skills list accepts no extra positional arguments.')
   }
   if (command === 'commands' && !help) {
     const [action, commandName, ...extra] = platformArgs
@@ -499,6 +658,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(line === undefined ? {} : { line }),
       ...(output === undefined ? {} : { output }),
       ...(agentPreset === undefined ? {} : { agentPreset }),
+      ...(mode === undefined ? {} : { mode }),
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       ...(max === undefined ? {} : { max }),
       ...(atSeq === undefined ? {} : { atSeq }),
     }
@@ -536,6 +697,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(line === undefined ? {} : { line }),
     ...(output === undefined ? {} : { output }),
     ...(agentPreset === undefined ? {} : { agentPreset }),
+    ...(mode === undefined ? {} : { mode }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     ...(max === undefined ? {} : { max }),
     ...(atSeq === undefined ? {} : { atSeq }),
   }

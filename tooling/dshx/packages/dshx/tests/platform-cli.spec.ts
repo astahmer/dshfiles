@@ -7,7 +7,10 @@ import { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlat
 import type { DshPlatformClient, DshPlatformTransport } from '../src/platform/client.js'
 import type { CliIO } from '../src/cli/run.js'
 
-function io(): CliIO & { readonly out: PassThrough; readonly err: PassThrough } {
+function io(): CliIO & {
+  readonly out: PassThrough
+  readonly err: PassThrough
+} {
   const stdin = new PassThrough()
   const out = new PassThrough()
   const err = new PassThrough()
@@ -23,7 +26,10 @@ function capture(stream: PassThrough): () => string {
 }
 
 function clientWith(rpc: DshPlatformTransport['rpc']): DshPlatformClient {
-  return createDshPlatformClientFromTransport({ rpc, sessionCursor: async () => 3 })
+  return createDshPlatformClientFromTransport({
+    rpc,
+    sessionCursor: async () => 3,
+  })
 }
 
 describe('DSH platform CLI', () => {
@@ -49,7 +55,14 @@ describe('DSH platform CLI', () => {
     const projectReads = vi.fn()
     const client = clientWith(async (namespace, method) => {
       if (namespace === 'pluginManager' && method === 'listPlugins') {
-        return [{ entryId: 'plugin-entry', moduleName: '@sample/plugin', enabled: true, fiberPhase: 'active' }]
+        return [
+          {
+            entryId: 'plugin-entry',
+            moduleName: '@sample/plugin',
+            enabled: true,
+            fiberPhase: 'active',
+          },
+        ]
       }
       throw new Error(`Unexpected RPC ${namespace}/${method}`)
     })
@@ -72,14 +85,26 @@ describe('DSH platform CLI', () => {
       schemaVersion: 1,
       command: 'plugins list',
       ok: true,
-      data: { items: [{ id: 'plugin-entry', moduleName: '@sample/plugin', enabled: true, phase: 'active' }] },
+      data: {
+        items: [
+          {
+            id: 'plugin-entry',
+            moduleName: '@sample/plugin',
+            enabled: true,
+            phase: 'active',
+          },
+        ],
+      },
     })
   })
 
   it('shows action-specific help and keeps JSON output when quiet is set', async () => {
     const helpStreams = io()
     const help = capture(helpStreams.out)
-    const helpExitCode = await runCli(['sessions', 'export', '--help'], { io: helpStreams, version: 'test-version' })
+    const helpExitCode = await runCli(['sessions', 'export', '--help'], {
+      io: helpStreams,
+      version: 'test-version',
+    })
 
     expect(helpExitCode).toBe(0)
     expect(help()).toContain('Usage: dshx sessions export <session-id> [--output <path>]')
@@ -98,7 +123,11 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(0)
-    expect(JSON.parse(output())).toMatchObject({ command: 'plugins list', ok: true, data: { items: [] } })
+    expect(JSON.parse(output())).toMatchObject({
+      command: 'plugins list',
+      ok: true,
+      data: { items: [] },
+    })
   })
 
   it('runs static Slot explanation without resolving a plugin project', async () => {
@@ -130,7 +159,12 @@ describe('DSH platform CLI', () => {
       calls.push({ url, ...(init === undefined ? {} : { init }) })
       if (init?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
       if (url.includes('?token=')) {
-        return new Response(null, { status: 302, headers: { 'set-cookie': 'dsh.session=example-cookie; Path=/api; HttpOnly; SameSite=Lax' } })
+        return new Response(null, {
+          status: 302,
+          headers: {
+            'set-cookie': 'dsh.session=example-cookie; Path=/api; HttpOnly; SameSite=Lax',
+          },
+        })
       }
       const body = JSON.parse(String(init?.body))
       const requestBody = z.object({ rpcId: z.string(), method: z.string() }).parse(body)
@@ -138,7 +172,10 @@ describe('DSH platform CLI', () => {
         JSON.stringify({
           type: 'server-response',
           rpcId: requestBody.rpcId,
-          result: { ok: true, value: requestBody.method === 'session/list' ? { items: [] } : null },
+          result: {
+            ok: true,
+            value: requestBody.method === 'session/list' ? { items: [] } : null,
+          },
         }),
         {
           status: 200,
@@ -147,7 +184,10 @@ describe('DSH platform CLI', () => {
       )
     })
 
-    const client = await connectDshPlatformClient({ url: 'http://127.0.0.1:3080/?token=synthetic-token', fetch: request })
+    const client = await connectDshPlatformClient({
+      url: 'http://127.0.0.1:3080/?token=synthetic-token',
+      fetch: request,
+    })
     expect(await client.sessions.list()).toEqual([])
     const controller = new AbortController()
     expect(await client.commands.execute('session-1', '/help', controller.signal)).toBeNull()
@@ -167,9 +207,12 @@ describe('DSH platform CLI', () => {
 
   it('refuses non loopback launch URLs before making a request', async () => {
     const request = vi.fn<typeof fetch>()
-    await expect(connectDshPlatformClient({ url: 'http://example.com/?token=synthetic-token', fetch: request })).rejects.toThrow(
-      'accepts only an HTTP launch URL on localhost',
-    )
+    await expect(
+      connectDshPlatformClient({
+        url: 'http://example.com/?token=synthetic-token',
+        fetch: request,
+      }),
+    ).rejects.toThrow('accepts only an HTTP launch URL on localhost')
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -192,13 +235,25 @@ describe('DSH platform CLI', () => {
           }
         }
         if (namespace === 'commands' && method === 'list') {
-          return [{ definitionId: 'command-1', name: 'review', description: 'Review current changes', input: { hint: 'Optional scope', attachments: true } }]
+          return [
+            {
+              definitionId: 'command-1',
+              name: 'review',
+              description: 'Review current changes',
+              input: { hint: 'Optional scope', attachments: true },
+            },
+          ]
         }
         throw new Error(`Unexpected RPC ${namespace}/${method}`)
       },
     })
 
-    expect(await client.sessions.list()).toMatchObject([{ sessionId: 'session-1', projections: { summary: 'Ready', state: 'idle' } }])
+    expect(await client.sessions.list()).toMatchObject([
+      {
+        sessionId: 'session-1',
+        projections: { summary: 'Ready', state: 'idle' },
+      },
+    ])
     expect(await client.commands.list('session-1')).toEqual([
       {
         definitionId: 'command-1',
@@ -210,7 +265,11 @@ describe('DSH platform CLI', () => {
   })
 
   it('uses revisioned settings mutations and rejects non slash-prefixed Session commands', async () => {
-    const calls: { readonly namespace: string; readonly method: string; readonly args: readonly unknown[] }[] = []
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: readonly unknown[]
+    }[] = []
     const client = clientWith(async (namespace, method, args) => {
       calls.push({ namespace, method, args })
       if (namespace === 'settings' && method === 'describe') {
@@ -303,7 +362,12 @@ describe('DSH platform CLI', () => {
     expect(exitCode).toBe(0)
     expect(JSON.parse(stdout())).toMatchObject({
       ok: true,
-      data: { scope: 'connected-host-profile', application: 'restart-required', restartRequired: true, enabled: true },
+      data: {
+        scope: 'connected-host-profile',
+        application: 'restart-required',
+        restartRequired: true,
+        enabled: true,
+      },
     })
   })
 
@@ -322,7 +386,10 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(130)
-    expect(JSON.parse(stdout())).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+    expect(JSON.parse(stdout())).toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    })
   })
 
   it('keeps settings secrets redacted and refuses secret values passed on the command line', async () => {
@@ -359,7 +426,9 @@ describe('DSH platform CLI', () => {
     const getResult = JSON.parse(stdout())
 
     expect(getExitCode).toBe(0)
-    expect(getResult).toMatchObject({ data: { redacted: true, configured: true, value: null } })
+    expect(getResult).toMatchObject({
+      data: { redacted: true, configured: true, value: null },
+    })
 
     const setStreams = io()
     const setOutput = capture(setStreams.out)
@@ -371,7 +440,10 @@ describe('DSH platform CLI', () => {
     const setResult = JSON.parse(setOutput())
 
     expect(setExitCode).toBe(1)
-    expect(setResult).toMatchObject({ ok: false, error: { code: 'secret-input-unsupported' } })
+    expect(setResult).toMatchObject({
+      ok: false,
+      error: { code: 'secret-input-unsupported' },
+    })
     expect(setOutput()).not.toContain('never-echo-this')
     expect(calls).toEqual(['settings/describe', 'settings/describe'])
   })
@@ -379,7 +451,10 @@ describe('DSH platform CLI', () => {
   it('emits JSON usage errors for malformed platform commands', async () => {
     const streams = io()
     const stdout = capture(streams.out)
-    const exitCode = await runCli(['plugins', 'whoops', '--json'], { io: streams, version: 'test-version' })
+    const exitCode = await runCli(['plugins', 'whoops', '--json'], {
+      io: streams,
+      version: 'test-version',
+    })
 
     expect(exitCode).toBe(2)
     expect(JSON.parse(stdout())).toMatchObject({
@@ -387,6 +462,266 @@ describe('DSH platform CLI', () => {
       command: 'plugins',
       ok: false,
       error: { code: 'usage' },
+    })
+  })
+
+  it('parses the DSH-native session, bundle, model, preset, and skill commands', () => {
+    expect(parseCliArgs(['sessions', 'prompt', 'session-1', 'review', 'this', '--mode', 'steer'])).toMatchObject({
+      command: 'sessions',
+      platformArgs: ['prompt', 'session-1', 'review', 'this'],
+      mode: 'steer',
+    })
+    expect(parseCliArgs(['bundles', 'install', '@sample/bundle'])).toMatchObject({
+      command: 'bundles',
+      platformArgs: ['install', '@sample/bundle'],
+    })
+    expect(parseCliArgs(['models', 'select', '--session', 'session-1', 'deepseek', 'reasoner', '--reasoning-effort', 'high'])).toMatchObject({
+      command: 'models',
+      platformArgs: ['select', 'deepseek', 'reasoner'],
+      session: 'session-1',
+      reasoningEffort: 'high',
+    })
+    expect(parseCliArgs(['skills', 'list', '--session', 'session-1'])).toMatchObject({
+      command: 'skills',
+      platformArgs: ['list'],
+      session: 'session-1',
+    })
+    expect(parseCliArgs(['plugins', 'check', '@sample/plugin'])).toMatchObject({
+      command: 'plugins',
+      platformArgs: ['check', '@sample/plugin'],
+    })
+    expect(() => parseCliArgs(['sessions', 'prompt', 'session-1'])).toThrow('requires message text')
+    expect(() => parseCliArgs(['models', 'select', 'deepseek', 'reasoner'])).toThrow('--session')
+    expect(() => parseCliArgs(['models', 'list', '--session', 'session-1'])).toThrow('models select')
+    expect(() => parseCliArgs(['plugins', 'check'])).toThrow('a package spec')
+  })
+
+  it('maps expanded DSH Remote contracts through the reusable typed client', async () => {
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: readonly unknown[]
+    }[] = []
+    const client = clientWith(async (namespace, method, args) => {
+      calls.push({ namespace, method, args })
+      if (namespace === 'session' && method === 'search')
+        return {
+          items: [{ sessionId: 'session-1', snippet: 'synthetic match' }],
+          hasMore: false,
+        }
+      if (namespace === 'session' && method === 'rename') return { title: 'Renamed', seq: 7 }
+      if (namespace === 'workspace' && ['archiveSession', 'unarchiveSession'].includes(method)) return { archivedSessionIds: ['session-1'] }
+      if (namespace === 'session' && method === 'prompt') return { accepted: true }
+      if (namespace === 'pluginManager' && method === 'inspect')
+        return {
+          status: 'accepted',
+          kind: 'registry',
+          name: '@sample/bundle',
+          version: '1.0.0',
+          bundle: true,
+          registry: null,
+        }
+      if (namespace === 'pluginManager' && ['installBundle', 'removeBundle'].includes(method))
+        return {
+          application: 'applied',
+          changed: true,
+          stage: method === 'installBundle' ? 'install' : 'remove',
+          target: '@sample/bundle',
+          enabled: true,
+        }
+      if (namespace === 'agentPresets' && method === 'list')
+        return {
+          presets: [{ id: 'standard', isDefault: true, name: 'Standard' }],
+        }
+      if (namespace === 'agentPresets' && method === 'read')
+        return {
+          agentPreset: 'standard',
+          name: 'Standard',
+          content: '- id: @deepseek-ai/dsh-agent',
+        }
+      if (namespace === 'session' && method === 'modelCatalog')
+        return {
+          default: { provider: 'deepseek', model: 'reasoner' },
+          routableProviders: ['deepseek'],
+          groups: [
+            {
+              id: 'deepseek',
+              name: 'DeepSeek',
+              models: [{ id: 'reasoner', name: 'Reasoner' }],
+            },
+          ],
+          failures: [],
+        }
+      if (namespace === 'session' && method === 'selectModel')
+        return {
+          selected: {
+            provider: 'deepseek',
+            model: 'reasoner',
+            reasoningEffort: 'high',
+          },
+        }
+      if (namespace === 'skills' && method === 'list')
+        return {
+          skills: [
+            {
+              name: 'review',
+              description: 'Review code',
+              modelInvocable: true,
+            },
+          ],
+        }
+      throw new Error(`Unexpected RPC ${namespace}/${method}`)
+    })
+
+    expect(await client.sessions.search('synthetic match')).toEqual({
+      items: [{ sessionId: 'session-1', snippet: 'synthetic match' }],
+      hasMore: false,
+    })
+    expect(await client.sessions.rename('session-1', 'Renamed')).toEqual({
+      title: 'Renamed',
+      seq: 7,
+    })
+    expect(await client.sessions.archive('session-1')).toEqual({
+      archivedSessionIds: ['session-1'],
+    })
+    expect(await client.sessions.unarchive('session-1')).toEqual({
+      archivedSessionIds: ['session-1'],
+    })
+    expect(await client.sessions.prompt('session-1', 'synthetic prompt', 'queue')).toEqual({ accepted: true })
+    expect(await client.plugins.check('@sample/bundle')).toMatchObject({
+      status: 'accepted',
+      bundle: true,
+    })
+    expect(await client.bundles.install('@sample/bundle')).toMatchObject({
+      stage: 'install',
+      application: 'applied',
+    })
+    expect(await client.bundles.remove('@sample/bundle')).toMatchObject({
+      stage: 'remove',
+      application: 'applied',
+    })
+    expect(await client.presets.list()).toMatchObject([{ id: 'standard', isDefault: true }])
+    expect(await client.presets.show('standard')).toMatchObject({
+      agentPreset: 'standard',
+      content: '- id: @deepseek-ai/dsh-agent',
+    })
+    expect(await client.models.list()).toMatchObject({
+      default: { provider: 'deepseek' },
+      groups: [{ id: 'deepseek' }],
+    })
+    expect(
+      await client.models.select('session-1', {
+        provider: 'deepseek',
+        model: 'reasoner',
+        reasoningEffort: 'high',
+      }),
+    ).toEqual({
+      provider: 'deepseek',
+      model: 'reasoner',
+      reasoningEffort: 'high',
+    })
+    expect(await client.skills.list('session-1')).toEqual([{ name: 'review', description: 'Review code', modelInvocable: true }])
+    expect(calls.map(call => `${call.namespace}/${call.method}`)).toEqual([
+      'session/search',
+      'session/rename',
+      'workspace/archiveSession',
+      'workspace/unarchiveSession',
+      'session/prompt',
+      'pluginManager/inspect',
+      'pluginManager/installBundle',
+      'pluginManager/removeBundle',
+      'agentPresets/list',
+      'agentPresets/read',
+      'session/modelCatalog',
+      'session/selectModel',
+      'skills/list',
+    ])
+    expect(calls[2]?.args).toEqual([{ sessionId: 'session-1' }])
+    expect(calls[3]?.args).toEqual([{ sessionId: 'session-1' }])
+    expect(calls[4]?.args[0]).toMatchObject({
+      sessionId: 'session-1',
+      mode: 'queue',
+      content: [{ type: 'text', text: 'synthetic prompt' }],
+    })
+  })
+
+  it('cancels a DSH bundle install through the matching manager request id', async () => {
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: readonly unknown[]
+    }[] = []
+    let resolveInstall: ((result: unknown) => void) | undefined
+    const client = clientWith(async (namespace, method, args) => {
+      calls.push({ namespace, method, args })
+      if (namespace === 'pluginManager' && method === 'installBundle')
+        return new Promise(resolve => {
+          resolveInstall = resolve
+        })
+      if (namespace === 'pluginManager' && method === 'cancelInstall') return { status: 'cancelled' }
+      throw new Error(`Unexpected RPC ${namespace}/${method}`)
+    })
+    const controller = new AbortController()
+    const installation = client.bundles.install('@sample/bundle', controller.signal)
+    expect(resolveInstall).toBeDefined()
+    controller.abort()
+    resolveInstall?.({
+      application: 'cancelled',
+      changed: false,
+      stage: 'install',
+      target: '@sample/bundle',
+    })
+
+    await expect(installation).rejects.toMatchObject({ code: 'cancelled' })
+    const requestId = z.object({ requestId: z.string() }).parse(calls[0]?.args[1]).requestId
+    expect(calls[0]).toMatchObject({
+      namespace: 'pluginManager',
+      method: 'installBundle',
+      args: ['@sample/bundle', { requestId }],
+    })
+    expect(calls[1]).toMatchObject({
+      namespace: 'pluginManager',
+      method: 'cancelInstall',
+      args: [requestId],
+    })
+  })
+
+  it('sends Session prompts without echoing their text in JSON output', async () => {
+    const streams = io()
+    const stdout = capture(streams.out)
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: readonly unknown[]
+    }[] = []
+    const client = clientWith(async (namespace, method, args) => {
+      calls.push({ namespace, method, args })
+      if (namespace === 'session' && method === 'prompt') return { accepted: true }
+      throw new Error(`Unexpected RPC ${namespace}/${method}`)
+    })
+    const exitCode = await runCli(['sessions', 'prompt', 'session-1', 'secret-like synthetic message', '--json'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+    const output = stdout()
+
+    expect(exitCode).toBe(0)
+    expect(JSON.parse(output)).toMatchObject({
+      ok: true,
+      data: { sessionId: 'session-1', mode: 'queue', accepted: true },
+    })
+    expect(output).not.toContain('secret-like synthetic message')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      namespace: 'session',
+      method: 'prompt',
+      args: [
+        {
+          sessionId: 'session-1',
+          content: [{ type: 'text', text: 'secret-like synthetic message' }],
+        },
+      ],
     })
   })
 })

@@ -1,99 +1,144 @@
-# DSHX platform CLI plan and status
+# DSHX platform CLI: BB crosswalk and status
 
-## Product goal
+## Goal and research basis
 
-Make DSHX a developer platform for DSH, with a reusable typed client beneath
-the CLI. CLI handlers parse input and present results; DSH API calls, wire
-validation, and domain behavior live in the platform client. The CLI must use
-DSH's authenticated local API and must not read session stores or edit profile
-files behind DSH's back.
+Make DSHX the developer platform for DSH, with one authenticated typed client
+used by the CLI and future developer tools. CLI handlers parse arguments and
+format results; RPC decoding, validation, and domain behavior belong in that
+client. DSHX uses DSH's supported Remote APIs and never reads session stores,
+profile files, or Cordis internals directly.
 
-This plan is grounded in the installed DSH `0.2.0-rc.2` package contracts and
-BB CLI `0.44.0`. BB terminology is mapped to DSH terminology; command parity is
-not a goal.
+The comparison used installed DSH `0.2.0-rc.2` declarations and implementations,
+DSHX `0.1.4-preview.3`, and BB CLI `0.44.0`. `bb guide commands --json` lists
+220 command paths in 20 groups. The matrix below compares those product areas;
+BB also manages machines, projects, browsers, themes, and servers that DSH does
+not own. “BB-quality” here means equally discoverable, composable, scriptable
+control for DSH capabilities, not 220 imitation commands.
 
 ## Connection and authentication
 
-DSH's web Connection accepts an application launch URL carrying its process
-token on the root/index request. The Host exchanges it for an authority-bound,
-HttpOnly, SameSite cookie. Every `/api` RPC and WebSocket stream then requires
-that cookie. The token is not accepted on API routes or in an Authorization
-header. The Host trust fence also checks the request authority and any browser
-origin markers.
+DSH's Web Connection accepts the current loopback launch URL carrying its
+process token on the root request, then issues an authority-bound HttpOnly
+cookie. The token is not accepted by API routes or in an Authorization header.
+Every API request and WebSocket stream uses that cookie.
 
-DSHX will accept the current local launch URL through `DSHX_URL` (and an
-explicit `--url` override). It will exchange the token in memory, keep the
-cookie only in the client instance, and restrict the first implementation to
-loopback HTTP. It will redact the launch URL and cookie from errors and JSON,
-and never persist either value. A headless caller therefore uses the same DSH
-authentication flow as the served client without a second credential store.
+DSHX reads `DSHX_URL` or `--url`, validates loopback HTTP, exchanges the token
+in memory, and keeps the cookie only in that client instance. It never writes
+either value to disk or includes them in errors or JSON. There is no second
+credential store.
 
 ## Capability matrix
 
-| BB capability | DSH equivalent | Native DSH CLI | Native DSH API | DSHX command and difficulty | Implementation status |
-| --- | --- | --- | --- | --- |
-| Runtime status | Running local Host and API readiness | `dsh --version`; launcher boots named profiles | No general version/health endpoint. API Gateway and session/plugin APIs provide connectivity probes. | `dshx status`, `dshx info`, `dshx doctor` — medium. Report local DSH CLI version separately from facts the Host API confirms. | Implemented; Host version/profile/build compatibility are reported as unavailable. |
-| Threads list/show | Sessions and session projections | None | `session/list`; projections are included as hints and can be read through `session/projections` | `dshx sessions list`, `show <id>` — low. | Implemented with Host Session summaries. |
-| Thread messages/log | Session history | None | `session/follow` supplies the exact opening cursor; `session/page` reads bounded, ordered history | `dshx sessions history <id>` — medium; use follow cursor plus page API. No storage scraping. | Implemented with bounded history pages. |
-| Thread create/fork/cancel | Session lifecycle | None | `session/create`, `session/fork`, `session/cancel` | `dshx sessions create`, `fork`, `cancel` — low. | Implemented through native lifecycle RPCs. |
-| Thread delete | No Session deletion operation | None | No `session/delete`. Workspace API can archive a Session, which is reversible and is not deletion. | Do not add `sessions delete`; consider a clearly named archive command separately. | Intentionally unavailable; no delete or archive alias added. |
-| Thread export | Session history records | None | `session/follow` plus paged `session/page`; no native export endpoint | `dshx sessions export <id>` — medium. Write a versioned DSHX JSON export from API records. | Implemented as ordered, versioned JSON. |
-| Plugins list/info | Loader entries and profile plugin manager | `dsh plugin --profile <name>` manages packages; no general runtime query command | `pluginInventory/list`, `pluginManager/listPlugins`, `pluginManager/listBundles` | `dshx plugins list`, `info <id>` — low. Preserve Host entry IDs and load phase. | Implemented; retains entry ID and loader phase. |
-| Plugins enable/disable | Persistent plugin-entry selection | `dsh plugin` does not expose this as a runtime command | `pluginManager/setPluginEnabled` | `dshx plugins enable/disable <id>` — low. Show `application`, warnings, and restart impact from `ChangeResult`. | Implemented with profile scope, warnings, error details, and restart state. |
-| Bundles list/info/enable/disable | Profile bundle selection and patch rows | `dsh plugin` manages installation; no dedicated bundle runtime CLI | `pluginManager/listBundles`, `setBundleEnabled` | `dshx bundles list`, `info`, `enable`, `disable` — low. Keep bundle/profile ownership in DSH. | Implemented with install/selection details and Host-owned mutation. |
-| Tools list/info/run | Model tool registry and per-session tool policy | None | No general tool list or standalone invocation endpoint. `dsh-tools` runs tools through an Agent turn and its policy/sandbox boundary. | Keep `dshx inspect tools` for the existing live development inspector. Do not add standalone `tools run`. | Existing `inspect tools` remains; standalone run/list is unavailable through this API. |
-| Commands list/info/run | User-invoked Session commands | None | `commands/list` and `commands/execute`; both are scoped to a Session ID. Execute runs a registered handler without sending the command to the model and accepts an `AbortSignal`. | `dshx commands list/info/run --session <id>` — medium. Preserve slash syntax and pass caller cancellation. | Implemented; Ctrl-C aborts command execution, while `sessions cancel` cancels active Session work. |
-| Services list/info | Cordis services in a plugin composition | None | No general application Remote inventory endpoint | Keep `dshx inspect services` on the existing DSHX runtime inspection bridge. No raw Cordis access from new handlers. | Existing live inspector remains; no general service API. |
-| Events list/watch and logs | Declared Cordis events and runtime logs | None | Existing DSHX inspector can list events. Gateway streams are for declared Remote endpoints/events, not a generic log feed. | Keep `dshx inspect events`; defer `events watch` and `logs --follow`. | Event listing remains in `inspect`; no generic watch/log API. |
-| Configuration get/set | DSH settings namespaces for profile plugin entries | `--dump-config` reads composed configuration; profile startup can prepare state | `settings/describe` returns schema, redacted values, write availability, and revision; `settings/mutate` validates path edits with optimistic revision | `dshx config list/get/set/unset` for one settings namespace — medium. Do not claim to edit `cordis.yml`, patches, or arbitrary profile config. Never use credential-value endpoints. | Implemented for scoped settings only; secret writes are refused by CLI. |
-| Profiles list/show | Named profile directories and shipped templates | Launcher accepts `--profile`; no profile list/show subcommand | No profile enumeration/details Remote endpoint | Defer. Do not enumerate directories or scrape profile files. | Intentionally unavailable; profile identity remains Host-owned. |
-| Machine output | Structured DSH state for scripts and agents | Native launcher output is command-specific | API results are typed; transport failures and Remote errors are distinct | New platform commands support `--json`, `--quiet`, and `--no-color`, stable envelopes, and stable exit codes. | Implemented; JSON envelope version 1, usage/runtime/not-found/rejected exit codes documented below. |
+| BB capability                         | DSH equivalent                                           | Native DSH CLI                                                        | Native DSH API                                                                                                                  | DSHX command and difficulty                                              | Status / boundary                                                                                                                                                                                                                                                                           |
+| ------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime status and diagnostics        | Local Host and authenticated API readiness               | `dsh --version`; launcher starts a named profile                      | No general health/version endpoint; Session, plugin, bundle, and settings RPCs are usable probes                                | `status`, `info`, `doctor` — medium                                      | Implemented. Doctor checks Node/DSHX/DSH CLI, API connectivity, failed or duplicate plugin entries, bundle errors, and settings. Host version, active profile identity, Client build state, and declared peer compatibility are unknown because DSH exposes no corresponding public Remote. |
+| Thread list/show/search               | Sessions and projections                                 | None                                                                  | `session/list`, `session/projections`, `session/search`                                                                         | `sessions list, show, search` — low                                      | Implemented. Search uses DSH's 20-result bounded content search.                                                                                                                                                                                                                            |
+| Thread messages/history/export        | Session event history                                    | None                                                                  | `session/follow` provides a cursor; `session/page` reads bounded ordered history                                                | `sessions history, export` — medium                                      | Implemented. Export pages through the API and writes versioned JSON. No storage scraping.                                                                                                                                                                                                   |
+| Thread create/fork/cancel/rename      | Session lifecycle                                        | None                                                                  | `session/create`, `fork`, `cancel`, `rename`                                                                                    | `sessions create, fork, cancel, rename` — low                            | Implemented through DSH lifecycle APIs.                                                                                                                                                                                                                                                     |
+| Thread prompt/send                    | A text turn admitted to a Session Agent                  | No headless command                                                   | `session/prompt` accepts a request ID, text parts, and queue/steer mode                                                         | `sessions prompt <id> <text...> [--mode queue, steer]` — medium          | Implemented. Ctrl-C requests cancellation before admission. Prompt text is not echoed in output. Attachments remain unsupported by this CLI.                                                                                                                                                |
+| Thread archive/restore/delete         | Reversible Workspace archive state                       | None                                                                  | `workspace/archiveSession`, `workspace/unarchiveSession`; no `session/delete`                                                   | `sessions archive, unarchive` — low                                      | Implemented with explicit reversible names. Archive does not stop activity; DSH refuses active Sessions unless the caller opts into stopping it. DSHX does not send that opt-in and does not invent delete.                                                                                 |
+| Plugins list/info/enable/disable      | Loader entries and profile plugin selection              | `dsh plugin` is for package management, not general runtime inventory | `pluginManager/listPlugins`, `setPluginEnabled`                                                                                 | `plugins list, info, enable, disable` — low                              | Implemented. Changes report application outcome, warnings, and restart requirements.                                                                                                                                                                                                        |
+| Plugin spec check/install/remove      | Package specs and bundle lifecycle                       | `dsh plugin add/remove`                                               | `pluginManager/inspect`, `installBundle`, `cancelInstall`, `removeBundle`                                                       | `plugins check`; `bundles install, remove` — medium                      | Implemented. Install uses DSH's manager and request cancellation; remove targets a named profile-owned bundle. Check performs no installation.                                                                                                                                              |
+| Bundles list/info/enable/disable      | Profile bundle selection and patch rows                  | No bundle inventory command                                           | `pluginManager/listBundles`, `setBundleEnabled`                                                                                 | `bundles list, info, enable, disable` — low                              | Implemented. Selection is profile-wide and DSH reports restart impact.                                                                                                                                                                                                                      |
+| Agent profiles/presets                | A Session's composed Agent preset                        | No list/show command                                                  | `agentPresets/list`, `agentPresets/read`                                                                                        | `presets list, show` — low                                               | Implemented for declared Agent presets. DSHX does not enumerate filesystem profiles or silently change the default.                                                                                                                                                                         |
+| Providers and models                  | Routable model catalog and Session-local selection       | No model command                                                      | `session/modelCatalog`, `session/selectModel`                                                                                   | `models list`; `models select --session ...` — medium                    | Implemented. Catalog includes provider lookup failures. Selection is Session-scoped; DSH may also persist it as the new default model.                                                                                                                                                      |
+| Skills                                | User-invocable skills visible to one Session composition | No command                                                            | `skills/list` takes a Session ID and returns metadata, not skill bodies                                                         | `skills list --session <id>` — low                                       | Implemented as a Session-scoped list. No registry install or filesystem skill edits.                                                                                                                                                                                                        |
+| Commands list/info/run                | User-invoked Session commands                            | None                                                                  | `commands/list`, `commands/execute`; both require a Session ID                                                                  | `commands list, info, run --session <id>` — medium                       | Implemented. Run accepts slash-prefixed input, does not start a model turn, and maps Ctrl-C to DSH's AbortSignal.                                                                                                                                                                           |
+| Tools list/info/run                   | Agent tool registry and policy                           | None                                                                  | No general app-level tool catalog or standalone invocation API. DSH tools run inside an Agent turn and its policy/sandbox.      | Existing `inspect tools`; no `tools run` — medium                        | Standalone tool inventory/invocation is unavailable through the public app API. No Cordis runner RPC is treated as a general tool API.                                                                                                                                                      |
+| Services list/info                    | Cordis service composition                               | None                                                                  | No public general service inventory Remote                                                                                      | Existing `inspect services` — medium                                     | The development inspector reads a project runtime composition. It is not a global Host service endpoint.                                                                                                                                                                                    |
+| Events and logs                       | Declared lifecycle events and Host logs                  | None                                                                  | No generic Remote event catalogue, log feed, or follow-logs endpoint                                                            | Existing `inspect events`; no `events watch` or `logs --follow` — medium | Deferred: a developer bridge is not equivalent to a supported Host event/log API.                                                                                                                                                                                                           |
+| Configuration get/set                 | Namespaced DSH settings                                  | `--dump-config` is read-only composed configuration output            | `settings/describe`, `settings/mutate` with schema validation and optimistic revision                                           | `config list, get, set, unset` — medium                                  | Implemented for API-described settings only. Values are redacted by DSH; DSHX refuses secret-path writes. No direct `cordis.yml`, patch, or arbitrary profile edits.                                                                                                                        |
+| User credentials/account              | Provider credentials and DSH account                     | UI-owned                                                              | Credential set/unset and account remotes exist, but carry secret and sign-in semantics                                          | No DSHX command — high                                                   | Deliberately excluded from this control CLI. Use DSH's Settings/account surfaces; never expose credential values in process args or JSON.                                                                                                                                                   |
+| Workspace/project/file operations     | Session workspaces and workspace files                   | No project or file command                                            | Workspace controller and `workspaceFiles` remotes exist; path scope and mutation semantics need an explicit DSHX boundary audit | No general file/project command — medium                                 | Deferred until Session/workspace path ownership and write constraints are fully verified. DSHX local project build commands remain separate.                                                                                                                                                |
+| Terminals                             | Host-owned Session terminals                             | No terminal command                                                   | Terminal create/list/follow/write/close remotes exist                                                                           | No DSHX terminal command — high                                          | Deferred pending a process-execution security review, Session scope, output bounds, and cancellation semantics. A terminal write is arbitrary command execution.                                                                                                                            |
+| Jobs                                  | DSH background jobs and retained output                  | No job command                                                        | `job/list`, `job/follow`, `job/kill` are stream/lifecycle APIs                                                                  | No DSHX job command — medium                                             | Deferred until the shared client has a bounded stream contract and job ownership/kill semantics are represented.                                                                                                                                                                            |
+| Goals and schedules                   | Durable Agent goals and scheduled work                   | No matching command                                                   | `goals/*` and `schedule/*` APIs exist                                                                                           | No DSHX goal/schedule command — medium                                   | Deferred until lifecycle, profile scope, and prompt side effects are mapped to explicit CLI operations.                                                                                                                                                                                     |
+| Machine/environment/server management | BB's remote machines, environments, server migration     | None                                                                  | DSH's local API does not manage BB machines or environments                                                                     | No equivalent                                                            | Different product boundary; do not invent DSH abstractions for BB features.                                                                                                                                                                                                                 |
+| Marketplace/plugin discovery          | DSH bundle registries and package specs                  | `dsh plugin add` uses the configured package manager                  | Plugin inspection and install use DSH's configured registries; no marketplace catalogue Remote                                  | `plugins check`, `bundles install` — medium                              | Package install is supported. Marketplace search/catalog behavior has no corresponding DSH API.                                                                                                                                                                                             |
+| Browser, theme, voice, app updates    | BB desktop/browser/preferences features                  | None                                                                  | No corresponding DSH app-level Remote surface                                                                                   | No equivalent                                                            | Outside DSH's product boundary.                                                                                                                                                                                                                                                             |
+| Machine-readable interface            | JSON for scripts and agents                              | Native output varies by command                                       | Typed Remote responses and structured errors                                                                                    | `--json`, `--quiet`, `--no-color` — low                                  | Platform commands use envelope version 1 and stable exit codes. Query output includes sessions, history, plugins, bundles, presets, models, skills, commands, and settings.                                                                                                                 |
+| Help/discoverability                  | BB guide and group help                                  | `dsh --help` covers native DSH CLI                                    | Remote contracts are not a discoverability interface                                                                            | `dshx --help` and group/action help — low                                | Implemented for DSHX authoring and platform commands. No one-to-one BB aliases are added.                                                                                                                                                                                                   |
 
-### Runtime diagnosis boundaries
+## BB group inventory
 
-`doctor` verifies the local DSHX process version and Node version, exchanges
-the DSH launch URL, call session/plugin APIs, inspect bundle errors, identify
-failed Loader entries, and report restart-required changes. DSH does not expose
-its runtime version, selected profile identity, browser Client build state, or
-a generic dependency/configuration diagnostic endpoint through the inspected
-Remote contracts. The CLI must label those facts as unavailable rather than
-guess from files or from the locally installed `dsh` executable.
+This records every top-level group returned by `bb guide commands --json` and
+why its DSHX coverage differs:
 
-## Implementation completion
+| BB group                         | DSHX mapping                                                                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `status`, `diagnostics`, `guide` | Status/doctor and DSHX help are implemented; BB invocation-error history has no DSH equivalent.                               |
+| `thread`                         | Mapped to the Session lifecycle and history commands above. DSH has no permanent Session delete.                              |
+| `plugin`, `marketplace`          | Plugin/bundle control and configured-registry installation are mapped; marketplace catalog/search is absent.                  |
+| `provider`                       | DSH model catalog and Session selection are mapped.                                                                           |
+| `settings`                       | Scoped DSH settings are mapped; BB's global UI preferences and secret/account operations are not.                             |
+| `skill`                          | Session-composition skill metadata is mapped; registry discovery and skill installation are absent.                           |
+| `terminal`                       | DSH API exists; CLI exposure waits for process-execution security and streaming bounds.                                       |
+| `project`, `environment`, `file` | DSH has Session workspaces/files but no BB-style project, branch, or environment lifecycle. File APIs await scope audit.      |
+| `manager`                        | DSH Sessions and Agent presets cover some agent creation/discovery; there is no matching multi-agent Manager lifecycle.       |
+| `machine`, `server`, `updates`   | BB machine/server/app updater operations have no DSH app-level equivalent. DSH plugin changes do report restart requirements. |
+| `browser`, `theme`, `voice`      | No matching DSH API surface.                                                                                                  |
 
-1. Loopback launch-token exchange and a shared typed DSH platform client are
-   implemented in `packages/dshx/src/platform/`.
-2. Status, info, doctor, Session list/show/history, plugin and bundle list/info,
-   and scoped settings reads are implemented with machine-readable output.
-3. Supported lifecycle changes are implemented: Session create/fork/cancel,
-   plugin/bundle enable/disable, and schema-validated settings set/unset using
-   optimistic revisions.
-4. Session-scoped command list/info/run and ordered history export are
-   implemented. The native execute method accepts `AbortSignal`; the CLI maps
-   Ctrl-C to it and uses exit code 130. `sessions cancel` separately targets
-   active Session work.
-5. Platform help and the CLI reference document commands, auth, JSON envelopes,
-   exit codes, and unsupported Host-owned operations.
-6. Focused validation passed with 16 Vitest tests, a TypeScript 7.0.2 package
-   build/typecheck, Oxlint 1.86.0, Oxfmt 0.71.0, and PNPM 12.5.1 lockfile
-   generation. API calls use synthetic Host responses; no live authenticated
-   Host call or user profile mutation was part of the proof.
+## JSON and exit-code contract
+
+Successful platform output uses:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "plugins list",
+  "ok": true,
+  "data": { "items": [] }
+}
+```
+
+Errors use `{ "schemaVersion": 1, "command": "...", "ok": false,
+"error": { "code": "...", "message": "..." } }`. Exit codes are stable:
+`0` success, `1` Host/API or inspection failure, `2` usage error, `4` target not
+found, `5` a plugin/bundle change DSH did not apply, and `130` interrupted
+command or cancelled Session prompt/bundle installation. `--quiet` suppresses
+human-readable success only; JSON and errors remain visible.
+
+## Implementation status
+
+The implementation scope for this plan is complete: every reviewed DSH
+application capability with a safe public contract is exposed. Matrix rows
+marked deferred or unavailable require a separate API/security boundary review
+or new Host support; they are recorded limits, not hidden implementation tasks.
+
+1. The authenticated loopback client is exported as `@dshfiles/dshx/platform`.
+   RPC results are decoded at the client boundary and no launch token or cookie
+   is persisted.
+2. Runtime diagnosis, Session list/show/search/history/export/create/fork/cancel/
+   rename/prompt/archive/restore, and Session-scoped command list/info/run use
+   the Remote APIs shown above.
+3. Plugin and bundle list/info/check/install/remove/enable/disable use the DSH
+   plugin manager and report the Host's observed application result.
+4. Agent presets, routable models, Session model selection, Session-scoped
+   skill metadata, and redacted settings are available through the same typed
+   client and JSON envelope.
+5. CLI commands call typed client capabilities; no new handler calls Cordis
+   internals or DSH persistence directly.
+6. API tests use synthetic Host responses. No real Session prompt, archive,
+   restore, bundle installation/removal, or profile mutation is used as test
+   data. Live authenticated-host proof must be reported separately from these
+   tests.
 
 ## DSH contract references
 
-- `@deepseek-ai/dsh-client-connection@0.2.0-rc.2`: `BrowserAuth`, request
-  trust, `/api` RPC, and cookie requirements.
+- `@deepseek-ai/dsh-client-connection@0.2.0-rc.2`: launch URL exchange,
+  authority/origin checks, and authenticated API access.
 - `@deepseek-ai/dsh-api-gateway@0.2.0-rc.2`: unary Remote dispatch and
   `/api/remote.mux` stream contract.
-- `@deepseek-ai/dsh-api-session-controller@0.2.0-rc.2`: session list,
-  create, fork, cancel, follow, and page contracts.
+- `@deepseek-ai/dsh-api-session-controller@0.2.0-rc.2`: Session list/search,
+  create/fork/cancel/rename/prompt/model selection, history, and skills.
+- `@deepseek-ai/dsh-api-workspace-controller@0.2.0-rc.2`: archive/restore,
+  workspace lifecycle, and pin/order operations.
 - `@deepseek-ai/dsh-plugin-manager@0.2.0-rc.2` and
-  `@deepseek-ai/dsh-host-plugin-inventory@0.2.0-rc.2`: plugin/bundle
-  inventory, enablement, failures, and application/restart outcomes.
-- `@deepseek-ai/dsh-commands@0.2.0-rc.2`: Session-scoped command list and
-  execution semantics.
+  `@deepseek-ai/dsh-host-plugin-inventory@0.2.0-rc.2`: plugin/bundle inventory,
+  installation, cancellation, removal, enablement, and restart outcomes.
+- `@deepseek-ai/dsh-agent-preset-registry@0.2.0-rc.2`: preset roster/read.
 - `@deepseek-ai/dsh-api-settings-controller@0.2.0-rc.2` and
-  `@deepseek-ai/dsh-settings@0.2.0-rc.2`: redacted namespace views, schema
-  validation, and optimistic revisions.
-- `bb guide json`, `bb guide commands thread`, and
-  `bb guide commands plugin`: BB JSON, thread, and plugin CLI capabilities.
+  `@deepseek-ai/dsh-settings@0.2.0-rc.2`: redacted settings, schema validation,
+  and optimistic revisions.
+- BB CLI `0.44.0`: `bb guide commands --json` (220 paths), plus the `thread`,
+  `plugin`, `settings`, and `provider` command groups.

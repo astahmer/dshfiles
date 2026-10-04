@@ -20,6 +20,95 @@ const sessionSummarySchema = z.object({
   projections: jsonValueSchema.optional(),
 })
 
+const sessionSearchItemSchema = z.object({
+  sessionId: z.string(),
+  snippet: z.string(),
+})
+const sessionSearchSchema = z.object({
+  items: z.array(sessionSearchItemSchema),
+  hasMore: z.boolean(),
+})
+
+const agentPresetRowSchema = z.object({
+  id: z.string(),
+  isDefault: z.boolean(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  broken: z.string().optional(),
+})
+const agentPresetRosterSchema = z.object({
+  presets: z.array(agentPresetRowSchema),
+})
+const agentPresetDocumentSchema = z.object({
+  agentPreset: z.string(),
+  content: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+})
+
+const modelSelectionSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  reasoningEffort: z.string().optional(),
+})
+const modelCatalogSchema = z.object({
+  default: modelSelectionSchema,
+  routableProviders: z.array(z.string()),
+  groups: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      models: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string().optional(),
+          reasoning: z
+            .object({
+              efforts: z.array(
+                z.object({
+                  id: z.string(),
+                  name: z.string(),
+                  description: z.string().optional(),
+                }),
+              ),
+              defaultEffort: z.string().optional(),
+            })
+            .optional(),
+        }),
+      ),
+    }),
+  ),
+  failures: z.array(z.object({ id: z.string(), name: z.string(), message: z.string() })),
+})
+
+const skillEntrySchema = z.object({
+  path: z.string().optional(),
+  name: z.string(),
+  description: z.string(),
+  whenToUse: z.string().optional(),
+  modelInvocable: z.boolean(),
+})
+
+const pluginInspectionSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('accepted'),
+    kind: z.enum(['registry', 'path', 'git', 'tarball']),
+    name: z.string().optional(),
+    version: z.string().optional(),
+    description: z.string().optional(),
+    bundle: z.union([z.boolean(), z.null()]),
+    registry: z.union([z.string(), z.null()]),
+    host: z.string().optional(),
+  }),
+  z.object({
+    status: z.literal('refused'),
+    problem: z.enum(['invalid-spec', 'already-installed', 'not-found', 'not-a-package', 'not-a-bundle', 'network', 'unknown']),
+    reason: z.string(),
+    registries: z.array(z.union([z.string(), z.null()])).optional(),
+  }),
+])
+
 const pluginSchema = z.object({
   entryId: z.string(),
   moduleName: z.string(),
@@ -38,11 +127,20 @@ const bundleSchema = z.object({
   removable: z.boolean(),
   readOnlyReason: z.enum(['management-required', 'unaddressable']).optional(),
   error: z.unknown().optional(),
-  rows: z.array(z.object({ rowId: z.string(), moduleName: z.string(), entryId: z.string().optional() })),
+  rows: z.array(
+    z.object({
+      rowId: z.string(),
+      moduleName: z.string(),
+      entryId: z.string().optional(),
+    }),
+  ),
   overrides: z.array(z.string()),
 })
 
-const commandInputSchema = z.object({ hint: z.string(), attachments: z.boolean().optional() })
+const commandInputSchema = z.object({
+  hint: z.string(),
+  attachments: z.boolean().optional(),
+})
 
 const commandSchema = z.object({
   definitionId: z.string().optional(),
@@ -114,6 +212,85 @@ export interface SessionSummary {
   readonly projections?: JsonValue
 }
 
+export interface SessionSearchItem {
+  readonly sessionId: string
+  readonly snippet: string
+}
+
+export interface AgentPresetRow {
+  readonly id: string
+  readonly isDefault: boolean
+  readonly name?: string
+  readonly description?: string
+  readonly broken?: string
+}
+
+export interface AgentPresetDocument {
+  readonly agentPreset: string
+  readonly content: string
+  readonly name?: string
+  readonly description?: string
+}
+
+export interface ModelSelection {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort?: string
+}
+
+export interface ModelCatalog {
+  readonly default: ModelSelection
+  readonly routableProviders: readonly string[]
+  readonly groups: readonly {
+    readonly id: string
+    readonly name: string
+    readonly models: readonly {
+      readonly id: string
+      readonly name: string
+      readonly description?: string
+      readonly reasoning?: {
+        readonly efforts: readonly {
+          readonly id: string
+          readonly name: string
+          readonly description?: string
+        }[]
+        readonly defaultEffort?: string
+      }
+    }[]
+  }[]
+  readonly failures: readonly {
+    readonly id: string
+    readonly name: string
+    readonly message: string
+  }[]
+}
+
+export interface SkillEntry {
+  readonly path?: string
+  readonly name: string
+  readonly description: string
+  readonly whenToUse?: string
+  readonly modelInvocable: boolean
+}
+
+export type PluginInspection =
+  | {
+      readonly status: 'accepted'
+      readonly kind: 'registry' | 'path' | 'git' | 'tarball'
+      readonly name?: string
+      readonly version?: string
+      readonly description?: string
+      readonly bundle: boolean | null
+      readonly registry: string | null
+      readonly host?: string
+    }
+  | {
+      readonly status: 'refused'
+      readonly problem: 'invalid-spec' | 'already-installed' | 'not-found' | 'not-a-package' | 'not-a-bundle' | 'network' | 'unknown'
+      readonly reason: string
+      readonly registries?: readonly (string | null)[]
+    }
+
 export interface PluginSummary {
   readonly id: string
   readonly moduleName: string
@@ -149,7 +326,10 @@ export interface SettingsNamespace {
   readonly autoGenerate: boolean
   readonly revision: number
   readonly applies: 'live'
-  readonly secrets: readonly { readonly path: readonly string[]; readonly set: boolean }[]
+  readonly secrets: readonly {
+    readonly path: readonly string[]
+    readonly set: boolean
+  }[]
 }
 
 export interface SettingsDescription {
@@ -169,7 +349,11 @@ export interface ChangeResult {
   readonly enabled?: boolean
   readonly stage: 'install' | 'enable' | 'remove'
   readonly target: string
-  readonly error?: { readonly code: string; readonly diagnostic?: string; readonly incompatible?: JsonValue }
+  readonly error?: {
+    readonly code: string
+    readonly diagnostic?: string
+    readonly incompatible?: JsonValue
+  }
   readonly warnings: readonly string[]
 }
 
@@ -181,20 +365,42 @@ export interface DshPlatformTransport {
 export interface DshPlatformClient {
   readonly sessions: {
     list(): Promise<readonly SessionSummary[]>
+    search(query: string): Promise<{
+      readonly items: readonly SessionSearchItem[]
+      readonly hasMore: boolean
+    }>
     create(input: { readonly cwd?: string; readonly agentPreset?: string }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
     fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
+    rename(sessionId: string, title: string): Promise<{ readonly title: string; readonly seq: number }>
+    archive(sessionId: string): Promise<{ readonly archivedSessionIds: readonly string[] }>
+    unarchive(sessionId: string): Promise<{ readonly archivedSessionIds: readonly string[] }>
+    prompt(sessionId: string, text: string, mode: 'queue' | 'steer', signal?: AbortSignal): Promise<{ readonly accepted: true }>
     page(sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages?: number): Promise<SessionPage>
     history(sessionId: string, maxMessages?: number): Promise<SessionPage>
     export(sessionId: string): Promise<readonly JsonValue[]>
   }
   readonly plugins: {
     list(): Promise<readonly PluginSummary[]>
+    check(spec: string): Promise<PluginInspection>
     setEnabled(id: string, enabled: boolean): Promise<ChangeResult>
   }
   readonly bundles: {
     list(): Promise<readonly BundleSummary[]>
+    install(spec: string, signal?: AbortSignal): Promise<ChangeResult>
+    remove(name: string): Promise<ChangeResult>
     setEnabled(name: string, enabled: boolean): Promise<ChangeResult>
+  }
+  readonly presets: {
+    list(): Promise<readonly AgentPresetRow[]>
+    show(id: string): Promise<AgentPresetDocument>
+  }
+  readonly models: {
+    list(): Promise<ModelCatalog>
+    select(sessionId: string, selection: ModelSelection): Promise<ModelSelection>
+  }
+  readonly skills: {
+    list(sessionId: string): Promise<readonly SkillEntry[]>
   }
   readonly commands: {
     list(sessionId: string): Promise<readonly CommandSummary[]>
@@ -236,7 +442,10 @@ function decodeJsonValue(value: unknown, context: string): JsonValue {
   return result.data
 }
 
-function loopbackLaunchUrl(value: string): { readonly origin: string; readonly token: string } {
+function loopbackLaunchUrl(value: string): {
+  readonly origin: string
+  readonly token: string
+} {
   let url: URL
   try {
     url = new URL(value)
@@ -321,7 +530,13 @@ function mapChangeResult(value: unknown): ChangeResult {
       enabled: z.boolean().optional(),
       stage: z.enum(['install', 'enable', 'remove']),
       target: z.string(),
-      error: z.object({ code: z.string(), diagnostic: z.string().optional(), incompatible: jsonValueSchema.optional() }).optional(),
+      error: z
+        .object({
+          code: z.string(),
+          diagnostic: z.string().optional(),
+          incompatible: jsonValueSchema.optional(),
+        })
+        .optional(),
       warnings: z.array(z.string()).optional(),
     })
     .parse(value)
@@ -341,6 +556,105 @@ function mapChangeResult(value: unknown): ChangeResult {
             ...(parsed.error.incompatible === undefined ? {} : { incompatible: parsed.error.incompatible }),
           },
         }),
+  }
+}
+
+function mapPluginInspection(value: unknown): PluginInspection {
+  const parsed = pluginInspectionSchema.parse(value)
+  if (parsed.status === 'refused') {
+    return {
+      status: parsed.status,
+      problem: parsed.problem,
+      reason: parsed.reason,
+      ...(parsed.registries === undefined ? {} : { registries: parsed.registries }),
+    }
+  }
+  return {
+    status: parsed.status,
+    kind: parsed.kind,
+    bundle: parsed.bundle,
+    registry: parsed.registry,
+    ...(parsed.name === undefined ? {} : { name: parsed.name }),
+    ...(parsed.version === undefined ? {} : { version: parsed.version }),
+    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    ...(parsed.host === undefined ? {} : { host: parsed.host }),
+  }
+}
+
+function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPresetRow {
+  return {
+    id: value.id,
+    isDefault: value.isDefault,
+    ...(value.name === undefined ? {} : { name: value.name }),
+    ...(value.description === undefined ? {} : { description: value.description }),
+    ...(value.broken === undefined ? {} : { broken: value.broken }),
+  }
+}
+
+function mapAgentPresetDocument(value: unknown): AgentPresetDocument {
+  const parsed = agentPresetDocumentSchema.parse(value)
+  return {
+    agentPreset: parsed.agentPreset,
+    content: parsed.content,
+    ...(parsed.name === undefined ? {} : { name: parsed.name }),
+    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+  }
+}
+
+function mapModelCatalog(value: unknown): ModelCatalog {
+  const parsed = modelCatalogSchema.parse(value)
+  return {
+    default: {
+      provider: parsed.default.provider,
+      model: parsed.default.model,
+      ...(parsed.default.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.default.reasoningEffort }),
+    },
+    routableProviders: parsed.routableProviders,
+    groups: parsed.groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      models: group.models.map(model => ({
+        id: model.id,
+        name: model.name,
+        ...(model.description === undefined ? {} : { description: model.description }),
+        ...(model.reasoning === undefined
+          ? {}
+          : {
+              reasoning: {
+                efforts: model.reasoning.efforts.map(effort => ({
+                  id: effort.id,
+                  name: effort.name,
+                  ...(effort.description === undefined ? {} : { description: effort.description }),
+                })),
+                ...(model.reasoning.defaultEffort === undefined ? {} : { defaultEffort: model.reasoning.defaultEffort }),
+              },
+            }),
+      })),
+    })),
+    failures: parsed.failures.map(failure => ({
+      id: failure.id,
+      name: failure.name,
+      message: failure.message,
+    })),
+  }
+}
+
+function mapModelSelection(value: unknown): ModelSelection {
+  const parsed = modelSelectionSchema.parse(value)
+  return {
+    provider: parsed.provider,
+    model: parsed.model,
+    ...(parsed.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.reasoningEffort }),
+  }
+}
+
+function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
+  return {
+    name: value.name,
+    description: value.description,
+    modelInvocable: value.modelInvocable,
+    ...(value.path === undefined ? {} : { path: value.path }),
+    ...(value.whenToUse === undefined ? {} : { whenToUse: value.whenToUse }),
   }
 }
 
@@ -369,6 +683,10 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   return {
     sessions: {
       list: listSessions,
+      search: async query => {
+        const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', [{ query }]))
+        return { items: result.items, hasMore: result.hasMore }
+      },
       create: async input => {
         const parsed = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(await transport.rpc('session', 'create', [input]))
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
@@ -376,6 +694,25 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       fork: async (sessionId, atSeq) =>
         z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', [{ sessionId, ...(atSeq === undefined ? {} : { atSeq }) }])),
       cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', [{ sessionId }])),
+      rename: async (sessionId, title) =>
+        z.object({ title: z.string(), seq: z.number().safe().nonnegative() }).parse(await transport.rpc('session', 'rename', [{ sessionId, title }])),
+      archive: async sessionId => {
+        const result = z.object({ archivedSessionIds: z.array(z.string()) }).parse(await transport.rpc('workspace', 'archiveSession', [{ sessionId }]))
+        return { archivedSessionIds: result.archivedSessionIds }
+      },
+      unarchive: async sessionId => {
+        const result = z.object({ archivedSessionIds: z.array(z.string()) }).parse(await transport.rpc('workspace', 'unarchiveSession', [{ sessionId }]))
+        return { archivedSessionIds: result.archivedSessionIds }
+      },
+      prompt: async (sessionId, text, mode, signal) => {
+        const request = {
+          requestId: randomUUID(),
+          sessionId,
+          mode,
+          content: [{ type: 'text', text }],
+        }
+        return z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'prompt', [request], signal))
+      },
       page,
       history: async (sessionId, maxMessages = 100) => {
         const throughSeq = await transport.sessionCursor(sessionId)
@@ -412,6 +749,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         const values = z.array(pluginSchema).parse(await transport.rpc('pluginManager', 'listPlugins', []))
         return values.map(mapPlugin)
       },
+      check: async spec => mapPluginInspection(await transport.rpc('pluginManager', 'inspect', [spec, {}])),
       setEnabled: async (id, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setPluginEnabled', [id, enabled])),
     },
     bundles: {
@@ -419,7 +757,44 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         const values = z.array(bundleSchema).parse(await transport.rpc('pluginManager', 'listBundles', []))
         return values.map(mapBundle)
       },
+      install: async (spec, signal) => {
+        if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH bundle installation was cancelled by the caller.')
+        const requestId = randomUUID()
+        let cancellation: Promise<unknown> | undefined
+        const cancelInstall = (): void => {
+          cancellation = transport.rpc('pluginManager', 'cancelInstall', [requestId]).catch(() => undefined)
+        }
+        signal?.addEventListener('abort', cancelInstall, { once: true })
+        try {
+          const result = mapChangeResult(await transport.rpc('pluginManager', 'installBundle', [spec, { requestId }]))
+          if (signal?.aborted && result.application === 'cancelled')
+            throw new DshPlatformError('cancelled', 'DSH bundle installation was cancelled and its profile files were restored.')
+          return result
+        } finally {
+          signal?.removeEventListener('abort', cancelInstall)
+          if (cancellation !== undefined) await cancellation
+        }
+      },
+      remove: async name => mapChangeResult(await transport.rpc('pluginManager', 'removeBundle', [name])),
       setEnabled: async (name, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', [name, enabled])),
+    },
+    presets: {
+      list: async () => agentPresetRosterSchema.parse(await transport.rpc('agentPresets', 'list', [])).presets.map(mapAgentPresetRow),
+      show: async id => mapAgentPresetDocument(await transport.rpc('agentPresets', 'read', [id])),
+    },
+    models: {
+      list: async () => mapModelCatalog(await transport.rpc('session', 'modelCatalog', [])),
+      select: async (sessionId, selection) => {
+        const request = { sessionId, ...selection }
+        const result = z.object({ selected: modelSelectionSchema }).parse(await transport.rpc('session', 'selectModel', [request]))
+        return mapModelSelection(result.selected)
+      },
+    },
+    skills: {
+      list: async sessionId => {
+        const result = z.object({ skills: z.array(skillEntrySchema) }).parse(await transport.rpc('skills', 'list', [{ sessionId }]))
+        return result.skills.map(mapSkillEntry)
+      },
     },
     commands: {
       list: async sessionId => {
@@ -488,7 +863,12 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
         method: 'POST',
         redirect: 'error',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ type: 'client-request', rpcId, method: `${namespace}/${method}`, payload: { args } }),
+        body: JSON.stringify({
+          type: 'client-request',
+          rpcId,
+          method: `${namespace}/${method}`,
+          payload: { args },
+        }),
         ...(signal === undefined ? {} : { signal }),
       })
     } catch {
@@ -512,7 +892,9 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
       const streamId = randomUUID()
       const url = new URL('/api/remote.mux', parsed.origin)
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-      const socket = new WebSocket(url, { headers: { cookie, origin: parsed.origin } })
+      const socket = new WebSocket(url, {
+        headers: { cookie, origin: parsed.origin },
+      })
       const timeout = setTimeout(() => finish(new DshPlatformError('stream-timeout', 'DSH did not open the session history stream in time.')), 10_000)
       let settled = false
       const finish = (error?: DshPlatformError, cursor?: number): void => {
@@ -534,7 +916,9 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
             type: 'open',
             streamId,
             endpoint: 'session/follow',
-            payload: { args: [{ address: { kind: 'session', sessionId }, maxMessages: 1 }] },
+            payload: {
+              args: [{ address: { kind: 'session', sessionId }, maxMessages: 1 }],
+            },
           }),
         )
       })

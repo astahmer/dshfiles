@@ -37,10 +37,16 @@ function commandName(args: CliArgs): string {
   return action === undefined ? (args.command ?? 'unknown') : `${args.command} ${action}`
 }
 
-function safeMessage(error: unknown): { readonly code: string; readonly message: string } {
+function safeMessage(error: unknown): {
+  readonly code: string
+  readonly message: string
+} {
   const code = error instanceof DshPlatformError ? error.code : 'command-failed'
   const message = error instanceof Error ? error.message : 'The DSH operation failed.'
-  return { code, message: message.replace(/token=[^&\s]*/g, 'token=[redacted]') }
+  return {
+    code,
+    message: message.replace(/token=[^&\s]*/g, 'token=[redacted]'),
+  }
 }
 
 function emitResult(args: CliArgs, io: PlatformCliIO, data: JsonValue | object, message: string): void {
@@ -74,7 +80,40 @@ async function executeCommandWithInterrupt(client: DshPlatformClient, sessionId:
   }
 }
 
-function rows<T>(items: readonly T[], columns: readonly { readonly heading: string; readonly render: (item: T) => string }[]): string {
+async function promptSessionWithInterrupt(
+  client: DshPlatformClient,
+  sessionId: string,
+  text: string,
+  mode: 'queue' | 'steer',
+): Promise<{ readonly accepted: true }> {
+  const controller = new AbortController()
+  const onInterrupt = (): void => controller.abort()
+  process.once('SIGINT', onInterrupt)
+  try {
+    return await client.sessions.prompt(sessionId, text, mode, controller.signal)
+  } finally {
+    process.off('SIGINT', onInterrupt)
+  }
+}
+
+async function installBundleWithInterrupt(client: DshPlatformClient, spec: string): Promise<import('../platform/client.js').ChangeResult> {
+  const controller = new AbortController()
+  const onInterrupt = (): void => controller.abort()
+  process.once('SIGINT', onInterrupt)
+  try {
+    return await client.bundles.install(spec, controller.signal)
+  } finally {
+    process.off('SIGINT', onInterrupt)
+  }
+}
+
+function rows<T>(
+  items: readonly T[],
+  columns: readonly {
+    readonly heading: string
+    readonly render: (item: T) => string
+  }[],
+): string {
   const values = items.map(item => columns.map(column => column.render(item).replace(/[\t\r\n]/g, ' ')))
   const widths = columns.map((column, index) => Math.max(column.heading.length, ...values.map(row => row[index]?.length ?? 0)))
   const format = (row: readonly string[]): string =>
@@ -90,7 +129,10 @@ function sessionRows(items: readonly SessionSummary[]): string {
     { heading: 'SESSION', render: item => item.sessionId },
     { heading: 'STATE', render: item => (item.running ? 'running' : 'idle') },
     { heading: 'BLANK', render: item => (item.blank ? 'yes' : 'no') },
-    { heading: 'UPDATED', render: item => new Date(item.updatedAt).toISOString() },
+    {
+      heading: 'UPDATED',
+      render: item => new Date(item.updatedAt).toISOString(),
+    },
     { heading: 'CWD', render: item => item.cwd ?? '' },
   ])
 }
@@ -157,7 +199,11 @@ function emitRejectedChange(args: CliArgs, io: PlatformCliIO, action: string, ta
           schemaVersion: 1,
           command: commandName(args),
           ok: false,
-          error: { code: `change-${result.application}`, message, details: changeData(result) },
+          error: {
+            code: `change-${result.application}`,
+            message,
+            details: changeData(result),
+          },
         },
         null,
         2,
@@ -261,7 +307,12 @@ async function runDoctor(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
     checks.push(doctorCheck('profile', 'unknown', 'The active profile identity is not exposed by DSH Remote APIs.'))
     checks.push(doctorCheck('client-build', 'unknown', 'DSH does not expose Client build state through a Remote API.'))
     checks.push(doctorCheck('plugin-compatibility', 'unknown', 'DSH does not expose a runtime compatibility inventory.'))
-    const data = { dshxVersion: runtime.dshxVersion, nodeVersion: process.version, dshCliVersion: dshVersion ?? null, checks }
+    const data = {
+      dshxVersion: runtime.dshxVersion,
+      nodeVersion: process.version,
+      dshCliVersion: dshVersion ?? null,
+      checks,
+    }
     emitResult(args, runtime.io, data, checks.map(item => `${item.status.toUpperCase()} ${item.id}: ${item.detail}`).join('\n'))
     return 1
   }
@@ -323,7 +374,12 @@ async function runDoctor(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
   }
   checks.push(doctorCheck('configuration', 'unknown', 'DSH exposes scoped settings schemas; profile patch composition and credential values stay Host-owned.'))
 
-  const data = { dshxVersion: runtime.dshxVersion, nodeVersion: process.version, dshCliVersion: dshVersion ?? null, checks }
+  const data = {
+    dshxVersion: runtime.dshxVersion,
+    nodeVersion: process.version,
+    dshCliVersion: dshVersion ?? null,
+    checks,
+  }
   const message = checks.map(item => `${item.status.toUpperCase()} ${item.id}: ${item.detail}`).join('\n')
   emitResult(args, runtime.io, data, message)
   return checks.some(item => item.status === 'fail') ? 1 : 0
@@ -394,6 +450,13 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         emitResult(args, runtime.io, { items }, sessionRows(items))
         return 0
       }
+      if (action === 'search') {
+        const query = parameters.join(' ')
+        const result = await client.sessions.search(query)
+        const message = result.items.length === 0 ? 'No matching Sessions.' : result.items.map(item => `${item.sessionId}\t${item.snippet}`).join('\n')
+        emitResult(args, runtime.io, { query, ...result }, `${message}${result.hasMore ? '\nMore results are available.' : ''}`)
+        return 0
+      }
       if (action === 'show') {
         const sessionId = parameters[0]
         const item = (await client.sessions.list()).find(session => session.sessionId === sessionId)
@@ -425,15 +488,54 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         emitResult(args, runtime.io, { sessionId: parameters[0], ...result }, `Cancellation accepted for ${parameters[0]}`)
         return 0
       }
+      if (action === 'rename') {
+        const sessionId = parameters[0] ?? ''
+        const title = parameters.slice(1).join(' ')
+        const result = await client.sessions.rename(sessionId, title)
+        emitResult(args, runtime.io, { sessionId, ...result }, `Renamed Session ${sessionId} to ${result.title}`)
+        return 0
+      }
+      if (action === 'archive' || action === 'unarchive') {
+        const sessionId = parameters[0] ?? ''
+        const archived = action === 'archive'
+        const result = await (archived ? client.sessions.archive(sessionId) : client.sessions.unarchive(sessionId))
+        emitResult(
+          args,
+          runtime.io,
+          {
+            sessionId,
+            archived,
+            archivedSessionIds: result.archivedSessionIds,
+          },
+          `${archived ? 'Archived' : 'Restored'} Session ${sessionId}`,
+        )
+        return 0
+      }
+      if (action === 'prompt') {
+        const sessionId = parameters[0] ?? ''
+        const mode = args.mode ?? 'queue'
+        const result = await promptSessionWithInterrupt(client, sessionId, parameters.slice(1).join(' '), mode)
+        emitResult(args, runtime.io, { sessionId, mode, ...result }, `Prompt accepted for Session ${sessionId} (${mode})`)
+        return 0
+      }
       if (action === 'export') {
         const sessionId = parameters[0] ?? ''
-        const data = { schemaVersion: 1, source: 'dshx', sessionId, records: await client.sessions.export(sessionId) }
+        const data = {
+          schemaVersion: 1,
+          source: 'dshx',
+          sessionId,
+          records: await client.sessions.export(sessionId),
+        }
         if (args.output !== undefined) {
           await writeFile(args.output, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
           emitResult(
             args,
             runtime.io,
-            { sessionId, output: args.output, recordCount: data.records.length },
+            {
+              sessionId,
+              output: args.output,
+              recordCount: data.records.length,
+            },
             `Exported ${data.records.length} records to ${args.output}`,
           )
         } else {
@@ -453,6 +555,29 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         const item = (await client.plugins.list()).find(plugin => plugin.id === parameters[0])
         if (!item) throw new DshPlatformError('not-found', `No DSH plugin entry named ${JSON.stringify(parameters[0])} exists.`)
         emitResult(args, runtime.io, item, JSON.stringify(item, null, 2))
+        return 0
+      }
+      if (action === 'check') {
+        const spec = parameters[0] ?? ''
+        const result = await client.plugins.check(spec)
+        if (result.status === 'refused') {
+          const message = `DSH cannot install ${JSON.stringify(spec)}: ${result.reason}`
+          if (args.json) {
+            write(
+              runtime.io.stdout,
+              `${JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: false, error: { code: `plugin-${result.problem}`, message, details: result } }, null, 2)}\n`,
+            )
+          } else {
+            write(runtime.io.stderr, `error [plugin-${result.problem}]: ${message}\n`)
+          }
+          return 1
+        }
+        emitResult(
+          args,
+          runtime.io,
+          result,
+          `${result.name ?? spec}${result.version === undefined ? '' : `@${result.version}`}: accepted ${result.kind} spec${result.bundle === true ? ' (DSH bundle)' : ''}`,
+        )
         return 0
       }
       if (action === 'enable' || action === 'disable') {
@@ -478,6 +603,22 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         emitResult(args, runtime.io, item, JSON.stringify(item, null, 2))
         return 0
       }
+      if (action === 'install') {
+        const spec = parameters[0] ?? ''
+        const result = await installBundleWithInterrupt(client, spec)
+        if (result.application === 'failed' || result.application === 'cancelled' || result.application === 'overridden')
+          return emitRejectedChange(args, runtime.io, 'install bundle', spec, result)
+        emitResult(args, runtime.io, changeData(result), changeMessage('install bundle', spec, result))
+        return 0
+      }
+      if (action === 'remove') {
+        const name = parameters[0] ?? ''
+        const result = await client.bundles.remove(name)
+        if (result.application === 'failed' || result.application === 'cancelled' || result.application === 'overridden')
+          return emitRejectedChange(args, runtime.io, 'remove bundle', name, result)
+        emitResult(args, runtime.io, changeData(result), changeMessage('remove bundle', name, result))
+        return 0
+      }
       if (action === 'enable' || action === 'disable') {
         const target = parameters[0] ?? ''
         const result = await client.bundles.setEnabled(target, action === 'enable')
@@ -486,6 +627,110 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         emitResult(args, runtime.io, changeData(result), changeMessage(`${action} bundle`, target, result))
         return 0
       }
+    }
+
+    if (args.command === 'presets') {
+      if (action === 'list') {
+        const items = await client.presets.list()
+        emitResult(
+          args,
+          runtime.io,
+          { items },
+          rows(items, [
+            { heading: 'PRESET', render: item => item.id },
+            {
+              heading: 'DEFAULT',
+              render: item => (item.isDefault ? 'yes' : 'no'),
+            },
+            {
+              heading: 'STATUS',
+              render: item => (item.broken === undefined ? 'available' : `broken: ${item.broken}`),
+            },
+            {
+              heading: 'DESCRIPTION',
+              render: item => item.description ?? item.name ?? '',
+            },
+          ]),
+        )
+        return 0
+      }
+      if (action === 'show') {
+        const preset = await client.presets.show(parameters[0] ?? '')
+        emitResult(args, runtime.io, preset, JSON.stringify(preset, null, 2))
+        return 0
+      }
+    }
+
+    if (args.command === 'models') {
+      if (action === 'list') {
+        const catalog = await client.models.list()
+        const items = catalog.groups.flatMap(group =>
+          group.models.map(model => ({
+            provider: group.id,
+            providerName: group.name,
+            id: model.id,
+            name: model.name,
+            ...(model.description === undefined ? {} : { description: model.description }),
+            ...(model.reasoning === undefined ? {} : { reasoning: model.reasoning }),
+          })),
+        )
+        const table = rows(items, [
+          { heading: 'PROVIDER', render: item => item.provider },
+          { heading: 'MODEL', render: item => item.id },
+          { heading: 'NAME', render: item => item.name },
+          {
+            heading: 'REASONING',
+            render: item => item.reasoning?.efforts.map(effort => effort.id).join(', ') ?? '',
+          },
+        ])
+        const failureText = catalog.failures.map(item => `Unavailable ${item.id}: ${item.message}`).join('\n')
+        emitResult(
+          args,
+          runtime.io,
+          {
+            default: catalog.default,
+            routableProviders: catalog.routableProviders,
+            items,
+            failures: catalog.failures,
+          },
+          [`Default: ${catalog.default.provider}/${catalog.default.model}`, table, failureText].filter(Boolean).join('\n'),
+        )
+        return 0
+      }
+      if (action === 'select') {
+        const sessionId = args.session ?? ''
+        const selection = await client.models.select(sessionId, {
+          provider: parameters[0] ?? '',
+          model: parameters[1] ?? '',
+          ...(args.reasoningEffort === undefined ? {} : { reasoningEffort: args.reasoningEffort }),
+        })
+        emitResult(
+          args,
+          runtime.io,
+          { sessionId, selected: selection },
+          `Selected ${selection.provider}/${selection.model} for Session ${sessionId}; DSH may also persist it as the new default model.`,
+        )
+        return 0
+      }
+    }
+
+    if (args.command === 'skills' && action === 'list') {
+      const sessionId = args.session ?? ''
+      const items = await client.skills.list(sessionId)
+      emitResult(
+        args,
+        runtime.io,
+        { sessionId, items },
+        rows(items, [
+          { heading: 'SKILL', render: item => `/${item.name}` },
+          {
+            heading: 'MODEL',
+            render: item => (item.modelInvocable ? 'yes' : 'no'),
+          },
+          { heading: 'DESCRIPTION', render: item => item.description },
+        ]),
+      )
+      return 0
     }
 
     if (args.command === 'commands') {
@@ -512,11 +757,19 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
     if (args.command === 'config') {
       if (action === 'list') {
         const description = await client.config.describe()
-        const items = description.namespaces.map(item => ({ ns: item.ns, revision: item.revision, applies: item.applies ?? null }))
+        const items = description.namespaces.map(item => ({
+          ns: item.ns,
+          revision: item.revision,
+          applies: item.applies ?? null,
+        }))
         emitResult(
           args,
           runtime.io,
-          { writable: description.writable, hasDocument: description.hasDocument, namespaces: items },
+          {
+            writable: description.writable,
+            hasDocument: description.hasDocument,
+            namespaces: items,
+          },
           items.map(item => `${item.ns}\trevision ${item.revision}\t${item.applies ?? 'apply mode unknown'}`).join('\n'),
         )
         return 0
@@ -532,13 +785,25 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           item => item.path.length === pathSegments.length && item.path.every((segment, index) => segment === pathSegments[index]),
         )
         if (secret !== undefined) {
-          const data = { namespace, path: path ?? '', revision: namespaceView.revision, value: null, redacted: true, configured: secret.set }
+          const data = {
+            namespace,
+            path: path ?? '',
+            revision: namespaceView.revision,
+            value: null,
+            redacted: true,
+            configured: secret.set,
+          }
           emitResult(args, runtime.io, data, `Secret value at ${namespace}.${path} is redacted (${secret.set ? 'configured' : 'not configured'}).`)
           return 0
         }
         const value = findPath(namespaceView.value, path)
         if (value === undefined) throw new DshPlatformError('not-found', `No value exists at ${namespace}${path ? `.${path}` : ''}.`)
-        const data = { namespace, path: path ?? '', revision: namespaceView.revision, value }
+        const data = {
+          namespace,
+          path: path ?? '',
+          revision: namespaceView.revision,
+          value,
+        }
         emitResult(args, runtime.io, data, JSON.stringify(value, null, 2))
         return 0
       }
@@ -554,7 +819,13 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         if (!settingsScope.writable) throw new DshPlatformError('read-only', 'DSH reports that this settings configuration is read-only.')
         const updated = await client.config.mutate(namespace, pathSegments, value, namespaceView.revision)
         const changed = updated.namespaces.find(item => item.ns === namespace)
-        const data = { namespace, path, revision: changed?.revision ?? null, value: changed ? (findPath(changed.value, path) ?? null) : null, applied: true }
+        const data = {
+          namespace,
+          path,
+          revision: changed?.revision ?? null,
+          value: changed ? (findPath(changed.value, path) ?? null) : null,
+          applied: true,
+        }
         emitResult(args, runtime.io, data, `${action === 'set' ? 'Set' : 'Unset'} ${namespace}.${path}`)
         return 0
       }
@@ -576,6 +847,8 @@ export function platformHelp(args: CliArgs): string | undefined {
   if (group === 'doctor') return `Usage: dshx doctor ${connection} ${output}\nChecks local runtime facts and the DSH APIs available to this launch URL.\n`
   if (group === 'sessions') {
     if (nested === 'list') return `Usage: dshx sessions list ${connection} ${output}\nLists Sessions visible to the connected DSH Host.\n`
+    if (nested === 'search')
+      return `Usage: dshx sessions search <query...> ${connection} ${output}\nSearches visible Session content; DSH returns at most 20 snippets.\n`
     if (nested === 'show') return `Usage: dshx sessions show <session-id> ${connection} ${output}\nShows one Session summary.\n`
     if (nested === 'history')
       return `Usage: dshx sessions history <session-id> [--max <count>] ${connection} ${output}\nReads bounded Session history through DSH's paging API.\n`
@@ -584,24 +857,48 @@ export function platformHelp(args: CliArgs): string | undefined {
     if (nested === 'fork')
       return `Usage: dshx sessions fork <session-id> [--at-seq <n>] ${connection} ${output}\nForks a Session, optionally from a sequence number.\n`
     if (nested === 'cancel') return `Usage: dshx sessions cancel <session-id> ${connection} ${output}\nRequests cancellation of the Session's active work.\n`
+    if (nested === 'rename')
+      return `Usage: dshx sessions rename <session-id> <title...> ${connection} ${output}\nRenames a Session through DSH's durable Session API.\n`
+    if (nested === 'archive' || nested === 'unarchive')
+      return `Usage: dshx sessions ${nested} <session-id> ${connection} ${output}\n${nested === 'archive' ? 'Archives' : 'Restores'} a Session using DSH's reversible Workspace API. Active work is not stopped.\n`
+    if (nested === 'prompt')
+      return `Usage: dshx sessions prompt <session-id> <message...> [--mode queue|steer] ${connection} ${output}\nSends text to the Session Agent; defaults to queue. Ctrl-C asks DSH to cancel prompt admission.\n`
     if (nested === 'export')
       return `Usage: dshx sessions export <session-id> [--output <path>] ${connection} ${output}\nExports Session records as versioned DSHX JSON.\n`
-    return `Usage: dshx sessions <list|show|history|create|fork|cancel|export> [arguments] [options]\nCommon options: ${connection} ${output}\nSession creation: --cwd <path> --agent-preset <id>\nHistory/fork: --max <count> --at-seq <n>\nExport: --output <path>\n`
+    return `Usage: dshx sessions <list|search|show|history|create|fork|cancel|rename|archive|unarchive|prompt|export> [arguments] [options]\nCommon options: ${connection} ${output}\nSession creation: --cwd <path> --agent-preset <id>\nPrompt: --mode queue|steer\nHistory/fork: --max <count> --at-seq <n>\nExport: --output <path>\n`
   }
   if (group === 'plugins') {
     if (nested === 'list') return `Usage: dshx plugins list ${connection} ${output}\nLists runtime plugin entries and their Loader state.\n`
     if (nested === 'info') return `Usage: dshx plugins info <entry-id> ${connection} ${output}\nShows one runtime plugin entry.\n`
+    if (nested === 'check')
+      return `Usage: dshx plugins check <package-spec> ${connection} ${output}\nChecks what DSH's plugin manager can install without installing it.\n`
     if (nested === 'enable' || nested === 'disable')
       return `Usage: dshx plugins ${nested} <entry-id> ${connection} ${output}\nChanges the Host-owned plugin selection and reports application/restart state.\n`
-    return `Usage: dshx plugins <list|info|enable|disable> [entry-id] ${connection} ${output}\n`
+    return `Usage: dshx plugins <list|info|check|enable|disable> [entry-id|package-spec] ${connection} ${output}\n`
   }
   if (group === 'bundles') {
     if (nested === 'list') return `Usage: dshx bundles list ${connection} ${output}\nLists bundles and their profile-wide selection/install state.\n`
     if (nested === 'info') return `Usage: dshx bundles info <name> ${connection} ${output}\nShows one bundle and its rows.\n`
+    if (nested === 'install')
+      return `Usage: dshx bundles install <package-spec> ${connection} ${output}\nInstalls through DSH's bundle manager; Ctrl-C asks DSH to cancel and restore profile files.\n`
+    if (nested === 'remove') return `Usage: dshx bundles remove <name> ${connection} ${output}\nRemoves a profile-owned bundle through DSH's package manager.\n`
     if (nested === 'enable' || nested === 'disable')
       return `Usage: dshx bundles ${nested} <name> ${connection} ${output}\nChanges the Host-owned bundle selection and reports application/restart state.\n`
-    return `Usage: dshx bundles <list|info|enable|disable> [name] ${connection} ${output}\n`
+    return `Usage: dshx bundles <list|info|install|remove|enable|disable> [name|package-spec] ${connection} ${output}\n`
   }
+  if (group === 'presets') {
+    if (nested === 'list') return `Usage: dshx presets list ${connection} ${output}\nLists Agent presets declared by the connected DSH Host.\n`
+    if (nested === 'show') return `Usage: dshx presets show <id> ${connection} ${output}\nReads one declared Agent preset composition.\n`
+    return `Usage: dshx presets <list|show> [id] ${connection} ${output}\n`
+  }
+  if (group === 'models') {
+    if (nested === 'list') return `Usage: dshx models list ${connection} ${output}\nLists DSH's currently routable provider models and any lookup failures.\n`
+    if (nested === 'select')
+      return `Usage: dshx models select --session <session-id> <provider> <model> [--reasoning-effort <id>] ${connection} ${output}\nSelects a model for one Session; DSH may persist it as the new default.\n`
+    return `Usage: dshx models <list|select> [arguments] ${connection} ${output}\n`
+  }
+  if (group === 'skills')
+    return `Usage: dshx skills list --session <session-id> ${connection} ${output}\nLists the user-invocable skills visible in that Session's composition; skill bodies are not returned.\n`
   if (group === 'commands') {
     if (nested === 'list') return `Usage: dshx commands list --session <session-id> ${connection} ${output}\nLists commands available to the Session.\n`
     if (nested === 'info')

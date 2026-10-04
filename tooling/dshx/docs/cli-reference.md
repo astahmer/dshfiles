@@ -101,21 +101,34 @@ dshx info [--json]
 dshx doctor [--url <launch-url>] [--json]
 
 dshx sessions list
+dshx sessions search <query...>
 dshx sessions show <session-id>
 dshx sessions history <session-id> [--max <count>]
 dshx sessions create [--cwd <path>] [--agent-preset <id>]
 dshx sessions fork <session-id> [--at-seq <sequence>]
 dshx sessions cancel <session-id>
+dshx sessions rename <session-id> <title...>
+dshx sessions archive <session-id>
+dshx sessions unarchive <session-id>
+dshx sessions prompt <session-id> <message...> [--mode queue|steer]
 dshx sessions export <session-id> [--output <path>]
 
 dshx plugins list
 dshx plugins info <entry-id>
+dshx plugins check <package-spec>
 dshx plugins enable <entry-id>
 dshx plugins disable <entry-id>
 dshx bundles list
 dshx bundles info <name>
+dshx bundles install <package-spec>
+dshx bundles remove <name>
 dshx bundles enable <name>
 dshx bundles disable <name>
+dshx presets list
+dshx presets show <id>
+dshx models list
+dshx models select --session <session-id> <provider> <model> [--reasoning-effort <id>]
+dshx skills list --session <session-id>
 
 dshx commands list --session <session-id>
 dshx commands info <name> --session <session-id>
@@ -143,8 +156,9 @@ Errors use `{ "schemaVersion": 1, "command": "...", "ok": false,
 "error": { "code": "...", "message": "..." } }`. Exit codes are stable:
 `0` success, `1` Host/API or operation failure, `2` usage error, `4` target not
 found, `5` a plugin/bundle change that DSH did not apply, and `130` an
-interrupted command. `--quiet` only suppresses human-readable success output;
-JSON and errors remain visible.
+interrupted command or cancelled Session prompt/bundle installation. `--quiet`
+only suppresses human-readable success output; JSON and errors remain visible.
+Platform commands also accept `--no-color`.
 
 Set `DSHX_URL` to the current tokenized loopback launch URL printed by `dsh`, or
 pass `--url`. DSHX exchanges it for a Host cookie in memory and only permits
@@ -159,8 +173,12 @@ Host version, Client build state, or declared plugin compatibility through the
 inspected Remote APIs; `doctor` labels those facts unknown.
 
 `sessions show` preserves Session metadata and projection hints returned by DSH.
+Search uses DSH's bounded content search and returns at most 20 snippets.
 History reads a cursor-bounded page through `session/follow` and `session/page`;
-export walks all pages in event order.
+export walks all pages in event order. Rename uses DSH's durable Session API.
+Archive and unarchive call the reversible Workspace API. Archive does not stop
+active work; DSH refuses an active Session unless asked to stop it, and DSHX
+does not opt into stopping.
 
 Plugin and bundle changes use the Host's mutation APIs and report whether the
 change applied immediately, requires restart, failed, or was overridden. Their
@@ -179,16 +197,30 @@ active Agent work. The CLI currently sends no command attachments. Session
 export reads the bounded paging API and writes a versioned JSON file when
 `--output` is supplied.
 
+`sessions prompt` sends text to DSH and does not echo it in output. It defaults
+to queue mode; `--mode steer` asks DSH to steer the active turn. Ctrl-C asks
+DSH to cancel prompt admission. `plugins check` asks the plugin manager what a
+package spec names without installing it. `bundles install/remove` use DSH's
+package manager; Ctrl-C sends its cancellation request, and a cancelled install
+restores the profile manifest and lockfile. `models list` shows currently
+routable models and provider lookup failures. `models select` selects a model
+for a Session; DSH may also persist it as the new default. `presets list/show`
+reads Agent preset declarations. `skills list --session` returns only the
+user-invocable skill metadata visible to that Session, never skill bodies.
+
 Standalone tool invocation, general service enumeration, profile enumeration,
 arbitrary profile/config-file edits, generic event watching, and log following
 are not exposed: the inspected DSH APIs have no safe matching boundary. The
-existing `dshx inspect tools|services|events` remains the development
-introspection surface.
+existing `dshx inspect tools|services|events` remains the project development
+introspection surface. DSH exposes workspace-file, terminal, job, goal,
+schedule, and credential remotes; DSHX defers them until path scope, process
+execution, stream bounds, lifecycle side effects, or secret handling have an
+explicit safe contract. See [the full BB-to-DSH crosswalk](./platform-cli-plan.md).
 
-Focused validation passed with TypeScript 7.0.2, Oxlint 1.86.0, Oxfmt 0.71.0,
-and PNPM 12.5.1: the DSHX package build, CLI typecheck, formatting check, lint,
-and 16 focused Vitest tests. The tests use synthetic Host responses. No live
-authenticated DSH call or user-profile mutation was used for validation.
+Focused validation passed with Node 22.23.3 and pnpm 12.5.1: the DSHX package
+build and typecheck, 17 focused Vitest tests, targeted ESLint, and Prettier
+checks for the changed source and docs. Tests use synthetic Host responses. No
+live authenticated DSH call or user-profile mutation was used for validation.
 
 ## `create-dshx`
 
