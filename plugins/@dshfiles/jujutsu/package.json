@@ -12,7 +12,9 @@
     "./client": "./dist/client.js"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -23,35 +25,41 @@
       ]
     }
   },
-  "files": ["dist", "cordis.patch.yml", "README.md"],
-  "dependencies": { "zod": "^4.4.3" },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
   "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@types/node": "^22.19.0",
     "@types/react": "~18.3.31",
     "react": "^18.3.1",
     "typescript": "^5.9.3",
-    "zod": "^4.4.3"
+    "vitest": "^4.1.10"
   },
   "scripts": {
     "build": "dshx build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test src/core.test.ts src/fileset.integration.test.ts"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

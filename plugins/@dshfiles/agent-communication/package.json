@@ -19,9 +19,14 @@
     "dist",
     "cordis.patch.yml"
   ],
+  "scripts": {
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
   "dependencies": {
     "write-file-atomic": "7.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -31,13 +36,14 @@
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
     "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@types/node": "^22.19.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }
