@@ -12,7 +12,7 @@ limits that remain.
 | Thread organization, settle/archive, header links, sidebar/footer customization | [thread-sidebar](../../plugins/@dshfiles/thread-sidebar/README.md) | Build with local dshx; the audited candidates did not cover this behavior on the installed rc.2 runtime. |
 | MCP manager, composer quick panel and searchable catalog | [mcp-servers](../../plugins/@dshfiles/mcp-servers/README.md) | Build with local dshx; inspected marketplace candidates used weaker loopback routes, bypassed ConfigEditor, or had incompatible peers. |
 | Shared project/folder selection | [project-folder-picker](../../plugins/@dshfiles/project-folder-picker/README.md) | Build as a reusable local package; adjacent marketplace project managers did not provide the component/API needed here. |
-| Secret CLI catalog | [secret-catalog](../../plugins/@dshfiles/secret-catalog/README.md) | Build with local dshx; the targeted marketplace search found no matching catalog. |
+| Secret CLI catalog | [secret-catalog](../../plugins/@dshfiles/secret-catalog/README.md) | Build with local dshx; no listing found manages aliases from the `secret` CLI. [`dsh-vault`](https://dshmarket.com/p/Ox0400/dsh-vault/) is a separate encrypted vault with its own storage and peer set ([source](https://github.com/Ox0400/dsh-vault)). |
 | Settings search | [settings-search](../../plugins/@dshfiles/settings-search/README.md) | Build with local dshx; the candidate depended on a removed runtime package and DOM selectors. |
 | Jujutsu graph and Source Control | [jujutsu](../../plugins/@dshfiles/jujutsu/README.md) | Build with local dshx; the inspected changes-tab candidate was read-only and built for an older runtime. |
 
