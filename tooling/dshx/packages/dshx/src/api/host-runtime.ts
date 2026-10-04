@@ -1,9 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { clientRequestSchema, serverResponseSchema } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionFetchRoute, ConnectionRpcHandler, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 import type { ApiHostRegistration } from './types.js'
 import { apiHostRegistrationParts } from './define.js'
 import { apiChannel, ContractViolation, error, isApiError, jsonBytes, throwIfAborted, validate } from './common.js'
+
+// Node resolves the Connection package only where DSH itself has it installed
+// (the profile bundle tree), so load it lazily: a Host artifact built without a
+// live connection service must never carry a top-level static import of it.
+const connectionSchemas = async () => import('@deepseek-ai/dsh-client-connection')
 
 const channelOwners = new WeakMap<object, Map<string, string>>()
 
@@ -94,6 +98,7 @@ export async function registerApi(ctx: Context, packageId: string, registration:
           } catch {
             return new Response('body is not JSON', { status: 400 })
           }
+          const { clientRequestSchema, serverResponseSchema } = await connectionSchemas()
           const parsed = clientRequestSchema.safeParse(body)
           if (!parsed.success) return new Response('invalid Connection RPC request', { status: 400 })
           const message = parsed.data

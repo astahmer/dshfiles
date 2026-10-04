@@ -197,6 +197,10 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
         input: VIRTUAL_HOST_ENTRY,
         preserveEntrySignatures: 'strict',
         external,
+        // Keep side effects in project files but drop side-effect imports of
+        // Node packages: a stdlib-only Host artifact stays importable on bare
+        // Node even when the surrounding DSH install is not available.
+        treeshake: { moduleSideEffects: 'no-external' },
         output,
       },
     },
