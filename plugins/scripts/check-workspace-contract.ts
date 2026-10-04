@@ -34,7 +34,7 @@ const problemsFor = (name: string): string[] => {
 }
 
 const problems = readdirSync(packagesRoot, { withFileTypes: true })
-  .filter(entry => entry.isDirectory())
+  .filter(entry => entry.isDirectory() && existsSync(join(packagesRoot, entry.name, 'package.json')))
   .flatMap(entry => problemsFor(entry.name))
 
 if (problems.length > 0) {
