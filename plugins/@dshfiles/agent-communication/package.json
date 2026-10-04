@@ -2,23 +2,18 @@
   "name": "@dshfiles/agent-communication",
   "version": "0.1.0",
   "private": true,
+  "description": "Durable topic and direct messaging for independent DSH Agents, with quiet-by-default delivery.",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
   "type": "module",
   "main": "./dist/index.js",
-  "description": "Durable topic and direct messaging for independent DSH Agents, with quiet-by-default delivery.",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
-  },
-  "files": [
-    "dist",
-    "cordis.patch.yml"
-  ],
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
@@ -27,13 +22,6 @@
   "dependencies": {
     "write-file-atomic": "7.0.0",
     "zod": "^4.4.3"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -45,5 +33,17 @@
     "@types/node": "^22.19.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

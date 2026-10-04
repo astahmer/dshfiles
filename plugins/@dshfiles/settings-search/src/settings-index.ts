@@ -56,7 +56,7 @@ const schemaText = (record: Record<string, unknown>, key: string): string | null
 const makeSettingOption = (value: unknown, schema: Record<string, unknown> | null): SettingsOption | null => {
   const parsedValue = optionValueSchema.safeParse(value)
   if (!parsedValue.success) return null
-  const label = schema === null ? null : schemaText(schema, 'label') ?? schemaText(schema, 'title')
+  const label = schema === null ? null : (schemaText(schema, 'label') ?? schemaText(schema, 'title'))
   return { value: parsedValue.data, label: label ?? String(parsedValue.data) }
 }
 
@@ -97,22 +97,21 @@ const finiteChoiceOptions = (schema: unknown, depth: number): readonly SettingsO
 
 const uniqueOptions = (options: readonly SettingsOption[]): readonly SettingsOption[] => {
   const seen = new Set<string>()
-  return options.filter(option => {
-    const key = JSON.stringify([typeof option.value, option.value])
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  }).slice(0, 64)
+  return options
+    .filter(option => {
+      const key = JSON.stringify([typeof option.value, option.value])
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, 64)
 }
 
-export const settingsSearchOptions = (schema: unknown): readonly SettingsOption[] =>
-  uniqueOptions(literalSchemaOptions(schema, 0))
+export const settingsSearchOptions = (schema: unknown): readonly SettingsOption[] => uniqueOptions(literalSchemaOptions(schema, 0))
 
-export const settingsChoiceOptions = (schema: unknown): readonly SettingsOption[] =>
-  uniqueOptions(finiteChoiceOptions(schema, 0) ?? [])
+export const settingsChoiceOptions = (schema: unknown): readonly SettingsOption[] => uniqueOptions(finiteChoiceOptions(schema, 0) ?? [])
 
-const normalizeSearchText = (value: string): string =>
-  value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+const normalizeSearchText = (value: string): string => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 export const settingsNamespaceTitle = (namespace: SettingsSearchNamespace): string => {
   const schema = objectRecord(namespace.schema)
@@ -120,8 +119,7 @@ export const settingsNamespaceTitle = (namespace: SettingsSearchNamespace): stri
   return schemaText(schema, 'label') ?? schemaText(schema, 'title') ?? namespace.ns
 }
 
-const fieldMap = (record: Record<string, unknown>): Record<string, unknown> | null =>
-  objectRecord(record.fields) ?? objectRecord(record.properties)
+const fieldMap = (record: Record<string, unknown>): Record<string, unknown> | null => objectRecord(record.fields) ?? objectRecord(record.properties)
 
 const overlapsSecretPath = (path: readonly string[], secrets: readonly SettingsSecretPath[]): boolean =>
   secrets.some(secret => {
@@ -164,23 +162,14 @@ const collectSchemaResults = (
 }
 
 export const describeSettingsTargets = (namespaces: readonly SettingsSearchNamespace[]): SettingsSearchResult[] =>
-  namespaces.flatMap(namespace => collectSchemaResults(
-    namespace.ns,
-    namespace.schema,
-    [],
-    [],
-    namespace.secrets ?? [],
-    settingsNamespaceTitle(namespace),
-    0,
-  ))
+  namespaces.flatMap(namespace => collectSchemaResults(namespace.ns, namespace.schema, [], [], namespace.secrets ?? [], settingsNamespaceTitle(namespace), 0))
 
-export const searchSettingsTargets = (
-  results: readonly SettingsSearchResult[],
-  query: string,
-): readonly SettingsSearchResult[] => {
+export const searchSettingsTargets = (results: readonly SettingsSearchResult[], query: string): readonly SettingsSearchResult[] => {
   const term = normalizeSearchText(query.trim())
   if (term.length === 0) return []
-  return results.filter(result => normalizeSearchText(
-    `${result.title} ${result.description} ${result.context} ${result.options.map(option => `${option.label} ${String(option.value)}`).join(' ')}`,
-  ).includes(term))
+  return results.filter(result =>
+    normalizeSearchText(
+      `${result.title} ${result.description} ${result.context} ${result.options.map(option => `${option.label} ${String(option.value)}`).join(' ')}`,
+    ).includes(term),
+  )
 }

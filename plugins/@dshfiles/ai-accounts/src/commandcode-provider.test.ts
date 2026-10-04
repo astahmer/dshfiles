@@ -32,9 +32,7 @@ describe('fetchCommandCodeCatalog', () => {
 
   it('refuses a base outside Command Code before any request', async () => {
     const before = received.length
-    await expect(fetchCommandCodeCatalog({ baseUrl: 'https://attacker.example', apiKey: 'typed-key' })).rejects.toThrow(
-      CommandCodeConfigError,
-    )
+    await expect(fetchCommandCodeCatalog({ baseUrl: 'https://attacker.example', apiKey: 'typed-key' })).rejects.toThrow(CommandCodeConfigError)
     expect(received.length).toBe(before)
   })
 })

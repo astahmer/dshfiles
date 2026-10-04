@@ -15,14 +15,7 @@ import {
   type SidebarPreferences,
   workspaceForLineage,
 } from './organization.js'
-import {
-  loadPreferences,
-  parseStoredPreferences,
-  PREFERENCES_STORAGE_KEY,
-  savePreferences,
-} from './preferences.js'
-
-
+import { loadPreferences, parseStoredPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
   id: string
@@ -119,10 +112,13 @@ test('session lineage preserves direct parent identity and computes unbounded pa
     parentId: 'missing',
     parentTitle: 'missing',
   })
-  assert.equal(sessionLineage(byId.child, {
-    ...byId,
-    root: { ...byId.root, parentId: SessionId('child') },
-  }).depth, 1)
+  assert.equal(
+    sessionLineage(byId.child, {
+      ...byId,
+      root: { ...byId.root, parentId: SessionId('child') },
+    }).depth,
+    1,
+  )
 })
 
 test('child threads inherit the nearest known workspace through the parent chain', () => {
@@ -142,14 +138,16 @@ test('invalid stored preference data is rejected without exposing the raw value'
 })
 
 test('navigation preferences preserve independent order, visibility, and header mode', () => {
-  const stored = parseStoredPreferences(JSON.stringify({
-    ...DEFAULT_PREFERENCES,
-    headerMode: 'expanded',
-    headerOrder: ['panel:files', 'search'],
-    hiddenHeaderIds: ['new-thread'],
-    footerOrder: ['footer:tasks', 'settings'],
-    hiddenFooterIds: ['footer:tasks'],
-  }))
+  const stored = parseStoredPreferences(
+    JSON.stringify({
+      ...DEFAULT_PREFERENCES,
+      headerMode: 'expanded',
+      headerOrder: ['panel:files', 'search'],
+      hiddenHeaderIds: ['new-thread'],
+      footerOrder: ['footer:tasks', 'settings'],
+      hiddenFooterIds: ['footer:tasks'],
+    }),
+  )
   assert.equal(stored.headerMode, 'expanded')
   assert.deepEqual(stored.headerOrder, ['panel:files', 'search'])
   assert.deepEqual(stored.hiddenHeaderIds, ['new-thread'])
@@ -187,7 +185,10 @@ test('header and footer entries use saved ordering and boundary-safe movement', 
     { id: 'panel:files', order: 0 },
   ]
   const ordered = orderSidebarEntries(entries, ['panel:files', 'new-thread'])
-  assert.deepEqual(ordered.map(entry => entry.id), ['panel:files', 'new-thread', 'search'])
+  assert.deepEqual(
+    ordered.map(entry => entry.id),
+    ['panel:files', 'new-thread', 'search'],
+  )
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c'])
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c'])
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])

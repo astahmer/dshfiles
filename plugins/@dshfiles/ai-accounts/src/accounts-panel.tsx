@@ -38,12 +38,7 @@ const STATE_LABEL: Record<AccountProfile['state'], string> = {
   unconfigured: 'Not signed in',
 }
 
-const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = [
-  'sticky',
-  'priority',
-  'round-robin',
-  'balanced',
-]
+const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = ['sticky', 'priority', 'round-robin', 'balanced']
 
 const DISTRIBUTION_HINT: Record<AccountsFile['distribution'], string> = {
   sticky: 'One account per conversation, so the upstream prompt cache stays warm. A rate-limited account is skipped and the retry lands on the next one.',
@@ -73,23 +68,19 @@ const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
 })
 
 const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
-  profile.instanceId === draft.instanceId
-  && profile.kind === draft.kind
-  && profile.displayName === draft.displayName
-  && profile.enabled === draft.enabled
-  && profile.homePath === draft.homePath
-  && profile.shadowHomePath === draft.shadowHomePath
-  && profile.apiKeyEnv === draft.apiKeyEnv
-  && profile.badge === draft.badge
-  && profile.accentColor === draft.accentColor
-  && profile.providerIcon === draft.providerIcon
-  && profile.additionalModelIds.join() === draft.additionalModelIds.join()
+  profile.instanceId === draft.instanceId &&
+  profile.kind === draft.kind &&
+  profile.displayName === draft.displayName &&
+  profile.enabled === draft.enabled &&
+  profile.homePath === draft.homePath &&
+  profile.shadowHomePath === draft.shadowHomePath &&
+  profile.apiKeyEnv === draft.apiKeyEnv &&
+  profile.badge === draft.badge &&
+  profile.accentColor === draft.accentColor &&
+  profile.providerIcon === draft.providerIcon &&
+  profile.additionalModelIds.join() === draft.additionalModelIds.join()
 
-const Field = (props: {
-  readonly label: string
-  readonly hint?: string
-  readonly children: JSX.Element
-}): JSX.Element => (
+const Field = (props: { readonly label: string; readonly hint?: string; readonly children: JSX.Element }): JSX.Element => (
   <label className={styles.field}>
     <span className={styles.fieldLabel}>{props.label}</span>
     {props.children}
@@ -97,14 +88,8 @@ const Field = (props: {
   </label>
 )
 
-
 /** Percent remaining, coloured by how much is left rather than by provider. */
-const remainingTone = (percent: number): string =>
-  percent <= 10
-    ? String(styles.barCritical)
-    : percent <= 30
-      ? String(styles.barLow)
-      : String(styles.barOk)
+const remainingTone = (percent: number): string => (percent <= 10 ? String(styles.barCritical) : percent <= 30 ? String(styles.barLow) : String(styles.barOk))
 
 const formatReset = (resetsAt: number | null): string | null => {
   if (resetsAt === null || Number.isNaN(resetsAt)) return null
@@ -115,9 +100,7 @@ const formatReset = (resetsAt: number | null): string | null => {
   return `Resets in ${String(Math.round(hours / 24))}d`
 }
 
-const UsageCardView = (props: {
-  readonly usage: UsageCard | undefined
-}): JSX.Element | null => {
+const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined || usage.status !== 'ok' || usage.windows.length === 0) return null
   return (
@@ -134,9 +117,7 @@ const UsageCardView = (props: {
               style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
             />
           </div>
-          {formatReset(window.resetsAt) === null ? null : (
-            <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>
-          )}
+          {formatReset(window.resetsAt) === null ? null : <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>}
         </div>
       ))}
       {usage.bankedResets > 0 ? (
@@ -152,7 +133,6 @@ const UsageCardView = (props: {
     </div>
   )
 }
-
 
 /**
  * Per-model default reasoning effort.
@@ -172,9 +152,7 @@ const ReasoningDefaults = (props: {
   return (
     <div className={styles.reasoning}>
       <span className={styles.fieldLabel}>Default reasoning effort</span>
-      <span className={styles.fieldHint}>
-        Applied when a request does not choose one. Models not listed keep the provider default.
-      </span>
+      <span className={styles.fieldHint}>Applied when a request does not choose one. Models not listed keep the provider default.</span>
       {catalog.map(model => (
         <div className={styles.reasoningRow} key={model.id}>
           <span className={styles.reasoningModel} title={model.id}>
@@ -190,11 +168,7 @@ const ReasoningDefaults = (props: {
               props.onChange(next)
             }}
           >
-            <option value="">
-              {model.defaultEffort === null
-                ? 'Provider default'
-                : `Provider default (${model.defaultEffort})`}
-            </option>
+            <option value="">{model.defaultEffort === null ? 'Provider default' : `Provider default (${model.defaultEffort})`}</option>
             {model.efforts.map(effort => (
               <option key={effort.id} value={effort.id}>
                 {effort.name}
@@ -206,7 +180,6 @@ const ReasoningDefaults = (props: {
     </div>
   )
 }
-
 
 /**
  * Model curation: hide, favorite, and reorder an account's models.
@@ -223,10 +196,7 @@ const ModelCuration = (props: {
   if (catalog.length === 0) return null
   const { hiddenModelIds, favoriteModelIds, modelOrder } = props.account
   const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
-  const ordered = [
-    ...listed,
-    ...catalog.filter(model => !listed.includes(model.id)).map(model => model.id),
-  ]
+  const ordered = [...listed, ...catalog.filter(model => !listed.includes(model.id)).map(model => model.id)]
   const move = (id: string, delta: number) => {
     const index = ordered.indexOf(id)
     const target = index + delta
@@ -240,9 +210,7 @@ const ModelCuration = (props: {
   return (
     <div className={styles.curation}>
       <span className={styles.fieldLabel}>Models</span>
-      <span className={styles.fieldHint}>
-        Starred models appear first, hidden ones drop out of the picker entirely.
-      </span>
+      <span className={styles.fieldHint}>Starred models appear first, hidden ones drop out of the picker entirely.</span>
       <ul className={styles.modelList}>
         {ordered.map((id, index) => {
           const model = catalog.find(candidate => candidate.id === id)
@@ -257,9 +225,7 @@ const ModelCuration = (props: {
                 aria-pressed={favorite}
                 onClick={() =>
                   props.onChange({
-                    favoriteModelIds: favorite
-                      ? favoriteModelIds.filter(candidate => candidate !== id)
-                      : [...favoriteModelIds, id],
+                    favoriteModelIds: favorite ? favoriteModelIds.filter(candidate => candidate !== id) : [...favoriteModelIds, id],
                   })
                 }
               >
@@ -293,9 +259,7 @@ const ModelCuration = (props: {
                 aria-pressed={!hidden}
                 onClick={() =>
                   props.onChange({
-                    hiddenModelIds: hidden
-                      ? hiddenModelIds.filter(candidate => candidate !== id)
-                      : [...hiddenModelIds, id],
+                    hiddenModelIds: hidden ? hiddenModelIds.filter(candidate => candidate !== id) : [...hiddenModelIds, id],
                   })
                 }
               >
@@ -308,7 +272,6 @@ const ModelCuration = (props: {
     </div>
   )
 }
-
 
 /**
  * Quota over time for one account.
@@ -324,11 +287,7 @@ const UsageHistoryChart = (props: {
 }): JSX.Element => {
   const points = props.points ?? []
   if (points.length < 2) {
-    return (
-      <p className={styles.historyEmpty}>
-        Not enough history yet. Quota is recorded every 15 minutes; check back shortly.
-      </p>
-    )
+    return <p className={styles.historyEmpty}>Not enough history yet. Quota is recorded every 15 minutes; check back shortly.</p>
   }
   const labels = [...new Set(points.flatMap(point => Object.keys(point.windows)))]
   const from = points[0]?.at ?? Date.now()
@@ -437,10 +396,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     }
   }, [accounts])
 
-  const selected = useMemo(
-    () => file?.accounts.find(account => account.instanceId === selectedId) ?? null,
-    [file, selectedId],
-  )
+  const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
   // The editor follows the selection, and keeps unsaved edits across re-reads.
   useEffect(() => {
@@ -448,11 +404,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
       setDraft(null)
       return
     }
-    setDraft(current =>
-      current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current)
-        ? current
-        : { ...selected },
-    )
+    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : { ...selected }))
   }, [selected])
 
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
@@ -510,8 +462,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
         <div>
           <h1 className={styles.title}>AI Accounts</h1>
           <p className={styles.subtitle}>
-            Each account is its own model route. Editing a profile here updates the picker;
-            credentials stay in each provider&apos;s own home.
+            Each account is its own model route. Editing a profile here updates the picker; credentials stay in each provider&apos;s own home.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -536,25 +487,13 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => setAddingKind('codex')}
-          >
+          <button type="button" className={styles.secondary} onClick={() => setAddingKind('codex')}>
             + Codex
           </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => setAddingKind('opencode-go')}
-          >
+          <button type="button" className={styles.secondary} onClick={() => setAddingKind('opencode-go')}>
             + OpenCode
           </button>
-          <button
-            type="button"
-            className={styles.secondary}
-            onClick={() => setAddingKind('commandcode')}
-          >
+          <button type="button" className={styles.secondary} onClick={() => setAddingKind('commandcode')}>
             + Command Code
           </button>
         </div>
@@ -565,44 +504,24 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
 
       <div className={styles.split}>
         <div className={styles.list}>
-          {file.accounts.length === 0 ? (
-            <p className={styles.empty}>No accounts yet. Add one to publish its model route.</p>
-          ) : null}
+          {file.accounts.length === 0 ? <p className={styles.empty}>No accounts yet. Add one to publish its model route.</p> : null}
           {file.accounts.map(profile => (
             <button
               type="button"
               key={profile.instanceId}
-              className={
-                profile.instanceId === selectedId
-                  ? `${styles.card} ${styles.cardSelected}`
-                  : styles.card
-              }
+              className={profile.instanceId === selectedId ? `${styles.card} ${styles.cardSelected}` : styles.card}
               onClick={() => setSelectedId(profile.instanceId)}
             >
-              <span
-                className={styles.cardGlyph}
-                style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }}
-                aria-hidden
-              >
+              <span className={styles.cardGlyph} style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }} aria-hidden>
                 {profile.providerIcon.slice(0, 2).toUpperCase()}
               </span>
               <span className={styles.cardBody}>
                 <span className={styles.cardTitle}>
                   <span className={styles.cardName}>{profile.displayName}</span>
-                  {profile.badge === '' ? null : (
-                    <span className={styles.badge}>{profile.badge}</span>
-                  )}
+                  {profile.badge === '' ? null : <span className={styles.badge}>{profile.badge}</span>}
                 </span>
                 <span className={styles.cardRoute}>{profile.instanceId}</span>
-                <span
-                  className={
-                    profile.state === 'healthy'
-                      ? styles.stateOk
-                      : profile.state === 'cooling'
-                        ? styles.stateWarn
-                        : styles.stateIdle
-                  }
-                >
+                <span className={profile.state === 'healthy' ? styles.stateOk : profile.state === 'cooling' ? styles.stateWarn : styles.stateIdle}>
                   {STATE_LABEL[profile.state]}
                   {profile.plan === null ? '' : ` · ${profile.plan}`}
                 </span>
@@ -631,9 +550,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
         </div>
 
         <div className={styles.detail}>
-          {addingKind === null && draft === null ? (
-            <p className={styles.empty}>Select an account to edit it.</p>
-          ) : null}
+          {addingKind === null && draft === null ? <p className={styles.empty}>Select an account to edit it.</p> : null}
 
           {addingKind === null && draft !== null ? (
             <>
@@ -643,11 +560,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               </p>
 
               <Field label="Route slug" hint="Letters, digits, dash and underscore. Appears as the provider in the model picker.">
-                <input
-                  className={styles.input}
-                  value={draft.instanceId}
-                  onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
-                />
+                <input className={styles.input} value={draft.instanceId} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} />
               </Field>
 
               <Field label="Display name">
@@ -660,27 +573,15 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               </Field>
 
               <Field label="Badge" hint="Short tag shown beside the name, e.g. work.">
-                <input
-                  className={styles.input}
-                  value={draft.badge}
-                  onChange={event => setDraft({ ...draft, badge: event.target.value })}
-                />
+                <input className={styles.input} value={draft.badge} onChange={event => setDraft({ ...draft, badge: event.target.value })} />
               </Field>
 
               <Field label="Accent color">
-                <input
-                  className={styles.input}
-                  value={draft.accentColor}
-                  onChange={event => setDraft({ ...draft, accentColor: event.target.value })}
-                />
+                <input className={styles.input} value={draft.accentColor} onChange={event => setDraft({ ...draft, accentColor: event.target.value })} />
               </Field>
 
               <Field label="Icon">
-                <select
-                  className={styles.input}
-                  value={draft.providerIcon}
-                  onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}
-                >
+                <select className={styles.input} value={draft.providerIcon} onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}>
                   {PROVIDER_ICONS.map(icon => (
                     <option key={icon} value={icon}>
                       {icon}
@@ -692,11 +593,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               {draft.kind === 'codex' ? (
                 <>
                   <Field label="CODEX_HOME path" hint="Where shared sessions, skills and plugins live.">
-                    <input
-                      className={styles.input}
-                      value={draft.homePath}
-                      onChange={event => setDraft({ ...draft, homePath: event.target.value })}
-                    />
+                    <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
                   </Field>
                   <Field
                     label="Shadow home path"
@@ -711,26 +608,16 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 </>
               ) : (
                 <>
-                  <Field
-                    label="API key environment variable"
-                    hint="Named, not valued: the key never enters this file."
-                  >
+                  <Field label="API key environment variable" hint="Named, not valued: the key never enters this file.">
                     <input
                       className={styles.input}
                       value={draft.apiKeyEnv}
-                      placeholder={
-                        draft.kind === 'commandcode'
-                          ? 'COMMANDCODE_API_KEY'
-                          : 'OPENCODE_API_KEY'
-                      }
+                      placeholder={draft.kind === 'commandcode' ? 'COMMANDCODE_API_KEY' : 'OPENCODE_API_KEY'}
                       onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
                     />
                   </Field>
                   {draft.kind === 'commandcode' ? (
-                    <Field
-                      label="API base URL"
-                      hint="Leave empty for Command Code's own deployment."
-                    >
+                    <Field label="API base URL" hint="Leave empty for Command Code's own deployment.">
                       <input
                         className={styles.input}
                         value={draft.apiBaseUrl}
@@ -751,34 +638,17 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 >
                   {saving ? 'Saving…' : 'Save'}
                 </button>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  onClick={() => setDraft(selected === null ? null : { ...selected })}
-                  disabled={!dirty}
-                >
+                <button type="button" className={styles.secondary} onClick={() => setDraft(selected === null ? null : { ...selected })} disabled={!dirty}>
                   Revert
                 </button>
-                <button
-                  type="button"
-                  className={styles.danger}
-                  onClick={() => selected !== null && void remove(selected)}
-                >
+                <button type="button" className={styles.danger} onClick={() => selected !== null && void remove(selected)}>
                   Remove
                 </button>
               </div>
 
-              <ModelCuration
-                account={draft}
-                catalog={catalog?.models}
-                onChange={next => setDraft({ ...draft, ...next })}
-              />
+              <ModelCuration account={draft} catalog={catalog?.models} onChange={next => setDraft({ ...draft, ...next })} />
 
-              <ReasoningDefaults
-                account={draft}
-                catalog={catalog?.models}
-                onChange={reasoningDefaults => setDraft({ ...draft, reasoningDefaults })}
-              />
+              <ReasoningDefaults account={draft} catalog={catalog?.models} onChange={reasoningDefaults => setDraft({ ...draft, reasoningDefaults })} />
 
               <div className={styles.historySection}>
                 <div className={styles.historyHead}>
@@ -813,29 +683,21 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 <UsageHistoryChart points={history} days={historyDays} />
               </div>
 
-              <UsageCardView
-                usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage}
-              />
+              <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
 
               {selected !== null && selected.kind === 'codex' ? (
                 <div className={styles.status}>
                   <div>
                     <span className={styles.statusLabel}>Home</span>
-                    <span className={styles.statusValue}>
-                      {selected.homePath === '' ? '~/.codex' : selected.homePath}
-                    </span>
+                    <span className={styles.statusValue}>{selected.homePath === '' ? '~/.codex' : selected.homePath}</span>
                   </div>
                   <div>
                     <span className={styles.statusLabel}>Mode</span>
-                    <span className={styles.statusValue}>
-                      {selected.mode === 'authOverlay' ? 'Shared state, private auth' : 'Direct'}
-                    </span>
+                    <span className={styles.statusValue}>{selected.mode === 'authOverlay' ? 'Shared state, private auth' : 'Direct'}</span>
                   </div>
                   <div>
                     <span className={styles.statusLabel}>Account</span>
-                    <span className={styles.statusValue}>
-                      {selected.identity ?? (selected.signedIn ? 'signed in' : 'not signed in')}
-                    </span>
+                    <span className={styles.statusValue}>{selected.identity ?? (selected.signedIn ? 'signed in' : 'not signed in')}</span>
                   </div>
                   {selected.signedIn ? null : (
                     <div className={styles.loginHint}>
@@ -848,18 +710,14 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                           void navigator.clipboard
                             .writeText(selected.loginHint)
                             .then(() => setNotice('Copied the sign-in command.'))
-                            .catch(() =>
-                              setNotice('Could not copy; select the command and copy it.'),
-                            )
+                            .catch(() => setNotice('Could not copy; select the command and copy it.'))
                         }}
                       >
                         Copy
                       </button>
                     </div>
                   )}
-                  {selected.detail === null ? null : (
-                    <p className={styles.warnText}>{selected.detail}</p>
-                  )}
+                  {selected.detail === null ? null : <p className={styles.warnText}>{selected.detail}</p>}
                 </div>
               ) : null}
             </>
@@ -868,9 +726,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
           {addingKind !== null ? (
             <>
               <h2 className={styles.detailTitle}>New {KIND_LABEL[addingKind]} account</h2>
-              <p className={styles.detailSub}>
-                Give it a route slug; each account becomes its own provider in the picker.
-              </p>
+              <p className={styles.detailSub}>Give it a route slug; each account becomes its own provider in the picker.</p>
               <NewAccountForm
                 kind={addingKind}
                 onCancel={() => setAddingKind(null)}
@@ -915,11 +771,7 @@ const NewAccountForm = (props: {
       </Field>
       {props.kind === 'codex' ? (
         <Field label="CODEX_HOME path" hint="Where shared sessions and skills live.">
-          <input
-            className={styles.input}
-            value={draft.homePath}
-            onChange={event => setDraft({ ...draft, homePath: event.target.value })}
-          />
+          <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
         </Field>
       ) : (
         <Field label="API key environment variable">
@@ -932,12 +784,7 @@ const NewAccountForm = (props: {
         </Field>
       )}
       <div className={styles.detailActions}>
-        <button
-          type="button"
-          className={styles.primary}
-          disabled={invalid}
-          onClick={() => void props.onCreate(draft)}
-        >
+        <button type="button" className={styles.primary} disabled={invalid} onClick={() => void props.onCreate(draft)}>
           Create
         </button>
         <button type="button" className={styles.secondary} onClick={props.onCancel}>
@@ -947,5 +794,3 @@ const NewAccountForm = (props: {
     </>
   )
 }
-
-import { aiAccountsApi as api } from './api.js'

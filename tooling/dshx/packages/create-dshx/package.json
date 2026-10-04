@@ -4,19 +4,24 @@
   "private": true,
   "description": "Create a DeepSeek Harness plugin project.",
   "keywords": [
+    "cli",
     "deepseek",
     "deepseek-harness",
     "plugins",
     "scaffold",
-    "cli",
     "typescript"
   ],
-  "license": "MIT",
   "homepage": "./README.md",
-  "type": "module",
+  "license": "MIT",
   "bin": {
     "create-dshx": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -24,14 +29,6 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "engines": {
-    "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -49,5 +46,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
   }
 }

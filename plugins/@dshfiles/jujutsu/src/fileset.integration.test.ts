@@ -23,7 +23,11 @@ const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
   return result.stdout
 }
 
-const lines = (value: string): string[] => value.split(/\r?\n/).filter(line => line.length > 0).sort()
+const lines = (value: string): string[] =>
+  value
+    .split(/\r?\n/)
+    .filter(line => line.length > 0)
+    .sort()
 
 test('literal root-file filesets select and split exact space, Unicode, and metacharacter paths', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-filesets-'))
@@ -35,16 +39,8 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
   runJj(repo, home, ['config', 'set', '--repo', 'user.name', 'Fileset Test'])
   runJj(repo, home, ['config', 'set', '--repo', 'user.email', 'fileset@example.invalid'])
 
-  const selected = [
-    'dir with space/café [a]*?.txt',
-    'literal "quote" and \\ slash [x]*?.txt',
-    'literal " | all() | root-file:"inject.txt',
-  ]
-  const unselected = [
-    'dir with space/café axbZ.txt',
-    'literal quote and \\ slash xYzZ.txt',
-    'untouched.txt',
-  ]
+  const selected = ['dir with space/café [a]*?.txt', 'literal "quote" and \\ slash [x]*?.txt', 'literal " | all() | root-file:"inject.txt']
+  const unselected = ['dir with space/café axbZ.txt', 'literal quote and \\ slash xYzZ.txt', 'untouched.txt']
   for (const [index, path] of [...selected, ...unselected].entries()) {
     await mkdir(dirname(join(repo, path)), { recursive: true })
     await writeFile(join(repo, path), 'content ' + index + '\n')
@@ -62,21 +58,22 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@-', '--name-only'])), selected.slice().sort())
   assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only'])), unselected.slice().sort())
 
-  const revisions = (): ReturnType<typeof revisionSchema.parse>[] => parseJsonLines(
-    runJj(repo, home, ['log', '--no-graph', '--limit', '500', '--revisions', 'all()', '--template', REVISION_TEMPLATE]),
-    value => {
+  const revisions = (): ReturnType<typeof revisionSchema.parse>[] =>
+    parseJsonLines(runJj(repo, home, ['log', '--no-graph', '--limit', '500', '--revisions', 'all()', '--template', REVISION_TEMPLATE]), value => {
       const parsed = revisionSchema.safeParse(value)
       if (!parsed.success) throw new Error(JSON.stringify({ value, issues: parsed.error.issues }))
       return parsed.data
-    },
-  )
+    })
   const workingCopy = revisions().find(revision => revision.workingCopy)
   assert.ok(workingCopy)
   const changedPaths = lines(runJj(repo, home, ['diff', '--revisions', workingCopy.commitId, '--name-only']))
   const patch = runJj(repo, home, ['diff', '--revisions', workingCopy.commitId, '--git'])
   const changes = parsePatchStats(patch, changedPaths)
   assert.deepEqual(changes.map(change => change.path).sort(), unselected.slice().sort())
-  assert.equal(changes.reduce((count, change) => count + change.additions, 0), unselected.length)
+  assert.equal(
+    changes.reduce((count, change) => count + change.additions, 0),
+    unselected.length,
+  )
 
   runJj(repo, home, buildMutationArgv({ kind: 'describe', commitId: workingCopy.commitId, message: 'description smoke' }))
   const described = revisions().find(revision => revision.workingCopy)

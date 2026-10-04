@@ -2,36 +2,19 @@
   "name": "@dshfiles/mcp-servers",
   "version": "0.1.0",
   "private": true,
+  "description": "Manage profile-wide MCP server configurations and native DSH MCP clients.",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
   "type": "module",
   "main": "./dist/index.js",
-  "description": "Manage profile-wide MCP server configurations and native DSH MCP clients.",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js"
   },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-ui-commands",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-locale"
-      ]
-    }
-  },
-  "files": [
-    "dist",
-    "cordis.patch.yml"
-  ],
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
@@ -39,23 +22,6 @@
   },
   "dependencies": {
     "zod": "^4.4.3"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-commands": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-config-editor": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-credentials": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-host-webserver": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-mcp-client": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -79,5 +45,39 @@
     "react": "^18.3.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-commands": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-config-editor": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-credentials": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-mcp-client": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
   }
 }

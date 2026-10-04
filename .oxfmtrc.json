@@ -1,0 +1,13 @@
+{
+  "arrowParens": "avoid",
+  "printWidth": 160,
+  "semi": false,
+  "singleQuote": true,
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/pnpm-lock.yaml",
+    "tooling/antislop/index.mjs",
+    "output/**"
+  ]
+}

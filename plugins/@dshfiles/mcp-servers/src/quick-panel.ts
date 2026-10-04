@@ -55,10 +55,7 @@ export class SessionQuickPanels {
 }
 
 /** Native plus/slash menu action that opens the session-addressed quick panel. */
-export function createQuickPanelContribution(
-  panels: SessionQuickPanels,
-  translate: TranslateQuickPanel,
-): CommandContribution {
+export function createQuickPanelContribution(panels: SessionQuickPanels, translate: TranslateQuickPanel): CommandContribution {
   return {
     name: 'mcp-servers',
     label: () => translate('title'),

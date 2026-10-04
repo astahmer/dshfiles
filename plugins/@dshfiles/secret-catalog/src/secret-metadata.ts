@@ -1,21 +1,23 @@
 import { z } from 'zod'
 
-const secretPrintRowSchema = z.object({
-  alias: z.string().min(1).max(256),
-  scope: z.string().max(64).optional(),
-  env: z.string().max(256).optional(),
-  environment: z.string().max(256).optional(),
-  environmentName: z.string().max(256).optional(),
-  envKey: z.string().max(256).optional(),
-  env_key: z.string().max(256).optional(),
-  dotenvKey: z.string().max(256).optional(),
-  dotenv_key: z.string().max(256).optional(),
-  item: z.string().max(512).optional(),
-  field: z.string().max(256).optional(),
-  source: z.string().max(2048).optional(),
-  service: z.string().max(512).optional(),
-  description: z.string().max(1024).optional(),
-}).strip()
+const secretPrintRowSchema = z
+  .object({
+    alias: z.string().min(1).max(256),
+    scope: z.string().max(64).optional(),
+    env: z.string().max(256).optional(),
+    environment: z.string().max(256).optional(),
+    environmentName: z.string().max(256).optional(),
+    envKey: z.string().max(256).optional(),
+    env_key: z.string().max(256).optional(),
+    dotenvKey: z.string().max(256).optional(),
+    dotenv_key: z.string().max(256).optional(),
+    item: z.string().max(512).optional(),
+    field: z.string().max(256).optional(),
+    source: z.string().max(2048).optional(),
+    service: z.string().max(512).optional(),
+    description: z.string().max(1024).optional(),
+  })
+  .strip()
 
 const secretPrintRowsSchema = z.union([
   z.array(secretPrintRowSchema).max(5000),

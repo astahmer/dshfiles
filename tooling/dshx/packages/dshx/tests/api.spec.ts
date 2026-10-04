@@ -38,7 +38,13 @@ function connectionFixture() {
     })
     const response = await route.fetch(request)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return (await response.json() as { readonly result: { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: { readonly code: string; readonly message: string; readonly details: object } } }).result
+    return (
+      (await response.json()) as {
+        readonly result:
+          | { readonly ok: true; readonly value: unknown }
+          | { readonly ok: false; readonly error: { readonly code: string; readonly message: string; readonly details: object } }
+      }
+    ).result
   })
   const context = {
     get(name: string) {

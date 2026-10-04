@@ -3,15 +3,7 @@ import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { queueApi } from './api.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import {
-  describeInbox,
-  isDirection,
-  moveWithinInbox,
-  QueueItemMissingError,
-  type QueueMoveRequest,
-  type QueuePosition,
-} from './queue-order.js'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { describeInbox, isDirection, moveWithinInbox, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
 import '@deepseek-ai/dsh-agent'
 
 /**
@@ -41,10 +33,7 @@ export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Pr
   }
   const agent = liveAgent(ctx, request.sessionId)
   if (agent === undefined) {
-    throw new LlmError(
-      `Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`,
-      'NOT_FOUND',
-    )
+    throw new LlmError(`Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`, 'NOT_FOUND')
   }
   try {
     return moveWithinInbox(agent.inbox, request)

@@ -50,9 +50,7 @@ export const aiAccountsTool = defineTool({
           [
             `${account.name} — route \`${account.route}\``,
             `  kind: ${account.kind}`,
-            `  signed in: ${
-              account.signedIn ? (account.identity ?? 'yes') : 'no'
-            }${account.plan === null ? '' : ` (${account.plan})`}`,
+            `  signed in: ${account.signedIn ? (account.identity ?? 'yes') : 'no'}${account.plan === null ? '' : ` (${account.plan})`}`,
             `  home: ${account.home === '' ? '—' : account.home} [${account.mode}]`,
             `  pool: ${account.state}`,
           ].join('\n'),
@@ -76,9 +74,7 @@ export const aiAccountsTool = defineTool({
         identity: account.identity,
         plan: account.plan,
         state: account.state,
-        home: account.kind === 'codex'
-          ? (account.shadowHomePath === '' ? account.homePath : account.shadowHomePath)
-          : account.apiBaseUrl,
+        home: account.kind === 'codex' ? (account.shadowHomePath === '' ? account.homePath : account.shadowHomePath) : account.apiBaseUrl,
         mode: account.mode,
       })),
     }

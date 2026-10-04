@@ -28,7 +28,12 @@ const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254
 
 export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
-  z.object({ kind: z.literal('split'), commitId: commitIdSchema, paths: z.array(z.string().min(1).max(1024)).min(1).max(100), message: z.string().min(1).max(4000) }),
+  z.object({
+    kind: z.literal('split'),
+    commitId: commitIdSchema,
+    paths: z.array(z.string().min(1).max(1024)).min(1).max(100),
+    message: z.string().min(1).max(4000),
+  }),
   z.object({ kind: z.literal('squash'), sourceId: commitIdSchema, destinationId: commitIdSchema, message: z.string().min(1).max(4000) }),
   z.object({ kind: z.literal('rebase'), sourceId: commitIdSchema, destinationId: commitIdSchema }),
   z.object({ kind: z.literal('bookmark-move'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
@@ -77,7 +82,14 @@ export const jujutsuApi = defineApi({
     }),
     details: method({
       input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),
-      output: z.object({ files: z.array(fileChangeSchema).max(1000), additions: z.number().int().min(0), deletions: z.number().int().min(0), patch: z.string().max(1_200_000), truncated: z.boolean(), evolution: z.string().max(120_000) }),
+      output: z.object({
+        files: z.array(fileChangeSchema).max(1000),
+        additions: z.number().int().min(0),
+        deletions: z.number().int().min(0),
+        patch: z.string().max(1_200_000),
+        truncated: z.boolean(),
+        evolution: z.string().max(120_000),
+      }),
     }),
     workingDiff: method({
       input: z.object({ repoId: repoIdSchema }),

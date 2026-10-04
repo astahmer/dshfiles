@@ -77,9 +77,7 @@ const providerBase = (baseUrl: string | undefined): string => `${resolveBase(bas
  * Its Claude models are only served on the Messages shape, so that is declared
  * per model here rather than discovered from a failed request later.
  */
-export const fetchCommandCodeCatalog = async (
-  options: CommandCodeCatalogOptions,
-): Promise<readonly CatalogEntry[]> => {
+export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions): Promise<readonly CatalogEntry[]> => {
   const base = resolveBase(options.baseUrl)
   if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
@@ -91,17 +89,12 @@ export const fetchCommandCodeCatalog = async (
     .flatMap(entry => (typeof entry.id === 'string' && entry.id.length > 0 ? [entry.id] : []))
     .map(id => ({
       id,
-      api: id.startsWith('anthropic/')
-        ? ('anthropic-messages' as const)
-        : ('openai-completions' as const),
+      api: id.startsWith('anthropic/') ? ('anthropic-messages' as const) : ('openai-completions' as const),
     }))
   return entries.length === 0 ? FALLBACK : entries
 }
 
-const modelsFor = (
-  entries: readonly CatalogEntry[],
-  baseUrl: string,
-): readonly Model<CommandCodeApi>[] =>
+const modelsFor = (entries: readonly CatalogEntry[], baseUrl: string): readonly Model<CommandCodeApi>[] =>
   entries.map(entry => ({
     id: entry.id,
     name: entry.id,
@@ -143,20 +136,14 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
           }
           const value = await ctx.env(keyEnv)
           signal.throwIfAborted()
-          return value === undefined || value.length === 0
-            ? undefined
-            : { auth: { apiKey: value }, source: keyEnv }
+          return value === undefined || value.length === 0 ? undefined : { auth: { apiKey: value }, source: keyEnv }
         },
       },
     },
     models: modelsFor(FALLBACK, base),
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
-    fetchModels: async () =>
-      modelsFor(
-        await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey: readKeyFromEnv(keyEnv) }),
-        base,
-      ),
+    fetchModels: async () => modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey: readKeyFromEnv(keyEnv) }), base),
     api: {
       'openai-completions': openAICompletionsApi(),
       'openai-responses': openAIResponsesApi(),

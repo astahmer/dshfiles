@@ -1,5 +1,6 @@
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
+import { MAX_USAGE_HISTORY_POINTS, quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
+import type { QuotaSnapshot } from './usage-history-model.js'
 
 export { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
 export type { QuotaSnapshot, UsageMeta } from './usage-history-model.js'
@@ -24,6 +25,69 @@ export const USAGE_HISTORY_DOMAIN = 'ai_accounts_usage'
 
 const LEGACY_BUCKET_MS = 15 * 60_000
 const MINUTE_MS = 60_000
+const FORECAST_POINT_COUNT = 48
+const BANK_CHANGE_POINT_COUNT = 100
+
+const spreadIndexes = (indexes: readonly number[], count: number): readonly number[] => {
+  if (count <= 0 || indexes.length === 0) return []
+  if (count >= indexes.length) return indexes
+  if (count === 1) {
+    const last = indexes.at(-1)
+    return last === undefined ? [] : [last]
+  }
+  return Array.from({ length: count }, (_, index) => {
+    const candidate = indexes[Math.round(index * (indexes.length - 1) / (count - 1))]
+    return candidate
+  }).filter((index): index is number => index !== undefined)
+}
+
+/** Keep history reads bounded while retaining the detail used by the page. */
+export const boundUsageHistoryPoints = (
+  points: readonly QuotaSnapshot[],
+): readonly QuotaSnapshot[] => {
+  const ordered = [...points].sort((left, right) => left.at - right.at)
+  if (ordered.length <= MAX_USAGE_HISTORY_POINTS) return ordered
+
+  const bankChanges: number[] = []
+  const resetBoundaries = new Set<number>()
+  const seenResetLabels = new Set<string>()
+  const previousResets = new Map<string, number | undefined>()
+  let previousBankSignature: string | undefined
+
+  for (const [index, point] of ordered.entries()) {
+    const bankSignature = JSON.stringify({
+      balance: point.bankedResets,
+      expiries: (point.bankedResetExpiries ?? []).map(value => value ?? null),
+    })
+    if (bankSignature !== previousBankSignature) bankChanges.push(index)
+    previousBankSignature = bankSignature
+
+    for (const label of Object.keys(point.windows)) {
+      const reset = point.resetsAt[label]
+      if (seenResetLabels.has(label) && previousResets.get(label) !== reset) resetBoundaries.add(index)
+      seenResetLabels.add(label)
+      previousResets.set(label, reset)
+    }
+  }
+
+  const selected = new Set<number>([0, ordered.length - 1])
+  for (const index of bankChanges.slice(-BANK_CHANGE_POINT_COUNT)) selected.add(index)
+  for (let index = Math.max(0, ordered.length - FORECAST_POINT_COUNT); index < ordered.length; index += 1) selected.add(index)
+
+  const resetIndexes = [...resetBoundaries].filter(index => !selected.has(index)).sort((left, right) => left - right)
+  for (const index of spreadIndexes(resetIndexes, MAX_USAGE_HISTORY_POINTS - selected.size)) selected.add(index)
+
+  const remainingIndexes = ordered
+    .map((_, index) => index)
+    .filter(index => !selected.has(index))
+  const remainingSlots = MAX_USAGE_HISTORY_POINTS - selected.size
+  for (const index of spreadIndexes(remainingIndexes, remainingSlots)) selected.add(index)
+
+  return [...selected]
+    .sort((left, right) => left - right)
+    .map(index => ordered[index])
+    .filter((point): point is QuotaSnapshot => point !== undefined)
+}
 
 export const usageHistoryDomain = defineDomain({
   name: USAGE_HISTORY_DOMAIN,

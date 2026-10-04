@@ -4,9 +4,16 @@
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "scripts": {
-    "install:all": "pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile",
-    "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run lint && pnpm --dir tooling/dshx run deps:check",
+    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile",
+    "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
-    "check": "pnpm run check:dshx && pnpm run check:plugins"
+    "check": "pnpm run check:dshx && pnpm run check:plugins && pnpm run lint && pnpm run fmt:check",
+    "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
+    "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
+    "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json"
+  },
+  "devDependencies": {
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0"
   }
 }

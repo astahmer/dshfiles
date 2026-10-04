@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { createSecretActionPolicy, filterSecretMetadata } from './secret-catalog-model.js'
 import { parseSecretPrintMetadata } from './secret-metadata.js'
 
-const rows = parseSecretPrintMetadata(JSON.stringify([
-  { alias: 'SYNTHETIC_SHARED', scope: 'project', env: 'prod', envKey: 'PROJECT_VALUE' },
-  { alias: 'SYNTHETIC_SHARED', scope: 'global', env: 'prod', envKey: 'GLOBAL_VALUE' },
-  { alias: 'SYNTHETIC_GLOBAL', scope: 'global', env: 'prod' },
-  { alias: 'SYNTHETIC_LOCAL', scope: 'local', env: 'dev' },
-]))
+const rows = parseSecretPrintMetadata(
+  JSON.stringify([
+    { alias: 'SYNTHETIC_SHARED', scope: 'project', env: 'prod', envKey: 'PROJECT_VALUE' },
+    { alias: 'SYNTHETIC_SHARED', scope: 'global', env: 'prod', envKey: 'GLOBAL_VALUE' },
+    { alias: 'SYNTHETIC_GLOBAL', scope: 'global', env: 'prod' },
+    { alias: 'SYNTHETIC_LOCAL', scope: 'local', env: 'dev' },
+  ]),
+)
 
 const rowBy = (predicate: (row: (typeof rows)[number]) => boolean): (typeof rows)[number] => {
   const row = rows.find(predicate)

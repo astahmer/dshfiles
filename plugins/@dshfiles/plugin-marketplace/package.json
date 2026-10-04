@@ -4,9 +4,11 @@
   "private": true,
   "description": "A Settings marketplace tab that installs DSH plugins from a Framework Hub catalog.",
   "license": "MIT",
-  "engines": {
-    "node": "^22.19.0 || >=24.0.0"
-  },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,27 +23,6 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
-  },
-  "files": [
-    "dist",
-    "cordis.patch.yml",
-    "README.md"
-  ],
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-primitives"
-      ],
-      "external": [],
-      "immediately": false
-    }
   },
   "scripts": {
     "build": "dshx build",
@@ -90,5 +71,24 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4",
     "react": ">=18 <20"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "external": [],
+      "immediately": false
+    }
   }
 }

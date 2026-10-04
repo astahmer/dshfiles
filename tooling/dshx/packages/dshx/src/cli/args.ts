@@ -434,11 +434,15 @@ interface OptionScope {
   readonly usage: string
 }
 
-const platformAction = (command: CliCommand, ...actions: string[]) => (context: OptionContext) =>
-  context.command === command && actions.includes(context.action ?? '')
+const platformAction =
+  (command: CliCommand, ...actions: string[]) =>
+  (context: OptionContext) =>
+    context.command === command && actions.includes(context.action ?? '')
 
-const addTargets = (...targets: CliAddTarget[]) => (context: OptionContext) =>
-  context.command === 'add' && targets.includes(context.addTarget ?? 'ui')
+const addTargets =
+  (...targets: CliAddTarget[]) =>
+  (context: OptionContext) =>
+    context.command === 'add' && targets.includes(context.addTarget ?? 'ui')
 
 const inspectSlots = (context: OptionContext) => context.command === 'inspect' && context.inspectTarget === 'slots'
 
@@ -653,7 +657,39 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const platformCommand = isPlatformCommand(command)
   if ((json || open || port !== undefined) && command === undefined) throw new CliUsageError('An option requires a command.')
   validateOptionScopes(
-    { json, open, port, dryRun, fix, runtime, url, cwd, session, line, output, agentPreset, mode, reasoningEffort, max, atSeq, principal, delivery, priority, topic, limit, slot, provider, id, order, name, description, event, root, explain, boot },
+    {
+      json,
+      open,
+      port,
+      dryRun,
+      fix,
+      runtime,
+      url,
+      cwd,
+      session,
+      line,
+      output,
+      agentPreset,
+      mode,
+      reasoningEffort,
+      max,
+      atSeq,
+      principal,
+      delivery,
+      priority,
+      topic,
+      limit,
+      slot,
+      provider,
+      id,
+      order,
+      name,
+      description,
+      event,
+      root,
+      explain,
+      boot,
+    },
     { command, action: platformArgs[0], inspectTarget, addTarget, boot: boot === true, fix },
   )
   if (command === 'comm' && !help) {

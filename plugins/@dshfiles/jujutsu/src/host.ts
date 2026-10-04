@@ -5,7 +5,18 @@ import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, normalize, relative } from 'node:path'
 import { defineHost } from '@dshfiles/dshx/host'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
-import { buildMutationArgv, isCommitId, isRecordedJjGitPush, isSafeSplitPath, parseJsonLines, parsePatchStats, PreviewStore, redactRemoteOutput, validatedRepositoryPath, type PreparedMutation } from './core.js'
+import {
+  buildMutationArgv,
+  isCommitId,
+  isRecordedJjGitPush,
+  isSafeSplitPath,
+  parseJsonLines,
+  parsePatchStats,
+  PreviewStore,
+  redactRemoteOutput,
+  validatedRepositoryPath,
+  type PreparedMutation,
+} from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 
 const MAX_OUTPUT = 1_160_000
@@ -163,7 +174,7 @@ const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSig
   }
   const repo: RegisteredRepo = { id: randomUUID(), root, identity }
   const confirmed = await runAt(ctx, root, identity, ['root'], signal, { outputLimit: 16_000 })
-  if (confirmed.truncated || await realpath(confirmed.stdout.trim()) !== root) throw new Error('Repository root changed during registration.')
+  if (confirmed.truncated || (await realpath(confirmed.stdout.trim())) !== root) throw new Error('Repository root changed during registration.')
   await assertRepoIdentity(repo)
   while (repos.size >= 32) {
     const oldest = repos.keys().next().value as string | undefined
@@ -180,7 +191,7 @@ const resolveRepo = async (ctx: Context, repoId: string, signal: AbortSignal | u
   await assertRepoIdentity(repo)
   const confirmation = await runAt(ctx, repo.root, repo.identity, ['root'], signal, { outputLimit: 16_000 })
   const reportedRoot = confirmation.stdout.trim()
-  if (confirmation.truncated || !isAbsolute(reportedRoot) || await realpath(reportedRoot) !== repo.root) {
+  if (confirmation.truncated || !isAbsolute(reportedRoot) || (await realpath(reportedRoot)) !== repo.root) {
     throw new Error('Registered path no longer resolves to the selected Jujutsu repository.')
   }
   await assertRepoIdentity(repo)
@@ -188,9 +199,13 @@ const resolveRepo = async (ctx: Context, repoId: string, signal: AbortSignal | u
 }
 
 const readRevisions = async (ctx: Context, repo: RegisteredRepo, limit: number, signal: AbortSignal | undefined): Promise<Revision[]> => {
-  const result = await runAt(ctx, repo.root, repo.identity, [
-    'log', '--no-graph', '--limit', String(limit), '--revisions', 'all()', '--template', REVISION_TEMPLATE,
-  ], signal)
+  const result = await runAt(
+    ctx,
+    repo.root,
+    repo.identity,
+    ['log', '--no-graph', '--limit', String(limit), '--revisions', 'all()', '--template', REVISION_TEMPLATE],
+    signal,
+  )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
   return parseJsonLines(result.stdout, value => revisionSchema.parse(value))
 }
@@ -203,17 +218,23 @@ const readEvolvedCommitIds = async (
 ): Promise<{ readonly commitIds: ReadonlySet<string>; readonly truncated: boolean }> => {
   if (revisions.length === 0) return { commitIds: new Set(), truncated: false }
   try {
-    const result = await runAt(ctx, repo.root, repo.identity, [
-      'evolog', '--no-graph', '--revisions', revisions.map(revision => revision.commitId).join('|'),
-      '--limit', '1500', '--template', EVOLUTION_TEMPLATE,
-    ], signal, { outputLimit: 512_000 })
-    const completeOutput = result.truncated
-      ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1)
-      : result.stdout
+    const result = await runAt(
+      ctx,
+      repo.root,
+      repo.identity,
+      ['evolog', '--no-graph', '--revisions', revisions.map(revision => revision.commitId).join('|'), '--limit', '1500', '--template', EVOLUTION_TEMPLATE],
+      signal,
+      { outputLimit: 512_000 },
+    )
+    const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const rows = parseJsonLines(completeOutput, value => {
       if (typeof value !== 'object' || value === null) throw new Error('Invalid evolution record.')
       const row = value as { commitId?: unknown; predecessors?: unknown }
-      if (!isCommitId(String(row.commitId ?? '')) || !Array.isArray(row.predecessors) || !row.predecessors.every(id => typeof id === 'string' && isCommitId(id))) {
+      if (
+        !isCommitId(String(row.commitId ?? '')) ||
+        !Array.isArray(row.predecessors) ||
+        !row.predecessors.every(id => typeof id === 'string' && isCommitId(id))
+      ) {
         throw new Error('Invalid evolution record.')
       }
       return { commitId: row.commitId as string, predecessors: row.predecessors as string[] }
@@ -231,10 +252,17 @@ const readEvolvedCommitIds = async (
 const readPaths = async (ctx: Context, repo: RegisteredRepo, revision: string, signal: AbortSignal | undefined): Promise<string[]> => {
   const result = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', revision, '--name-only'], signal, { outputLimit: 256_000 })
   if (result.truncated) throw new Error('Changed file list exceeded the bounded output limit.')
-  return result.stdout.split(/\r?\n/).filter(path => path.length > 0).slice(0, 1000)
+  return result.stdout
+    .split(/\r?\n/)
+    .filter(path => path.length > 0)
+    .slice(0, 1000)
 }
 
-const readRemotes = async (ctx: Context, repo: RegisteredRepo, signal: AbortSignal | undefined): Promise<{ readonly names: string[]; readonly configFingerprint: string }> => {
+const readRemotes = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  signal: AbortSignal | undefined,
+): Promise<{ readonly names: string[]; readonly configFingerprint: string }> => {
   try {
     const result = await runAt(ctx, repo.root, repo.identity, ['git', 'remote', 'list'], signal, { outputLimit: 32_000 })
     if (result.truncated) return { names: [], configFingerprint: 'truncated' }
@@ -252,14 +280,21 @@ const readRemotes = async (ctx: Context, repo: RegisteredRepo, signal: AbortSign
   }
 }
 
-const readLastPush = async (ctx: Context, repo: RegisteredRepo, signal: AbortSignal | undefined): Promise<{ at: string | null; description: string | null; historyTruncated: boolean }> => {
+const readLastPush = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  signal: AbortSignal | undefined,
+): Promise<{ at: string | null; description: string | null; historyTruncated: boolean }> => {
   try {
-    const result = await runAt(ctx, repo.root, repo.identity, [
-      '--at-operation=@', '--ignore-working-copy', 'operation', 'log', '--no-graph', '--limit', '1000', '--template', OPERATION_TEMPLATE,
-    ], signal, { outputLimit: 512_000 })
-    const completeOutput = result.truncated
-      ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1)
-      : result.stdout
+    const result = await runAt(
+      ctx,
+      repo.root,
+      repo.identity,
+      ['--at-operation=@', '--ignore-working-copy', 'operation', 'log', '--no-graph', '--limit', '1000', '--template', OPERATION_TEMPLATE],
+      signal,
+      { outputLimit: 512_000 },
+    )
+    const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const operations = parseJsonLines(completeOutput, value => {
       if (typeof value !== 'object' || value === null) throw new Error('Invalid operation row.')
       const row = value as { description?: unknown; attributes?: unknown; time?: unknown }
@@ -299,12 +334,16 @@ const snapshot = async (ctx: Context, repo: RegisteredRepo, limit: number, signa
     lastPushHistoryTruncated: lastPush.historyTruncated,
     evolutionHistoryTruncated: evolution.truncated,
   }
-  const fingerprint = createHash('sha256').update(JSON.stringify({
-    revisions: graphRevisions,
-    changedPaths,
-    status: state.status,
-    remoteConfig: remotes.configFingerprint,
-  })).digest('hex')
+  const fingerprint = createHash('sha256')
+    .update(
+      JSON.stringify({
+        revisions: graphRevisions,
+        changedPaths,
+        status: state.status,
+        remoteConfig: remotes.configFingerprint,
+      }),
+    )
+    .digest('hex')
   return { state, identity: repo.identity, fingerprint }
 }
 
@@ -320,7 +359,11 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
     case 'describe': {
       const revision = findRevision(revisions, action.commitId)
       if (revision.immutable) throw new Error('Jujutsu marks this revision immutable.')
-      return { title: 'Update description', summary: 'Change ' + revision.shortestChangeId + ' description', detail: 'Current:\n' + (revision.description || '(empty)') + '\n\nNew:\n' + action.message }
+      return {
+        title: 'Update description',
+        summary: 'Change ' + revision.shortestChangeId + ' description',
+        detail: 'Current:\n' + (revision.description || '(empty)') + '\n\nNew:\n' + action.message,
+      }
     }
     case 'split': {
       const revision = findRevision(revisions, action.commitId)
@@ -328,35 +371,72 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
       if (!action.paths.every(path => isSafeSplitPath(path) && selectedPaths.includes(path))) {
         throw new Error('Split files must be selected from this revision and use safe literal paths.')
       }
-      return { title: 'Split revision', summary: 'Split ' + revision.shortestChangeId + ' by selected files', detail: 'Files:\n' + action.paths.join('\n') + '\n\nNew revision description:\n' + action.message }
+      return {
+        title: 'Split revision',
+        summary: 'Split ' + revision.shortestChangeId + ' by selected files',
+        detail: 'Files:\n' + action.paths.join('\n') + '\n\nNew revision description:\n' + action.message,
+      }
     }
     case 'squash': {
       const source = findRevision(revisions, action.sourceId)
       const destination = findRevision(revisions, action.destinationId)
       if (source.immutable || destination.immutable) throw new Error('Jujutsu marks a selected revision immutable.')
-      return { title: 'Squash changes', summary: 'Move ' + source.shortestChangeId + ' into ' + destination.shortestChangeId, detail: 'Source: ' + (source.description || '(empty)') + '\nDestination: ' + (destination.description || '(empty)') + '\n\nResulting description:\n' + action.message }
+      return {
+        title: 'Squash changes',
+        summary: 'Move ' + source.shortestChangeId + ' into ' + destination.shortestChangeId,
+        detail:
+          'Source: ' +
+          (source.description || '(empty)') +
+          '\nDestination: ' +
+          (destination.description || '(empty)') +
+          '\n\nResulting description:\n' +
+          action.message,
+      }
     }
     case 'rebase': {
       const source = findRevision(revisions, action.sourceId)
       const destination = findRevision(revisions, action.destinationId)
       if (source.immutable) throw new Error('Jujutsu marks the source revision immutable.')
       if (source.commitId === destination.commitId) throw new Error('Choose two different visible revisions to rebase.')
-      return { title: 'Rebase revision', summary: 'Rebase ' + source.shortestChangeId + ' onto ' + destination.shortestChangeId, detail: 'Jujutsu will rebase this revision and its descendants. Conflicts remain recorded in the repository for review.' }
+      return {
+        title: 'Rebase revision',
+        summary: 'Rebase ' + source.shortestChangeId + ' onto ' + destination.shortestChangeId,
+        detail: 'Jujutsu will rebase this revision and its descendants. Conflicts remain recorded in the repository for review.',
+      }
     }
     case 'bookmark-move': {
       const destination = findRevision(revisions, action.destinationId)
       const current = revisions.find(revision => revision.localBookmarks.includes(action.bookmark))
       if (current === undefined) throw new Error('Bookmark is no longer present. Refresh and try again.')
-      return { title: 'Move bookmark', summary: 'Move ' + action.bookmark + ' to ' + destination.shortestChangeId, detail: 'Current target: ' + current.shortestChangeId + '\nNew target: ' + destination.shortestChangeId + '\n\nBackward and sideways movement is enabled.' }
+      return {
+        title: 'Move bookmark',
+        summary: 'Move ' + action.bookmark + ' to ' + destination.shortestChangeId,
+        detail:
+          'Current target: ' + current.shortestChangeId + '\nNew target: ' + destination.shortestChangeId + '\n\nBackward and sideways movement is enabled.',
+      }
     }
     case 'fetch':
-      return { title: 'Fetch remote', summary: 'Fetch from ' + action.remote, detail: 'JJ will update remote bookmarks and tags using configured fetch refspecs. Exact incoming changes depend on the remote response.' }
+      return {
+        title: 'Fetch remote',
+        summary: 'Fetch from ' + action.remote,
+        detail: 'JJ will update remote bookmarks and tags using configured fetch refspecs. Exact incoming changes depend on the remote response.',
+      }
     case 'push':
-      return { title: 'Push bookmark', summary: 'Push ' + action.bookmark + ' to ' + action.remote, detail: 'JJ dry-run preview follows. The real push starts only after confirmation.' }
+      return {
+        title: 'Push bookmark',
+        summary: 'Push ' + action.bookmark + ' to ' + action.remote,
+        detail: 'JJ dry-run preview follows. The real push starts only after confirmation.',
+      }
   }
 }
 
-const prepareMutation = async (ctx: Context, repo: RegisteredRepo, current: Snapshot, action: Mutation, signal: AbortSignal | undefined): Promise<PreparedMutation> => {
+const prepareMutation = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  current: Snapshot,
+  action: Mutation,
+  signal: AbortSignal | undefined,
+): Promise<PreparedMutation> => {
   const paths = action.kind === 'split' ? await readPaths(ctx, repo, action.commitId, signal) : current.state.changedPaths
   const preview = mutationPreview(action, current.state.revisions, paths)
   const argv = buildMutationArgv(action)
@@ -365,10 +445,19 @@ const prepareMutation = async (ctx: Context, repo: RegisteredRepo, current: Snap
     if (!current.state.remoteNames.includes(action.remote)) throw new Error('Remote is no longer configured. Refresh and select a listed remote.')
   }
   if (action.kind === 'push') {
-    if (!current.state.revisions.some(row => row.localBookmarks.includes(action.bookmark))) throw new Error('Bookmark is no longer present. Refresh and choose a listed bookmark.')
+    if (!current.state.revisions.some(row => row.localBookmarks.includes(action.bookmark)))
+      throw new Error('Bookmark is no longer present. Refresh and choose a listed bookmark.')
     try {
-      const dryRun = await runAt(ctx, repo.root, repo.identity, ['git', 'push', '--dry-run', '--remote', action.remote, '--bookmark', action.bookmark], signal, { timeoutMs: NETWORK_TIMEOUT })
-      detail += '\n\n' + (redactRemoteOutput(dryRun.stdout, 7000) || 'JJ reported no dry-run output.') + (dryRun.truncated ? '\n[dry-run output truncated]' : '')
+      const dryRun = await runAt(
+        ctx,
+        repo.root,
+        repo.identity,
+        ['git', 'push', '--dry-run', '--remote', action.remote, '--bookmark', action.bookmark],
+        signal,
+        { timeoutMs: NETWORK_TIMEOUT },
+      )
+      detail +=
+        '\n\n' + (redactRemoteOutput(dryRun.stdout, 7000) || 'JJ reported no dry-run output.') + (dryRun.truncated ? '\n[dry-run output truncated]' : '')
     } catch {
       if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
       detail += '\n\nRemote dry-run unavailable. No push has occurred; the real push requires confirmation.'
@@ -389,57 +478,59 @@ const prepareMutation = async (ctx: Context, repo: RegisteredRepo, current: Snap
 }
 
 const jujutsuHostApi = jujutsuApi.host({
-    registerRepository: async ({ input, ctx, signal }) => {
-      const repo = await registerRepo(ctx, input.path, signal)
-      return { repoId: repo.id, root: repo.root }
-    },
-    load: async ({ input, ctx, signal }) => {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
-      return (await snapshot(ctx, repo, input.limit, signal)).state
-    },
-    details: async ({ input, ctx, signal }) => {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
-      const revisions = await readRevisions(ctx, repo, MAX_REVISIONS, signal)
-      findRevision(revisions, input.commitId)
-      const paths = await readPaths(ctx, repo, input.commitId, signal)
-      const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', input.commitId, '--git'], signal)
-      const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, { outputLimit: 118_000 })
-      const files = parsePatchStats(patch.stdout, paths)
-      return {
-        files,
-        additions: files.reduce((sum, file) => sum + file.additions, 0),
-        deletions: files.reduce((sum, file) => sum + file.deletions, 0),
-        patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-        truncated: patch.truncated,
-        evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
-      }
-    },
-    workingDiff: async ({ input, ctx, signal }) => {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
-      const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', '@', '--git'], signal)
-      return { patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout, truncated: patch.truncated }
-    },
-    prepare: async ({ input, ctx, signal }) => {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
-      const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
-      const prepared = await prepareMutation(ctx, repo, current, input.action, signal)
-      const id = randomUUID()
-      previews.put(id, prepared)
-      return { id, kind: input.action.kind, title: prepared.title, summary: prepared.summary, detail: prepared.detail, expiresAt: prepared.expiresAt }
-    },
-    confirm: async ({ input, ctx, signal }) => {
-      const repo = await resolveRepo(ctx, input.repoId, signal)
-      const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
-      const prepared = previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
-      if (prepared === undefined) throw new Error('Preview expired or repository state changed. Refresh and preview again.')
-      await assertRepoIdentity(repo)
-      const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
-        timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
-      })
-      await assertRepoIdentity(repo)
-      const output = redactRemoteOutput(result.stdout, 11_000)
-      return { message: prepared.title + ' completed.', output: output + (result.truncated ? '\n[command output truncated]' : '') }
-    },
+  registerRepository: async ({ input, ctx, signal }) => {
+    const repo = await registerRepo(ctx, input.path, signal)
+    return { repoId: repo.id, root: repo.root }
+  },
+  load: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    return (await snapshot(ctx, repo, input.limit, signal)).state
+  },
+  details: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    const revisions = await readRevisions(ctx, repo, MAX_REVISIONS, signal)
+    findRevision(revisions, input.commitId)
+    const paths = await readPaths(ctx, repo, input.commitId, signal)
+    const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', input.commitId, '--git'], signal)
+    const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, {
+      outputLimit: 118_000,
+    })
+    const files = parsePatchStats(patch.stdout, paths)
+    return {
+      files,
+      additions: files.reduce((sum, file) => sum + file.additions, 0),
+      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+      patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+      truncated: patch.truncated,
+      evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
+    }
+  },
+  workingDiff: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', '@', '--git'], signal)
+    return { patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout, truncated: patch.truncated }
+  },
+  prepare: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
+    const prepared = await prepareMutation(ctx, repo, current, input.action, signal)
+    const id = randomUUID()
+    previews.put(id, prepared)
+    return { id, kind: input.action.kind, title: prepared.title, summary: prepared.summary, detail: prepared.detail, expiresAt: prepared.expiresAt }
+  },
+  confirm: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
+    const prepared = previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
+    if (prepared === undefined) throw new Error('Preview expired or repository state changed. Refresh and preview again.')
+    await assertRepoIdentity(repo)
+    const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
+      timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
+    })
+    await assertRepoIdentity(repo)
+    const output = redactRemoteOutput(result.stdout, 11_000)
+    return { message: prepared.title + ' completed.', output: output + (result.truncated ? '\n[command output truncated]' : '') }
+  },
 })
 
 export default defineHost({

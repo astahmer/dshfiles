@@ -2,34 +2,40 @@
   "name": "@dshfiles/bash-parallel",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Concurrent read-only bash execution for DSH, with a fail-closed classifier.",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
-  "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" }
+  "scripts": {
+    "build": "dshx build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --experimental-strip-types src/classify.test.ts"
   },
-  "files": ["dist", "cordis.patch.yml", "README.md"],
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
-  "devDependencies": {
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
-    "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
-    "@types/node": "^22.19.0",
-    "typescript": "^5.9.3"
-  },
-  "scripts": {
-    "build": "dshx build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --experimental-strip-types src/classify.test.ts"
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

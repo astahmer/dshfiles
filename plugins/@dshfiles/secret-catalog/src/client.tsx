@@ -22,16 +22,10 @@ export default defineClient({
   setup(ctx) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const label = (): string => 'Secret Catalog'
-    ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label }, PanelGlyph),
-    )
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label }, PanelGlyph))
     ctx.slots.inject('main', () =>
       ctx.slots.register({ name: 'main', key: PANEL_ID }, () => (
-        <SecretCatalogPanel
-          directoryPicker={pickerPorts.directoryPicker}
-          projects={ctx.workspaces.list}
-          registerWorkspace={pickerPorts.registerWorkspace}
-        />
+        <SecretCatalogPanel directoryPicker={pickerPorts.directoryPicker} projects={ctx.workspaces.list} registerWorkspace={pickerPorts.registerWorkspace} />
       )),
     )
   },

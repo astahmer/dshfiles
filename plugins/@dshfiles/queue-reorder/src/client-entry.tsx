@@ -44,15 +44,12 @@ export default defineClient({
             if (scoped === undefined) {
               throw new Error(`queue dock: session "${sessionId}" resolved no scope`)
             }
-            const conversation = scoped.get('conversation') as
-              | ConversationService
-              | undefined
+            const conversation = scoped.get('conversation') as ConversationService | undefined
             if (conversation === undefined) {
               throw new Error('queue dock: conversation service unavailable')
             }
             return {
-              updateQueue: (itemId: string, action: unknown): Promise<void> =>
-                conversation.updateQueue(itemId, action),
+              updateQueue: (itemId: string, action: unknown): Promise<void> => conversation.updateQueue(itemId, action),
             }
           },
         },

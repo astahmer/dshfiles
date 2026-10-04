@@ -40,7 +40,6 @@ async function setup(host: 'define' | 'native' | 'missing' | 'disabled'): Promis
     await writeFile(configFile, "export default { host: false, client: 'src/client.tsx' }\n")
     await writeFile(resolve(root, 'src/client.tsx'), 'export default {}\n')
   }
-  const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as Record<string, unknown>
   return {
     root,
     project: project(root, host === 'missing' || host === 'disabled' ? undefined : resolve(root, 'src/host.ts'), configFile),

@@ -47,7 +47,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const generation = useRef(0)
   const pathMode = query.startsWith('/')
   const matchingProjects = useMemo(() => filterRegisteredProjects(props.projects, query), [props.projects, query])
-  const folderEntries = pathMode ? listing?.entries ?? [] : []
+  const folderEntries = pathMode ? (listing?.entries ?? []) : []
   const itemCount = pathMode ? folderEntries.length : matchingProjects.length
 
   useEffect(() => {
@@ -193,7 +193,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
             placeholder="Search projects or type / for a folder…"
             value={query}
           />
-          <button disabled={busy} onClick={() => void chooseWithSystemPicker()} type="button">Browse…</button>
+          <button disabled={busy} onClick={() => void chooseWithSystemPicker()} type="button">
+            Browse…
+          </button>
         </div>
         {pathMode ? (
           <>
@@ -209,8 +211,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   role="option"
                   type="button"
                 >
-                  <span className={styles.folderGlyph} aria-hidden>▸</span>
-                  <span className={styles.itemText}><strong>{entry.name}</strong><small>{entry.path}</small></span>
+                  <span className={styles.folderGlyph} aria-hidden>
+                    ▸
+                  </span>
+                  <span className={styles.itemText}>
+                    <strong>{entry.name}</strong>
+                    <small>{entry.path}</small>
+                  </span>
                   {entry.hidden && <span className={styles.badge}>Hidden</span>}
                 </button>
               ))}
@@ -222,10 +229,25 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 <button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} type="button">
                   Select this folder
                 </button>
-                <button disabled={busy} onClick={() => void registerCurrentFolder()} type="button">Register project</button>
-                <form className={styles.createFolder} onSubmit={event => { event.preventDefault(); void createFolder() }}>
-                  <input aria-label="New folder name" onChange={event => setNewDirectoryName(event.currentTarget.value)} placeholder="New folder name" value={newDirectoryName} />
-                  <button disabled={busy || newDirectoryName.trim().length === 0} type="submit">Create folder</button>
+                <button disabled={busy} onClick={() => void registerCurrentFolder()} type="button">
+                  Register project
+                </button>
+                <form
+                  className={styles.createFolder}
+                  onSubmit={event => {
+                    event.preventDefault()
+                    void createFolder()
+                  }}
+                >
+                  <input
+                    aria-label="New folder name"
+                    onChange={event => setNewDirectoryName(event.currentTarget.value)}
+                    placeholder="New folder name"
+                    value={newDirectoryName}
+                  />
+                  <button disabled={busy || newDirectoryName.trim().length === 0} type="submit">
+                    Create folder
+                  </button>
                 </form>
                 {listing.truncated && <small className={styles.muted}>Folder list is truncated.</small>}
               </div>
@@ -245,8 +267,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   role="option"
                   type="button"
                 >
-                  <span className={styles.projectGlyph} aria-hidden>{project.title.slice(0, 2).toLocaleUpperCase()}</span>
-                  <span className={styles.itemText}><strong>{project.title}</strong><small>{project.canonicalPath}</small></span>
+                  <span className={styles.projectGlyph} aria-hidden>
+                    {project.title.slice(0, 2).toLocaleUpperCase()}
+                  </span>
+                  <span className={styles.itemText}>
+                    <strong>{project.title}</strong>
+                    <small>{project.canonicalPath}</small>
+                  </span>
                   {index < 9 && <kbd>⌘ {index + 1}</kbd>}
                 </button>
               ))}
@@ -254,9 +281,19 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
             </div>
           </>
         )}
-        {error !== null && <p className={styles.error} role="alert">{error}</p>}
+        {error !== null && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
         <footer className={styles.footer}>
-          <span>↑ ↓ Navigate</span><span><kbd>Enter</kbd> Select / open</span><span><kbd>Esc</kbd> Close</span>
+          <span>↑ ↓ Navigate</span>
+          <span>
+            <kbd>Enter</kbd> Select / open
+          </span>
+          <span>
+            <kbd>Esc</kbd> Close
+          </span>
         </footer>
       </section>
     </div>

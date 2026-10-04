@@ -2,8 +2,13 @@
   "name": "@dshfiles/jujutsu",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Jujutsu revision graph and confirmed Source Control actions for DSH.",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -11,36 +16,13 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js"
   },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
-    }
+  "scripts": {
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "files": [
-    "dist",
-    "cordis.patch.yml",
-    "README.md"
-  ],
   "dependencies": {
     "zod": "^4.4.3"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -57,9 +39,27 @@
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
-  "scripts": {
-    "build": "dshx build",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
   }
 }

@@ -1,14 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  type SidebarPreferences,
-} from './organization.js'
-import {
-  loadPreferences,
-  parseStoredPreferences,
-  PREFERENCES_STORAGE_KEY,
-  savePreferences,
-} from './preferences.js'
+import { type SidebarPreferences } from './organization.js'
+import { loadPreferences, parseStoredPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences.js'
 
 interface SidebarState {
   preferences: SidebarPreferences

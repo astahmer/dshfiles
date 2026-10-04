@@ -49,7 +49,7 @@ interface SecretMutationDialogProps {
   readonly onRemove: (target: SecretRemoveTarget, row: SecretMetadata) => void
 }
 
-const optionalText = (value: string): string | undefined => value.length === 0 ? undefined : value
+const optionalText = (value: string): string | undefined => (value.length === 0 ? undefined : value)
 const isSecretScope = (value: string): value is SecretMutationScope => value === 'global' || value === 'project' || value === 'local'
 
 export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Element => {
@@ -68,9 +68,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
   const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
   const row = props.row
 
-  const title = props.mode === 'create'
-    ? 'Add secret alias'
-    : props.mode === 'edit' ? 'Edit ' + (row?.alias ?? 'alias') : 'Remove ' + (row?.alias ?? 'alias')
+  const title = props.mode === 'create' ? 'Add secret alias' : props.mode === 'edit' ? 'Edit ' + (row?.alias ?? 'alias') : 'Remove ' + (row?.alias ?? 'alias')
 
   const submitCreate = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -119,68 +117,178 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
 
   return (
     <div className={styles.dialogOverlay}>
-      <section aria-labelledby="secret-dialog-title" aria-modal="true" className={styles.dialog} onKeyDown={event => {
-        if (event.key === 'Escape' && !props.pending) props.onClose()
-      }} role="dialog">
+      <section
+        aria-labelledby="secret-dialog-title"
+        aria-modal="true"
+        className={styles.dialog}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && !props.pending) props.onClose()
+        }}
+        role="dialog"
+      >
         <header className={styles.dialogHeader}>
           <h2 id="secret-dialog-title">{title}</h2>
-          <button aria-label="Close dialog" disabled={props.pending} onClick={props.onClose} type="button">×</button>
+          <button aria-label="Close dialog" disabled={props.pending} onClick={props.onClose} type="button">
+            ×
+          </button>
         </header>
-        {props.error !== null && <p className={styles.error} role="alert">{props.error}</p>}
+        {props.error !== null && (
+          <p className={styles.error} role="alert">
+            {props.error}
+          </p>
+        )}
         {props.mode === 'create' && (
           <form className={styles.dialogForm} onSubmit={submitCreate}>
-            <label>Alias<input autoComplete="off" maxLength={128} onChange={event => setAlias(event.currentTarget.value)} pattern="[A-Za-z_][A-Za-z0-9_-]*" required value={alias} /></label>
-            <label>Target scope
-              <select onChange={event => { if (isSecretScope(event.currentTarget.value)) setScope(event.currentTarget.value) }} value={scope}>
+            <label>
+              Alias
+              <input
+                autoComplete="off"
+                maxLength={128}
+                onChange={event => setAlias(event.currentTarget.value)}
+                pattern="[A-Za-z_][A-Za-z0-9_-]*"
+                required
+                value={alias}
+              />
+            </label>
+            <label>
+              Target scope
+              <select
+                onChange={event => {
+                  if (isSecretScope(event.currentTarget.value)) setScope(event.currentTarget.value)
+                }}
+                value={scope}
+              >
                 <option value="global">Global aliases</option>
                 <option value="project">Selected project</option>
-                <option disabled={!props.hasProjectFolder} value="local">Machine-local override</option>
+                <option disabled={!props.hasProjectFolder} value="local">
+                  Machine-local override
+                </option>
               </select>
             </label>
             {scope !== 'global' && !props.hasProjectFolder && <p className={styles.formHint}>Choose a project folder before adding this alias.</p>}
-            <label>Environment<input autoComplete="off" maxLength={256} onChange={event => setEnvironment(event.currentTarget.value)} pattern="[A-Za-z0-9_-]+" required value={environment} /></label>
-            <label>Value creation
-              <select onChange={event => {
-                const nextMode = event.currentTarget.value === 'manual' ? 'manual' : 'generate'
-                setValueMode(nextMode)
-                if (nextMode === 'generate') setValue('')
-              }} value={valueMode}>
+            <label>
+              Environment
+              <input
+                autoComplete="off"
+                maxLength={256}
+                onChange={event => setEnvironment(event.currentTarget.value)}
+                pattern="[A-Za-z0-9_-]+"
+                required
+                value={environment}
+              />
+            </label>
+            <label>
+              Value creation
+              <select
+                onChange={event => {
+                  const nextMode = event.currentTarget.value === 'manual' ? 'manual' : 'generate'
+                  setValueMode(nextMode)
+                  if (nextMode === 'generate') setValue('')
+                }}
+                value={valueMode}
+              >
                 <option value="generate">Generate on this Host</option>
                 <option value="manual">Enter value</option>
               </select>
             </label>
-            {valueMode === 'generate'
-              ? <p className={styles.formHint}>The CLI generates the value on this Host; it never enters the form.</p>
-              : <label>Secret value<input autoComplete="new-password" onChange={event => setValue(event.currentTarget.value)} required type="password" value={value} /></label>}
-            <label>Item name<input autoComplete="off" onChange={event => setName(event.currentTarget.value)} value={name} /></label>
-            <label>Source URL<input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} value={source} /></label>
-            <label>Tags<input autoComplete="off" onChange={event => setTags(event.currentTarget.value)} placeholder="Comma-separated" value={tags} /></label>
-            <label>Item type
+            {valueMode === 'generate' ? (
+              <p className={styles.formHint}>The CLI generates the value on this Host; it never enters the form.</p>
+            ) : (
+              <label>
+                Secret value
+                <input autoComplete="new-password" onChange={event => setValue(event.currentTarget.value)} required type="password" value={value} />
+              </label>
+            )}
+            <label>
+              Item name
+              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} value={name} />
+            </label>
+            <label>
+              Source URL
+              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} value={source} />
+            </label>
+            <label>
+              Tags
+              <input autoComplete="off" onChange={event => setTags(event.currentTarget.value)} placeholder="Comma-separated" value={tags} />
+            </label>
+            <label>
+              Item type
               <select onChange={event => setType(event.currentTarget.value)} value={type || 'login'}>
                 <option value="login">Login</option>
                 <option value="secure-note">Secure Note</option>
               </select>
             </label>
-            <label>Field<input autoComplete="off" onChange={event => setField(event.currentTarget.value)} placeholder="password" value={field} /></label>
+            <label>
+              Field
+              <input autoComplete="off" onChange={event => setField(event.currentTarget.value)} placeholder="password" value={field} />
+            </label>
             <footer className={styles.dialogActions}>
-              <button disabled={props.pending} onClick={props.onClose} type="button">Cancel</button>
-              <button disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)} type="submit">{props.pending ? 'Adding…' : 'Add alias'}</button>
+              <button disabled={props.pending} onClick={props.onClose} type="button">
+                Cancel
+              </button>
+              <button
+                disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)}
+                type="submit"
+              >
+                {props.pending ? 'Adding…' : 'Add alias'}
+              </button>
             </footer>
           </form>
         )}
         {props.mode === 'edit' && row !== undefined && (
           <form className={styles.dialogForm} onSubmit={submitUpdate}>
-            <p className={styles.formHint}>Alias: <strong>{row.alias}</strong> · {row.scope} · {row.environment}. Blank fields keep their current values.</p>
-            <label>Item name<input autoComplete="off" onChange={event => setName(event.currentTarget.value)} placeholder={row.item || 'Keep current'} value={name} /></label>
-            <label>Source URL<input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} placeholder={row.service || 'Keep current'} value={source} /></label>
-            <label>Tags<input autoComplete="off" disabled={clearTags} onChange={event => setTags(event.currentTarget.value)} placeholder="Comma-separated" value={tags} /></label>
-            <label className={styles.inlineField}><input checked={clearTags} onChange={event => setClearTags(event.currentTarget.checked)} type="checkbox" />Clear all tags</label>
-            <label>Replace value (optional)<input autoComplete="new-password" onChange={event => { setValue(event.currentTarget.value); setValueReplacementStage('editing') }} type="password" value={value} /></label>
-            {value.length > 0 && valueReplacementStage === 'confirming' && <p className={styles.formHint}>Confirm that you want to replace the current secret value. The new value remains masked.</p>}
+            <p className={styles.formHint}>
+              Alias: <strong>{row.alias}</strong> · {row.scope} · {row.environment}. Blank fields keep their current values.
+            </p>
+            <label>
+              Item name
+              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} placeholder={row.item || 'Keep current'} value={name} />
+            </label>
+            <label>
+              Source URL
+              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} placeholder={row.service || 'Keep current'} value={source} />
+            </label>
+            <label>
+              Tags
+              <input
+                autoComplete="off"
+                disabled={clearTags}
+                onChange={event => setTags(event.currentTarget.value)}
+                placeholder="Comma-separated"
+                value={tags}
+              />
+            </label>
+            <label className={styles.inlineField}>
+              <input checked={clearTags} onChange={event => setClearTags(event.currentTarget.checked)} type="checkbox" />
+              Clear all tags
+            </label>
+            <label>
+              Replace value (optional)
+              <input
+                autoComplete="new-password"
+                onChange={event => {
+                  setValue(event.currentTarget.value)
+                  setValueReplacementStage('editing')
+                }}
+                type="password"
+                value={value}
+              />
+            </label>
+            {value.length > 0 && valueReplacementStage === 'confirming' && (
+              <p className={styles.formHint}>Confirm that you want to replace the current secret value. The new value remains masked.</p>
+            )}
             <footer className={styles.dialogActions}>
-              <button disabled={props.pending} onClick={props.onClose} type="button">Cancel</button>
+              <button disabled={props.pending} onClick={props.onClose} type="button">
+                Cancel
+              </button>
               <button disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0)} type="submit">
-                {props.pending ? 'Saving…' : value.length > 0 ? valueReplacementStage === 'editing' ? 'Review replacement' : 'Confirm replacement' : 'Save changes'}
+                {props.pending
+                  ? 'Saving…'
+                  : value.length > 0
+                    ? valueReplacementStage === 'editing'
+                      ? 'Review replacement'
+                      : 'Confirm replacement'
+                    : 'Save changes'}
               </button>
             </footer>
           </form>
@@ -189,10 +297,25 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
           <div className={styles.dialogForm}>
             {removeState.stage === 'choose' ? (
               <>
-                <p>Choose which stored record to remove for <strong>{row.alias}</strong>.</p>
-                <button disabled={props.pending} onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))} type="button">Remove alias and all environment overrides</button>
-                <button className={styles.dangerButton} disabled={props.pending} onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))} type="button">Delete the Bitwarden item…</button>
-                <footer className={styles.dialogActions}><button disabled={props.pending} onClick={props.onClose} type="button">Cancel</button></footer>
+                <p>
+                  Choose which stored record to remove for <strong>{row.alias}</strong>.
+                </p>
+                <button disabled={props.pending} onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))} type="button">
+                  Remove alias and all environment overrides
+                </button>
+                <button
+                  className={styles.dangerButton}
+                  disabled={props.pending}
+                  onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))}
+                  type="button"
+                >
+                  Delete the Bitwarden item…
+                </button>
+                <footer className={styles.dialogActions}>
+                  <button disabled={props.pending} onClick={props.onClose} type="button">
+                    Cancel
+                  </button>
+                </footer>
               </>
             ) : (
               <>
@@ -202,8 +325,12 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                     : 'Confirm deleting the Bitwarden item resolved by alias ' + row.alias + '. This cannot be undone.'}
                 </p>
                 <footer className={styles.dialogActions}>
-                  <button disabled={props.pending} onClick={() => setRemoveState({ stage: 'choose' })} type="button">Back</button>
-                  <button className={styles.dangerButton} disabled={props.pending} onClick={finishRemove} type="button">{props.pending ? 'Removing…' : removeState.target === 'alias' ? 'Confirm remove alias' : 'Confirm delete item'}</button>
+                  <button disabled={props.pending} onClick={() => setRemoveState({ stage: 'choose' })} type="button">
+                    Back
+                  </button>
+                  <button className={styles.dangerButton} disabled={props.pending} onClick={finishRemove} type="button">
+                    {props.pending ? 'Removing…' : removeState.target === 'alias' ? 'Confirm remove alias' : 'Confirm delete item'}
+                  </button>
                 </footer>
               </>
             )}

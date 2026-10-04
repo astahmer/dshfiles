@@ -29,6 +29,7 @@
         "src/compiler/host/index.ts",
       ],
       "ignoreDependencies": ["@deepseek-ai/dsh"],
+      "ignore": ["src/compiler/client/locale-ownership.ts"],
     },
   },
 }

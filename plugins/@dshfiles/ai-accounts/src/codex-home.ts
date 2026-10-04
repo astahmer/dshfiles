@@ -11,25 +11,12 @@ import { join, resolve, sep } from 'node:path'
  * shared, so a second account costs one login rather than a second workspace.
  */
 
-const SHARED_DIRECTORIES = [
-  'sessions',
-  'archived_sessions',
-  'sqlite',
-  'shell_snapshots',
-  'worktrees',
-  'skills',
-  'plugins',
-  'cache',
-  'logs',
-] as const
+const SHARED_DIRECTORIES = ['sessions', 'archived_sessions', 'sqlite', 'shell_snapshots', 'worktrees', 'skills', 'plugins', 'cache', 'logs'] as const
 
 const PRIVATE_ENTRIES: ReadonlySet<string> = new Set(['auth.json', 'models_cache.json'])
 const SHADOW_LOCAL_ENTRIES: ReadonlySet<string> = new Set(['log', 'memories', 'tmp'])
 
-type LinkState =
-  | { readonly tag: 'missing' }
-  | { readonly tag: 'notSymlink' }
-  | { readonly tag: 'symlink'; readonly target: string }
+type LinkState = { readonly tag: 'missing' } | { readonly tag: 'notSymlink' } | { readonly tag: 'symlink'; readonly target: string }
 
 export interface CodexHomeInput {
   readonly homePath?: string
@@ -44,8 +31,7 @@ export interface CodexHomeLayout {
 
 export class CodexHomeError extends Error {}
 
-const expandHome = (value: string): string =>
-  value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
+const expandHome = (value: string): string => (value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
 
 /** Codex homes hold credentials, so a configured path may never leave the user's home. */
 const containedHome = (value: string): string => {
@@ -66,9 +52,7 @@ export const resolveCodexHomeLayout = (input: CodexHomeInput): CodexHomeLayout =
   }
   const effective = containedHome(shadow)
   if (effective === shared) {
-    throw new CodexHomeError(
-      `Shadow home '${effective}' must differ from the shared Codex home '${shared}'.`,
-    )
+    throw new CodexHomeError(`Shadow home '${effective}' must differ from the shared Codex home '${shared}'.`)
   }
   return { mode: 'authOverlay', sharedHomePath: shared, effectiveHomePath: effective }
 }
@@ -86,11 +70,7 @@ const readLinkState = async (path: string): Promise<LinkState> => {
   }
 }
 
-const ensureSymlink = async (
-  sharedHomePath: string,
-  effectiveHomePath: string,
-  entryName: string,
-): Promise<void> => {
+const ensureSymlink = async (sharedHomePath: string, effectiveHomePath: string, entryName: string): Promise<void> => {
   const target = join(sharedHomePath, entryName)
   const link = join(effectiveHomePath, entryName)
   const state = await readLinkState(link)
@@ -122,9 +102,7 @@ const ensurePrivateAuth = async (sharedHomePath: string, effectiveHomePath: stri
   const privatePath = join(effectiveHomePath, 'auth.json')
   const state = await readLinkState(privatePath)
   if (state.tag === 'symlink') {
-    throw new CodexHomeError(
-      `'auth.json' in the shadow home '${effectiveHomePath}' is a symlink; each account needs its own real file.`,
-    )
+    throw new CodexHomeError(`'auth.json' in the shadow home '${effectiveHomePath}' is a symlink; each account needs its own real file.`)
   }
   if (state.tag === 'notSymlink') return
   try {
@@ -168,11 +146,9 @@ export const materializeCodexShadowHome = async (layout: CodexHomeLayout): Promi
 }
 
 /** The command that writes the next login for this instance. */
-export const codexLoginHint = (layout: CodexHomeLayout): string =>
-  `CODEX_HOME="${layout.effectiveHomePath}" codex login`
+export const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME="${layout.effectiveHomePath}" codex login`
 
-export const authJsonPath = (layout: CodexHomeLayout): string =>
-  join(layout.effectiveHomePath, 'auth.json')
+export const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
 
 export interface CodexAuthView {
   readonly path: string
@@ -192,8 +168,7 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | undefined =>
   }
 }
 
-const readString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.length > 0 ? value : undefined
+const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined)
 
 /** Account identity read from Codex's own id token. Never the access token. */
 export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexAuthView> => {
@@ -217,8 +192,7 @@ export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexA
     }
   }
   const tokens = (parsed.tokens ?? {}) as Record<string, unknown>
-  const claims =
-    typeof tokens.id_token === 'string' ? decodeJwtPayload(tokens.id_token) : undefined
+  const claims = typeof tokens.id_token === 'string' ? decodeJwtPayload(tokens.id_token) : undefined
   const profile = (claims?.['https://api.openai.com/profile'] ?? {}) as Record<string, unknown>
   const auth = (claims?.['https://api.openai.com/auth'] ?? {}) as Record<string, unknown>
   return {

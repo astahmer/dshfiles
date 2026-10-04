@@ -69,8 +69,7 @@ export interface AccountPool {
   describe(): readonly AccountStatus[]
 }
 
-const idleSeconds = (lastUsedAt: number, now: number): number =>
-  Math.max((now - lastUsedAt) / 1000, 0)
+const idleSeconds = (lastUsedAt: number, now: number): number => Math.max((now - lastUsedAt) / 1000, 0)
 
 export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool => {
   const accounts = new Map<string, PoolAccount>()
@@ -80,8 +79,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
   const requested = options.distribution ?? DEFAULT_DISTRIBUTION
   let mode: Distribution = DISTRIBUTIONS.includes(requested) ? requested : DEFAULT_DISTRIBUTION
 
-  const eligible = (now: number): PoolAccount[] =>
-    [...accounts.values()].filter(account => account.enabled && account.cooldownUntil <= now)
+  const eligible = (now: number): PoolAccount[] => [...accounts.values()].filter(account => account.enabled && account.cooldownUntil <= now)
 
   const pickRoundRobin = (pool: readonly PoolAccount[]): PoolAccount | undefined => {
     const account = pool[cursor % pool.length]
@@ -90,13 +88,8 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
   }
 
   /** Idle accounts weigh more, so concurrent conversations spread out. */
-  const pickBalanced = (
-    pool: readonly PoolAccount[],
-    now: number,
-  ): PoolAccount | undefined => {
-    const weights = pool.map(account =>
-      account.lastUsedAt === 0 ? 4 : idleSeconds(account.lastUsedAt, now),
-    )
+  const pickBalanced = (pool: readonly PoolAccount[], now: number): PoolAccount | undefined => {
+    const weights = pool.map(account => (account.lastUsedAt === 0 ? 4 : idleSeconds(account.lastUsedAt, now)))
     const total = weights.reduce((sum, weight) => sum + weight, 0)
     if (!Number.isFinite(total) || total <= 0) return pool[0]
     let roll = Math.random() * total
@@ -148,12 +141,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
         }
         if (boundId !== undefined) affinity.delete(conversationKey)
       }
-      const account =
-        mode === 'balanced'
-          ? pickBalanced(pool, now)
-          : mode === 'priority'
-            ? pool[0]
-            : pickRoundRobin(pool)
+      const account = mode === 'balanced' ? pickBalanced(pool, now) : mode === 'priority' ? pool[0] : pickRoundRobin(pool)
       if (account === undefined) return undefined
       if (mode === 'sticky') bindAffinity(conversationKey, account.id)
       return account
@@ -173,10 +161,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
     noteRateLimited(accountId, retryAfterMs) {
       const account = accounts.get(accountId)
       if (account === undefined) return
-      const wait =
-        retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0
-          ? retryAfterMs
-          : defaultCooldownMs
+      const wait = retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : defaultCooldownMs
       account.cooldownUntil = Date.now() + wait
       account.cooldownMs = wait
     },
@@ -212,11 +197,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
         kind: account.kind,
         label: account.label,
         enabled: account.enabled,
-        state: !account.enabled
-          ? ('disabled' as const)
-          : account.cooldownUntil > now
-            ? ('cooling' as const)
-            : ('healthy' as const),
+        state: !account.enabled ? ('disabled' as const) : account.cooldownUntil > now ? ('cooling' as const) : ('healthy' as const),
         cooldownUntil: account.cooldownUntil > now ? account.cooldownUntil : undefined,
         cooldownMs: account.cooldownMs,
         lastUsedAt: account.lastUsedAt || undefined,
@@ -240,9 +221,7 @@ export interface RateLimitFailure {
   readonly status?: number
 }
 
-export const isRateLimitFailure = (
-  failure: RateLimitFailure | undefined | null,
-): boolean => {
+export const isRateLimitFailure = (failure: RateLimitFailure | undefined | null): boolean => {
   if (failure === undefined || failure === null) return false
   if (failure.status === 429 || failure.status === 403) return true
   return failure.code !== undefined && RATE_LIMIT_CODES.has(failure.code)

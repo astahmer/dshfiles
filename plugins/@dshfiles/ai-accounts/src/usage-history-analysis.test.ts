@@ -48,19 +48,28 @@ describe('quota usage-history analysis', () => {
 
   it('reports reset-first when the current pace would run past the provider reset', () => {
     const points = [point(0, 100, 4_000_000), point(1_800_000, 70, 4_000_000), point(3_600_000, 40, 4_000_000)]
-    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 40, resetsAt: 4_000_000, now: 3_600_000 }).status)
-      .toBe('reset-before-depletion')
+    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 40, resetsAt: 4_000_000, now: 3_600_000 }).status).toBe('reset-before-depletion')
   })
 
   it('requires enough elapsed history and avoids a depletion forecast when usage is stable', () => {
-    expect(forecastQuotaWindow({
-      points: [point(0, 80, 9_000_000), point(1_000_000, 80, 9_000_000)],
-      label: 'Weekly', remainingPercent: 80, resetsAt: 9_000_000, now: 1_000_000,
-    }).status).toBe('insufficient-history')
-    expect(forecastQuotaWindow({
-      points: [point(0, 80, 9_000_000), point(1_800_000, 80, 9_000_000), point(3_600_000, 82, 9_000_000)],
-      label: 'Weekly', remainingPercent: 82, resetsAt: 9_000_000, now: 3_600_000,
-    }).status).toBe('no-depletion')
+    expect(
+      forecastQuotaWindow({
+        points: [point(0, 80, 9_000_000), point(1_000_000, 80, 9_000_000)],
+        label: 'Weekly',
+        remainingPercent: 80,
+        resetsAt: 9_000_000,
+        now: 1_000_000,
+      }).status,
+    ).toBe('insufficient-history')
+    expect(
+      forecastQuotaWindow({
+        points: [point(0, 80, 9_000_000), point(1_800_000, 80, 9_000_000), point(3_600_000, 82, 9_000_000)],
+        label: 'Weekly',
+        remainingPercent: 82,
+        resetsAt: 9_000_000,
+        now: 3_600_000,
+      }).status,
+    ).toBe('no-depletion')
   })
 
   it('keeps reset-bank snapshots only when count or expiry data changes', () => {

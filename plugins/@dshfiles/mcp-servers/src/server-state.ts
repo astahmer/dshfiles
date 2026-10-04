@@ -11,12 +11,12 @@ export function saveServer(current: readonly StoredServer[], candidate: StoredSe
     throw new Error('Server names must be unique because DSH uses them for MCP tool names.')
   }
   const index = current.findIndex(server => server.id === candidate.id)
-  return index < 0 ? [...current, candidate] : current.map((server, row) => row === index ? candidate : server)
+  return index < 0 ? [...current, candidate] : current.map((server, row) => (row === index ? candidate : server))
 }
 
 export function setServerEnabled(current: readonly StoredServer[], id: string, enabled: boolean): StoredServer[] {
   if (!current.some(server => server.id === id)) throw new Error('MCP server was not found.')
-  return current.map(server => server.id === id ? { ...server, enabled } : server)
+  return current.map(server => (server.id === id ? { ...server, enabled } : server))
 }
 
 export function removeServer(current: readonly StoredServer[], id: string): StoredServer[] {
@@ -32,12 +32,13 @@ export function publicServerView(
   registeredToolCount = 0,
   localProcess: LocalProcessStatus = 'not-configured',
 ): ServerView {
-  const bindings = server.transport === 'stdio'
-    ? Object.entries(server.envRefs).map(([key, reference]) => [`environment:${key}`, reference] as const)
-    : [
-      ...Object.entries(server.headerRefs).map(([key, reference]) => [`header:${key}`, reference] as const),
-      ...Object.entries(server.startCommand?.envRefs ?? {}).map(([key, reference]) => [`local-environment:${key}`, reference] as const),
-    ]
+  const bindings =
+    server.transport === 'stdio'
+      ? Object.entries(server.envRefs).map(([key, reference]) => [`environment:${key}`, reference] as const)
+      : [
+          ...Object.entries(server.headerRefs).map(([key, reference]) => [`header:${key}`, reference] as const),
+          ...Object.entries(server.startCommand?.envRefs ?? {}).map(([key, reference]) => [`local-environment:${key}`, reference] as const),
+        ]
   const credentialReferences = bindings.map(([target, reference]) => ({
     target,
     reference,
@@ -50,7 +51,7 @@ export function publicServerView(
     serverName: server.serverName,
     enabled: server.enabled,
     credentialReferences,
-    configuration: ready ? 'ready' as const : 'needs-credentials' as const,
+    configuration: ready ? ('ready' as const) : ('needs-credentials' as const),
     clientLifecycle,
     localProcess,
     connectionHealth: 'not-reported' as const,
@@ -63,8 +64,10 @@ export function publicServerView(
     ...common,
     transport: 'streamable-http',
     url: server.url,
-    ...(server.startCommand === undefined ? {} : {
-      startCommand: { commandLine: formatCommandLine([server.startCommand.command, ...server.startCommand.args]), cwd: server.startCommand.cwd },
-    }),
+    ...(server.startCommand === undefined
+      ? {}
+      : {
+          startCommand: { commandLine: formatCommandLine([server.startCommand.command, ...server.startCommand.args]), cwd: server.startCommand.cwd },
+        }),
   }
 }

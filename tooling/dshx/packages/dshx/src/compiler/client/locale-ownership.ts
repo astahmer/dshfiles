@@ -59,10 +59,7 @@ export function claimLocaleNamespaces(ownership: LocaleNamespaceOwnership, packa
 }
 
 /** First owner that blocks a claim, or undefined when every namespace is free. */
-export function findLocaleNamespaceConflict(
-  ownership: LocaleNamespaceOwnership,
-  claimed: readonly string[],
-): LocaleNamespaceConflict | undefined {
+export function findLocaleNamespaceConflict(ownership: LocaleNamespaceOwnership, claimed: readonly string[]): LocaleNamespaceConflict | undefined {
   for (const namespace of claimed) {
     const owner = ownership.owners.get(namespace)
     if (owner === undefined || owner === ownership.packageId) continue

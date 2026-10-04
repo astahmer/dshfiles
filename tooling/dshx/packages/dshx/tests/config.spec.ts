@@ -35,6 +35,8 @@ describe('defineConfig', () => {
     expect(defineConfig(config)).toBe(config)
     expect(defineConfig(config).host.vite.plugins[0].marker).toBe(123)
 
+    // Compile-only invalid input fixtures must never execute.
+    // oxlint-disable-next-line no-constant-condition
     if (false) {
       defineConfig({
         host: {
@@ -180,8 +182,8 @@ describe('resolveDshxConfig', () => {
       "export default { host: { vite: { plugins: [{ name: 'host-plugin' }] } }, client: { vite: { plugins: [{ name: 'client-plugin' }] } } }\n",
     )
     const resolved = await resolveDshxConfig({ cwd: valid.root })
-    expect((resolved.hostVitePlugins?.[0] as { name?: string }).name).toBe('host-plugin')
-    expect((resolved.clientVitePlugins?.[0] as { name?: string }).name).toBe('client-plugin')
+    expect(resolved.hostVitePlugins?.[0]).toMatchObject({ name: 'host-plugin' })
+    expect(resolved.clientVitePlugins?.[0]).toMatchObject({ name: 'client-plugin' })
 
     const shared = await temporaryProject({ name: '@test/shared-plugin', type: 'module' })
     await source(shared.root, 'src/host.ts')

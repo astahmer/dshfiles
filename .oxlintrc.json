@@ -1,0 +1,44 @@
+{
+  "plugins": [
+    "typescript",
+    "oxc"
+  ],
+  "jsPlugins": [
+    {
+      "name": "antislop",
+      "specifier": "./tooling/antislop/index.mjs"
+    }
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "antislop/no-chained-type-assertions": "warn",
+    "antislop/no-broad-object-parameters": "warn",
+    "antislop/no-conditional-empty-object-spread": "warn",
+    "antislop/no-known-value-widening": "warn",
+    "antislop/no-reflect-apply": "warn",
+    "antislop/no-reflect-get": "warn",
+    "antislop/no-passthrough-variable": "warn",
+    "antislop/no-runtime-typeof": "warn",
+    "antislop/no-unsafe-dictionary-type": "warn",
+    "antislop/no-unknown-parameters": "warn",
+    "antislop/no-unknown-returns": "warn",
+    "antislop/no-unknown-type-aliases": "warn",
+    "antislop/no-widen-then-assert": "warn",
+    "antislop/require-safety-comment-for-type-assertion": "warn",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "tooling/antislop/index.mjs",
+    "output/**"
+  ]
+}

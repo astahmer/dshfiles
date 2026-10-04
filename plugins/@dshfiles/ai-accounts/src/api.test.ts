@@ -29,9 +29,8 @@ describe('account draft boundary', () => {
     expect(accepts({ apiBaseUrl: 'http://localhost:8787' })).toBe(true)
   })
 
-  it.each(['AWS_SECRET_ACCESS_KEY', 'HOME', 'PATH', 'commandcode_api_key', 'X_API_KEY_SUFFIX'])(
-    'refuses %s as a key variable',
-    apiKeyEnv => expect(accepts({ apiKeyEnv })).toBe(false),
+  it.each(['AWS_SECRET_ACCESS_KEY', 'HOME', 'PATH', 'commandcode_api_key', 'X_API_KEY_SUFFIX'])('refuses %s as a key variable', apiKeyEnv =>
+    expect(accepts({ apiKeyEnv })).toBe(false),
   )
 
   it.each([
@@ -42,8 +41,7 @@ describe('account draft boundary', () => {
     'not a url',
   ])('refuses %s as a base URL', apiBaseUrl => expect(accepts({ apiBaseUrl })).toBe(false))
 
-  it.each(['relative/home', '~/../etc', '/Users/me/../../etc', '~/.codex/\0'])(
-    'refuses %s as a home path',
-    homePath => expect(accepts({ homePath })).toBe(false),
+  it.each(['relative/home', '~/../etc', '/Users/me/../../etc', '~/.codex/\0'])('refuses %s as a home path', homePath =>
+    expect(accepts({ homePath })).toBe(false),
   )
 })

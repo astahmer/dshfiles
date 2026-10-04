@@ -40,10 +40,7 @@ export interface QueueMoveRequest {
  * Both are durable inbox splices, so the log holds the new order rather than a
  * deletion paired with an unrelated re-queue.
  */
-export const moveWithinInbox = <Message extends { readonly id: string }>(
-  inbox: QueueInbox<Message>,
-  request: QueueMoveRequest,
-): QueuePosition => {
+export const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>, request: QueueMoveRequest): QueuePosition => {
   for (const [target, list] of INBOX_LISTS) {
     const pending = inbox[list]
     const index = pending.findIndex(message => message.id === request.itemId)

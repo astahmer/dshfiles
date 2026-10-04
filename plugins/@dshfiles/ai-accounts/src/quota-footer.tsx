@@ -14,10 +14,7 @@ import styles from './accounts.module.css'
  * Nothing renders until an account actually reports quota, so an unconfigured
  * profile shows no dangling empty state.
  */
-export const QuotaFooter = (props: {
-  readonly wide: boolean
-  readonly onOpenUsageHistory: () => void
-}): JSX.Element | null => {
+export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
 
@@ -41,19 +38,14 @@ export const QuotaFooter = (props: {
 
   const rows = (usage?.cards ?? [])
     .map(card => {
-      const tightest = card.usage.windows.reduce<
-        { label: string; percent: number; resetsAt: number | null } | undefined
-      >(
-        (current, window) => {
-          if (current !== undefined && current.percent <= window.percentRemaining) return current
-          return {
-            label: window.label,
-            percent: window.percentRemaining,
-            resetsAt: window.resetsAt,
-          }
-        },
-        undefined,
-      )
+      const tightest = card.usage.windows.reduce<{ label: string; percent: number; resetsAt: number | null } | undefined>((current, window) => {
+        if (current !== undefined && current.percent <= window.percentRemaining) return current
+        return {
+          label: window.label,
+          percent: window.percentRemaining,
+          resetsAt: window.resetsAt,
+        }
+      }, undefined)
       return { instanceId: card.instanceId, tightest }
     })
     .filter(row => row.tightest !== undefined)
@@ -64,27 +56,36 @@ export const QuotaFooter = (props: {
     // Rail: a dot per account and a compact, labelled history action.
     return (
       <div className={styles.footerRail} aria-label="Account quota">
-        {rows.map(row => <span key={row.instanceId} className={toneFor(row.tightest?.percent ?? 0)} title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`} />)}
-        <button type="button" className={styles.footerHistoryIcon} aria-label="Open usage history" title="Open usage history" onClick={props.onOpenUsageHistory}>↗</button>
+        {rows.map(row => (
+          <span key={row.instanceId} className={toneFor(row.tightest?.percent ?? 0)} title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`} />
+        ))}
+        <button
+          type="button"
+          className={styles.footerHistoryIcon}
+          aria-label="Open usage history"
+          title="Open usage history"
+          onClick={props.onOpenUsageHistory}
+        >
+          ↗
+        </button>
       </div>
     )
   }
 
   return (
     <div className={styles.footerWide} title="Tightest window per account.">
-      {rows.map(row => <div className={styles.footerRow} key={row.instanceId}>
-        <span className={styles.footerName}>{row.instanceId}</span>
-        <span className={`${styles.footerBar} ${toneFor(row.tightest?.percent ?? 0)}`} />
-        <span className={styles.footerPercent}>{String(row.tightest?.percent ?? 0)}%</span>
-      </div>)}
-      <button type="button" className={styles.footerHistoryLink} onClick={props.onOpenUsageHistory}>Open usage history</button>
+      {rows.map(row => (
+        <div className={styles.footerRow} key={row.instanceId}>
+          <span className={styles.footerName}>{row.instanceId}</span>
+          <span className={`${styles.footerBar} ${toneFor(row.tightest?.percent ?? 0)}`} />
+          <span className={styles.footerPercent}>{String(row.tightest?.percent ?? 0)}%</span>
+        </div>
+      ))}
+      <button type="button" className={styles.footerHistoryLink} onClick={props.onOpenUsageHistory}>
+        Open usage history
+      </button>
     </div>
   )
 }
 
-const toneFor = (percent: number): string =>
-  percent <= 10
-    ? String(styles.stateCritical)
-    : percent <= 30
-      ? String(styles.stateWarn)
-      : String(styles.stateOk)
+const toneFor = (percent: number): string => (percent <= 10 ? String(styles.stateCritical) : percent <= 30 ? String(styles.stateWarn) : String(styles.stateOk))

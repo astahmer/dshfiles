@@ -15,8 +15,8 @@ test('quoting suppresses substitution syntax', () => {
 test('substitution outside quotes still disqualifies', () => {
   expectVerdict('echo `ls`', false, 'bare backtick executes')
   expectVerdict('echo $(ls)', false, 'bare dollar-paren executes')
-  expectVerdict("echo \"x $(ls)\"", false, 'dollar-paren inside double quotes executes')
-  expectVerdict("echo \"x `ls`\"", false, 'backtick inside double quotes executes')
+  expectVerdict('echo "x $(ls)"', false, 'dollar-paren inside double quotes executes')
+  expectVerdict('echo "x `ls`"', false, 'backtick inside double quotes executes')
 })
 
 test('fd duplication is not a file write', () => {

@@ -7,10 +7,11 @@ import {
   type UsageHistoryMeta,
   type UsageHistoryPoint,
 } from './api.js'
+import { MAX_USAGE_HISTORY_POINTS } from './usage-history-model.js'
 import { changedBankedResetSnapshots, forecastQuotaWindow, quotaHistoryCycles } from './usage-history-analysis.js'
 import styles from './accounts.module.css'
 
-const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90] as const
+const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90, 180, 365] as const
 const INTERVAL_OPTIONS = Array.from({ length: 60 }, (_, index) => index + 1)
 const RETENTION_OPTIONS = [30, 90, 180, 365] as const
 const CHART_POINT_LIMIT = 500
@@ -193,6 +194,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
       setPoints([])
       return () => { live = false }
     }
+    setPoints([])
     setLoading(true)
     void accounts.history({ instanceId: selectedId, days })
       .then(result => { if (live) setPoints(result.points) })
@@ -340,7 +342,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         </section>
 
         <section className={styles.historyBlock}>
-          <div className={styles.historyBlockHeading}><div><h2>Quota over time</h2><p>{String(points.length)} snapshots in the last {String(days)} days.</p></div></div>
+          <div className={styles.historyBlockHeading}><div><h2>Quota over time</h2><p>{points.length >= MAX_USAGE_HISTORY_POINTS ? `Showing up to ${String(MAX_USAGE_HISTORY_POINTS)} sampled readings from the last ${String(days)} days.` : `${String(points.length)} snapshots in the last ${String(days)} days.`}</p></div></div>
           <QuotaHistoryPlot points={points} />
         </section>
 

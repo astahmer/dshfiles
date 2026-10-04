@@ -28,23 +28,16 @@ const keyEnvNamePattern = /^[A-Z][A-Z0-9_]*_API_KEY$/
 
 export const isKeyEnvName = (name: string): boolean => keyEnvNamePattern.test(name)
 
-const isLoopbackHost = (hostname: string): boolean =>
-  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+const isLoopbackHost = (hostname: string): boolean => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 
 export const isAllowedCommandCodeBase = (value: string): boolean => {
   const url = URL.parse(value)
   if (url === null || url.username !== '' || url.password !== '') return false
   if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
-  return (
-    url.protocol === 'https:'
-    && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
-  )
+  return url.protocol === 'https:' && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
 }
 
-const isPlainHomePath = (path: string): boolean =>
-  (path.startsWith('/') || path.startsWith('~/'))
-  && !path.includes('\0')
-  && !path.split('/').includes('..')
+const isPlainHomePath = (path: string): boolean => (path.startsWith('/') || path.startsWith('~/')) && !path.includes('\0') && !path.split('/').includes('..')
 
 const homePathSchema = z
   .string()
@@ -200,17 +193,7 @@ export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>
 export type UsageHistoryMeta = z.infer<typeof usageMetaSchema>
 
 /** Icon names the page offers, matching the reference account page. */
-export const PROVIDER_ICONS = [
-  'Bot',
-  'Rocket',
-  'Sparkles',
-  'Terminal',
-  'Layers',
-  'Brain',
-  'Globe',
-  'Code',
-  'Gem',
-] as const
+export const PROVIDER_ICONS = ['Bot', 'Rocket', 'Sparkles', 'Terminal', 'Layers', 'Brain', 'Globe', 'Code', 'Gem'] as const
 
 export const aiAccountsApi = defineApi({
   id: 'ai-accounts',

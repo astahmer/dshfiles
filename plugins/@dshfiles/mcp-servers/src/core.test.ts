@@ -54,34 +54,54 @@ describe('MCP manager state', () => {
   })
 
   it('rejects secret values where only credential references are allowed', () => {
-    expect(serverDraftSchema.safeParse({
-      id: '', name: 'Remote', serverName: 'remote', enabled: true, transport: 'streamable-http',
-      url: 'https://example.com/mcp', headerRefs: { Authorization: 'REMOTE_TOKEN' }, token: 'secret',
-    }).success).toBe(false)
+    expect(
+      serverDraftSchema.safeParse({
+        id: '',
+        name: 'Remote',
+        serverName: 'remote',
+        enabled: true,
+        transport: 'streamable-http',
+        url: 'https://example.com/mcp',
+        headerRefs: { Authorization: 'REMOTE_TOKEN' },
+        token: 'secret',
+      }).success,
+    ).toBe(false)
   })
 
   it('accepts only an explicit absolute-cwd local runner with credential references', () => {
     const valid = {
-      id: '', name: 'Remote tunnel', serverName: 'remote-tunnel', enabled: true, transport: 'streamable-http',
-      url: 'https://example.com/mcp', headerRefs: { Authorization: 'REMOTE_TOKEN' },
+      id: '',
+      name: 'Remote tunnel',
+      serverName: 'remote-tunnel',
+      enabled: true,
+      transport: 'streamable-http',
+      url: 'https://example.com/mcp',
+      headerRefs: { Authorization: 'REMOTE_TOKEN' },
       startCommand: { commandLine: 'npx -y @example/tunnel', cwd: '/opt/tunnel', envRefs: { ACCESS_TOKEN: 'TUNNEL_TOKEN' } },
     }
     expect(serverDraftSchema.safeParse(valid).success).toBe(true)
-    expect(serverDraftSchema.safeParse({
-      ...valid, startCommand: { ...valid.startCommand, cwd: 'relative/path' },
-    }).success).toBe(false)
+    expect(
+      serverDraftSchema.safeParse({
+        ...valid,
+        startCommand: { ...valid.startCommand, cwd: 'relative/path' },
+      }).success,
+    ).toBe(false)
     expect(serverDraftSchema.safeParse({ ...valid, startCommand: null, credential: 'plaintext' }).success).toBe(false)
   })
 
   it('rejects credential-bearing URL userinfo, query strings, and fragments', () => {
-    for (const url of [
-      'https://user:password@example.com/mcp',
-      'https://example.com/mcp?access_token=secret',
-      'https://example.com/mcp#token=secret',
-    ]) {
-      expect(serverDraftSchema.safeParse({
-        id: '', name: 'Remote', serverName: 'remote', enabled: true, transport: 'streamable-http', url, headerRefs: {},
-      }).success).toBe(false)
+    for (const url of ['https://user:password@example.com/mcp', 'https://example.com/mcp?access_token=secret', 'https://example.com/mcp#token=secret']) {
+      expect(
+        serverDraftSchema.safeParse({
+          id: '',
+          name: 'Remote',
+          serverName: 'remote',
+          enabled: true,
+          transport: 'streamable-http',
+          url,
+          headerRefs: {},
+        }).success,
+      ).toBe(false)
     }
   })
 })
@@ -96,26 +116,41 @@ describe('catalog search', () => {
     let requestUrl = ''
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       requestUrl = String(input)
-      return new Response(JSON.stringify({
-        servers: [
-          { server: {
-            name: 'io.example/weather', title: 'Weather', description: 'Forecast tools', version: '1.2.0',
-            _meta: { 'com.example': { category: ['weather', 'development'], documentationUrl: 'https://docs.example.com/weather' } },
-            remotes: [
-              { type: 'streamable-http', url: 'https://api.example.com/mcp?token=do-not-return' },
-              { type: 'streamable-http', url: 'https://api.example.com/mcp' },
-            ],
-          } },
-        ],
-      }), { status: 200, headers: { 'content-type': 'application/json' } })
+      return new Response(
+        JSON.stringify({
+          servers: [
+            {
+              server: {
+                name: 'io.example/weather',
+                title: 'Weather',
+                description: 'Forecast tools',
+                version: '1.2.0',
+                _meta: { 'com.example': { category: ['weather', 'development'], documentationUrl: 'https://docs.example.com/weather' } },
+                remotes: [
+                  { type: 'streamable-http', url: 'https://api.example.com/mcp?token=do-not-return' },
+                  { type: 'streamable-http', url: 'https://api.example.com/mcp' },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
     })
     vi.stubGlobal('fetch', fetchMock)
     try {
       const rows = await searchOfficialRegistry('weather')
-      expect(rows).toEqual([{
-        name: 'io.example/weather', title: 'Weather', category: 'weather', description: 'Forecast tools', version: '1.2.0',
-        endpoint: 'https://api.example.com/mcp', docsUrl: 'https://docs.example.com/weather',
-      }])
+      expect(rows).toEqual([
+        {
+          name: 'io.example/weather',
+          title: 'Weather',
+          category: 'weather',
+          description: 'Forecast tools',
+          version: '1.2.0',
+          endpoint: 'https://api.example.com/mcp',
+          docsUrl: 'https://docs.example.com/weather',
+        },
+      ])
       const request = new URL(requestUrl)
       expect(request.searchParams.get('search')).toBe('weather')
       expect(request.searchParams.get('version')).toBe('latest')
@@ -190,20 +225,32 @@ describe('managed local HTTP process', () => {
     const stdout = { on: vi.fn(), resume: vi.fn() }
     const stderr = { on: vi.fn(), resume: vi.fn() }
     const handle = {
-      stdout, stderr, done: new Promise(() => undefined),
-      terminate: vi.fn(), waitForExit: vi.fn(async () => true),
+      stdout,
+      stderr,
+      done: new Promise(() => undefined),
+      terminate: vi.fn(),
+      waitForExit: vi.fn(async () => true),
     }
     const subprocess = {
       resolveExecutable: vi.fn(async () => '/resolved/npx'),
       spawn: vi.fn(() => handle),
     }
-    const managed = await ManagedLocalCommand.start(subprocess as never, {
-      command: 'npx', args: ['-y', '@example/tunnel'], cwd: '/opt/tunnel',
-    }, { ACCESS_TOKEN: 'secret-never-render' })
+    const managed = await ManagedLocalCommand.start(
+      subprocess as never,
+      {
+        command: 'npx',
+        args: ['-y', '@example/tunnel'],
+        cwd: '/opt/tunnel',
+      },
+      { ACCESS_TOKEN: 'secret-never-render' },
+    )
 
     expect(subprocess.spawn).toHaveBeenCalledWith({
-      argv: ['/resolved/npx', '-y', '@example/tunnel'], cwd: '/opt/tunnel', env: { ACCESS_TOKEN: 'secret-never-render' },
-      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' }, graceMs: 5_000,
+      argv: ['/resolved/npx', '-y', '@example/tunnel'],
+      cwd: '/opt/tunnel',
+      env: { ACCESS_TOKEN: 'secret-never-render' },
+      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
+      graceMs: 5_000,
     })
     expect(stdout.resume).toHaveBeenCalledOnce()
     expect(stderr.resume).toHaveBeenCalledOnce()
@@ -218,8 +265,11 @@ describe('managed local HTTP process', () => {
   it('reports an early process exit without retaining the outcome error text', async () => {
     let rejectDone: (reason: Error) => void = () => undefined
     const handle = {
-      done: new Promise((_resolve, reject) => { rejectDone = reject }),
-      terminate: vi.fn(), waitForExit: vi.fn(async () => true),
+      done: new Promise((_resolve, reject) => {
+        rejectDone = reject
+      }),
+      terminate: vi.fn(),
+      waitForExit: vi.fn(async () => true),
     }
     const subprocess = {
       resolveExecutable: vi.fn(async () => '/resolved/runner'),
@@ -239,7 +289,9 @@ describe('native client lifecycle reconciliation', () => {
     const stopped: string[] = []
     const reconciler = new ClientReconciler(async target => {
       started.push(`${target.id}:${target.fingerprint}`)
-      return () => { stopped.push(`${target.id}:${target.fingerprint}`) }
+      return () => {
+        stopped.push(`${target.id}:${target.fingerprint}`)
+      }
     })
     const initial = { id: 'one', enabled: true, ready: true, fingerprint: 'a' }
     await reconciler.update([initial])
@@ -259,7 +311,9 @@ describe('native client lifecycle reconciliation', () => {
     const stopped: string[] = []
     const reconciler = new ClientReconciler(async target => {
       started.push(target.id)
-      return () => { stopped.push(target.id) }
+      return () => {
+        stopped.push(target.id)
+      }
     })
     const configured = { id: 'one', enabled: true, ready: true, fingerprint: 'ref-only-config' }
     await reconciler.update([configured])
@@ -276,7 +330,9 @@ describe('native client lifecycle reconciliation', () => {
   })
 
   it('reports native child activation failures without exposing error text', async () => {
-    const reconciler = new ClientReconciler(async () => { throw new Error('sensitive transport detail') })
+    const reconciler = new ClientReconciler(async () => {
+      throw new Error('sensitive transport detail')
+    })
     await reconciler.update([{ id: 'one', enabled: true, ready: true, fingerprint: 'safe' }])
     expect(reconciler.state('one')).toBe('start-failed')
     await reconciler.dispose()

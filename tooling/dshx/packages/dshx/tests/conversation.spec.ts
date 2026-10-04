@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import type { SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session/types'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { defineConversation, type ConversationRenderProps } from '../src/conversation/index.js'
 import { getConversationContributionParts, isConversationContribution } from '../src/conversation/define.js'
 

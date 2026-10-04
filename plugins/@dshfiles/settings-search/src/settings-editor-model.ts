@@ -5,23 +5,15 @@ import { objectRecord, settingsChoiceOptions, type SettingsOption, type Settings
 export type SettingsJsonValue = Extract<SettingsPathOpView, { readonly op: 'set' }>['value']
 export type SettingsEditorKind = 'string' | 'number' | 'boolean' | 'choice' | 'json'
 
-export const setOperationForSettingsTarget = (
-  target: SettingsSearchTarget,
-  value: SettingsJsonValue,
-): readonly SettingsPathOpView[] => [{ op: 'set', path: [...target.fieldPath], value }]
-
-export const unsetOperationForSettingsTarget = (target: SettingsSearchTarget): readonly SettingsPathOpView[] => [
-  { op: 'unset', path: [...target.fieldPath] },
+export const setOperationForSettingsTarget = (target: SettingsSearchTarget, value: SettingsJsonValue): readonly SettingsPathOpView[] => [
+  { op: 'set', path: [...target.fieldPath], value },
 ]
 
-const jsonValueSchema: z.ZodType<SettingsJsonValue> = z.lazy(() => z.union([
-  z.null(),
-  z.boolean(),
-  z.number().finite(),
-  z.string(),
-  z.array(jsonValueSchema),
-  z.record(z.string(), jsonValueSchema),
-]))
+export const unsetOperationForSettingsTarget = (target: SettingsSearchTarget): readonly SettingsPathOpView[] => [{ op: 'unset', path: [...target.fieldPath] }]
+
+const jsonValueSchema: z.ZodType<SettingsJsonValue> = z.lazy(() =>
+  z.union([z.null(), z.boolean(), z.number().finite(), z.string(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
+)
 
 export const schemaNodeAtPath = (schema: unknown, path: readonly string[]): Record<string, unknown> | null => {
   let current: unknown = schema
@@ -84,11 +76,7 @@ export const settingsEditorKind = (
   return 'json'
 }
 
-export const formatSettingsDraft = (
-  value: unknown,
-  kind: SettingsEditorKind,
-  choices: readonly SettingsOption[] = [],
-): string => {
+export const formatSettingsDraft = (value: unknown, kind: SettingsEditorKind, choices: readonly SettingsOption[] = []): string => {
   if (value === undefined) return ''
   if (kind === 'choice') {
     const index = choices.findIndex(option => Object.is(option.value, value))
@@ -104,27 +92,19 @@ export const formatSettingsDraft = (
   }
 }
 
-export type SettingsDraftParseResult =
-  | { readonly ok: true; readonly value: SettingsJsonValue }
-  | { readonly ok: false; readonly message: string }
+export type SettingsDraftParseResult = { readonly ok: true; readonly value: SettingsJsonValue } | { readonly ok: false; readonly message: string }
 
-export const parseSettingsDraft = (
-  draft: string,
-  kind: SettingsEditorKind,
-  choices: readonly SettingsOption[] = [],
-): SettingsDraftParseResult => {
+export const parseSettingsDraft = (draft: string, kind: SettingsEditorKind, choices: readonly SettingsOption[] = []): SettingsDraftParseResult => {
   if (kind === 'string') return { ok: true, value: draft }
   if (kind === 'choice') {
     const index = z.number().int().nonnegative().safeParse(Number(draft))
     if (!index.success || draft.trim().length === 0) return { ok: false, message: 'Choose one of the available options.' }
     const option = choices[index.data]
-    return option === undefined
-      ? { ok: false, message: 'Choose one of the available options.' }
-      : { ok: true, value: option.value }
+    return option === undefined ? { ok: false, message: 'Choose one of the available options.' } : { ok: true, value: option.value }
   }
   if (kind === 'boolean') {
     if (draft === 'true') return { ok: true, value: true }
-  if (draft === 'false') return { ok: true, value: false }
+    if (draft === 'false') return { ok: true, value: false }
     return { ok: false, message: 'Choose true or false.' }
   }
   if (kind === 'number') {

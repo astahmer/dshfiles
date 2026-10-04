@@ -45,19 +45,28 @@ function redactValue(value: unknown, secrets: readonly string[], seen = new Weak
 
 /** Preserve the Host logger API while redacting resolved credential values. */
 export function redactingLogger(logger: LoggerService, secrets: readonly string[]): LoggerService {
-  const wrap = (target: Function): Function => new Proxy(target, {
-    apply(original, thisArg, args: unknown[]) {
-      const result = Reflect.apply(original, thisArg, args.map(value => redactValue(value, secrets)))
-      return typeof result === 'function' ? wrap(result) : result
-    },
-    get(original, property, receiver) {
-      const value = Reflect.get(original, property, receiver) as unknown
-      if (typeof value !== 'function') return value
-      return (...args: unknown[]) => {
-        const result = Reflect.apply(value, original, args.map(item => redactValue(item, secrets)))
+  const wrap = (target: Function): Function =>
+    new Proxy(target, {
+      apply(original, thisArg, args: unknown[]) {
+        const result = Reflect.apply(
+          original,
+          thisArg,
+          args.map(value => redactValue(value, secrets)),
+        )
         return typeof result === 'function' ? wrap(result) : result
-      }
-    },
-  })
+      },
+      get(original, property, receiver) {
+        const value = Reflect.get(original, property, receiver) as unknown
+        if (typeof value !== 'function') return value
+        return (...args: unknown[]) => {
+          const result = Reflect.apply(
+            value,
+            original,
+            args.map(item => redactValue(item, secrets)),
+          )
+          return typeof result === 'function' ? wrap(result) : result
+        }
+      },
+    })
   return wrap(logger) as LoggerService
 }

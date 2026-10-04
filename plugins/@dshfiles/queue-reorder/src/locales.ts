@@ -20,7 +20,4 @@ const dictionaries = {
 
 export const QUEUE_REORDER_LOCALE_NAMESPACE = 'conversation.queueReorder'
 
-export const queueReorderLocale = declareLocaleNamespace(
-  QUEUE_REORDER_LOCALE_NAMESPACE,
-  dictionaries,
-)
+export const queueReorderLocale = declareLocaleNamespace(QUEUE_REORDER_LOCALE_NAMESPACE, dictionaries)

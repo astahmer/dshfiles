@@ -15,10 +15,7 @@ export const readCodexAccessToken = async (codexHome: string): Promise<string> =
   try {
     raw = await readFile(path, 'utf8')
   } catch {
-    throw new LlmError(
-      `No readable Codex login at ${path}. Sign in with \`CODEX_HOME="${codexHome}" codex login\`.`,
-      'MISSING_CREDENTIAL',
-    )
+    throw new LlmError(`No readable Codex login at ${path}. Sign in with \`CODEX_HOME="${codexHome}" codex login\`.`, 'MISSING_CREDENTIAL')
   }
   let auth: Record<string, unknown>
   try {
@@ -28,14 +25,10 @@ export const readCodexAccessToken = async (codexHome: string): Promise<string> =
   }
   const tokens = (auth.tokens ?? {}) as Record<string, unknown>
   const accessToken = typeof tokens.access_token === 'string' ? tokens.access_token : ''
-  const apiKeyOnly =
-    typeof auth.OPENAI_API_KEY === 'string' && auth.OPENAI_API_KEY.length > 0
+  const apiKeyOnly = typeof auth.OPENAI_API_KEY === 'string' && auth.OPENAI_API_KEY.length > 0
   const wrongMode = auth.auth_mode !== undefined && auth.auth_mode !== 'chatgpt'
   if (accessToken.length === 0 || apiKeyOnly || wrongMode) {
-    throw new LlmError(
-      `Codex login at ${path} has no ChatGPT access token. Sign in with ChatGPT, not an API key.`,
-      'MISSING_CREDENTIAL',
-    )
+    throw new LlmError(`Codex login at ${path} has no ChatGPT access token. Sign in with ChatGPT, not an API key.`, 'MISSING_CREDENTIAL')
   }
   return accessToken
 }

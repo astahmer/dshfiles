@@ -14,18 +14,17 @@ export class ManagedLocalCommand {
   private stopping: Promise<void> | undefined
 
   private constructor(private readonly handle: SubprocessHandle) {
-    void handle.done.then(() => this.noteExit(), () => this.noteExit())
+    void handle.done.then(
+      () => this.noteExit(),
+      () => this.noteExit(),
+    )
     handle.stdout?.on('error', () => undefined)
     handle.stderr?.on('error', () => undefined)
     handle.stdout?.resume()
     handle.stderr?.resume()
   }
 
-  static async start(
-    runtime: SubprocessRuntime,
-    command: LocalCommand,
-    env: Readonly<Record<string, string>>,
-  ): Promise<ManagedLocalCommand> {
+  static async start(runtime: SubprocessRuntime, command: LocalCommand, env: Readonly<Record<string, string>>): Promise<ManagedLocalCommand> {
     const executable = await runtime.resolveExecutable(command.command, env)
     const handle = runtime.spawn({
       argv: [executable, ...command.args],

@@ -1,11 +1,6 @@
 export { defineClient, defineSlot } from './define.js'
 export { declareLocaleNamespace, defineLocale } from './locale.js'
-export {
-  CLIENT_SLOT_REFERENCES,
-  findClientSlot,
-  slotOwnerImports,
-  type ClientSlotReference,
-} from './slot-reference.js'
+export { CLIENT_SLOT_REFERENCES, findClientSlot, slotOwnerImports, type ClientSlotReference } from './slot-reference.js'
 export type {
   ClientConversationContribution,
   ClientDefinition,

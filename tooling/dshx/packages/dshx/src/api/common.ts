@@ -101,7 +101,15 @@ export async function validate(schema: unknown, value: unknown): Promise<unknown
   return (result as { readonly value: unknown }).value
 }
 
-export function error(kind: ApiError['kind'], message: string, apiId: string, method: string, retryable: boolean, cause?: unknown, remoteCode?: string): ApiError {
+export function error(
+  kind: ApiError['kind'],
+  message: string,
+  apiId: string,
+  method: string,
+  retryable: boolean,
+  cause?: unknown,
+  remoteCode?: string,
+): ApiError {
   return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause }) as unknown as ApiError
 }
 

@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import {
-  buildThreadUrl,
-  clearThreadUrl,
-  readThreadUrl,
-} from './thread-url.js'
+import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 
 test('copied thread links retain the app path and omit transient credentials and fragments', () => {
   const current = 'http://127.0.0.1:3080/app/?token=private&debug=1#composer'

@@ -8,7 +8,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { mcpServersApi, referenceNameSchema, serverDraftSchema, storedServerSchema, type ManagerSnapshot, type ServerDraft, type ServerView, type StoredServer } from './api.js'
+import { mcpServersApi, serverDraftSchema, storedServerSchema, type ManagerSnapshot, type ServerDraft, type ServerView, type StoredServer } from './api.js'
 import { PROVIDERS, searchOfficialRegistry } from './catalog.js'
 import { hasInlineCredential, parseCommandLine } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
@@ -25,8 +25,16 @@ export const Config = z.object({ servers: z.array(storedServerSchema).max(MAX_SE
     if (server.transport === 'stdio' && hasInlineCredential([server.command, ...server.args])) {
       context.addIssue({ code: 'custom', path: ['servers', index], message: 'Use credential references instead of inline command credentials.' })
     }
-    if (server.transport === 'streamable-http' && server.startCommand !== undefined && hasInlineCredential([server.startCommand.command, ...server.startCommand.args])) {
-      context.addIssue({ code: 'custom', path: ['servers', index, 'startCommand'], message: 'Use credential references instead of inline command credentials.' })
+    if (
+      server.transport === 'streamable-http' &&
+      server.startCommand !== undefined &&
+      hasInlineCredential([server.startCommand.command, ...server.startCommand.args])
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['servers', index, 'startCommand'],
+        message: 'Use credential references instead of inline command credentials.',
+      })
     }
   })
 })
@@ -38,9 +46,7 @@ type NativeTarget = ClientTarget & {
 }
 
 function entryFor(ctx: Context) {
-  const matches = ctx.configEditor.entries().filter(entry =>
-    entry.options.id === ENTRY_ID && entry.options.name === PACKAGE_NAME,
-  )
+  const matches = ctx.configEditor.entries().filter(entry => entry.options.id === ENTRY_ID && entry.options.name === PACKAGE_NAME)
   if (matches.length !== 1 || matches[0]?.fiber === undefined) {
     throw new Error('MCP manager profile row is unavailable.')
   }
@@ -64,35 +70,39 @@ function serversFor(ctx: Context): StoredServer[] {
 function referenceBindings(server: StoredServer): Array<[string, string]> {
   return server.transport === 'stdio'
     ? Object.entries(server.envRefs)
-    : [
-      ...Object.entries(server.headerRefs),
-      ...Object.entries(server.startCommand?.envRefs ?? {}),
-    ]
+    : [...Object.entries(server.headerRefs), ...Object.entries(server.startCommand?.envRefs ?? {})]
 }
 
 async function projectServer(ctx: Context, server: StoredServer, localProcess: LocalProcessStatus): Promise<ServerView> {
   const refs = [...new Set(referenceBindings(server).map(([, reference]) => reference))]
-  const availability = new Map(await Promise.all(refs.map(async name => {
-    try {
-      const info = await ctx.credentials.describe(credentialRef(name))
-      return [name, info.configured] as const
-    } catch {
-      return [name, false] as const
-    }
-  })))
+  const availability = new Map(
+    await Promise.all(
+      refs.map(async name => {
+        try {
+          const info = await ctx.credentials.describe(credentialRef(name))
+          return [name, info.configured] as const
+        } catch {
+          return [name, false] as const
+        }
+      }),
+    ),
+  )
   return publicServerView(server, availability, 'inactive', 0, localProcess)
 }
 
 async function snapshot(ctx: Context, servers = serversFor(ctx), runtime?: ManagerRuntime): Promise<ManagerSnapshot> {
   const tools = ctx.tools.schemas()
-  const rows = await Promise.all(servers.map(async server => {
-    const localProcess = runtime?.localProcess(server) ?? (server.transport === 'streamable-http' && server.startCommand !== undefined ? 'stopped' : 'not-configured')
-    const projected = await projectServer(ctx, server, localProcess)
-    const prefix = `mcp__${server.serverName}__`
-    const registeredToolCount = tools.reduce((count, tool) => count + Number(tool.name.startsWith(prefix)), 0)
-    const clientLifecycle = runtime?.reconciler.state(server.id) ?? (server.enabled ? 'starting' : 'inactive')
-    return { ...projected, clientLifecycle, registeredToolCount }
-  }))
+  const rows = await Promise.all(
+    servers.map(async server => {
+      const localProcess =
+        runtime?.localProcess(server) ?? (server.transport === 'streamable-http' && server.startCommand !== undefined ? 'stopped' : 'not-configured')
+      const projected = await projectServer(ctx, server, localProcess)
+      const prefix = `mcp__${server.serverName}__`
+      const registeredToolCount = tools.reduce((count, tool) => count + Number(tool.name.startsWith(prefix)), 0)
+      const clientLifecycle = runtime?.reconciler.state(server.id) ?? (server.enabled ? 'starting' : 'inactive')
+      return { ...projected, clientLifecycle, registeredToolCount }
+    }),
+  )
   return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported' }
 }
 
@@ -167,11 +177,7 @@ async function nativeTarget(ctx: Context, server: StoredServer, suspended: boole
   }
 }
 
-async function desiredTargets(
-  ctx: Context,
-  servers: readonly StoredServer[],
-  manuallyDisconnected: ReadonlySet<string>,
-): Promise<NativeTarget[]> {
+async function desiredTargets(ctx: Context, servers: readonly StoredServer[], manuallyDisconnected: ReadonlySet<string>): Promise<NativeTarget[]> {
   return Promise.all(servers.map(server => nativeTarget(ctx, server, manuallyDisconnected.has(server.id))))
 }
 
@@ -180,14 +186,27 @@ function storedDraft(draft: ServerDraft): StoredServer {
   if (draft.transport === 'streamable-http') {
     const localStart = draft.startCommand
     if (localStart == null) {
-      return { id, name: draft.name, serverName: draft.serverName, enabled: draft.enabled, transport: 'streamable-http', url: draft.url, headerRefs: draft.headerRefs }
+      return {
+        id,
+        name: draft.name,
+        serverName: draft.serverName,
+        enabled: draft.enabled,
+        transport: 'streamable-http',
+        url: draft.url,
+        headerRefs: draft.headerRefs,
+      }
     }
     const [command, ...args] = parseCommandLine(localStart.commandLine)
     if (command === undefined) throw new TypeError('Enter a local start command.')
     if (hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
     return {
-      id, name: draft.name, serverName: draft.serverName, enabled: draft.enabled, transport: 'streamable-http',
-      url: draft.url, headerRefs: draft.headerRefs,
+      id,
+      name: draft.name,
+      serverName: draft.serverName,
+      enabled: draft.enabled,
+      transport: 'streamable-http',
+      url: draft.url,
+      headerRefs: draft.headerRefs,
       startCommand: { command, args, cwd: localStart.cwd, envRefs: localStart.envRefs },
     }
   }
@@ -214,7 +233,10 @@ class ManagerRuntime {
   readonly reconciler: ClientReconciler
   private readonly localProcesses = new Map<string, ManagedLocalCommand>()
 
-  constructor(private readonly ctx: Context, readonly manuallyDisconnected: Set<string>) {
+  constructor(
+    private readonly ctx: Context,
+    readonly manuallyDisconnected: Set<string>,
+  ) {
     this.reconciler = new ClientReconciler(async target => {
       const native = target as NativeTarget
       let localProcess: ManagedLocalCommand | undefined
@@ -276,7 +298,13 @@ class ManagerRuntime {
     const targets = await desiredTargets(this.ctx, servers, this.manuallyDisconnected)
     const restart = new Set(restartIds)
     for (const target of targets) {
-      if (target.enabled && target.ready && target.suspended !== true && target.localCommand !== undefined && this.localProcesses.get(target.id)?.status === 'exited') {
+      if (
+        target.enabled &&
+        target.ready &&
+        target.suspended !== true &&
+        target.localCommand !== undefined &&
+        this.localProcesses.get(target.id)?.status === 'exited'
+      ) {
         restart.add(target.id)
       }
     }
@@ -376,9 +404,14 @@ const hostPlugin = definePlugin({
       const servers = serversFor(ctx)
       const affected = servers.filter(server => referenceBindings(server).some(([, reference]) => reference === ref))
       if (affected.length > 0) {
-        void runtime.reconcile(servers, affected.map(server => server.id)).catch(() => {
-          ctx.logger.warn('MCP manager could not refresh a credential-backed server.')
-        })
+        void runtime
+          .reconcile(
+            servers,
+            affected.map(server => server.id),
+          )
+          .catch(() => {
+            ctx.logger.warn('MCP manager could not refresh a credential-backed server.')
+          })
       }
     })
 

@@ -2,42 +2,58 @@ import type { RegistryEntry } from './api.js'
 
 export const PROVIDERS = [
   {
-    id: 'figma', name: 'Figma', category: 'Design',
+    id: 'figma',
+    name: 'Figma',
+    category: 'Design',
     description: 'Read design context and work with Figma files.',
     docsUrl: 'https://developers.figma.com/docs/figma-mcp-server/',
   },
   {
-    id: 'github', name: 'GitHub', category: 'Developer tools',
+    id: 'github',
+    name: 'GitHub',
+    category: 'Developer tools',
     description: 'Work with repositories, issues, pull requests, and code.',
     docsUrl: 'https://github.com/github/github-mcp-server',
   },
   {
-    id: 'linear', name: 'Linear', category: 'Project management',
+    id: 'linear',
+    name: 'Linear',
+    category: 'Project management',
     description: 'Search and manage Linear issues, projects, and comments.',
     docsUrl: 'https://linear.app/docs/mcp',
   },
   {
-    id: 'notion', name: 'Notion', category: 'Knowledge',
+    id: 'notion',
+    name: 'Notion',
+    category: 'Knowledge',
     description: 'Search, read, and update a Notion workspace.',
     docsUrl: 'https://developers.notion.com/docs/mcp',
   },
   {
-    id: 'cloudflare', name: 'Cloudflare', category: 'Developer tools',
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    category: 'Developer tools',
     description: 'Use Cloudflare services through the provider MCP server.',
     docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/',
   },
   {
-    id: 'cloudflare-docs', name: 'Cloudflare Docs', category: 'Documentation',
+    id: 'cloudflare-docs',
+    name: 'Cloudflare Docs',
+    category: 'Documentation',
     description: 'Search current Cloudflare developer documentation.',
     docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/',
   },
   {
-    id: 'sentry', name: 'Sentry', category: 'Monitoring',
+    id: 'sentry',
+    name: 'Sentry',
+    category: 'Monitoring',
     description: 'Investigate errors, performance, and Sentry projects.',
     docsUrl: 'https://docs.sentry.io/product/sentry-mcp/',
   },
   {
-    id: 'vercel', name: 'Vercel', category: 'Deployment',
+    id: 'vercel',
+    name: 'Vercel',
+    category: 'Deployment',
     description: 'Search Vercel docs and manage projects and deployments.',
     docsUrl: 'https://vercel.com/docs/mcp',
   },
@@ -45,31 +61,21 @@ export const PROVIDERS = [
 
 export function filterProviders<T extends { name: string; category: string; description: string }>(rows: readonly T[], query: string): T[] {
   const needle = query.trim().toLocaleLowerCase()
-  return needle.length === 0
-    ? [...rows]
-    : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
+  return needle.length === 0 ? [...rows] : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
 }
 
 const REGISTRY_ENDPOINT = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const MAX_REGISTRY_BYTES = 1_000_000
 
 function object(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : undefined
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 }
 
 function safeHttps(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2048) return null
   try {
     const url = new URL(value)
-    return url.protocol === 'https:'
-      && url.username === ''
-      && url.password === ''
-      && url.search === ''
-      && url.hash === ''
-      ? url.href
-      : null
+    return url.protocol === 'https:' && url.username === '' && url.password === '' && url.search === '' && url.hash === '' ? url.href : null
   } catch {
     return null
   }
@@ -78,7 +84,9 @@ function safeHttps(value: unknown): string | null {
 function publisherMetadata(item: Record<string, unknown>): Record<string, unknown>[] {
   const root = object(item._meta)
   if (root === undefined) return []
-  return Object.values(root).map(object).filter((value): value is Record<string, unknown> => value !== undefined)
+  return Object.values(root)
+    .map(object)
+    .filter((value): value is Record<string, unknown> => value !== undefined)
 }
 
 function categoryOf(item: Record<string, unknown>): string {
@@ -137,11 +145,9 @@ function registryRow(value: unknown): RegistryEntry | undefined {
   if (item === undefined || typeof item.name !== 'string' || item.name.length > 200) return undefined
 
   const remotes = Array.isArray(item.remotes) ? item.remotes : []
-  const endpoint = remotes.map(object).find(remote =>
-    remote !== undefined
-    && (remote.type === 'streamable-http' || remote.transport === 'streamable-http')
-    && safeHttps(remote.url) !== null,
-  )
+  const endpoint = remotes
+    .map(object)
+    .find(remote => remote !== undefined && (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null)
   const documentation = documentationOf(item)
   const version = typeof item.version === 'string' ? item.version.slice(0, 80) : ''
   const description = typeof item.description === 'string' ? item.description.slice(0, 500) : ''

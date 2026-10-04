@@ -11,13 +11,16 @@
     },
     "./package.json": "./package.json"
   },
-  "scripts": { "test": "vitest run", "typecheck": "tsc -p tsconfig.json --noEmit" },
-  "peerDependencies": {
-    "react": ">=18.2.0 <19"
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/react": "~18.3.31",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0 <19"
   }
 }

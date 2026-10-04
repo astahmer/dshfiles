@@ -42,11 +42,18 @@ const relativeTime = (value: string): string => {
 
 const dayLabel = (value: string): string => {
   const time = Date.parse(value)
-  return Number.isFinite(time) ? new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date unavailable'
+  return Number.isFinite(time)
+    ? new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Date unavailable'
 }
 
-const safeSplitPath = (path: string): boolean => path.length > 0 && path.length <= 1024 &&
-  !path.includes('\0') && !path.includes('\n') && !path.includes('\r') && !path.startsWith('/') &&
+const safeSplitPath = (path: string): boolean =>
+  path.length > 0 &&
+  path.length <= 1024 &&
+  !path.includes('\0') &&
+  !path.includes('\n') &&
+  !path.includes('\r') &&
+  !path.startsWith('/') &&
   path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
 
 const groupRows = (revisions: readonly Revision[]): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
@@ -107,24 +114,31 @@ export const JujutsuPanel = (): JSX.Element => {
     let stale = false
     setBusy(true)
     setError(null)
-    void api.load({ repoId, limit: 300 }).then(result => {
-      if (stale) return
-      setState(result)
-      setWorkingPatch(null)
-      const previous = selectedRevisionRef.current
-      const selection = previous === null ? undefined :
-        result.revisions.find(row => row.commitId === previous.commitId) ??
-        result.revisions.find(row => row.changeId === previous.changeId)
-      selectedRevisionRef.current = selection ?? null
-      setSelectedId(selection?.commitId ?? null)
-      const visibleCommitIds = new Set(result.revisions.map(row => row.commitId))
-      setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
-    }).catch(reason => {
-      if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load this repository.')
-    }).finally(() => {
-      if (!stale) setBusy(false)
-    })
-    return () => { stale = true }
+    void api
+      .load({ repoId, limit: 300 })
+      .then(result => {
+        if (stale) return
+        setState(result)
+        setWorkingPatch(null)
+        const previous = selectedRevisionRef.current
+        const selection =
+          previous === null
+            ? undefined
+            : (result.revisions.find(row => row.commitId === previous.commitId) ?? result.revisions.find(row => row.changeId === previous.changeId))
+        selectedRevisionRef.current = selection ?? null
+        setSelectedId(selection?.commitId ?? null)
+        const visibleCommitIds = new Set(result.revisions.map(row => row.commitId))
+        setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
+      })
+      .catch(reason => {
+        if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load this repository.')
+      })
+      .finally(() => {
+        if (!stale) setBusy(false)
+      })
+    return () => {
+      stale = true
+    }
   }, [repoId, reloadKey])
 
   useEffect(() => {
@@ -134,12 +148,17 @@ export const JujutsuPanel = (): JSX.Element => {
     }
     let stale = false
     setDetails(null)
-    void api.details({ repoId, commitId: selectedId }).then(result => {
-      if (!stale) setDetails(result)
-    }).catch(reason => {
-      if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load revision details.')
-    })
-    return () => { stale = true }
+    void api
+      .details({ repoId, commitId: selectedId })
+      .then(result => {
+        if (!stale) setDetails(result)
+      })
+      .catch(reason => {
+        if (!stale) setError(reason instanceof Error ? reason.message : 'Could not load revision details.')
+      })
+    return () => {
+      stale = true
+    }
   }, [repoId, selectedId])
 
   useEffect(() => {
@@ -169,8 +188,9 @@ export const JujutsuPanel = (): JSX.Element => {
   const groups = useMemo(() => groupRows(visibleRevisions), [visibleRevisions])
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
   const selectedRevision = state?.revisions.find(revision => revision.commitId === selectedId)
-  const selectedDescribeText = selectedRevision === undefined ? '' : describeDrafts[selectedRevision.commitId] ?? selectedRevision.description.replace(/\n+$/, '')
-  const workingDescribeText = workingCopy === undefined ? '' : describeDrafts[workingCopy.commitId] ?? workingCopy.description.replace(/\n+$/, '')
+  const selectedDescribeText =
+    selectedRevision === undefined ? '' : (describeDrafts[selectedRevision.commitId] ?? selectedRevision.description.replace(/\n+$/, ''))
+  const workingDescribeText = workingCopy === undefined ? '' : (describeDrafts[workingCopy.commitId] ?? workingCopy.description.replace(/\n+$/, ''))
   const selectedDescribeChanged = selectedRevision !== undefined && describeDraftChanged(selectedDescribeText, selectedRevision.description)
   const workingDescribeChanged = workingCopy !== undefined && describeDraftChanged(workingDescribeText, workingCopy.description)
   const ancestors = useMemo(() => {
@@ -281,48 +301,117 @@ export const JujutsuPanel = (): JSX.Element => {
             <h1>Jujutsu</h1>
             <div className={styles.muted}>{state?.root ?? 'Select a repository to inspect its revision graph.'}</div>
           </div>
-          <button type="button" className={styles.secondary} disabled={busy || repoId === null} onClick={() => setReloadKey(value => value + 1)}>↻ Refresh</button>
+          <button type="button" className={styles.secondary} disabled={busy || repoId === null} onClick={() => setReloadKey(value => value + 1)}>
+            ↻ Refresh
+          </button>
         </div>
         <form className={styles.repoForm} onSubmit={event => void register(event)}>
-          <input aria-label="Repository path" list="jj-repositories" value={path} onChange={event => setPath(event.target.value)} placeholder="/path/to/repository" />
-          <datalist id="jj-repositories">{repoHistory.map(item => <option key={item} value={item} />)}</datalist>
-          <button type="submit" disabled={busy || path.trim().length === 0}>{repoId === null ? 'Open repository' : 'Select repository'}</button>
+          <input
+            aria-label="Repository path"
+            list="jj-repositories"
+            value={path}
+            onChange={event => setPath(event.target.value)}
+            placeholder="/path/to/repository"
+          />
+          <datalist id="jj-repositories">
+            {repoHistory.map(item => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
+          <button type="submit" disabled={busy || path.trim().length === 0}>
+            {repoId === null ? 'Open repository' : 'Select repository'}
+          </button>
           <select aria-label="Remote" value={remote} onChange={event => setRemote(event.target.value)} disabled={!state?.remoteNames.length}>
-            {state?.remoteNames.map(name => <option key={name} value={name}>{name}</option>)}
+            {state?.remoteNames.map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
-          <button type="button" className={styles.secondary} disabled={repoId === null || remote === '' || busy} onClick={() => void askForConfirmation({ kind: 'fetch', remote })}>Fetch</button>
+          <button
+            type="button"
+            className={styles.secondary}
+            disabled={repoId === null || remote === '' || busy}
+            onClick={() => void askForConfirmation({ kind: 'fetch', remote })}
+          >
+            Fetch
+          </button>
           <select aria-label="Bookmark to push" value={bookmark} onChange={event => setBookmark(event.target.value)} disabled={!bookmark}>
-            {state?.revisions.flatMap(row => row.localBookmarks).filter((name, index, all) => all.indexOf(name) === index).map(name => <option key={name} value={name}>{name}</option>)}
+            {state?.revisions
+              .flatMap(row => row.localBookmarks)
+              .filter((name, index, all) => all.indexOf(name) === index)
+              .map(name => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
           </select>
-          <button type="button" className={styles.secondary} disabled={repoId === null || remote === '' || bookmark === '' || busy} onClick={() => void askForConfirmation({ kind: 'push', remote, bookmark })}>Push</button>
+          <button
+            type="button"
+            className={styles.secondary}
+            disabled={repoId === null || remote === '' || bookmark === '' || busy}
+            onClick={() => void askForConfirmation({ kind: 'push', remote, bookmark })}
+          >
+            Push
+          </button>
         </form>
-        {state !== null && <>
-          <div className={styles.statusLine} title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
-            Last recorded JJ push command: {state.lastPushAt
-              ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
-              : state.lastPushHistoryTruncated ? 'not found before the operation-history limit' : 'not found in the latest 1,000 operations'}
-          </div>
-          {state.evolutionHistoryTruncated && <div className={styles.statusLine}>Evolution scan limited; some evolved markers may be missing.</div>}
-        </>}
+        {state !== null && (
+          <>
+            <div className={styles.statusLine} title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
+              Last recorded JJ push command:{' '}
+              {state.lastPushAt
+                ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
+                : state.lastPushHistoryTruncated
+                  ? 'not found before the operation-history limit'
+                  : 'not found in the latest 1,000 operations'}
+            </div>
+            {state.evolutionHistoryTruncated && <div className={styles.statusLine}>Evolution scan limited; some evolved markers may be missing.</div>}
+          </>
+        )}
         <nav className={styles.tabs} aria-label="Jujutsu views">
-          <button type="button" className={tab === 'graph' ? styles.activeTab : ''} onClick={() => setTab('graph')}>Revision graph</button>
-          <button type="button" className={tab === 'source' ? styles.activeTab : ''} onClick={() => setTab('source')}>Source Control</button>
+          <button type="button" className={tab === 'graph' ? styles.activeTab : ''} onClick={() => setTab('graph')}>
+            Revision graph
+          </button>
+          <button type="button" className={tab === 'source' ? styles.activeTab : ''} onClick={() => setTab('source')}>
+            Source Control
+          </button>
         </nav>
       </header>
 
-      {error && <div className={styles.error} role="alert">{error}</div>}
+      {error && (
+        <div className={styles.error} role="alert">
+          {error}
+        </div>
+      )}
       {actionOutput && <pre className={styles.output}>{actionOutput}</pre>}
-      {busy && <div className={styles.loading} role="status">Working…</div>}
+      {busy && (
+        <div className={styles.loading} role="status">
+          Working…
+        </div>
+      )}
 
       {tab === 'graph' && state !== null && (
         <section className={styles.graphView}>
           <div className={styles.filters}>
             <input aria-label="Filter author" value={authorFilter} onChange={event => setAuthorFilter(event.target.value)} placeholder="Author" />
-            <input aria-label="Search revisions" value={textFilter} onChange={event => setTextFilter(event.target.value)} placeholder="Search descriptions, IDs, bookmarks, tags, workspaces" />
-            <label><input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} /> Mine</label>
-            <label><input type="checkbox" checked={hideImmutable} onChange={event => setHideImmutable(event.target.checked)} /> Hide immutable</label>
-            <label>From <input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
-            <label>To <input type="date" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
+            <input
+              aria-label="Search revisions"
+              value={textFilter}
+              onChange={event => setTextFilter(event.target.value)}
+              placeholder="Search descriptions, IDs, bookmarks, tags, workspaces"
+            />
+            <label>
+              <input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} /> Mine
+            </label>
+            <label>
+              <input type="checkbox" checked={hideImmutable} onChange={event => setHideImmutable(event.target.checked)} /> Hide immutable
+            </label>
+            <label>
+              From <input type="date" value={fromDate} onChange={event => setFromDate(event.target.value)} />
+            </label>
+            <label>
+              To <input type="date" value={toDate} onChange={event => setToDate(event.target.value)} />
+            </label>
           </div>
           <div className={styles.graphColumns}>
             <div className={styles.revisionList}>
@@ -336,41 +425,76 @@ export const JujutsuPanel = (): JSX.Element => {
                       onDragOver={event => event.preventDefault()}
                       onDrop={event => dropOn(event, revision)}
                     >
-                      <div className={styles.graphRail} aria-hidden><span className={revision.workingCopy ? styles.nodeCurrent : styles.node} /></div>
-                      <button type="button" className={styles.revisionBody} onClick={() => { selectedRevisionRef.current = revision; setSelectedId(revision.commitId) }}>
+                      <div className={styles.graphRail} aria-hidden>
+                        <span className={revision.workingCopy ? styles.nodeCurrent : styles.node} />
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.revisionBody}
+                        onClick={() => {
+                          selectedRevisionRef.current = revision
+                          setSelectedId(revision.commitId)
+                        }}
+                      >
                         <div className={styles.revisionTitle}>
                           {revision.workingCopy && <span className={styles.currentBadge}>Editing</span>}
                           <span>{revision.description.split('\n')[0] || '(no description)'}</span>
                         </div>
                         <div className={styles.revisionMeta}>
                           <span>{revision.author || 'Unknown author'}</span>
-                          {revision.workspaces.map(workspace => <span className={styles.workspaceBadge} key={workspace}>{workspace}</span>)}
-                          {graphParentLinks(revision, revisionsByCommitId, hideImmutable).map(link => <span
-                            className={link.hiddenImmutableCount > 0 ? styles.ancestryBridge : styles.parentLink}
-                            key={link.commitId}
-                            title={link.hiddenImmutableCount > 0 ? 'Ancestry continues through hidden immutable revisions.' : 'Direct parent revision.'}
-                          >{link.hiddenImmutableCount > 0
-                            ? `via ${link.hiddenImmutableCount} immutable → ${link.label}${link.terminal ? ' root' : ''}`
-                            : `parent ${link.label}`}</span>)}
+                          {revision.workspaces.map(workspace => (
+                            <span className={styles.workspaceBadge} key={workspace}>
+                              {workspace}
+                            </span>
+                          ))}
+                          {graphParentLinks(revision, revisionsByCommitId, hideImmutable).map(link => (
+                            <span
+                              className={link.hiddenImmutableCount > 0 ? styles.ancestryBridge : styles.parentLink}
+                              key={link.commitId}
+                              title={link.hiddenImmutableCount > 0 ? 'Ancestry continues through hidden immutable revisions.' : 'Direct parent revision.'}
+                            >
+                              {link.hiddenImmutableCount > 0
+                                ? `via ${link.hiddenImmutableCount} immutable → ${link.label}${link.terminal ? ' root' : ''}`
+                                : `parent ${link.label}`}
+                            </span>
+                          ))}
                           {revision.immutable && <span className={styles.immutableBadge}>immutable</span>}
                           {revision.evolved && <span className={styles.tag}>evolved</span>}
                           {revision.divergent && <span className={styles.tag}>divergent</span>}
                         </div>
                       </button>
                       <span className={styles.relative}>{relativeTime(revision.authorTime)}</span>
-                      <span className={styles.changeId} title={revision.changeId}>{revision.shortestChangeId}</span>
-                      <button type="button" className={styles.dragHandle} draggable onDragStart={event => startDrag(event, revision)} title="Drag revision to rebase after preview">⠿</button>
+                      <span className={styles.changeId} title={revision.changeId}>
+                        {revision.shortestChangeId}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.dragHandle}
+                        draggable
+                        onDragStart={event => startDrag(event, revision)}
+                        title="Drag revision to rebase after preview"
+                      >
+                        ⠿
+                      </button>
                       <div className={styles.labels}>
-                        {revision.bookmarks.map(name => <span
-                          draggable={revision.localBookmarks.includes(name)}
-                          onDragStart={event => {
-                            event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
-                            event.dataTransfer.effectAllowed = 'move'
-                          }}
-                          className={revision.localBookmarks.includes(name) ? styles.bookmark : styles.remoteBookmark}
-                          key={name}
-                        >{name}</span>)}
-                        {revision.tags.map(name => <span className={styles.tag} key={name}>tag {name}</span>)}
+                        {revision.bookmarks.map(name => (
+                          <span
+                            draggable={revision.localBookmarks.includes(name)}
+                            onDragStart={event => {
+                              event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
+                              event.dataTransfer.effectAllowed = 'move'
+                            }}
+                            className={revision.localBookmarks.includes(name) ? styles.bookmark : styles.remoteBookmark}
+                            key={name}
+                          >
+                            {name}
+                          </span>
+                        ))}
+                        {revision.tags.map(name => (
+                          <span className={styles.tag} key={name}>
+                            tag {name}
+                          </span>
+                        ))}
                       </div>
                     </article>
                   ))}
@@ -383,22 +507,72 @@ export const JujutsuPanel = (): JSX.Element => {
                 <>
                   <div className={styles.titleRow}>
                     <h2>Revision {selectedRevision.shortestChangeId}</h2>
-                    <button type="button" className={styles.secondary} onClick={() => { selectedRevisionRef.current = null; setSelectedId(null) }}>Close</button>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      onClick={() => {
+                        selectedRevisionRef.current = null
+                        setSelectedId(null)
+                      }}
+                    >
+                      Close
+                    </button>
                   </div>
                   <p>{selectedRevision.description || '(no description)'}</p>
-                  <div className={styles.detailMeta}>{selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}</div>
-                  {details ? <>
-                    <div className={styles.counts}>{details.files.length} files · +{details.additions} −{details.deletions}{details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}</div>
-                    <ul className={styles.fileList}>{details.files.map(file => <li key={file.path}><span>{file.path}</span><span>+{file.additions} −{file.deletions}</span></li>)}</ul>
-                    <details><summary>Change evolution</summary><pre>{details.evolution}</pre></details>
-                    <details open><summary>Diff</summary><pre className={styles.diff}>{details.patch}</pre></details>
-                  </> : <p className={styles.muted}>Loading revision details…</p>}
-                  {!selectedRevision.immutable && <div className={styles.actionBox}>
-                    <label>New description<textarea value={selectedDescribeText} onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))} rows={3} /></label>
-                    <button type="button" disabled={!selectedDescribeChanged} onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}>Preview describe</button>
-                  </div>}
+                  <div className={styles.detailMeta}>
+                    {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
+                  </div>
+                  {details ? (
+                    <>
+                      <div className={styles.counts}>
+                        {details.files.length} files · +{details.additions} −{details.deletions}
+                        {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
+                      </div>
+                      <ul className={styles.fileList}>
+                        {details.files.map(file => (
+                          <li key={file.path}>
+                            <span>{file.path}</span>
+                            <span>
+                              +{file.additions} −{file.deletions}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <details>
+                        <summary>Change evolution</summary>
+                        <pre>{details.evolution}</pre>
+                      </details>
+                      <details open>
+                        <summary>Diff</summary>
+                        <pre className={styles.diff}>{details.patch}</pre>
+                      </details>
+                    </>
+                  ) : (
+                    <p className={styles.muted}>Loading revision details…</p>
+                  )}
+                  {!selectedRevision.immutable && (
+                    <div className={styles.actionBox}>
+                      <label>
+                        New description
+                        <textarea
+                          value={selectedDescribeText}
+                          onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
+                          rows={3}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!selectedDescribeChanged}
+                        onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
+                      >
+                        Preview describe
+                      </button>
+                    </div>
+                  )}
                 </>
-              ) : <p className={styles.muted}>Select a revision to see its details, diff counts and evolution.</p>}
+              ) : (
+                <p className={styles.muted}>Select a revision to see its details, diff counts and evolution.</p>
+              )}
             </aside>
           </div>
         </section>
@@ -407,58 +581,142 @@ export const JujutsuPanel = (): JSX.Element => {
       {tab === 'source' && state !== null && (
         <section className={styles.sourceView}>
           <div className={styles.sourceSummary}>
-            <div><h2>Working copy</h2><pre>{state.status || 'Clean working copy.'}</pre></div>
+            <div>
+              <h2>Working copy</h2>
+              <pre>{state.status || 'Clean working copy.'}</pre>
+            </div>
             <div className={styles.sourceActions}>
-              <button type="button" className={styles.secondary} onClick={() => void loadWorkingDiff()}>Show full diff</button>
-              <label>Ancestor groups <select value={ancestorLimit} onChange={event => setAncestorLimit(Number(event.target.value))}>{[1, 2, 3, 4, 5, 8, 10].map(count => <option key={count} value={count}>{count}</option>)}</select></label>
+              <button type="button" className={styles.secondary} onClick={() => void loadWorkingDiff()}>
+                Show full diff
+              </button>
+              <label>
+                Ancestor groups{' '}
+                <select value={ancestorLimit} onChange={event => setAncestorLimit(Number(event.target.value))}>
+                  {[1, 2, 3, 4, 5, 8, 10].map(count => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
-          {workingPatch !== null && <details open><summary>Working-copy diff</summary><pre className={styles.diff}>{workingPatch}</pre></details>}
+          {workingPatch !== null && (
+            <details open>
+              <summary>Working-copy diff</summary>
+              <pre className={styles.diff}>{workingPatch}</pre>
+            </details>
+          )}
           <div className={styles.sourceColumns}>
             <div className={styles.ancestorList}>
               <h3>Ancestor groups</h3>
-              {ancestors.map(({ depth, revision }) => <button type="button" className={styles.ancestor} key={revision.commitId} onClick={() => setSquashTarget(revision.commitId)}>
-                <span>@-{depth}</span><span>{revision.description.split('\n')[0] || '(no description)'}</span><code>{revision.shortestChangeId}</code>
-              </button>)}
+              {ancestors.map(({ depth, revision }) => (
+                <button type="button" className={styles.ancestor} key={revision.commitId} onClick={() => setSquashTarget(revision.commitId)}>
+                  <span>@-{depth}</span>
+                  <span>{revision.description.split('\n')[0] || '(no description)'}</span>
+                  <code>{revision.shortestChangeId}</code>
+                </button>
+              ))}
               {ancestors.length === 0 && <p className={styles.muted}>No visible @-1 ancestors in this graph window.</p>}
             </div>
             <div className={styles.sourceActions}>
               <h3>Describe working copy</h3>
-              <textarea aria-label="Working copy description" value={workingDescribeText} onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))} rows={3} />
-              {workingCopy && <button type="button" disabled={!workingDescribeChanged} onClick={() => void askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}>Preview describe</button>}
+              <textarea
+                aria-label="Working copy description"
+                value={workingDescribeText}
+                onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))}
+                rows={3}
+              />
+              {workingCopy && (
+                <button
+                  type="button"
+                  disabled={!workingDescribeChanged}
+                  onClick={() => void askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}
+                >
+                  Preview describe
+                </button>
+              )}
               <h3>Split selected files from @</h3>
-              <div className={styles.fileChoices}>{state.changedPaths.map(file => {
-                const selectable = safeSplitPath(file)
-                return <label key={file} className={!selectable ? styles.disabledFile : ''}>
-                  <input type="checkbox" disabled={!selectable} checked={splitPaths.includes(file)} onChange={event => setSplitPaths(current => event.target.checked ? [...current, file] : current.filter(item => item !== file))} />
-                  {file}{!selectable && <span> — unsafe path format unavailable</span>}
-                </label>
-              })}</div>
-              <textarea aria-label="Split description" value={splitText} onChange={event => setSplitText(event.target.value)} placeholder="Description for selected changes" rows={2} />
-              {workingCopy && <button type="button" disabled={splitPaths.length === 0 || splitText.trim().length === 0} onClick={() => void askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}>Preview split</button>}
+              <div className={styles.fileChoices}>
+                {state.changedPaths.map(file => {
+                  const selectable = safeSplitPath(file)
+                  return (
+                    <label key={file} className={!selectable ? styles.disabledFile : ''}>
+                      <input
+                        type="checkbox"
+                        disabled={!selectable}
+                        checked={splitPaths.includes(file)}
+                        onChange={event => setSplitPaths(current => (event.target.checked ? [...current, file] : current.filter(item => item !== file)))}
+                      />
+                      {file}
+                      {!selectable && <span> — unsafe path format unavailable</span>}
+                    </label>
+                  )
+                })}
+              </div>
+              <textarea
+                aria-label="Split description"
+                value={splitText}
+                onChange={event => setSplitText(event.target.value)}
+                placeholder="Description for selected changes"
+                rows={2}
+              />
+              {workingCopy && (
+                <button
+                  type="button"
+                  disabled={splitPaths.length === 0 || splitText.trim().length === 0}
+                  onClick={() => void askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}
+                >
+                  Preview split
+                </button>
+              )}
               <h3>Squash working copy into ancestor</h3>
               <select aria-label="Squash destination" value={squashTarget} onChange={event => setSquashTarget(event.target.value)}>
                 <option value="">Choose an ancestor</option>
-                {ancestors.map(({ depth, revision }) => <option key={revision.commitId} value={revision.commitId}>@-{depth} · {revision.shortestChangeId}</option>)}
+                {ancestors.map(({ depth, revision }) => (
+                  <option key={revision.commitId} value={revision.commitId}>
+                    @-{depth} · {revision.shortestChangeId}
+                  </option>
+                ))}
               </select>
-              <textarea aria-label="Squash description" value={squashText} onChange={event => setSquashText(event.target.value)} placeholder="Resulting description" rows={2} />
-              {workingCopy && <button type="button" disabled={!squashTarget || squashText.trim().length === 0} onClick={() => void askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}>Preview squash</button>}
+              <textarea
+                aria-label="Squash description"
+                value={squashText}
+                onChange={event => setSquashText(event.target.value)}
+                placeholder="Resulting description"
+                rows={2}
+              />
+              {workingCopy && (
+                <button
+                  type="button"
+                  disabled={!squashTarget || squashText.trim().length === 0}
+                  onClick={() => void askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}
+                >
+                  Preview squash
+                </button>
+              )}
             </div>
           </div>
         </section>
       )}
 
-      {preview && <div className={styles.modalBackdrop} role="presentation">
-        <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="jj-preview-title">
-          <h2 id="jj-preview-title">Confirm {preview.title.toLocaleLowerCase()}</h2>
-          <strong>{preview.summary}</strong>
-          <pre>{preview.detail}</pre>
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.secondary} disabled={busy} onClick={() => setPreview(null)}>Cancel</button>
-            <button type="button" disabled={busy} onClick={() => void confirm()}>Confirm and run</button>
-          </div>
-        </section>
-      </div>}
+      {preview && (
+        <div className={styles.modalBackdrop} role="presentation">
+          <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="jj-preview-title">
+            <h2 id="jj-preview-title">Confirm {preview.title.toLocaleLowerCase()}</h2>
+            <strong>{preview.summary}</strong>
+            <pre>{preview.detail}</pre>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondary} disabled={busy} onClick={() => setPreview(null)}>
+                Cancel
+              </button>
+              <button type="button" disabled={busy} onClick={() => void confirm()}>
+                Confirm and run
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

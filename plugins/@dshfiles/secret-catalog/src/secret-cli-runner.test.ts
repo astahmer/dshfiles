@@ -51,12 +51,16 @@ describe('managed secret CLI runner', () => {
       SECRET_SESSION_FILE: '/private/tmp/synthetic-secret-session',
       AWS_SECRET_ACCESS_KEY: 'must-not-be-forwarded',
     }
-    const result = await runSecretCli(test.runtime, {
-      args: ['set', 'SYNTHETIC_TOKEN', '--env', 'dev'],
-      cwd: '/private/tmp/project',
-      captureStdout: true,
-      stdin: 'synthetic-secret-value',
-    }, environment)
+    const result = await runSecretCli(
+      test.runtime,
+      {
+        args: ['set', 'SYNTHETIC_TOKEN', '--env', 'dev'],
+        cwd: '/private/tmp/project',
+        captureStdout: true,
+        stdin: 'synthetic-secret-value',
+      },
+      environment,
+    )
 
     expect(result).toBe('synthetic-output\n')
     expect(test.spec()?.argv).toEqual(['/nix/store/secret-cli/bin/secret', 'set', 'SYNTHETIC_TOKEN', '--env', 'dev'])
@@ -69,9 +73,15 @@ describe('managed secret CLI runner', () => {
 
   it('does not expose CLI stdout for copy and mutation commands', async () => {
     const test = harness({ output: 'must-not-reach-the-caller' })
-    const result = await runSecretCli(test.runtime, {
-      args: ['get', 'SYNTHETIC_TOKEN', '--copy'], cwd: '/private/tmp/project', captureStdout: false,
-    }, {})
+    const result = await runSecretCli(
+      test.runtime,
+      {
+        args: ['get', 'SYNTHETIC_TOKEN', '--copy'],
+        cwd: '/private/tmp/project',
+        captureStdout: false,
+      },
+      {},
+    )
 
     expect(result).toBe('')
     expect(test.spec()?.stdio.stdout).toEqual({ maxBytes: 1 })
@@ -85,7 +95,9 @@ describe('managed secret CLI runner', () => {
     expect(failed.handle.terminate).toHaveBeenCalledOnce()
 
     const oversized = harness({ lossy: true })
-    await expect(runSecretCli(oversized.runtime, { args: ['get', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: true }, {})).rejects.toThrow('Secret CLI command failed.')
+    await expect(runSecretCli(oversized.runtime, { args: ['get', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: true }, {})).rejects.toThrow(
+      'Secret CLI command failed.',
+    )
     expect(oversized.handle.terminate).toHaveBeenCalledOnce()
   })
 })

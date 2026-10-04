@@ -3,19 +3,8 @@ import { chmod } from 'node:fs/promises'
 import { z } from 'zod'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import {
-  accountDraftSchema,
-  accountsFileSchema,
-  type AccountDraft,
-  type AccountProfile,
-  type AccountsFile,
-} from './api.js'
-import {
-  describeCodexAuth,
-  materializeCodexShadowHome,
-  CodexHomeError,
-  resolveCodexHomeLayout,
-} from './codex-home.js'
+import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
+import { describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { readKeyFromEnv } from './credentials.js'
 
@@ -29,12 +18,7 @@ import { readKeyFromEnv } from './credentials.js'
  * which stays inside each Codex home where its owner put it.
  */
 
-const STORE_PATH = join(
-  process.env.DSH_HOME ?? join(homedir(), '.dsh'),
-  'plugins',
-  'ai-accounts',
-  'accounts.json',
-)
+const STORE_PATH = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
 
 const DEFAULT_SHADOW_ROOT = join(homedir(), '.codex-dshx')
 
@@ -121,36 +105,25 @@ export const writeAccountFile = async (next: AccountStoreFile): Promise<AccountS
   return validated
 }
 
-const expandHome = (value: string): string =>
-  value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
+const expandHome = (value: string): string => (value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
 
 /** Derive an account's Codex homes, defaulting the shadow under the root. */
 const layoutFor = (profile: AccountDraft, file: AccountStoreFile) =>
   resolveCodexHomeLayout({
     homePath: profile.homePath,
-    shadowHomePath:
-      profile.shadowHomePath.trim().length > 0
-        ? profile.shadowHomePath
-        : join(file.shadowRoot.replace(/\/$/, ''), profile.instanceId),
+    shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(file.shadowRoot.replace(/\/$/, ''), profile.instanceId),
   })
 
 const defaultName = (draft: AccountDraft): string =>
-  draft.displayName.trim().length > 0
-    ? draft.displayName.trim()
-    : `${draft.kind === 'codex' ? 'Codex' : 'OpenCode Go'} (${draft.instanceId})`
+  draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${draft.kind === 'codex' ? 'Codex' : 'OpenCode Go'} (${draft.instanceId})`
 
 /**
  * Observed fields for one stored profile: whether it holds a login, the identity
  * it presents, and how its Codex home is arranged. Never a credential.
  */
-const observe = async (
-  draft: AccountDraft,
-  file: AccountStoreFile,
-  status: AccountStatus | undefined,
-): Promise<AccountProfile> => {
+const observe = async (draft: AccountDraft, file: AccountStoreFile, status: AccountStatus | undefined): Promise<AccountProfile> => {
   if (draft.kind === 'opencode-go') {
-    const hasKey =
-readKeyFromEnv(draft.apiKeyEnv).length > 0
+    const hasKey = readKeyFromEnv(draft.apiKeyEnv).length > 0
     return {
       ...draft,
       displayName: defaultName(draft),
@@ -198,13 +171,7 @@ readKeyFromEnv(draft.apiKeyEnv).length > 0
     signedIn: auth.signedIn,
     identity: auth.identity ?? null,
     plan: auth.plan ?? null,
-    state: !draft.enabled
-      ? 'disabled'
-      : cooling
-        ? 'cooling'
-        : auth.signedIn
-          ? 'healthy'
-          : 'unconfigured',
+    state: !draft.enabled ? 'disabled' : cooling ? 'cooling' : auth.signedIn ? 'healthy' : 'unconfigured',
     loginHint: `CODEX_HOME="${layout.effectiveHomePath}" codex login`,
     detail: auth.error ?? null,
   }
@@ -214,10 +181,7 @@ readKeyFromEnv(draft.apiKeyEnv).length > 0
  * The whole store as the page and the tool read it: stored profiles joined with
  * the pool's live health and each home's observed login.
  */
-export const buildAccountsFile = async (
-  file: AccountStoreFile,
-  statuses: readonly AccountStatus[],
-): Promise<AccountsFile> => ({
+export const buildAccountsFile = async (file: AccountStoreFile, statuses: readonly AccountStatus[]): Promise<AccountsFile> => ({
   ...file,
   accounts: await Promise.all(
     file.accounts.map(async draft => {
@@ -230,9 +194,7 @@ export const buildAccountsFile = async (
 /** Create or update one profile, keyed by its instance id. */
 export const upsertAccount = async (draft: AccountDraft): Promise<AccountStoreFile> => {
   const file = await readAccountFile()
-  const accounts = file.accounts.filter(
-    existing => existing.instanceId !== draft.instanceId,
-  )
+  const accounts = file.accounts.filter(existing => existing.instanceId !== draft.instanceId)
   const normalized: AccountDraft = { ...draft, displayName: defaultName(draft) }
   if (normalized.kind === 'codex') {
     // Materialize now so the login command points at a directory that exists.
@@ -249,9 +211,7 @@ export const removeAccount = async (instanceId: string): Promise<AccountStoreFil
   })
 }
 
-export const setDistribution = async (
-  distribution: AccountsFile['distribution'],
-): Promise<AccountStoreFile> => {
+export const setDistribution = async (distribution: AccountsFile['distribution']): Promise<AccountStoreFile> => {
   const file = await readAccountFile()
   return writeAccountFile({ ...file, distribution })
 }

@@ -58,7 +58,8 @@ function findDefineHost(sourceFile: ts.SourceFile): ts.CallExpression | undefine
 
 function property(object: ts.ObjectLiteralExpression, name: string): ts.PropertyAssignment | undefined {
   return object.properties.find(item => ts.isPropertyAssignment(item) && ts.isIdentifier(item.name) && item.name.text === name) as
-    ts.PropertyAssignment | undefined
+    | ts.PropertyAssignment
+    | undefined
 }
 
 function hasCommand(sourceFile: ts.SourceFile, name: string): boolean {

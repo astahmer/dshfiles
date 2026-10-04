@@ -77,8 +77,7 @@ export const CLIENT_SLOT_REFERENCES: readonly ClientSlotReference[] = [
 ]
 
 /** Look up one slot, or `undefined` when the name is not a known Client slot. */
-export const findClientSlot = (name: string): ClientSlotReference | undefined =>
-  CLIENT_SLOT_REFERENCES.find(slot => slot.name === name)
+export const findClientSlot = (name: string): ClientSlotReference | undefined => CLIENT_SLOT_REFERENCES.find(slot => slot.name === name)
 
 /**
  * Type-only imports a plugin needs before this slot name typechecks.
@@ -86,5 +85,4 @@ export const findClientSlot = (name: string): ClientSlotReference | undefined =>
  * Returns them already formatted, so both the explanation and the generated
  * source come from one source of truth and cannot disagree.
  */
-export const slotOwnerImports = (name: string): readonly string[] =>
-  findClientSlot(name)?.declaredBy ?? []
+export const slotOwnerImports = (name: string): readonly string[] => findClientSlot(name)?.declaredBy ?? []

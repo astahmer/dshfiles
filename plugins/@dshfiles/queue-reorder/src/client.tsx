@@ -30,25 +30,16 @@ interface QueuedMessage {
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 
 /** Decode one projection row, or `null` when it is not a queued message. */
 const asQueuedMessage = (value: unknown): QueuedMessage | null => {
   const record = asRecord(value)
   if (record === null || typeof record.id !== 'string') return null
   const content = Array.isArray(record.content)
-    ? record.content.filter(
-        (block): block is TextBlock => asRecord(block) !== null && typeof (block as TextBlock).type === 'string',
-      )
+    ? record.content.filter((block): block is TextBlock => asRecord(block) !== null && typeof (block as TextBlock).type === 'string')
     : []
   return { id: record.id, content }
-}
-
-/** The `inbox` projection unit shape, narrowed to what the dock reads. */
-interface InboxProjection {
-  readonly 'next-turn'?: readonly QueuedMessage[]
 }
 
 type Direction = 'up' | 'down'
@@ -79,24 +70,17 @@ export interface QueueDockInjected {
  * and `sessionId` — come from the framework's own composed type, and
  * `updateQueue` from this slot's `inject`, so neither is restated here.
  */
-export type DockProps = ComposedProps<
-  'conversation.input.dock',
-  string,
-  never,
-  undefined,
-  QueueDockInjected,
-  never,
-  undefined
->
+export type DockProps = ComposedProps<'conversation.input.dock', string, never, undefined, QueueDockInjected, never, undefined>
 
 export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const inbox = props.useProjection('inbox')
   const queue = useApi(queueApi)
   const rows = useMemo(
-    () => (inbox?.['next-turn'] ?? []).flatMap(row => {
-      const message = asQueuedMessage(row)
-      return message === null ? [] : [message]
-    }),
+    () =>
+      (inbox?.['next-turn'] ?? []).flatMap(row => {
+        const message = asQueuedMessage(row)
+        return message === null ? [] : [message]
+      }),
     [inbox],
   )
   const rowCount = rows.length
@@ -107,7 +91,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState(true)
-  const [running, setRunning] = useState(false)
+  const [running] = useState(false)
   const [mutable] = useState(true)
   const listId = useId()
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
@@ -193,9 +177,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                 const isBusy = busy === row.id
                 return (
                   <li
-                    className={
-                      dropIndex === index ? `${styles.row} ${styles.rowDrop}` : styles.row
-                    }
+                    className={dropIndex === index ? `${styles.row} ${styles.rowDrop}` : styles.row}
                     key={row.id}
                     onDragOver={event => {
                       if (dragId === null || dragId === row.id) return
@@ -203,9 +185,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                       event.dataTransfer.dropEffect = 'move'
                       setDropIndex(index)
                     }}
-                    onDragLeave={() =>
-                      setDropIndex(current => (current === index ? null : current))
-                    }
+                    onDragLeave={() => setDropIndex(current => (current === index ? null : current))}
                     onDrop={event => {
                       event.preventDefault()
                       const sourceId = dragId ?? event.dataTransfer.getData('text/plain')
@@ -284,12 +264,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           >
                             ⏎
                           </button>
-                          <button
-                            type="button"
-                            className={styles.action}
-                            aria-label="Cancel editing"
-                            onClick={() => setEditing(null)}
-                          >
+                          <button type="button" className={styles.action} aria-label="Cancel editing" onClick={() => setEditing(null)}>
                             ✕
                           </button>
                         </>

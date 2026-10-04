@@ -9,20 +9,22 @@ const PANEL_ID = 'dshfiles-jujutsu'
 export default defineClient({
   name: '@dshfiles/jujutsu',
   setup(ctx) {
-    ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register(
-        { name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' },
-        PanelGlyph,
-      ),
-    )
-    ctx.slots.inject('main', () =>
-      ctx.slots.register({ name: 'main', key: PANEL_ID }, JujutsuPanel),
-    )
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, JujutsuPanel))
   },
 })
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
-  <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+  >
     <path d="M6 4v16M6 7h7m-7 5h9m-9 5h7" />
     <circle cx="6" cy="4" r="2" fill="currentColor" />
     <circle cx="6" cy="12" r="2" fill="currentColor" />

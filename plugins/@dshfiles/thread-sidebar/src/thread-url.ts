@@ -11,11 +11,7 @@ export interface ThreadRoute {
  * Build a same-origin deep link while dropping transient query and fragment
  * data (including launch credentials) from the copied address.
  */
-export const buildThreadUrl = (
-  currentUrl: string,
-  sessionId: string,
-  workspaceId?: string,
-): string => {
+export const buildThreadUrl = (currentUrl: string, sessionId: string, workspaceId?: string): string => {
   const url = new URL(currentUrl)
   url.search = ''
   url.hash = ''

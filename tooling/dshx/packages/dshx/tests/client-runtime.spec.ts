@@ -128,10 +128,7 @@ describe('Client runtime adapter', () => {
     const setup = vi.fn((_ctx: Context, decorate: (component: unknown) => unknown) => {
       decorateCalls.push(decorate(() => null))
     })
-    const plugin = createClientPlugin(
-      { inject: ['remote', 'slots'], setup },
-      { packageId: '@test/plugin' },
-    )
+    const plugin = createClientPlugin({ inject: ['remote', 'slots'], setup }, { packageId: '@test/plugin' })
     await plugin.apply({} as Context)
     expect(decorateCalls).toHaveLength(1)
     expect(typeof decorateCalls[0]).toBe('function')

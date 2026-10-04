@@ -14,9 +14,7 @@ export class ClientReconciler {
   private readonly lifecycle = new Map<string, ClientLifecycle>()
   private pending: Promise<void> = Promise.resolve()
 
-  constructor(
-    private readonly start: (target: ClientTarget) => Promise<() => void | Promise<void>>,
-  ) {}
+  constructor(private readonly start: (target: ClientTarget) => Promise<() => void | Promise<void>>) {}
 
   update(targets: readonly ClientTarget[]): Promise<void> {
     const run = this.pending.then(() => this.apply(targets))
@@ -49,9 +47,7 @@ export class ClientReconciler {
 
   private async apply(targets: readonly ClientTarget[]): Promise<void> {
     const byId = new Map(targets.map(target => [target.id, target]))
-    const desired = new Map(
-      targets.filter(target => target.enabled && target.ready && target.suspended !== true).map(target => [target.id, target]),
-    )
+    const desired = new Map(targets.filter(target => target.enabled && target.ready && target.suspended !== true).map(target => [target.id, target]))
     for (const [id, current] of this.active) {
       const next = desired.get(id)
       if (next === undefined || next.fingerprint !== current.fingerprint) {

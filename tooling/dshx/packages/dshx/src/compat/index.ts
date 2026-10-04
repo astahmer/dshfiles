@@ -217,10 +217,7 @@ const HOST_SCOPE_LIBRARIES = new Set(['@deepseek-ai/schemastery'])
  * `devDependencies` for local typechecking, which is what the DSH range check
  * above already asks for.
  */
-export function projectHostProvidedDependencyDiagnostics(
-  manifest: Readonly<Record<string, unknown>>,
-  packageFile: string,
-): readonly DshxDiagnostic[] {
+export function projectHostProvidedDependencyDiagnostics(manifest: Readonly<Record<string, unknown>>, packageFile: string): readonly DshxDiagnostic[] {
   const section = manifest['dependencies']
   if (section === null || typeof section !== 'object' || Array.isArray(section)) return []
   const offenders = Object.keys(section as Record<string, unknown>)

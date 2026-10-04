@@ -11,7 +11,4 @@ const dictionaries = {
 
 export const AI_ACCOUNTS_LOCALE_NAMESPACE = 'settings.aiAccounts'
 
-export const aiAccountsLocale = declareLocaleNamespace(
-  AI_ACCOUNTS_LOCALE_NAMESPACE,
-  dictionaries,
-)
+export const aiAccountsLocale = declareLocaleNamespace(AI_ACCOUNTS_LOCALE_NAMESPACE, dictionaries)

@@ -351,9 +351,9 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   if ((definition.settings?.length ?? 0) > 0 && !inject.includes('settings')) inject.push('settings')
   const apis = definition.apis ?? []
   if (apis.length > 0 && !inject.includes('connection')) inject.push('connection')
-  const config = definition.Config ?? (definition.settings?.length === 0 || definition.settings === undefined
-    ? undefined
-    : settingsContract(definition.settings[0]!).schema.volatile())
+  const config =
+    definition.Config ??
+    (definition.settings?.length === 0 || definition.settings === undefined ? undefined : settingsContract(definition.settings[0]!).schema.volatile())
   return {
     name: definition.name ?? fallbackName(metadata),
     inject,

@@ -1,37 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { describeSettingsTargets, searchSettingsTargets, settingsNamespaceTitle } from './settings-index.js'
 
-const namespaces = [{
-  ns: 'threads',
-  schema: {
-    type: 'object',
-    meta: { title: 'Thread settings' },
-    fields: {
-      editing: {
-        type: 'object',
-        meta: { label: 'Threads & editing' },
-        fields: {
-          queue: {
-            type: 'object',
-            meta: { label: 'Queue' },
-            fields: {
-              followup: {
-                type: 'boolean',
-                meta: { label: 'Default thread followup behavior', description: 'Choose how followup work is handled.' },
+const namespaces = [
+  {
+    ns: 'threads',
+    schema: {
+      type: 'object',
+      meta: { title: 'Thread settings' },
+      fields: {
+        editing: {
+          type: 'object',
+          meta: { label: 'Threads & editing' },
+          fields: {
+            queue: {
+              type: 'object',
+              meta: { label: 'Queue' },
+              fields: {
+                followup: {
+                  type: 'boolean',
+                  meta: { label: 'Default thread followup behavior', description: 'Choose how followup work is handled.' },
+                },
               },
             },
           },
         },
-      },
-      credentials: {
-        type: 'object',
-        meta: { label: 'Credentials' },
-        fields: { token: { type: 'string', meta: { label: 'Token' } } },
+        credentials: {
+          type: 'object',
+          meta: { label: 'Credentials' },
+          fields: { token: { type: 'string', meta: { label: 'Token' } } },
+        },
       },
     },
+    secrets: [{ path: ['credentials', 'token'], set: true }],
   },
-  secrets: [{ path: ['credentials', 'token'], set: true }],
-}] as const
+] as const
 
 describe('settings descriptor search', () => {
   it('returns stable entry and field identities with namespace context', () => {
@@ -63,22 +65,24 @@ describe('settings descriptor search', () => {
   it('uses schema titles for categories and searches accent-insensitively through finite option labels', () => {
     expect(settingsNamespaceTitle(namespaces[0]!)).toBe('Thread settings')
 
-    const optionResults = describeSettingsTargets([{
-      ns: 'locale',
-      schema: {
-        type: 'object',
-        fields: {
-          beverage: {
-            type: 'union',
-            meta: { label: 'Preferred beverage' },
-            list: [
-              { type: 'const', value: 'café', meta: { label: 'Coffee' } },
-              { type: 'const', value: 'tea' },
-            ],
+    const optionResults = describeSettingsTargets([
+      {
+        ns: 'locale',
+        schema: {
+          type: 'object',
+          fields: {
+            beverage: {
+              type: 'union',
+              meta: { label: 'Preferred beverage' },
+              list: [
+                { type: 'const', value: 'café', meta: { label: 'Coffee' } },
+                { type: 'const', value: 'tea' },
+              ],
+            },
           },
         },
       },
-    }])
+    ])
 
     expect(searchSettingsTargets(optionResults, 'cafe').map(result => result.title)).toContain('Preferred beverage')
     expect(searchSettingsTargets(optionResults, 'coffee').map(result => result.title)).toContain('Preferred beverage')

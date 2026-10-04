@@ -46,6 +46,8 @@ export const rootFileFileset = (value: string): string => {
   const quoted = value
     .replaceAll('\\', '\\\\')
     .replaceAll('"', '\\"')
+    // JJ fileset quoting must escape control characters in literal filenames.
+    // oxlint-disable-next-line no-control-regex
     .replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, character => '\\x' + character.charCodeAt(0).toString(16).padStart(2, '0'))
     .replaceAll('\t', '\\t')
   return 'root-file:"' + quoted + '"'
@@ -116,8 +118,7 @@ export const isRecordedJjGitPush = (attributes: string): boolean => {
   const executable = tokens.shift() ?? ''
   if (!/(?:^|[\\/])jj$/i.test(executable)) return false
   while (tokens[0] === '--color=never' || tokens[0] === '--no-pager') tokens.shift()
-  return tokens[0] === 'git' && tokens[1] === 'push' &&
-    !tokens.slice(2).some(token => token === '--dry-run' || token.startsWith('--dry-run='))
+  return tokens[0] === 'git' && tokens[1] === 'push' && !tokens.slice(2).some(token => token === '--dry-run' || token.startsWith('--dry-run='))
 }
 
 /** Count added and removed patch lines without counting diff headers. */

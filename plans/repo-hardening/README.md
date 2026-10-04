@@ -1,10 +1,9 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–3 done, Phase 4 next.
+Status: **in progress** — Phases 0–3 done, Phase 4 underway.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
-that does the work. Each phase closes with the full check run, and the next
-phase starts only after review.
+that does the work. Each phase closes with the full check run, and phases continue autonomously under the user's 2026-10-04 instruction.
 
 ## Decisions
 
@@ -16,7 +15,7 @@ phase starts only after review.
 | `flake.nix` dshx package | Make it a pure build: dependencies fetched by a hash-pinned fixed-output derivation, no network in the build |
 | `plugin-marketplace` | Move from `tooling/dshx/packages` to `plugins/@dshfiles` |
 | Bundles in the `web` profile | Install every owned bundle |
-| Execution | Phase by phase, separate jj workspace `hardening`, review between phases |
+| Execution | Phase by phase, separate jj workspace `hardening`, autonomous continuation between phases |
 
 ## Baseline (2026-10-04, after Phase 0 merges)
 
@@ -121,12 +120,21 @@ Exit evidence: root `pnpm check` exit 0 — dshx 378 tests, create-dshx 20, all
 
 ## Phase 4 — Toolchain
 
-- [ ] Oxlint and Oxfmt replace eslint and prettier repo-wide, with the antislop
-      rules
+- [x] Oxlint 1.86.0 and Oxfmt 0.71.0 replace eslint and prettier; root lint
+      and format gates cover both workspaces. Reused the owned emilint bundle
+      with pinned revision provenance. Existing antislop findings are warnings
+      pending Phase 6; correctness rules are errors. React behavior rules remain
+      outside this mechanical migration.
 - [ ] TS 7 typecheck through `@typescript/native-preview`
 - [ ] dshx AST code (`project/typecheck.ts`, `project/migrations.ts`,
       `scaffold/*`, `compiler/client/capabilities.ts`) ported to `oxc-parser`
 - [ ] `create-dshx` templates target the new toolchain
+
+Takeover: current T3 thread owns `hardening`; prior audit thread interrupted.
+Lint exits 0; dshx 379 tests pass. Full plugin check currently exposes inherited
+`bash-parallel` errors; the default workspace is removing that rejected
+experiment. Preserve concurrent default UI work. The unfinished locale ownership
+module has a temporary knip exclusion while its owning workspace completes it.
 
 ## Phase 5 — Shared dshx helpers
 

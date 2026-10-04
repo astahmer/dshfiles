@@ -17,7 +17,7 @@ const cwdForScope = (scope: string, requestedCwd: string | null): string | null 
 }
 
 const api = secretCatalogApi.host({
-  list: async ({ input, ctx }) => [...await operationsFor(ctx).list(input.cwd)],
+  list: async ({ input, ctx }) => [...(await operationsFor(ctx).list(input.cwd))],
   reveal: ({ input, ctx }) => operationsFor(ctx).reveal(input.alias, input.scope, cwdForScope(input.scope, input.cwd), input.environment),
   copy: ({ input, ctx }) => operationsFor(ctx).copy(input.alias, input.scope, cwdForScope(input.scope, input.cwd), input.environment),
   machine: () => {

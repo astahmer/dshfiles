@@ -125,7 +125,8 @@ export const createSecretCatalogOperations = (run: SecretCliRunner): SecretCatal
       const alias = validatedAlias(input.alias)
       const environment = environmentSchema.parse(input.environment)
       const cwd = input.scope === 'global' ? validateCwd(input.cwd) : requireFolder(input.cwd)
-      if (input.valueMode === 'manual' && (input.value === null || input.value.length === 0)) throw new Error('A non-empty value is required for a manual secret.')
+      if (input.valueMode === 'manual' && (input.value === null || input.value.length === 0))
+        throw new Error('A non-empty value is required for a manual secret.')
       if (input.valueMode === 'generate' && input.value !== null) throw new Error('Generated secrets cannot include a submitted value.')
       const existingRows = await list(cwd)
       if (existingRows.some(row => row.alias === alias && row.environment === environment)) {

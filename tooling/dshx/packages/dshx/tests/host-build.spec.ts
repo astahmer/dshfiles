@@ -127,7 +127,7 @@ describe('host compiler', () => {
         "import { defineHost } from '@dshfiles/dshx/host'",
         "import { z } from 'zod'",
         "import { defineApi, method } from '@dshfiles/dshx/api'",
-        "const Config = z.object({ servers: z.array(z.string()).default([]) })",
+        'const Config = z.object({ servers: z.array(z.string()).default([]) })',
         "const api = defineApi({ id: 'manager', version: 1, methods: { list: method() } })",
         'export default defineHost({ Config, apis: [api.host({ list() { return [] } })] })',
         '',

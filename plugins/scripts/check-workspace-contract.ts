@@ -12,8 +12,7 @@ import { z } from 'zod'
 const workspaceRoot = join(import.meta.dirname, '..')
 const packagesRoot = join(workspaceRoot, '@dshfiles')
 
-const scriptsSchema = (required: readonly string[]) =>
-  z.object(Object.fromEntries(required.map(name => [name, z.string().min(1)])))
+const scriptsSchema = (required: readonly string[]) => z.object(Object.fromEntries(required.map(name => [name, z.string().min(1)])))
 
 const bundleManifestSchema = z.object({ scripts: scriptsSchema(['build', 'test', 'typecheck']) })
 const libraryManifestSchema = z.object({ scripts: scriptsSchema(['test', 'typecheck']) })

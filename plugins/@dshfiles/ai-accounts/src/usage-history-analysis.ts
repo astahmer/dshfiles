@@ -28,17 +28,16 @@ export const forecastQuotaWindow = (input: {
     return { status: 'reset-due', sampleCount: 0 }
   }
 
-  const ordered = [...input.points].filter(point => point.at <= input.now)
-    .sort((left, right) => left.at - right.at)
-  const lastReset = [...ordered].reverse().find(point => point.resetsAt[input.label] !== undefined)
-    ?.resetsAt[input.label]
+  const ordered = [...input.points].filter(point => point.at <= input.now).sort((left, right) => left.at - right.at)
+  const lastReset = [...ordered].reverse().find(point => point.resetsAt[input.label] !== undefined)?.resetsAt[input.label]
   const cycleReset = input.resetsAt ?? lastReset
-  const cycle = ordered.filter(point =>
-    point.windows[input.label] !== undefined
-    && (cycleReset === undefined
-      ? point.resetsAt[input.label] === undefined
-      : point.resetsAt[input.label] === cycleReset),
-  ).slice(-FORECAST_SAMPLE_LIMIT)
+  const cycle = ordered
+    .filter(
+      point =>
+        point.windows[input.label] !== undefined &&
+        (cycleReset === undefined ? point.resetsAt[input.label] === undefined : point.resetsAt[input.label] === cycleReset),
+    )
+    .slice(-FORECAST_SAMPLE_LIMIT)
   const first = cycle[0]
   const last = cycle.at(-1)
   if (cycle.length < 3 || first === undefined || last === undefined || last.at - first.at < MIN_FORECAST_SPAN_MS) {
@@ -60,7 +59,7 @@ export const forecastQuotaWindow = (input: {
     return { status: 'no-depletion', sampleCount: cycle.length, percentPerHour: Number.isFinite(percentPerHour) ? percentPerHour : 0 }
   }
 
-  const estimatedAt = input.now + Math.max(0, input.remainingPercent) / -percentPerMinute * MINUTE_MS
+  const estimatedAt = input.now + (Math.max(0, input.remainingPercent) / -percentPerMinute) * MINUTE_MS
   if (!Number.isFinite(estimatedAt)) return { status: 'insufficient-history', sampleCount: cycle.length }
   if (input.resetsAt === null) {
     return { status: 'estimated-depletion', sampleCount: cycle.length, percentPerHour, estimatedAt }
@@ -75,9 +74,7 @@ export const forecastQuotaWindow = (input: {
 }
 
 /** Keep only the first banked-reset observation and subsequent changes. */
-export const changedBankedResetSnapshots = (
-  points: readonly UsageHistoryPoint[],
-): readonly UsageHistoryPoint[] => {
+export const changedBankedResetSnapshots = (points: readonly UsageHistoryPoint[]): readonly UsageHistoryPoint[] => {
   const ordered = [...points].sort((left, right) => left.at - right.at)
   const changed: UsageHistoryPoint[] = []
   let previousSignature: string | undefined
@@ -93,10 +90,7 @@ export const changedBankedResetSnapshots = (
   return changed
 }
 
-export const quotaHistoryCycles = (
-  points: readonly UsageHistoryPoint[],
-  label: string,
-): readonly (readonly UsageHistoryPoint[])[] => {
+export const quotaHistoryCycles = (points: readonly UsageHistoryPoint[], label: string): readonly (readonly UsageHistoryPoint[])[] => {
   const ordered = [...points].sort((left, right) => left.at - right.at)
   const cycles = new Map<string, UsageHistoryPoint[]>()
   for (const point of ordered) {

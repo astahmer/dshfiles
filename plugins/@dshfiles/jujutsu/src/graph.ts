@@ -11,8 +11,7 @@ export interface GraphParentLink {
 }
 
 /** Ignore JJ's canonical trailing newline when comparing the editable description. */
-export const describeDraftChanged = (draft: string, current: string): boolean =>
-  draft.replace(/\n+$/, '') !== current.replace(/\n+$/, '')
+export const describeDraftChanged = (draft: string, current: string): boolean => draft.replace(/\n+$/, '') !== current.replace(/\n+$/, '')
 
 /** Search full IDs and the user-visible revision labels. */
 export const matchesRevisionSearch = (revision: SearchableRevision, query: string): boolean => {
@@ -26,15 +25,14 @@ export const matchesRevisionSearch = (revision: SearchableRevision, query: strin
     ...revision.bookmarks,
     ...revision.tags,
     ...revision.workspaces,
-  ].join('\n').toLocaleLowerCase().includes(needle)
+  ]
+    .join('\n')
+    .toLocaleLowerCase()
+    .includes(needle)
 }
 
 /** Collapse hidden immutable parents into explicit ancestry links to visible ancestors. */
-export const graphParentLinks = (
-  revision: ParentRevision,
-  revisionsById: ReadonlyMap<string, ParentRevision>,
-  hideImmutable: boolean,
-): GraphParentLink[] => {
+export const graphParentLinks = (revision: ParentRevision, revisionsById: ReadonlyMap<string, ParentRevision>, hideImmutable: boolean): GraphParentLink[] => {
   const links = new Map<string, GraphParentLink>()
   const visit = (commitId: string, hiddenImmutableCount: number, seen: ReadonlySet<string>): void => {
     const parent = revisionsById.get(commitId)

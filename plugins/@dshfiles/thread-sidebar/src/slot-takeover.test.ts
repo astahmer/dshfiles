@@ -11,33 +11,49 @@ test('composition disables native declarations before the full sidebar can own t
   assert.match(patch, /- id: ui-sidebar\s+disabled: true/)
 
   const slots = new SlotCore()
-  slots.register({
-    name: 'root',
-    children: { sidebar: { kind: 'single', scope: 'root' } },
-  }, childSlotOwner())
+  slots.register(
+    {
+      name: 'root',
+      children: { sidebar: { kind: 'single', scope: 'root' } },
+    },
+    childSlotOwner(),
+  )
 
   const nativeComponent = childSlotOwner()
-  const nativeDispose = slots.register({
-    name: 'sidebar',
-    registrant: 'ui-sidebar',
-    children: sidebarChildren,
-  }, nativeComponent)
+  const nativeDispose = slots.register(
+    {
+      name: 'sidebar',
+      registrant: 'ui-sidebar',
+      children: sidebarChildren,
+    },
+    nativeComponent,
+  )
 
-  assert.throws(() => slots.register({
-    name: 'sidebar',
-    priority: -1000,
-    registrant: '@dshfiles/thread-sidebar',
-    children: sidebarChildren,
-  }, childSlotOwner()), /already declared/)
+  assert.throws(
+    () =>
+      slots.register(
+        {
+          name: 'sidebar',
+          priority: -1000,
+          registrant: '@dshfiles/thread-sidebar',
+          children: sidebarChildren,
+        },
+        childSlotOwner(),
+      ),
+    /already declared/,
+  )
 
   nativeDispose()
   const sidebarComponent = childSlotOwner()
-  slots.register({
-    name: 'sidebar',
-    priority: -1000,
-    registrant: '@dshfiles/thread-sidebar',
-    children: sidebarChildren,
-  }, sidebarComponent)
+  slots.register(
+    {
+      name: 'sidebar',
+      priority: -1000,
+      registrant: '@dshfiles/thread-sidebar',
+      children: sidebarChildren,
+    },
+    sidebarComponent,
+  )
 
   const sidebarWinner = slots.entriesOfSlot('sidebar')[0]
   assert.equal(sidebarWinner?.component, sidebarComponent)

@@ -48,10 +48,7 @@ const error = (message: string): UsageCard => ({
   bankedResetExpiries: [],
 })
 
-const empty = (
-  status: UsageCard['status'],
-  message: string | null = null,
-): UsageCard => ({
+const empty = (status: UsageCard['status'], message: string | null = null): UsageCard => ({
   status,
   message,
   identity: null,
@@ -63,35 +60,32 @@ const empty = (
 
 /** Codex answers in its own wire shape; map it onto our window model. */
 const codexWindowSchema = z.object({
-    used_percent: z.number().finite().optional(),
-    limit_window_seconds: z.number().positive().optional(),
-    reset_at: z.number().finite().optional(),
-    resets_at: z.number().finite().optional(),
-  })
-
+  used_percent: z.number().finite().optional(),
+  limit_window_seconds: z.number().positive().optional(),
+  reset_at: z.number().finite().optional(),
+  resets_at: z.number().finite().optional(),
+})
 
 const codexUsageSchema = z.object({
-    plan_type: z.string().optional(),
-    rate_limit: z.object({
-        primary_window: codexWindowSchema.optional(),
-        secondary_window: codexWindowSchema.optional(),
-      })
-    
-      .optional(),
-    // Codex reports credits and reset banking alongside the windows.
-    credits: z.object({}).loose().optional(),
-  })
+  plan_type: z.string().optional(),
+  rate_limit: z
+    .object({
+      primary_window: codexWindowSchema.optional(),
+      secondary_window: codexWindowSchema.optional(),
+    })
 
+    .optional(),
+  // Codex reports credits and reset banking alongside the windows.
+  credits: z.object({}).loose().optional(),
+})
 
 const codexAuthSchema = z.object({
-    tokens: z.object({
-        access_token: z.string().min(1),
-        account_id: z.string().optional(),
-        id_token: z.string().optional(),
-      })
-    ,
-  })
-
+  tokens: z.object({
+    access_token: z.string().min(1),
+    account_id: z.string().optional(),
+    id_token: z.string().optional(),
+  }),
+})
 
 /** Percent remaining, clamped, from Codex's percent-used. */
 const remainingFrom = (usedPercent: number | undefined): number | null => {
@@ -132,9 +126,7 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
         accept: 'application/json',
       },
       redirect: 'error',
-      signal: signal === undefined
-        ? AbortSignal.timeout(5_000)
-        : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+      signal: signal === undefined ? AbortSignal.timeout(5_000) : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return error(`Codex returned ${String(response.status)} for usage.`)
     const body = codexUsageSchema.parse(await response.json())
@@ -175,21 +167,18 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
 }
 
 const opencodeWindowSchema = z.object({
-    status: z.enum(['ok', 'rate-limited']),
-    percent: z.number().finite().min(0).max(100),
-    resetsAt: z.string().datetime().optional(),
-  })
-
+  status: z.enum(['ok', 'rate-limited']),
+  percent: z.number().finite().min(0).max(100),
+  resetsAt: z.string().datetime().optional(),
+})
 
 const opencodeUsageSchema = z.object({
-    usage: z.object({
-        rolling: opencodeWindowSchema.optional(),
-        weekly: opencodeWindowSchema.optional(),
-        monthly: opencodeWindowSchema.optional(),
-      })
-    ,
-  })
-
+  usage: z.object({
+    rolling: opencodeWindowSchema.optional(),
+    weekly: opencodeWindowSchema.optional(),
+    monthly: opencodeWindowSchema.optional(),
+  }),
+})
 
 const OPENCODE_WINDOW_LABELS: Readonly<Record<'rolling' | 'weekly' | 'monthly', string>> = {
   rolling: 'Current session',
@@ -204,18 +193,13 @@ export const readOpenCodeUsage = async (apiKey: string, signal?: AbortSignal): P
   try {
     const response = await fetch('https://opencode.ai/zen/go/v1/usage', {
       headers: { authorization: `Bearer ${apiKey.trim()}`, accept: 'application/json' },
-      signal: signal === undefined
-        ? AbortSignal.timeout(5_000)
-        : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+      signal: signal === undefined ? AbortSignal.timeout(5_000) : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return error(`OpenCode returned ${String(response.status)} for usage.`)
     const body = opencodeUsageSchema.parse(await response.json())
 
     const windows: (UsageWindow & { label: string })[] = []
-    for (const [key, label] of Object.entries(OPENCODE_WINDOW_LABELS) as [
-      'rolling' | 'weekly' | 'monthly',
-      string,
-    ][]) {
+    for (const [key, label] of Object.entries(OPENCODE_WINDOW_LABELS) as ['rolling' | 'weekly' | 'monthly', string][]) {
       const window = body.usage[key]
       if (window === undefined) continue
       windows.push({

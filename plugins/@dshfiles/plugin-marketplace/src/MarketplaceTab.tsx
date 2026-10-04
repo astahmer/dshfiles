@@ -177,7 +177,9 @@ function InstallDialog({
                   else onInstall(state.plugin)
                 }}
               >
-                <span aria-hidden="true">{installing ? <IconLoadingOutlineMedium className={styles.spinner} /> : risk ? <IconDownloadOutlineMedium /> : null}</span>
+                <span aria-hidden="true">
+                  {installing ? <IconLoadingOutlineMedium className={styles.spinner} /> : risk ? <IconDownloadOutlineMedium /> : null}
+                </span>
                 {installing ? t('downloading') : risk ? t('finalConfirmInstall') : t('continueInstall')}
               </button>
             </>

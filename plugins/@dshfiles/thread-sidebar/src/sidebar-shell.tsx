@@ -1,11 +1,7 @@
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import {
-  moveSidebarEntry,
-  orderSidebarEntries,
-  type OrderedSidebarEntry,
-} from './organization.js'
+import { moveSidebarEntry, orderSidebarEntries, type OrderedSidebarEntry } from './organization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import styles from './sidebar-shell.module.css'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -47,19 +43,14 @@ interface FooterEntry extends OrderedSidebarEntry {
 
 const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTranslate>[0]): string => translate(key)
 
-const updateOrder = (
-  entries: readonly OrderedSidebarEntry[],
-  savedOrder: readonly string[],
-  id: string,
-  direction: -1 | 1,
-): string[] => moveSidebarEntry(
-  orderSidebarEntries(entries, savedOrder).map(entry => entry.id),
-  id,
-  direction,
-)
+const updateOrder = (entries: readonly OrderedSidebarEntry[], savedOrder: readonly string[], id: string, direction: -1 | 1): string[] =>
+  moveSidebarEntry(
+    orderSidebarEntries(entries, savedOrder).map(entry => entry.id),
+    id,
+    direction,
+  )
 
-const toggleHidden = (ids: readonly string[], id: string): string[] =>
-  ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id]
+const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
@@ -83,47 +74,51 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     if (searchOpen) searchInput.current?.focus()
   }, [searchOpen])
 
-  const headerEntries = useMemo<HeaderEntry[]>(() => [
-    { id: 'new-thread', label: text(props.t, 'threadSidebarNewThread'), kind: 'new-thread', order: -2 },
-    { id: 'search', label: text(props.t, 'threadSidebarSearch'), kind: 'search', order: -1 },
-    ...panels.map(panel => ({
-      id: 'panel:' + panel.id,
-      label: panel.label,
-      kind: 'panel' as const,
-      panelId: panel.id,
-      order: panel.order,
-    })),
-  ], [panels, props.t])
-
-  const orderedHeaderEntries = useMemo(
-    () => orderSidebarEntries(headerEntries, preferences.headerOrder),
-    [headerEntries, preferences.headerOrder],
+  const headerEntries = useMemo<HeaderEntry[]>(
+    () => [
+      { id: 'new-thread', label: text(props.t, 'threadSidebarNewThread'), kind: 'new-thread', order: -2 },
+      { id: 'search', label: text(props.t, 'threadSidebarSearch'), kind: 'search', order: -1 },
+      ...panels.map(panel => ({
+        id: 'panel:' + panel.id,
+        label: panel.label,
+        kind: 'panel' as const,
+        panelId: panel.id,
+        order: panel.order,
+      })),
+    ],
+    [panels, props.t],
   )
+
+  const orderedHeaderEntries = useMemo(() => orderSidebarEntries(headerEntries, preferences.headerOrder), [headerEntries, preferences.headerOrder])
   const visibleHeaderEntries = orderedHeaderEntries.filter(entry => !preferences.hiddenHeaderIds.includes(entry.id))
 
-  const footerEntries = useMemo<FooterEntry[]>(() => [
-    ...(footerSnapshot.settingsId === null ? [] : [{
-      key: 'settings',
-      id: 'settings',
-      label: text(props.t, 'threadSidebarHostSettings'),
-      kind: 'settings' as const,
-      registrationId: null,
-      order: -1,
-    }]),
-    ...footerSnapshot.actions.map(action => ({
-      key: 'footer:' + action.id,
-      id: 'footer:' + action.id,
-      label: action.label,
-      kind: 'action' as const,
-      registrationId: action.id,
-      order: action.order,
-    })),
-  ], [footerSnapshot, props.t])
-
-  const orderedFooterEntries = useMemo(
-    () => orderSidebarEntries(footerEntries, preferences.footerOrder),
-    [footerEntries, preferences.footerOrder],
+  const footerEntries = useMemo<FooterEntry[]>(
+    () => [
+      ...(footerSnapshot.settingsId === null
+        ? []
+        : [
+            {
+              key: 'settings',
+              id: 'settings',
+              label: text(props.t, 'threadSidebarHostSettings'),
+              kind: 'settings' as const,
+              registrationId: null,
+              order: -1,
+            },
+          ]),
+      ...footerSnapshot.actions.map(action => ({
+        key: 'footer:' + action.id,
+        id: 'footer:' + action.id,
+        label: action.label,
+        kind: 'action' as const,
+        registrationId: action.id,
+        order: action.order,
+      })),
+    ],
+    [footerSnapshot, props.t],
   )
+
+  const orderedFooterEntries = useMemo(() => orderSidebarEntries(footerEntries, preferences.footerOrder), [footerEntries, preferences.footerOrder])
   const visibleFooterEntries = orderedFooterEntries.filter(entry => !preferences.hiddenFooterIds.includes(entry.id))
   const hiddenFooterEntries = orderedFooterEntries.filter(entry => preferences.hiddenFooterIds.includes(entry.id))
 
@@ -154,53 +149,53 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     if (entry.panelId !== undefined) props.selectPanel(entry.panelId)
   }
 
-  const renderHeaderCustomizeRows = (): JSX.Element[] => orderedHeaderEntries.map((entry, index) => (
-    <div className={styles.customizeRow} key={entry.id}>
-      <span className={styles.customizeLabel}>{entry.label}</span>
-      <button
-        type="button"
-        aria-label={text(props.t, 'threadSidebarMoveUp')}
-        disabled={index === 0}
-        onClick={() => updateHeaderOrder(entry.id, -1)}
-      >↑</button>
-      <button
-        type="button"
-        aria-label={text(props.t, 'threadSidebarMoveDown')}
-        disabled={index === orderedHeaderEntries.length - 1}
-        onClick={() => updateHeaderOrder(entry.id, 1)}
-      >↓</button>
-      <input
-        type="checkbox"
-        aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
-        checked={!preferences.hiddenHeaderIds.includes(entry.id)}
-        onChange={() => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) })}
-      />
-    </div>
-  ))
+  const renderHeaderCustomizeRows = (): JSX.Element[] =>
+    orderedHeaderEntries.map((entry, index) => (
+      <div className={styles.customizeRow} key={entry.id}>
+        <span className={styles.customizeLabel}>{entry.label}</span>
+        <button type="button" aria-label={text(props.t, 'threadSidebarMoveUp')} disabled={index === 0} onClick={() => updateHeaderOrder(entry.id, -1)}>
+          ↑
+        </button>
+        <button
+          type="button"
+          aria-label={text(props.t, 'threadSidebarMoveDown')}
+          disabled={index === orderedHeaderEntries.length - 1}
+          onClick={() => updateHeaderOrder(entry.id, 1)}
+        >
+          ↓
+        </button>
+        <input
+          type="checkbox"
+          aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
+          checked={!preferences.hiddenHeaderIds.includes(entry.id)}
+          onChange={() => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) })}
+        />
+      </div>
+    ))
 
-  const renderFooterCustomizeRows = (): JSX.Element[] => orderedFooterEntries.map((entry, index) => (
-    <div className={styles.customizeRow} key={entry.id}>
-      <span className={styles.customizeLabel}>{entry.label}</span>
-      <button
-        type="button"
-        aria-label={text(props.t, 'threadSidebarMoveUp')}
-        disabled={index === 0}
-        onClick={() => updateFooterOrder(entry.id, -1)}
-      >↑</button>
-      <button
-        type="button"
-        aria-label={text(props.t, 'threadSidebarMoveDown')}
-        disabled={index === orderedFooterEntries.length - 1}
-        onClick={() => updateFooterOrder(entry.id, 1)}
-      >↓</button>
-      <input
-        type="checkbox"
-        aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
-        checked={!preferences.hiddenFooterIds.includes(entry.id)}
-        onChange={() => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) })}
-      />
-    </div>
-  ))
+  const renderFooterCustomizeRows = (): JSX.Element[] =>
+    orderedFooterEntries.map((entry, index) => (
+      <div className={styles.customizeRow} key={entry.id}>
+        <span className={styles.customizeLabel}>{entry.label}</span>
+        <button type="button" aria-label={text(props.t, 'threadSidebarMoveUp')} disabled={index === 0} onClick={() => updateFooterOrder(entry.id, -1)}>
+          ↑
+        </button>
+        <button
+          type="button"
+          aria-label={text(props.t, 'threadSidebarMoveDown')}
+          disabled={index === orderedFooterEntries.length - 1}
+          onClick={() => updateFooterOrder(entry.id, 1)}
+        >
+          ↓
+        </button>
+        <input
+          type="checkbox"
+          aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
+          checked={!preferences.hiddenFooterIds.includes(entry.id)}
+          onChange={() => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) })}
+        />
+      </div>
+    ))
 
   const compactHeader = props.collapsed || preferences.headerMode === 'compact'
 
@@ -219,19 +214,17 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
       </div>
 
-      <nav
-        className={compactHeader ? styles.headerCompact : styles.headerExpanded}
-        aria-label={text(props.t, 'threadSidebarHeaderNavigation')}
-      >
+      <nav className={compactHeader ? styles.headerCompact : styles.headerExpanded} aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
         {visibleHeaderEntries.map(entry => {
           const active = entry.kind === 'panel' && activePanelId === entry.panelId
-          const icon = entry.kind === 'new-thread'
-            ? <span aria-hidden="true">＋</span>
-            : entry.kind === 'search'
-              ? <span aria-hidden="true">⌕</span>
-              : entry.panelId === undefined
-                ? null
-                : props.renderSlot('sidebar.panellist', { size: 22, active }, { only: entry.panelId })
+          const icon =
+            entry.kind === 'new-thread' ? (
+              <span aria-hidden="true">＋</span>
+            ) : entry.kind === 'search' ? (
+              <span aria-hidden="true">⌕</span>
+            ) : entry.panelId === undefined ? null : (
+              props.renderSlot('sidebar.panellist', { size: 22, active }, { only: entry.panelId })
+            )
           return (
             <button
               key={entry.id}
@@ -277,7 +270,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         <section className={styles.customizePanel} aria-label={text(props.t, 'threadSidebarCustomize')}>
           <div className={styles.customizeTitle}>
             <h2>{text(props.t, 'threadSidebarCustomize')}</h2>
-            <button type="button" onClick={() => setCustomizeOpen(false)}>{text(props.t, 'threadSidebarDone')}</button>
+            <button type="button" onClick={() => setCustomizeOpen(false)}>
+              {text(props.t, 'threadSidebarDone')}
+            </button>
           </div>
           <fieldset className={styles.modeField}>
             <legend>{text(props.t, 'threadSidebarHeaderStyle')}</legend>
@@ -315,12 +310,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       ) : null}
 
       <div className={styles.regionArea}>
-        {wide ? props.renderSlot('sidebar.workspaces', {
-          wide,
-          expandSidebar: () => {
-            if (props.collapsed) props.toggleSidebar()
-          },
-        }) : null}
+        {wide
+          ? props.renderSlot('sidebar.workspaces', {
+              wide,
+              expandSidebar: () => {
+                if (props.collapsed) props.toggleSidebar()
+              },
+            })
+          : null}
       </div>
 
       <footer className={styles.footer}>

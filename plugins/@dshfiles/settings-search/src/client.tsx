@@ -3,8 +3,24 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
-import { formatSettingsDraft, hasSettingsPath, parseSettingsDraft, readSettingsPath, schemaNodeAtPath, setOperationForSettingsTarget, settingsEditorKind, unsetOperationForSettingsTarget } from './settings-editor-model.js'
-import { describeSettingsTargets, searchSettingsTargets, settingsChoiceOptions, settingsNamespaceTitle, type SettingsSearchNamespace, type SettingsSearchResult } from './settings-index.js'
+import {
+  formatSettingsDraft,
+  hasSettingsPath,
+  parseSettingsDraft,
+  readSettingsPath,
+  schemaNodeAtPath,
+  setOperationForSettingsTarget,
+  settingsEditorKind,
+  unsetOperationForSettingsTarget,
+} from './settings-editor-model.js'
+import {
+  describeSettingsTargets,
+  searchSettingsTargets,
+  settingsChoiceOptions,
+  settingsNamespaceTitle,
+  type SettingsSearchNamespace,
+  type SettingsSearchResult,
+} from './settings-index.js'
 import styles from './settings-search.module.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
@@ -110,42 +126,74 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
 
   return (
     <section aria-labelledby="settings-search-editor-title" className={styles.editor}>
-      <button className={styles.backButton} onClick={props.onBack} type="button">← Back to results</button>
+      <button className={styles.backButton} onClick={props.onBack} type="button">
+        ← Back to results
+      </button>
       <p className={styles.contextNote}>{props.result.context}</p>
       <h2 id="settings-search-editor-title">{props.result.title}</h2>
       {props.result.description.length > 0 && <p className={styles.description}>{props.result.description}</p>}
-      <code className={styles.path}>{props.result.target.entryId} · {path.join(' · ')}</code>
+      <code className={styles.path}>
+        {props.result.target.entryId} · {path.join(' · ')}
+      </code>
       {snapshot.status === 'loading' && <p role="status">Loading the current setting…</p>}
       {snapshot.status === 'unavailable' && <p role="status">This setting is not available from the current Host.</p>}
       {snapshot.status === 'ready' && (
         <>
           <label className={styles.valueField}>
             <span>Current value</span>
-            {kind === 'boolean' || kind === 'choice'
-              ? <select autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
-                {kind === 'choice'
-                  ? <>
+            {kind === 'boolean' || kind === 'choice' ? (
+              <select autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
+                {kind === 'choice' ? (
+                  <>
                     <option value="">Choose an option…</option>
-                    {choices.map((choice, index) => <option key={String(index)} value={String(index)}>{choice.label}</option>)}
+                    {choices.map((choice, index) => (
+                      <option key={String(index)} value={String(index)}>
+                        {choice.label}
+                      </option>
+                    ))}
                   </>
-                  : <>
+                ) : (
+                  <>
                     <option value="true">true</option>
                     <option value="false">false</option>
-                  </>}
+                  </>
+                )}
               </select>
-              : kind === 'string'
-                ? <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={4} value={draft} />
-                : <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={6} value={draft} />}
+            ) : kind === 'string' ? (
+              <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={4} value={draft} />
+            ) : (
+              <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={6} value={draft} />
+            )}
           </label>
           <p className={styles.formHint}>
             {snapshot.writable ? `Host document · revision ${snapshot.revision ?? 'pending'}` : 'The Host settings document is read-only.'}
             {overridden ? ' · Custom value' : ' · Inherited value'}
           </p>
           {message !== null && <p role="status">{message}</p>}
-          {conflict && <button disabled={pending} onClick={reloadLatest} type="button">Reload latest value</button>}
+          {conflict && (
+            <button disabled={pending} onClick={reloadLatest} type="button">
+              Reload latest value
+            </button>
+          )}
           <footer className={styles.editorActions}>
-            <button disabled={!canWrite || !dirty || !parsed.ok} onClick={() => { void save() }} type="button">{pending ? 'Saving…' : 'Save setting'}</button>
-            <button disabled={!canWrite || !overridden} onClick={() => { void reset() }} type="button">Restore inherited value</button>
+            <button
+              disabled={!canWrite || !dirty || !parsed.ok}
+              onClick={() => {
+                void save()
+              }}
+              type="button"
+            >
+              {pending ? 'Saving…' : 'Save setting'}
+            </button>
+            <button
+              disabled={!canWrite || !overridden}
+              onClick={() => {
+                void reset()
+              }}
+              type="button"
+            >
+              Restore inherited value
+            </button>
           </footer>
         </>
       )}
@@ -165,28 +213,31 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const [browseEntryId, setBrowseEntryId] = useState<string | null>(null)
   const [selected, setSelected] = useState<SettingsSearchResult | null>(null)
 
-  useEffect(() => { void describe.ensure() }, [describe])
+  useEffect(() => {
+    void describe.ensure()
+  }, [describe])
 
   const namespaces = mirror.view?.namespaces ?? []
   const allResults = useMemo(() => describeSettingsTargets(namespaces), [namespaces])
-  const namespaceGroups = useMemo(() => namespaces.map(namespace => ({
-    namespace,
-    title: settingsNamespaceTitle(namespace),
-    count: allResults.filter(result => result.target.entryId === namespace.ns).length,
-  })), [allResults, namespaces])
+  const namespaceGroups = useMemo(
+    () =>
+      namespaces.map(namespace => ({
+        namespace,
+        title: settingsNamespaceTitle(namespace),
+        count: allResults.filter(result => result.target.entryId === namespace.ns).length,
+      })),
+    [allResults, namespaces],
+  )
   const trimmedQuery = query.trim()
   const matched = useMemo(() => searchSettingsTargets(allResults, trimmedQuery).slice(0, MAX_RESULTS), [allResults, trimmedQuery])
-  const browsedResults = useMemo(() => browseEntryId === null
-    ? []
-    : allResults.filter(result => result.target.entryId === browseEntryId), [allResults, browseEntryId])
+  const browsedResults = useMemo(
+    () => (browseEntryId === null ? [] : allResults.filter(result => result.target.entryId === browseEntryId)),
+    [allResults, browseEntryId],
+  )
   const visibleResults = trimmedQuery.length > 0 ? matched : browsedResults
   const boundedActiveIndex = Math.min(activeIndex, Math.max(visibleResults.length - 1, 0))
-  const selectedNamespace = selected === null
-    ? undefined
-    : namespaces.find(namespace => namespace.ns === selected.target.entryId)
-  const selectedTarget = selected === null
-    ? undefined
-    : allResults.find(result => result.id === selected.id)
+  const selectedNamespace = selected === null ? undefined : namespaces.find(namespace => namespace.ns === selected.target.entryId)
+  const selectedTarget = selected === null ? undefined : allResults.find(result => result.id === selected.id)
 
   const selectResult = (result: SettingsSearchResult): void => setSelected(result)
 
@@ -213,12 +264,30 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
 
   if (selected !== null) {
     if (selectedNamespace === undefined || selectedTarget === undefined) {
-      return <section className={styles.page}><p role="status">This settings entry is no longer available.</p><button onClick={() => setSelected(null)} type="button">Back to search</button></section>
+      return (
+        <section className={styles.page}>
+          <p role="status">This settings entry is no longer available.</p>
+          <button onClick={() => setSelected(null)} type="button">
+            Back to search
+          </button>
+        </section>
+      )
     }
-    return <div className={styles.page}>
-      <header><h1>Settings Search</h1><p>Open and edit the matching setting from its Host configuration entry.</p></header>
-      <SettingsFieldEditor key={selectedTarget.id} form={props.getForm(selectedTarget.target.entryId)} namespace={selectedNamespace} onBack={() => setSelected(null)} result={selectedTarget} />
-    </div>
+    return (
+      <div className={styles.page}>
+        <header>
+          <h1>Settings Search</h1>
+          <p>Open and edit the matching setting from its Host configuration entry.</p>
+        </header>
+        <SettingsFieldEditor
+          key={selectedTarget.id}
+          form={props.getForm(selectedTarget.target.entryId)}
+          namespace={selectedNamespace}
+          onBack={() => setSelected(null)}
+          result={selectedTarget}
+        />
+      </div>
+    )
   }
 
   return (
@@ -233,7 +302,10 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
           autoFocus
           autoComplete="off"
           maxLength={MAX_QUERY_LENGTH}
-          onChange={event => { setQuery(event.currentTarget.value); setActiveIndex(0) }}
+          onChange={event => {
+            setQuery(event.currentTarget.value)
+            setActiveIndex(0)
+          }}
           onKeyDown={navigateResults}
           placeholder="Search settings…"
           type="search"
@@ -242,29 +314,62 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
       </label>
       {mirror.status === 'loading' && <p role="status">Loading settings descriptors…</p>}
       {mirror.error !== null && <p role="alert">Could not read settings: {mirror.error}</p>}
-      {trimmedQuery.length > 0 && <p className={styles.resultCount}>{matched.length} {matched.length === 1 ? 'match' : 'matches'}</p>}
+      {trimmedQuery.length > 0 && (
+        <p className={styles.resultCount}>
+          {matched.length} {matched.length === 1 ? 'match' : 'matches'}
+        </p>
+      )}
       {trimmedQuery.length === 0 && browseEntryId === null && (
         <section aria-label="Settings entries" className={styles.namespaceList}>
           <h2>Categories and entries</h2>
           {namespaceGroups.map(({ namespace, title, count }) => (
-            <button className={styles.namespaceButton} disabled={count === 0} key={namespace.ns} onClick={() => { setBrowseEntryId(namespace.ns); setActiveIndex(0) }} type="button">
-              <strong>{title}</strong><span>{namespace.ns} · {count} searchable {count === 1 ? 'setting' : 'settings'}</span>
+            <button
+              className={styles.namespaceButton}
+              disabled={count === 0}
+              key={namespace.ns}
+              onClick={() => {
+                setBrowseEntryId(namespace.ns)
+                setActiveIndex(0)
+              }}
+              type="button"
+            >
+              <strong>{title}</strong>
+              <span>
+                {namespace.ns} · {count} searchable {count === 1 ? 'setting' : 'settings'}
+              </span>
             </button>
           ))}
           {namespaceGroups.length === 0 && mirror.status === 'ready' && <p>No settings entries are available.</p>}
         </section>
       )}
       {trimmedQuery.length === 0 && browseEntryId !== null && (
-        <button className={styles.backButton} onClick={() => setBrowseEntryId(null)} type="button">← All categories and entries</button>
+        <button className={styles.backButton} onClick={() => setBrowseEntryId(null)} type="button">
+          ← All categories and entries
+        </button>
       )}
       {visibleResults.length > 0 && (
         <section aria-label="Matching settings" className={styles.results}>
           {visibleResults.map((result, index) => (
-            <button aria-current={index === boundedActiveIndex ? 'true' : undefined} className={styles.result} key={result.id} onClick={() => selectResult(result)} type="button">
+            <button
+              aria-current={index === boundedActiveIndex ? 'true' : undefined}
+              className={styles.result}
+              key={result.id}
+              onClick={() => selectResult(result)}
+              type="button"
+            >
               <strong>{result.title}</strong>
               <small>{result.context}</small>
               {result.description.length > 0 && <p>{result.description}</p>}
-              {result.options.length > 0 && <small className={styles.optionLabels}>Options: {result.options.slice(0, 8).map(option => option.label).join(', ')}{result.options.length > 8 ? `, +${result.options.length - 8} more` : ''}</small>}
+              {result.options.length > 0 && (
+                <small className={styles.optionLabels}>
+                  Options:{' '}
+                  {result.options
+                    .slice(0, 8)
+                    .map(option => option.label)
+                    .join(', ')}
+                  {result.options.length > 8 ? `, +${result.options.length - 8} more` : ''}
+                </small>
+              )}
             </button>
           ))}
         </section>
@@ -279,9 +384,10 @@ export default defineClient({
   name: '@dshfiles/settings-search',
   setup(ctx) {
     const getForm = (entryId: string): ConfigForm<unknown> => ctx.configForms.get<unknown>(entryId)
-    ctx.slots.inject('settings.section', () => ctx.slots.register(
-      { name: 'settings.section', id: SETTINGS_SEARCH_ID, order: 0, label: () => 'Search' },
-      () => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} />,
-    ))
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register({ name: 'settings.section', id: SETTINGS_SEARCH_ID, order: 0, label: () => 'Search' }, () => (
+        <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} />
+      )),
+    )
   },
 })

@@ -3,10 +3,7 @@ import { filterRegisteredProjects, folderSelection, movePickerSelection, workspa
 import type { RegisteredProject } from './project-folder-picker.js'
 
 const dshfilesProject: RegisteredProject = { workspaceId: 'ws-1', title: 'dshfiles', canonicalPath: '/Users/me/dev/dshfiles' }
-const projects: readonly RegisteredProject[] = [
-  dshfilesProject,
-  { workspaceId: 'ws-2', title: 'emisoup', canonicalPath: '/Users/me/dev/emisoup' },
-]
+const projects: readonly RegisteredProject[] = [dshfilesProject, { workspaceId: 'ws-2', title: 'emisoup', canonicalPath: '/Users/me/dev/emisoup' }]
 
 describe('project and folder selection', () => {
   it('searches registered project names and canonical paths', () => {
@@ -22,10 +19,15 @@ describe('project and folder selection', () => {
 
   it('keeps project identity and canonical folder path explicit', () => {
     expect(workspaceSelection(dshfilesProject)).toEqual({
-      kind: 'workspace', workspaceId: 'ws-1', canonicalPath: '/Users/me/dev/dshfiles', title: 'dshfiles',
+      kind: 'workspace',
+      workspaceId: 'ws-1',
+      canonicalPath: '/Users/me/dev/dshfiles',
+      title: 'dshfiles',
     })
     expect(folderSelection('/Users/me/dev')).toEqual({
-      kind: 'directory', canonicalPath: '/Users/me/dev', title: 'dev',
+      kind: 'directory',
+      canonicalPath: '/Users/me/dev',
+      title: 'dev',
     })
   })
 })

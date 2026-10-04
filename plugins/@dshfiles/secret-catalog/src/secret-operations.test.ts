@@ -7,26 +7,32 @@ import { createWorkspacePickerPorts, type WorkspacePickerRemote } from './worksp
 
 describe('Secret Catalog metadata and exact alias actions', () => {
   it('projects only value-free metadata from the CLI JSON contract', () => {
-    const rows = parseSecretPrintMetadata(JSON.stringify([{
-      alias: 'SYNTHETIC_API_TOKEN',
-      scope: 'global',
-      env: 'prod',
-      envKey: 'SYNTHETIC_API_TOKEN',
-      item: 'synthetic-service',
-      field: 'password',
-      value: 'synthetic-secret-must-not-cross',
-    }]))
-    expect(rows).toEqual([{
-      id: '["global","SYNTHETIC_API_TOKEN","prod","synthetic-service","password"]',
-      alias: 'SYNTHETIC_API_TOKEN',
-      scope: 'global',
-      environment: 'prod',
-      variableName: 'SYNTHETIC_API_TOKEN',
-      item: 'synthetic-service',
-      field: 'password',
-      service: 'synthetic-service',
-      description: 'synthetic-service',
-    }])
+    const rows = parseSecretPrintMetadata(
+      JSON.stringify([
+        {
+          alias: 'SYNTHETIC_API_TOKEN',
+          scope: 'global',
+          env: 'prod',
+          envKey: 'SYNTHETIC_API_TOKEN',
+          item: 'synthetic-service',
+          field: 'password',
+          value: 'synthetic-secret-must-not-cross',
+        },
+      ]),
+    )
+    expect(rows).toEqual([
+      {
+        id: '["global","SYNTHETIC_API_TOKEN","prod","synthetic-service","password"]',
+        alias: 'SYNTHETIC_API_TOKEN',
+        scope: 'global',
+        environment: 'prod',
+        variableName: 'SYNTHETIC_API_TOKEN',
+        item: 'synthetic-service',
+        field: 'password',
+        service: 'synthetic-service',
+        description: 'synthetic-service',
+      },
+    ])
     expect(JSON.stringify(rows)).not.toContain('synthetic-secret-must-not-cross')
   })
 
@@ -45,28 +51,32 @@ describe('Secret Catalog metadata and exact alias actions', () => {
       requests.push(request)
       return '[]'
     })
-    await expect(operations.create({
-      alias: 'SYNTHETIC',
-      scope: 'global',
-      cwd: null,
-      environment: 'prod',
-      valueMode: 'generate',
-      value: null,
-      name: '--global',
-    })).rejects.toThrow()
-    await expect(operations.update({
-      alias: 'SYNTHETIC',
-      scope: 'global',
-      cwd: null,
-      environment: 'prod',
-      value: null,
-      tags: '-f',
-    })).rejects.toThrow()
+    await expect(
+      operations.create({
+        alias: 'SYNTHETIC',
+        scope: 'global',
+        cwd: null,
+        environment: 'prod',
+        valueMode: 'generate',
+        value: null,
+        name: '--global',
+      }),
+    ).rejects.toThrow()
+    await expect(
+      operations.update({
+        alias: 'SYNTHETIC',
+        scope: 'global',
+        cwd: null,
+        environment: 'prod',
+        value: null,
+        tags: '-f',
+      }),
+    ).rejects.toThrow()
     expect(requests.filter(request => request.args[0] !== 'print')).toEqual([])
   })
 
   it('runs reveal and clipboard copy only when exact alias methods are called', async () => {
-    const run = vi.fn(async (request: SecretCliRequest) => request.args[0] === 'get' ? 'synthetic-value\n' : '')
+    const run = vi.fn(async (request: SecretCliRequest) => (request.args[0] === 'get' ? 'synthetic-value\n' : ''))
     const operations = createSecretCatalogOperations(run)
     expect(run).not.toHaveBeenCalled()
     expect(await operations.reveal('SYNTHETIC_TOKEN', 'global', null)).toBe('synthetic-value')
@@ -142,12 +152,14 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     })
     expect(run.mock.calls).toEqual([
       [{ args: ['print', '--all', '--json'], cwd: '/tmp/project', captureStdout: true }],
-      [{
-        args: ['set', 'SYNTHETIC_LOCAL', '--env', 'prod', '--config', '/tmp/project/.secret.local.json'],
-        cwd: '/tmp/project',
-        captureStdout: false,
-        stdin: 'synthetic-input-value',
-      }],
+      [
+        {
+          args: ['set', 'SYNTHETIC_LOCAL', '--env', 'prod', '--config', '/tmp/project/.secret.local.json'],
+          cwd: '/tmp/project',
+          captureStdout: false,
+          stdin: 'synthetic-input-value',
+        },
+      ],
     ])
     expect(run.mock.calls.flatMap(([request]) => request.args)).not.toContain('synthetic-input-value')
   })
@@ -155,14 +167,16 @@ describe('Secret Catalog metadata and exact alias actions', () => {
   it('refuses to add an alias already present in the current environment', async () => {
     const run = vi.fn(async (_request: SecretCliRequest) => JSON.stringify([{ alias: 'SYNTHETIC_EXISTING', scope: 'global', env: 'prod' }]))
     const operations = createSecretCatalogOperations(run)
-    await expect(operations.create({
-      alias: 'SYNTHETIC_EXISTING',
-      scope: 'project',
-      cwd: '/tmp/project',
-      environment: 'prod',
-      valueMode: 'generate',
-      value: null,
-    })).rejects.toThrow('already exists')
+    await expect(
+      operations.create({
+        alias: 'SYNTHETIC_EXISTING',
+        scope: 'project',
+        cwd: '/tmp/project',
+        environment: 'prod',
+        valueMode: 'generate',
+        value: null,
+      }),
+    ).rejects.toThrow('already exists')
     expect(run).toHaveBeenCalledTimes(1)
   })
 
@@ -198,17 +212,21 @@ describe('Secret Catalog metadata and exact alias actions', () => {
       tags: '',
     })
     expect(run.mock.calls).toEqual([
-      [{
-        args: ['edit', 'SYNTHETIC_EXISTING', '--name', 'Renamed item', '--tags', '', '--env', 'dev', '--config', '/tmp/project/.secret.local.json'],
-        cwd: '/tmp/project',
-        captureStdout: false,
-      }],
-      [{
-        args: ['set', 'SYNTHETIC_EXISTING', '--force', '--env', 'dev', '--config', '/tmp/project/.secret.local.json'],
-        cwd: '/tmp/project',
-        captureStdout: false,
-        stdin: 'synthetic-replacement',
-      }],
+      [
+        {
+          args: ['edit', 'SYNTHETIC_EXISTING', '--name', 'Renamed item', '--tags', '', '--env', 'dev', '--config', '/tmp/project/.secret.local.json'],
+          cwd: '/tmp/project',
+          captureStdout: false,
+        },
+      ],
+      [
+        {
+          args: ['set', 'SYNTHETIC_EXISTING', '--force', '--env', 'dev', '--config', '/tmp/project/.secret.local.json'],
+          cwd: '/tmp/project',
+          captureStdout: false,
+          stdin: 'synthetic-replacement',
+        },
+      ],
     ])
     expect(run.mock.calls.flatMap(([request]) => request.args)).not.toContain('synthetic-replacement')
   })
@@ -243,12 +261,18 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     const calls: string[] = []
     const remote: WorkspacePickerRemote = {
       directoryPicker: {
-        pick: async () => { calls.push('pick'); return { ok: true, value: '/work/repo' } },
+        pick: async () => {
+          calls.push('pick')
+          return { ok: true, value: '/work/repo' }
+        },
         list: async path => {
           calls.push(`list:${path ?? ''}`)
           return { ok: true, value: { path: path ?? '/work', home: '/home/me', crumbs: [], entries: [], truncated: false } }
         },
-        createDirectory: async (path, name) => { calls.push(`mkdir:${path}/${name}`); return { ok: true, value: `${path}/${name}` } },
+        createDirectory: async (path, name) => {
+          calls.push(`mkdir:${path}/${name}`)
+          return { ok: true, value: `${path}/${name}` }
+        },
       },
       workspace: {
         create: async input => {
@@ -262,7 +286,9 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect((await ports.directoryPicker.list('/work/repo', new AbortController().signal)).path).toBe('/work/repo')
     expect(await ports.directoryPicker.createDirectory('/work/repo', 'new')).toBe('/work/repo/new')
     expect(await ports.registerWorkspace('/work/repo')).toEqual({
-      workspaceId: 'workspace-7', title: 'repo', canonicalPath: '/work/repo',
+      workspaceId: 'workspace-7',
+      title: 'repo',
+      canonicalPath: '/work/repo',
     })
     expect(calls).toEqual(['pick', 'list:/work/repo', 'mkdir:/work/repo/new', 'workspace:/work/repo'])
   })

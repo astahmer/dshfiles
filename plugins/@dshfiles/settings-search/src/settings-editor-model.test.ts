@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { formatSettingsDraft, hasSettingsPath, parseSettingsDraft, readSettingsPath, schemaNodeAtPath, setOperationForSettingsTarget, settingsEditorKind, unsetOperationForSettingsTarget } from './settings-editor-model.js'
+import {
+  formatSettingsDraft,
+  hasSettingsPath,
+  parseSettingsDraft,
+  readSettingsPath,
+  schemaNodeAtPath,
+  setOperationForSettingsTarget,
+  settingsEditorKind,
+  unsetOperationForSettingsTarget,
+} from './settings-editor-model.js'
 import { settingsChoiceOptions } from './settings-index.js'
 
 const schema = {
@@ -39,12 +48,8 @@ describe('settings field editor model', () => {
 
   it('maps a selected stable target to one exact set or inherited-value operation', () => {
     const target = { entryId: 'appearance', fieldPath: ['colors', 'accent'] }
-    expect(setOperationForSettingsTarget(target, '#39a')).toEqual([
-      { op: 'set', path: ['colors', 'accent'], value: '#39a' },
-    ])
-    expect(unsetOperationForSettingsTarget(target)).toEqual([
-      { op: 'unset', path: ['colors', 'accent'] },
-    ])
+    expect(setOperationForSettingsTarget(target, '#39a')).toEqual([{ op: 'set', path: ['colors', 'accent'], value: '#39a' }])
+    expect(unsetOperationForSettingsTarget(target)).toEqual([{ op: 'unset', path: ['colors', 'accent'] }])
   })
 
   it('formats absent defaults as blank and preserves multiline JSON drafts', () => {

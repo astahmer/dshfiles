@@ -21,17 +21,19 @@ export const secretCatalogApi = defineApi({
     }),
     machine: method({ input: z.object({}), output: z.object({ id: z.string().max(256), name: z.string().max(256) }) }),
     create: method({
-      input: z.object({
-        alias: aliasSchema,
-        cwd: cwdSchema,
-        scope: scopeSchema,
-        environment: environmentSchema,
-        valueMode: z.enum(['generate', 'manual']),
-        value: z.string().max(262_144).nullable(),
-        ...createMetadataSchema.shape,
-      }).refine(input => input.valueMode === 'generate' ? input.value === null : input.value !== null && input.value.length > 0, {
-        message: 'A manual value is required only for manual creation.',
-      }),
+      input: z
+        .object({
+          alias: aliasSchema,
+          cwd: cwdSchema,
+          scope: scopeSchema,
+          environment: environmentSchema,
+          valueMode: z.enum(['generate', 'manual']),
+          value: z.string().max(262_144).nullable(),
+          ...createMetadataSchema.shape,
+        })
+        .refine(input => (input.valueMode === 'generate' ? input.value === null : input.value !== null && input.value.length > 0), {
+          message: 'A manual value is required only for manual creation.',
+        }),
       output: z.object({ created: z.literal(true) }),
     }),
     update: method({

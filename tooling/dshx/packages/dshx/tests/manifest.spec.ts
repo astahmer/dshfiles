@@ -204,11 +204,9 @@ describe('checkProjectManifest', () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/api-view.tsx'),
-      [
-        "import { useApiQuery as query } from '@dshfiles/dshx/client'",
-        "export function ApiView(contract: unknown) { return query(contract, 'get') }",
-        '',
-      ].join('\n'),
+      ["import { useApiQuery as query } from '@dshfiles/dshx/client'", "export function ApiView(contract: unknown) { return query(contract, 'get') }", ''].join(
+        '\n',
+      ),
     )
     await writeFile(resolve(root, 'src/client.tsx'), "import { ApiView } from './api-view.js'\nexport const apply = ApiView\n")
     const missing = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))

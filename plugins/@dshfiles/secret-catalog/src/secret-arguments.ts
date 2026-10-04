@@ -1,12 +1,23 @@
 import { z } from 'zod'
 
-export const aliasSchema = z.string().min(1).max(128).regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
+export const aliasSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
 
-export const environmentSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/)
+export const environmentSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .regex(/^[A-Za-z0-9_-]+$/)
 
 /** Free text passed after a `secret` flag; a leading dash would be read as another flag. */
 const optionValueSchema = (maxLength: number) =>
-  z.string().max(maxLength).refine(value => !value.startsWith('-'), { message: 'A value cannot start with "-".' })
+  z
+    .string()
+    .max(maxLength)
+    .refine(value => !value.startsWith('-'), { message: 'A value cannot start with "-".' })
 
 export const updateMetadataSchema = z.object({
   name: optionValueSchema(512).optional(),

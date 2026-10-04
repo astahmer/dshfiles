@@ -56,7 +56,12 @@ const services: Record<HostCapability, string> = {
 }
 
 /** @internal Capability adapters always resolve services through the caller's context. */
-export function createPluginApi<Uses extends readonly HostCapability[]>(ctx: Context, uses: Uses, packageId: string, config: Record<string, unknown> = {}): PluginApi<Uses> {
+export function createPluginApi<Uses extends readonly HostCapability[]>(
+  ctx: Context,
+  uses: Uses,
+  packageId: string,
+  config: Record<string, unknown> = {},
+): PluginApi<Uses> {
   const capabilities: {
     -readonly [Key in keyof HostCapabilities]?: HostCapabilities[Key]
   } = {}
@@ -104,8 +109,7 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
     inject: [...new Set([...(definition.inject ?? []), ...uses.map(capability => services[capability])])],
     setup: adaptHostSetup(
       ctx => setup?.(createPluginApi(ctx, uses, id)),
-      (ctx, rowConfig, metadata) =>
-        setup?.(createPluginApi(ctx, uses, metadata.packageId, unwrapRowConfig(rowConfig))),
+      (ctx, rowConfig, metadata) => setup?.(createPluginApi(ctx, uses, metadata.packageId, unwrapRowConfig(rowConfig))),
     ),
   }
 }

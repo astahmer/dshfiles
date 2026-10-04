@@ -1,8 +1,6 @@
 import type { SecretRemoveTarget } from './secret-mutation-dialog.js'
 
-export type RemovalDialogState =
-  | { readonly stage: 'choose' }
-  | { readonly stage: 'confirm'; readonly target: SecretRemoveTarget }
+export type RemovalDialogState = { readonly stage: 'choose' } | { readonly stage: 'confirm'; readonly target: SecretRemoveTarget }
 
 export const chooseRemovalTarget = (state: RemovalDialogState, target: SecretRemoveTarget): RemovalDialogState => {
   if (state.stage === 'confirm') return state

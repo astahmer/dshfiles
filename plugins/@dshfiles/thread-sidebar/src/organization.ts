@@ -64,10 +64,7 @@ export interface SessionLineage {
  * chain. A visited set keeps corrupt cycles bounded; missing ancestors still
  * preserve the direct relationship and one level of indentation.
  */
-export const sessionLineage = (
-  session: Pick<SessionSummary, 'id' | 'parentId'>,
-  byId: Readonly<Record<string, SessionSummary>>,
-): SessionLineage => {
+export const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
   if (session.parentId === undefined) return { depth: 0 }
 
   let depth = 0
@@ -104,13 +101,16 @@ export const workspaceForLineage = (
   return undefined
 }
 
-export const parseSessionIds = (value: string): string[] =>
-  [...new Set(value.split(/[\s,;]+/).map(item => item.trim()).filter(Boolean))]
+export const parseSessionIds = (value: string): string[] => [
+  ...new Set(
+    value
+      .split(/[\s,;]+/)
+      .map(item => item.trim())
+      .filter(Boolean),
+  ),
+]
 
-export const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(
-  entries: readonly Entry[],
-  savedOrder: readonly string[],
-): Entry[] => {
+export const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(entries: readonly Entry[], savedOrder: readonly string[]): Entry[] => {
   const savedPositions = new Map(savedOrder.map((id, index) => [id, index]))
   return entries
     .map((entry, index) => ({ entry, index, savedPosition: savedPositions.get(entry.id) }))
@@ -125,11 +125,7 @@ export const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(
     .map(({ entry }) => entry)
 }
 
-export const moveSidebarEntry = (
-  orderedIds: readonly string[],
-  id: string,
-  direction: -1 | 1,
-): string[] => {
+export const moveSidebarEntry = (orderedIds: readonly string[], id: string, direction: -1 | 1): string[] => {
   const next = [...orderedIds]
   const index = next.indexOf(id)
   const target = index + direction
@@ -146,14 +142,7 @@ export const archiveWithoutStopping = <SessionId extends string>(
   sessionId: SessionId,
 ): Promise<void> => archive(sessionId, { stopActivity: false })
 
-export const isAutoArchiveCandidate = ({
-  session,
-  workspaceId,
-  now,
-  preferences,
-  archivedSessionIds,
-  pinnedSessionIds,
-}: AutoArchiveContext): boolean => {
+export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
   if (!preferences.autoArchiveEnabled || session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false

@@ -2,16 +2,11 @@ import type { ProjectFolderSelection, RegisteredProject } from './project-folder
 
 export type PickerDirection = 'up' | 'down'
 
-export const filterRegisteredProjects = (
-  projects: readonly RegisteredProject[],
-  query: string,
-): readonly RegisteredProject[] => {
+export const filterRegisteredProjects = (projects: readonly RegisteredProject[], query: string): readonly RegisteredProject[] => {
   if (query.startsWith('/')) return []
   const search = query.trim().toLocaleLowerCase()
   if (search.length === 0) return projects
-  return projects.filter(project =>
-    `${project.title} ${project.canonicalPath}`.toLocaleLowerCase().includes(search),
-  )
+  return projects.filter(project => `${project.title} ${project.canonicalPath}`.toLocaleLowerCase().includes(search))
 }
 
 export const movePickerSelection = (current: number, count: number, direction: PickerDirection): number => {

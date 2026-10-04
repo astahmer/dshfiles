@@ -3,6 +3,7 @@ import { resolveCodexHomeLayout } from './codex-home.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import {
   USAGE_HISTORY_DOMAIN,
+  boundUsageHistoryPoints,
   parseUsageBucketKey,
   usageBucketKey,
   usageHistoryDomain,
@@ -159,9 +160,8 @@ export const readUsageHistory = async (
   const rows = [...domain.table('quota').entries()]
     .filter(([key, value]) => parseUsageBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
     .map(([, value]) => value)
-    .sort((left, right) => left.at - right.at)
     .map(value => ({ ...value, bankedResetExpiries: value.bankedResetExpiries ?? [] }))
-  return rows
+  return boundUsageHistoryPoints(rows)
 }
 
 export interface UsageHistoryScheduler {

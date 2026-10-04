@@ -34,10 +34,7 @@ type BalancedDictionaries<Dictionaries extends LocaleDictionaries> = Dictionarie
  * Calling it is the whole ceremony: the returned `defineLocale` definition is
  * still what the Client registers.
  */
-export function declareLocaleNamespace<
-  const Namespace extends string,
-  const Dictionaries extends LocaleDictionaries,
->(
+export function declareLocaleNamespace<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(
   namespace: Namespace,
   dictionaries: BalancedDictionaries<Dictionaries>,
 ): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {

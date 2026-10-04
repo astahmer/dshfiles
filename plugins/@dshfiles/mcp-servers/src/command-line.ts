@@ -57,10 +57,12 @@ export function parseCommandLine(source: string): readonly string[] {
 }
 
 export function formatCommandLine(words: readonly string[]): string {
-  return words.map(word => {
-    if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(word)) return word
-    return `"${word.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
-  }).join(' ')
+  return words
+    .map(word => {
+      if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(word)) return word
+      return `"${word.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+    })
+    .join(' ')
 }
 
 const SECRET_OPTION = /(?:^|[-_])(?:api[-_]?key|access[-_]?token|token|secret|password|passwd|credential|authorization|bearer)(?:$|[-_])/i

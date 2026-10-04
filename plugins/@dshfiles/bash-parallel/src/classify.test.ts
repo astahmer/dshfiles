@@ -28,7 +28,8 @@ test('plain reads are parallel', () => {
     'cat a.ts | head -20',
     'wc -l *.ts',
     'stat . && df -h',
-  ]) parallel(command)
+  ])
+    parallel(command)
 })
 
 test('bare jj reads are exclusive because they snapshot the working copy', () => {
@@ -55,17 +56,19 @@ test('writes are exclusive', () => {
     'echo x >> file',
     'cat x | tee y',
     'dd if=/dev/zero of=f',
-  ]) exclusive(command)
+  ])
+    exclusive(command)
 })
 
 test('read verb with a write flag is exclusive', () => {
   for (const command of [
     'find . -name "*.ts" -delete',
-    'find . -name "*.ts" -exec rm {} \;',
+    'find . -name "*.ts" -exec rm {} ;',
     'find . -newer f -fprint out',
     'sed -i s/a/b/ file',
     "sed -i'' s/a/b/ file",
-  ]) exclusive(command)
+  ])
+    exclusive(command)
 })
 
 test('subcommand allowlists gate git and jj', () => {
@@ -86,31 +89,12 @@ test('jj needs the read-only flag', () => {
 })
 
 test('hidden writes are exclusive', () => {
-  for (const command of [
-    'echo $(rm -rf /)',
-    'cat `whoami`',
-    'cat x | sh',
-    'bash -c "rm x"',
-    'sh -c "ls"',
-    'eval "ls"',
-    'source ./env.sh',
-    '. ./env.sh',
-  ]) exclusive(command)
+  for (const command of ['echo $(rm -rf /)', 'cat `whoami`', 'cat x | sh', 'bash -c "rm x"', 'sh -c "ls"', 'eval "ls"', 'source ./env.sh', '. ./env.sh'])
+    exclusive(command)
 })
 
 test('malformed input fails closed', () => {
-  for (const command of [
-    '',
-    '   ',
-    ';',
-    '&&',
-    'ls |',
-    '| ls',
-    '$(ls)',
-    '`ls`',
-    'ls &',
-    'ls && sleep 10 &',
-  ]) exclusive(command)
+  for (const command of ['', '   ', ';', '&&', 'ls |', '| ls', '$(ls)', '`ls`', 'ls &', 'ls && sleep 10 &']) exclusive(command)
 })
 
 test('background execution is exclusive', () => {

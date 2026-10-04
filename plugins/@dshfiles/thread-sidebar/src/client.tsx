@@ -26,9 +26,10 @@ type InjectedActions = {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useWorkspaces'> & InjectedActions & {
-  tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
-}
+type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useWorkspaces'> &
+  InjectedActions & {
+    tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+  }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 
@@ -51,17 +52,13 @@ const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
 
-const sessionsForAutoArchive = (
-  ids: readonly SessionSummary['id'][],
-  byId: Readonly<Record<string, SessionSummary>>,
-): SessionSummary[] => ids.flatMap(sessionId => {
-  const session = byId[sessionId]
-  return session === undefined ? [] : [session]
-})
+const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Readonly<Record<string, SessionSummary>>): SessionSummary[] =>
+  ids.flatMap(sessionId => {
+    const session = byId[sessionId]
+    return session === undefined ? [] : [session]
+  })
 
-const workspaceForSessions = (
-  workspaces: readonly WorkspaceView[],
-): Map<string, string> => {
+const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
   const map = new Map<string, string>()
   for (const workspace of workspaces) {
     for (const sessionId of workspace.sessionIds) map.set(sessionId, workspace.workspaceId)
@@ -77,7 +74,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [notice, setNotice] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null)
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : readThreadUrl(window.location.href)?.sessionId ?? null,
+    typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
   const archiveInFlight = useRef(false)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -93,33 +90,25 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     announce: (message: string) => void
   } | null>(null)
 
-  const workspaceBySession = useMemo(
-    () => workspaceForSessions(workspaceState.items),
-    [workspaceState.items],
-  )
+  const workspaceBySession = useMemo(() => workspaceForSessions(workspaceState.items), [workspaceState.items])
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const displayWorkspaces = useMemo(
-    () => workspaceState.items.map(workspace => ({
-      id: workspace.workspaceId,
-      title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
-    })),
+    () =>
+      workspaceState.items.map(workspace => ({
+        id: workspace.workspaceId,
+        title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
+      })),
     [props.tSidebar, workspaceState.items],
   )
-  const sessions = useMemo(
-    () => sessionsForAutoArchive(sessionState.ids, sessionState.byId),
-    [sessionState.byId, sessionState.ids],
-  )
-  const selectedSession = useMemo(
-    () => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0),
-    [sessionState.byId],
-  )
+  const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
+  const selectedSession = useMemo(() => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0), [sessionState.byId])
 
   useEffect(() => {
     const onPopState = (): void => {
       const requested = readThreadUrl(window.location.href)?.sessionId ?? null
-      suppressUrlForSession.current = requested === null ? selectedSession?.id ?? null : null
+      suppressUrlForSession.current = requested === null ? (selectedSession?.id ?? null) : null
       openedRouteId.current = null
       setRouteRequest(requested)
     }
@@ -192,10 +181,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     updatePreferences(patch)
   }
 
-  const mutateSession = async (
-    sessionId: SessionSummary['id'],
-    operation: (sessionId: SessionSummary['id']) => Promise<void>,
-  ): Promise<void> => {
+  const mutateSession = async (sessionId: SessionSummary['id'], operation: (sessionId: SessionSummary['id']) => Promise<void>): Promise<void> => {
     try {
       await operation(sessionId)
       setNotice(null)
@@ -209,14 +195,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
     const session = sessionState.byId[sessionId]
-    const workspaceId = session === undefined
-      ? undefined
-      : workspaceForLineage(session, sessionState.byId, workspaceBySession)
-    window.history.replaceState(
-      window.history.state,
-      '',
-      buildThreadUrl(window.location.href, sessionId, workspaceId),
-    )
+    const workspaceId = session === undefined ? undefined : workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
     props.open(sessionId)
   }
 
@@ -252,14 +232,17 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       const now = Date.now()
       for (const session of latest.sessions) {
         const activity: SessionActivity = session
-        if (!isAutoArchiveCandidate({
-          session: activity,
-          workspaceId: latest.workspaceBySession.get(session.id),
-          now,
-          preferences: latest.preferences,
-          archivedSessionIds: latest.archived,
-          pinnedSessionIds: latest.pinned,
-        })) continue
+        if (
+          !isAutoArchiveCandidate({
+            session: activity,
+            workspaceId: latest.workspaceBySession.get(session.id),
+            now,
+            preferences: latest.preferences,
+            archivedSessionIds: latest.archived,
+            pinnedSessionIds: latest.pinned,
+          })
+        )
+          continue
         try {
           await latest.archive(session.id)
         } catch {
@@ -286,10 +269,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (!preferences.autoArchiveEnabled) return
     if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
     void runAutoArchive()
-    const timer = window.setInterval(
-      () => void runAutoArchive(),
-      preferences.scanIntervalMinutes * 60_000,
-    )
+    const timer = window.setInterval(() => void runAutoArchive(), preferences.scanIntervalMinutes * 60_000)
     return () => window.clearInterval(timer)
   }, [preferences.autoArchiveEnabled, preferences.scanIntervalMinutes, sessionState.phase, workspaceState.phase])
 
@@ -310,17 +290,26 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       rows.get(section)?.push(session)
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
-    rows.set('pinned', rows.get('pinned')?.sort((left, right) =>
-      workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id),
-    ) ?? [])
+    rows.set(
+      'pinned',
+      rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
+    )
     return rows
-  }, [archivedSessionIds, displayWorkspaces, parkedSessionIds, pinnedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionState.ids, threadQuery, workspaceBySession, workspaceState.pinnedSessionIds])
+  }, [
+    archivedSessionIds,
+    displayWorkspaces,
+    parkedSessionIds,
+    pinnedSessionIds,
+    preferences.workspaceFilter,
+    sessionState.byId,
+    sessionState.ids,
+    threadQuery,
+    workspaceBySession,
+    workspaceState.pinnedSessionIds,
+  ])
 
-  const projectFilterValue = preferences.workspaceFilter === null
-    ? '__all__'
-    : preferences.workspaceFilter.length === 0
-      ? '__unassigned__'
-      : preferences.workspaceFilter
+  const projectFilterValue =
+    preferences.workspaceFilter === null ? '__all__' : preferences.workspaceFilter.length === 0 ? '__unassigned__' : preferences.workspaceFilter
 
   const selectProject = (value: string): void => {
     if (value === '__all__') changePreferences({ workspaceFilter: null })
@@ -349,7 +338,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             <option value="__all__">{props.tSidebar('threadSidebarAllProjects')}</option>
             <option value="__unassigned__">{props.tSidebar('threadSidebarUnassigned')}</option>
             {displayWorkspaces.map(workspace => (
-              <option key={workspace.id} value={workspace.id}>{workspace.title}</option>
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.title}
+              </option>
             ))}
           </select>
         </label>
@@ -422,108 +413,120 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         </section>
       ) : null}
 
-      {notice !== null ? <p role="status" className={styles.notice}>{notice}</p> : null}
-      {storageWarning ? <p role="status" className={styles.notice}>{props.tSidebar('threadSidebarStorageFailure')}</p> : null}
+      {notice !== null ? (
+        <p role="status" className={styles.notice}>
+          {notice}
+        </p>
+      ) : null}
+      {storageWarning ? (
+        <p role="status" className={styles.notice}>
+          {props.tSidebar('threadSidebarStorageFailure')}
+        </p>
+      ) : null}
 
       <div className={styles.sections}>
-        {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
-          <p className={styles.empty}>{props.tSidebar('threadSidebarLoading')}</p>
-        ) : null}
+        {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? <p className={styles.empty}>{props.tSidebar('threadSidebarLoading')}</p> : null}
         {sections.map(section => {
           const rows = rowsBySection.get(section) ?? []
           if (rows.length === 0 && section !== 'active') return null
           const collapsed = preferences.collapsedSections.includes(section)
           return (
             <section className={styles.group} key={section}>
-              <button
-                type="button"
-                className={styles.groupHeader}
-                aria-expanded={!collapsed}
-                onClick={() => toggleSection(section)}
-              >
+              <button type="button" className={styles.groupHeader} aria-expanded={!collapsed} onClick={() => toggleSection(section)}>
                 <span>{props.tSidebar(sectionLabels[section])}</span>
                 <span className={styles.count}>{rows.length}</span>
                 <span aria-hidden="true">{collapsed ? '⌄' : '⌃'}</span>
               </button>
-              {!collapsed ? rows.map(session => {
-                const archived = archivedSessionIds.has(session.id)
-                const pinned = pinnedSessionIds.has(session.id)
-                const parked = parkedSessionIds.has(session.id)
-                const lineage = sessionLineage(session, sessionState.byId)
-                const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-                const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title
-                return (
-                  <article
-                    className={styles.row}
-                    data-lineage-depth={lineage.depth}
-                    key={session.id}
-                    onContextMenu={event => {
-                      event.preventDefault()
-                      const width = 210
-                      const height = 88
-                      setContextMenu({
-                        sessionId: session.id,
-                        workspaceId,
-                        x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
-                        y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
-                      })
-                    }}
-                    style={{ marginInlineStart: lineage.depth * 12 }}
-                  >
-                    <button
-                      type="button"
-                      className={styles.openButton}
-                      disabled={archived}
-                      title={new Date(session.updatedAt).toLocaleString()}
-                      onClick={() => openThread(session.id)}
-                    >
-                      <span className={styles.rowProject}>
-                        {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
-                        {lineage.parentTitle === undefined ? null : (
-                          <span className={styles.parentLabel}>
-                            {' · '}{props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
-                          </span>
-                        )}
-                      </span>
-                      <span className={styles.rowTitle}>{session.displayTitle}</span>
-                      {session.running ? <span className={styles.running}>{props.tSidebar('threadSidebarWorking')}</span> : null}
-                    </button>
-                    <div className={styles.actions}>
-                      {!archived ? (
-                        <>
-                          <button
-                            type="button"
-                            aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                            title={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                            onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
-                          >{pinned ? '◆' : '◇'}</button>
-                          <button
-                            type="button"
-                            aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                            title={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                            disabled={session.running}
-                            onClick={() => toggleParked(session.id)}
-                          >{parked ? '▰' : '▱'}</button>
-                          <button
-                            type="button"
-                            aria-label={props.tSidebar('threadSidebarArchive')}
-                            title={props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive')}
-                            disabled={session.running}
-                            onClick={() => void mutateSession(session.id, props.archiveSession)}
-                          >↓</button>
-                        </>
-                      ) : (
+              {!collapsed
+                ? rows.map(session => {
+                    const archived = archivedSessionIds.has(session.id)
+                    const pinned = pinnedSessionIds.has(session.id)
+                    const parked = parkedSessionIds.has(session.id)
+                    const lineage = sessionLineage(session, sessionState.byId)
+                    const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+                    const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title
+                    return (
+                      <article
+                        className={styles.row}
+                        data-lineage-depth={lineage.depth}
+                        key={session.id}
+                        onContextMenu={event => {
+                          event.preventDefault()
+                          const width = 210
+                          const height = 88
+                          setContextMenu({
+                            sessionId: session.id,
+                            workspaceId,
+                            x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+                            y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
+                          })
+                        }}
+                        style={{ marginInlineStart: lineage.depth * 12 }}
+                      >
                         <button
                           type="button"
-                          aria-label={props.tSidebar('threadSidebarRestore')}
-                          title={props.tSidebar('threadSidebarRestore')}
-                          onClick={() => void mutateSession(session.id, props.unarchiveSession)}
-                        >↩</button>
-                      )}
-                    </div>
-                  </article>
-                )
-              }) : null}
+                          className={styles.openButton}
+                          disabled={archived}
+                          title={new Date(session.updatedAt).toLocaleString()}
+                          onClick={() => openThread(session.id)}
+                        >
+                          <span className={styles.rowProject}>
+                            {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
+                            {lineage.parentTitle === undefined ? null : (
+                              <span className={styles.parentLabel}>
+                                {' · '}
+                                {props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
+                              </span>
+                            )}
+                          </span>
+                          <span className={styles.rowTitle}>{session.displayTitle}</span>
+                          {session.running ? <span className={styles.running}>{props.tSidebar('threadSidebarWorking')}</span> : null}
+                        </button>
+                        <div className={styles.actions}>
+                          {!archived ? (
+                            <>
+                              <button
+                                type="button"
+                                aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                                title={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                                onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
+                              >
+                                {pinned ? '◆' : '◇'}
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                                title={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                                disabled={session.running}
+                                onClick={() => toggleParked(session.id)}
+                              >
+                                {parked ? '▰' : '▱'}
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={props.tSidebar('threadSidebarArchive')}
+                                title={props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive')}
+                                disabled={session.running}
+                                onClick={() => void mutateSession(session.id, props.archiveSession)}
+                              >
+                                ↓
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={props.tSidebar('threadSidebarRestore')}
+                              title={props.tSidebar('threadSidebarRestore')}
+                              onClick={() => void mutateSession(session.id, props.unarchiveSession)}
+                            >
+                              ↩
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    )
+                  })
+                : null}
             </section>
           )
         })}
@@ -539,22 +542,21 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           aria-label={props.tSidebar('threadSidebarContextMenu')}
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
+          <button type="button" role="menuitem" onClick={() => void copyContextValue(contextMenu.sessionId, props.tSidebar('threadSidebarIdCopied'))}>
+            {props.tSidebar('threadSidebarCopyId')}
+          </button>
           <button
             type="button"
             role="menuitem"
-            onClick={() => void copyContextValue(
-              contextMenu.sessionId,
-              props.tSidebar('threadSidebarIdCopied'),
-            )}
-          >{props.tSidebar('threadSidebarCopyId')}</button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void copyContextValue(
-              buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
-              props.tSidebar('threadSidebarLinkCopied'),
-            )}
-          >{props.tSidebar('threadSidebarCopyLink')}</button>
+            onClick={() =>
+              void copyContextValue(
+                buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
+                props.tSidebar('threadSidebarLinkCopied'),
+              )
+            }
+          >
+            {props.tSidebar('threadSidebarCopyLink')}
+          </button>
         </div>
       )}
     </section>

@@ -11,14 +11,74 @@
 
 /** Verbs that only read, under every flag we have audited. */
 const READ_ONLY_VERBS = new Set([
-  'cat', 'echo', 'printf', 'grep', 'egrep', 'fgrep', 'head', 'tail', 'wc',
-  'ls', 'dir', 'find', 'fd', 'stat', 'du', 'df', 'file', 'diff', 'tree',
-  'sort', 'uniq', 'cut', 'tr', 'sed', 'awk', 'jq', 'yq', 'comm', 'join',
-  'paste', 'column', 'nl', 'fold', 'fmt', 'basename', 'dirname', 'realpath',
-  'readlink', 'which', 'type', 'md5sum', 'shasum', 'sha256sum', 'cksum',
-  'seq', 'date', 'env', 'printenv', 'pwd', 'whoami', 'id', 'uname', 'hostname',
-  'uptime', 'ps', 'pgrep', 'strings', 'xxd', 'od', 'hexdump', 'cmp', 'sleep',
-  'ast-outline', 'node', 'tsc', 'oxlint', 'oxfmt', 'lsof',
+  'cat',
+  'echo',
+  'printf',
+  'grep',
+  'egrep',
+  'fgrep',
+  'head',
+  'tail',
+  'wc',
+  'ls',
+  'dir',
+  'find',
+  'fd',
+  'stat',
+  'du',
+  'df',
+  'file',
+  'diff',
+  'tree',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'sed',
+  'awk',
+  'jq',
+  'yq',
+  'comm',
+  'join',
+  'paste',
+  'column',
+  'nl',
+  'fold',
+  'fmt',
+  'basename',
+  'dirname',
+  'realpath',
+  'readlink',
+  'which',
+  'type',
+  'md5sum',
+  'shasum',
+  'sha256sum',
+  'cksum',
+  'seq',
+  'date',
+  'env',
+  'printenv',
+  'pwd',
+  'whoami',
+  'id',
+  'uname',
+  'hostname',
+  'uptime',
+  'ps',
+  'pgrep',
+  'strings',
+  'xxd',
+  'od',
+  'hexdump',
+  'cmp',
+  'sleep',
+  'ast-outline',
+  'node',
+  'tsc',
+  'oxlint',
+  'oxfmt',
+  'lsof',
 ])
 
 /**
@@ -36,16 +96,38 @@ const LOCAL_ONLY_VERBS = new Set(['cd', 'pushd', 'popd', 'set', 'shopt', 'export
  * selects the read-only form.
  */
 const VERB_SUBCOMMAND_ALLOWLIST = new Map<string, ReadonlySet<string>>([
-  ['git', new Set([
-    'status', 'log', 'show', 'diff', 'blame', 'branch', 'tag', 'remote', 'config',
-    'rev-parse', 'rev-list', 'ls-files', 'ls-tree', 'ls-remote', 'describe',
-    'cat-file', 'shortlog', 'reflog', 'symbolic-ref', 'for-each-ref',
-    'count-objects', 'verify-commit', 'whatchanged', 'grep', 'help', 'version',
-  ])],
-  ['jj', new Set([
-    'status', 'log', 'diff', 'show', 'file', 'root', 'bookmarks', 'op', 'oplog',
-    'util', 'evolog', 'config', 'version', 'help',
-  ])],
+  [
+    'git',
+    new Set([
+      'status',
+      'log',
+      'show',
+      'diff',
+      'blame',
+      'branch',
+      'tag',
+      'remote',
+      'config',
+      'rev-parse',
+      'rev-list',
+      'ls-files',
+      'ls-tree',
+      'ls-remote',
+      'describe',
+      'cat-file',
+      'shortlog',
+      'reflog',
+      'symbolic-ref',
+      'for-each-ref',
+      'count-objects',
+      'verify-commit',
+      'whatchanged',
+      'grep',
+      'help',
+      'version',
+    ]),
+  ],
+  ['jj', new Set(['status', 'log', 'diff', 'show', 'file', 'root', 'bookmarks', 'op', 'oplog', 'util', 'evolog', 'config', 'version', 'help'])],
 ])
 
 /**
@@ -104,11 +186,22 @@ const splitCommands = (command: string): Split[] => {
       if (char === quote && command[index - 1] !== '\\') quote = null
       continue
     }
-    if (char === '\\') { current += char + (command[index + 1] ?? ''); index += 1; continue }
-    if (char === '"' || char === "'") { quote = char; current += char; continue }
+    if (char === '\\') {
+      current += char + (command[index + 1] ?? '')
+      index += 1
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      current += char
+      continue
+    }
     // An `&` directly after a redirection operator belongs to that redirect
     // (`>&1`, `2>&1`), not to command sequencing.
-    if (char === '&' && /[0-9]?>$/.test(current)) { current += char; continue }
+    if (char === '&' && /[0-9]?>$/.test(current)) {
+      current += char
+      continue
+    }
     if (char === ';' || char === '\n') {
       segments.push({ segment: current, terminated: true })
       current = ''
@@ -136,14 +229,30 @@ const tokenize = (segment: string): string[] => {
   for (let index = 0; index < segment.length; index += 1) {
     const char = segment[index]!
     if (quote !== null) {
-      if (char === quote && segment[index - 1] !== '\\') { quote = null; continue }
+      if (char === quote && segment[index - 1] !== '\\') {
+        quote = null
+        continue
+      }
       current += char
       continue
     }
-    if (char === '"' || char === "'") { quote = char; started = true; continue }
-    if (char === '\\') { current += segment[index + 1] ?? ''; started = true; index += 1; continue }
+    if (char === '"' || char === "'") {
+      quote = char
+      started = true
+      continue
+    }
+    if (char === '\\') {
+      current += segment[index + 1] ?? ''
+      started = true
+      index += 1
+      continue
+    }
     if (/\s/.test(char)) {
-      if (started || current.length > 0) { tokens.push(current); current = ''; started = false }
+      if (started || current.length > 0) {
+        tokens.push(current)
+        current = ''
+        started = false
+      }
       continue
     }
     current += char
@@ -161,17 +270,35 @@ const hasCommandSubstitution = (command: string): boolean => {
   let quote: '"' | "'" | null = null
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index]!
-    if (quote === "'") { if (char === "'" && command[index - 1] !== '\\') quote = null; continue }
+    if (quote === "'") {
+      if (char === "'" && command[index - 1] !== '\\') quote = null
+      continue
+    }
     if (quote === '"') {
-      if (char === '\\') { index += 1; continue }
-      if (char === '"') { quote = null; continue }
+      if (char === '\\') {
+        index += 1
+        continue
+      }
+      if (char === '"') {
+        quote = null
+        continue
+      }
       if (char === '$' && command[index + 1] === '(') return true
       if (char === '`') return true
       continue
     }
-    if (char === '\\') { index += 1; continue }
-    if (char === "'") { quote = "'"; continue }
-    if (char === '"') { quote = '"'; continue }
+    if (char === '\\') {
+      index += 1
+      continue
+    }
+    if (char === "'") {
+      quote = "'"
+      continue
+    }
+    if (char === '"') {
+      quote = '"'
+      continue
+    }
     if (char === '$' && command[index + 1] === '(') return true
     if (char === '`') return true
   }
@@ -187,9 +314,18 @@ const redirectionVerdict = (segment: string): Verdict | undefined => {
   let quote: '"' | "'" | null = null
   for (let index = 0; index < segment.length; index += 1) {
     const char = segment[index]!
-    if (quote !== null) { if (char === quote && segment[index - 1] !== '\\') quote = null; continue }
-    if (char === '\\') { index += 1; continue }
-    if (char === '"' || char === "'") { quote = char; continue }
+    if (quote !== null) {
+      if (char === quote && segment[index - 1] !== '\\') quote = null
+      continue
+    }
+    if (char === '\\') {
+      index += 1
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
     // heredoc and here-string: a here-doc writes a temp file
     if (char === '<' && segment[index + 1] === '<') {
       return exclusive('here-doc writes a temporary file')
@@ -222,7 +358,7 @@ const classifyVerb = (tokens: readonly string[]): Verdict => {
 
   const subcommandAllowlist = VERB_SUBCOMMAND_ALLOWLIST.get(verb)
   if (subcommandAllowlist !== undefined) {
-    const subcommand = rest.find((token) => !token.startsWith('-'))
+    const subcommand = rest.find(token => !token.startsWith('-'))
     if (subcommand === undefined) return exclusive(`${verb} subcommand is ambiguous`)
     if (!subcommandAllowlist.has(subcommand.toLowerCase())) return exclusive(`${verb} ${subcommand} may mutate`)
     if (verb === 'jj' && !rest.includes('--ignore-working-copy')) {

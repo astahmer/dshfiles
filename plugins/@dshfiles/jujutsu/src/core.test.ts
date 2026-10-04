@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { Mutation } from './api.js'
-import { buildMutationArgv, isRecordedJjGitPush, isSafeSplitPath, parseJsonLines, parsePatchStats, PreviewStore, redactRemoteOutput, rootFileFileset, validatedRepositoryPath } from './core.ts'
+import {
+  buildMutationArgv,
+  isRecordedJjGitPush,
+  isSafeSplitPath,
+  parseJsonLines,
+  parsePatchStats,
+  PreviewStore,
+  redactRemoteOutput,
+  rootFileFileset,
+  validatedRepositoryPath,
+} from './core.ts'
 import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.ts'
 
 const id = 'a'.repeat(40)
@@ -27,7 +37,10 @@ test('mutation strings remain single argv values and never become shell commands
   const argv = buildMutationArgv(action)
   assert.deepEqual(argv, ['describe', id, '--message', message])
   assert.equal(argv.join(' ').includes(message), true)
-  assert.equal(argv.some(value => value === 'touch'), false)
+  assert.equal(
+    argv.some(value => value === 'touch'),
+    false,
+  )
   assert.throws(() => buildMutationArgv({ kind: 'describe', commitId: id, message: 'bad\0arg' }), /null bytes/)
   assert.deepEqual(buildMutationArgv({ kind: 'describe', commitId: id, message: '' }), ['describe', id, '--message', ''])
 })
@@ -35,8 +48,13 @@ test('mutation strings remain single argv values and never become shell commands
 test('split argv quotes each listed path as one exact JJ root-file fileset', () => {
   const action: Mutation = { kind: 'split', commitId: id, paths: ['src/a.ts', 'dir with space/café [1]*?.txt'], message: 'split selected files' }
   assert.deepEqual(buildMutationArgv(action), [
-    'split', '--revision', id, '--message', 'split selected files',
-    'root-file:"src/a.ts"', 'root-file:"dir with space/café [1]*?.txt"',
+    'split',
+    '--revision',
+    id,
+    '--message',
+    'split selected files',
+    'root-file:"src/a.ts"',
+    'root-file:"dir with space/café [1]*?.txt"',
   ])
   assert.equal(rootFileFileset('odd "quoted" \\ path*.txt'), 'root-file:"odd \\"quoted\\" \\\\ path*.txt"')
   assert.equal(rootFileFileset('literal" | all() | root-file:"second'), 'root-file:"literal\\" | all() | root-file:\\"second"')
@@ -70,7 +88,11 @@ test('hiding immutable revisions retains explicit ancestry links to visible pare
   const middle = { commitId: otherId, parents: [id], shortestChangeId: 'middle', immutable: true }
   const topId = 'e'.repeat(40)
   const top = { commitId: topId, parents: [otherId], shortestChangeId: 'top', immutable: false }
-  const byId = new Map([[id, base], [otherId, middle], [topId, top]])
+  const byId = new Map([
+    [id, base],
+    [otherId, middle],
+    [topId, top],
+  ])
   assert.deepEqual(graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenImmutableCount: 1, terminal: false }])
   assert.deepEqual(graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenImmutableCount: 0, terminal: false }])
 })
@@ -96,7 +118,10 @@ test('diff parser counts patch lines, skips headers, and maps file names', () =>
 })
 
 test('revision parser fails closed on malformed JSONL', () => {
-  assert.deepEqual(parseJsonLines('{"ok":true}\n', value => value), [{ ok: true }])
+  assert.deepEqual(
+    parseJsonLines('{"ok":true}\n', value => value),
+    [{ ok: true }],
+  )
   assert.throws(() => parseJsonLines('{oops}\n', value => value), /unreadable revision record/)
 })
 
@@ -112,13 +137,15 @@ test('last-push detection requires JJ operation argv metadata', () => {
 })
 
 test('remote preview redacts complete authorization values and credential-shaped values', () => {
-  const result = redactRemoteOutput([
-    'https://user:pass@example.test/repo?token=abc',
-    'Authorization: Bearer SENTINEL',
-    'Proxy-Authorization: Basic PROXY_SENTINEL',
-    'authorization=Bearer ASSIGNMENT_SENTINEL',
-    'access_token=TOKEN_SENTINEL',
-  ].join('\n'))
+  const result = redactRemoteOutput(
+    [
+      'https://user:pass@example.test/repo?token=abc',
+      'Authorization: Bearer SENTINEL',
+      'Proxy-Authorization: Basic PROXY_SENTINEL',
+      'authorization=Bearer ASSIGNMENT_SENTINEL',
+      'access_token=TOKEN_SENTINEL',
+    ].join('\n'),
+  )
   assert.equal(result.includes('user:pass'), false)
   assert.equal(result.includes('token=abc'), false)
   assert.equal(result.includes('Bearer SENTINEL'), false)

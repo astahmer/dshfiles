@@ -10,10 +10,12 @@ export interface WorkspacePickerRemote {
     readonly createDirectory: (path: string, name: string) => Promise<RemoteResult<string>>
   }
   readonly workspace: {
-    readonly create: (input: { readonly path: string }) => Promise<RemoteResult<{
-      readonly workspace: { readonly workspaceId: string; readonly path: string; readonly title: string }
-      readonly created: boolean
-    }>>
+    readonly create: (input: { readonly path: string }) => Promise<
+      RemoteResult<{
+        readonly workspace: { readonly workspaceId: string; readonly path: string; readonly title: string }
+        readonly created: boolean
+      }>
+    >
   }
 }
 
