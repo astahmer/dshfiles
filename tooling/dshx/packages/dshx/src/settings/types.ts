@@ -16,9 +16,11 @@ export interface SettingsClientOptions<ClientValue extends object> {
   readonly decode: (value: unknown) => ClientValue
 }
 
+/**
+ * DSH 0.2 Settings take no base or validate callbacks: defaults and validation
+ * live in the Schemastery schema, composition defaults in the profile patch.
+ */
 export interface SettingsHostOptions<Value extends object> {
-  readonly base?: Partial<Value>
-  readonly validate?: (value: Value) => void
   readonly setup?: (scope: SettingsScope<Value>, ctx: Context) => void | (() => void)
 }
 

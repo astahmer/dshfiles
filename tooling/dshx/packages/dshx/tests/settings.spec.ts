@@ -44,16 +44,24 @@ describe('defineSettings', () => {
 
   it('keeps Host-only facets outside the portable contract', () => {
     const schema = Schema.object({ enabled: Schema.boolean().default(true) })
-    const contract = defineSettings({ namespace: 'advanced', schema, applies: 'restart' })
-    const base = { enabled: false }
-    const validate = (value: { enabled: boolean }): void => {
-      void value.enabled
-    }
-    const contribution = contract.host({ base, validate })
+    const contract = defineSettings({ namespace: 'advanced', schema })
+    const contribution = contract.host({ setup: () => undefined })
     expect(contribution).toEqual({})
-    expect(contract).not.toHaveProperty('base')
-    expect(contract).not.toHaveProperty('validate')
     expect(contract).not.toHaveProperty('setup')
+  })
+
+  it('refuses at the type level what DSH 0.2 refuses at activation', () => {
+    const schema = Schema.object({ enabled: Schema.boolean().default(true) })
+    // @ts-expect-error DSH 0.2 applies every Settings change live.
+    const restart = defineSettings({ namespace: 'restart-only', schema, applies: 'restart' })
+    const contract = defineSettings({ namespace: 'callbacks', schema })
+    // @ts-expect-error Defaults belong in the schema, not a Host base.
+    const withBase = contract.host({ base: { enabled: false } })
+    // @ts-expect-error Validation belongs in the schema, not a Host callback.
+    const withValidate = contract.host({ validate: () => undefined })
+    expect(() => createHostPlugin({ settings: [restart] }, { packageId: '@test/plugin' })).toThrow(expect.objectContaining({ code: 'DSHX2002' }))
+    expect(() => createHostPlugin({ settings: [withBase] }, { packageId: '@test/plugin' })).toThrow('do not accept base or validate')
+    expect(() => createHostPlugin({ settings: [withValidate] }, { packageId: '@test/plugin' })).toThrow('do not accept base or validate')
   })
 
   it('rejects invalid namespaces and diagnoses secret contracts when a Host claims ownership', () => {

@@ -42,11 +42,9 @@ export const marketplaceSettings = defineSettings({
   applies: 'live',
 })
 
+// The URL is validated where it is used (normalizeHubBaseUrl), since DSH 0.2
+// Settings take no validate callback.
 export const marketplaceSettingsHost = marketplaceSettings.host({
-  base: { hubBaseUrl: DEFAULT_HUB_BASE_URL },
-  validate(value) {
-    validateHubBaseUrl(value.hubBaseUrl)
-  },
   setup(scope) {
     activeSettings = scope
     return () => {

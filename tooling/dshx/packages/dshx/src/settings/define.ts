@@ -79,7 +79,8 @@ export function settingsSchemaHasUnsafeSecretPath(schema: z<any, object>): boole
 export interface SettingsDefinition<Schema extends z<any, object>, ClientValue extends object = SettingsValue<Schema>> {
   readonly namespace: string
   readonly schema: Schema
-  readonly applies?: 'live' | 'restart'
+  /** DSH 0.2 applies every Settings change live; restart-only options belong in native Config fields. */
+  readonly applies?: 'live'
   readonly client?: SettingsClientOptions<ClientValue>
 }
 
