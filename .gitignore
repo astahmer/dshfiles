@@ -4,7 +4,12 @@ dist/
 .vite/
 .direnv/
 .pnpm-store/
-
-# Browser-automation snapshots from probe runs. Regenerated on every session and
-# not worth reviewing; the useful signal is the session log, not the dump.
+# Playwright CLI session artifacts from dshx boot checks.
 output/playwright/
+
+# playwright-bdd generated specs, playwright output, and session artifacts.
+.features-gen/
+test-results/
+playwright-report/
+
+.playwright-cli/
