@@ -1,0 +1,151 @@
+{
+  "inspected_on": "2026-10-05",
+  "installed_dsh": "0.2.0-rc.2",
+  "node_used": "22.23.3",
+  "sources": [
+    {
+      "repo": "UynajGI/dsh-ssh",
+      "sha": "9c344efb9bef13ad942b4e9ea16c203fb0095632",
+      "date": "2026-08-16T14:52:40Z",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/UynajGI/dsh-ssh/tree/9c344efb9bef13ad942b4e9ea16c203fb0095632"
+    },
+    {
+      "repo": "Yan-Zero/dsh-host",
+      "sha": "408f8a5d7a0d754f976dcd57f528cd54eee63bc2",
+      "date": "2026-08-16T07:31:03Z",
+      "source_url": "https://github.com/Yan-Zero/dsh-host/tree/408f8a5d7a0d754f976dcd57f528cd54eee63bc2"
+    },
+    {
+      "repo": "Yan-Zero/dsh-remote-ssh",
+      "sha": "21d727cbe24fbae283196e5101adb3de2bdd9157",
+      "date": "2026-08-16T07:47:32Z",
+      "pushed_at": "2026-08-16T07:47:39Z",
+      "archived": false,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "source_url": "https://github.com/Yan-Zero/dsh-remote-ssh/tree/21d727cbe24fbae283196e5101adb3de2bdd9157"
+    },
+    {
+      "repo": "ZhangFengshun/dsh-remote-ssh",
+      "sha": "eeb27968641ca13b351d5dbc62e99840f1c9973a",
+      "date": "2026-10-04T06:33:12Z",
+      "pushed_at": "2026-10-04T06:33:37Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/ZhangFengshun/dsh-remote-ssh/tree/eeb27968641ca13b351d5dbc62e99840f1c9973a"
+    },
+    {
+      "repo": "aijunjiang/dsh-remote-ssh",
+      "sha": "ebf6a08a84c4d697c9a3bfd3c84e36257631eb2f",
+      "date": "2026-09-11T01:43:46Z",
+      "pushed_at": "2026-09-11T01:43:50Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/aijunjiang/dsh-remote-ssh/tree/ebf6a08a84c4d697c9a3bfd3c84e36257631eb2f"
+    },
+    {
+      "repo": "deepseek-ai/deepseek-harness",
+      "sha": "5badb15009ae1756c3afe0ae0cef1faafc290ccc",
+      "date": "2026-10-03T03:48:13Z",
+      "pushed_at": "2026-10-03T06:02:48Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/deepseek-ai/deepseek-harness/tree/5badb15009ae1756c3afe0ae0cef1faafc290ccc"
+    },
+    {
+      "repo": "dsh-ssh/dsh-ssh",
+      "sha": "17764146e474b44222d12a95c585b5de782f9daa",
+      "date": "2026-08-27T08:55:46Z",
+      "pushed_at": "2026-08-27T08:55:49Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/dsh-ssh/dsh-ssh/tree/17764146e474b44222d12a95c585b5de782f9daa"
+    },
+    {
+      "repo": "get-bb/bb",
+      "sha": "72279d019a9ac82351dd3f7bd70862cbd050a02e",
+      "date": "2026-10-04T21:30:42Z",
+      "pushed_at": "2026-10-04T22:32:07Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/get-bb/bb/tree/72279d019a9ac82351dd3f7bd70862cbd050a02e"
+    },
+    {
+      "repo": "liguobao/ds-harness-remote",
+      "sha": "ba8c5ec4377b59d5e8c1866b331cc8658500b81b",
+      "date": "2026-10-03T17:53:46Z",
+      "license": null,
+      "source_url": "https://github.com/liguobao/ds-harness-remote/tree/ba8c5ec4377b59d5e8c1866b331cc8658500b81b"
+    },
+    {
+      "repo": "liyown/dshx",
+      "sha": "8048a780a263cbd788b71d316f2ec84a272158f8",
+      "date": "2026-09-06T03:00:11Z",
+      "pushed_at": "2026-10-03T03:01:13Z",
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/liyown/dshx/tree/8048a780a263cbd788b71d316f2ec84a272158f8"
+    },
+    {
+      "repo": "tengqi159/deepseek-harness-desktop",
+      "sha": "0ca33b8541563f03556ab4ae7e96f7f8dbfd4eec",
+      "date": "2026-08-15T07:11:41Z",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source_url": "https://github.com/tengqi159/deepseek-harness-desktop/tree/0ca33b8541563f03556ab4ae7e96f7f8dbfd4eec"
+    }
+  ]
+}
