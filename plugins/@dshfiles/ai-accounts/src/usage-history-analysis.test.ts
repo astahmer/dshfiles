@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { parseUsageBucketKey, usageBucketKey } from './usage-history.js'
+import { boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey } from './usage-history.js'
 import { changedBankedResetSnapshots, forecastQuotaWindow, quotaHistoryCycles } from './usage-history-analysis.js'
-import type { UsageHistoryPoint } from './usage-history-model.js'
+import { MAX_USAGE_HISTORY_POINTS, type UsageHistoryPoint } from './usage-history-model.js'
 
 const point = (at: number, remaining: number, resetsAt: number, bankedResets = 0, expiries: (number | null)[] = []): UsageHistoryPoint => ({
   at,
@@ -26,6 +26,33 @@ describe('quota usage-history analysis', () => {
       intervalMinutes: 5,
     })
     expect(usageBucketKey('codex:personal', at, 5)).not.toBe(usageBucketKey('codex:personal', at, 15))
+  })
+
+  it('bounds long history reads while preserving recent forecasts and reset-bank changes', () => {
+    const snapshots = Array.from({ length: 10_000 }, (_, index) => ({
+      ...point(
+        index * 60_000,
+        100 - index % 100,
+        (Math.floor(index / 1_000) + 1) * 1_000_000,
+        Math.floor(index / 200),
+      ),
+      instanceId: 'codex',
+    }))
+    const bounded = boundUsageHistoryPoints(snapshots)
+    const recordedTimes = new Set(bounded.map(snapshot => snapshot.at))
+
+    expect(bounded).toHaveLength(MAX_USAGE_HISTORY_POINTS)
+    expect(recordedTimes.has(snapshots[0]?.at ?? -1)).toBe(true)
+    expect(recordedTimes.has(snapshots.at(-1)?.at ?? -1)).toBe(true)
+    for (let index = 200; index < snapshots.length; index += 200) {
+      expect(recordedTimes.has(snapshots[index]?.at ?? -1)).toBe(true)
+    }
+    for (let index = 1_000; index < snapshots.length; index += 1_000) {
+      expect(recordedTimes.has(snapshots[index]?.at ?? -1)).toBe(true)
+    }
+    for (let index = snapshots.length - 48; index < snapshots.length; index += 1) {
+      expect(recordedTimes.has(snapshots[index]?.at ?? -1)).toBe(true)
+    }
   })
 
   it('projects depletion from recent snapshots in the same reset cycle', () => {

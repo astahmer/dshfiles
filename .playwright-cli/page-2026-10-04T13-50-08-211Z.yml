@@ -1,0 +1,46 @@
+- generic [ref=f2e4]:
+  - generic [ref=f2e7]:
+    - generic [ref=f2e8]:
+      - button "New session" [ref=f2e9] [cursor=pointer]
+      - button "Collapse sidebar" [ref=f2e38] [cursor=pointer]
+    - button "New session" [ref=f2e41] [cursor=pointer]:
+      - generic [ref=f2e42]: New Session
+      - generic:
+        - generic:
+          - generic: ⌥
+          - generic: ⌘
+          - generic: "N"
+    - navigation "Global panels" [ref=f2e47]:
+      - button "Plugins" [ref=f2e48] [cursor=pointer]
+      - button "AI Accounts" [ref=f2e57] [cursor=pointer]
+      - button "Usage history" [ref=f2e65] [cursor=pointer]
+    - generic [ref=f2e74]:
+      - generic [ref=f2e75]:
+        - generic [ref=f2e76]: Workspaces
+        - generic [ref=f2e78]:
+          - button "Search sessions" [ref=f2e79] [cursor=pointer]
+          - textbox "Search session names"
+        - generic [ref=f2e83]:
+          - button "View options" [ref=f2e85] [cursor=pointer]
+          - button "Add workspace" [ref=f2e89] [cursor=pointer]
+      - tree "Sessions" [ref=f2e94]:
+        - treeitem "dsh-plugins" [ref=f2e97] [cursor=pointer]
+        - treeitem "Default workspace" [expanded] [ref=f2e105] [cursor=pointer]
+    - button "Settings" [ref=f2e118] [cursor=pointer]
+  - generic [ref=f2e127]:
+    - generic:
+      - banner
+    - generic [ref=f2e133]:
+      - generic [ref=f2e141]:
+        - generic [ref=f2e142]: Into the Unknown
+        - generic [ref=f2e143]: Preview
+      - button "Choose workspace" [ref=f2e145] [cursor=pointer]
+      - generic [ref=f2e153] [cursor=pointer]:
+        - generic [ref=f2e155]:
+          - textbox "Choose workspace" [ref=f2e156]
+          - generic: Choose a workspace to start
+        - generic [ref=f2e157]:
+          - generic [ref=f2e158]:
+            - button "Add files or run commands" [disabled]
+          - generic [ref=f2e159]:
+            - button "Send message" [disabled]

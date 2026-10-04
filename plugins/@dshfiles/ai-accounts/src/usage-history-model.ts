@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const MAX_USAGE_HISTORY_POINTS = 5_000
+
 export const quotaSnapshotSchema = z.object({
   at: z.number(),
   instanceId: z.string().min(1).max(64),

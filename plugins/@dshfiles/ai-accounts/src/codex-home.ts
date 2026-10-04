@@ -153,6 +153,7 @@ export const authJsonPath = (layout: CodexHomeLayout): string => join(layout.eff
 export interface CodexAuthView {
   readonly path: string
   readonly signedIn: boolean
+  /** The signed-in email, when the id token carries one. Never an internal id. */
   readonly identity: string | undefined
   readonly plan: string | undefined
   readonly error: string | undefined
@@ -169,6 +170,16 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | undefined =>
 }
 
 const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined)
+
+/**
+ * A label for a signed-in account when the id token carries no email.
+ *
+ * Codex's own id token often has a `user_id` and nothing else identifying, so
+ * the plan plus the tail of the user id is what a person can recognise. The full
+ * id stays out of the page and the agent tool.
+ */
+const labelFromUserId = (userId: string, plan: string | undefined): string =>
+  `${plan === undefined ? 'ChatGPT' : `ChatGPT ${plan}`} ·${userId.slice(-4)}`
 
 /** Account identity read from Codex's own id token. Never the access token. */
 export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexAuthView> => {
@@ -195,11 +206,15 @@ export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexA
   const claims = typeof tokens.id_token === 'string' ? decodeJwtPayload(tokens.id_token) : undefined
   const profile = (claims?.['https://api.openai.com/profile'] ?? {}) as Record<string, unknown>
   const auth = (claims?.['https://api.openai.com/auth'] ?? {}) as Record<string, unknown>
+  const plan = readString(parsed.chatgpt_plan_type) ?? readString(auth.chatgpt_plan_type)
+  const userId = readString(auth.user_id) ?? readString(auth.chatgpt_user_id)
   return {
     path,
     signedIn: readString(tokens.access_token) !== undefined,
-    identity: readString(profile.email) ?? readString(auth.chatgpt_account_id),
-    plan: readString(parsed.chatgpt_plan_type) ?? readString(auth.chatgpt_plan_type),
+    identity:
+      readString(profile.email)
+      ?? (userId === undefined ? undefined : labelFromUserId(userId, plan)),
+    plan,
     error: undefined,
   }
 }

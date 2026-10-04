@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
+import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
 /**
  * Wire contract for the accounts page.
@@ -250,11 +250,11 @@ export const aiAccountsApi = defineApi({
     history: method({
       input: z.object({
         instanceId: z.string().min(1).max(64),
-        days: z.number().int().min(1).max(90).default(7),
+        days: z.number().int().min(1).max(365).default(7),
       }),
       output: z.object({
         instanceId: z.string().min(1).max(64),
-        points: z.array(usageHistoryPointSchema),
+        points: z.array(usageHistoryPointSchema).max(MAX_USAGE_HISTORY_POINTS),
       }),
     }),
     /** Schedule and retention are persisted with the history domain. */

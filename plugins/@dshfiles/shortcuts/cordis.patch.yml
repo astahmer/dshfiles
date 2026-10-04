@@ -1,0 +1,3 @@
+# The shortcuts plugin is client-only: it installs a capture-phase keyboard
+# listener and needs no Host entry.
+- insert: []

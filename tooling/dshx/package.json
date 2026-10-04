@@ -10,13 +10,18 @@
     "deps:check": "knip",
     "typecheck": "pnpm --filter @dshfiles/dshx typecheck",
     "test": "pnpm --filter @dshfiles/dshx test",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test",
+    "test:e2e": "pnpm run test:e2e:gen && playwright test --config=playwright.e2e.config.ts",
+    "test:e2e:boot": "pnpm run test:e2e",
+    "test:e2e:gen": "bddgen test --config=playwright.e2e.config.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "knip": "6.32.2",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@playwright/test": "1.56.1",
+    "playwright-bdd": "^8.5.1"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

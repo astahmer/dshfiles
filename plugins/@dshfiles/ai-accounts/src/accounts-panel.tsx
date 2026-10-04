@@ -11,13 +11,13 @@ import {
   type AccountsFile,
   type AccountsCatalog,
 } from './api.js'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import styles from './accounts.module.css'
 
 /**
- * The accounts panel, in the shape of the reference account page: a list of
- * toggleable providers on one side, the selected provider's editable settings
- * on the other.
+ * The accounts page, in the shape of the reference account page: a rail of
+ * toggleable providers on one side, the selected provider's numbered settings
+ * sections on the other, inside one bordered shell.
  *
  * Every write goes through the Host, which also owns the file, so the page and an
  * agent share one source of truth. Nothing here holds a credential: an account
@@ -31,6 +31,9 @@ const KIND_LABEL: Record<AccountProfile['kind'], string> = {
   commandcode: 'Command Code',
 }
 
+/** Rail group headings, in the order the groups are listed. */
+const KIND_GROUPS: readonly AccountProfile['kind'][] = ['codex', 'opencode-go', 'commandcode']
+
 const STATE_LABEL: Record<AccountProfile['state'], string> = {
   healthy: 'Authenticated',
   cooling: 'Rate limited',
@@ -38,7 +41,12 @@ const STATE_LABEL: Record<AccountProfile['state'], string> = {
   unconfigured: 'Not signed in',
 }
 
-const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = ['sticky', 'priority', 'round-robin', 'balanced']
+const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = [
+  'sticky',
+  'priority',
+  'round-robin',
+  'balanced',
+]
 
 const DISTRIBUTION_HINT: Record<AccountsFile['distribution'], string> = {
   sticky: 'One account per conversation, so the upstream prompt cache stays warm. A rate-limited account is skipped and the retry lands on the next one.',
@@ -46,6 +54,9 @@ const DISTRIBUTION_HINT: Record<AccountsFile['distribution'], string> = {
   'round-robin': 'Rotate on every request so spend spreads evenly.',
   balanced: 'Weighted random, biased toward the least recently used account.',
 }
+
+/** The section a route slug is valid under, so the field explains its own rule. */
+const SLUG_HINT = 'Letters, digits, dash and underscore. Appears as the provider in the model picker.'
 
 /** A blank account of the requested kind, with the shared Codex home default. */
 const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
@@ -68,19 +79,34 @@ const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
 })
 
 const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
-  profile.instanceId === draft.instanceId &&
-  profile.kind === draft.kind &&
-  profile.displayName === draft.displayName &&
-  profile.enabled === draft.enabled &&
-  profile.homePath === draft.homePath &&
-  profile.shadowHomePath === draft.shadowHomePath &&
-  profile.apiKeyEnv === draft.apiKeyEnv &&
-  profile.badge === draft.badge &&
-  profile.accentColor === draft.accentColor &&
-  profile.providerIcon === draft.providerIcon &&
-  profile.additionalModelIds.join() === draft.additionalModelIds.join()
+  profile.instanceId === draft.instanceId
+  && profile.kind === draft.kind
+  && profile.displayName === draft.displayName
+  && profile.enabled === draft.enabled
+  && profile.homePath === draft.homePath
+  && profile.shadowHomePath === draft.shadowHomePath
+  && profile.apiKeyEnv === draft.apiKeyEnv
+  && profile.apiBaseUrl === draft.apiBaseUrl
+  && profile.badge === draft.badge
+  && profile.accentColor === draft.accentColor
+  && profile.providerIcon === draft.providerIcon
+  && profile.additionalModelIds.join() === draft.additionalModelIds.join()
 
-const Field = (props: { readonly label: string; readonly hint?: string; readonly children: JSX.Element }): JSX.Element => (
+/** Up to three initials, the same tag the reference page derives by default. */
+const badgeFromName = (displayName: string): string =>
+  displayName
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map(part => part[0])
+    .join('')
+    .slice(0, 3)
+    .toUpperCase()
+
+const Field = (props: {
+  readonly label: string
+  readonly hint?: string
+  readonly children: JSX.Element
+}): JSX.Element => (
   <label className={styles.field}>
     <span className={styles.fieldLabel}>{props.label}</span>
     {props.children}
@@ -88,8 +114,14 @@ const Field = (props: { readonly label: string; readonly hint?: string; readonly
   </label>
 )
 
+
 /** Percent remaining, coloured by how much is left rather than by provider. */
-const remainingTone = (percent: number): string => (percent <= 10 ? String(styles.barCritical) : percent <= 30 ? String(styles.barLow) : String(styles.barOk))
+const remainingTone = (percent: number): string =>
+  percent <= 10
+    ? String(styles.barCritical)
+    : percent <= 30
+      ? String(styles.barLow)
+      : String(styles.barOk)
 
 const formatReset = (resetsAt: number | null): string | null => {
   if (resetsAt === null || Number.isNaN(resetsAt)) return null
@@ -100,7 +132,9 @@ const formatReset = (resetsAt: number | null): string | null => {
   return `Resets in ${String(Math.round(hours / 24))}d`
 }
 
-const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
+const UsageCardView = (props: {
+  readonly usage: UsageCard | undefined
+}): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined || usage.status !== 'ok' || usage.windows.length === 0) return null
   return (
@@ -117,7 +151,9 @@ const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.El
               style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
             />
           </div>
-          {formatReset(window.resetsAt) === null ? null : <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>}
+          {formatReset(window.resetsAt) === null ? null : (
+            <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>
+          )}
         </div>
       ))}
       {usage.bankedResets > 0 ? (
@@ -134,144 +170,26 @@ const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.El
   )
 }
 
-/**
- * Per-model default reasoning effort.
- *
- * Only models that actually offer levels are listed, and the provider's own
- * default is the first option, so pinning is an override rather than a
- * requirement.
- */
-const ReasoningDefaults = (props: {
-  readonly account: AccountDraft
-  readonly catalog: readonly { id: string; name: string; efforts: readonly { id: string; name: string }[]; defaultEffort: string | null }[] | undefined
-  readonly onChange: (defaults: Record<string, string>) => void
-}): JSX.Element | null => {
-  const catalog = (props.catalog ?? []).filter(model => model.efforts.length > 0)
-  if (catalog.length === 0) return null
-  const pins = props.account.reasoningDefaults
-  return (
-    <div className={styles.reasoning}>
-      <span className={styles.fieldLabel}>Default reasoning effort</span>
-      <span className={styles.fieldHint}>Applied when a request does not choose one. Models not listed keep the provider default.</span>
-      {catalog.map(model => (
-        <div className={styles.reasoningRow} key={model.id}>
-          <span className={styles.reasoningModel} title={model.id}>
-            {model.name}
-          </span>
-          <select
-            className={styles.input}
-            value={pins[model.id] ?? ''}
-            onChange={event => {
-              const next = { ...pins }
-              if (event.target.value === '') delete next[model.id]
-              else next[model.id] = event.target.value
-              props.onChange(next)
-            }}
-          >
-            <option value="">{model.defaultEffort === null ? 'Provider default' : `Provider default (${model.defaultEffort})`}</option>
-            {model.efforts.map(effort => (
-              <option key={effort.id} value={effort.id}>
-                {effort.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+/** One numbered section header, the shape the reference page numbers 01–05. */
+const Section = (props: {
+  readonly index: string
+  readonly title: string
+  readonly action?: JSX.Element | null
+  readonly muted?: string
+  readonly children: ReactNode
+}): JSX.Element => (
+  <section className={styles.section}>
+    <div className={styles.sectionHead}>
+      <div className={styles.sectionHeadTitle}>
+        <span className={styles.sectionIndex}>{props.index}</span>
+        <h3>{props.title}</h3>
+      </div>
+      {props.action ?? null}
+      {props.muted === undefined ? null : <span className={styles.sectionMuted}>{props.muted}</span>}
     </div>
-  )
-}
-
-/**
- * Model curation: hide, favorite, and reorder an account's models.
- *
- * Reordering is explicit rather than a full sort, so a model the provider adds
- * later appears after the curated ones instead of displacing them.
- */
-const ModelCuration = (props: {
-  readonly account: AccountDraft
-  readonly catalog: readonly { id: string; name: string }[] | undefined
-  readonly onChange: (next: Partial<AccountDraft>) => void
-}): JSX.Element | null => {
-  const catalog = props.catalog ?? []
-  if (catalog.length === 0) return null
-  const { hiddenModelIds, favoriteModelIds, modelOrder } = props.account
-  const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
-  const ordered = [...listed, ...catalog.filter(model => !listed.includes(model.id)).map(model => model.id)]
-  const move = (id: string, delta: number) => {
-    const index = ordered.indexOf(id)
-    const target = index + delta
-    if (index < 0 || target < 0 || target >= ordered.length) return
-    const next = [...ordered]
-    const [moved] = next.splice(index, 1)
-    if (moved === undefined) return
-    next.splice(target, 0, moved)
-    props.onChange({ modelOrder: next })
-  }
-  return (
-    <div className={styles.curation}>
-      <span className={styles.fieldLabel}>Models</span>
-      <span className={styles.fieldHint}>Starred models appear first, hidden ones drop out of the picker entirely.</span>
-      <ul className={styles.modelList}>
-        {ordered.map((id, index) => {
-          const model = catalog.find(candidate => candidate.id === id)
-          const hidden = hiddenModelIds.includes(id)
-          const favorite = favoriteModelIds.includes(id)
-          return (
-            <li className={styles.modelRow} key={id}>
-              <button
-                type="button"
-                className={favorite ? styles.starOn : styles.starOff}
-                aria-label={favorite ? `Unstar ${model?.name ?? id}` : `Star ${model?.name ?? id}`}
-                aria-pressed={favorite}
-                onClick={() =>
-                  props.onChange({
-                    favoriteModelIds: favorite ? favoriteModelIds.filter(candidate => candidate !== id) : [...favoriteModelIds, id],
-                  })
-                }
-              >
-                ★
-              </button>
-              <span className={hidden ? styles.modelHidden : styles.modelName} title={id}>
-                {model?.name ?? id}
-              </span>
-              <button
-                type="button"
-                className={styles.moveButton}
-                aria-label={`Move ${model?.name ?? id} up`}
-                disabled={index === 0}
-                onClick={() => move(id, -1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className={styles.moveButton}
-                aria-label={`Move ${model?.name ?? id} down`}
-                disabled={index === ordered.length - 1}
-                onClick={() => move(id, 1)}
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                className={styles.moveButton}
-                aria-label={hidden ? `Show ${model?.name ?? id}` : `Hide ${model?.name ?? id}`}
-                aria-pressed={!hidden}
-                onClick={() =>
-                  props.onChange({
-                    hiddenModelIds: hidden ? hiddenModelIds.filter(candidate => candidate !== id) : [...hiddenModelIds, id],
-                  })
-                }
-              >
-                {hidden ? 'Show' : 'Hide'}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
+    <p className={styles.help}>{props.children}</p>
+  </section>
+)
 
 /**
  * Quota over time for one account.
@@ -287,7 +205,11 @@ const UsageHistoryChart = (props: {
 }): JSX.Element => {
   const points = props.points ?? []
   if (points.length < 2) {
-    return <p className={styles.historyEmpty}>Not enough history yet. Quota is recorded every 15 minutes; check back shortly.</p>
+    return (
+      <p className={styles.historyEmpty}>
+        Not enough history yet. Quota is recorded on an interval; check back shortly.
+      </p>
+    )
   }
   const labels = [...new Set(points.flatMap(point => Object.keys(point.windows)))]
   const from = points[0]?.at ?? Date.now()
@@ -329,16 +251,246 @@ const UsageHistoryChart = (props: {
   )
 }
 
+/**
+ * Model curation: favorite, hide, and reorder an account's models.
+ *
+ * Reordering is explicit rather than a full sort, so a model the provider adds
+ * later appears after the curated ones instead of displacing them. The rows are
+ * split into Favorites, All, and Hidden groups so a long catalog stays readable.
+ */
+const ModelCuration = (props: {
+  readonly account: AccountDraft
+  readonly catalog: readonly { id: string; name: string; efforts: readonly { id: string; name: string }[]; defaultEffort: string | null }[]
+  readonly onChange: (next: Partial<AccountDraft>) => void
+}): JSX.Element => {
+  const { hiddenModelIds, favoriteModelIds, modelOrder, reasoningDefaults } = props.account
+  const listed = modelOrder.filter(id => props.catalog.some(model => model.id === id))
+  const ordered = [
+    ...listed.map(id => props.catalog.find(model => model.id === id)).filter(model => model !== undefined),
+    ...props.catalog.filter(model => !listed.includes(model.id)),
+  ]
+  const hidden = new Set(hiddenModelIds)
+  const favorites = new Set(favoriteModelIds)
+  const favoriteModels = ordered.filter(model => favorites.has(model.id) && !hidden.has(model.id))
+  const availableModels = ordered.filter(model => !hidden.has(model.id) && !favorites.has(model.id))
+  const hiddenModels = ordered.filter(model => hidden.has(model.id))
+  const allHidden = ordered.length > 0 && ordered.every(model => hidden.has(model.id))
+
+  const move = (id: string, delta: number) => {
+    const next = ordered.map(model => model.id)
+    const index = next.indexOf(id)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= next.length) return
+    const [moved] = next.splice(index, 1)
+    if (moved === undefined) return
+    next.splice(target, 0, moved)
+    props.onChange({ modelOrder: next })
+  }
+
+  const toggleFavorite = (modelId: string) => {
+    const nextFavorites = new Set(favoriteModelIds)
+    if (nextFavorites.has(modelId)) nextFavorites.delete(modelId)
+    else nextFavorites.add(modelId)
+    const favoritesFirst = ordered.filter(model => nextFavorites.has(model.id)).map(model => model.id)
+    const rest = ordered.filter(model => !nextFavorites.has(model.id)).map(model => model.id)
+    props.onChange({ favoriteModelIds: [...nextFavorites], modelOrder: [...favoritesFirst, ...rest] })
+  }
+
+  const toggleHidden = (modelId: string) => {
+    const next = new Set(hiddenModelIds)
+    if (next.has(modelId)) next.delete(modelId)
+    else next.add(modelId)
+    props.onChange({ hiddenModelIds: [...next] })
+  }
+
+  const setEffort = (modelId: string, effortId: string) => {
+    const next = { ...reasoningDefaults }
+    if (effortId === '') delete next[modelId]
+    else next[modelId] = effortId
+    props.onChange({ reasoningDefaults: next })
+  }
+
+  const rows = (models: readonly { id: string; name: string; efforts: readonly { id: string; name: string }[]; defaultEffort: string | null }[]) =>
+    models.map(model => {
+      const isFavorite = favorites.has(model.id)
+      const isHidden = hidden.has(model.id)
+      const groupIndex = models.findIndex(candidate => candidate.id === model.id)
+      return (
+        <li className={isHidden ? `${styles.modelRow} ${styles.modelRowHidden}` : styles.modelRow} key={model.id}>
+          <button
+            type="button"
+            className={isFavorite ? styles.starOn : styles.starOff}
+            aria-label={isFavorite ? `Unstar ${model.name}` : `Star ${model.name}`}
+            aria-pressed={isFavorite}
+            onClick={() => toggleFavorite(model.id)}
+          >
+            ★
+          </button>
+          <span className={styles.modelName} title={model.id}>
+            <strong>{model.name}</strong>
+            <small>{model.id}</small>
+          </span>
+          <span className={styles.modelActions}>
+            {model.efforts.length === 0 ? null : (
+              <select
+                className={styles.reasoningSelect}
+                aria-label={`Default reasoning effort for ${model.name}`}
+                value={reasoningDefaults[model.id] ?? model.defaultEffort ?? ''}
+                onChange={event => setEffort(model.id, event.target.value)}
+              >
+                {model.defaultEffort === null || reasoningDefaults[model.id] !== undefined
+                  ? null
+                  : <option value="">Provider default</option>}
+                {model.efforts.map(effort => (
+                  <option key={effort.id} value={effort.id}>
+                    {effort.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              className={styles.moveButton}
+              aria-label={`Move ${model.name} up`}
+              disabled={groupIndex === 0}
+              onClick={() => move(model.id, -1)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className={styles.moveButton}
+              aria-label={`Move ${model.name} down`}
+              disabled={groupIndex === models.length - 1}
+              onClick={() => move(model.id, 1)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className={styles.moveButton}
+              aria-pressed={!isHidden}
+              aria-label={isHidden ? `Show ${model.name} in the picker` : `Hide ${model.name} from the picker`}
+              onClick={() => toggleHidden(model.id)}
+            >
+              {isHidden ? 'Show' : 'Hide'}
+            </button>
+          </span>
+        </li>
+      )
+    })
+
+  const toggleAll = () => {
+    if (allHidden) {
+      props.onChange({ hiddenModelIds: hiddenModelIds.filter(id => !props.catalog.some(model => model.id === id)) })
+      return
+    }
+    props.onChange({ hiddenModelIds: [...new Set([...hiddenModelIds, ...ordered.map(model => model.id)])] })
+  }
+
+  return (
+    <div className={styles.curation}>
+      <div className={styles.modelToolbar}>
+        <button type="button" className={styles.quiet} onClick={toggleAll}>
+          {allHidden ? 'Enable all' : 'Disable all'}
+        </button>
+        <span className={styles.modelCount}>
+          {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden
+        </span>
+      </div>
+      {ordered.length === 0 ? (
+        <p className={styles.empty}>No models returned yet. Sign in, then refresh the provider catalog.</p>
+      ) : null}
+      {favoriteModels.length > 0 ? (
+        <>
+          <h4 className={styles.modelGroup}>Favorites</h4>
+          <ul className={styles.modelList}>{rows(favoriteModels)}</ul>
+        </>
+      ) : null}
+      {availableModels.length > 0 ? (
+        <>
+          <h4 className={styles.modelGroup}>All</h4>
+          <ul className={styles.modelList}>{rows(availableModels)}</ul>
+        </>
+      ) : null}
+      {hiddenModels.length > 0 ? (
+        <>
+          <h4 className={styles.modelGroup}>Hidden from picker</h4>
+          <ul className={styles.modelList}>{rows(hiddenModels)}</ul>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/** One group of the rail: a provider heading and the accounts under it. */
+const AccountGroup = (props: {
+  readonly kind: AccountProfile['kind']
+  readonly accounts: readonly AccountProfile[]
+  readonly selectedId: string | null
+  readonly onSelect: (instanceId: string) => void
+  readonly onToggle: (profile: AccountProfile) => void
+}): JSX.Element | null => {
+  if (props.accounts.length === 0) return null
+  return (
+    <section className={styles.group}>
+      <h2>{KIND_LABEL[props.kind].toUpperCase()}</h2>
+      {props.accounts.map(profile => (
+        <div
+          className={
+            profile.instanceId === props.selectedId
+              ? `${styles.accountRow} ${styles.accountRowSelected}`
+              : styles.accountRow
+          }
+          key={profile.instanceId}
+        >
+          <button
+            type="button"
+            className={styles.accountSelect}
+            aria-current={profile.instanceId === props.selectedId ? 'true' : undefined}
+            onClick={() => props.onSelect(profile.instanceId)}
+          >
+            <span
+              className={styles.mark}
+              style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }}
+              aria-hidden
+            >
+              {profile.badge === '' ? badgeFromName(profile.displayName).slice(0, 2) : profile.badge}
+            </span>
+            <span className={styles.accountCopy}>
+              <strong>{profile.displayName}</strong>
+              <small>{profile.identity ?? STATE_LABEL[profile.state]}</small>
+            </span>
+          </button>
+          <label className={styles.accountToggle} title={profile.enabled ? 'Hide from the model picker' : 'Show in the model picker'}>
+            <input
+              type="checkbox"
+              aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
+              checked={profile.enabled}
+              onChange={event => props.onToggle({ ...profile, enabled: event.target.checked })}
+            />
+            <span className={styles.switchTrack}>
+              <span className={profile.enabled ? styles.knobOn : styles.knobOff} />
+            </span>
+          </label>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
   const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
+  const [refreshingCatalog, setRefreshingCatalog] = useState(false)
   const [history, setHistory] = useState<readonly { at: number; windows: Record<string, number> }[]>([])
   const [historyDays, setHistoryDays] = useState(7)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [addingKind, setAddingKind] = useState<AccountProfile['kind'] | null>(null)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -353,16 +505,27 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   }, [load])
 
   // The catalog is per account and only changes when the account does.
+  const refreshCatalog = useCallback(
+    async (instanceId: string): Promise<void> => {
+      setRefreshingCatalog(true)
+      try {
+        setCatalog(await accounts.catalog({ instanceId }))
+      } catch {
+        setCatalog(null)
+      } finally {
+        setRefreshingCatalog(false)
+      }
+    },
+    [accounts],
+  )
+
   useEffect(() => {
     if (selectedId === null) {
       setCatalog(null)
       return
     }
-    void accounts
-      .catalog({ instanceId: selectedId })
-      .then(setCatalog)
-      .catch(() => setCatalog(null))
-  }, [accounts, selectedId])
+    void refreshCatalog(selectedId)
+  }, [selectedId, refreshCatalog])
 
   // History is read alongside the catalog, and a manual collect fills it in
   // immediately rather than waiting for the next scheduled sweep.
@@ -396,7 +559,10 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     }
   }, [accounts])
 
-  const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
+  const selected = useMemo(
+    () => file?.accounts.find(account => account.instanceId === selectedId) ?? null,
+    [file, selectedId],
+  )
 
   // The editor follows the selection, and keeps unsaved edits across re-reads.
   useEffect(() => {
@@ -404,7 +570,11 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
       setDraft(null)
       return
     }
-    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : { ...selected }))
+    setDraft(current =>
+      current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current)
+        ? current
+        : { ...selected },
+    )
   }, [selected])
 
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
@@ -415,11 +585,24 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     try {
       setFile(await accounts.save({ draft: next }))
       setSelectedId(next.instanceId)
-      setNotice(`Saved ${next.instanceId}.`)
+      setNotice('Saved. New sessions use the updated route settings.')
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** Write straight through, for the toggles the reference page saves on click. */
+  const persist = async (patch: Partial<AccountDraft>) => {
+    if (selected === null) return
+    const next = { ...selected, ...patch }
+    setDraft(next)
+    try {
+      setFile(await accounts.save({ draft: next }))
+    } catch (error) {
+      setNotice(`Could not save: ${String(error)}`)
+      setDraft(selected)
     }
   }
 
@@ -430,7 +613,16 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   const remove = async (profile: AccountProfile) => {
     setFile(await accounts.remove({ instanceId: profile.instanceId }))
     setSelectedId(current => (current === profile.instanceId ? null : current))
-    setNotice(`Removed ${profile.instanceId}.`)
+    setNotice(`Removed ${profile.displayName}. Credentials were left on disk.`)
+  }
+
+  const copy = async (text: string, message: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setNotice(message)
+    } catch {
+      setNotice(`Copy this into a terminal: ${text}`)
+    }
   }
 
   /**
@@ -456,22 +648,31 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     return <div className={styles.notice}>{notice ?? 'Loading accounts…'}</div>
   }
 
+  const kicker = draft?.kind === 'opencode-go'
+    ? 'OPENCODE SUBSCRIPTION'
+    : draft?.kind === 'commandcode'
+      ? 'COMMAND CODE'
+      : 'CHATGPT SUBSCRIPTION'
+
+  const launchCommand = draft !== null && draft.kind === 'codex' && draft.shadowHomePath.trim() !== ''
+    ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex`
+    : null
+
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>AI Accounts</h1>
-          <p className={styles.subtitle}>
-            Each account is its own model route. Editing a profile here updates the picker; credentials stay in each provider&apos;s own home.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.secondary} onClick={props.onOpenUsageHistory}>
-            Open usage history
-          </button>
+      <header className={styles.toolbar}>
+        <span className={styles.scopeBar}>
+          <span>Applying settings for</span>
+          <span className={styles.scopeValue}>All accounts</span>
+          <span>on</span>
+          <span className={styles.scopeValue}>this host</span>
+        </span>
+        <span className={styles.scopeBar}>
+          <span>Spreading requests</span>
           <select
-            className={styles.distribution}
+            className={styles.scopeSelect}
             value={file.distribution}
+            aria-label="Request distribution"
             onChange={event => {
               const distribution = event.target.value as AccountsFile['distribution']
               void accounts
@@ -479,7 +680,6 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 .then(setFile)
                 .catch(error => setNotice(`Could not change distribution: ${String(error)}`))
             }}
-            aria-label="Request distribution"
           >
             {DISTRIBUTIONS.map(value => (
               <option key={value} value={value}>
@@ -487,258 +687,442 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               </option>
             ))}
           </select>
-          <button type="button" className={styles.secondary} onClick={() => setAddingKind('codex')}>
-            + Codex
-          </button>
-          <button type="button" className={styles.secondary} onClick={() => setAddingKind('opencode-go')}>
-            + OpenCode
-          </button>
-          <button type="button" className={styles.secondary} onClick={() => setAddingKind('commandcode')}>
-            + Command Code
-          </button>
-        </div>
+        </span>
       </header>
 
-      <p className={styles.distributionHint}>{DISTRIBUTION_HINT[file.distribution]}</p>
-      {notice === null ? null : <p className={styles.notice}>{notice}</p>}
-
-      <div className={styles.split}>
-        <div className={styles.list}>
-          {file.accounts.length === 0 ? <p className={styles.empty}>No accounts yet. Add one to publish its model route.</p> : null}
-          {file.accounts.map(profile => (
-            <button
-              type="button"
-              key={profile.instanceId}
-              className={profile.instanceId === selectedId ? `${styles.card} ${styles.cardSelected}` : styles.card}
-              onClick={() => setSelectedId(profile.instanceId)}
-            >
-              <span className={styles.cardGlyph} style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }} aria-hidden>
-                {profile.providerIcon.slice(0, 2).toUpperCase()}
-              </span>
-              <span className={styles.cardBody}>
-                <span className={styles.cardTitle}>
-                  <span className={styles.cardName}>{profile.displayName}</span>
-                  {profile.badge === '' ? null : <span className={styles.badge}>{profile.badge}</span>}
-                </span>
-                <span className={styles.cardRoute}>{profile.instanceId}</span>
-                <span className={profile.state === 'healthy' ? styles.stateOk : profile.state === 'cooling' ? styles.stateWarn : styles.stateIdle}>
-                  {STATE_LABEL[profile.state]}
-                  {profile.plan === null ? '' : ` · ${profile.plan}`}
-                </span>
-              </span>
-              <span
-                className={styles.switch}
-                role="switch"
-                aria-checked={profile.enabled}
-                aria-label={`Enable ${profile.displayName}`}
-                tabIndex={0}
-                onClick={event => {
-                  event.stopPropagation()
-                  void toggleEnabled(profile)
-                }}
-                onKeyDown={event => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
-                  event.preventDefault()
-                  event.stopPropagation()
-                  void toggleEnabled(profile)
-                }}
+      <div className={styles.layout}>
+        <aside className={styles.rail} aria-label="Provider accounts">
+          <div className={styles.railHeading}>
+            <span>
+              YOUR ACCOUNTS <i className={styles.count}>{file.accounts.length}</i>
+            </span>
+            <span className={styles.addAnchor}>
+              <button
+                type="button"
+                className={styles.addTrigger}
+                aria-label="Add account"
+                aria-expanded={addMenuOpen}
+                onClick={() => setAddMenuOpen(current => !current)}
               >
-                <span className={profile.enabled ? styles.knobOn : styles.knobOff} />
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.detail}>
-          {addingKind === null && draft === null ? <p className={styles.empty}>Select an account to edit it.</p> : null}
-
-          {addingKind === null && draft !== null ? (
-            <>
-              <h2 className={styles.detailTitle}>{draft.displayName || draft.instanceId}</h2>
-              <p className={styles.detailSub}>
-                {KIND_LABEL[draft.kind]} · {draft.kind === 'codex' ? 'Shared state, private auth' : 'API key from the environment'}
-              </p>
-
-              <Field label="Route slug" hint="Letters, digits, dash and underscore. Appears as the provider in the model picker.">
-                <input className={styles.input} value={draft.instanceId} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} />
-              </Field>
-
-              <Field label="Display name">
-                <input
-                  className={styles.input}
-                  value={draft.displayName}
-                  placeholder={KIND_LABEL[draft.kind]}
-                  onChange={event => setDraft({ ...draft, displayName: event.target.value })}
-                />
-              </Field>
-
-              <Field label="Badge" hint="Short tag shown beside the name, e.g. work.">
-                <input className={styles.input} value={draft.badge} onChange={event => setDraft({ ...draft, badge: event.target.value })} />
-              </Field>
-
-              <Field label="Accent color">
-                <input className={styles.input} value={draft.accentColor} onChange={event => setDraft({ ...draft, accentColor: event.target.value })} />
-              </Field>
-
-              <Field label="Icon">
-                <select className={styles.input} value={draft.providerIcon} onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}>
-                  {PROVIDER_ICONS.map(icon => (
-                    <option key={icon} value={icon}>
-                      {icon}
-                    </option>
+                +
+              </button>
+              {addMenuOpen ? (
+                <span className={styles.addMenu} role="menu">
+                  {KIND_GROUPS.map(kind => (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      key={kind}
+                      disabled={saving}
+                      onClick={() => {
+                        setAddMenuOpen(false)
+                        setAddingKind(kind)
+                      }}
+                    >
+                      <span className={styles.addMenuMark} style={{ background: kind === 'codex' ? '#2563EB' : kind === 'opencode-go' ? '#7C3AED' : '#0E7490' }} aria-hidden>
+                        {KIND_LABEL[kind].slice(0, 2).toUpperCase()}
+                      </span>
+                      {KIND_LABEL[kind]} account
+                    </button>
                   ))}
-                </select>
-              </Field>
+                </span>
+              ) : null}
+            </span>
+          </div>
+          {file.accounts.length === 0 ? (
+            <p className={styles.empty}>Add an account to publish its own model route.</p>
+          ) : null}
+          {KIND_GROUPS.map(kind => (
+            <AccountGroup
+              kind={kind}
+              accounts={file.accounts.filter(profile => profile.kind === kind)}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onToggle={profile => void toggleEnabled(profile)}
+              key={kind}
+            />
+          ))}
+          <p className={styles.railFoot}>
+            Credentials stay in each provider&apos;s own account directory.
+          </p>
+        </aside>
 
-              {draft.kind === 'codex' ? (
-                <>
-                  <Field label="CODEX_HOME path" hint="Where shared sessions, skills and plugins live.">
-                    <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
-                  </Field>
-                  <Field
-                    label="Shadow home path"
-                    hint="Account-specific home. Keeps auth.json separate while sharing state. Leave empty for one under the shadow root."
-                  >
-                    <input
-                      className={styles.input}
-                      value={draft.shadowHomePath}
-                      onChange={event => setDraft({ ...draft, shadowHomePath: event.target.value })}
-                    />
-                  </Field>
-                </>
-              ) : (
-                <>
-                  <Field label="API key environment variable" hint="Named, not valued: the key never enters this file.">
-                    <input
-                      className={styles.input}
-                      value={draft.apiKeyEnv}
-                      placeholder={draft.kind === 'commandcode' ? 'COMMANDCODE_API_KEY' : 'OPENCODE_API_KEY'}
-                      onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
-                    />
-                  </Field>
-                  {draft.kind === 'commandcode' ? (
-                    <Field label="API base URL" hint="Leave empty for Command Code's own deployment.">
-                      <input
-                        className={styles.input}
-                        value={draft.apiBaseUrl}
-                        placeholder="https://api.commandcode.ai"
-                        onChange={event => setDraft({ ...draft, apiBaseUrl: event.target.value })}
-                      />
-                    </Field>
-                  ) : null}
-                </>
-              )}
-
-              <div className={styles.detailActions}>
-                <button
-                  type="button"
-                  className={styles.primary}
-                  disabled={!dirty || saving || draft.instanceId.trim().length === 0}
-                  onClick={() => void save(draft)}
+        {draft !== null ? (
+          <section className={styles.detail}>
+            <div className={styles.detailTop}>
+              <div className={styles.detailTitleBlock}>
+                <span
+                  className={styles.markLarge}
+                  style={{ background: draft.accentColor === '' ? undefined : draft.accentColor }}
+                  aria-hidden
                 >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                <button type="button" className={styles.secondary} onClick={() => setDraft(selected === null ? null : { ...selected })} disabled={!dirty}>
-                  Revert
-                </button>
-                <button type="button" className={styles.danger} onClick={() => selected !== null && void remove(selected)}>
-                  Remove
-                </button>
+                  {draft.badge === '' ? 'AI' : draft.badge}
+                </span>
+                <div>
+                  <p className={styles.kicker}>{kicker}</p>
+                  <h2>{draft.displayName || draft.instanceId}</h2>
+                </div>
               </div>
+              <label className={styles.switchLabel}>
+                <span>{draft.enabled ? 'Enabled in model picker' : 'Hidden from model picker'}</span>
+                <input
+                  type="checkbox"
+                  checked={draft.enabled}
+                  onChange={event => void persist({ enabled: event.target.checked })}
+                />
+                <span className={styles.switchTrack}>
+                  <span className={draft.enabled ? styles.knobOn : styles.knobOff} />
+                </span>
+              </label>
+            </div>
 
-              <ModelCuration account={draft} catalog={catalog?.models} onChange={next => setDraft({ ...draft, ...next })} />
-
-              <ReasoningDefaults account={draft} catalog={catalog?.models} onChange={reasoningDefaults => setDraft({ ...draft, reasoningDefaults })} />
-
-              <div className={styles.historySection}>
-                <div className={styles.historyHead}>
-                  <span className={styles.fieldLabel}>Quota history</span>
-                  <select
-                    className={styles.historyRange}
-                    value={String(historyDays)}
-                    onChange={event => setHistoryDays(Number(event.target.value))}
-                    aria-label="History range"
-                  >
-                    {[1, 3, 7, 14, 30].map(days => (
-                      <option key={days} value={String(days)}>
-                        {days}d
-                      </option>
-                    ))}
-                  </select>
+            <div className={styles.detailContent}>
+              <Section
+                index="01"
+                title="Account identity"
+                action={
                   <button
                     type="button"
-                    className={styles.historyRefresh}
+                    className={styles.quiet}
+                    disabled={draft.kind !== 'codex' || selectedId === null}
                     onClick={() => {
                       if (selectedId === null) return
                       void accounts
-                        .collectUsage()
-                        .then(() => accounts.history({ instanceId: selectedId, days: historyDays }))
-                        .then(result => setHistory(result.points))
-                        .catch(() => setNotice('Could not record usage right now.'))
+                        .identity({ instanceId: selectedId })
+                        .then(identity => {
+                          setNotice(
+                            identity.signedIn
+                              ? 'Codex account identity refreshed.'
+                              : 'No signed-in account was found at this home yet.',
+                          )
+                          if (identity.signedIn) void load()
+                        })
+                        .catch(() => setNotice('Could not read the Codex account identity.'))
                     }}
                   >
-                    Record now
+                    ↻ Refresh
                   </button>
+                }
+              >
+                <div className={styles.fieldGrid}>
+                  <Field label="Route slug" hint={SLUG_HINT}>
+                    <input
+                      className={styles.input}
+                      value={draft.instanceId}
+                      onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Display name">
+                    <input
+                      className={styles.input}
+                      value={draft.displayName}
+                      placeholder={KIND_LABEL[draft.kind]}
+                      onChange={event => setDraft({ ...draft, displayName: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Signed-in identity">
+                    <input
+                      className={styles.input}
+                      readOnly
+                      value={
+                        selected?.identity
+                        ?? (draft.kind === 'codex'
+                          ? 'Sign in, then refresh'
+                          : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+                      }
+                    />
+                  </Field>
+                  <Field label="Picker tag" hint="Up to 3 characters, shown on the provider mark.">
+                    <input
+                      className={styles.input}
+                      value={draft.badge}
+                      maxLength={3}
+                      placeholder={badgeFromName(draft.displayName)}
+                      onChange={event => setDraft({ ...draft, badge: event.target.value.toUpperCase() })}
+                    />
+                  </Field>
+                  <Field label="Tag color">
+                    <input
+                      className={styles.colorInput}
+                      type="color"
+                      value={draft.accentColor}
+                      onChange={event => setDraft({ ...draft, accentColor: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Picker icon">
+                    <select
+                      className={styles.input}
+                      value={draft.providerIcon}
+                      onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}
+                    >
+                      {PROVIDER_ICONS.map(icon => (
+                        <option key={icon} value={icon}>
+                          {icon}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
+              </Section>
+
+              <Section
+                index="02"
+                title="Runtime paths"
+                muted="Absolute path on this host"
+                action={
+                  launchCommand === null ? null : (
+                    <button
+                      type="button"
+                      className={styles.quiet}
+                      onClick={() =>
+                        void copy(
+                          launchCommand,
+                          'Launch command copied. Run it in a terminal to open interactive Codex for this account.',
+                        )
+                      }
+                    >
+                      Copy launch command
+                    </button>
+                  )
+                }
+              >
+                <div className={styles.pathField}>
+                  <span>
+                    {draft.kind === 'codex' ? 'CODEX_HOME' : 'API KEY'}
+                    <small>
+                      {draft.kind === 'codex'
+                        ? 'Shared sessions, skills and plugins.'
+                        : 'Named, never valued: the key stays in the environment.'}
+                    </small>
+                  </span>
+                  <input
+                    className={styles.input}
+                    aria-label={draft.kind === 'codex' ? 'CODEX_HOME' : 'API key environment variable'}
+                    spellCheck={false}
+                    value={draft.kind === 'codex' ? draft.homePath : draft.apiKeyEnv}
+                    placeholder={draft.kind === 'codex' ? '~/.codex' : 'OPENCODE_API_KEY'}
+                    onChange={event =>
+                      setDraft(
+                        draft.kind === 'codex'
+                          ? { ...draft, homePath: event.target.value }
+                          : { ...draft, apiKeyEnv: event.target.value },
+                      )
+                    }
+                  />
+                </div>
+                {draft.kind === 'codex' ? (
+                  <div className={styles.pathField}>
+                    <span>
+                      Shadow home
+                      <small>Per-account home keeping auth.json separate while sharing state.</small>
+                    </span>
+                    <input
+                      className={styles.input}
+                      aria-label="Shadow home path"
+                      spellCheck={false}
+                      value={draft.shadowHomePath}
+                      placeholder="Leave empty for one under the shadow root"
+                      onChange={event => setDraft({ ...draft, shadowHomePath: event.target.value })}
+                    />
+                  </div>
+                ) : null}
+                {draft.kind === 'commandcode' ? (
+                  <div className={styles.pathField}>
+                    <span>
+                      API base URL
+                      <small>Leave empty for Command Code&apos;s own deployment.</small>
+                    </span>
+                    <input
+                      className={styles.input}
+                      aria-label="API base URL"
+                      spellCheck={false}
+                      value={draft.apiBaseUrl}
+                      placeholder="https://api.commandcode.ai"
+                      onChange={event => setDraft({ ...draft, apiBaseUrl: event.target.value })}
+                    />
+                  </div>
+                ) : null}
+              </Section>
+
+              <Section
+                index="03"
+                title="Models"
+                action={
+                  <button
+                    type="button"
+                    className={styles.quiet}
+                    disabled={refreshingCatalog}
+                    onClick={() => {
+                      if (draft.instanceId === '') return
+                      void refreshCatalog(draft.instanceId)
+                    }}
+                  >
+                    {refreshingCatalog ? 'Checking…' : '↻ Check now'}
+                  </button>
+                }
+              >
+                <span className={styles.sectionHelp}>
+                  Show or hide models in the picker, star the ones you reach for, and pin a default
+                  reasoning effort per model.
+                </span>
+                <ModelCuration
+                  account={draft}
+                  catalog={catalog?.models ?? []}
+                  onChange={next => setDraft({ ...draft, ...next })}
+                />
+              </Section>
+
+              <Section
+                index="04"
+                title="Quota"
+                action={
+                  <span className={styles.sectionActions}>
+                    <select
+                      className={styles.rangeSelect}
+                      value={String(historyDays)}
+                      aria-label="History range"
+                      onChange={event => setHistoryDays(Number(event.target.value))}
+                    >
+                      {[1, 3, 7, 14, 30].map(days => (
+                        <option key={days} value={String(days)}>
+                          {days}d
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={styles.quiet}
+                      onClick={() => {
+                        if (selectedId === null) return
+                        void accounts
+                          .collectUsage()
+                          .then(() => accounts.history({ instanceId: selectedId, days: historyDays }))
+                          .then(result => setHistory(result.points))
+                          .catch(() => setNotice('Could not record usage right now.'))
+                      }}
+                    >
+                      Record now
+                    </button>
+                  </span>
+                }
+              >
+                <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
                 <UsageHistoryChart points={history} days={historyDays} />
-              </div>
+              </Section>
 
-              <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
-
-              {selected !== null && selected.kind === 'codex' ? (
-                <div className={styles.status}>
+              <Section
+                index="05"
+                title="Session"
+                action={
+                  selected === null || selected.signedIn ? null : (
+                    <button
+                      type="button"
+                      className={styles.quiet}
+                      onClick={() => void copy(selected.loginHint, 'Sign-in command copied.')}
+                    >
+                      ↗ Copy sign-in command
+                    </button>
+                  )
+                }
+              >
+                <div className={styles.factGrid}>
                   <div>
-                    <span className={styles.statusLabel}>Home</span>
-                    <span className={styles.statusValue}>{selected.homePath === '' ? '~/.codex' : selected.homePath}</span>
+                    <span className={styles.factLabel}>Route</span>
+                    <span className={styles.factValue}>{draft.instanceId}</span>
                   </div>
                   <div>
-                    <span className={styles.statusLabel}>Mode</span>
-                    <span className={styles.statusValue}>{selected.mode === 'authOverlay' ? 'Shared state, private auth' : 'Direct'}</span>
+                    <span className={styles.factLabel}>Mode</span>
+                    <span className={styles.factValue}>
+                      {draft.kind === 'codex'
+                        ? draft.shadowHomePath === ''
+                          ? 'Shared auth'
+                          : 'Shared state, private auth'
+                        : 'Key from the environment'}
+                    </span>
                   </div>
                   <div>
-                    <span className={styles.statusLabel}>Account</span>
-                    <span className={styles.statusValue}>{selected.identity ?? (selected.signedIn ? 'signed in' : 'not signed in')}</span>
+                    <span className={styles.factLabel}>Account</span>
+                    <span className={styles.factValue}>
+                      {selected?.identity ?? STATE_LABEL[selected?.state ?? 'unconfigured']}
+                    </span>
                   </div>
-                  {selected.signedIn ? null : (
-                    <div className={styles.loginHint}>
-                      <span>Sign in with</span>
-                      <code>{selected.loginHint}</code>
-                      <button
-                        type="button"
-                        className={styles.copyButton}
-                        onClick={() => {
-                          void navigator.clipboard
-                            .writeText(selected.loginHint)
-                            .then(() => setNotice('Copied the sign-in command.'))
-                            .catch(() => setNotice('Could not copy; select the command and copy it.'))
-                        }}
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  )}
-                  {selected.detail === null ? null : <p className={styles.warnText}>{selected.detail}</p>}
                 </div>
-              ) : null}
-            </>
-          ) : null}
+                <p className={styles.spreadingNote}>
+                  Requests spread by <strong>{file.distribution}</strong>. {DISTRIBUTION_HINT[file.distribution]}
+                </p>
+                {selected !== null && !selected.signedIn ? (
+                  <div className={styles.loginHint}>
+                    <span>Sign in with</span>
+                    <code>{selected.loginHint}</code>
+                  </div>
+                ) : null}
+                {selected?.detail == null ? null : <p className={styles.warnText}>{selected.detail}</p>}
+              </Section>
+            </div>
 
-          {addingKind !== null ? (
-            <>
+            <footer className={styles.footer}>
+              <button
+                type="button"
+                className={styles.primary}
+                disabled={!dirty || saving || draft.instanceId.trim().length === 0}
+                onClick={() => void save(draft)}
+              >
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                className={styles.quiet}
+                disabled={!dirty}
+                onClick={() => setDraft(selected === null ? null : { ...selected })}
+              >
+                Revert
+              </button>
+              <button
+                type="button"
+                className={styles.quiet}
+                onClick={props.onOpenUsageHistory}
+              >
+                Usage history
+              </button>
+              <span className={styles.footerNotice}>
+                {notice ?? (dirty ? 'Unsaved changes.' : 'Provider and account are separate entries in the model picker.')}
+              </span>
+              <button
+                type="button"
+                className={styles.danger}
+                onClick={() => selected !== null && void remove(selected)}
+              >
+                Remove profile
+              </button>
+            </footer>
+          </section>
+        ) : (
+          <section className={styles.welcome}>
+            <span className={styles.welcomeMark} aria-hidden>✳</span>
+            <h2>Your accounts, side by side.</h2>
+            <p>Create a Codex, OpenCode Go, or Command Code profile. Each one becomes its own route in the model picker.</p>
+          </section>
+        )}
+
+        {addingKind !== null ? (
+          <div className={styles.addOverlay} role="dialog" aria-modal="true" aria-label={`New ${KIND_LABEL[addingKind]} account`}>
+            <div className={styles.addCard}>
               <h2 className={styles.detailTitle}>New {KIND_LABEL[addingKind]} account</h2>
-              <p className={styles.detailSub}>Give it a route slug; each account becomes its own provider in the picker.</p>
+              <p className={styles.detailSub}>
+                Give it a route slug; each account becomes its own provider in the picker.
+              </p>
               <NewAccountForm
                 kind={addingKind}
                 onCancel={() => setAddingKind(null)}
-                onCreate={async draft => {
+                onCreate={async next => {
                   setAddingKind(null)
-                  setSelectedId(draft.instanceId)
-                  await save(draft)
+                  setSelectedId(next.instanceId)
+                  await save(next)
                 }}
               />
-            </>
-          ) : null}
-        </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -757,7 +1141,7 @@ const NewAccountForm = (props: {
         <input
           className={styles.input}
           value={draft.instanceId}
-          placeholder="codex_work"
+          placeholder={props.kind === 'codex' ? 'codex_work' : `${props.kind}_work`}
           onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
         />
       </Field>
@@ -771,26 +1155,36 @@ const NewAccountForm = (props: {
       </Field>
       {props.kind === 'codex' ? (
         <Field label="CODEX_HOME path" hint="Where shared sessions and skills live.">
-          <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
+          <input
+            className={styles.input}
+            value={draft.homePath}
+            onChange={event => setDraft({ ...draft, homePath: event.target.value })}
+          />
         </Field>
       ) : (
         <Field label="API key environment variable">
           <input
             className={styles.input}
             value={draft.apiKeyEnv}
-            placeholder="OPENCODE_API_KEY"
+            placeholder={props.kind === 'commandcode' ? 'COMMANDCODE_API_KEY' : 'OPENCODE_API_KEY'}
             onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
           />
         </Field>
       )}
       <div className={styles.detailActions}>
-        <button type="button" className={styles.primary} disabled={invalid} onClick={() => void props.onCreate(draft)}>
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={invalid}
+          onClick={() => void props.onCreate(draft)}
+        >
           Create
         </button>
-        <button type="button" className={styles.secondary} onClick={props.onCancel}>
+        <button type="button" className={styles.quiet} onClick={props.onCancel}>
           Cancel
         </button>
       </div>
     </>
   )
 }
+

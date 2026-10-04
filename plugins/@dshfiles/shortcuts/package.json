@@ -1,0 +1,47 @@
+{
+  "name": "@dshfiles/shortcuts",
+  "version": "0.1.0",
+  "description": "Capture-phase keyboard shortcuts that claim their chords before the browser does",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./dist/client.js"
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "scripts": {
+    "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build"
+  },
+  "dependencies": {
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0 <5.0.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
+    "@deepseek-ai/cordis": "4.0.4",
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  }
+}

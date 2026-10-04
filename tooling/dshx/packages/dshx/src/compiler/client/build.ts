@@ -16,6 +16,7 @@ import {
   clientUsesLocales,
 } from './capabilities.js'
 import { clientGuardPlugin, singleClientChunkPlugin } from './guards.js'
+import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
 
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
 const VIRTUAL_CLIENT_PUBLIC = '\0virtual:dshx-client-public'
@@ -200,6 +201,22 @@ async function validateLocaleProviderEdge(paths: Awaited<ReturnType<typeof resol
   })
 }
 
+/**
+ * A `list` slot addresses entries by `id`, so a plugin that reuses a shipped id
+ * lands in the same cell. The cell then renders one occupant and drops the other
+ * without any error, which presents as a plugin affordance that is simply never
+ * shown. Catching it here turns an invisible runtime absence into a build error.
+ */
+async function validateSlotOccupancy(paths: Awaited<ReturnType<typeof resolveOptions>>): Promise<void> {
+  const conflicts = slotOccupancyConflicts(await clientSlotRegistrations(paths.entry, paths.root))
+  const first = conflicts[0]
+  if (first === undefined) return
+  throw new DshxError('DSHX1206', `Client registers ${JSON.stringify(first.slot)} with the shipped id ${JSON.stringify(first.id)}.`, {
+    file: first.file,
+    hint: `Use a distinct id to render beside the shipped dock, or DSH's slot shadowing to replace it deliberately.`,
+  })
+}
+
 async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
   const analysis = await clientSetupServices(paths.entry, paths.root)
   for (const capability of analysis.sdk?.uses ?? []) {
@@ -340,6 +357,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
 /** Start a Client watcher without awaiting a successful initial build. */
 export async function watchClient(options: BuildClientOptions): Promise<BuildWatcher> {
   const paths = await resolveOptions(options)
+  await validateSlotOccupancy(paths)
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)
@@ -357,6 +375,7 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
 /** Build a DSH-compatible client factory with Vite/Rolldown. */
 export async function buildClient(options: BuildClientOptions): Promise<ClientBuildResult> {
   const paths = await resolveOptions(options)
+  await validateSlotOccupancy(paths)
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)

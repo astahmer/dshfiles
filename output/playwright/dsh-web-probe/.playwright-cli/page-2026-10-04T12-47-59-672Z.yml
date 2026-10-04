@@ -1,6 +1,0 @@
-- generic [ref=e4]:
-  - generic [ref=e5]: HARNESS
-  - generic [ref=e6]:
-    - generic [ref=e7]: Failed to load plugins
-    - generic [ref=e8]: "@dshfiles/ai-accounts"
-    - generic [ref=e9]: "web boot: 1 entry did not activate @dshfiles/ai-accounts: failed"

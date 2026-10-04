@@ -4,3 +4,7 @@ dist/
 .vite/
 .direnv/
 .pnpm-store/
+
+# Browser-automation snapshots from probe runs. Regenerated on every session and
+# not worth reviewing; the useful signal is the session log, not the dump.
+output/playwright/

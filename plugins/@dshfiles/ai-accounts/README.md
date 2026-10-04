@@ -7,7 +7,10 @@ the sidebar panel list.
 The Host records one quota snapshot per enabled, supported account on startup
 and at a configurable interval (5 minutes by default). It keeps quota
 percentages, provider reset timestamps, banked reset counts, and reported expiry
-dates for up to 90 days by default. Collection concurrency is bounded, failed
+dates for 90 days by default, configurable up to 365 days. Collection runs at
+any whole-minute interval from 1 to 60. History reads return at most 5,000
+points, preserving recent forecast inputs, reset boundaries, and reset-bank
+changes while sampling older quota points. Collection concurrency is bounded, failed
 provider reads do not create misleading zero-valued snapshots, and plugin
 unload cancels an active collection. Values remain in the Host's local
 `ai_accounts_usage` storage domain; provider credentials and raw responses are

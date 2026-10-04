@@ -307,6 +307,89 @@ describe('client compiler', () => {
     expect(bind).toHaveBeenCalledWith('demo')
   })
 
+  it('fails the build when a dock reuses a shipped Slot id', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'const Dock = (): null => null',
+        'export default defineClient({ inject: ["slots"], setup(ctx) { ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "queue", order: 20 }, Dock)) } })',
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/phase-a-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+        inject: ['@deepseek-ai/dsh-client-ui-conversation'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'DSHX1206',
+      message: expect.stringContaining('conversation.input.dock'),
+      file: expect.stringContaining('/src/client.tsx'),
+    })
+  })
+
+  it('accepts a dock that takes a distinct Slot id', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'const Dock = (): null => null',
+        'export default defineClient({ inject: ["slots"], setup(ctx) { ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "fixture-dock", order: 21 }, Dock)) } })',
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/phase-a-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+        inject: ['@deepseek-ai/dsh-client-ui-conversation'],
+      }),
+    ).resolves.toEqual(expect.objectContaining({ face: 'client' }))
+  })
+
+  it('finds Slot registrations that a Client entry reaches through its imports', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        "import { registerDock } from './dock.js'",
+        'export default defineClient({ inject: ["slots"], setup(ctx) { registerDock(ctx) } })',
+        '',
+      ].join('\n'),
+    )
+    await writeFile(
+      resolve(root, 'src/dock.ts'),
+      [
+        'const Dock = (): null => null',
+        'export const registerDock = (ctx: { slots: { inject: (slot: string, register: () => unknown) => void } }): void => {',
+        '  ctx.slots.inject("conversation.input.dock", () => ctx.slots.register({ name: "conversation.input.dock", id: "queue" }, Dock))',
+        '}',
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/phase-a-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+        inject: ['@deepseek-ai/dsh-client-ui-conversation'],
+      }),
+    ).rejects.toMatchObject({ code: 'DSHX1206' })
+  })
+
   it('fails before runtime when setup uses ctx.sessions without declaring it', async () => {
     const root = await temporaryProject()
     await writeFile(
