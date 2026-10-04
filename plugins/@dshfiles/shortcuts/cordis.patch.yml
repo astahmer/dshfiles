@@ -1,3 +1,7 @@
 # The shortcuts plugin is client-only: it installs a capture-phase keyboard
-# listener and needs no Host entry.
-- insert: []
+# listener and declares no Host entry, but it still needs a row so the loader
+# mounts the package and hands its Client contribution to the shell. Keep this
+# id distinct from the native DSH entry whose id is `shortcuts`.
+- insert:
+    - id: dshfiles-shortcuts
+      name: '@dshfiles/shortcuts'

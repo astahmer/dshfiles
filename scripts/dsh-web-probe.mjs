@@ -10,6 +10,10 @@
 //
 // `--console` and `--requests` take playwright-cli's own filters, so
 // `--console error` reports only errors and `--console` reports everything.
+//
+// `dsh web` mints its browser session from the launch token and keeps it in a
+// cookie, so the first probe needs the token and later probes do not:
+// `--keep-open` reuses one named `--session` across probes and skips the token.
 
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -21,7 +25,7 @@ const playwrightCli = join(repoRoot, 'tooling/dshx/node_modules/.bin', `playwrig
 const outputDirectory = join(repoRoot, 'output/playwright/dsh-web-probe')
 
 const parseArguments = argv => {
-  const options = { timeout: 20000, selector: null, console: null, requests: false, evaluate: null, reload: false }
+  const options = { timeout: 20000, selector: null, console: null, requests: false, evaluate: null, reload: false, session: 'dsh-probe', screenshot: false, keepOpen: false }
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     const next = () => {
@@ -32,6 +36,15 @@ const parseArguments = argv => {
     switch (argument) {
       case '--url':
         options.url = next()
+        break
+      case '--session':
+        options.session = next()
+        break
+      case '--screenshot':
+        options.screenshot = true
+        break
+      case '--keep-open':
+        options.keepOpen = true
         break
       case '--selector':
         options.selector = next()
@@ -62,6 +75,9 @@ const parseArguments = argv => {
             '  --evaluate <expression>  evaluate a page expression and print its result',
             '  --reload                reload before probing, to capture boot-time console output',
             '  --timeout <ms>          selector wait budget',
+            '  --session <name>        browser session to reuse; keeps the dsh web auth cookie',
+            '  --screenshot            write a PNG of the page and report its file name',
+            '  --keep-open             leave the browser open so the next probe reuses the session',
             '',
           ].join('\n'),
         )
@@ -97,13 +113,25 @@ function run(args, cwd) {
 const main = async () => {
   const options = parseArguments(process.argv.slice(2))
   await mkdir(outputDirectory, { recursive: true })
-  const session = `dsh-probe-${process.pid}`
+  const session = options.session
   const command = args => run([`-s=${session}`, ...args], outputDirectory)
-  const report = { url: options.url.replace(/token=[^&]+/, 'token=<redacted>') }
+  const report = { url: options.url.replace(/token=[^&]+/, 'token=<redacted>'), session }
 
   try {
-    await command(['open', options.url])
-    if (options.reload) await command(['reload'])
+    // A session that already holds the dsh web cookie is navigated straight to
+    // the clean URL: opening the token URL again restarts the cookie exchange
+    // and drops the session the caller wanted to reuse.
+    const authenticated = await command(['--raw', 'eval', `() => document.title + '|' + document.body.innerText.slice(0, 40)`])
+      .catch(() => '')
+    const alreadyOpen = authenticated.includes('AI Accounts')
+    if (alreadyOpen) {
+      const target = new URL(options.url)
+      target.searchParams.delete('token')
+      await command(['goto', target.href])
+    } else {
+      await command(['open', options.url])
+    }
+    if (options.reload && alreadyOpen) await command(['reload'])
     await command(['snapshot'])
 
     const selector = options.selector ?? 'body'
@@ -127,8 +155,15 @@ const main = async () => {
     if (options.console !== null) report.console = await command(['console', options.console])
     if (options.requests) report.requests = await command(['requests'])
     if (options.evaluate !== null) report.evaluate = await command(['--raw', 'eval', options.evaluate])
+    if (options.screenshot) {
+      const taken = await command(['screenshot'])
+      report.screenshot = taken.match(/[\w.-]+\.png/)?.[0] ?? taken.trim()
+    }
   } finally {
-    await command(['close']).catch(() => {})
+    // The dsh web auth cookie lives in the browser profile, so closing here would
+    // discard it and force a fresh token on every probe. `--keep-open` reuses the
+    // authenticated session across probes.
+    if (!options.keepOpen) await command(['close']).catch(() => {})
   }
 
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)

@@ -53,7 +53,7 @@ export default defineClient({
             }
           },
         },
-        DraggableQueueDock,
+        decorate(DraggableQueueDock),
       ),
     )
   },
