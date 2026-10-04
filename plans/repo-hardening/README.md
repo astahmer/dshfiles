@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–5 implemented; Phase 6 underway.
+Status: **in progress** — Phases 0–5 done; Phase 6 underway.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and phases continue autonomously under the user's 2026-10-04 instruction.
@@ -138,11 +138,27 @@ Knip passes with the previously recorded temporary ownership exclusion.
 The full plugin gate still has inherited queue-reorder decorator typing and
 the rejected bash-parallel experiment; neither is claimed green.
 
-Takeover: current T3 thread owns `hardening`; prior audit thread interrupted.
-Lint exits 0; dshx 379 tests pass. Full plugin check currently exposes inherited
-`bash-parallel` errors; the default workspace is removing that rejected
-experiment. Preserve concurrent default UI work. The unfinished locale ownership
-module has a temporary knip exclusion while its owning workspace completes it.
+## Integration repair (2026-10-04)
+
+The integration onto `main` left the root gate red; earlier "green" reports
+never ran `pnpm check` end to end. Fixed:
+
+- [x] The locale-ownership change was rebased from a stale `package.json` and
+      dropped the `./client/env` export: every generated project failed TS2688
+- [x] knip: stale locale-ownership ignore removed; e2e suite and slot smoke
+      script are entries
+- [x] The contract crashed on an ignored directory holding only `node_modules`
+- [x] `shortcuts` (landed after Phase 3) joined the contract; its new test found
+      checkboxes swallowing every chord
+- [x] Setup-service checks matched neither the runtime nor DSH: an undeclared
+      `inject` gets `locale` and `slots`, and `slots` is renderer-owned. The Oxc
+      port began detecting `ctx.slots`, so every imperative-Slot plugin failed
+      to build
+- [x] The virtual `dshx/host` module never exported the Phase 5 process
+      helpers, so jujutsu, secret-catalog and mcp-servers could not build
+
+Evidence: root `pnpm check` exit 0 — dshx 409 tests, create-dshx 21, 12
+plugins typecheck, test (172) and build; lint and format clean.
 
 ## Phase 5 — Shared dshx helpers
 
@@ -163,9 +179,10 @@ wildcard declaration is a global script, so a module import cannot replace it.
 
 ## Phase 6 — Plugin quality
 
-- [ ] ai-accounts: parse config through its zod schema, split
-      `accounts-panel.tsx` and `host.ts`, remove the module singleton
-- [ ] queue-reorder: remove `as never` by fixing the types where they belong
+- [x] ai-accounts: module singleton replaced by a context-owned runtime;
+      `account-config.ts` builds config from the zod-validated store
+- [ ] ai-accounts: split `accounts-panel.tsx` (1072 lines) and `host.ts`
+- [x] queue-reorder: `as never` gone; dshx's decorator keeps component props
 - [ ] zod at the remaining hand-narrowed boundaries; redacted debug logs
       instead of swallowed errors; arrow functions in mcp-servers
 - [ ] Locales for jujutsu, secret-catalog, settings-search
