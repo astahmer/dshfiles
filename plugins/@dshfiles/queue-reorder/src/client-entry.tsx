@@ -32,7 +32,6 @@ export default defineClient({
   // activates those services. Without this the plugin loads but never mounts.
   inject: ['slots', 'sessions'],
   setup(ctx, decorate) {
-    document.documentElement.dataset['dshfilesQueueReorder'] = 'setup-ran'
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         {

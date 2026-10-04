@@ -18,7 +18,6 @@ import { installShortcuts, type Shortcut } from './keyboard.js'
 export default defineClient({
   name: '@dshfiles/shortcuts',
   setup(ctx) {
-    document.documentElement.dataset['dshfilesShortcuts'] = 'setup-ran'
     const layout = ctx.get('layout')
     const shortcuts: Shortcut[] = [
       {

@@ -24,7 +24,6 @@ export default defineClientPlugin({
   // Declare the services used through the scoped context. The UI capability
   // supplies the native slot adapter and decorates each registered component.
   setup(api) {
-    document.documentElement.dataset['dshfilesAiAccounts'] = 'setup-ran'
     const ctx = api.raw.ctx
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
     const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
