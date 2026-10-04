@@ -22,9 +22,9 @@ for (const relative of ambient) {
  * `tsc` drops the triple-slash reference from an emitted `.d.ts`, so the ambient
  * file it points at would be shipped but never loaded. Re-add it.
  */
-const clientEntry = join(packageRoot, 'dist/client/index.d.ts')
 const reference = '/// <reference path="./css-modules.d.ts" />\n\n'
-const entry = await readFile(clientEntry, 'utf8')
-if (!entry.startsWith('///')) {
-  await writeFile(clientEntry, reference + entry)
+for (const name of ['index', 'env']) {
+  const clientEntry = join(packageRoot, `dist/client/${name}.d.ts`)
+  const entry = await readFile(clientEntry, 'utf8')
+  if (!entry.startsWith('///')) await writeFile(clientEntry, reference + entry)
 }

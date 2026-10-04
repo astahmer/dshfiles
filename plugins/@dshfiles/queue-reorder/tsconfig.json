@@ -9,7 +9,7 @@
     "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node", "@dshfiles/dshx/client/env"]
   },
   "include": ["src"]
 }

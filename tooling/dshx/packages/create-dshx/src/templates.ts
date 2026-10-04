@@ -268,12 +268,6 @@ export default defineClientPlugin({
 `
 }
 
-const cssModuleDeclaration = `declare module '*.module.css' {
-  const classes: Record<string, string>
-  export default classes
-}
-`
-
 const cssModuleStyles = `.card,
 .deck {
   width: min(252px, calc(100vw - 28px));
@@ -320,10 +314,7 @@ export const STYLE_REGISTRY = {
     label: 'CSS Modules',
     description: 'Scoped CSS through the standard Vite CSS Modules pipeline.',
     devDependencies: {},
-    files: () => [
-      { path: 'src/css-modules.d.ts', contents: cssModuleDeclaration },
-      { path: 'src/Plugin.module.css', contents: cssModuleStyles },
-    ],
+    files: () => [{ path: 'src/Plugin.module.css', contents: cssModuleStyles }],
   },
   tailwind: {
     label: 'Tailwind CSS',
@@ -596,6 +587,8 @@ function renderTsconfig(): string {
         preserveSymlinks: true,
         jsx: 'react-jsx',
         strict: true,
+        noUncheckedIndexedAccess: true,
+        types: ['node', '@dshfiles/dshx/client/env'],
         noEmit: true,
         skipLibCheck: true,
       },

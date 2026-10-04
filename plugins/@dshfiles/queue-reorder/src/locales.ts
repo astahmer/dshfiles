@@ -1,4 +1,4 @@
-import { declareLocaleNamespace } from '@dshfiles/dshx/client'
+import { defineLocale } from '@dshfiles/dshx/client'
 
 /**
  * The Locale runtime rejects a second registrant for the same namespace and
@@ -20,4 +20,4 @@ const dictionaries = {
 
 export const QUEUE_REORDER_LOCALE_NAMESPACE = 'conversation.queueReorder'
 
-export const queueReorderLocale = declareLocaleNamespace(QUEUE_REORDER_LOCALE_NAMESPACE, dictionaries)
+export const queueReorderLocale = defineLocale(QUEUE_REORDER_LOCALE_NAMESPACE, dictionaries)

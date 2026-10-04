@@ -1,3 +1,4 @@
+import { terminateManagedProcess } from '@dshfiles/dshx/host'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 
 export type LocalProcessStatus = 'not-configured' | 'starting' | 'running' | 'exited' | 'stopping' | 'stopped' | 'stop-unconfirmed'
@@ -57,8 +58,7 @@ export class ManagedLocalCommand {
 
   private async stopRange(): Promise<void> {
     try {
-      this.handle.terminate()
-      const empty = await this.handle.waitForExit(AbortSignal.timeout(10_000))
+      const empty = await terminateManagedProcess({ handle: this.handle, timeoutMs: 10_000 })
       this.currentStatus = empty ? 'stopped' : 'stop-unconfirmed'
     } catch {
       this.currentStatus = 'stop-unconfirmed'

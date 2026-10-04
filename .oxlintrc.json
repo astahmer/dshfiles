@@ -40,5 +40,16 @@
     "**/node_modules/**",
     "tooling/antislop/index.mjs",
     "output/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "tooling/dshx/packages/dshx/src/client/env.ts",
+        "tooling/dshx/packages/dshx/client/env.d.ts"
+      ],
+      "rules": {
+        "typescript/triple-slash-reference": "off"
+      }
+    }
   ]
 }

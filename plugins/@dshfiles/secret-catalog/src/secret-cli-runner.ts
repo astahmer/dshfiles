@@ -1,3 +1,4 @@
+import { waitForManagedExit, terminateManagedProcess } from '@dshfiles/dshx/host'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
@@ -15,14 +16,6 @@ const sessionEnvironment = (source: SecretSessionEnvironment): Record<string, st
   if (source.BW_SESSION !== undefined && source.BW_SESSION.length > 0) result.BW_SESSION = source.BW_SESSION
   if (source.SECRET_SESSION_FILE !== undefined && source.SECRET_SESSION_FILE.length > 0) result.SECRET_SESSION_FILE = source.SECRET_SESSION_FILE
   return result
-}
-
-const waitForRange = async (handle: SubprocessHandle): Promise<boolean> => {
-  try {
-    return await handle.waitForExit(AbortSignal.timeout(RANGE_WAIT_MS))
-  } catch {
-    return false
-  }
 }
 
 /** Run the fixed secret CLI through DSH's managed process boundary. */
@@ -60,7 +53,7 @@ export const runSecretCli = async (
     }
     const outcome = await handle.done
     if (controller.signal.aborted) throw new Error('Secret CLI command deadline elapsed.')
-    if (!(await waitForRange(handle))) throw new Error('Secret CLI process range did not exit.')
+    if (!(await waitForManagedExit({ handle, timeoutMs: RANGE_WAIT_MS }))) throw new Error('Secret CLI process range did not exit.')
     if (outcome.exitCode !== 0) throw new Error('Secret CLI command returned a failure status.')
     if (!request.captureStdout) return ''
     const output = handle.collected.stdout?.readFrom(0)
@@ -68,8 +61,7 @@ export const runSecretCli = async (
     return output.text
   } catch {
     if (handle !== undefined) {
-      handle.terminate()
-      await waitForRange(handle)
+      await terminateManagedProcess({ handle, timeoutMs: RANGE_WAIT_MS })
     }
     throw new Error(timedOut ? 'Secret CLI command timed out.' : 'Secret CLI command failed.')
   } finally {

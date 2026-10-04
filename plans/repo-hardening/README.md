@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–3 done, Phase 4 implemented; Phase 5 next.
+Status: **in progress** — Phases 0–5 implemented; Phase 6 underway.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and phases continue autonomously under the user's 2026-10-04 instruction.
@@ -146,10 +146,20 @@ module has a temporary knip exclusion while its owning workspace completes it.
 
 ## Phase 5 — Shared dshx helpers
 
-- [ ] Client env types entry replaces the six `css-modules.d.ts` copies
-- [ ] Host subprocess runner replaces the jujutsu, secret-catalog and
-      mcp-servers copies
-- [ ] One locale API across plugins
+- [x] `@dshfiles/dshx/client/env` packages the ambient CSS types. Seven
+      plugin copies removed; templates consume the shared declaration.
+- [x] Shared Host process exit/termination helpers replace repeated cleanup
+      in jujutsu, secret-catalog and mcp-servers. Domain runners remain separate:
+      persistent MCP processes, secret input/redaction, and JJ repository identity
+      have different ownership contracts.
+- [x] All plugin locale definitions use `defineLocale`; legacy alias remains
+      for compatibility. The global namespace widening needs a separate Phase 6
+      correctness fix, rather than more claims about generic declaration merging.
+
+Phase 5 evidence: shared helper consumers pass secret-catalog 24, MCP 19,
+JJ 12 tests; creator 20 tests, dshx typecheck and generated-project checks pass.
+Two ambient declaration entries have a narrow triple-slash lint exception: the
+wildcard declaration is a global script, so a module import cannot replace it.
 
 ## Phase 6 — Plugin quality
 

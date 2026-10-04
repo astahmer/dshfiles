@@ -48,7 +48,7 @@ describe('create-dshx', () => {
     expect(relativeFiles.includes('src/api/status.ts')).toBe(template === 'showcase')
     expect(relativeFiles.includes('src/settings.ts')).toBe(template === 'showcase')
     expect(relativeFiles.includes('src/Plugin.module.css')).toBe(style === 'css-modules')
-    expect(relativeFiles.includes('src/css-modules.d.ts')).toBe(style === 'css-modules')
+    expect(relativeFiles).not.toContain('src/css-modules.d.ts')
     expect(relativeFiles.includes('src/styles.css')).toBe(style === 'tailwind')
     expect(relativeFiles.some(file => file.endsWith('.css'))).toBe(style !== 'none')
 

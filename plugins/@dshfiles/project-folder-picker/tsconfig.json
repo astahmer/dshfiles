@@ -7,7 +7,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["@dshfiles/dshx/client/env"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

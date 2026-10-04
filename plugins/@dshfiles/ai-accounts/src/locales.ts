@@ -1,4 +1,4 @@
-import { declareLocaleNamespace } from '@dshfiles/dshx/client'
+import { defineLocale } from '@dshfiles/dshx/client'
 
 /**
  * The accounts panel is its own main panel, so it carries its own namespace
@@ -11,4 +11,4 @@ const dictionaries = {
 
 export const AI_ACCOUNTS_LOCALE_NAMESPACE = 'settings.aiAccounts'
 
-export const aiAccountsLocale = declareLocaleNamespace(AI_ACCOUNTS_LOCALE_NAMESPACE, dictionaries)
+export const aiAccountsLocale = defineLocale(AI_ACCOUNTS_LOCALE_NAMESPACE, dictionaries)

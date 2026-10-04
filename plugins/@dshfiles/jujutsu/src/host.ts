@@ -1,3 +1,4 @@
+import { waitForManagedExit } from '@dshfiles/dshx/host'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
@@ -121,7 +122,7 @@ const runAt = async (
       if (timedOut) throw new Error('Jujutsu command timed out.')
       throw new Error('Jujutsu command was cancelled.')
     }
-    if (!(await handle.waitForExit(controller.signal))) {
+    if (!(await waitForManagedExit({ handle, timeoutMs: options.timeoutMs ?? COMMAND_TIMEOUT, signal: controller.signal }))) {
       handle.terminate()
       throw new Error('Jujutsu process group did not exit.')
     }

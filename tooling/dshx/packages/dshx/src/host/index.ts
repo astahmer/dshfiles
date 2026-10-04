@@ -15,3 +15,5 @@ export type { BasePluginApi, EventsApi, LifecycleApi } from '../sdk/lifecycle.js
 export type {} from '@deepseek-ai/dsh-llm'
 export type {} from '@deepseek-ai/dsh-tools'
 export type {} from '@deepseek-ai/dsh-system-prompt'
+
+export { waitForManagedExit, terminateManagedProcess } from './process.js'

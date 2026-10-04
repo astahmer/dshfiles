@@ -17,6 +17,7 @@
         "src/config/index.ts",
         "src/host/index.ts",
         "src/client/index.ts",
+        "src/client/env.ts",
         "src/api/index.ts",
         "src/settings/index.ts",
         "src/conversation/index.ts",

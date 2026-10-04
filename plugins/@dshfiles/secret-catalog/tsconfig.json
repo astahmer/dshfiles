@@ -6,7 +6,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "jsx": "react-jsx",
-    "types": ["node", "react"],
+    "types": ["node", "react", "@dshfiles/dshx/client/env"],
     "skipLibCheck": true,
     "noEmit": true
   },
