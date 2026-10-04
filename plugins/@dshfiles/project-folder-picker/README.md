@@ -41,3 +41,26 @@ The component itself has no DSH peer dependency because it consumes injected
 ports. The consuming Secret Catalog package pins the rc.2 workspace-controller
 peer contract. DSH refusals are surfaced to the user; the adapter does not
 approximate an unavailable Host operation.
+
+## Why this is not in the web profile
+
+Every other package under `plugins/@dshfiles/` is a bundle: it has a
+`dshx.config.ts`, a `cordis.patch.yml`, and an entry in the profile's
+`dsh.profile.bundles`. This one has none of those, deliberately. `dshx build`
+refuses it with `DSHX4006: No Host or Client entry is enabled for this project`,
+and that refusal is correct — adding it to a profile would fail the boot, not
+extend it.
+
+A bundle registers Slots and Host services; this package only exports a React
+component. It has no Host wiring of its own because every capability it needs
+arrives as an injected port, which is what lets Secret Catalog swap the real
+`remote.directoryPicker` in and a test swap a fake in.
+
+The distinction that matters when adding a package to a profile: a bundle has a
+`dsh` block in its `package.json`, a library does not. Me reads for that, not for
+a plugin-shaped directory name.
+
+Secret Catalog is the consumer, and it declares the dependency with
+`link:../project-folder-picker`, the same relative form every sibling uses,
+because pnpm resolves `link:` from the workspace root rather than from the
+depending package.
