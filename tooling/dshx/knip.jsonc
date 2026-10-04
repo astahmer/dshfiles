@@ -11,6 +11,9 @@
   ],
   "ignoreBinaries": ["dsh"],
   "workspaces": {
+    ".": {
+      "entry": ["e2e/support/steps.ts", "scripts/smoke-client-slot.mjs"],
+    },
     "packages/dshx": {
       "entry": [
         "src/index.ts",
@@ -30,7 +33,6 @@
         "src/compiler/host/index.ts",
       ],
       "ignoreDependencies": ["@deepseek-ai/dsh"],
-      "ignore": ["src/compiler/client/locale-ownership.ts"],
     },
   },
 }
