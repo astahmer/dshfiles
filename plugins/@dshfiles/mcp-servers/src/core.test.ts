@@ -1,15 +1,18 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
-import { hasInlineCredential, parseCommandLine, formatCommandLine } from '../src/command-line.js'
-import { serverDraftSchema, type StoredServer } from '../src/api.js'
-import { PROVIDERS, filterProviders, searchOfficialRegistry } from '../src/catalog.js'
-import { runAfterConfirmation } from '../src/confirmed-action.js'
-import { ManagedLocalCommand } from '../src/local-process.js'
-import { ClientReconciler } from '../src/reconcile.js'
-import { redactText, redactingLogger } from '../src/redaction.js'
-import { publicServerView, removeServer, saveServer, setServerEnabled } from '../src/server-state.js'
-import { createQuickPanelContribution, SessionQuickPanels } from '../src/quick-panel.js'
+import { hasInlineCredential, parseCommandLine, formatCommandLine } from './command-line.js'
+import { serverDraftSchema, type StoredServer } from './api.js'
+import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js'
+import { runAfterConfirmation } from './confirmed-action.js'
+import { ManagedLocalCommand } from './local-process.js'
+import { ClientReconciler } from './reconcile.js'
+import { redactText, redactingLogger } from './redaction.js'
+import { publicServerView, removeServer, saveServer, setServerEnabled } from './server-state.js'
+import { createQuickPanelContribution, SessionQuickPanels } from './quick-panel.js'
 
-const server = (overrides: Partial<StoredServer> = {}): StoredServer => ({
+type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
+
+const server = (overrides: Partial<StoredStdioServer> = {}): StoredStdioServer => ({
   id: 'one',
   name: 'Local tools',
   serverName: 'local-tools',
@@ -41,7 +44,7 @@ describe('MCP manager state', () => {
 
   it('does not serialize unknown runtime fields or credential values to the client view', () => {
     const secret = 'never-render-this-value'
-    const runtimeObject = { ...server(), secretValue: secret } as StoredServer
+    const runtimeObject: StoredServer = Object.assign(server(), { secretValue: secret })
     const view = publicServerView(runtimeObject, new Map([['LOCAL_TOOLS_TOKEN', true]]), 'loaded', 3)
     expect(view.credentialReferences).toEqual([{ target: 'environment:API_TOKEN', reference: 'LOCAL_TOOLS_TOKEN', configured: true }])
     expect(JSON.stringify(view)).not.toContain(secret)
@@ -143,7 +146,7 @@ describe('native composer quick panel', () => {
     expect(command.ui.kind).toBe('action')
     if (command.ui.kind !== 'action') throw new Error('Expected the native action command.')
 
-    const session = { sessionId: 'active-session' }
+    const session = { sessionId: SessionId('active-session') }
     command.ui.run(session)
 
     expect(panels.forSession('active-session').getSnapshot()).toBe(true)

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { filterRegisteredProjects, folderSelection, movePickerSelection, workspaceSelection } from './project-folder-picker-model.js'
 import type { RegisteredProject } from './project-folder-picker.js'
 
+const dshfilesProject: RegisteredProject = { workspaceId: 'ws-1', title: 'dshfiles', canonicalPath: '/Users/me/dev/dshfiles' }
 const projects: readonly RegisteredProject[] = [
-  { workspaceId: 'ws-1', title: 'dshfiles', canonicalPath: '/Users/me/dev/dshfiles' },
+  dshfilesProject,
   { workspaceId: 'ws-2', title: 'emisoup', canonicalPath: '/Users/me/dev/emisoup' },
 ]
 
@@ -20,7 +21,7 @@ describe('project and folder selection', () => {
   })
 
   it('keeps project identity and canonical folder path explicit', () => {
-    expect(workspaceSelection(projects[0])).toEqual({
+    expect(workspaceSelection(dshfilesProject)).toEqual({
       kind: 'workspace', workspaceId: 'ws-1', canonicalPath: '/Users/me/dev/dshfiles', title: 'dshfiles',
     })
     expect(folderSelection('/Users/me/dev')).toEqual({

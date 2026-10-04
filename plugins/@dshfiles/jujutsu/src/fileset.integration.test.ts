@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import test from 'node:test'
+import { onTestFinished, test } from 'vitest'
 import { buildMutationArgv, parseJsonLines, parsePatchStats, rootFileFileset } from './core.ts'
 import { revisionSchema } from './api.ts'
 import { EVOLUTION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
@@ -25,11 +25,11 @@ const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
 
 const lines = (value: string): string[] => value.split(/\r?\n/).filter(line => line.length > 0).sort()
 
-test('literal root-file filesets select and split exact space, Unicode, and metacharacter paths', async t => {
+test('literal root-file filesets select and split exact space, Unicode, and metacharacter paths', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-filesets-'))
   const repo = join(home, 'repo')
   await mkdir(repo)
-  t.after(async () => rm(home, { recursive: true, force: true }))
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
 
   runJj(repo, home, ['git', 'init', '--no-colocate'])
   runJj(repo, home, ['config', 'set', '--repo', 'user.name', 'Fileset Test'])

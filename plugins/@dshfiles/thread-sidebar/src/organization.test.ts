@@ -1,7 +1,10 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { test, vi } from 'vitest'
 import {
   archiveWithoutStopping,
+  type AutoArchiveContext,
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
   moveSidebarEntry,
@@ -9,33 +12,74 @@ import {
   parseSessionIds,
   sessionLineage,
   sectionForSession,
+  type SidebarPreferences,
   workspaceForLineage,
-} from '../.test-dist/organization.js'
+} from './organization.js'
 import {
   loadPreferences,
   parseStoredPreferences,
   PREFERENCES_STORAGE_KEY,
   savePreferences,
-} from '../.test-dist/preferences.js'
+} from './preferences.js'
+
+
+
+interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
+  id: string
+  parentId?: string
+}
+
+const sessionSummary = ({ id, parentId, ...overrides }: SessionFixture): SessionSummary => ({
+  displayTitle: id,
+  running: false,
+  retainedBy: {},
+  blank: false,
+  updatedAt: 0,
+  ...overrides,
+  id: SessionId(id),
+  parentId: parentId === undefined ? undefined : SessionId(parentId),
+})
+
+class MemoryStorage implements Storage {
+  readonly #values = new Map<string, string>()
+
+  get length(): number {
+    return this.#values.size
+  }
+
+  clear = (): void => this.#values.clear()
+
+  getItem = (key: string): string | null => this.#values.get(key) ?? null
+
+  key = (index: number): string | null => [...this.#values.keys()][index] ?? null
+
+  removeItem = (key: string): void => {
+    this.#values.delete(key)
+  }
+
+  setItem = (key: string, value: string): void => {
+    this.#values.set(key, value)
+  }
+}
 
 const now = 10_000_000
-const preferences = { ...DEFAULT_PREFERENCES, autoArchiveEnabled: true }
+const preferences: SidebarPreferences = { ...DEFAULT_PREFERENCES, autoArchiveEnabled: true }
 const idSets = {
-  archivedSessionIds: new Set(),
-  pinnedSessionIds: new Set(),
+  archivedSessionIds: new Set<string>(),
+  pinnedSessionIds: new Set<string>(),
 }
 
 test('live running, pinned, parked, and archived state selects one stable sidebar section', () => {
   const parkedIds = new Set(['parked'])
-  assert.equal(sectionForSession({ id: 'running', running: true }, idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'active')
-  assert.equal(sectionForSession({ id: 'pinned', running: false }, idSets.archivedSessionIds, new Set(['pinned']), parkedIds), 'pinned')
-  assert.equal(sectionForSession({ id: 'parked', running: false }, idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'parked')
-  assert.equal(sectionForSession({ id: 'archived', running: false }, new Set(['archived']), idSets.pinnedSessionIds, parkedIds), 'archived')
+  assert.equal(sectionForSession(sessionSummary({ id: 'running', running: true }), idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'active')
+  assert.equal(sectionForSession(sessionSummary({ id: 'pinned', running: false }), idSets.archivedSessionIds, new Set(['pinned']), parkedIds), 'pinned')
+  assert.equal(sectionForSession(sessionSummary({ id: 'parked', running: false }), idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'parked')
+  assert.equal(sectionForSession(sessionSummary({ id: 'archived', running: false }), new Set(['archived']), idSets.pinnedSessionIds, parkedIds), 'archived')
 })
 
 test('auto archive requires an old, idle, nonblank, unpinned, unparked, included session', () => {
-  const candidate = {
-    session: { id: 'idle', running: false, blank: false, updatedAt: now - 120 * 60_000 },
+  const candidate: AutoArchiveContext = {
+    session: sessionSummary({ id: 'idle', updatedAt: now - 120 * 60_000 }),
     workspaceId: 'project-a',
     now,
     preferences,
@@ -61,31 +105,31 @@ test('session exclusion input trims, splits, and deduplicates ids without loggin
 
 test('session lineage preserves direct parent identity and computes unbounded parent depth safely', () => {
   const byId = {
-    root: { id: 'root', displayTitle: 'Parent', parentId: undefined },
-    child: { id: 'child', displayTitle: 'Child', parentId: 'root' },
-    grandchild: { id: 'grandchild', displayTitle: 'Grandchild', parentId: 'child' },
+    root: sessionSummary({ id: 'root', displayTitle: 'Parent' }),
+    child: sessionSummary({ id: 'child', displayTitle: 'Child', parentId: 'root' }),
+    grandchild: sessionSummary({ id: 'grandchild', displayTitle: 'Grandchild', parentId: 'child' }),
   }
   assert.deepEqual(sessionLineage(byId.grandchild, byId), {
     depth: 2,
     parentId: 'child',
     parentTitle: 'Child',
   })
-  assert.deepEqual(sessionLineage({ id: 'orphan', parentId: 'missing' }, {}), {
+  assert.deepEqual(sessionLineage(sessionSummary({ id: 'orphan', parentId: 'missing' }), {}), {
     depth: 1,
     parentId: 'missing',
     parentTitle: 'missing',
   })
   assert.equal(sessionLineage(byId.child, {
     ...byId,
-    root: { ...byId.root, parentId: 'child' },
+    root: { ...byId.root, parentId: SessionId('child') },
   }).depth, 1)
 })
 
 test('child threads inherit the nearest known workspace through the parent chain', () => {
   const byId = {
-    root: { id: 'root', parentId: undefined },
-    child: { id: 'child', parentId: 'root' },
-    grandchild: { id: 'grandchild', parentId: 'child' },
+    root: sessionSummary({ id: 'root' }),
+    child: sessionSummary({ id: 'child', parentId: 'root' }),
+    grandchild: sessionSummary({ id: 'grandchild', parentId: 'child' }),
   }
   assert.equal(workspaceForLineage(byId.grandchild, byId, new Map([['root', 'workspace-a']])), 'workspace-a')
   assert.equal(workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
@@ -114,17 +158,11 @@ test('navigation preferences preserve independent order, visibility, and header 
 })
 
 test('parked ids, settlement settings, and navigation choices round-trip through browser storage', () => {
-  const values = new Map()
-  const previousWindow = globalThis.window
-  globalThis.window = {
-    localStorage: {
-      getItem: key => values.get(key) ?? null,
-      setItem: (key, value) => values.set(key, value),
-    },
-  }
+  const localStorage = new MemoryStorage()
+  vi.stubGlobal('window', { localStorage })
 
   try {
-    const saved = {
+    const saved: SidebarPreferences = {
       ...DEFAULT_PREFERENCES,
       autoArchiveEnabled: true,
       idleMinutes: 240,
@@ -135,11 +173,10 @@ test('parked ids, settlement settings, and navigation choices round-trip through
       hiddenFooterIds: ['footer:tasks'],
     }
     assert.equal(savePreferences(saved), true)
-    assert.equal(values.has(PREFERENCES_STORAGE_KEY), true)
+    assert.notEqual(localStorage.getItem(PREFERENCES_STORAGE_KEY), null)
     assert.deepEqual(loadPreferences(), saved)
   } finally {
-    if (previousWindow === undefined) delete globalThis.window
-    else globalThis.window = previousWindow
+    vi.unstubAllGlobals()
   }
 })
 

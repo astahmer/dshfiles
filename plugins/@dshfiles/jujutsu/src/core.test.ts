@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import type { Mutation } from './api.js'
 import { buildMutationArgv, isRecordedJjGitPush, isSafeSplitPath, parseJsonLines, parsePatchStats, PreviewStore, redactRemoteOutput, rootFileFileset, validatedRepositoryPath } from './core.ts'
 import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.ts'

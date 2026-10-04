@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import test from 'node:test'
+import { test } from 'vitest'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
-import { sidebarChildren } from '../.test-dist/sidebar-contract.js'
+import { sidebarChildren } from './sidebar-contract.js'
+
+const childSlotOwner = () => (_props: { readonly renderSlot: unknown }) => null
 
 test('composition disables native declarations before the full sidebar can own them', async () => {
   const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
@@ -12,9 +14,9 @@ test('composition disables native declarations before the full sidebar can own t
   slots.register({
     name: 'root',
     children: { sidebar: { kind: 'single', scope: 'root' } },
-  }, () => null)
+  }, childSlotOwner())
 
-  const nativeComponent = () => null
+  const nativeComponent = childSlotOwner()
   const nativeDispose = slots.register({
     name: 'sidebar',
     registrant: 'ui-sidebar',
@@ -26,10 +28,10 @@ test('composition disables native declarations before the full sidebar can own t
     priority: -1000,
     registrant: '@dshfiles/thread-sidebar',
     children: sidebarChildren,
-  }, () => null), /already declared/)
+  }, childSlotOwner()), /already declared/)
 
   nativeDispose()
-  const sidebarComponent = () => null
+  const sidebarComponent = childSlotOwner()
   slots.register({
     name: 'sidebar',
     priority: -1000,
