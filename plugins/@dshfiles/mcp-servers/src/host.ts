@@ -45,7 +45,7 @@ type NativeTarget = ClientTarget & {
   readonly localCommand?: { readonly command: string; readonly args: readonly string[]; readonly cwd: string; readonly env: Readonly<Record<string, string>> }
 }
 
-function entryFor(ctx: Context) {
+const entryFor = (ctx: Context) => {
   const matches = ctx.configEditor.entries().filter(entry => entry.options.id === ENTRY_ID && entry.options.name === PACKAGE_NAME)
   if (matches.length !== 1 || matches[0]?.fiber === undefined) {
     throw new Error('MCP manager profile row is unavailable.')
@@ -53,27 +53,27 @@ function entryFor(ctx: Context) {
   return matches[0]
 }
 
-function currentContext(ctx: Context): Context {
+const currentContext = (ctx: Context): Context => {
   return entryFor(ctx).fiber?.ctx ?? ctx
 }
 
-function parseStoredConfig(value: unknown): StoredServer[] {
+const parseStoredConfig = (value: unknown): StoredServer[] => {
   const result = Config.safeParse(value ?? {})
   if (!result.success) throw new Error('MCP manager configuration is invalid.')
   return result.data.servers
 }
 
-function serversFor(ctx: Context): StoredServer[] {
+const serversFor = (ctx: Context): StoredServer[] => {
   return parseStoredConfig(entryFor(ctx).options.config)
 }
 
-function referenceBindings(server: StoredServer): Array<[string, string]> {
+const referenceBindings = (server: StoredServer): Array<[string, string]> => {
   return server.transport === 'stdio'
     ? Object.entries(server.envRefs)
     : [...Object.entries(server.headerRefs), ...Object.entries(server.startCommand?.envRefs ?? {})]
 }
 
-async function projectServer(ctx: Context, server: StoredServer, localProcess: LocalProcessStatus): Promise<ServerView> {
+const projectServer = async (ctx: Context, server: StoredServer, localProcess: LocalProcessStatus): Promise<ServerView> => {
   const refs = [...new Set(referenceBindings(server).map(([, reference]) => reference))]
   const availability = new Map(
     await Promise.all(
@@ -90,7 +90,7 @@ async function projectServer(ctx: Context, server: StoredServer, localProcess: L
   return publicServerView(server, availability, 'inactive', 0, localProcess)
 }
 
-async function snapshot(ctx: Context, servers = serversFor(ctx), runtime?: ManagerRuntime): Promise<ManagerSnapshot> {
+const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: ManagerRuntime): Promise<ManagerSnapshot> => {
   const tools = ctx.tools.schemas()
   const rows = await Promise.all(
     servers.map(async server => {
@@ -106,7 +106,7 @@ async function snapshot(ctx: Context, servers = serversFor(ctx), runtime?: Manag
   return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported' }
 }
 
-async function resolveReferences(ctx: Context, refs: Record<string, string>): Promise<Record<string, string> | undefined> {
+const resolveReferences = async (ctx: Context, refs: Record<string, string>): Promise<Record<string, string> | undefined> => {
   const resolved: Record<string, string> = {}
   for (const [key, name] of Object.entries(refs)) {
     try {
@@ -120,7 +120,7 @@ async function resolveReferences(ctx: Context, refs: Record<string, string>): Pr
   return resolved
 }
 
-async function nativeTarget(ctx: Context, server: StoredServer, suspended: boolean): Promise<NativeTarget> {
+const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boolean): Promise<NativeTarget> => {
   let config: NativeMcpConfig
   let ready: boolean
   let redactions: readonly string[]
@@ -177,11 +177,11 @@ async function nativeTarget(ctx: Context, server: StoredServer, suspended: boole
   }
 }
 
-async function desiredTargets(ctx: Context, servers: readonly StoredServer[], manuallyDisconnected: ReadonlySet<string>): Promise<NativeTarget[]> {
+const desiredTargets = async (ctx: Context, servers: readonly StoredServer[], manuallyDisconnected: ReadonlySet<string>): Promise<NativeTarget[]> => {
   return Promise.all(servers.map(server => nativeTarget(ctx, server, manuallyDisconnected.has(server.id))))
 }
 
-function storedDraft(draft: ServerDraft): StoredServer {
+const storedDraft = (draft: ServerDraft): StoredServer => {
   const id = draft.id || randomUUID()
   if (draft.transport === 'streamable-http') {
     const localStart = draft.startCommand
@@ -230,15 +230,15 @@ const runtimes = new WeakMap<Context, ManagerRuntime>()
 const disconnectionsByRoot = new WeakMap<object, Set<string>>()
 
 class ManagerRuntime {
-  readonly reconciler: ClientReconciler
+  readonly reconciler: ClientReconciler<NativeTarget>
   private readonly localProcesses = new Map<string, ManagedLocalCommand>()
 
   constructor(
     private readonly ctx: Context,
     readonly manuallyDisconnected: Set<string>,
   ) {
-    this.reconciler = new ClientReconciler(async target => {
-      const native = target as NativeTarget
+    this.reconciler = new ClientReconciler<NativeTarget>(async native => {
+      const logger = redactingLogger(this.ctx.logger, native.redactions)
       let localProcess: ManagedLocalCommand | undefined
       if (native.localCommand !== undefined) {
         try {
@@ -250,12 +250,13 @@ class ManagerRuntime {
           }
           localProcess = await ManagedLocalCommand.start(this.ctx.subprocess, native.localCommand, native.localCommand.env)
           this.localProcesses.set(native.id, localProcess)
-        } catch {
+        } catch (error) {
+          logger.warn('MCP server %s: local start command failed: %s', native.id, error)
           throw new Error('The local MCP start command could not be launched.')
         }
       }
       try {
-        const scoped = this.ctx.extend({ logger: redactingLogger(this.ctx.logger, native.redactions) })
+        const scoped = this.ctx.extend({ logger })
         const fiber = await scoped.plugin(nativeMcpClient, native.config)
         localProcess?.markRunning()
         return async () => {
@@ -273,7 +274,8 @@ class ManagerRuntime {
             }
           }
         }
-      } catch {
+      } catch (error) {
+        logger.warn('MCP server %s: native client failed to start: %s', native.id, error)
         if (localProcess !== undefined) {
           await localProcess.stop()
           if (localProcess.status === 'stopped' && this.localProcesses.get(native.id) === localProcess) {
@@ -327,18 +329,18 @@ class ManagerRuntime {
   }
 }
 
-function runtimeFor(ctx: Context): ManagerRuntime | undefined {
+const runtimeFor = (ctx: Context): ManagerRuntime | undefined => {
   return runtimes.get(currentContext(ctx))
 }
 
-async function currentSnapshot(ctx: Context, servers?: StoredServer[]): Promise<ManagerSnapshot> {
+const currentSnapshot = async (ctx: Context, servers?: StoredServer[]): Promise<ManagerSnapshot> => {
   const live = currentContext(ctx)
   const runtime = runtimes.get(live)
   const currentServers = servers ?? serversFor(live)
   return snapshot(live, currentServers, runtime)
 }
 
-async function persist(ctx: Context, servers: StoredServer[]): Promise<ManagerSnapshot> {
+const persist = async (ctx: Context, servers: StoredServer[]): Promise<ManagerSnapshot> => {
   if (servers.length > MAX_SERVERS) throw new Error(`At most ${MAX_SERVERS} servers can be configured.`)
   const entry = entryFor(ctx)
   await ctx.configEditor.edit(entry, () => ({ servers }))

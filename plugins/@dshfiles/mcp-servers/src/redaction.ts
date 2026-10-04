@@ -1,6 +1,6 @@
 import type { LoggerService } from '@deepseek-ai/cordis'
 
-export function redactText(value: string, secrets: readonly string[]): string {
+export const redactText = (value: string, secrets: readonly string[]): string => {
   let result = value
   const variants = new Set<string>()
   for (const secret of secrets) {
@@ -14,7 +14,7 @@ export function redactText(value: string, secrets: readonly string[]): string {
   return result
 }
 
-function redactValue(value: unknown, secrets: readonly string[], seen = new WeakMap<object, unknown>()): unknown {
+const redactValue = (value: unknown, secrets: readonly string[], seen = new WeakMap<object, unknown>()): unknown => {
   if (typeof value === 'string') return redactText(value, secrets)
   if (typeof value !== 'object' || value === null) return value
   const previous = seen.get(value)
@@ -44,7 +44,7 @@ function redactValue(value: unknown, secrets: readonly string[], seen = new Weak
 }
 
 /** Preserve the Host logger API while redacting resolved credential values. */
-export function redactingLogger(logger: LoggerService, secrets: readonly string[]): LoggerService {
+export const redactingLogger = (logger: LoggerService, secrets: readonly string[]): LoggerService => {
   const wrap = (target: Function): Function =>
     new Proxy(target, {
       apply(original, thisArg, args: unknown[]) {

@@ -1,5 +1,5 @@
 /** Parse display text into argv without ever invoking a shell. */
-export function parseCommandLine(source: string): readonly string[] {
+export const parseCommandLine = (source: string): readonly string[] => {
   if (source.length > 8192) throw new TypeError('Command line is too long.')
   const words: string[] = []
   let word = ''
@@ -56,7 +56,7 @@ export function parseCommandLine(source: string): readonly string[] {
   return words
 }
 
-export function formatCommandLine(words: readonly string[]): string {
+export const formatCommandLine = (words: readonly string[]): string => {
   return words
     .map(word => {
       if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(word)) return word
@@ -69,7 +69,7 @@ const SECRET_OPTION = /(?:^|[-_])(?:api[-_]?key|access[-_]?token|token|secret|pa
 const KNOWN_TOKEN = /(?:\bbearer\s+|\b(?:gh[pousr]_|github_pat_|sk-[A-Za-z0-9_-]{20,}|xox[baprs]-))[A-Za-z0-9._~+/-]{12,}={0,2}/i
 
 /** Catch common inline credential forms so users must use credential references. */
-export function hasInlineCredential(argv: readonly string[]): boolean {
+export const hasInlineCredential = (argv: readonly string[]): boolean => {
   for (let index = 0; index < argv.length; index++) {
     const value = argv[index] ?? ''
     if (KNOWN_TOKEN.test(value) || /^-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(value)) return true

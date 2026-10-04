@@ -32,7 +32,7 @@ const icon = (size = 18): JSX.Element => (
   </svg>
 )
 
-function slug(value: string): string {
+const slug = (value: string): string => {
   return (
     value
       .toLowerCase()
@@ -42,7 +42,7 @@ function slug(value: string): string {
   )
 }
 
-function blankDraft(name = '', endpoint = ''): ServerDraft {
+const blankDraft = (name = '', endpoint = ''): ServerDraft => {
   return {
     id: '',
     name,
@@ -55,7 +55,7 @@ function blankDraft(name = '', endpoint = ''): ServerDraft {
   }
 }
 
-function referenceMap(text: string): Record<string, string> {
+const referenceMap = (text: string): Record<string, string> => {
   const parsed: unknown = JSON.parse(text)
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('Enter a JSON object of names to credential references.')
   const result: Record<string, string> = {}
@@ -66,7 +66,7 @@ function referenceMap(text: string): Record<string, string> {
   return result
 }
 
-function referencesFor(server: ServerView, prefix: string): Record<string, string> {
+const referencesFor = (server: ServerView, prefix: string): Record<string, string> => {
   return Object.fromEntries(
     server.credentialReferences.filter(item => item.target.startsWith(prefix)).map(item => [item.target.slice(prefix.length), item.reference]),
   )
@@ -175,7 +175,7 @@ const EN_KEYS = {
   localStopUnconfirmed: true,
 } as const
 
-function localProcessText(server: ServerView, t: T): string | undefined {
+const localProcessText = (server: ServerView, t: T): string | undefined => {
   if (server.localProcess === 'not-configured') return undefined
   const state =
     server.localProcess === 'starting'
@@ -192,7 +192,7 @@ function localProcessText(server: ServerView, t: T): string | undefined {
   return `${t('localProcess')}: ${state}`
 }
 
-function McpQuickPanel({ t, panel }: { t: T; panel: QuickPanelState }): JSX.Element | null {
+const McpQuickPanel = ({ t, panel }: { t: T; panel: QuickPanelState }): JSX.Element | null => {
   const api = useApi(mcpServersApi)
   const open = useSyncExternalStore(panel.subscribe, panel.getSnapshot)
   const [manage, setManage] = useState(false)
@@ -326,11 +326,11 @@ function McpQuickPanel({ t, panel }: { t: T; panel: QuickPanelState }): JSX.Elem
   )
 }
 
-function ManagerPage({ t }: { t: T }): JSX.Element {
+const ManagerPage = ({ t }: { t: T }): JSX.Element => {
   return <ManagerView t={t} />
 }
 
-function ManagerDialog({ t, onClose }: { t: T; onClose: () => void }): JSX.Element {
+const ManagerDialog = ({ t, onClose }: { t: T; onClose: () => void }): JSX.Element => {
   return (
     <div
       className={styles.overlay}
@@ -352,7 +352,7 @@ function ManagerDialog({ t, onClose }: { t: T; onClose: () => void }): JSX.Eleme
   )
 }
 
-function ManagerView({ t }: { t: T }): JSX.Element {
+const ManagerView = ({ t }: { t: T }): JSX.Element => {
   const api = useApi(mcpServersApi)
   const [snapshot, setSnapshot] = useState<ManagerSnapshot | null>(null)
   const [draft, setDraft] = useState<ServerDraft | null>(null)
@@ -691,7 +691,7 @@ function ManagerView({ t }: { t: T }): JSX.Element {
   )
 }
 
-function ServerEditor(props: {
+const ServerEditor = (props: {
   t: T
   draft: ServerDraft
   setDraft: (draft: ServerDraft) => void
@@ -704,7 +704,7 @@ function ServerEditor(props: {
   busy: boolean
   onSave: () => void
   onCancel: () => void
-}): JSX.Element {
+}): JSX.Element => {
   const { t, draft, setDraft } = props
   const set = (key: 'name' | 'serverName' | 'url' | 'commandLine' | 'cwd', value: string) => setDraft({ ...draft, [key]: value } as ServerDraft)
   return (

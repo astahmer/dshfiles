@@ -3,7 +3,7 @@ import { formatCommandLine } from './command-line.js'
 import type { LocalProcessStatus } from './local-process.js'
 import type { ClientLifecycle } from './reconcile.js'
 
-export function saveServer(current: readonly StoredServer[], candidate: StoredServer, max = 64): StoredServer[] {
+export const saveServer = (current: readonly StoredServer[], candidate: StoredServer, max = 64): StoredServer[] => {
   if (!current.some(server => server.id === candidate.id) && current.length >= max) {
     throw new Error(`At most ${max} servers can be configured.`)
   }
@@ -14,24 +14,24 @@ export function saveServer(current: readonly StoredServer[], candidate: StoredSe
   return index < 0 ? [...current, candidate] : current.map((server, row) => (row === index ? candidate : server))
 }
 
-export function setServerEnabled(current: readonly StoredServer[], id: string, enabled: boolean): StoredServer[] {
+export const setServerEnabled = (current: readonly StoredServer[], id: string, enabled: boolean): StoredServer[] => {
   if (!current.some(server => server.id === id)) throw new Error('MCP server was not found.')
   return current.map(server => (server.id === id ? { ...server, enabled } : server))
 }
 
-export function removeServer(current: readonly StoredServer[], id: string): StoredServer[] {
+export const removeServer = (current: readonly StoredServer[], id: string): StoredServer[] => {
   if (!current.some(server => server.id === id)) throw new Error('MCP server was not found.')
   return current.filter(server => server.id !== id)
 }
 
 /** Explicit allow-list projection: runtime-only values can never reach the UI. */
-export function publicServerView(
+export const publicServerView = (
   server: StoredServer,
   availability: ReadonlyMap<string, boolean>,
   clientLifecycle: ClientLifecycle = 'inactive',
   registeredToolCount = 0,
   localProcess: LocalProcessStatus = 'not-configured',
-): ServerView {
+): ServerView => {
   const bindings =
     server.transport === 'stdio'
       ? Object.entries(server.envRefs).map(([key, reference]) => [`environment:${key}`, reference] as const)

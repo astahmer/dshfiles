@@ -59,7 +59,7 @@ export const PROVIDERS = [
   },
 ] as const
 
-export function filterProviders<T extends { name: string; category: string; description: string }>(rows: readonly T[], query: string): T[] {
+export const filterProviders = <T extends { name: string; category: string; description: string }>(rows: readonly T[], query: string): T[] => {
   const needle = query.trim().toLocaleLowerCase()
   return needle.length === 0 ? [...rows] : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
 }
@@ -67,11 +67,11 @@ export function filterProviders<T extends { name: string; category: string; desc
 const REGISTRY_ENDPOINT = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const MAX_REGISTRY_BYTES = 1_000_000
 
-function object(value: unknown): Record<string, unknown> | undefined {
+const object = (value: unknown): Record<string, unknown> | undefined => {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 }
 
-function safeHttps(value: unknown): string | null {
+const safeHttps = (value: unknown): string | null => {
   if (typeof value !== 'string' || value.length > 2048) return null
   try {
     const url = new URL(value)
@@ -81,7 +81,7 @@ function safeHttps(value: unknown): string | null {
   }
 }
 
-function publisherMetadata(item: Record<string, unknown>): Record<string, unknown>[] {
+const publisherMetadata = (item: Record<string, unknown>): Record<string, unknown>[] => {
   const root = object(item._meta)
   if (root === undefined) return []
   return Object.values(root)
@@ -89,7 +89,7 @@ function publisherMetadata(item: Record<string, unknown>): Record<string, unknow
     .filter((value): value is Record<string, unknown> => value !== undefined)
 }
 
-function categoryOf(item: Record<string, unknown>): string {
+const categoryOf = (item: Record<string, unknown>): string => {
   for (const metadata of publisherMetadata(item)) {
     const category = metadata.category
     if (typeof category === 'string' && category.trim().length > 0) return category.trim().slice(0, 80)
@@ -101,7 +101,7 @@ function categoryOf(item: Record<string, unknown>): string {
   return 'Uncategorized'
 }
 
-function documentationOf(item: Record<string, unknown>): string | null {
+const documentationOf = (item: Record<string, unknown>): string | null => {
   const direct = safeHttps(item.documentationUrl) ?? safeHttps(item.websiteUrl)
   if (direct !== null) return direct
   for (const metadata of publisherMetadata(item)) {
@@ -111,7 +111,7 @@ function documentationOf(item: Record<string, unknown>): string | null {
   return null
 }
 
-async function readBoundedJson(response: Response): Promise<unknown> {
+const readBoundedJson = async (response: Response): Promise<unknown> => {
   if (response.body === null) throw new Error('Registry response has no body.')
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -139,7 +139,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   return JSON.parse(new TextDecoder().decode(bytes)) as unknown
 }
 
-function registryRow(value: unknown): RegistryEntry | undefined {
+const registryRow = (value: unknown): RegistryEntry | undefined => {
   const wrapped = object(value)
   const item = object(wrapped?.server) ?? wrapped
   if (item === undefined || typeof item.name !== 'string' || item.name.length > 200) return undefined
@@ -162,7 +162,7 @@ function registryRow(value: unknown): RegistryEntry | undefined {
   }
 }
 
-export async function searchOfficialRegistry(query: string): Promise<RegistryEntry[]> {
+export const searchOfficialRegistry = async (query: string): Promise<RegistryEntry[]> => {
   const url = new URL(REGISTRY_ENDPOINT)
   url.searchParams.set('search', query)
   url.searchParams.set('version', 'latest')

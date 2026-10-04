@@ -218,6 +218,17 @@ describe('native-client log redaction', () => {
     expect(warn).toHaveBeenCalledWith('remote returned [REDACTED] and [REDACTED]')
     expect(redactText('key=sensitive value/with+symbols', [secret])).toBe('key=[REDACTED]')
   })
+
+  it('redacts a start failure logged as an Error, including its cause', () => {
+    const secret = 'token-123'
+    const warn = vi.fn()
+    const logger = redactingLogger({ warn } as never, [secret])
+    logger.warn('MCP server %s: native client failed to start: %s', 'one', new Error(`401 for ${secret}`, { cause: new Error(secret) }))
+    const logged = warn.mock.calls[0]?.[2]
+    expect(logged).toBeInstanceOf(Error)
+    expect(String(logged)).not.toContain(secret)
+    expect(String(logged instanceof Error ? logged.cause : undefined)).not.toContain(secret)
+  })
 })
 
 describe('managed local HTTP process', () => {

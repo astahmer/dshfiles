@@ -9,21 +9,21 @@ export interface ClientTarget {
 export type ClientLifecycle = 'inactive' | 'starting' | 'loaded' | 'start-failed' | 'manually-disconnected'
 
 /** Serializes native client start/stop transitions and replaces edited clients. */
-export class ClientReconciler {
+export class ClientReconciler<Target extends ClientTarget = ClientTarget> {
   private readonly active = new Map<string, { fingerprint: string; dispose: () => void | Promise<void> }>()
   private readonly lifecycle = new Map<string, ClientLifecycle>()
   private pending: Promise<void> = Promise.resolve()
 
-  constructor(private readonly start: (target: ClientTarget) => Promise<() => void | Promise<void>>) {}
+  constructor(private readonly start: (target: Target) => Promise<() => void | Promise<void>>) {}
 
-  update(targets: readonly ClientTarget[]): Promise<void> {
+  update(targets: readonly Target[]): Promise<void> {
     const run = this.pending.then(() => this.apply(targets))
     this.pending = run.catch(() => undefined)
     return run
   }
 
   /** Dispose and recreate one native client through its owning Cordis fiber. */
-  restart(id: string, targets: readonly ClientTarget[]): Promise<void> {
+  restart(id: string, targets: readonly Target[]): Promise<void> {
     const run = this.pending.then(async () => {
       const current = this.active.get(id)
       if (current !== undefined) {
@@ -45,7 +45,7 @@ export class ClientReconciler {
     await this.update([])
   }
 
-  private async apply(targets: readonly ClientTarget[]): Promise<void> {
+  private async apply(targets: readonly Target[]): Promise<void> {
     const byId = new Map(targets.map(target => [target.id, target]))
     const desired = new Map(targets.filter(target => target.enabled && target.ready && target.suspended !== true).map(target => [target.id, target]))
     for (const [id, current] of this.active) {
