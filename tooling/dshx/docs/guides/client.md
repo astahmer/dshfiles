@@ -104,11 +104,10 @@ The helper preserves keyed/list/chain/session/maybe behavior from the official S
 Client registration order is:
 
 1. Locale contributions, in array order.
-2. Experimental Conversation contributions and their keyed chat renderers.
-3. Slots, in array order.
-4. `setup(ctx)`.
+2. Slots, in array order.
+3. `setup(ctx)`.
 
-Non-empty Locales add `locale`. Non-empty Conversations add `conversationEvents` and `slots`. Non-empty Slots add `slots`. Hook capabilities add `connection` or `settingsScope` only when the corresponding Hook module survives final tree-shaking.
+Non-empty Conversations fail with `DSHX2302`: protocol-2 has no conversation event registry. Non-empty Locales add `locale`. Non-empty Slots add `slots`. Hook capabilities add `connection` or `settingsScope` only when the corresponding Hook module survives final tree-shaking.
 
 Slot and Conversation components are wrapped with the current Client Fiber's API and Settings contexts. Contract identity maps belong to that Fiber and disappear on dispose/HMR; DSHX does not retain a global scope or API cache.
 

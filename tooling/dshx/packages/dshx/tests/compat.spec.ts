@@ -60,7 +60,6 @@ describe('DSH protocol compatibility generations', () => {
         'session:custom-durable-event-vocabulary:unavailable',
       ]),
     )
-    expect(capabilities).not.toContain('client:conversation-event-registry')
     expect(capabilities).not.toContain('client:conversation-components:experimental')
   })
 

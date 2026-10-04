@@ -41,7 +41,7 @@ describe('installed protocol-2 contract regressions', () => {
 
   it('does not advertise a removed conversation event registry', () => {
     expect(PROTOCOL_2_COMPATIBILITY.client.conversation?.componentContributions).toBe(false)
-    expect(PROTOCOL_2_COMPATIBILITY.client.conversation?.eventService).toBeUndefined()
+    expect(PROTOCOL_2_COMPATIBILITY.client.conversation).not.toHaveProperty('eventService')
   })
 
   it('rejects unsupported per-handler authority rather than silently ignoring it', () => {

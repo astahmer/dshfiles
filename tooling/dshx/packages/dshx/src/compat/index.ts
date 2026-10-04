@@ -145,7 +145,6 @@ export function getCompatibilityCapabilities(compatibility: DshCompatibility): r
   if (compatibility.client.settings?.service === 'settingsScope') capabilities.push('client:settings-scope')
   if (compatibility.client.settings?.service === 'configForms') capabilities.push('client:config-forms')
   if (compatibility.client.settings?.hookDrivenCapabilityInference === true) capabilities.push('client:settings-hook-inference')
-  if (compatibility.client.conversation?.eventService === 'conversationEvents') capabilities.push('client:conversation-event-registry')
   if (compatibility.client.conversation?.slotService === 'slots') capabilities.push('client:conversation-chat-slots')
   if (compatibility.client.conversation?.componentContributions === true) {
     capabilities.push(`client:conversation-components:${compatibility.client.conversation.verification}`)

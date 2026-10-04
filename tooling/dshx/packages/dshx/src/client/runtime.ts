@@ -11,7 +11,7 @@ import type {
 } from './types.js'
 import { isSlotContribution, slotContributionParts } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
-import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
+import { isConversationContribution } from '../conversation/define.js'
 import { createApiClientRuntime, provideApiContext } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
@@ -43,16 +43,11 @@ interface ClientSlotsService {
   register(options: Record<string, unknown>, component: unknown): unknown
 }
 
-interface ClientConversationEventsService {
-  register(definition: unknown): unknown
-}
-
 interface ClientLocaleService {
   register(namespace: string, dictionaries: LocaleDictionaries): () => void
 }
 
 type ClientRuntimeContext = Context & {
-  readonly conversationEvents: ClientConversationEventsService
   readonly locale: ClientLocaleService
   readonly slots: ClientSlotsService
 }
@@ -297,11 +292,6 @@ function registerLocales(client: ClientRuntimeContext, definition: ClientDefinit
 }
 
 function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator): void {
-  for (const conversation of definition.conversations ?? []) {
-    const { definition: conversationDefinition, renderer } = getConversationContributionParts(conversation)
-    client.conversationEvents.register(conversationDefinition)
-    client.slots.inject(renderer.name, () => client.slots.register({ name: renderer.name, ...renderer.options }, decorate(renderer.component)))
-  }
   for (const slot of definition.slots ?? []) {
     const { name, options, component } = slotContributionParts(slot)
     client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(component)))
@@ -314,7 +304,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
   const hasLocales = (definition.locales?.length ?? 0) > 0
   const hasConversations = (definition.conversations?.length ?? 0) > 0
   const compatibility = metadata.compatibility ?? PROTOCOL_2_COMPATIBILITY
-  if (hasConversations && compatibility.client.conversation?.componentContributions !== true) {
+  if (hasConversations) {
     fail(
       'DSHX2302',
       'This DSH version has no native conversation event registry.',
@@ -332,8 +322,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
     ...new Set([
       ...(definition.inject ?? []),
       ...(hasLocales || usesFullRuntime ? ['locale'] : []),
-      ...(hasConversations ? ['conversationEvents'] : []),
-      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime || hasConversations ? ['slots'] : []),
+      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime ? ['slots'] : []),
       ...(hasApiCapability ? ['connection'] : []),
     ]),
   ]
