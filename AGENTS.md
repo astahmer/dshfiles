@@ -349,3 +349,33 @@ A plugin that installs is not a plugin that works.
   `lsof -nP -iTCP:3080 -sTCP:LISTEN` before debugging a boot failure.
 - Prefer `dsh --profile web --dump-config` over reading installed plugin source
   to learn what a profile actually loads.
+
+### Rebuilt plugins reach the browser over HMR
+
+`dsh web` does **not** need a restart to pick up a rebuilt plugin.
+`@deepseek-ai/dsh-client-hmr` is in the default web profile; it polls each
+bundle's `mtime`/`ctime`/`size` every 500ms and pushes an SSE `graph` frame on
+`/plugins/events`, which the client applies without a reload. Verified on a live
+instance: rebuilding `dist/client.js` produced a fresh graph frame within one
+poll interval.
+
+What a page refresh alone does **not** do is re-read the boot manifest. The
+bundle `rev` is a content hash computed when the server started, so a running
+server keeps serving the manifest it booted with. Confirmed by editing a served
+bundle twice on one server and reading the same `rev` back both times.
+
+So the workflow is: rebuild, let the client receive the graph frame, and only
+restart when the change is to `cordis.patch.yml`, `package.json`, or the profile
+composition — anything the server resolves at boot rather than per request.
+
+### Client boot failures are cross-plugin
+
+A `Failed to load plugins` card lists symptoms, not causes. The entry named first
+is frequently not the broken one: a plugin that throws during `apply` is the
+cause, and the entries listed as `pending (waiting for service: X)` are innocent
+dependents of the service it failed to publish. Fixing the failed entry is the
+only thing that clears the pending ones.
+
+`dshx check` and `tsc` both pass on a plugin with a colliding locale namespace
+or a missing runtime service, because both are defects only visible across the
+installed set. See `plans/plugin-boot-integrity.md`.
