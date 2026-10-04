@@ -10,7 +10,7 @@ import { createBdd } from 'playwright-bdd'
  * The base test must be playwright-bdd's own, not @playwright/test's, because the
  * BDD fixtures are attached to it.
  */
-export const { Given, When, Then } = createBdd(bddTest)
+export const { Given, When, Then, After } = createBdd(bddTest)
 
 /** Read the boot card, waiting for either the failure card or a mounted application. */
 export const readBootOutcome = async (page: Page, timeoutMs: number): Promise<string> => {

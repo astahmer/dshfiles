@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
-import { Given, Then, readBootOutcome } from './bdd.js'
+import { After, Given, Then, When, readBootOutcome } from './bdd.js'
+import { defineParameterType } from 'playwright-bdd'
 import { bootProfile, type BootedProfile } from './boot.js'
 
 /**
@@ -45,6 +46,19 @@ Then('the Web UI mounts without a plugin failure card', async ({ page }: { page:
   ).toEqual([])
 })
 
+Then('the Web UI mounts without a failure card', async ({ page }: { page: Page }) => {
+  const boots = isolatedBoots.get(page)
+  const pluginId = [...(boots?.keys() ?? [])][0] ?? 'the isolated plugin'
+  const text = await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
+  // An entry left pending on a live-host service is expected: this scenario runs
+  // no Host conversation, so nothing can unblock those. Only "failed" is a defect.
+  const failed = [...text.matchAll(/^(?<id>@[^:\n]+): failed\b/gm)].map(match => match.groups?.id)
+  expect(
+    failed,
+    `${pluginId} left ${String(failed.length)} client entry/entries that failed to activate:\n${text}`,
+  ).toEqual([])
+})
+
 Then('every client entry that failed to activate is reported by id', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   const text = await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
@@ -61,3 +75,48 @@ Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
   await profile.close()
   profiles.delete(page)
 })
+
+/**
+ * Steps for booting each plugin on its own.
+ *
+ * These are the only steps that build a disposable profile, and they live beside
+ * the boot ones because the failure they guard is the same class: a client entry
+ * that throws during apply and is only visible in a browser.
+ */
+
+/** Plugin boots still running for this page, so a scenario can close them all. */
+const isolatedBoots = new WeakMap<Page, Map<string, { close(): Promise<void>; output(): string }>>()
+
+Given('each plugin is booted on its own', async ({ page }: { page: Page }) => {
+  isolatedBoots.set(page, new Map())
+})
+
+When('the plugin "{pluginId}" is opened', async ({ page }: { page: Page }, pluginId: string) => {
+  const { bootPluginAlone } = await import('./plugin-boot.js')
+  const boot = await bootPluginAlone(pluginId)
+  isolatedBoots.get(page)?.set(pluginId, boot)
+  await page.goto(boot.url, { waitUntil: 'domcontentloaded' })
+  await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
+})
+
+Then('the plugin shuts down', async ({ page }: { page: Page }) => {
+  const boots = isolatedBoots.get(page)
+  if (boots === undefined) return
+  for (const boot of boots.values()) await boot.close()
+  boots.clear()
+})
+
+// A scenario that fails mid-way must not leave a Host running, so every isolated
+// boot is torn down after each scenario regardless of how it ended.
+After(async ({ page }: { page: Page }) => {
+  await profiles.get(page)?.close()
+  profiles.delete(page)
+  const boots = isolatedBoots.get(page)
+  if (boots === undefined) return
+  for (const boot of boots.values()) await boot.close()
+  boots.clear()
+})
+
+// The scenario outline interpolates a package id, so the parameter type has to be
+// declared before any step that uses {pluginId} can match.
+defineParameterType({ name: 'pluginId', regexp: /@dshfiles\/[a-z-]+/ })

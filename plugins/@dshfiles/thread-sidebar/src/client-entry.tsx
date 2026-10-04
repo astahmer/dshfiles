@@ -17,9 +17,11 @@ import { archiveWithoutStopping } from './organization.js'
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
   locales: [threadSidebarLocale],
-  // setup(ctx) reads ctx.slots throughout; declaring it here is what injects that
-  // service. Without this the plugin loads but never mounts.
-  inject: ['slots'],
+  // rootProps and the workspaces entry read these at render time, not from setup,
+  // so the compiler cannot infer them. Declaring only slots lets the plugin
+  // activate and then throw inside the slot, which blanks the sidebar instead of
+  // failing the boot.
+  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces'],
   setup(ctx) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
     const syncPanels = (): void => {
