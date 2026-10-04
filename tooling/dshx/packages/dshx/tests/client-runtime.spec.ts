@@ -216,11 +216,23 @@ describe('Client runtime adapter', () => {
   })
 
   it('does not inject or register an empty Slot list', () => {
-    const setup = vi.fn()
-    const plugin = createClientPlugin({ slots: [], setup }, { packageId: '@test/plugin' })
+    const plugin = createClientPlugin({ slots: [] }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual([])
     plugin.apply({ slots: { inject: vi.fn(), register: vi.fn() } } as unknown as Context)
+  })
+
+  it('injects the runtime services setup(ctx) may touch imperatively', () => {
+    const inject = vi.fn()
+    const setup = vi.fn((ctx: { slots: { inject: typeof inject }; locale: unknown }) => {
+      ctx.slots.inject('test.slot', () => undefined)
+      void ctx.locale
+    })
+    const plugin = createClientPlugin({ setup }, { packageId: '@test/plugin' })
+
+    expect(plugin.inject).toEqual(['locale', 'slots'])
+    plugin.apply({ slots: { inject, register: vi.fn() } } as unknown as Context)
     expect(setup).toHaveBeenCalledOnce()
+    expect(inject).toHaveBeenCalledWith('test.slot', expect.any(Function))
   })
 
   it('registers each Conversation Definition before its paired keyed renderer and then setup', () => {
@@ -288,10 +300,10 @@ describe('Client runtime adapter', () => {
     expect(disposers.every(dispose => dispose.mock.calls.length === 0)).toBe(true)
   })
 
-  it('does not inject or register an empty Conversation list', () => {
+  it('does not register an empty Conversation list', () => {
     const setup = vi.fn()
     const plugin = createClientPlugin({ conversations: [], setup }, { packageId: '@test/plugin' })
-    expect(plugin.inject).toEqual([])
+    expect(plugin.inject).toEqual(['locale', 'slots'])
     plugin.apply({} as Context)
     expect(setup).toHaveBeenCalledOnce()
   })

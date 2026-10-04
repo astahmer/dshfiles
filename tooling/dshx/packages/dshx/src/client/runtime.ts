@@ -316,12 +316,17 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
     )
   }
   const hasApiCapability = metadata.apiCapability === true
+  // A free-form setup(ctx) may register Slots or Locales imperatively, so a definition
+  // that brings its own setup and declares no inject of its own gets the whole runtime
+  // surface. Definitions that do declare inject stay exactly as declared.
+  const declaresInject = (definition.inject?.length ?? 0) > 0
+  const usesFullRuntime = definition.setup !== undefined && !declaresInject
   const inject = [
     ...new Set([
       ...(definition.inject ?? []),
-      ...(hasLocales ? ['locale'] : []),
+      ...(hasLocales || usesFullRuntime ? ['locale'] : []),
       ...(hasConversations ? ['conversationEvents'] : []),
-      ...((definition.slots?.length ?? 0) > 0 || hasConversations ? ['slots'] : []),
+      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime || hasConversations ? ['slots'] : []),
       ...(hasApiCapability ? ['connection'] : []),
     ]),
   ]

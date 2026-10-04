@@ -296,7 +296,7 @@ describe('client compiler', () => {
       inject: string[]
       apply(ctx: unknown): unknown
     }
-    expect(plugin.inject).toEqual(['locale'])
+    expect(plugin.inject).toEqual(['locale', 'slots'])
     const register = vi.fn(() => vi.fn())
     const bind = vi.fn()
     plugin.apply({
