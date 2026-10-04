@@ -30,6 +30,15 @@ export interface Shortcut {
   readonly modifier: Modifier
   /** Extra modifier that must also be held, for chords like `primary+shift+p`. */
   readonly alsoShift?: boolean
+  /**
+   * Whether the chord still applies when a text field has focus.
+   *
+   * The composer is a textarea and holds focus almost all the time, so a chord
+   * guarded against editable targets would never fire in practice. Plain letter
+   * chords still need the guard — those are the ones that would insert text — but
+   * a modified chord cannot type anything, so it is safe to claim anywhere.
+   */
+  readonly allowInEditable?: boolean
   /** Human label for menus and help. */
   readonly label: string
   readonly run: (event: KeyboardEvent) => void
@@ -37,7 +46,8 @@ export interface Shortcut {
 
 export const isMacPlatform = (platform: string): boolean => platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
 
-const EDITABLE_SELECTOR = 'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"])'
+const EDITABLE_SELECTOR =
+  'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
 
 /** Whether the event landed somewhere that consumes plain character keys. */
 export const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -89,10 +99,14 @@ export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[])
     // Someone already handled it, a composition is in flight, or the key is being
     // auto-repeated: none of these are a fresh command.
     if (event.defaultPrevented || event.isComposing || event.repeat) return
-    if (isEditableTarget(event.composedPath().find(node => node instanceof Element) ?? null)) return
-
+    // A modified chord cannot insert text, so it is claimed even from a text
+    // field. Without this the guard below would swallow every chord aimed at the
+    // composer, which is where focus actually is.
+    const inEditable = isEditableTarget(event.composedPath().find(node => node instanceof Element) ?? null)
     for (const shortcut of shortcuts) {
       if (!matchesShortcut(event, shortcut, mac)) continue
+      if (inEditable && shortcut.allowInEditable !== true) continue
+
       // Both calls are needed: preventDefault stops the browser's own binding,
       // stopPropagation keeps the Host's runtime from also dispatching it.
       event.preventDefault()
