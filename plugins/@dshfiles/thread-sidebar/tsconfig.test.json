@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "outDir": ".test-dist",
+    "rootDir": "src"
+  },
+  "include": ["src/organization.ts", "src/preferences.ts", "src/sidebar-contract.ts"]
+}

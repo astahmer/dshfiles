@@ -21,7 +21,7 @@ import type { HostDefinition } from './types.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { loadRuntimePlugins } from './runtime-plugins.js'
 import { inspectBridgeEnabled, ownHostInspectBridge, startHostInspectBridge } from './inspect-bridge.js'
-import { registerApi } from '../api/runtime.js'
+import { registerApi } from '../api/host-runtime.js'
 import { isApiHostRegistration } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import {
@@ -34,7 +34,7 @@ import {
 } from '../settings/define.js'
 import { promptContributionKind, promptContributionParts } from './define.js'
 
-const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'settings', 'apis', 'setup'])
+const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'Config', 'settings', 'apis', 'setup'])
 
 /** Project identity embedded by the Host compiler. */
 export interface HostPluginMetadata {
@@ -78,6 +78,12 @@ async function startHostRuntime(ctx: Context, metadata: HostPluginMetadata): Pro
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
+}
+
+function isStandardSchema(value: unknown): value is StandardSchemaV1 {
+  const source = record(value)
+  const standard = record(source?.['~standard'])
+  return standard?.version === 1 && typeof standard.vendor === 'string' && typeof standard.validate === 'function'
 }
 
 function settingsContract(contribution: SettingsContribution): SettingsContract<any, any> {
@@ -291,6 +297,14 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
       }
     }
   }
+  if (source.Config !== undefined && !isStandardSchema(source.Config)) {
+    fail(
+      'DSHX2002',
+      'Host definition Config must implement Standard Schema version 1.',
+      metadata,
+      'Pass a Standard Schema compatible object such as a Zod schema as Config, or derive Config from defineHost({ settings }).',
+    )
+  }
   if (source.settings !== undefined) {
     if (!Array.isArray(source.settings)) {
       fail(
@@ -309,6 +323,14 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
         'Combine fields in one defineSettings({ schema }) contract, or use separate native plugin entries.',
       )
     }
+  }
+  if (source.Config !== undefined && Array.isArray(source.settings) && source.settings.length > 0) {
+    fail(
+      'DSHX2002',
+      'Host definition cannot combine native Config with DSHX Settings.',
+      metadata,
+      'Use either Config for native Loader-owned fields or settings for a DSHX Settings namespace. Split the Host entry if it needs both.',
+    )
   }
   if (source.apis !== undefined && (!Array.isArray(source.apis) || source.apis.some(item => !isApiHostRegistration(item)))) {
     fail('DSHX2002', 'Host apis must be an array of values returned by api.host().', metadata, 'Use apis: [contract.host({ ... })] or remove apis.')
@@ -329,14 +351,13 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   if ((definition.settings?.length ?? 0) > 0 && !inject.includes('settings')) inject.push('settings')
   const apis = definition.apis ?? []
   if (apis.length > 0 && !inject.includes('connection')) inject.push('connection')
+  const config = definition.Config ?? (definition.settings?.length === 0 || definition.settings === undefined
+    ? undefined
+    : settingsContract(definition.settings[0]!).schema.volatile())
   return {
     name: definition.name ?? fallbackName(metadata),
     inject,
-    ...((definition.settings?.length ?? 0) === 0
-      ? {}
-      : {
-          Config: settingsContract(definition.settings![0]!).schema.volatile(),
-        }),
+    ...(config === undefined ? {} : { Config: config }),
     apply(ctx, config) {
       for (const tool of definition.tools ?? []) ctx.tools.register(tool)
       for (const command of definition.commands ?? []) ctx.commands.register(command)

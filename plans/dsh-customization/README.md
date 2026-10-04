@@ -104,14 +104,20 @@ implement against DSH's real Host services and events.
 |---|---|---|
 | Provider accounts (Codex, OpenCode Go, Command Code) | built with dshx | `plugins/@dshfiles/ai-accounts` |
 | Queue reordering | built with dshx | `plugins/@dshfiles/queue-reorder` |
-| Thread sidebar and lifecycle | not started | — |
-| Sidebar header links | partial: our accounts panel is a sidebar row | `plugins/@dshfiles/ai-accounts` |
-| MCP server management and catalog | not started | — |
-| Secret catalog | not started | — |
-| Reusable project and folder picker | not started | — |
-| Sidebar and footer customization | partial: accounts uses `sidebar.panellist` | `plugins/@dshfiles/ai-accounts` |
-| Settings search | not started | — |
-| Jujutsu plugin | not started | — |
+| Thread sidebar and lifecycle | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
+| Sidebar header links | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
+| MCP server management and catalog | implemented; combined DSH boot verified | `plugins/@dshfiles/mcp-servers` |
+| Secret catalog | implemented; synthetic CLI tests and combined DSH boot verified | `plugins/@dshfiles/secret-catalog` |
+| Reusable project and folder picker | implemented as a shared package | `plugins/@dshfiles/project-folder-picker` |
+| Sidebar and footer customization | implemented on the installed sidebar slots | `plugins/@dshfiles/thread-sidebar` |
+| Settings search | implemented; combined DSH boot verified | `plugins/@dshfiles/settings-search` |
+| Jujutsu plugin | implemented; safe command tests and combined DSH boot verified | `plugins/@dshfiles/jujutsu` |
+
+All requested plugin packages and the shared picker are in this repository.
+The isolated combined profile activated the Host packages and served the five
+custom Client bundles. The active user profile remains unchanged. See [the
+integration review](integration-review.md) for validation evidence, profile
+composition steps, and remaining runtime contract limits.
 
 ## Product decisions to carry forward
 

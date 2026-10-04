@@ -4,7 +4,7 @@ import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { ApiHostRegistration } from '../api/types.js'
-import { registerApi } from '../api/runtime.js'
+import { registerApi } from '../api/host-runtime.js'
 import type { HostDefinition } from '../host/types.js'
 import { assertPluginId, createBaseApi, type BasePluginApi } from './lifecycle.js'
 

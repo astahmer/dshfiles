@@ -747,6 +747,7 @@ describe('client compiler', () => {
     expect(code).toContain('apiCapability: true')
     expect(code).not.toContain('@dshfiles/dshx/api')
     expect(code).not.toContain('@dshfiles/dshx/client')
+    expect(code).not.toMatch(/require\(["']@deepseek-ai\/dsh-client-connection(?:\/client)?["']\)/)
 
     const registration: {
       factory: (requireModule: (id: string) => unknown) => Record<string, unknown>

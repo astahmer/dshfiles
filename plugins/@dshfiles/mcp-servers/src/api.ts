@@ -1,0 +1,132 @@
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { z } from 'zod'
+
+export const referenceNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).max(128)
+const envNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).max(128)
+const headerNameSchema = z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/).max(128)
+const refsSchema = (key: typeof envNameSchema | typeof headerNameSchema) =>
+  z.record(key, referenceNameSchema).refine(record => Object.keys(record).length <= 32)
+const absolutePathSchema = z.string().trim().min(1).max(2048).refine(value =>
+  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value),
+  'Use an absolute working directory for the local start command.',
+)
+const localStartSchema = z.object({
+  command: z.string().min(1).max(2048),
+  args: z.array(z.string().max(4096)).max(128),
+  cwd: absolutePathSchema,
+  envRefs: refsSchema(envNameSchema),
+}).strict()
+const localStartDraftSchema = z.object({
+  commandLine: z.string().min(1).max(8192),
+  cwd: absolutePathSchema,
+  envRefs: refsSchema(envNameSchema),
+}).strict()
+
+const endpointSchema = z.string().url().max(2048).refine(value => {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && url.username === '' && url.password === '' && url.search === '' && url.hash === ''
+  } catch {
+    return false
+  }
+}, 'Use an HTTPS endpoint without embedded credentials.')
+
+const baseDraft = {
+  id: z.string().max(80),
+  name: z.string().trim().min(1).max(120),
+  serverName: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/),
+  enabled: z.boolean(),
+}
+
+export const storedServerSchema = z.discriminatedUnion('transport', [
+  z.object({
+    ...baseDraft,
+    transport: z.literal('stdio'),
+    command: z.string().min(1).max(2048),
+    args: z.array(z.string().max(4096)).max(128),
+    cwd: z.string().max(2048),
+    envRefs: refsSchema(envNameSchema),
+  }).strict(),
+  z.object({
+    ...baseDraft,
+    transport: z.literal('streamable-http'),
+    url: endpointSchema,
+    headerRefs: refsSchema(headerNameSchema),
+    startCommand: localStartSchema.optional(),
+  }).strict(),
+])
+
+export const serverDraftSchema = z.discriminatedUnion('transport', [
+  z.object({
+    ...baseDraft,
+    id: z.string().max(80),
+    transport: z.literal('stdio'),
+    commandLine: z.string().min(1).max(8192),
+    cwd: z.string().max(2048),
+    envRefs: refsSchema(envNameSchema),
+  }).strict(),
+  z.object({
+    ...baseDraft,
+    id: z.string().max(80),
+    transport: z.literal('streamable-http'),
+    url: endpointSchema,
+    headerRefs: refsSchema(headerNameSchema),
+    startCommand: localStartDraftSchema.nullable().optional(),
+  }).strict(),
+])
+
+export const serverViewSchema = z.discriminatedUnion('transport', [
+  z.object({
+    id: z.string(), name: z.string(), serverName: z.string(), enabled: z.boolean(),
+    transport: z.literal('stdio'), commandLine: z.string(), cwd: z.string(),
+    credentialReferences: z.array(z.object({ target: z.string(), reference: z.string(), configured: z.boolean() })),
+    configuration: z.enum(['ready', 'needs-credentials']),
+    clientLifecycle: z.enum(['inactive', 'starting', 'loaded', 'start-failed', 'manually-disconnected']),
+    localProcess: z.enum(['not-configured', 'starting', 'running', 'exited', 'stopping', 'stopped', 'stop-unconfirmed']),
+    connectionHealth: z.literal('not-reported'), registeredToolCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    id: z.string(), name: z.string(), serverName: z.string(), enabled: z.boolean(),
+    transport: z.literal('streamable-http'), url: z.string(),
+    credentialReferences: z.array(z.object({ target: z.string(), reference: z.string(), configured: z.boolean() })),
+    configuration: z.enum(['ready', 'needs-credentials']),
+    clientLifecycle: z.enum(['inactive', 'starting', 'loaded', 'start-failed', 'manually-disconnected']),
+    localProcess: z.enum(['not-configured', 'starting', 'running', 'exited', 'stopping', 'stopped', 'stop-unconfirmed']),
+    startCommand: z.object({ commandLine: z.string(), cwd: z.string() }).optional(),
+    connectionHealth: z.literal('not-reported'), registeredToolCount: z.number().int().nonnegative(),
+  }),
+])
+
+export const providerSchema = z.object({
+  id: z.string(), name: z.string(), category: z.string(), description: z.string(), docsUrl: z.string().url(),
+})
+
+export const registryEntrySchema = z.object({
+  name: z.string(), title: z.string(), category: z.string(), description: z.string(), version: z.string(), endpoint: endpointSchema.nullable(), docsUrl: z.string().url().nullable(),
+})
+
+export const snapshotSchema = z.object({
+  servers: z.array(serverViewSchema),
+  providers: z.array(providerSchema),
+  connectionHealth: z.literal('not-reported'),
+})
+
+export type StoredServer = z.infer<typeof storedServerSchema>
+export type ServerDraft = z.infer<typeof serverDraftSchema>
+export type ServerView = z.infer<typeof serverViewSchema>
+export type RegistryEntry = z.infer<typeof registryEntrySchema>
+export type ManagerSnapshot = z.infer<typeof snapshotSchema>
+
+export const mcpServersApi = defineApi({
+  id: 'mcp-servers',
+  version: 1,
+  methods: {
+    list: method({ input: z.void(), output: snapshotSchema }),
+    refresh: method({ input: z.void(), output: snapshotSchema }),
+    save: method({ input: z.object({ server: serverDraftSchema }), output: snapshotSchema }),
+    setEnabled: method({ input: z.object({ id: z.string().min(1).max(80), enabled: z.boolean() }), output: snapshotSchema }),
+    setConnection: method({ input: z.object({ id: z.string().min(1).max(80), connected: z.boolean() }), output: snapshotSchema }),
+    remove: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
+    searchRegistry: method({ input: z.object({ query: z.string().trim().min(1).max(80) }), output: z.array(registryEntrySchema).max(20) }),
+  },
+})

@@ -1,0 +1,255 @@
+.sidebar {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  color: inherit;
+}
+
+.header {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.titleRow,
+.projectFilter,
+.groupHeader,
+.row,
+.actions,
+.checkRow {
+  display: flex;
+  align-items: center;
+}
+
+.titleRow {
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.iconButton,
+.groupHeader,
+.actions button {
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.iconButton {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.1rem;
+}
+
+.iconButton:hover,
+.groupHeader:hover,
+.actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.projectFilter {
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  font-size: 0.83rem;
+}
+
+.projectFilter select,
+.field input,
+.field textarea {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.projectFilter select {
+  max-width: 65%;
+  padding: 0.35rem 0.45rem;
+}
+
+.settings {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.checkRow {
+  gap: 0.55rem;
+  font-size: 0.87rem;
+}
+
+.checkRow input {
+  accent-color: var(--dsh-color-accent, Highlight);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+}
+
+.field small,
+.note {
+  color: color-mix(in srgb, currentColor 65%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.exclusions {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.6rem 0.65rem;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 0.5rem;
+}
+
+.exclusions legend {
+  padding: 0 0.25rem;
+  font-size: 0.82rem;
+}
+
+.note {
+  margin: 0;
+}
+
+.notice,
+.empty {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  font-size: 0.82rem;
+}
+
+.sections {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0.25rem 0.45rem 0.75rem;
+}
+
+.group {
+  margin-top: 0.25rem;
+}
+
+.groupHeader {
+  width: 100%;
+  gap: 0.55rem;
+  padding: 0.55rem 0.4rem;
+  color: color-mix(in srgb, currentColor 75%, transparent);
+  text-align: left;
+}
+
+.groupHeader > :first-child {
+  white-space: nowrap;
+}
+
+.groupHeader::after {
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  content: '';
+}
+
+.count {
+  min-width: 1.3rem;
+  text-align: center;
+  font-size: 0.76rem;
+}
+
+.row {
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.55rem 0.3rem;
+  border-radius: 0.55rem;
+}
+
+.row:hover,
+.row:focus-within {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.openButton {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.18rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.openButton:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.rowProject {
+  overflow: hidden;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.running {
+  color: var(--dsh-color-accent, Highlight);
+  font-size: 0.78rem;
+}
+
+.actions {
+  gap: 0.1rem;
+}
+
+.actions button {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.9rem;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.toolbar button:focus-visible,
+.iconButton:focus-visible,
+.projectFilter select:focus-visible,
+.groupHeader:focus-visible,
+.openButton:focus-visible,
+.actions button:focus-visible,
+.settings input:focus-visible,
+.settings textarea:focus-visible {
+  outline: 2px solid var(--dsh-color-accent, Highlight);
+  outline-offset: 2px;
+}

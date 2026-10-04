@@ -105,6 +105,21 @@ export default defineHost({
 
 Each handler receives `{ input, ctx, signal }`. `.host()` requires exactly the contract's method keys: missing and extra handlers are type errors and are also rejected at runtime. `authority` defaults to `loopback`; pass `{ authority: 'trusted-host' }` only when the official Connection policy requires it.
 
+## Host transport and authentication
+
+dshx registers one exact `POST` route per API method through the native
+`connection.fetch.register()` service. The routes live under DSH's authenticated
+`/api` handler. Client calls use the native Connection RPC service with the same
+channel and method path; dshx handles the RPC envelope, method match, request
+validation, response correlation, and JSON response. This keeps plugin APIs
+inside Connection's admission and browser-authentication checks instead of
+adding a separate loopback HTTP endpoint. Route registrations are disposed with
+the Host plugin, and duplicate paths are rejected by Connection.
+
+The typed API owns this transport. Plugin code should declare contracts and
+handlers with `defineApi()` and `defineHost()` rather than registering raw
+`connection.fetch` routes or reaching into `webServer` directly.
+
 ## Imperative Client calls
 
 ```tsx

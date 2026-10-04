@@ -1,0 +1,99 @@
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { z } from 'zod'
+
+export const revisionSchema = z.object({
+  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
+  changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
+  shortestChangeId: z.string().min(1).max(32),
+  description: z.string().max(20_000),
+  author: z.string().max(320),
+  authorTime: z.string().max(64),
+  parents: z.array(z.string().regex(/^[a-f0-9]{40,64}$/)).max(16),
+  bookmarks: z.array(z.string().max(256)).max(64),
+  localBookmarks: z.array(z.string().max(256)).max(64),
+  tags: z.array(z.string().max(256)).max(64),
+  workspaces: z.array(z.string().max(128)).max(32),
+  workingCopy: z.boolean(),
+  mine: z.boolean(),
+  immutable: z.boolean(),
+  divergent: z.boolean(),
+  evolved: z.boolean(),
+})
+
+const repoPathSchema = z.string().min(1).max(2048)
+const repoIdSchema = z.string().uuid()
+const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
+const remoteNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
+const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/)
+
+export const mutationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
+  z.object({ kind: z.literal('split'), commitId: commitIdSchema, paths: z.array(z.string().min(1).max(1024)).min(1).max(100), message: z.string().min(1).max(4000) }),
+  z.object({ kind: z.literal('squash'), sourceId: commitIdSchema, destinationId: commitIdSchema, message: z.string().min(1).max(4000) }),
+  z.object({ kind: z.literal('rebase'), sourceId: commitIdSchema, destinationId: commitIdSchema }),
+  z.object({ kind: z.literal('bookmark-move'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
+  z.object({ kind: z.literal('fetch'), remote: remoteNameSchema }),
+  z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
+])
+
+export const previewSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(['describe', 'split', 'squash', 'rebase', 'bookmark-move', 'fetch', 'push']),
+  title: z.string().max(200),
+  summary: z.string().max(1000),
+  detail: z.string().max(8000),
+  expiresAt: z.number().int(),
+})
+
+export const fileChangeSchema = z.object({
+  path: z.string().max(2048),
+  additions: z.number().int().min(0),
+  deletions: z.number().int().min(0),
+})
+
+export const stateSchema = z.object({
+  root: z.string().max(2048),
+  revisions: z.array(revisionSchema).max(500),
+  status: z.string().max(80_000),
+  changedPaths: z.array(z.string().max(2048)).max(1000),
+  remoteNames: z.array(z.string().max(128)).max(64),
+  lastPushAt: z.string().max(64).nullable(),
+  lastPushDescription: z.string().max(500).nullable(),
+  lastPushHistoryTruncated: z.boolean(),
+  evolutionHistoryTruncated: z.boolean(),
+})
+
+export const jujutsuApi = defineApi({
+  id: 'jujutsu',
+  version: 1,
+  methods: {
+    registerRepository: method({
+      input: z.object({ path: repoPathSchema }),
+      output: z.object({ repoId: repoIdSchema, root: z.string().max(2048) }),
+    }),
+    load: method({
+      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(300) }),
+      output: stateSchema,
+    }),
+    details: method({
+      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),
+      output: z.object({ files: z.array(fileChangeSchema).max(1000), additions: z.number().int().min(0), deletions: z.number().int().min(0), patch: z.string().max(1_200_000), truncated: z.boolean(), evolution: z.string().max(120_000) }),
+    }),
+    workingDiff: method({
+      input: z.object({ repoId: repoIdSchema }),
+      output: z.object({ patch: z.string().max(1_200_000), truncated: z.boolean() }),
+    }),
+    prepare: method({
+      input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
+      output: previewSchema,
+    }),
+    confirm: method({
+      input: z.object({ repoId: repoIdSchema, previewId: z.string().uuid() }),
+      output: z.object({ message: z.string().max(1000), output: z.string().max(12_000) }),
+    }),
+  },
+})
+
+export type Revision = z.infer<typeof revisionSchema>
+export type Mutation = z.infer<typeof mutationSchema>
+export type JujutsuState = z.infer<typeof stateSchema>

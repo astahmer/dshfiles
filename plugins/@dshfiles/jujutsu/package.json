@@ -1,0 +1,57 @@
+{
+  "name": "@dshfiles/jujutsu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Jujutsu revision graph and confirmed Source Control actions for DSH.",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./dist/client.js"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "files": ["dist", "cordis.patch.yml", "README.md"],
+  "dependencies": { "zod": "^4.4.3" },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "devDependencies": {
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@types/node": "^22.19.0",
+    "@types/react": "~18.3.31",
+    "react": "^18.3.1",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "build": "dshx build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test src/core.test.ts src/fileset.integration.test.ts"
+  }
+}

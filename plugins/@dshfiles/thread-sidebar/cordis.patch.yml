@@ -1,0 +1,5 @@
+- id: ui-sidebar
+  disabled: true
+- insert:
+    - id: thread-sidebar
+      name: '@dshfiles/thread-sidebar'

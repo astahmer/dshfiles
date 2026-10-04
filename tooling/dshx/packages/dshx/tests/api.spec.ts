@@ -1,9 +1,11 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { createApiClientRuntime, startApiQueryEffect } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/define.js'
 import * as publicApi from '../src/api/index.js'
-import { apiChannel, apiConnectionAvailable, createApiClient, registerApi, subscribeApiConnection } from '../src/api/runtime.js'
+import { apiChannel, apiConnectionAvailable, createApiClient, subscribeApiConnection } from '../src/api/runtime.js'
+import { registerApi } from '../src/api/host-runtime.js'
 
 function schema<Input, Output>(validate: (value: unknown) => StandardSchemaV1.Result<Output>): StandardSchemaV1<Input, Output> {
   return { '~standard': { version: 1, vendor: 'dshx-test', validate } }
@@ -18,6 +20,53 @@ const api = defineApi({
   },
 })
 
+function connectionFixture() {
+  const routes = new Map<string, ConnectionFetchRoute>()
+  const removers: Array<() => Promise<void>> = []
+  const remove = vi.fn(async (path: string) => {
+    routes.delete(path)
+  })
+  const call = vi.fn(async (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => {
+    const path = `${channel}/${endpoint}`
+    const route = routes.get(path)
+    if (route === undefined) return { ok: false as const, error: { code: 'not-found', message: 'Route not found.', details: {} } }
+    const request = new Request(`http://localhost${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 'test-rpc', method: endpoint, payload }),
+      ...(signal === undefined ? {} : { signal }),
+    })
+    const response = await route.fetch(request)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return (await response.json() as { readonly result: { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: { readonly code: string; readonly message: string; readonly details: object } } }).result
+  })
+  const context = {
+    get(name: string) {
+      return name === 'connection'
+        ? {
+            operator: {},
+            fetch: {
+              register(route: ConnectionFetchRoute) {
+                if (routes.has(route.path)) throw new Error(`Route already registered: ${route.path}`)
+                routes.set(route.path, route)
+                const dispose = async (): Promise<void> => {
+                  await remove(route.path)
+                }
+                return dispose
+              },
+            },
+            rpc: { call },
+          }
+        : undefined
+    },
+    effect(setup: () => () => Promise<void>) {
+      removers.push(setup())
+    },
+  }
+  Object.assign(context, { root: context })
+  return { context, routes, removers, remove, call }
+}
+
 describe('generic API runtime', () => {
   it('does not expose transport construction helpers', () => {
     expect(publicApi).not.toHaveProperty('createApiClient')
@@ -31,25 +80,7 @@ describe('generic API runtime', () => {
   })
 
   it('registers handlers through the official Connection shape', async () => {
-    let handler: ((endpoint: string, payload: unknown, signal: AbortSignal) => Promise<unknown>) | undefined
-    const remove = vi.fn(async () => undefined)
-    const ctx = {
-      get(name: string) {
-        return name === 'connection'
-          ? {
-              rpc: {
-                handle(_channel: string, value: typeof handler) {
-                  handler = value
-                  return remove
-                },
-              },
-            }
-          : undefined
-      },
-      effect() {
-        return undefined
-      },
-    }
+    const fixture = connectionFixture()
     const registration = api.host({
       async get() {
         return { value: 'ready' }
@@ -58,29 +89,21 @@ describe('generic API runtime', () => {
         return { value: input.force === true ? 'forced' : 'normal' }
       },
     })
-    await registerApi(ctx as never, '@scope/plugin', registration)
-    expect(handler).toBeDefined()
-    await expect(handler?.('get', { version: 1, input: undefined }, new AbortController().signal)).resolves.toEqual({
+    await registerApi(fixture.context as never, '@scope/plugin', registration)
+    expect(fixture.routes.size).toBe(2)
+    const endpoint = `${apiChannel('@scope/plugin', 'status').slice(1)}/get`
+    await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toEqual({
       ok: true,
       value: { version: 1, output: { value: 'ready' } },
     })
-    await expect(handler?.('get', { version: 2, input: undefined }, new AbortController().signal)).resolves.toMatchObject({
+    await expect(fixture.call('/api', endpoint, { version: 2, input: undefined })).resolves.toMatchObject({
       ok: false,
       error: { code: 'DSHX6401' },
     })
   })
 
   it('releases channel ownership with the Host fiber lifecycle', async () => {
-    const disposers: Array<() => Promise<void>> = []
-    const remove = vi.fn(async () => undefined)
-    const ctx = {
-      get(name: string) {
-        return name === 'connection' ? { rpc: { handle: vi.fn(() => remove) } } : undefined
-      },
-      effect(setup: () => () => Promise<void>) {
-        disposers.push(setup())
-      },
-    }
+    const fixture = connectionFixture()
     const registration = api.host({
       async get() {
         return { value: 'ready' }
@@ -93,11 +116,11 @@ describe('generic API runtime', () => {
     const first = 'pkg-ppsie4'
     const second = 'pkg-1m7n0mo'
     expect(apiChannel(first, 'status')).toBe(apiChannel(second, 'status'))
-    await registerApi(ctx as never, first, registration)
-    await expect(registerApi(ctx as never, second, registration)).rejects.toThrow('API channel collision')
-    await disposers[0]?.()
-    await expect(registerApi(ctx as never, second, registration)).resolves.toBeUndefined()
-    expect(remove).toHaveBeenCalledOnce()
+    await registerApi(fixture.context as never, first, registration)
+    await expect(registerApi(fixture.context as never, second, registration)).rejects.toThrow('API channel collision')
+    await fixture.removers[0]?.()
+    await expect(registerApi(fixture.context as never, second, registration)).resolves.toBeUndefined()
+    expect(fixture.remove).toHaveBeenCalledTimes(2)
   })
 
   it('provides typed calls and safe errors over Connection.call', async () => {
@@ -109,7 +132,7 @@ describe('generic API runtime', () => {
         { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
       > => ({
         ok: true,
-        value: { version: 1, output: { value: endpoint } },
+        value: { version: 1, output: { value: endpoint.split('/').at(-1) } },
       }),
     )
     const client = createApiClient(
@@ -123,7 +146,7 @@ describe('generic API runtime', () => {
     )
     await expect(client.get()).resolves.toEqual({ value: 'get' })
     await expect(client.refresh({ force: true })).resolves.toEqual({ value: 'refresh' })
-    expect(call).toHaveBeenCalledWith(apiChannel('@scope/plugin', 'status'), 'get', { version: 1, input: undefined }, undefined)
+    expect(call).toHaveBeenCalledWith('/api', `${apiChannel('@scope/plugin', 'status').slice(1)}/get`, { version: 1, input: undefined }, undefined)
 
     call.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'boom' } })
     const result = await client.safe.get()
@@ -181,31 +204,11 @@ describe('generic API runtime', () => {
   })
 
   it('maps Host and Client API version mismatches to contract errors', async () => {
-    let handler: ((endpoint: string, payload: unknown, signal: AbortSignal) => Promise<any>) | undefined
+    const fixture = connectionFixture()
     const host = defineApi({ id: 'versioned', version: 1, methods: { get: method<void, string>() } })
     const clientContract = defineApi({ id: 'versioned', version: 2, methods: { get: method<void, string>() } })
-    const context = {
-      get(name: string) {
-        return name === 'connection'
-          ? {
-              rpc: {
-                handle(_channel: string, value: typeof handler) {
-                  handler = value
-                  return async () => undefined
-                },
-                call(_channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) {
-                  return handler?.(endpoint, payload, signal ?? new AbortController().signal)
-                },
-              },
-            }
-          : undefined
-      },
-      effect(setup: () => unknown) {
-        setup()
-      },
-    }
     await registerApi(
-      context as never,
+      fixture.context as never,
       '@scope/plugin',
       host.host({
         async get() {
@@ -213,12 +216,12 @@ describe('generic API runtime', () => {
         },
       }),
     )
-    const client = createApiClient(context as never, clientContract, '@scope/plugin')
+    const client = createApiClient(fixture.context as never, clientContract, '@scope/plugin')
     await expect(client.get()).rejects.toMatchObject({ kind: 'contract', remoteCode: 'DSHX6401', retryable: false })
   })
 
   it('returns Standard Schema transformed output from the Host boundary', async () => {
-    let handler: ((endpoint: string, payload: unknown, signal: AbortSignal) => Promise<any>) | undefined
+    const fixture = connectionFixture()
     const validateOutput = vi.fn((value: unknown) => ({ value: String(value).toUpperCase() }))
     const transformed = defineApi({
       id: 'transformed',
@@ -227,25 +230,8 @@ describe('generic API runtime', () => {
         get: method({ output: schema<string, string>(validateOutput) }),
       },
     })
-    const context = {
-      get(name: string) {
-        return name === 'connection'
-          ? {
-              rpc: {
-                handle(_channel: string, value: typeof handler) {
-                  handler = value
-                  return async () => undefined
-                },
-              },
-            }
-          : undefined
-      },
-      effect(setup: () => unknown) {
-        setup()
-      },
-    }
     await registerApi(
-      context as never,
+      fixture.context as never,
       '@scope/plugin',
       transformed.host({
         async get() {
@@ -253,7 +239,8 @@ describe('generic API runtime', () => {
         },
       }),
     )
-    await expect(handler?.('get', { version: 1 }, new AbortController().signal)).resolves.toMatchObject({
+    const endpoint = `${apiChannel('@scope/plugin', 'transformed').slice(1)}/get`
+    await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toMatchObject({
       ok: true,
       value: { output: 'READY' },
     })
@@ -261,7 +248,7 @@ describe('generic API runtime', () => {
   })
 
   it('checks the JSON boundary before transforming Client input into a Host-only value', async () => {
-    let handler: ((endpoint: string, payload: unknown, signal: AbortSignal) => Promise<any>) | undefined
+    const fixture = connectionFixture()
     const transformed = defineApi({
       id: 'host-input-transform',
       version: 1,
@@ -273,23 +260,11 @@ describe('generic API runtime', () => {
         }),
       },
     })
-    const context = {
-      get: () => ({
-        rpc: {
-          handle(_channel: string, value: typeof handler) {
-            handler = value
-            return async () => undefined
-          },
-        },
-      }),
-      effect(setup: () => unknown) {
-        setup()
-      },
-    }
     const implementation = vi.fn(({ input }: { input: { parsed: bigint } }) => input.parsed.toString())
-    await registerApi(context as never, '@scope/plugin', transformed.host({ parse: implementation }))
+    await registerApi(fixture.context as never, '@scope/plugin', transformed.host({ parse: implementation }))
 
-    await expect(handler?.('parse', { version: 1, input: { raw: '9007199254740993' } }, new AbortController().signal)).resolves.toMatchObject({
+    const endpoint = `${apiChannel('@scope/plugin', 'host-input-transform').slice(1)}/parse`
+    await expect(fixture.call('/api', endpoint, { version: 1, input: { raw: '9007199254740993' } })).resolves.toMatchObject({
       ok: true,
       value: { output: '9007199254740993' },
     })
@@ -297,7 +272,7 @@ describe('generic API runtime', () => {
   })
 
   it('maps JSON-safe and schema failures to contract errors', async () => {
-    let handler: ((endpoint: string, payload: unknown, signal: AbortSignal) => Promise<any>) | undefined
+    const fixture = connectionFixture()
     const validateInput = vi.fn(() => ({ issues: [{ message: 'nope' }] }))
     const contract = defineApi({
       id: 'validated',
@@ -306,24 +281,8 @@ describe('generic API runtime', () => {
         get: method({ input: schema<{ readonly accepted?: boolean }, { readonly accepted: boolean }>(validateInput) }),
       },
     })
-    const context = {
-      get: () => ({
-        rpc: {
-          handle(_channel: string, value: typeof handler) {
-            handler = value
-            return async () => undefined
-          },
-          call(_channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) {
-            return handler?.(endpoint, payload, signal ?? new AbortController().signal)
-          },
-        },
-      }),
-      effect(setup: () => unknown) {
-        setup()
-      },
-    }
-    await registerApi(context as never, '@scope/plugin', contract.host({ get: () => ({ value: 'ready' }) }))
-    const client = createApiClient(context as never, contract, '@scope/plugin')
+    await registerApi(fixture.context as never, '@scope/plugin', contract.host({ get: () => ({ value: 'ready' }) }))
+    const client = createApiClient(fixture.context as never, contract, '@scope/plugin')
     await expect(client.get({})).rejects.toMatchObject({ kind: 'contract', retryable: false })
     expect(validateInput).toHaveBeenCalledOnce()
   })

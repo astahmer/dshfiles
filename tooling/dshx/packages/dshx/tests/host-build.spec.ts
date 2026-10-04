@@ -120,6 +120,38 @@ describe('host compiler', () => {
     expect(registered).toHaveLength(1)
   })
 
+  it('preserves a Standard Schema Loader Config beside Host API contributions', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost } from '@dshfiles/dshx/host'",
+        "import { z } from 'zod'",
+        "import { defineApi, method } from '@dshfiles/dshx/api'",
+        "const Config = z.object({ servers: z.array(z.string()).default([]) })",
+        "const api = defineApi({ id: 'manager', version: 1, methods: { list: method() } })",
+        'export default defineHost({ Config, apis: [api.host({ list() { return [] } })] })',
+        '',
+      ].join('\n'),
+    )
+
+    await buildHost({
+      packageId: '@dshx/phase-a-fixture',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+    })
+
+    const output = resolve(root, 'dist/index.js')
+    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as {
+      Config: { '~standard'?: { version?: number; vendor?: string } }
+      inject: readonly string[]
+      apply(ctx: unknown, config?: unknown): unknown
+    }
+    expect(plugin.Config['~standard']).toMatchObject({ version: 1, vendor: 'zod' })
+    expect(plugin.inject).toContain('connection')
+  })
+
   it('embeds the same API contract validation as the public source module', async () => {
     const root = await temporaryProject()
     await writeFile(

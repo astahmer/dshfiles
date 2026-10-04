@@ -1,0 +1,3 @@
+- insert:
+    - id: settings-search
+      name: '@dshfiles/settings-search'
