@@ -50,6 +50,60 @@ export interface AutoArchiveContext {
   pinnedSessionIds: ReadonlySet<string>
 }
 
+export interface SessionLineage {
+  /** Number of known direct-parent edges above the session. */
+  depth: number
+  /** Durable direct parent identity, when the session is a child. */
+  parentId?: SessionSummary['id']
+  /** Current parent title, falling back to its durable identity. */
+  parentTitle?: string
+}
+
+/**
+ * Project a Session's direct parent and visual depth from the durable parentId
+ * chain. A visited set keeps corrupt cycles bounded; missing ancestors still
+ * preserve the direct relationship and one level of indentation.
+ */
+export const sessionLineage = (
+  session: Pick<SessionSummary, 'id' | 'parentId'>,
+  byId: Readonly<Record<string, SessionSummary>>,
+): SessionLineage => {
+  if (session.parentId === undefined) return { depth: 0 }
+
+  let depth = 0
+  let cursor: string | undefined = session.parentId
+  const visited = new Set<string>([session.id])
+  const directParent = byId[session.parentId]
+  while (cursor !== undefined && !visited.has(cursor)) {
+    visited.add(cursor)
+    depth += 1
+    cursor = byId[cursor]?.parentId
+  }
+
+  return {
+    depth,
+    parentId: session.parentId,
+    parentTitle: directParent?.displayTitle ?? session.parentId,
+  }
+}
+
+/** Resolve a workspace from the session or its nearest known ancestor. */
+export const workspaceForLineage = (
+  session: Pick<SessionSummary, 'id' | 'parentId'>,
+  byId: Readonly<Record<string, SessionSummary>>,
+  workspaceBySession: ReadonlyMap<string, string>,
+): string | undefined => {
+  let cursor: string | undefined = session.id
+  const visited = new Set<string>()
+  while (cursor !== undefined && !visited.has(cursor)) {
+    visited.add(cursor)
+    const workspaceId = workspaceBySession.get(cursor)
+    if (workspaceId !== undefined) return workspaceId
+    cursor = byId[cursor]?.parentId
+  }
+  return undefined
+}
+
 export const parseSessionIds = (value: string): string[] =>
   [...new Set(value.split(/[\s,;]+/).map(item => item.trim()).filter(Boolean))]
 

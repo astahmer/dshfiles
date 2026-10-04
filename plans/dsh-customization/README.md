@@ -98,6 +98,18 @@ revision or bookmark should preview the proposed move and require confirmation
 before a rebase or bookmark mutation. The BB README is a behavior reference;
 implement against DSH's real Host services and events.
 
+### Thread links and delegated work
+
+Let users right-click any sidebar thread to copy its stable thread ID or a link
+that opens that thread in the same DSH Host. Show delegated threads nested
+under their direct parent, with parent identity preserved at every level. The
+relationship model must support an arbitrary parent chain even if the current
+delegation depth setting is lower. In chat, `@` should surface recent thread
+references when empty and allow searching all threads by ID, title, or project.
+Keep parallel child-thread execution and parent-side orchestration available
+through the DSH agent tools. See the implementation notes in
+[`thread-sidebar`](../../plugins/@dshfiles/thread-sidebar/README.md).
+
 ## Status
 
 Packaging the web UI as a native app is tracked separately in
@@ -110,6 +122,7 @@ is not a customization feature.
 | Queue reordering | built with dshx | `plugins/@dshfiles/queue-reorder` |
 | Independent Agent communication | built with dshx; profile activation pending | `plugins/@dshfiles/agent-communication` |
 | Thread sidebar and lifecycle | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
+| Thread links and recursive delegation context | implemented; full runtime acceptance pending | `plugins/@dshfiles/thread-sidebar` and DSH standard web preset |
 | Sidebar header links | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
 | MCP server management and catalog | implemented; combined DSH boot verified | `plugins/@dshfiles/mcp-servers` |
 | Secret catalog | implemented; synthetic CLI tests and combined DSH boot verified | `plugins/@dshfiles/secret-catalog` |

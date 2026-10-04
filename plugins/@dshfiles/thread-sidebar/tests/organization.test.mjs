@@ -7,7 +7,9 @@ import {
   moveSidebarEntry,
   orderSidebarEntries,
   parseSessionIds,
+  sessionLineage,
   sectionForSession,
+  workspaceForLineage,
 } from '../.test-dist/organization.js'
 import {
   loadPreferences,
@@ -55,6 +57,38 @@ test('auto archive requires an old, idle, nonblank, unpinned, unparked, included
 test('session exclusion input trims, splits, and deduplicates ids without logging them', () => {
   assert.deepEqual(parseSessionIds(' s1, s2\ns1;\t s3 '), ['s1', 's2', 's3'])
   assert.deepEqual(parseSessionIds(' , ;\n '), [])
+})
+
+test('session lineage preserves direct parent identity and computes unbounded parent depth safely', () => {
+  const byId = {
+    root: { id: 'root', displayTitle: 'Parent', parentId: undefined },
+    child: { id: 'child', displayTitle: 'Child', parentId: 'root' },
+    grandchild: { id: 'grandchild', displayTitle: 'Grandchild', parentId: 'child' },
+  }
+  assert.deepEqual(sessionLineage(byId.grandchild, byId), {
+    depth: 2,
+    parentId: 'child',
+    parentTitle: 'Child',
+  })
+  assert.deepEqual(sessionLineage({ id: 'orphan', parentId: 'missing' }, {}), {
+    depth: 1,
+    parentId: 'missing',
+    parentTitle: 'missing',
+  })
+  assert.equal(sessionLineage(byId.child, {
+    ...byId,
+    root: { ...byId.root, parentId: 'child' },
+  }).depth, 1)
+})
+
+test('child threads inherit the nearest known workspace through the parent chain', () => {
+  const byId = {
+    root: { id: 'root', parentId: undefined },
+    child: { id: 'child', parentId: 'root' },
+    grandchild: { id: 'grandchild', parentId: 'child' },
+  }
+  assert.equal(workspaceForLineage(byId.grandchild, byId, new Map([['root', 'workspace-a']])), 'workspace-a')
+  assert.equal(workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
 })
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {

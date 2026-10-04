@@ -7,7 +7,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "dshx build",
-    "test:focused": "tsc -p tsconfig.test.json && node --test tests/organization.test.mjs tests/slot-takeover.test.mjs"
+    "test:focused": "tsc -p tsconfig.test.json && node --test tests/organization.test.mjs tests/slot-takeover.test.mjs tests/thread-url.test.mjs"
   },
   "main": "./dist/index.js",
   "exports": {

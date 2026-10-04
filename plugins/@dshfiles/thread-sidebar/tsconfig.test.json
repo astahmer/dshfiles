@@ -10,5 +10,5 @@
     "outDir": ".test-dist",
     "rootDir": "src"
   },
-  "include": ["src/organization.ts", "src/preferences.ts", "src/sidebar-contract.ts"]
+  "include": ["src/organization.ts", "src/preferences.ts", "src/sidebar-contract.ts", "src/thread-url.ts"]
 }

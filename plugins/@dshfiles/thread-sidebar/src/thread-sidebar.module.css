@@ -216,6 +216,10 @@
   white-space: nowrap;
 }
 
+.parentLabel {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+}
+
 .rowTitle {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -240,6 +244,36 @@
 .actions button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  min-width: 12rem;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.65rem;
+  background: var(--dsw-specific-sidebar-fill, Canvas);
+  color: inherit;
+  box-shadow: 0 8px 28px color-mix(in srgb, black 35%, transparent);
+}
+
+.contextMenu button {
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.contextMenu button:hover,
+.contextMenu button:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .toolbar button:focus-visible,

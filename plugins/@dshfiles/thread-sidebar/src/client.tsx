@@ -6,14 +6,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   isAutoArchiveCandidate,
   parseSessionIds,
+  sessionLineage,
   sectionForSession,
   type SessionActivity,
   type SidebarPreferences,
   type SidebarSection,
+  workspaceForLineage,
 } from './organization.js'
 import { toggleCollapsedSection } from './preferences.js'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import styles from './thread-sidebar.module.css'
 
 type InjectedActions = {
@@ -28,6 +31,13 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
 }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
+
+interface ThreadContextMenuState {
+  sessionId: string
+  workspaceId?: string
+  x: number
+  y: number
+}
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'inactive', 'archived']
 
@@ -65,7 +75,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning, threadQuery } = useSidebarState()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null)
+  const [routeRequest, setRouteRequest] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : readThreadUrl(window.location.href)?.sessionId ?? null,
+  )
   const archiveInFlight = useRef(false)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+  const openedRouteId = useRef<string | null>(null)
+  const suppressUrlForSession = useRef<string | null>(null)
   const latestAutoArchive = useRef<{
     sessions: SessionSummary[]
     workspaceBySession: Map<string, string>
@@ -94,6 +111,82 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     () => sessionsForAutoArchive(sessionState.ids, sessionState.byId),
     [sessionState.byId, sessionState.ids],
   )
+  const selectedSession = useMemo(
+    () => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0),
+    [sessionState.byId],
+  )
+
+  useEffect(() => {
+    const onPopState = (): void => {
+      const requested = readThreadUrl(window.location.href)?.sessionId ?? null
+      suppressUrlForSession.current = requested === null ? selectedSession?.id ?? null : null
+      openedRouteId.current = null
+      setRouteRequest(requested)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [selectedSession?.id])
+
+  useEffect(() => {
+    if (routeRequest === null || sessionState.phase !== 'ready') return
+    const target = Object.values(sessionState.byId).find(session => session.id === routeRequest)
+    if (target === undefined) {
+      setNotice(props.tSidebar('threadSidebarLinkNotFound'))
+      window.history.replaceState(window.history.state, '', clearThreadUrl(window.location.href))
+      setRouteRequest(null)
+      return
+    }
+    if ((target.retainedBy.mainView ?? 0) > 0) {
+      openedRouteId.current = routeRequest
+      setRouteRequest(null)
+      return
+    }
+    if (openedRouteId.current === routeRequest) return
+    openedRouteId.current = routeRequest
+    props.open(target.id)
+  }, [props.open, props.tSidebar, routeRequest, sessionState.byId, sessionState.phase])
+
+  useEffect(() => {
+    const selected = selectedSession
+    if (selected === undefined || routeRequest !== null) return
+    if (suppressUrlForSession.current === selected.id) return
+    suppressUrlForSession.current = null
+    const workspaceId = workspaceForLineage(selected, sessionState.byId, workspaceBySession)
+    const next = buildThreadUrl(window.location.href, selected.id, workspaceId)
+    if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
+  }, [routeRequest, selectedSession, sessionState.byId, workspaceBySession])
+
+  useEffect(() => {
+    if (contextMenu === null) return
+    contextMenuRef.current?.querySelector('button')?.focus()
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.target instanceof Node && contextMenuRef.current?.contains(event.target)) return
+      setContextMenu(null)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setContextMenu(null)
+        return
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+      const items = [...(contextMenuRef.current?.querySelectorAll('button') ?? [])]
+      if (items.length === 0) return
+      event.preventDefault()
+      const currentIndex = items.findIndex(item => item === document.activeElement)
+      const direction = event.key === 'ArrowDown' ? 1 : -1
+      const nextIndex = (currentIndex + direction + items.length) % items.length
+      items[nextIndex]?.focus()
+    }
+    const close = (): void => setContextMenu(null)
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    window.addEventListener('blur', close)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('blur', close)
+    }
+  }, [contextMenu])
 
   const changePreferences = (patch: Partial<SidebarPreferences>): void => {
     updatePreferences(patch)
@@ -108,6 +201,32 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       setNotice(null)
     } catch {
       setNotice(props.tSidebar('threadSidebarArchiveFailure'))
+    }
+  }
+
+  const openThread = (sessionId: SessionSummary['id']): void => {
+    setRouteRequest(null)
+    openedRouteId.current = sessionId
+    suppressUrlForSession.current = null
+    const session = sessionState.byId[sessionId]
+    const workspaceId = session === undefined
+      ? undefined
+      : workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    window.history.replaceState(
+      window.history.state,
+      '',
+      buildThreadUrl(window.location.href, sessionId, workspaceId),
+    )
+    props.open(sessionId)
+  }
+
+  const copyContextValue = async (value: string, successMessage: string): Promise<void> => {
+    setContextMenu(null)
+    try {
+      await navigator.clipboard.writeText(value)
+      setNotice(successMessage)
+    } catch {
+      setNotice(props.tSidebar('threadSidebarClipboardFailure'))
     }
   }
 
@@ -180,7 +299,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
       if (session === undefined || session.blank) continue
-      const workspaceId = workspaceBySession.get(session.id)
+      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       if (normalizedQuery.length > 0) {
         const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title ?? ''
@@ -330,18 +449,42 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                 const archived = archivedSessionIds.has(session.id)
                 const pinned = pinnedSessionIds.has(session.id)
                 const parked = parkedSessionIds.has(session.id)
-                const workspaceId = workspaceBySession.get(session.id)
+                const lineage = sessionLineage(session, sessionState.byId)
+                const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
                 const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title
                 return (
-                  <article className={styles.row} key={session.id}>
+                  <article
+                    className={styles.row}
+                    data-lineage-depth={lineage.depth}
+                    key={session.id}
+                    onContextMenu={event => {
+                      event.preventDefault()
+                      const width = 210
+                      const height = 88
+                      setContextMenu({
+                        sessionId: session.id,
+                        workspaceId,
+                        x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+                        y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
+                      })
+                    }}
+                    style={{ marginInlineStart: lineage.depth * 12 }}
+                  >
                     <button
                       type="button"
                       className={styles.openButton}
                       disabled={archived}
                       title={new Date(session.updatedAt).toLocaleString()}
-                      onClick={() => props.open(session.id)}
+                      onClick={() => openThread(session.id)}
                     >
-                      <span className={styles.rowProject}>{workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}</span>
+                      <span className={styles.rowProject}>
+                        {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
+                        {lineage.parentTitle === undefined ? null : (
+                          <span className={styles.parentLabel}>
+                            {' · '}{props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
+                          </span>
+                        )}
+                      </span>
                       <span className={styles.rowTitle}>{session.displayTitle}</span>
                       {session.running ? <span className={styles.running}>{props.tSidebar('threadSidebarWorking')}</span> : null}
                     </button>
@@ -388,6 +531,32 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           <p className={styles.empty}>{props.tSidebar('threadSidebarEmpty')}</p>
         ) : null}
       </div>
+      {contextMenu === null ? null : (
+        <div
+          ref={contextMenuRef}
+          className={styles.contextMenu}
+          role="menu"
+          aria-label={props.tSidebar('threadSidebarContextMenu')}
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copyContextValue(
+              contextMenu.sessionId,
+              props.tSidebar('threadSidebarIdCopied'),
+            )}
+          >{props.tSidebar('threadSidebarCopyId')}</button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void copyContextValue(
+              buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
+              props.tSidebar('threadSidebarLinkCopied'),
+            )}
+          >{props.tSidebar('threadSidebarCopyLink')}</button>
+        </div>
+      )}
     </section>
   )
 }

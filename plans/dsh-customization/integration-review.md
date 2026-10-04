@@ -31,6 +31,18 @@ archived sessions. Header links and footer actions have independent order and
 visibility controls, with hidden footer actions retained in More. The installed
 slot contracts support this shell without a Host change.
 
+The sidebar now adds right-click actions to copy a thread ID or same-Host link.
+Links use root/index query parameters because DSH's static frontend returns
+404 for unknown pathname routes. Opening a copied link waits for the Host
+session catalog, then selects the addressed thread. Child rows show their
+direct parent and computed depth from the durable `parentId` chain. The DSH
+standard web preset already includes parallel continuable subagents, parent
+control tools, recursive descendant listing, and the native subagent catalog.
+Its `subagent.maxDepth` setting defaults to 1 but remains configurable; no
+plugin data shape assumes a depth-one tree. The native `@` reference source
+already lists recent sessions by metadata and can search IDs, titles, labels,
+and workspace paths.
+
 The MCP manager covers local stdio and remote Streamable HTTP, CRUD,
 enable/disable, reconnect/refresh, curated provider references, Registry search,
 the sidebar page, and the native composer `+` action. The picker is a separate
@@ -49,8 +61,10 @@ All plugin checks below used official Node 22.23.3 and pnpm 12.0.0.
 
 - Strict TypeScript checks passed for all six packages, including the shared
   picker.
-- Focused tests passed: thread-sidebar 9, MCP 19, project-folder-picker 3,
-  Secret Catalog 23, settings-search 9, and Jujutsu 12 (75 total).
+- Focused tests passed: thread-sidebar 13, MCP 19, project-folder-picker 3,
+  Secret Catalog 23, settings-search 9, and Jujutsu 12 (79 total). The new
+  thread-sidebar checks cover recursive parent depth, inherited workspace
+  identity, route parsing, and removal of launch/query data from copied links.
 - Security review replaced Secret Catalog's direct `child_process.spawn` with
   DSH's managed subprocess service. The runner forwards only optional
   `BW_SESSION` and `SECRET_SESSION_FILE`, bounds output, discards stderr, and
@@ -67,6 +81,9 @@ All plugin checks below used official Node 22.23.3 and pnpm 12.0.0.
   `@deepseek-ai/dsh-web-app`, and all five custom bundles dumped successfully.
   Its composed tree contained one subprocess provider, disabled the native
   sidebar row, and registered the five requested bundle rows.
+- The added thread menu, lineage, and query-route slice passes its focused
+  TypeScript check, 13 focused tests, and six-artifact dshx build. Full DSH
+  runtime/browser acceptance remains pending the separate dshx activation fix.
 - The combined profile booted on an OS-assigned loopback port. DSH reported no
   plugin activation failures. The authenticated token-to-cookie page exchange
   returned HTTP 200; all 10 same-origin page assets returned success and
@@ -85,6 +102,10 @@ visual/manual interaction pass.
   in browser storage. There is no dedicated last-activity timestamp, so settle
   age uses `SessionSummary.updatedAt`, which metadata edits can refresh. Archive
   is requested with `stopActivity: false`.
+- The static frontend has no pathname routing contract, so this implementation
+  uses query-based links on the root/index URL. A clean
+  `/projects/:project/threads/:thread` path needs an explicit Host route and
+  client route API. Links resolve only on the DSH Host that owns the session.
 - MCP configuration persists in the active profile, not in one DSH-wide catalog
   shared by profiles. Native MCP has no remote health signal, so the UI reports
   lifecycle and registered tools without claiming a health probe. OAuth and
