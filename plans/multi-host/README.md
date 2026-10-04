@@ -1,5 +1,9 @@
 # Multi-host execution plan
 
+The [implementation plan](implementation.md) defines the current phase sequence,
+Pi/VPS test targets, model budget and acceptance gates. This document retains the
+source assessment and architecture rationale.
+
 Research date: 2026-10-05. Recommendation: **H — runtime federation, using stock
 DSH runtimes, a narrow DSHX API extension, and an owned host-management plugin.**
 Initially attach existing runtimes; add OpenSSH forwarding as one connector.
