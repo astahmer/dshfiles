@@ -8,6 +8,7 @@ import {
   type QuotaSnapshot,
 } from './usage-history.js'
 import type { AccountProfile } from './api.js'
+import { readKeyFromEnv } from './credentials.js'
 
 /**
  * Quota history collection.
@@ -31,8 +32,7 @@ const readAccountWindows = async (account: AccountProfile) => {
     return usage
   }
   if (account.kind === 'commandcode') return undefined
-  const keyEnv = account.apiKeyEnv.trim()
-  return readOpenCodeUsage(keyEnv.length === 0 ? '' : (process.env[keyEnv] ?? ''))
+  return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv))
 }
 
 /**

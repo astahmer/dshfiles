@@ -18,6 +18,57 @@ export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
 export const accountStateSchema = z.enum(['healthy', 'cooling', 'disabled', 'unconfigured'])
 
+/**
+ * A keyed account names the variable holding its key, and the Host sends that
+ * value to the account's base URL. Both are constrained so an API caller can
+ * never point an arbitrary environment variable at an arbitrary host.
+ */
+const keyEnvNamePattern = /^[A-Z][A-Z0-9_]*_API_KEY$/
+
+export const isKeyEnvName = (name: string): boolean => keyEnvNamePattern.test(name)
+
+const isLoopbackHost = (hostname: string): boolean =>
+  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+
+export const isAllowedCommandCodeBase = (value: string): boolean => {
+  const url = URL.parse(value)
+  if (url === null || url.username !== '' || url.password !== '') return false
+  if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
+  return (
+    url.protocol === 'https:'
+    && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
+  )
+}
+
+const isPlainHomePath = (path: string): boolean =>
+  (path.startsWith('/') || path.startsWith('~/'))
+  && !path.includes('\0')
+  && !path.split('/').includes('..')
+
+const homePathSchema = z
+  .string()
+  .trim()
+  .max(1024)
+  .refine(path => path === '' || isPlainHomePath(path), {
+    message: 'Use an absolute path or one under ~/, without ".." segments.',
+  })
+
+const apiKeyEnvSchema = z
+  .string()
+  .trim()
+  .max(128)
+  .refine(name => name === '' || isKeyEnvName(name), {
+    message: 'Name an environment variable ending in _API_KEY, e.g. COMMANDCODE_API_KEY.',
+  })
+
+const apiBaseUrlSchema = z
+  .string()
+  .trim()
+  .max(512)
+  .refine(url => url === '' || isAllowedCommandCodeBase(url), {
+    message: 'Use https on commandcode.ai, or a loopback address.',
+  })
+
 export const accountProfileSchema = z.object({
   /** Routing slug the model picker shows, e.g. `codex_personal`. */
   instanceId: z.string().min(1).max(64),
@@ -25,13 +76,13 @@ export const accountProfileSchema = z.object({
   displayName: z.string().min(1).max(120),
   enabled: z.boolean(),
   /** Home this account reads shared Codex state from. */
-  homePath: z.string().max(1024),
+  homePath: homePathSchema,
   /** Per-account home holding a private `auth.json`; empty means the shared home. */
-  shadowHomePath: z.string().max(1024),
+  shadowHomePath: homePathSchema,
   /** Keyed accounts name an environment variable instead of carrying a value. */
-  apiKeyEnv: z.string().max(256),
+  apiKeyEnv: apiKeyEnvSchema,
   /** Command Code accounts may point at a different API base. */
-  apiBaseUrl: z.string().max(512),
+  apiBaseUrl: apiBaseUrlSchema,
   badge: z.string().max(32),
   accentColor: z.string().max(32),
   providerIcon: z.string().max(32),
@@ -83,7 +134,7 @@ export const accountDraftSchema = accountProfileSchema.pick({
 export const accountsFileSchema = z.object({
   distribution: z.enum(['sticky', 'priority', 'round-robin', 'balanced']),
   cooldownMs: z.number().int().min(0).max(86_400_000),
-  shadowRoot: z.string().max(1024),
+  shadowRoot: homePathSchema,
   accounts: z.array(accountProfileSchema).max(64),
 })
 

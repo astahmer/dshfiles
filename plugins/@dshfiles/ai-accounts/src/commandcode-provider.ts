@@ -1,6 +1,8 @@
 import { createProvider, type Model } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
+import { isAllowedCommandCodeBase, isKeyEnvName } from './api.js'
+import { readKeyFromEnv } from './credentials.js'
 
 /**
  * Command Code as a provider.
@@ -30,6 +32,12 @@ export interface CommandCodeProviderOptions {
   readonly keyEnv?: string
 }
 
+export interface CommandCodeCatalogOptions {
+  readonly baseUrl?: string
+  /** The key itself, already resolved for exactly this base. */
+  readonly apiKey: string
+}
+
 /**
  * A floor catalog so the route is usable before the live catalog is read. It is
  * deliberately small; the real list comes from {@link fetchCommandCodeCatalog}.
@@ -42,11 +50,23 @@ const FALLBACK: readonly CatalogEntry[] = [
   { id: 'deepseek/deepseek-v3.2', api: 'openai-completions' },
 ]
 
-const resolveBase = (baseUrl: string | undefined): string =>
-  (baseUrl === undefined || baseUrl === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl).replace(
-    /\/$/,
-    '',
-  )
+export class CommandCodeConfigError extends Error {}
+
+const resolveBase = (baseUrl: string | undefined): string => {
+  const base = baseUrl === undefined || baseUrl.trim() === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl.trim()
+  if (!isAllowedCommandCodeBase(base)) {
+    throw new CommandCodeConfigError(`Refusing Command Code base '${base}': use https on commandcode.ai, or a loopback address.`)
+  }
+  return base.replace(/\/$/, '')
+}
+
+const resolveKeyEnv = (keyEnv: string | undefined): string => {
+  const name = keyEnv === undefined || keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv.trim()
+  if (!isKeyEnvName(name)) {
+    throw new CommandCodeConfigError(`Refusing key variable '${name}': name one ending in _API_KEY.`)
+  }
+  return name
+}
 
 /** Command Code serves its OpenAI-compatible routes under a provider prefix. */
 const providerBase = (baseUrl: string | undefined): string => `${resolveBase(baseUrl)}/provider`
@@ -58,17 +78,12 @@ const providerBase = (baseUrl: string | undefined): string => `${resolveBase(bas
  * per model here rather than discovered from a failed request later.
  */
 export const fetchCommandCodeCatalog = async (
-  options: CommandCodeProviderOptions = {},
+  options: CommandCodeCatalogOptions,
 ): Promise<readonly CatalogEntry[]> => {
   const base = resolveBase(options.baseUrl)
-  const keyEnv =
-    options.keyEnv === undefined || options.keyEnv === ''
-      ? DEFAULT_COMMANDCODE_KEY_ENV
-      : options.keyEnv
-  const key = process.env[keyEnv]
-  if (key === undefined || key.length === 0) return FALLBACK
+  if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
-    headers: { authorization: `Bearer ${key}`, accept: 'application/json' },
+    headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },
   })
   if (!response.ok) return FALLBACK
   const body = (await response.json()) as { data?: readonly { id?: string }[] }
@@ -104,10 +119,7 @@ const modelsFor = (
 
 export const createCommandCodeProvider = (options: CommandCodeProviderOptions = {}) => {
   const base = providerBase(options.baseUrl)
-  const keyEnv =
-    options.keyEnv === undefined || options.keyEnv === ''
-      ? DEFAULT_COMMANDCODE_KEY_ENV
-      : options.keyEnv
+  const keyEnv = resolveKeyEnv(options.keyEnv)
   return createProvider({
     id: COMMANDCODE_KIND,
     name: 'Command Code',
@@ -140,7 +152,11 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
     models: modelsFor(FALLBACK, base),
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
-    fetchModels: async () => modelsFor(await fetchCommandCodeCatalog(options), base),
+    fetchModels: async () =>
+      modelsFor(
+        await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey: readKeyFromEnv(keyEnv) }),
+        base,
+      ),
     api: {
       'openai-completions': openAICompletionsApi(),
       'openai-responses': openAIResponsesApi(),

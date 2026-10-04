@@ -1,6 +1,6 @@
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 
 /**
  * Codex home layout, ported from T3 Code's `CodexHomeLayout.ts`.
@@ -47,16 +47,24 @@ export class CodexHomeError extends Error {}
 const expandHome = (value: string): string =>
   value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
 
+/** Codex homes hold credentials, so a configured path may never leave the user's home. */
+const containedHome = (value: string): string => {
+  const path = resolve(expandHome(value))
+  const owner = homedir()
+  if (path === owner || !path.startsWith(`${owner}${sep}`)) {
+    throw new CodexHomeError(`Codex home '${path}' must be a directory inside '${owner}'.`)
+  }
+  return path
+}
+
 export const resolveCodexHomeLayout = (input: CodexHomeInput): CodexHomeLayout => {
   const configured = input.homePath?.trim() ?? ''
-  const shared = resolve(
-    expandHome(configured.length > 0 ? configured : join(homedir(), '.codex')),
-  )
+  const shared = containedHome(configured.length > 0 ? configured : join(homedir(), '.codex'))
   const shadow = input.shadowHomePath?.trim() ?? ''
   if (shadow.length === 0) {
     return { mode: 'direct', sharedHomePath: shared, effectiveHomePath: shared }
   }
-  const effective = resolve(expandHome(shadow))
+  const effective = containedHome(shadow)
   if (effective === shared) {
     throw new CodexHomeError(
       `Shadow home '${effective}' must differ from the shared Codex home '${shared}'.`,

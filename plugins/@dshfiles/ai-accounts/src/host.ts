@@ -23,6 +23,7 @@ import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { collectUsageHistory, readUsageHistory } from './usage-recorder.js'
 import { fetchCommandCodeCatalog } from './commandcode-provider.js'
+import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -50,6 +51,7 @@ import {
   codexLoginHint,
   describeCodexAuth,
   materializeCodexShadowHome,
+  CodexHomeError,
   resolveCodexHomeLayout,
   type CodexHomeLayout,
 } from './codex-home.js'
@@ -163,6 +165,13 @@ interface KeyedRoute {
 
 type Route = CodexRoute | KeyedRoute
 
+const keyEnvFor = (route: KeyedRoute): string =>
+  route.apiKeyEnv.trim().length > 0
+    ? route.apiKeyEnv.trim()
+    : route.kind === COMMANDCODE_KIND
+      ? DEFAULT_COMMANDCODE_KEY_ENV
+      : 'OPENCODE_API_KEY'
+
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
   if (explicit.length > 0) return explicit
@@ -248,19 +257,34 @@ const buildProfile = (params: {
   }
 }
 
-const buildRoutes = (config: AiAccountsConfig): Map<string, Route> => {
+interface BuiltRoutes {
+  readonly routes: Map<string, Route>
+  /** Accounts left out because their Codex home is invalid, with the reason. */
+  readonly rejected: readonly string[]
+}
+
+const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
   const routes = new Map<string, Route>()
+  const rejected: string[] = []
   for (const account of config.codexAccounts) {
     const instanceId = normalizeInstanceId(account.instanceId, CODEX_KIND)
+    let layout: CodexHomeLayout
+    try {
+      layout = resolveCodexHomeLayout({
+        homePath: account.homePath,
+        shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
+      })
+    } catch (error) {
+      if (!(error instanceof CodexHomeError)) throw error
+      rejected.push(`${instanceId}: ${error.message}`)
+      continue
+    }
     routes.set(instanceId, {
       kind: CODEX_KIND,
       instanceId,
       displayName: displayNameFor(account.displayName, CODEX_KIND, instanceId),
       enabled: account.enabled,
-      layout: resolveCodexHomeLayout({
-        homePath: account.homePath,
-        shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
-      }),
+      layout,
     })
   }
   for (const account of config.opencodeAccounts) {
@@ -275,7 +299,7 @@ const buildRoutes = (config: AiAccountsConfig): Map<string, Route> => {
       enabled: account.enabled,
     })
   }
-  return routes
+  return { routes, rejected }
 }
 
 const defaultConfig: AiAccountsConfig = {
@@ -400,10 +424,7 @@ const readAccountUsage = async (account: AccountProfile): Promise<UsageCard> => 
     )
   }
   if (account.kind === 'commandcode') return unsupported()
-  const keyEnv = account.apiKeyEnv.trim()
-  return readOpenCodeUsage(
-    keyEnv.length === 0 ? '' : (process.env[keyEnv] ?? ''),
-  )
+  return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv))
 }
 
 const unsupported = (): UsageCard => ({
@@ -490,7 +511,8 @@ export default definePlugin({
     hostContext = ctx
     const file = readAccountFileSync()
     const config = readConfig({ distribution: file.distribution, cooldownMs: file.cooldownMs, codexShadowRoot: file.shadowRoot, codexAccounts: file.accounts, opencodeAccounts: file.accounts })
-    const routes = buildRoutes(config)
+    const { routes, rejected } = buildRoutes(config)
+    for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
     if (routes.size === 0) return
     const enabled = [...routes].filter(([, route]) => route.enabled)
     if (enabled.length === 0) return
@@ -581,12 +603,9 @@ export default definePlugin({
         }
         // Keyed providers read the variable their own account names, so several
         // subscriptions live in the vault without any value in the accounts file.
-        const named = route.apiKeyEnv.trim().length > 0
-          ? route.apiKeyEnv.trim()
-          : route.kind === COMMANDCODE_KIND
-            ? DEFAULT_COMMANDCODE_KEY_ENV
-            : 'OPENCODE_API_KEY'
-        const key = ((process.env[named] ?? '') || config.opencodeApiKey).trim()
+        const named = keyEnvFor(route)
+        const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
+        const key = readKeyFromEnv(named) || sharedKey
         if (key.length === 0) {
           throw new LlmError(
             `No key for '${provider}'. Export ${named}, or set a shared key on the entry.`,
@@ -642,10 +661,9 @@ export default definePlugin({
       if (route.kind !== COMMANDCODE_KIND) continue
       disposers.push(
         llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
-          const entries = await fetchCommandCodeCatalog({
-            baseUrl: request.baseURL ?? route.apiBaseUrl,
-            keyEnv: request.apiKey ?? route.apiKeyEnv,
-          })
+          const entries = await fetchCommandCodeCatalog(
+            discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }),
+          )
           return entries.map(entry => ({
             id: entry.id,
             contextWindow: 128_000,

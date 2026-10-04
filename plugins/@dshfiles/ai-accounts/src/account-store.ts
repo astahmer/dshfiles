@@ -13,9 +13,11 @@ import {
 import {
   describeCodexAuth,
   materializeCodexShadowHome,
+  CodexHomeError,
   resolveCodexHomeLayout,
 } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
+import { readKeyFromEnv } from './credentials.js'
 
 /**
  * Account profiles on disk.
@@ -148,9 +150,7 @@ const observe = async (
 ): Promise<AccountProfile> => {
   if (draft.kind === 'opencode-go') {
     const hasKey =
-      (draft.apiKeyEnv.trim().length > 0
-        ? (process.env[draft.apiKeyEnv.trim()] ?? '').trim().length > 0
-        : false)
+readKeyFromEnv(draft.apiKeyEnv).length > 0
     return {
       ...draft,
       displayName: defaultName(draft),
@@ -167,7 +167,23 @@ const observe = async (
     }
   }
 
-  const layout = layoutFor(draft, file)
+  let layout
+  try {
+    layout = layoutFor(draft, file)
+  } catch (error) {
+    if (!(error instanceof CodexHomeError)) throw error
+    return {
+      ...draft,
+      displayName: defaultName(draft),
+      mode: 'direct',
+      signedIn: false,
+      identity: null,
+      plan: null,
+      state: draft.enabled ? 'unconfigured' : 'disabled',
+      loginHint: '',
+      detail: error.message,
+    }
+  }
   let auth
   try {
     auth = await describeCodexAuth(layout)
