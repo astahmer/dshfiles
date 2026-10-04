@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatSettingsDraft, hasSettingsPath, parseSettingsDraft, readSettingsPath, schemaNodeAtPath, setOperationForSettingsTarget, settingsEditorKind, unsetOperationForSettingsTarget } from './settings-editor-model.js'
+import { settingsChoiceOptions } from './settings-index.js'
 
 const schema = {
   type: 'object',
@@ -49,5 +50,21 @@ describe('settings field editor model', () => {
   it('formats absent defaults as blank and preserves multiline JSON drafts', () => {
     expect(formatSettingsDraft(undefined, 'string')).toBe('')
     expect(formatSettingsDraft({ nested: true }, 'json')).toBe(['{', '  "nested": true', '}'].join('\n'))
+  })
+
+  it('uses typed select choices for union-of-constant schema fields', () => {
+    const choiceSchema = {
+      type: 'union',
+      list: [
+        { type: 'const', value: 'steer' },
+        { type: 'const', value: 'queue' },
+      ],
+    }
+    const choices = settingsChoiceOptions(choiceSchema)
+
+    expect(settingsEditorKind(choiceSchema, 'queue', choices)).toBe('choice')
+    expect(formatSettingsDraft('queue', 'choice', choices)).toBe('1')
+    expect(parseSettingsDraft('0', 'choice', choices)).toEqual({ ok: true, value: 'steer' })
+    expect(parseSettingsDraft('2', 'choice', choices).ok).toBe(false)
   })
 })

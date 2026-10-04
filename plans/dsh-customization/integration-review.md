@@ -35,10 +35,13 @@ The MCP manager covers local stdio and remote Streamable HTTP, CRUD,
 enable/disable, reconnect/refresh, curated provider references, Registry search,
 the sidebar page, and the native composer `+` action. The picker is a separate
 package used by the Secret Catalog. Secret values remain absent from list
-snapshots; reveal and copy are explicit actions. Settings Search indexes
-`ConfigForms.describe()` metadata and edits the live Host-backed form value at
-the selected schema path. Jujutsu mutations use argv-based subprocess calls,
-state-bound one-use previews, and confirmation before changes.
+snapshots; reveal cycles through a masked preview, full value, and hidden, while
+copy remains an explicit action. Settings Search indexes
+`ConfigForms.describe()` metadata, ignores accents, searches finite option
+labels and values, and edits the live Host-backed form at the selected schema
+path. Finite choice fields use a typed select. Jujutsu mutations use argv-based
+subprocess calls, state-bound one-use previews, and confirmation before
+changes.
 
 ## Verification
 
@@ -47,7 +50,7 @@ All plugin checks below used official Node 22.23.3 and pnpm 12.0.0.
 - Strict TypeScript checks passed for all six packages, including the shared
   picker.
 - Focused tests passed: thread-sidebar 9, MCP 19, project-folder-picker 3,
-  Secret Catalog 21, settings-search 7, and Jujutsu 12 (71 total).
+  Secret Catalog 23, settings-search 9, and Jujutsu 12 (75 total).
 - Security review replaced Secret Catalog's direct `child_process.spawn` with
   DSH's managed subprocess service. The runner forwards only optional
   `BW_SESSION` and `SECRET_SESSION_FILE`, bounds output, discards stderr, and

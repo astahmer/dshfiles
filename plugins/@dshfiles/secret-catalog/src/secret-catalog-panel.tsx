@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { SecretMutationDialog, type SecretCreateForm, type SecretMutationScope, type SecretRemoveTarget, type SecretUpdateForm } from './secret-mutation-dialog.js'
 import { createSecretActionPolicy, filterSecretMetadata, type SecretScopeFilter } from './secret-catalog-model.js'
+import { nextSecretRevealStage, previewSecretValue, type SecretRevealStage } from './secret-reveal-model.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import styles from './secret-catalog.module.css'
@@ -30,7 +31,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<{ readonly id: string; readonly value: string } | null>(null)
+  const [revealed, setRevealed] = useState<{ readonly id: string; readonly value: string; readonly stage: SecretRevealStage } | null>(null)
   const [busyRow, setBusyRow] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
@@ -103,7 +104,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
     if (revealed?.id === row.id) {
-      clearRevealed()
+      const nextStage = nextSecretRevealStage(revealed.stage)
+      if (nextStage === null) clearRevealed()
+      else setRevealed({ ...revealed, stage: nextStage })
       return
     }
     clearRevealed()
@@ -113,7 +116,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     try {
       const value = await api.reveal({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
       if (generation !== revealGeneration.current || document.visibilityState === 'hidden') return
-      setRevealed({ id: row.id, value })
+      setRevealed({ id: row.id, value, stage: 'preview' })
       revealTimer.current = setTimeout(clearRevealed, 15_000)
     } catch {
       if (generation === revealGeneration.current) setError('Could not reveal this alias.')
@@ -239,9 +242,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               <tr key={row.id}>
                 <td><strong className={styles.variable}>{row.variableName}</strong><small>{row.alias} · {row.scope} · {row.environment}{row.field.length > 0 ? ` · ${row.field}` : ''}</small></td>
                 <td><strong>{row.description || row.service || row.item || row.alias}</strong><small>{row.service}{row.item && row.service !== row.item ? ` · ${row.item}` : ''}</small></td>
-                <td className={styles.valueCell}>{revealed?.id === row.id ? <output className={styles.revealed}>{revealed.value}</output> : <span aria-label="Hidden secret value" className={styles.mask}>••••••••••••</span>}</td>
+                <td className={styles.valueCell}>{revealed?.id === row.id ? <output className={styles.revealed}>{revealed.stage === 'preview' ? previewSecretValue(revealed.value) : revealed.value}</output> : <span aria-label="Hidden secret value" className={styles.mask}>••••••••••••</span>}</td>
                 <td><div className={styles.actions}>
-                  <button aria-label={`${revealed?.id === row.id ? 'Hide' : 'Reveal'} ${row.alias}`} disabled={!canActOnRow(row) || busyRow === row.id} onClick={() => void onReveal(row)} title={!canActOnRow(row) ? 'Choose a project folder and resolve duplicate alias/environment rows first.' : undefined} type="button">{revealed?.id === row.id ? 'Hide' : 'Reveal'}</button>
+                  <button aria-label={`${revealed?.id === row.id ? revealed.stage === 'preview' ? 'Reveal full' : 'Hide' : 'Preview'} ${row.alias}`} disabled={!canActOnRow(row) || busyRow === row.id} onClick={() => void onReveal(row)} title={!canActOnRow(row) ? 'Choose a project folder and resolve duplicate alias/environment rows first.' : undefined} type="button">{revealed?.id === row.id ? revealed.stage === 'preview' ? 'Reveal full' : 'Hide' : 'Preview'}</button>
                   <button aria-label={`Copy ${row.alias}`} disabled={!canActOnRow(row) || busyRow === row.id} onClick={() => void onCopy(row)} title={!canActOnRow(row) ? 'Choose a project folder and resolve duplicate alias/environment rows first.' : undefined} type="button">Copy</button>
                   <button aria-label={'Edit ' + row.alias} disabled={!canActOnRow(row) || busyRow === row.id} onClick={() => openDialog({ mode: 'edit', row })} type="button">Edit</button>
                   <button aria-label={'Remove ' + row.alias} disabled={!canActOnRow(row) || busyRow === row.id} onClick={() => openDialog({ mode: 'remove', row })} type="button">Remove</button>

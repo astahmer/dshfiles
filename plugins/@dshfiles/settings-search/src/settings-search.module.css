@@ -11,6 +11,7 @@
 .namespaceButton span,.result small{color:#aaa}
 .result[aria-current=true],.namespaceButton:focus-visible,.result:focus-visible{outline:2px solid #5ea8e8}
 .result p{color:#bdbdbd;margin:4px 0 0}
+.result .optionLabels{font-size:.82rem;color:#9a9a9a}
 .contextNote{padding:10px 12px;background:#252525;border-left:3px solid #d8a348;color:#bbb;margin:0}
 .path{font-size:.78rem;color:#9bc8e8;overflow-wrap:anywhere}
 .valueField{display:flex;flex-direction:column;gap:7px;font-weight:600}

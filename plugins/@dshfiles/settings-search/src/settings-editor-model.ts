@@ -1,9 +1,9 @@
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import { z } from 'zod'
-import { objectRecord, type SettingsSearchTarget } from './settings-index.js'
+import { objectRecord, settingsChoiceOptions, type SettingsOption, type SettingsSearchTarget } from './settings-index.js'
 
 export type SettingsJsonValue = Extract<SettingsPathOpView, { readonly op: 'set' }>['value']
-export type SettingsEditorKind = 'string' | 'number' | 'boolean' | 'json'
+export type SettingsEditorKind = 'string' | 'number' | 'boolean' | 'choice' | 'json'
 
 export const setOperationForSettingsTarget = (
   target: SettingsSearchTarget,
@@ -68,7 +68,12 @@ export const hasSettingsPath = (value: unknown, path: readonly string[]): boolea
   return true
 }
 
-export const settingsEditorKind = (schema: Record<string, unknown> | null, current: unknown): SettingsEditorKind => {
+export const settingsEditorKind = (
+  schema: Record<string, unknown> | null,
+  current: unknown,
+  choices: readonly SettingsOption[] = settingsChoiceOptions(schema),
+): SettingsEditorKind => {
+  if (choices.length > 0) return 'choice'
   const schemaType = schema?.type
   if (schemaType === 'string') return 'string'
   if (schemaType === 'number' || schemaType === 'integer') return 'number'
@@ -79,8 +84,16 @@ export const settingsEditorKind = (schema: Record<string, unknown> | null, curre
   return 'json'
 }
 
-export const formatSettingsDraft = (value: unknown, kind: SettingsEditorKind): string => {
+export const formatSettingsDraft = (
+  value: unknown,
+  kind: SettingsEditorKind,
+  choices: readonly SettingsOption[] = [],
+): string => {
   if (value === undefined) return ''
+  if (kind === 'choice') {
+    const index = choices.findIndex(option => Object.is(option.value, value))
+    return index >= 0 ? String(index) : ''
+  }
   if (kind === 'string' && typeof value === 'string') return value
   if (kind === 'number' && typeof value === 'number') return String(value)
   if (kind === 'boolean' && typeof value === 'boolean') return String(value)
@@ -95,8 +108,20 @@ export type SettingsDraftParseResult =
   | { readonly ok: true; readonly value: SettingsJsonValue }
   | { readonly ok: false; readonly message: string }
 
-export const parseSettingsDraft = (draft: string, kind: SettingsEditorKind): SettingsDraftParseResult => {
+export const parseSettingsDraft = (
+  draft: string,
+  kind: SettingsEditorKind,
+  choices: readonly SettingsOption[] = [],
+): SettingsDraftParseResult => {
   if (kind === 'string') return { ok: true, value: draft }
+  if (kind === 'choice') {
+    const index = z.number().int().nonnegative().safeParse(Number(draft))
+    if (!index.success || draft.trim().length === 0) return { ok: false, message: 'Choose one of the available options.' }
+    const option = choices[index.data]
+    return option === undefined
+      ? { ok: false, message: 'Choose one of the available options.' }
+      : { ok: true, value: option.value }
+  }
   if (kind === 'boolean') {
     if (draft === 'true') return { ok: true, value: true }
   if (draft === 'false') return { ok: true, value: false }

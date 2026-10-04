@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { describeSettingsTargets, searchSettingsTargets } from './settings-index.js'
+import { describeSettingsTargets, searchSettingsTargets, settingsNamespaceTitle } from './settings-index.js'
 
 const namespaces = [{
   ns: 'threads',
   schema: {
     type: 'object',
+    meta: { title: 'Thread settings' },
     fields: {
       editing: {
         type: 'object',
@@ -39,7 +40,7 @@ describe('settings descriptor search', () => {
 
     expect(target?.id).toBe(JSON.stringify(['threads', ['editing', 'queue', 'followup']]))
     expect(target?.target).toEqual({ entryId: 'threads', fieldPath: ['editing', 'queue', 'followup'] })
-    expect(target?.context).toBe('threads · Threads & editing · Queue')
+    expect(target?.context).toBe('Thread settings · threads · Threads & editing · Queue')
   })
 
   it('searches field names, descriptions, namespace and section context', () => {
@@ -57,5 +58,30 @@ describe('settings descriptor search', () => {
     expect(searchSettingsTargets(results, ' ')).toEqual([])
     expect(results.some(result => result.title === 'Credentials')).toBe(false)
     expect(results.some(result => result.title === 'Token')).toBe(false)
+  })
+
+  it('uses schema titles for categories and searches accent-insensitively through finite option labels', () => {
+    expect(settingsNamespaceTitle(namespaces[0]!)).toBe('Thread settings')
+
+    const optionResults = describeSettingsTargets([{
+      ns: 'locale',
+      schema: {
+        type: 'object',
+        fields: {
+          beverage: {
+            type: 'union',
+            meta: { label: 'Preferred beverage' },
+            list: [
+              { type: 'const', value: 'café', meta: { label: 'Coffee' } },
+              { type: 'const', value: 'tea' },
+            ],
+          },
+        },
+      },
+    }])
+
+    expect(searchSettingsTargets(optionResults, 'cafe').map(result => result.title)).toContain('Preferred beverage')
+    expect(searchSettingsTargets(optionResults, 'coffee').map(result => result.title)).toContain('Preferred beverage')
+    expect(optionResults[0]?.options.map(option => option.label)).toEqual(['Coffee', 'tea'])
   })
 })

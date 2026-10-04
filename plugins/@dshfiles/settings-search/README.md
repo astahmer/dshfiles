@@ -2,16 +2,21 @@
 
 DSH 0.2 settings search indexes the redacted `ConfigForms.describe()` schema
 mirror and returns stable `{ entryId, fieldPath }` identities. Search matches
-field labels, descriptions, owning entry, and ancestor section labels. With an
-empty query it shows the available settings entries; choosing one browses that
-entry's searchable fields. Secret paths and their descendants are excluded.
+field labels, descriptions, owning entry, ancestor section labels, and finite
+option labels and values; letter accents are ignored. The search field focuses
+when its Settings section opens. With an empty query it shows available
+settings categories, using schema titles when present; choosing one browses
+that entry's searchable fields. Secret paths and their descendants are
+excluded.
 
 Selecting a result opens a focused editor backed by
 `ctx.configForms.get(entryId)`. The editor reads the current Host-backed
 snapshot, writes a typed path operation with the snapshot revision, and can
-remove a user override to restore the inherited value. It edits the real
-settings entry instead of creating a second stored form. The native settings
-shell remains in charge of categories, onboarding, launchers, and shortcuts.
+remove a user override to restore the inherited value. Finite schema choices
+open as a typed select. The selected field control receives focus when the
+editor opens. It edits the real settings entry instead of creating a second
+stored form. The native settings shell remains in charge of categories,
+onboarding, launchers, and shortcuts.
 
 ## Host navigation boundary
 

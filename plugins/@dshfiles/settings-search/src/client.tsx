@@ -4,7 +4,7 @@ import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace } from '@deep
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
 import { formatSettingsDraft, hasSettingsPath, parseSettingsDraft, readSettingsPath, schemaNodeAtPath, setOperationForSettingsTarget, settingsEditorKind, unsetOperationForSettingsTarget } from './settings-editor-model.js'
-import { describeSettingsTargets, searchSettingsTargets, type SettingsSearchNamespace, type SettingsSearchResult } from './settings-index.js'
+import { describeSettingsTargets, searchSettingsTargets, settingsChoiceOptions, settingsNamespaceTitle, type SettingsSearchNamespace, type SettingsSearchResult } from './settings-index.js'
 import styles from './settings-search.module.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
@@ -34,24 +34,28 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   )
   const path = props.result.target.fieldPath
   const schema = schemaNodeAtPath(props.namespace.schema, path)
+  const choices = useMemo(
+    () => settingsChoiceOptions(schemaNodeAtPath(props.namespace.schema, props.result.target.fieldPath)),
+    [props.namespace.schema, props.result.id],
+  )
   const value = readSettingsPath(snapshot.value, path)
-  const kind = settingsEditorKind(schema, value)
+  const kind = settingsEditorKind(schema, value, choices)
   const overridden = hasSettingsPath(snapshot.user, path)
-  const [draft, setDraft] = useState(() => formatSettingsDraft(value, kind))
+  const [draft, setDraft] = useState(() => formatSettingsDraft(value, kind, choices))
   const [draftRevision, setDraftRevision] = useState(snapshot.revision)
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const canWrite = snapshot.status === 'ready' && snapshot.writable && snapshot.revision !== undefined && !pending
-  const parsed = parseSettingsDraft(draft, kind)
+  const parsed = parseSettingsDraft(draft, kind, choices)
 
   useEffect(() => {
     if (!dirty) {
-      setDraft(formatSettingsDraft(value, kind))
+      setDraft(formatSettingsDraft(value, kind, choices))
       setDraftRevision(snapshot.revision)
     }
-  }, [dirty, kind, snapshot.revision, value])
+  }, [choices, dirty, kind, snapshot.revision, value])
 
   const save = async (): Promise<void> => {
     if (!canWrite || draftRevision === undefined) return
@@ -97,7 +101,7 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   }
 
   const reloadLatest = (): void => {
-    setDraft(formatSettingsDraft(value, kind))
+    setDraft(formatSettingsDraft(value, kind, choices))
     setDraftRevision(snapshot.revision)
     setDirty(false)
     setConflict(false)
@@ -117,14 +121,21 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
         <>
           <label className={styles.valueField}>
             <span>Current value</span>
-            {kind === 'boolean'
-              ? <select disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
-                <option value="true">true</option>
-                <option value="false">false</option>
+            {kind === 'boolean' || kind === 'choice'
+              ? <select autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
+                {kind === 'choice'
+                  ? <>
+                    <option value="">Choose an option…</option>
+                    {choices.map((choice, index) => <option key={String(index)} value={String(index)}>{choice.label}</option>)}
+                  </>
+                  : <>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </>}
               </select>
               : kind === 'string'
-                ? <textarea autoComplete="off" disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={4} value={draft} />
-                : <textarea autoComplete="off" disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={6} value={draft} />}
+                ? <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={4} value={draft} />
+                : <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={6} value={draft} />}
           </label>
           <p className={styles.formHint}>
             {snapshot.writable ? `Host document · revision ${snapshot.revision ?? 'pending'}` : 'The Host settings document is read-only.'}
@@ -160,6 +171,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const allResults = useMemo(() => describeSettingsTargets(namespaces), [namespaces])
   const namespaceGroups = useMemo(() => namespaces.map(namespace => ({
     namespace,
+    title: settingsNamespaceTitle(namespace),
     count: allResults.filter(result => result.target.entryId === namespace.ns).length,
   })), [allResults, namespaces])
   const trimmedQuery = query.trim()
@@ -218,6 +230,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
       <label className={styles.searchLabel}>
         <span className={styles.srOnly}>Search settings</span>
         <input
+          autoFocus
           autoComplete="off"
           maxLength={MAX_QUERY_LENGTH}
           onChange={event => { setQuery(event.currentTarget.value); setActiveIndex(0) }}
@@ -233,9 +246,9 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
       {trimmedQuery.length === 0 && browseEntryId === null && (
         <section aria-label="Settings entries" className={styles.namespaceList}>
           <h2>Categories and entries</h2>
-          {namespaceGroups.map(({ namespace, count }) => (
+          {namespaceGroups.map(({ namespace, title, count }) => (
             <button className={styles.namespaceButton} disabled={count === 0} key={namespace.ns} onClick={() => { setBrowseEntryId(namespace.ns); setActiveIndex(0) }} type="button">
-              <strong>{namespace.ns}</strong><span>{count} searchable {count === 1 ? 'setting' : 'settings'}</span>
+              <strong>{title}</strong><span>{namespace.ns} · {count} searchable {count === 1 ? 'setting' : 'settings'}</span>
             </button>
           ))}
           {namespaceGroups.length === 0 && mirror.status === 'ready' && <p>No settings entries are available.</p>}
@@ -251,6 +264,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
               <strong>{result.title}</strong>
               <small>{result.context}</small>
               {result.description.length > 0 && <p>{result.description}</p>}
+              {result.options.length > 0 && <small className={styles.optionLabels}>Options: {result.options.slice(0, 8).map(option => option.label).join(', ')}{result.options.length > 8 ? `, +${result.options.length - 8} more` : ''}</small>}
             </button>
           ))}
         </section>

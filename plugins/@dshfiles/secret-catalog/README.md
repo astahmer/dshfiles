@@ -16,10 +16,12 @@ when it is registered, its workspace id.
 
 ## Value actions and mutations
 
-- Reveal calls the Host only after the exact row's Reveal button is pressed.
-  The value stays in component state for at most 15 seconds and clears on
-  window blur, document hiding, filter/scope/folder change, refresh, and
-  unmount.
+- Reveal calls the Host only after the exact row's Preview button is pressed.
+  The value control cycles through a masked preview, the full value, and
+  hidden. Long previews show four leading and trailing characters; short
+  values remain masked. The value stays in component state for at most 15
+  seconds and clears on window blur, document hiding, filter/scope/folder
+  change, refresh, and unmount.
 - Copy calls `secret get <alias> --copy` only after the exact row's Copy button
   is pressed. The Host discards both output streams.
 - Add supports global, project, and machine-local config scopes and an explicit
