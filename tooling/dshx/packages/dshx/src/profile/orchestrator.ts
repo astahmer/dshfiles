@@ -1,5 +1,6 @@
 import { realpath } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
+import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY, classifyCompatibility } from '../compat/index.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
@@ -159,6 +160,51 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function duplicateLoaderIds(project: ProfileProject, source: string): string[] {
+  let value: unknown
+  try {
+    value = parse(source)
+  } catch (cause) {
+    throw new DshxError('DSHX4302', 'DSH returned invalid YAML while composing the target profile.', {
+      cause,
+      file: project.packageFile,
+      hint: `Run "dsh --profile ${project.profile} --dump-config" and fix the reported configuration error.`,
+    })
+  }
+  if (!Array.isArray(value)) {
+    throw new DshxError('DSHX4302', 'DSH returned an unexpected profile composition document.', {
+      file: project.packageFile,
+      hint: `Run "dsh --profile ${project.profile} --dump-config" and inspect its output.`,
+    })
+  }
+
+  // Top-level rows share the profile Loader namespace. Group children are
+  // scoped by their owning group when the Loader prepares them.
+  const ids = value.flatMap(entry => (isObject(entry) && typeof entry.id === 'string' ? [entry.id] : []))
+  return [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))]
+}
+
+async function inspectLoaderIds(project: ProfileProject, options: ProfileOrchestratorOptions): Promise<void> {
+  // DSH's dump uses the same bundle patch composition as web boot, but does not
+  // start a server or activate any plugins.
+  const result = await runDsh(project, ['--profile', project.profile, '--dump-config'], INSPECT_TIMEOUT_MS, options)
+  if (result.exitCode !== 0) {
+    throw new DshxError('DSHX4302', `Failed to compose DSH profile ${JSON.stringify(project.profile)}: ${commandDetail(result)}`, {
+      cause: result.cause,
+      file: project.packageFile,
+      hint: `Run "dsh --profile ${project.profile} --dump-config" and fix the reported profile error.`,
+    })
+  }
+
+  const duplicates = duplicateLoaderIds(project, result.stdout)
+  if (duplicates.length > 0) {
+    throw new DshxError('DSHX4306', `DSH profile ${JSON.stringify(project.profile)} has duplicate Loader ids: ${duplicates.join(', ')}.`, {
+      file: project.packageFile,
+      hint: 'Give each inserted top-level Loader row a unique id. For scoped packages, retain the scope in the id (for example, @dshfiles/foo -> dshfiles-foo).',
+    })
+  }
+}
+
 async function parseDependencies(project: ProfileProject, source: string): Promise<InstalledDependency[]> {
   let value: unknown
   try {
@@ -239,6 +285,7 @@ export async function inspectProjectProfile(project: ProfileProject, options: Pr
       hint: `Run "pnpm exec dsh plugin --profile ${project.profile} remove ${oldNames.join(' ')}", then retry.`,
     })
   }
+  await inspectLoaderIds(project, options)
   return {
     state: desired === undefined ? 'absent' : 'linked',
     profile: project.profile,
