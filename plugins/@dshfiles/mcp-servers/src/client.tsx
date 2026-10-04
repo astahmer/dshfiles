@@ -74,6 +74,8 @@ function referencesFor(server: ServerView, prefix: string): Record<string, strin
 
 export default defineClient({
   name: '@dshfiles/mcp-servers',
+  // setup(ctx) reads ctx.slots and ctx.commandUi; locales already inject locale.
+  inject: ['slots', 'commandUi'],
   locales: [mcpServersLocale],
   setup(ctx) {
     const translate = ctx.locale.bind(MCP_LOCALE_NAMESPACE) as T

@@ -17,6 +17,9 @@ import { archiveWithoutStopping } from './organization.js'
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
   locales: [threadSidebarLocale],
+  // setup(ctx) reads ctx.slots throughout; declaring it here is what injects that
+  // service. Without this the plugin loads but never mounts.
+  inject: ['slots'],
   setup(ctx) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
     const syncPanels = (): void => {

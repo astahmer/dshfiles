@@ -382,6 +382,8 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
 
 export default defineClient({
   name: '@dshfiles/settings-search',
+  // setup(ctx) reads ctx.slots and ctx.configForms.
+  inject: ['slots', 'configForms'],
   setup(ctx) {
     const getForm = (entryId: string): ConfigForm<unknown> => ctx.configForms.get<unknown>(entryId)
     ctx.slots.inject('settings.section', () =>

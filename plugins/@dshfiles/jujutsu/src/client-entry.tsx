@@ -8,6 +8,8 @@ const PANEL_ID = 'dshfiles-jujutsu'
 
 export default defineClient({
   name: '@dshfiles/jujutsu',
+  // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
+  inject: ['slots'],
   setup(ctx) {
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, JujutsuPanel))

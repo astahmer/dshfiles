@@ -17,6 +17,7 @@ const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
 const DSHX_COMMUNICATION_PUBLIC = '@dshfiles/dshx/communication'
 const HOST_RUNTIME_PATH = fileURLToPath(new URL('../../host/runtime.js', import.meta.url))
 const HOST_DEFINE_PATH = fileURLToPath(new URL('../../host/define.js', import.meta.url))
+const HOST_PROCESS_PATH = fileURLToPath(new URL('../../host/process.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
@@ -80,6 +81,10 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         return [
           `export { defineHost, defineCommand, definePromptContext, definePromptSection } from ${JSON.stringify(HOST_DEFINE_PATH)}`,
           `export { definePlugin } from ${JSON.stringify(HOST_SDK_PATH)}`,
+          // Managed-subprocess helpers are public: a Host plugin that spawns a
+          // process needs them to await and terminate it, and without this the
+          // only way to reach them is a private import the guard would refuse.
+          `export { waitForManagedExit, terminateManagedProcess } from ${JSON.stringify(HOST_PROCESS_PATH)}`,
           "export { defineTool } from '@deepseek-ai/dsh-tools'",
           '',
         ].join('\n')

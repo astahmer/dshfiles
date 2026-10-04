@@ -19,6 +19,8 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/secret-catalog',
+  // setup(ctx) reads ctx.slots, ctx.remote and ctx.workspaces.
+  inject: ['slots', 'remote', 'workspaces'],
   setup(ctx) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const label = (): string => 'Secret Catalog'
