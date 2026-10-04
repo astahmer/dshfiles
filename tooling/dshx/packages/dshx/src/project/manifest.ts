@@ -12,6 +12,7 @@ import {
   clientUsesLocales,
   clientUsesSettings,
 } from '../compiler/client/capabilities.js'
+import { buildLocaleNamespaceOwnership, findLocaleNamespaceConflict } from '../compiler/client/locale-ownership.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
 import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
@@ -202,6 +203,7 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
     )
   }
   const inject = checkStringArray(diagnostics, declaration.inject, 'dsh.client.inject', 'DSHX4212', file)
+  const locales = checkStringArray(diagnostics, declaration.locales, 'dsh.client.locales', 'DSHX4225', file)
   const peers = isObject(manifest.peerDependencies) ? manifest.peerDependencies : {}
   for (const provider of inject ?? []) {
     if (provider in peers) continue
@@ -226,6 +228,23 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
         'Set dsh.client.immediately to true or false, or remove the optional field.',
       ),
     )
+  }
+  if (locales !== undefined) {
+    const ownership = buildLocaleNamespaceOwnership(config.packageId)
+    const conflict = findLocaleNamespaceConflict(ownership, locales)
+    if (conflict !== undefined) {
+      diagnostics.push(
+        issue(
+          'DSHX4226',
+          'error',
+          `Locale namespace ${JSON.stringify(conflict.namespace)} is already registered by ${conflict.owner}.`,
+          file,
+          conflict.reserved
+            ? `The Locale runtime keeps one dictionary per namespace and locale for the whole client, and ${conflict.owner} is a shipped package. Declare a namespace you own, such as ${JSON.stringify(`${conflict.namespace}.yourPlugin`)}.`
+            : `The Locale runtime keeps one dictionary per namespace and locale for the whole client, and this profile installs ${conflict.owner}. Declare a namespace you own, such as ${JSON.stringify(`${conflict.namespace}.yourPlugin`)}.`,
+        ),
+      )
+    }
   }
   if (external === undefined) return
 

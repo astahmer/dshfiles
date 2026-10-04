@@ -6,25 +6,22 @@
   "keywords": [
     "deepseek",
     "deepseek-harness",
-    "developer-tools",
     "plugins",
     "typescript",
-    "vite"
+    "vite",
+    "developer-tools"
   ],
-  "homepage": "./README.md",
   "license": "MIT",
-  "bin": {
-    "dshx": "./dist/cli/bin.js"
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE",
-    "client/env.d.ts"
-  ],
+  "homepage": "./README.md",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "dshx": "./dist/cli/bin.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -69,12 +66,13 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
-    },
-    "./client/env": {
-      "types": "./client/env.d.ts",
-      "default": "./dist/client/env.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-ambient.mjs",
     "prepack": "pnpm build",
@@ -91,65 +89,66 @@
     "create-dshx": "workspace:*",
     "diff": "9.0.0",
     "execa": "catalog:",
-    "oxc-parser": "0.152.0",
     "semver": "7.8.5",
     "typescript": "catalog:",
     "vite": "catalog:",
     "write-file-atomic": "7.0.0",
     "ws": "^8.18.0",
     "yaml": "catalog:",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "oxc-parser": "0.152.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/cordis-plugin-include": "1.0.9",
-    "@deepseek-ai/cordis-plugin-loader": "1.0.5",
-    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-chat": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
     "@deepseek-ai/dsh-commands": "0.2.0-rc.2",
     "@deepseek-ai/dsh-cordis-host-runner": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tool-cordis": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@types/node": "catalog:",
     "@types/react": "~18.3.31",
     "@types/semver": "^7.7.1",
     "@types/write-file-atomic": "4.0.3",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "@deepseek-ai/dsh-client-ui-chat": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/cordis-plugin-include": "1.0.9",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.5",
+    "playwright": "1.56.1",
+    "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
+    "@types/node": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-commands": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-cordis-host-runner": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-session": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-settings": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tool-cordis": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "react": ">=18 <20",
-    "react-dom": ">=18 <20"
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.1 <0.3.0-0",
+    "react-dom": ">=18 <20",
+    "playwright": ">=1.56.0 <2"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-client-locale": {
@@ -185,8 +184,5 @@
     "react-dom": {
       "optional": true
     }
-  },
-  "engines": {
-    "node": "^22.19.0 || >=24.0.0"
   }
 }

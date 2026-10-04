@@ -1,7 +1,14 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
-import { CLIENT_SDK_PROVIDERS, clientSetupServices, clientUsesApi, clientUsesLocales, clientUsesSettings } from '../compiler/client/capabilities.js'
+import {
+  CLIENT_SDK_PROVIDERS,
+  clientLocaleNamespaces,
+  clientSetupServices,
+  clientUsesApi,
+  clientUsesLocales,
+  clientUsesSettings,
+} from '../compiler/client/capabilities.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
@@ -218,6 +225,14 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
     if (await clientUsesApi(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-connection')
     if (await clientUsesSettings(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-ui-settings')
     if (await clientUsesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
+    const localeNamespaces = await clientLocaleNamespaces(config.clientEntry, config.root)
+    if (localeNamespaces !== undefined && localeNamespaces.length > 0) {
+      const declared = new Set(Array.isArray(client.locales) ? client.locales.filter((value): value is string => typeof value === 'string') : [])
+      if (!localeNamespaces.every(namespace => declared.has(namespace))) {
+        client.locales = [...declared, ...localeNamespaces.filter(namespace => !declared.has(namespace))]
+        changed = true
+      }
+    }
     if (Array.isArray(client.inject) && client.inject.every(value => typeof value === 'string')) {
       const inject = client.inject as string[]
       for (const provider of providers)

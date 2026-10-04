@@ -11,10 +11,14 @@ import { clientCssPlugin } from './css.js'
 import {
   CLIENT_SDK_PROVIDERS,
   CLIENT_SETUP_SERVICE_CAPABILITIES,
+  clientLocaleNamespaces,
   clientSetupServices,
   clientUsesConversationComponents,
   clientUsesLocales,
 } from './capabilities.js'
+import { installedLocaleNamespaces } from './installed.js'
+import { buildLocaleNamespaceOwnership, claimLocaleNamespaces, findLocaleNamespaceConflict } from './locale-ownership.js'
+import { profilePackages } from './profile-scan.js'
 import { clientGuardPlugin, singleClientChunkPlugin } from './guards.js'
 import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
 
@@ -56,6 +60,12 @@ export interface BuildClientOptions {
   readonly external?: readonly string[]
   /** Package edges declared by dsh.client.inject. */
   readonly inject?: readonly string[]
+  /**
+   * DSH profile whose installed plugin set scopes sibling locale-namespace
+   * conflicts. Omitted means shipped namespaces are still refused, but a plugin
+   * installed alongside this one cannot be detected.
+   */
+  readonly localeOwnershipProfile?: string
   readonly compatibility?: DshCompatibility
 }
 
@@ -249,12 +259,51 @@ async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolv
   }
 }
 
+/**
+ * Locale namespaces are a client-wide singleton, so a claim has to be checked
+ * against every other package that can load alongside this one. Shipped
+ * namespaces are always reserved; a sibling plugin only conflicts when a profile
+ * installs both, which is why the sibling scan is profile-scoped and silent when
+ * the profile cannot be resolved.
+ */
+async function validateLocaleNamespaceOwnership(
+  paths: Awaited<ReturnType<typeof resolveOptions>>,
+  options: BuildClientOptions,
+  siblings: ReadonlyMap<string, readonly string[]>,
+): Promise<void> {
+  const claimed = await clientLocaleNamespaces(paths.entry, paths.root)
+  if (claimed === undefined || claimed.length === 0) return
+  const ownership = buildLocaleNamespaceOwnership(options.packageId)
+  for (const [packageId, namespaces] of siblings) claimLocaleNamespaces(ownership, packageId, namespaces)
+  const conflict = findLocaleNamespaceConflict(ownership, claimed)
+  if (conflict === undefined) return
+  throw new DshxError('DSHX2403', `Locale namespace ${JSON.stringify(conflict.namespace)} is already registered by ${conflict.owner}.`, {
+    file: paths.entry,
+    hint: conflict.reserved
+      ? `${conflict.owner} is a shipped package and always registers this namespace. Declare a namespace you own, such as ${JSON.stringify(`${conflict.namespace}.yourPlugin`)}.`
+      : `Profile ${JSON.stringify(options.localeOwnershipProfile)} installs ${conflict.owner} alongside this package. Declare a namespace you own, such as ${JSON.stringify(`${conflict.namespace}.yourPlugin`)}.`,
+  })
+}
+
+/** Locally installed client plugins that claim a namespace, keyed by package id. */
+async function siblingLocaleNamespaces(options: BuildClientOptions): Promise<ReadonlyMap<string, readonly string[]>> {
+  const siblings = new Map<string, readonly string[]>()
+  if (options.localeOwnershipProfile === undefined) return siblings
+  for (const packageId of (await profilePackages(options.localeOwnershipProfile)) ?? []) {
+    if (packageId === options.packageId) continue
+    const namespaces = await installedLocaleNamespaces(packageId)
+    if (namespaces !== undefined && namespaces.length > 0) siblings.set(packageId, namespaces)
+  }
+  return siblings
+}
+
 function clientSetupServiceGuardPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Plugin {
   return {
     name: 'dshx-client-setup-service-guard',
     async buildStart() {
       await validateSetupServiceEdges(paths, options)
       await validateLocaleProviderEdge(paths, options)
+      await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
     },
   }
 }
@@ -361,6 +410,7 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)
+  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, true)
   return buildWatcher(
     await build({
@@ -379,6 +429,7 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)
+  await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, false)
   const declarations = options.declarations ?? true
   return buildReport(await build(config), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')

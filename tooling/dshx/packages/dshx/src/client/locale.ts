@@ -35,11 +35,11 @@ type BalancedDictionaries<Dictionaries extends LocaleDictionaries> = Dictionarie
  * still what the Client registers.
  */
 export function declareLocaleNamespace<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(
-  namespace: Namespace,
+  namespace: Namespace & UnreservedNamespace<Namespace>,
   dictionaries: BalancedDictionaries<Dictionaries>,
 ): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {
   registerLocaleNamespace<Namespace, DictionaryKeys<Dictionaries>>(dictionaries)
-  return defineLocale(namespace, dictionaries)
+  return defineLocale<Namespace, Dictionaries>(namespace, dictionaries)
 }
 
 /**
@@ -64,9 +64,21 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 const augmentLocaleNamespace = <_Namespace extends string, _Key extends string>(): void => {}
 
-/** Define one type-safe namespace without requiring LocaleNamespaceMap declaration merging. */
-export function defineLocale<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(
-  namespace: Namespace,
+/** Namespaces shipped packages own outright, refused here and by the build check. */
+export type ReservedLocaleNamespace = 'conversation' | 'settings'
+
+type UnreservedNamespace<Namespace extends string> = Namespace extends ReservedLocaleNamespace ? never : Namespace
+
+/**
+ * Define one type-safe namespace without requiring LocaleNamespaceMap declaration merging.
+ *
+ * A reserved namespace is a type error here because the Locale runtime keeps one
+ * dictionary per namespace and locale for the whole client, so no profile may
+ * claim one a shipped package already registers. The build repeats the check for
+ * namespaces that are not literal at the type level.
+ */
+export function defineLocale<Namespace extends string, const Dictionaries extends LocaleDictionaries>(
+  namespace: Namespace & UnreservedNamespace<Namespace>,
   dictionaries: BalancedDictionaries<Dictionaries>,
 ): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {
   const definition = {} as LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>>

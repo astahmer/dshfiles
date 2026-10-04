@@ -65,8 +65,10 @@ live* rather than by tooling preference.
    must cover.
 2. **Boot smoke** — one real browser, one real profile, assert every client entry
    reaches `active`. This is the net for anything static analysis misses.
-3. **Behavior E2E** — scripted user journeys for the surfaces plugins actually
-   change, in a real profile with a real Host.
+3. **Behavior E2E** — Gherkin journeys for the surfaces plugins actually
+   change, in a real profile with a real Host. Feature files carry the intent;
+   step definitions carry the selectors, so a UI change is absorbed in one place
+   rather than in every test.
 
 ## Why
 
@@ -114,19 +116,106 @@ frameworks doubles that cost for no extra coverage.
 | Choice | Decision | Rationale |
 |--------|----------|-----------|
 | jsdom | Rejected | Lacks `EventSource`, has no module loader, and a stubbed `fetch` produced a false 36-entry failure. It simulates the browser rather than running it. |
-| Vitest browser mode | Rejected for now | Correct in principle, but the installed `playwright` alpha pins a browser build that was absent. It also wants to own the browser lifecycle, which `playwright-cli` already does for `smoke-dsh.mjs`. Revisit once the browser pin is stable. |
-| Playwright BDD (`@playwright/test` + `playwright.test()`) | Rejected | Introduces a second test runner, a second config, and a second way to interpret a failure, for zero coverage. `playwright-cli`'s `run-code` already receives a live `page`. |
-| Playwright test runner (`@playwright/test`, plain specs) | **Recommended** | One runner, `expect` assertions, parallel workers, retries, traces, and a `--ui` mode. `smoke-dsh.mjs` keeps using `playwright-cli` because it drives an already-running DSH rather than owning one; the profile smoke owns its lifecycle and belongs in `@playwright/test`. |
+| Vitest browser mode | Rejected | Wrong lifecycle. These tests must boot a *DSH profile*, own a port, and assert across a whole plugin graph; Vitest browser mode assumes it owns the page and starts from a fixture URL. It would fight the thing being tested. |
+| Playwright BDD (`test.step` / `playwright.test()`) | **Recommended for journeys** | See the section below. |
+| Plain `@playwright/test` specs | Used only for boot assertions | The boot check is one assertion against one DOM node. A feature file for it would be ceremony. |
 | Mock the host | Rejected | The defects were precisely about services the host provides and packages negotiate between. A mock reproduces the assumption under test. |
-| One browser per run | Rejected | 15–20s each. Boot smoke shares a single launch across all entry assertions. |
+| One browser per run | Rejected | 15-20s each. Boot smoke shares a single launch across all entry assertions. |
+
+### Why Gherkin earns its keep, and where it does not
+
+The argument for `.feature` files is not that BDD is fashionable. It is a
+specific failure mode that plain specs have and feature files do not.
+
+A behavior E2E test for this product is a sequence of UI steps: open the panel,
+send a message, wait for a reply, drag a queue row. Written as imperative spec
+code, the *intent* is buried under selectors and waits. When the UI shifts — a
+heading changes, a button moves — the spec breaks, and the fix is to re-read 40
+lines of Playwright code and guess which line the change invalidated. In a
+feature file the breakage is usually visible on sight, because the step is
+literally `When I open the AI Accounts panel` and nothing about that sentence
+mentions a selector.
+
+The second property matters more for this repo: the steps are the reusable part.
+Booting a profile, waiting for the UI, signing in, opening a session, sending a
+message — that setup is identical across every journey. In spec code it is a
+helper that accretes arguments until nobody can change it without touching every
+test. As step definitions it is written once, and a UI change is absorbed by
+editing one step file instead of every spec that used it.
+
+```gherkin
+Feature: Queue reordering
+
+  Background:
+    Given the web profile is booted
+    And a conversation exists with two queued messages
+
+  Scenario: Reordering a queued message runs it in the new order
+    When I drag the second queued message above the first
+    Then the queue shows it first
+    And the Host records a queue_move for that item
+
+  Scenario: Reordering is refused once the first message is running
+    Given the first queued message is already running
+    When I drag the second queued message above the first
+    Then the queue order is unchanged
+    And no queue_move is sent to the Host
+```
+
+Where it does **not** earn its keep:
+
+- **The boot smoke.** One assertion, one DOM node, no journey. A feature file
+  would be three lines of ceremony for no intent that code does not already carry.
+- **Anything with more than about five steps in a scenario.** Past that point the
+  scenario is testing several things, and the feature file's readability advantage
+  inverts — a long Gherkin scenario is harder to follow than a long spec.
+- **Unit and static checks.** Unchanged; they stay in Vitest.
+
+So: Gherkin for journeys, plain specs for single assertions, static checks for
+contracts.
 
 ### Architecture
 
 ```
-pnpm test                       vitest, node          ~40s    types + static contracts
-pnpm test:e2e:boot              boot smoke            ~60s    all client entries active
-pnpm test:e2e:profile           profile smoke         ~90s    this repo's real profile
-pnpm smoke:dsh -- --version X   cross-version smoke   ~5min   pinned DSH release
+pnpm test                vitest, node     ~40s   types + static contracts
+pnpm test:e2e:gen        bddgen           ~2s    compile feature files to specs
+pnpm test:e2e            Gherkin journeys ~1min  user-visible behavior
+```
+
+The boot smoke runs as the first scenario rather than as its own command: it is
+one assertion against one DOM node, so a separate command would buy a second
+browser launch for no extra coverage.
+
+`smoke:dsh` was retired on `main` as unused by knip, so the cross-version layer
+is gone. Reinstating it is future work, not a claim this plan makes.
+
+Boot smoke and journeys share one module that boots a profile on a reserved port
+and hands the caller a live `page`. They differ in assertion style, not in
+harness, so a journey scenario does not pay for a second browser launch.
+
+```gherkin
+# e2e/features/queue-reorder.feature
+Feature: Queue reordering
+  Background:
+    Given the web profile is booted
+  Scenario: A queued message can be moved up
+    Given a conversation with two queued messages
+    When I move the second queued message up
+    Then the queue lists it first
+```
+
+```ts
+# e2e/steps/queue.ts — the only file that knows the selector
+Given('a conversation with two queued messages', async ({ page, boot }) => {
+  await boot.sendMessage('first')
+  await boot.sendMessage('second')
+})
+When('I move the second queued message up', async ({ page }) => {
+  await page.getByRole('button', { name: 'Move queued message up' }).nth(1).click()
+})
+Then('the queue lists it first', async ({ page }) => {
+  await expect(page.getByRole('listitem').first()).toContainText('second')
+})
 ```
 
 ```mermaid
@@ -205,11 +294,17 @@ downstream project parsing a localized DOM string.
    entry is `failed`. Wire it into `smoke-dsh.mjs` for the scaffolded plugin.
 4. Add the profile smoke: boot the repo's actual `web` profile and assert the same.
    This is the check that would have caught both original defects.
-5. Promote behavior E2E to `@playwright/test` only once a journey needs assertions
-   more complex than "the entry activated". Start with one: send a message and
-   assert a reply renders.
-6. Propose `window.__DSH_BOOT_STATE__` upstream so tests read a documented hook
-   instead of parsing a localized DOM card.
+5. ~~Adopt `@playwright/test` with Gherkin for journeys.~~ Done:
+   `e2e/features/client-boot.feature` compiles to Playwright specs via
+   `bddgen`, with `e2e/support/steps.ts` the only file that knows the boot
+   card's wording.
+6. Keep the boot smoke as a plain spec, not a feature. Revisit only if it grows
+   past a single assertion.
+7. Add the first user-visible journey now that the harness exists: send a message,
+   assert a reply renders, assert the queue lists the second message beneath the
+   first.
+7. Propose `window.__DSH_BOOT_STATE__` upstream so both the boot smoke and the
+   journey steps read a documented hook instead of parsing a localized DOM card.
 
 ## Open questions
 
@@ -241,7 +336,9 @@ downstream project parsing a localized DOM string.
 |------|----------|-----------|
 | 2026-10-04 | Rejected jsdom for boot verification | It produced a false 36-entry failure from a stubbed `fetch` and a spurious `dsh-client-hmr` error from a missing `EventSource`. |
 | 2026-10-04 | Rejected Playwright BDD | A second runner and config for no coverage; `smoke-dsh.mjs` already drives a real page. |
-| 2026-10-04 | Rejected Vitest browser mode for now | The installed `playwright` alpha pins a browser build that was absent; the browser pin is unstable. Revisit once it settles. |
+| 2026-10-04 | Rejected Vitest browser mode | These tests boot a DSH profile and own a port; browser mode assumes it owns the page and starts from a fixture URL. |
+| 2026-10-04 | Adopted Gherkin for journeys, plain specs for single assertions | The intent of a journey is buried under selectors in a spec, and the shared setup is the reusable part — which is what step definitions are for. A boot assertion is one node and gains nothing from a feature file. |
+| 2026-10-04 | One boot harness shared by smoke and journeys | A browser launch is the expensive unit; two harnesses would pay for it twice. |
 | 2026-10-04 | Boot smoke shares one launch across all entry assertions | One browser launch is the expensive unit; per-entry launches would make the layer unusable. |
-| 2026-10-04 | Keep `playwright-cli` in `smoke-dsh.mjs`, use `@playwright/test` for the profile smoke | The former drives an already-running DSH; the latter owns a lifecycle and needs assertions, retries, and traces. |
+| 2026-10-04 | Keep `playwright-cli` in `smoke-dsh.mjs`, use `@playwright/test` for the profile smoke and journeys | The former drives an already-running DSH; the latter owns a lifecycle and needs assertions, retries, and traces. |
 | 2026-10-04 | `pending` on a live-host service is not a failure | The smoke does not run a Host conversation, so those entries can never reach `active` here. Treating them as defects would make the check permanently red. |

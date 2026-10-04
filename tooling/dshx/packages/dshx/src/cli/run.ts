@@ -1002,6 +1002,43 @@ async function runBootCheck(args: CliArgs, options: CliRunOptions, project: Reso
   return 1
 }
 
+async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
+  const io = options.io ?? defaultIO()
+  const { checkClientBoot } = await import('../project/client-boot-check.js')
+  const result = await checkClientBoot({
+    projectRoot: project.root,
+    profile: 'dshx-boot',
+    port: args.port ?? 0,
+  })
+  if (args.json) {
+    write(io.stdout, `${JSON.stringify({ project: projectSummary(project), clientBoot: result }, null, 2)}\n`)
+    return result.ok ? 0 : 1
+  }
+  if (result.ok) {
+    write(io.stdout, `Client plugins activated cleanly in a browser at ${result.url ?? 'an announced URL'}.\n`)
+    return 0
+  }
+  if (result.browserError !== undefined) {
+    printDiagnostic(io, {
+      code: 'DSHX4110',
+      severity: 'error',
+      message: `The browser could not be driven: ${result.browserError}`,
+      file: project.packageFile,
+      hint: 'Install the Playwright browsers this repository pins, then rerun "dshx check --boot --runtime".',
+    })
+    return 1
+  }
+  printDiagnostic(io, {
+    code: 'DSHX4111',
+    severity: 'error',
+    message: `The Web UI booted with ${String(result.failures.length)} client entry/entries that failed to activate.`,
+    file: project.packageFile,
+    hint: 'A client entry reaches "failed" when its apply throws, commonly a missing Cordis service or a locale namespace another package already owns. Entries left "pending" on a live-host service are expected here and are not listed.',
+  })
+  for (const entry of result.failures) write(io.stdout, `  ${entry.id}: ${entry.state}${entry.detail === undefined ? '' : ` \u2014 ${entry.detail}`}\n`)
+  return 1
+}
+
 async function runAddPreset(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
   const preset = args.addTarget === 'panel' ? 'panel' : 'api'
@@ -1357,7 +1394,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1420,7 +1457,13 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       const code = await runCheck(args, options, project)
       // Boot last: it is the only stage that can see a load-time failure, and it
       // costs a process, so it runs once everything cheaper has already passed.
-      if (code === 0 && args.boot) return await runBootCheck(args, options, project)
+      if (code === 0 && args.boot) {
+        const hostCode = await runBootCheck(args, options, project)
+        if (hostCode !== 0) return hostCode
+        // The browser pass costs a browser launch on top of the boot, so it rides
+        // on --runtime, which is already the opt-in for the expensive checks.
+        return args.runtime ? await runClientBootCheck(args, options, project) : 0
+      }
       return code
     }
     if (args.command === 'inspect') return await runInspect(args, options, project)

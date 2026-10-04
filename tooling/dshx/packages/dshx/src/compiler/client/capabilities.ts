@@ -17,16 +17,7 @@ interface ConversationDefinitionAnalysis {
   readonly reexports: readonly string[]
 }
 
-/**
- * Optional Cordis services a Client `setup(ctx)` may consume directly, and the
- * provider package that supplies each one.
- *
- * A service missing from this table still builds, but it escapes the "setup used
- * a service without declaring it" check, so the plugin loads and then fails at
- * runtime with Cordis' `cannot get property "<name>" without inject`. Keep this
- * list in step with the services the compatibility generation's client runtime
- * actually provides.
- */
+/** Optional Cordis services that Client setup code may consume directly. */
 export const CLIENT_SETUP_SERVICE_CAPABILITIES = {
   locale: { provider: '@deepseek-ai/dsh-client-locale' },
   slots: { provider: '@deepseek-ai/dsh-client-ui-conversation' },
@@ -49,6 +40,7 @@ export interface ClientSetupServiceAnalysis {
   /** Services supplied by declarative Client fields such as non-empty locales. */
   readonly autoInject: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
   readonly sourceFile: string | undefined
+  readonly localeNamespaces: readonly string[] | undefined
   /** Present only for a statically recognized SDK definition; undefined means dynamic uses. */
   readonly sdk?: { readonly uses: readonly string[] | undefined }
 }
@@ -60,6 +52,7 @@ interface ClientDefinitionSourceAnalysis extends ClientSetupServiceAnalysis {
 async function sourceFile(specifier: string, importer: string): Promise<string | undefined> {
   const target = resolve(importer, '..', specifier)
   const extension = extname(target)
+  if (extension !== '' && !SOURCE_EXTENSIONS.some(candidate => candidate === extension)) return undefined
   if (extension !== '' && !SOURCE_EXTENSIONS.some(item => item === extension)) return undefined
   const candidates =
     extension === ''
@@ -272,7 +265,7 @@ const functionUsesSetupService = ({
 
 const clientSetupServicesInSource = (source: string, file: string): ClientDefinitionSourceAnalysis => {
   const bindings = sourceBindings({ source, file })
-  const absent = { services: [], inject: undefined, autoInject: [], sourceFile: undefined, reexports: bindings.reexports }
+  const absent = { services: [], inject: undefined, autoInject: [], localeNamespaces: undefined, sourceFile: undefined, reexports: bindings.reexports }
   if (bindings.defaultExpression === undefined) return absent
   const defaultExpression = bindings.resolveExpression(bindings.defaultExpression)
   if (defaultExpression?.type !== 'CallExpression' || defaultExpression.callee.type === 'Super') return absent
@@ -308,11 +301,29 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   const localeProperty = propertyAt('locales')
   const locales = localeProperty === undefined ? undefined : bindings.resolveExpression(localeProperty.value)
   const autoInject: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
+  const localeNamespaces: string[] = []
+  let knownLocaleNamespaces = localeProperty === undefined && spreadIndex < 0
+  if (locales?.type === 'ArrayExpression') {
+    knownLocaleNamespaces = true
+    for (const element of locales.elements) {
+      if (element === null || element.type === 'SpreadElement') {
+        knownLocaleNamespaces = false
+        break
+      }
+      const namespace = localeNamespace({ expression: element, bindings })
+      if (namespace === undefined) {
+        knownLocaleNamespaces = false
+        break
+      }
+      localeNamespaces.push(namespace)
+    }
+  }
   const setupProperty = propertyAt('setup')
   const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
-  const services: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> =
-    setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service: 'locale' }) ? ['locale'] : []
-  const result: ClientDefinitionSourceAnalysis = { services, inject, autoInject, sourceFile: file, reexports: bindings.reexports }
+  const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
+    service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
+  )
+  const result: ClientDefinitionSourceAnalysis = { services, inject, autoInject, sourceFile: file, localeNamespaces: knownLocaleNamespaces ? localeNamespaces : undefined, reexports: bindings.reexports }
   if (name === 'defineClientPlugin') return { ...result, sdk: { uses: arrayField('uses') } }
   return result
 }
@@ -434,5 +445,41 @@ export async function clientSetupServices(entry: string, root: string): Promise<
       if (target !== undefined && !visited.has(target)) pending.push(target)
     }
   }
-  return { services: [], inject: undefined, autoInject: [], sourceFile: undefined }
+  return { services: [], inject: undefined, autoInject: [], localeNamespaces: undefined, sourceFile: undefined }
+}
+
+const localeNamespace = ({ expression, bindings }: { expression: Expression; bindings: ReturnType<typeof sourceBindings> }): string | undefined => {
+  const call = bindings.resolveExpression(expression)
+  if (call?.type !== 'CallExpression' || call.callee.type === 'Super') return undefined
+  const factory = bindings.importedName(call.callee)
+  if (factory !== 'defineLocale' && factory !== 'declareLocaleNamespace') return undefined
+  const argument = call.arguments[0]
+  if (argument === undefined || argument.type === 'SpreadElement') return undefined
+  return stringValue(bindings.resolveExpression(argument) ?? argument)
+}
+
+export const clientLocaleNamespaces = async (entry: string, root: string): Promise<readonly string[] | undefined> => {
+  const analysis = await clientSetupServices(entry, root)
+  if (analysis.localeNamespaces !== undefined) return analysis.localeNamespaces
+  const pending = [resolve(root, entry)]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const file = pending.pop()
+    if (file === undefined || visited.has(file)) continue
+    visited.add(file)
+    const source = await readFile(file, 'utf8').catch(() => undefined)
+    if (source === undefined) continue
+    const bindings = sourceBindings({ source, file })
+    const claimed: string[] = []
+    for (const initializer of bindings.initializers.values()) {
+      const namespace = localeNamespace({ expression: initializer, bindings })
+      if (namespace !== undefined) claimed.push(namespace)
+    }
+    if (claimed.length > 0) return claimed
+    for (const request of bindings.imports) {
+      const target = await sourceFile(request, file)
+      if (target !== undefined && !visited.has(target)) pending.push(target)
+    }
+  }
+  return undefined
 }
