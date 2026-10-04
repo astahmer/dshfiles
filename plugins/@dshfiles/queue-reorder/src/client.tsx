@@ -1,4 +1,15 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import {
+  IconCheckOutlineRegular,
+  IconChevronDownOutlineRegular,
+  IconChevronUpOutlineRegular,
+  IconCloseOutlineRegular,
+  IconEditOutlineRegular,
+  IconQueueOutlineRegular,
+  IconSendOutlineRegular,
+  IconTrashOutlineRegular,
+  Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
@@ -8,10 +19,16 @@ import styles from './queue.module.css'
 /**
  * The shipped queue dock, with reordering added.
  *
- * This replaces the `queue` entry rather than sitting beside it, so the composer
- * keeps one queue surface. It carries the shipped dock's structure, class names
- * and edit/remove/steer actions, which still mutate through `updateQueue`, and
- * adds a drag handle plus ↑/↓ to each row.
+ * This occupies the `queue` seat itself, so the composer keeps exactly one queue
+ * surface: a second entry with another id renders as its own dock beside the
+ * shipped one, which is what produced two stacked queues.
+ *
+ * Everything the shipped dock does is preserved — the same structure, spacing and
+ * tokens, the same edit/remove/steer actions still mutating through `updateQueue`,
+ * the same collapse behaviour, and the same session-derived gating that decides
+ * whether steer is offered at all. `running` and `queueMutable` come from the
+ * live session rather than being pinned, because a dock whose steer button is
+ * permanently disabled is worse than no dock.
  *
  * Reorder is the one action `updateQueue` cannot express, so it calls the Host's
  * `queue-order` API, which splices the pending list durably. The agent's
@@ -27,6 +44,11 @@ interface TextBlock {
 interface QueuedMessage {
   readonly id: string
   readonly content: readonly TextBlock[]
+}
+
+interface SessionState {
+  readonly running: boolean
+  readonly subagent: { readonly address: { readonly mode: string } } | null
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -60,15 +82,29 @@ const attachmentsOf = (content: readonly TextBlock[]): string | null => {
   return `${files.length} attachment${files.length === 1 ? '' : 's'}`
 }
 
+/** One-line preview, truncated the way the shipped dock truncates. */
+const previewOf = (content: readonly TextBlock[]): string => {
+  const flat = content
+    .filter(block => block.type !== 'image' && block.type !== 'file')
+    .map(block => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`))
+    .join(' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+  const chars = Array.from(flat)
+  return chars.length > PREVIEW_CHARS ? `${chars.slice(0, PREVIEW_CHARS).join('')}…` : flat
+}
+
+const PREVIEW_CHARS = 200
+
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
   readonly updateQueue: (itemId: string, action: QueueAction) => Promise<unknown>
 }
 
 /**
- * Props the dock reads. The seat's standard props — including `useProjection`
- * and `sessionId` — come from the framework's own composed type, and
- * `updateQueue` from this slot's `inject`, so neither is restated here.
+ * Props the dock reads. The seat's standard props — including `useSession`,
+ * `useProjection` and `sessionId` — come from the framework's own composed type,
+ * and `updateQueue` from this slot's `inject`, so neither is restated here.
  */
 export type DockProps = ComposedProps<'conversation.input.dock', string, never, undefined, QueueDockInjected, never, undefined>
 
@@ -85,21 +121,32 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   )
   const rowCount = rows.length
 
+  const running = props.useSession((state: SessionState) => state.running)
+  const queueMutable = props.useSession(
+    (state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable',
+  )
+
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const [collapsed, setCollapsed] = useState(true)
-  const [running] = useState(false)
-  const [mutable] = useState(true)
+  // Open by default: the list is the point of the dock, and a collapsed dock
+  // hides the very rows a user queues in order to act on.
+  const [collapsed, setCollapsed] = useState(false)
+  const previousRowCount = useRef(rowCount)
   const listId = useId()
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
+    // Emptying the queue folds the dock, and a new arrival must unfold it again:
+    // otherwise the second queued message appears already collapsed, even though
+    // nothing asked for that.
     if (rowCount === 0) setCollapsed(true)
-    if (editing !== null && !rows.some(row => row.id === editing)) setEditing(null)
-  }, [editing, rowCount, rows])
+    else if (previousRowCount.current === 0) setCollapsed(false)
+    previousRowCount.current = rowCount
+    if (editing !== null && (!queueMutable || !rows.some(row => row.id === editing))) setEditing(null)
+  }, [editing, queueMutable, rowCount, rows])
 
   useEffect(() => {
     if (editing === null) return
@@ -146,8 +193,11 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
 
   if (rowCount === 0) return null
 
-  const interactionActive = mutable && (editing !== null || busy !== null)
+  const interactionActive = queueMutable && (editing !== null || busy !== null)
   const expanded = !collapsed || interactionActive
+  // The shipped dock shows a lone row without a header, so a single queued
+  // message is always visible rather than hidden behind a collapsed panel.
+  const listVisible = rowCount === 1 || expanded
 
   return (
     <div className={styles.dock} data-queue-dock="">
@@ -162,14 +212,17 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
             onClick={() => setCollapsed(value => !value)}
           >
             <span className={styles.lead} aria-hidden>
-              ⋮
+              <IconQueueOutlineRegular />
             </span>
-            <span className={styles.count}>{rowCount}</span>
-            <span className={styles.hint}>queued — drag to reorder, top runs first</span>
+            <span className={styles.count}>{rowCount} queued</span>
+            <span className={styles.hint}>top runs first</span>
+            <span className={styles.chevron} aria-hidden>
+              {expanded ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
+            </span>
           </button>
         ) : null}
-        <ul className={styles.list} id={listId} hidden={!expanded}>
-          {expanded
+        <ul className={styles.list} id={listId} hidden={!listVisible}>
+          {listVisible
             ? rows.map((row, index) => {
                 const text = textOf(row.content)
                 const files = attachmentsOf(row.content)
@@ -177,7 +230,13 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                 const isBusy = busy === row.id
                 return (
                   <li
-                    className={dropIndex === index ? `${styles.row} ${styles.rowDrop}` : styles.row}
+                    className={
+                      dragId === row.id
+                        ? `${styles.row} ${styles.rowDragging}`
+                        : dropIndex === index
+                          ? `${styles.row} ${styles.rowDrop}`
+                          : styles.row
+                    }
                     key={row.id}
                     onDragOver={event => {
                       if (dragId === null || dragId === row.id) return
@@ -200,9 +259,8 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                   >
                     <span
                       className={styles.grip}
-                      draggable={editing === null && busy === null}
+                      draggable={queueMutable && editing === null && busy === null}
                       aria-hidden
-                      title="Drag to reorder"
                       onDragStart={event => {
                         setDragId(row.id)
                         event.dataTransfer.setData('text/plain', row.id)
@@ -212,9 +270,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                         setDragId(null)
                         setDropIndex(null)
                       }}
-                    >
-                      ⋮⋮
-                    </span>
+                    />
                     <span className={styles.body}>
                       {isEditing ? (
                         <textarea
@@ -231,75 +287,97 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           }}
                         />
                       ) : (
-                        <span className={styles.text}>{text ?? files ?? '—'}</span>
+                        <span className={styles.preview}>{previewOf(row.content) || files || '—'}</span>
                       )}
                     </span>
-                    <span className={styles.actions}>
-                      <button
-                        type="button"
-                        className={styles.action}
-                        aria-label={`Move queued message ${index + 1} up`}
-                        disabled={index === 0 || busy !== null}
-                        onClick={() => void move(row.id, 'up')}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.action}
-                        aria-label={`Move queued message ${index + 1} down`}
-                        disabled={index === rowCount - 1 || busy !== null}
-                        onClick={() => void move(row.id, 'down')}
-                      >
-                        ↓
-                      </button>
-                      {isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.action}
-                            aria-label="Save queued message"
-                            disabled={draft.trim().length === 0}
-                            onClick={() => void saveEdit()}
-                          >
-                            ⏎
-                          </button>
-                          <button type="button" className={styles.action} aria-label="Cancel editing" onClick={() => setEditing(null)}>
-                            ✕
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.action}
-                            aria-label="Edit queued message"
-                            disabled={busy !== null || text === null}
-                            onClick={() => setEditing(row.id)}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.action}
-                            aria-label="Remove queued message"
-                            disabled={isBusy}
-                            onClick={() => void applyAction(row.id, { kind: 'remove' })}
-                          >
-                            🗑
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.action}
-                            aria-label="Steer with queued message"
-                            disabled={!running || isBusy}
-                            onClick={() => void applyAction(row.id, { kind: 'steer' })}
-                          >
-                            ⇧
-                          </button>
-                        </>
-                      )}
-                    </span>
+                    {queueMutable ? (
+                      <span className={styles.actions}>
+                        {isEditing ? (
+                          <>
+                            <Tooltip portal label="Save" side="bottom" delayMs={500}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label="Save queued message"
+                                disabled={busy !== null || draft.trim().length === 0}
+                                onClick={() => void saveEdit()}
+                              >
+                                <IconCheckOutlineRegular size={14} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip portal label="Cancel" side="bottom" delayMs={500}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label="Cancel editing"
+                                disabled={busy !== null}
+                                onClick={() => setEditing(null)}
+                              >
+                                <IconCloseOutlineRegular />
+                              </button>
+                            </Tooltip>
+                          </>
+                        ) : (
+                          <>
+                            <Tooltip portal label="Move up" side="bottom" delayMs={500} disabled={index === 0}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label={`Move queued message ${index + 1} up`}
+                                disabled={index === 0 || busy !== null}
+                                onClick={() => void move(row.id, 'up')}
+                              >
+                                <IconChevronUpOutlineRegular />
+                              </button>
+                            </Tooltip>
+                            <Tooltip portal label="Move down" side="bottom" delayMs={500} disabled={index === rowCount - 1}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label={`Move queued message ${index + 1} down`}
+                                disabled={index === rowCount - 1 || busy !== null}
+                                onClick={() => void move(row.id, 'down')}
+                              >
+                                <IconChevronDownOutlineRegular />
+                              </button>
+                            </Tooltip>
+                            <Tooltip portal label="Edit" side="bottom" delayMs={500} disabled={text === null}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label="Edit queued message"
+                                disabled={busy !== null || text === null}
+                                onClick={() => setEditing(row.id)}
+                              >
+                                <IconEditOutlineRegular size={14} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip portal label="Remove" side="bottom" delayMs={500}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label="Remove queued message"
+                                disabled={isBusy}
+                                onClick={() => void applyAction(row.id, { kind: 'remove' })}
+                              >
+                                <IconTrashOutlineRegular size={14} />
+                              </button>
+                            </Tooltip>
+                            <Tooltip portal label="Steer" side="bottom" delayMs={500} disabled={!running}>
+                              <button
+                                type="button"
+                                className={styles.action}
+                                aria-label="Steer with queued message"
+                                disabled={busy !== null || !running}
+                                onClick={() => void applyAction(row.id, { kind: 'steer' })}
+                              >
+                                <IconSendOutlineRegular />
+                              </button>
+                            </Tooltip>
+                          </>
+                        )}
+                      </span>
+                    ) : null}
                   </li>
                 )
               })
