@@ -579,7 +579,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (command !== 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events')) {
       throw new CliUsageError('Inspect targets are only valid with the inspect command.')
     }
-    if (command === 'add' && (token === 'ui' || token === 'tool' || token === 'command' || token === 'hook')) {
+    if (command === 'add' && (token === 'ui' || token === 'panel' || token === 'api' || token === 'tool' || token === 'command' || token === 'hook')) {
       if (addTarget !== undefined) throw new CliUsageError('Only one add target may be specified.')
       addTarget = token
       continue
@@ -782,17 +782,17 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
     throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
-  if (command === 'add' && addTarget === undefined && !help && !version) throw new CliUsageError('Add requires a target: ui, tool, command, or hook.')
+  if (command === 'add' && addTarget === undefined && !help && !version) throw new CliUsageError('Add requires a target: ui, panel, api, tool, command, or hook.')
   if (
     command === 'add' &&
-    addTarget !== 'ui' &&
-    addTarget !== 'panel' &&
-    addTarget !== 'api' &&
-    addTarget !== 'tool' &&
-    addTarget !== 'command' &&
-    addTarget !== 'hook'
+    (addTarget === 'ui' ||
+      addTarget === 'panel' ||
+      addTarget === 'api' ||
+      addTarget === 'tool' ||
+      addTarget === 'command' ||
+      addTarget === 'hook') === false
   )
-    throw new CliUsageError('Only add ui, add tool, add command, and add hook are supported.')
+    throw new CliUsageError('Only add ui, add panel, add api, add tool, add command, and add hook are supported.')
   if (help || version)
     return {
       explain: false,

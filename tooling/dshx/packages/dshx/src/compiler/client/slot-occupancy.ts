@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
+import type { Expression } from 'oxc-parser'
 import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
@@ -7,11 +8,13 @@ const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as cons
 /**
  * Slot entries a shipped DSH Client already occupies.
  *
- * A `list` slot addresses entries by `id`, and two occupants of one id render as
- * a single dock whose loser is dropped without an error. A plugin that wants to
- * *replace* a shipped dock needs DSH's shadowing mechanism; a plugin that wants
- * to sit beside one needs its own id. Either way the collision is worth failing
- * the build over, because the symptom is an affordance that is simply absent.
+ * A `list` slot addresses entries by `id`, and two occupants of one id resolve to
+ * a single cell that keeps one head and drops the other without an error. A
+ * plugin that wants to sit beside a shipped dock needs its own id; one that wants
+ * to *replace* it declares an explicit `priority`, which DSH documents as the
+ * cell shadowing rank where the lowest entry renders. Either way an accidental
+ * collision is worth failing the build over, because the symptom is an affordance
+ * that is simply absent.
  */
 export const SHIPPED_SLOT_OCCUPANTS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['conversation.input.dock', new Set(['todo', 'queue'])],
@@ -44,6 +47,26 @@ export interface SlotRegistration {
   readonly slot: string
   readonly id: string
   readonly file: string
+  /**
+   * The declared `priority`, DSH's cell shadowing rank. A registration that sets
+   * one is deliberately taking over a cell another entry already holds.
+   */
+  readonly priority?: number
+}
+
+/**
+ * A numeric literal, including the negated form: a parser reads `-1` as a unary
+ * expression over `1`, so a bare `Literal` check misses every negative rank — and
+ * shadowing is exactly where a plugin picks a negative rank.
+ */
+function numericValue(expression: Expression): number | undefined {
+  if (expression.type === 'Literal') return typeof expression.value === 'number' ? expression.value : undefined
+  if (expression.type !== 'UnaryExpression') return undefined
+  const operand = unwrapExpression(expression.argument)
+  if (operand.type !== 'Literal' || typeof operand.value !== 'number') return undefined
+  if (expression.operator === '-') return -operand.value
+  if (expression.operator === '+') return operand.value
+  return undefined
 }
 
 const registrationsIn = (source: string, file: string): SlotRegistration[] => {
@@ -60,14 +83,20 @@ const registrationsIn = (source: string, file: string): SlotRegistration[] => {
         if (options.type !== 'ObjectExpression') return
         let slot: string | undefined
         let id: string | undefined
+        let priority: number | undefined
         for (const property of options.properties) {
           if (property.type !== 'Property') continue
           const name = propertyName(property.key)
           const value = stringValue(unwrapExpression(property.value))
           if (name === 'name') slot = value
           if (name === 'id') id = value
+          if (name === 'priority') {
+            priority = numericValue(unwrapExpression(property.value))
+          }
         }
-        if (slot !== undefined && id !== undefined) found.push({ slot, id, file })
+        if (slot !== undefined && id !== undefined) {
+          found.push(priority === undefined ? { slot, id, file } : { slot, id, file, priority })
+        }
       },
     },
   })
@@ -110,6 +139,7 @@ export function slotOccupancyConflicts(
   occupants: ReadonlyMap<string, ReadonlySet<string>> = SHIPPED_SLOT_OCCUPANTS,
 ): readonly (SlotRegistration & { readonly occupant: string })[] {
   return registrations.flatMap(registration => {
+    if (registration.priority !== undefined) return []
     const claimed = occupants.get(registration.slot)
     return claimed?.has(registration.id) === true ? [{ ...registration, occupant: registration.id }] : []
   })

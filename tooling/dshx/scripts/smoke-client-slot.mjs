@@ -13,6 +13,7 @@
 //   node scripts/smoke-client-slot.mjs --interact          # + reorder tier
 //   node scripts/smoke-client-slot.mjs --slot conversation.input.dock
 
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -22,6 +23,14 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const playwrightCli = join(repoRoot, 'node_modules/.bin', `playwright-cli${process.platform === 'win32' ? '.cmd' : ''}`)
+
+/** Fail with the reason rather than an opaque spawn ENOENT. */
+const requirePlaywrightCli = () => {
+  if (existsSync(playwrightCli)) return playwrightCli
+  throw new Error(
+    `${playwrightCli} is missing. This gate drives a real browser, so it needs @playwright/cli installed in tooling/dshx.`,
+  )
+}
 const outputDirectory = join(repoRoot, 'output/playwright/smoke-client-slot')
 const bootTimeoutMs = 180_000
 
@@ -232,6 +241,7 @@ const main = async () => {
     return
   }
 
+  requirePlaywrightCli()
   const port = await freePort()
   const dsh = await bootDsh(options.profile, port)
   const session = `slot-smoke-${process.pid}`

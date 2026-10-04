@@ -223,7 +223,7 @@ async function validateSlotOccupancy(paths: Awaited<ReturnType<typeof resolveOpt
   if (first === undefined) return
   throw new DshxError('DSHX1206', `Client registers ${JSON.stringify(first.slot)} with the shipped id ${JSON.stringify(first.id)}.`, {
     file: first.file,
-    hint: `Use a distinct id to render beside the shipped dock, or DSH's slot shadowing to replace it deliberately.`,
+    hint: `Use a distinct id to render beside the shipped dock, or declare a \`priority\` on this registration to shadow it deliberately.`,
   })
 }
 

@@ -64,6 +64,30 @@ copy and fails only at boot. Both are now dshx's to refuse. When you catch
 yourself reaching for `as unknown as`, a local `declare module`, or a duplicated
 interface, ask which layer should own it before shipping the escape hatch.
 
+## Never restart the running DSH instance
+
+The web profile runs on `127.0.0.1:3080` and the user is almost always using it,
+often with other agents mid-turn. Never `kill` it, and never restart it to pick
+up a plugin change: a restart drops every in-flight turn and can kill sessions
+other agents are actively working in. Reloading the live instance is the user's
+decision.
+
+Verify a change on a **second instance on another port** instead:
+
+```sh
+dsh web --port 3199 --no-open
+```
+
+Give it a scratch `DSH_HOME` when the change touches stored state (accounts,
+usage history, plugins), so the second instance cannot rewrite the real one:
+
+```sh
+DSH_HOME=/private/tmp/dsh-verify dsh web --port 3199 --no-open
+```
+
+Report what the second instance shows, then let the user decide when to restart
+the real one. Test against the running application — but never by restarting it.
+
 ## Never delete source while a build is serving
 
 A plugin's `dist/` keeps working after its sources are gone, so deleting a file

@@ -16,11 +16,13 @@
         version = "0.1.4-preview.3";
         src = ./tooling/dshx;
         nativeBuildInputs = [ pkgs.nodejs_24 pkgs.pnpm ];
-        # The fork's install needs a writable HOME for pnpm's store and cache.
-        HOME = "/tmp";
         dontConfigure = true;
         buildPhase = ''
           runHook preBuild
+          # Keep pnpm's store and cache in this build's writable temporary
+          # directory instead of sharing /tmp across concurrent Nix builds.
+          export HOME="$TMPDIR/dshx-home"
+          mkdir -p "$HOME"
           # A flake copies only git-tracked files, so the workspace has no
           # node_modules yet; install before building.
           pnpm install --frozen-lockfile --ignore-scripts
@@ -32,9 +34,13 @@
         '';
         installPhase = ''
           runHook preInstall
-          mkdir -p "$out/lib/dshx"
-          cp -r package.json packages/dshx/dist "$out/lib/dshx/"
-          cp -r packages/dshx/node_modules "$out/lib/dshx/node_modules"
+          export HOME="$TMPDIR/dshx-home"
+          mkdir -p "$HOME"
+          mkdir -p "$out/lib" "$out/bin"
+          # Preserve the workspace package and its production dependency graph.
+          # Copying packages/dshx/node_modules alone leaves pnpm symlinks pointing
+          # at the build tree's .pnpm store, which is not part of this output.
+          pnpm --filter @dshfiles/dshx deploy --prod --legacy "$out/lib/dshx"
           mkdir -p "$out/bin"
           printf '%s\n' \
             '#!/usr/bin/env bash' \
@@ -111,6 +117,7 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = [
+          dshxPkg
           pkgs.fnm
           pkgs.pnpm
         ];

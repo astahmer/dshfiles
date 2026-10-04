@@ -15,6 +15,7 @@
 // cookie, so the first probe needs the token and later probes do not:
 // `--keep-open` reuses one named `--session` across probes and skips the token.
 
+import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +23,14 @@ import { spawn } from 'node:child_process'
 
 const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const playwrightCli = join(repoRoot, 'tooling/dshx/node_modules/.bin', `playwright-cli${process.platform === 'win32' ? '.cmd' : ''}`)
+
+/** Fail with the reason rather than an opaque spawn ENOENT. */
+const requirePlaywrightCli = () => {
+  if (existsSync(playwrightCli)) return playwrightCli
+  throw new Error(
+    `${playwrightCli} is missing. This probe drives a real browser, so it needs @playwright/cli installed in tooling/dshx.`,
+  )
+}
 const outputDirectory = join(repoRoot, 'output/playwright/dsh-web-probe')
 
 const parseArguments = argv => {
@@ -112,6 +121,7 @@ function run(args, cwd) {
 
 const main = async () => {
   const options = parseArguments(process.argv.slice(2))
+  requirePlaywrightCli()
   await mkdir(outputDirectory, { recursive: true })
   const session = options.session
   const command = args => run([`-s=${session}`, ...args], outputDirectory)
