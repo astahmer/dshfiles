@@ -19,6 +19,7 @@ export type CliCommand =
   | 'skills'
   | 'commands'
   | 'config'
+  | 'comm'
 export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events'
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
 
@@ -59,6 +60,11 @@ export interface CliArgs {
   readonly reasoningEffort?: string
   readonly max?: number
   readonly atSeq?: number
+  readonly principal?: string
+  readonly delivery?: 'quiet' | 'queue'
+  readonly priority?: 'normal' | 'urgent'
+  readonly topic?: string
+  readonly limit?: number
 }
 
 export class CliUsageError extends Error {
@@ -90,6 +96,11 @@ const valueOptions = new Set([
   '--reasoning-effort',
   '--max',
   '--at-seq',
+  '--principal',
+  '--delivery',
+  '--priority',
+  '--topic',
+  '--limit',
 ])
 const booleanOptions = new Set([
   '--explain',
@@ -239,6 +250,31 @@ const sharedArgs = {
     description: 'Fork at this inclusive Session event sequence.',
     valueHint: 'sequence',
   },
+  principal: {
+    type: 'string',
+    description: 'Stable external DSHX communication identity.',
+    valueHint: 'name',
+  },
+  delivery: {
+    type: 'string',
+    description: 'External topic delivery: quiet or queue.',
+    valueHint: 'quiet|queue',
+  },
+  priority: {
+    type: 'string',
+    description: 'Communication message priority.',
+    valueHint: 'normal|urgent',
+  },
+  topic: {
+    type: 'string',
+    description: 'Filter communication inbox by topic.',
+    valueHint: 'topic',
+  },
+  limit: {
+    type: 'string',
+    description: 'Maximum communication messages to return.',
+    valueHint: 'count',
+  },
   help: { type: 'boolean', alias: 'h', description: 'Show command help.' },
   version: {
     type: 'boolean',
@@ -357,6 +393,13 @@ export const dshxCommand = defineCommand({
       },
       args: sharedArgs,
     }),
+    comm: defineCommand({
+      meta: {
+        name: 'comm',
+        description: 'Exchange durable messages between DSH Agents and external MCP clients.',
+      },
+      args: sharedArgs,
+    }),
   },
 })
 
@@ -392,7 +435,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       command === 'models' ||
       command === 'skills' ||
       command === 'commands' ||
-      command === 'config'
+      command === 'config' ||
+      command === 'comm'
     ) {
       platformArgs.push(token)
       continue
@@ -415,7 +459,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       token === 'models' ||
       token === 'skills' ||
       token === 'commands' ||
-      token === 'config'
+      token === 'config' ||
+      token === 'comm'
     ) {
       if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
       command = token
@@ -474,6 +519,22 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     atSeq = Number(parsed.atSeq)
     if (!Number.isSafeInteger(atSeq) || atSeq < 0) throw new CliUsageError('--at-seq requires a non-negative safe integer.')
   }
+  const principal = parsed.principal
+  const delivery = parsed.delivery
+  const priority = parsed.priority
+  const topic = parsed.topic
+  let limit: number | undefined
+  if (delivery !== undefined && delivery !== 'quiet' && delivery !== 'queue') {
+    throw new CliUsageError('--delivery requires quiet or queue for external communication clients.')
+  }
+  if (priority !== undefined && priority !== 'normal' && priority !== 'urgent') throw new CliUsageError('--priority requires normal or urgent.')
+  if (principal !== undefined && !/^[a-zA-Z0-9._-]{1,64}$/.test(principal)) {
+    throw new CliUsageError('--principal requires 1 to 64 letters, digits, dot, underscore, or hyphen.')
+  }
+  if (parsed.limit !== undefined) {
+    limit = Number(parsed.limit)
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new CliUsageError('--limit requires an integer from 1 to 500.')
+  }
   if (parsed.order !== undefined) {
     const value = Number(parsed.order)
     if (!Number.isInteger(value)) throw new CliUsageError('--order requires an integer value.')
@@ -496,7 +557,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     command === 'models' ||
     command === 'skills' ||
     command === 'commands' ||
-    command === 'config'
+    command === 'config' ||
+    command === 'comm'
   if (json && command !== undefined && command !== 'check' && command !== 'inspect' && command !== 'add' && !platformCommand)
     throw new CliUsageError('--json is only valid with check, inspect, or add.')
   if (open && command !== undefined && command !== 'dev') throw new CliUsageError('--open is only valid with dev.')
@@ -505,7 +567,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError('DSHX4147: --dry-run is only valid with add commands or check --fix.')
   if (fix && command !== 'check') throw new CliUsageError('DSHX4147: --fix is only valid with check.')
   if (runtime && command !== 'check') throw new CliUsageError('--runtime is only valid with check.')
-  if (url !== undefined && (!platformCommand || command === 'info')) throw new CliUsageError('--url is not used by this DSH platform command.')
+  if (url !== undefined && (!platformCommand || command === 'info' || command === 'comm'))
+    throw new CliUsageError('--url is not used by this DSH platform command.')
   if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create'))
     throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
   if (session !== undefined && command !== 'commands' && command !== 'skills' && !(command === 'models' && platformArgs[0] === 'select'))
@@ -519,6 +582,30 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError('--reasoning-effort is only valid with models select.')
   if (max !== undefined && !(command === 'sessions' && platformArgs[0] === 'history')) throw new CliUsageError('--max is only valid with sessions history.')
   if (atSeq !== undefined && !(command === 'sessions' && platformArgs[0] === 'fork')) throw new CliUsageError('--at-seq is only valid with sessions fork.')
+  if (principal !== undefined && command !== 'comm') throw new CliUsageError('--principal is only valid with comm commands.')
+  if (delivery !== undefined && !(command === 'comm' && platformArgs[0] === 'subscribe'))
+    throw new CliUsageError('--delivery is only valid with comm subscribe.')
+  if (priority !== undefined && !(command === 'comm' && ['publish', 'send'].includes(platformArgs[0] ?? '')))
+    throw new CliUsageError('--priority is only valid with comm publish or send.')
+  if (topic !== undefined && !(command === 'comm' && platformArgs[0] === 'inbox')) throw new CliUsageError('--topic is only valid with comm inbox.')
+  if (limit !== undefined && !(command === 'comm' && platformArgs[0] === 'inbox')) throw new CliUsageError('--limit is only valid with comm inbox.')
+  if (command === 'comm' && !help) {
+    const [action, first, ...extra] = platformArgs
+    const actions = ['agents', 'topics', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
+    if (!actions.includes(action ?? '')) throw new CliUsageError(`comm requires ${actions.join(', ')}.`)
+    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && first === undefined) throw new CliUsageError(`comm ${action} requires an id.`)
+    if (['publish', 'send'].includes(action ?? '') && (first === undefined || extra.join(' ').trim().length === 0)) {
+      throw new CliUsageError(`comm ${action} requires a target and message text.`)
+    }
+    if (['agents', 'topics', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
+      throw new CliUsageError(`comm ${action} accepts no positional arguments.`)
+    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && extra.length > 0)
+      throw new CliUsageError(`comm ${action} accepts one positional argument.`)
+    if (action === 'inbox' && platformArgs.length > 0) throw new CliUsageError('comm inbox accepts no positional arguments.')
+    if (action === 'mcp' && (json || delivery !== undefined || priority !== undefined || topic !== undefined || limit !== undefined)) {
+      throw new CliUsageError('comm mcp does not accept --json or inbox/message options.')
+    }
+  }
   if (command === 'status' || command === 'info' || command === 'doctor') {
     if (parsed._.length > 1 && !help) throw new CliUsageError(`${command} does not accept positional arguments.`)
   }
@@ -662,6 +749,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       ...(max === undefined ? {} : { max }),
       ...(atSeq === undefined ? {} : { atSeq }),
+      ...(principal === undefined ? {} : { principal }),
+      ...(delivery === undefined ? {} : { delivery }),
+      ...(priority === undefined ? {} : { priority }),
+      ...(topic === undefined ? {} : { topic }),
+      ...(limit === undefined ? {} : { limit }),
     }
   if (command === undefined) throw new CliUsageError('A command is required: build, check, dev, test, package, inspect, or add.')
   return {
@@ -701,5 +793,10 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     ...(max === undefined ? {} : { max }),
     ...(atSeq === undefined ? {} : { atSeq }),
+    ...(principal === undefined ? {} : { principal }),
+    ...(delivery === undefined ? {} : { delivery }),
+    ...(priority === undefined ? {} : { priority }),
+    ...(topic === undefined ? {} : { topic }),
+    ...(limit === undefined ? {} : { limit }),
   }
 }

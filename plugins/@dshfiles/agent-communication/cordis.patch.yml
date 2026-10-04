@@ -1,0 +1,3 @@
+- insert:
+    - id: agent-communication
+      name: '@dshfiles/agent-communication'

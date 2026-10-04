@@ -23,6 +23,7 @@ DSHX Preview exposes a small authoring surface and keeps compiler/runtime intern
 Additional references:
 
 - [CLI reference](./cli-reference.md)
+- [Agent communication](./agent-communication.md) — the shared typed service, quiet delivery model, CLI, MCP, and activation steps.
 - [Compatibility and verification](./compatibility.md)
 - [Preview scope and known limits](./preview.md)
 - [Publishing a plugin package](./guides/publishing.md)
@@ -31,8 +32,8 @@ Additional references:
 
 ## Public entry points
 
-| Entry                                       | Status                 | Browser-safe | Purpose                                                                       |
-| ------------------------------------------- | ---------------------- | ------------ | ----------------------------------------------------------------------------- |
+| Entry                                      | Status                 | Browser-safe | Purpose                                                                       |
+| ------------------------------------------ | ---------------------- | ------------ | ----------------------------------------------------------------------------- |
 | `@dshfiles/dshx`                           | API Candidate          | Yes          | `defineConfig`, `DshxConfig` only                                             |
 | `@dshfiles/dshx/config`                    | API Candidate          | Yes          | Same config-only surface                                                      |
 | `@dshfiles/dshx/host`                      | API Candidate          | No           | Host definitions and contributions                                            |

@@ -50,6 +50,7 @@ import { CliUsageError, parseCliArgs, type CliArgs } from './args.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
 import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../platform/client.js'
+import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
 
 export interface CliIO {
@@ -86,6 +87,7 @@ export interface CliRuntime {
   readonly addCommand?: (options: AddCommandOptions) => Promise<AddCommandResult>
   readonly addHook?: (options: AddHookOptions) => Promise<AddHookResult>
   readonly connectPlatform?: (options?: ConnectDshPlatformClientOptions) => Promise<DshPlatformClient>
+  readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
 }
 
 export interface CliRunOptions {
@@ -1272,7 +1274,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     args = parseCliArgs(argv)
   } catch (error) {
     const message = (error instanceof CliUsageError ? error.message : String(error)).replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]')
-    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config'])
+    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config', 'comm'])
     const group = argv.find(token => platformGroups.has(token))
     if (group !== undefined && argv.includes('--json')) {
       const actions = new Set([
@@ -1299,6 +1301,15 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
         'set',
         'unset',
         'select',
+        'agents',
+        'topics',
+        'subscribe',
+        'unsubscribe',
+        'publish',
+        'send',
+        'inbox',
+        'ack',
+        'mcp',
       ])
       const groupIndex = argv.indexOf(group)
       const action = argv.slice(groupIndex + 1).find(token => actions.has(token))
@@ -1334,17 +1345,19 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       args.command === 'models' ||
       args.command === 'skills' ||
       args.command === 'commands' ||
-      args.command === 'config'
+      args.command === 'config' ||
+      args.command === 'comm'
     ) {
       return runPlatformCli(args, {
         io,
         dshxVersion: options.version ?? VERSION,
         ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
+        ...(runtime.connectCommunication === undefined ? {} : { connectCommunication: runtime.connectCommunication }),
       })
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1365,12 +1378,14 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     args.command === 'models' ||
     args.command === 'skills' ||
     args.command === 'commands' ||
-    args.command === 'config'
+    args.command === 'config' ||
+    args.command === 'comm'
   ) {
     return runPlatformCli(args, {
       io,
       dshxVersion: options.version ?? VERSION,
       ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
+      ...(runtime.connectCommunication === undefined ? {} : { connectCommunication: runtime.connectCommunication }),
     })
   }
   try {

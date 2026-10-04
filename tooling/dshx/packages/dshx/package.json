@@ -61,6 +61,10 @@
       "types": "./dist/platform/index.d.ts",
       "default": "./dist/platform/index.js"
     },
+    "./communication": {
+      "types": "./dist/communication/index.d.ts",
+      "default": "./dist/communication/index.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
@@ -79,6 +83,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.7.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@standard-schema/spec": "^1.1.0",
     "citty": "0.2.2",
     "diff": "9.0.0",

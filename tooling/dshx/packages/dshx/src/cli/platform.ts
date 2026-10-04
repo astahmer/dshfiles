@@ -7,6 +7,8 @@ import { z } from 'zod'
 import type { CliArgs } from './args.js'
 import { DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
 import type { BundleSummary, DshPlatformClient, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
+import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
+import { runCommunicationCommand } from '../communication/cli.js'
 
 const runFile = promisify(execFile)
 const engineRange = '^22.19.0 || >=24.0.0'
@@ -20,6 +22,7 @@ export interface PlatformCliRuntime {
   readonly io: PlatformCliIO
   readonly dshxVersion: string
   readonly connect?: typeof connectDshPlatformClient
+  readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
 }
 
 interface DoctorCheck {
@@ -434,6 +437,12 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   }
   if (args.command === 'doctor') return runDoctor(args, runtime)
   if (args.command === 'status') return runStatus(args, runtime)
+  if (args.command === 'comm') {
+    return runCommunicationCommand(args, {
+      io: runtime.io,
+      ...(runtime.connectCommunication === undefined ? {} : { connect: runtime.connectCommunication }),
+    })
+  }
 
   const connect = runtime.connect ?? connectDshPlatformClient
   let client: DshPlatformClient
@@ -914,6 +923,23 @@ export function platformHelp(args: CliArgs): string | undefined {
       return `Usage: dshx config set <namespace> <path> <json-value> ${connection} ${output}\nWrites one schema-validated setting using its current revision. Secret values must be changed in DSH Settings.\n`
     if (nested === 'unset') return `Usage: dshx config unset <namespace> <path> ${connection} ${output}\nRemoves one setting using its current revision.\n`
     return `Usage: dshx config <list|get|set|unset> [arguments] ${connection} ${output}\nValues use JSON syntax. Secret values are redacted and must be changed in DSH Settings.\n`
+  }
+  if (group === 'comm') {
+    const principal = '[--principal <name>]'
+    if (nested === 'agents') return `Usage: dshx comm agents ${principal} ${output}\nLists live DSH Agents and their Session ids.\n`
+    if (nested === 'topics') return `Usage: dshx comm topics ${principal} ${output}\nLists topics and subscriber counts.\n`
+    if (nested === 'subscribe')
+      return `Usage: dshx comm subscribe <topic> [--delivery quiet|queue] ${principal} ${output}\nSubscribes this external CLI principal.\n`
+    if (nested === 'unsubscribe') return `Usage: dshx comm unsubscribe <topic> ${principal} ${output}\nRemoves this external CLI principal from a topic.\n`
+    if (nested === 'publish')
+      return `Usage: dshx comm publish <topic> <message...> [--priority normal|urgent] ${principal} ${output}\nPublishes a durable peer message.\n`
+    if (nested === 'send')
+      return `Usage: dshx comm send <agent-session-id> <message...> [--priority normal|urgent] ${principal} ${output}\nSends a direct message to a DSH Agent inbox.\n`
+    if (nested === 'inbox')
+      return `Usage: dshx comm inbox [--topic <topic>] [--limit <count>] ${principal} ${output}\nReads unacknowledged messages for this external principal.\n`
+    if (nested === 'ack') return `Usage: dshx comm ack <message-id> ${principal} ${output}\nAcknowledges one inbox message.\n`
+    if (nested === 'mcp') return `Usage: dshx comm mcp [--principal <name>]\nRuns an MCP stdio server for external agent clients; stdout is reserved for MCP.\n`
+    return `Usage: dshx comm <agents|topics|subscribe|unsubscribe|publish|send|inbox|ack|mcp> [arguments] [options]\nCommon options: ${principal} ${output}\nMessages are durable; delivery defaults to quiet/queue and steering requires DSH Agent opt-in.\n`
   }
   return undefined
 }

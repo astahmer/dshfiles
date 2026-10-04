@@ -27,14 +27,15 @@ pnpm add -D @dshfiles/dshx@preview @deepseek-ai/dsh
 
 ## Public modules
 
-| Module                                      | Status                 | Exports                                                                               |
-| ------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------- |
+| Module                                     | Status                 | Exports                                                                               |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------- |
 | `@dshfiles/dshx`                           | API Candidate          | `defineConfig`, `DshxConfig`                                                          |
 | `@dshfiles/dshx/config`                    | API Candidate          | Same config-only surface                                                              |
 | `@dshfiles/dshx/host`                      | API Candidate          | `defineHost`, `defineTool`, `defineCommand`, Prompt helpers and official Prompt types |
 | `@dshfiles/dshx/client`                    | API Candidate          | `defineClient`, `defineLocale`, `defineSlot`, Hooks, Locale/Slot types                |
 | `@dshfiles/dshx/api`                       | API Candidate          | `defineApi`, `method`, `isApiError`, shared API types                                 |
 | `@dshfiles/dshx/settings`                  | API Candidate          | `defineSettings` and shared Settings types                                            |
+| `@dshfiles/dshx/communication`             | API Candidate          | Typed local communication service, durable inbox, and Host bridge                     |
 | `@dshfiles/dshx/experimental/conversation` | Experimental           | `defineConversation`, lifecycle/render types, official event types                    |
 | `@dshfiles/dshx/tooling`                   | Tooling / Experimental | Node-only build/watch, config, compatibility, diagnostics, CLI, and repair APIs       |
 
@@ -43,34 +44,34 @@ The root no longer reexports Host/Client authoring helpers. The old `/compiler`,
 ## Minimal Host
 
 ```ts
-import { defineHost, defineTool } from "@dshfiles/dshx/host";
+import { defineHost, defineTool } from '@dshfiles/dshx/host'
 
 const status = defineTool({
-  name: "my_plugin_status",
-  description: "Return plugin status.",
+  name: 'my_plugin_status',
+  description: 'Return plugin status.',
   parameters: {},
   output: {
-    schema: { type: "string" },
-    render: (_args, value) => [{ type: "text", text: value }],
+    schema: { type: 'string' },
+    render: (_args, value) => [{ type: 'text', text: value }],
   },
   async execute() {
-    return "ready";
+    return 'ready'
   },
-});
+})
 
-export default defineHost({ tools: [status] });
+export default defineHost({ tools: [status] })
 ```
 
 ## Build config
 
 ```ts
-import { defineConfig } from "@dshfiles/dshx";
+import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
-  host: { entry: "src/host.ts" },
-  client: { entry: "src/client.tsx" },
+  host: { entry: 'src/host.ts' },
+  client: { entry: 'src/client.tsx' },
   build: { sourcemap: true, declarations: true },
-});
+})
 ```
 
 `host.vite.plugins` and `client.vite.plugins` accept a bounded native Vite `PluginOption[]`. DSHX protects entry, target, external, chunk, format, and asset policy; Client CSS and inline assets still use Vite's standard pipeline.
@@ -92,29 +93,24 @@ For plugin-owned copy, use `defineLocale()` instead of augmenting `LocaleNamespa
 ```
 
 ```tsx
-import {
-  defineClient,
-  defineLocale,
-  defineSlot,
-  type PropsLocaleOf,
-} from "@dshfiles/dshx/client";
+import { defineClient, defineLocale, defineSlot, type PropsLocaleOf } from '@dshfiles/dshx/client'
 
-const copy = defineLocale("my-plugin.status", {
-  zh: { ready: "已就绪" },
-  en: { ready: "Ready" },
-});
+const copy = defineLocale('my-plugin.status', {
+  zh: { ready: '已就绪' },
+  en: { ready: 'Ready' },
+})
 
 function Status({ t }: PropsLocaleOf<typeof copy>) {
-  return <p>{t("ready")}</p>;
+  return <p>{t('ready')}</p>
 }
 
-const slot = defineSlot("sidebar.footer.action", {
-  id: "my-plugin.status",
+const slot = defineSlot('sidebar.footer.action', {
+  id: 'my-plugin.status',
   locale: copy,
   component: Status,
-});
+})
 
-export default defineClient({ locales: [copy], slots: [slot] });
+export default defineClient({ locales: [copy], slots: [slot] })
 ```
 
 `zh` and `en` must contain the same string-valued keys. Non-empty `locales` registers the dictionaries before Slots and automatically requests the Cordis `locale` service; the package still declares `@deepseek-ai/dsh-client-locale` in `dsh.client.inject`. `dshx check`, `dshx build`, and every `dshx dev` Client rebuild diagnose a missing provider edge. Raw locale namespace strings remain available for advanced integration with a provider-owned, augmented `LocaleNamespaceMap`, but do not register dictionaries.

@@ -10,15 +10,18 @@ import { isHostExternal, singleHostChunkPlugin } from './guards.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
+const VIRTUAL_HOST_COMMUNICATION_PUBLIC = '\0virtual:dshx-host-communication-public'
 const DSHX_HOST_PUBLIC = '@dshfiles/dshx/host'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
 const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
+const DSHX_COMMUNICATION_PUBLIC = '@dshfiles/dshx/communication'
 const HOST_RUNTIME_PATH = fileURLToPath(new URL('../../host/runtime.js', import.meta.url))
 const HOST_DEFINE_PATH = fileURLToPath(new URL('../../host/define.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
+const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
 
 /** Options for producing one Node ESM Host bundle. */
 export interface BuildHostOptions {
@@ -53,14 +56,22 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
     name: 'dshx-host-entry',
     enforce: 'pre',
     resolveId(source) {
-      if (source === VIRTUAL_HOST_ENTRY || source === DSHX_HOST_PUBLIC || source === DSHX_API_PUBLIC || source === DSHX_SETTINGS_PUBLIC) {
+      if (
+        source === VIRTUAL_HOST_ENTRY ||
+        source === DSHX_HOST_PUBLIC ||
+        source === DSHX_API_PUBLIC ||
+        source === DSHX_SETTINGS_PUBLIC ||
+        source === DSHX_COMMUNICATION_PUBLIC
+      ) {
         return source === DSHX_HOST_PUBLIC
           ? VIRTUAL_HOST_PUBLIC
           : source === DSHX_API_PUBLIC
             ? `${VIRTUAL_HOST_PUBLIC}-api`
             : source === DSHX_SETTINGS_PUBLIC
               ? `${VIRTUAL_HOST_PUBLIC}-settings`
-              : VIRTUAL_HOST_ENTRY
+              : source === DSHX_COMMUNICATION_PUBLIC
+                ? VIRTUAL_HOST_COMMUNICATION_PUBLIC
+                : VIRTUAL_HOST_ENTRY
       }
       return null
     },
@@ -82,6 +93,9 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       if (id === `${VIRTUAL_HOST_PUBLIC}-settings`) {
         return `export { defineSettings } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}\n`
+      }
+      if (id === VIRTUAL_HOST_COMMUNICATION_PUBLIC) {
+        return `export * from ${JSON.stringify(COMMUNICATION_RUNTIME_PATH)}\n`
       }
       if (id !== VIRTUAL_HOST_ENTRY) return null
       if (paths.entry === undefined) {
@@ -135,7 +149,11 @@ async function resolveOptions(options: BuildHostOptions) {
 
 async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildHostOptions, watch: boolean): Promise<InlineConfig> {
   const external = (source: string): boolean =>
-    source !== DSHX_HOST_PUBLIC && source !== DSHX_API_PUBLIC && source !== DSHX_SETTINGS_PUBLIC && isHostExternal(source)
+    source !== DSHX_HOST_PUBLIC &&
+    source !== DSHX_API_PUBLIC &&
+    source !== DSHX_SETTINGS_PUBLIC &&
+    source !== DSHX_COMMUNICATION_PUBLIC &&
+    isHostExternal(source)
   const assetsInlineLimit = (): boolean => true
   const output = {
     format: 'es',

@@ -208,6 +208,34 @@ for a Session; DSH may also persist it as the new default. `presets list/show`
 reads Agent preset declarations. `skills list --session` returns only the
 user-invocable skill metadata visible to that Session, never skill bodies.
 
+### `dshx comm`
+
+Communication uses the DSHX Host's authenticated local socket and one typed
+service shared with the Agent plugin and MCP adapter. It does not read DSH
+session storage or open a network listener.
+
+```bash
+dshx comm agents [--json]
+dshx comm topics [--json]
+dshx comm subscribe <topic> [--delivery quiet|queue] [--principal <name>]
+dshx comm unsubscribe <topic> [--principal <name>]
+dshx comm publish <topic> <message...> [--priority normal|urgent]
+dshx comm send <agent-session-id> <message...> [--priority normal|urgent]
+dshx comm inbox [--topic <topic>] [--limit <count>] [--principal <name>] [--json]
+dshx comm ack <message-id> [--principal <name>]
+dshx comm mcp [--principal <name>]
+```
+
+The CLI's default external inbox identity is `cli`; MCP defaults to
+`mcp.default`. Named principals separate external clients and persist their
+subscriptions. External clients may subscribe with `quiet` or `queue` delivery.
+DSH Agents automatically join a hashed topic for their working directory and
+their direct inbox. Queue delivery adds a content-free notice and does not
+interrupt a running turn. Steering is available only through DSH Agent tools
+when the recipient has opted in, allowlisted the sender, and the message is
+urgent. See [Agent communication](./agent-communication.md) for the service,
+security boundary, candidate decision, and profile activation.
+
 Standalone tool invocation, general service enumeration, profile enumeration,
 arbitrary profile/config-file edits, generic event watching, and log following
 are not exposed: the inspected DSH APIs have no safe matching boundary. The
