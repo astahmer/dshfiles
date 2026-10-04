@@ -2,6 +2,15 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { queueApi } from './api.js'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import {
+  describeInbox,
+  isDirection,
+  moveWithinInbox,
+  QueueItemMissingError,
+  type QueueMoveRequest,
+  type QueuePosition,
+} from './queue-order.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import '@deepseek-ai/dsh-agent'
 
@@ -19,104 +28,36 @@ import '@deepseek-ai/dsh-agent'
  * button and the agent can never disagree.
  */
 
-type Direction = 'up' | 'down'
-type InboxTarget = 'next-turn' | 'next-step'
-
-const isDirection = (value: unknown): value is Direction => value === 'up' || value === 'down'
-
-export interface QueuePosition {
-  readonly sessionId: string
-  readonly itemId: string
-  readonly index: number
-  readonly total: number
-  readonly target: InboxTarget
-  readonly first: boolean
-  readonly last: boolean
-}
-
-interface PendingMessage {
-  readonly id: string
-}
-
-/** Each pending list's splice target and the camelCase property that reads it. */
-const INBOX_LISTS = [
-  ['next-turn', 'nextTurn'],
-  ['next-step', 'nextStep'],
-] as const satisfies readonly (readonly [InboxTarget, 'nextTurn' | 'nextStep'])[]
-
-interface LocatedItem {
-  readonly target: InboxTarget
-  readonly index: number
-  readonly list: readonly PendingMessage[]
-}
-
-const findPending = (
-  ctx: Context,
-  sessionId: string,
-  itemId: string,
-): { readonly inbox: Agent['inbox'] } & LocatedItem => {
+const liveAgent = (ctx: Context, sessionId: string) => {
   const agents = ctx.get('agents')
   if (agents === undefined) throw new LlmError('agents service unavailable', 'MISSING_SERVICE')
-  const agent = agents.get(sessionId as never)
-  if (agent === undefined) {
-    throw new LlmError(
-      `Session ${sessionId} has no live agent, so nothing is waiting to be reordered.`,
-      'NOT_FOUND',
-    )
-  }
-  for (const [target, list] of INBOX_LISTS) {
-    const pending = agent.inbox[list] as readonly PendingMessage[]
-    const index = pending.findIndex(message => message.id === itemId)
-    if (index >= 0) return { inbox: agent.inbox, target, index, list: pending }
-  }
-  throw new LlmError(`Queued item ${itemId} is no longer pending.`, 'NOT_FOUND')
+  return agents.get(SessionId(sessionId))
 }
 
 /** Move one pending item by exactly one position. */
-export const moveQueueItem = async (
-  ctx: Context,
-  request: { readonly sessionId: string; readonly itemId: string; readonly direction: Direction },
-): Promise<QueuePosition> => {
+export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Promise<QueuePosition> => {
   if (!isDirection(request.direction)) {
     throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
   }
-  const { inbox, target, index, list } = findPending(ctx, request.sessionId, request.itemId)
-  const total = list.length
-  const destination = request.direction === 'up' ? index - 1 : index + 1
-  const position = (at: number): QueuePosition => ({
-    sessionId: request.sessionId,
-    itemId: request.itemId,
-    index: at,
-    total,
-    target,
-    first: at === 0,
-    last: at === total - 1,
-  })
-  if (destination < 0 || destination >= total) return position(index)
-
-  // One remove plus one insert at the destination. Both are recorded as
-  // durable inbox splices, so the log holds the new order rather than a
-  // deletion paired with an unrelated re-queue.
-  const removed = inbox.splice(target, index, 1, [])
-  const [moved] = removed
-  if (moved === undefined) return position(index)
-  inbox.splice(target, destination, 0, [moved])
-
-  return position(destination)
+  const agent = liveAgent(ctx, request.sessionId)
+  if (agent === undefined) {
+    throw new LlmError(
+      `Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`,
+      'NOT_FOUND',
+    )
+  }
+  try {
+    return moveWithinInbox(agent.inbox, request)
+  } catch (error) {
+    if (error instanceof QueueItemMissingError) throw new LlmError(error.message, 'NOT_FOUND')
+    throw error
+  }
 }
 
 /** Pending ids per list, for rendering which affordances are available. */
-export const describeQueueOrder = (
-  ctx: Context,
-  sessionId: string,
-): readonly { readonly target: InboxTarget; readonly items: readonly string[] }[] => {
-  const agents = ctx.get('agents')
-  const agent = agents?.get(sessionId as never)
-  if (agent === undefined) return []
-  return INBOX_LISTS.map(([target, list]) => ({
-    target,
-    items: (agent.inbox[list] as readonly PendingMessage[]).map(message => message.id),
-  }))
+export const describeQueueOrder = (ctx: Context, sessionId: string) => {
+  const agent = liveAgent(ctx, sessionId)
+  return agent === undefined ? [] : describeInbox(agent.inbox)
 }
 
 /** The context this plugin activated on, captured once at setup. */
@@ -156,11 +97,9 @@ const moveTool = defineTool({
     if (hostContext === undefined) {
       throw new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE')
     }
-    return moveQueueItem(hostContext, {
-      sessionId: args.sessionId,
-      itemId: args.itemId,
-      direction: args.direction as Direction,
-    })
+    const direction = args.direction
+    if (!isDirection(direction)) throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
+    return moveQueueItem(hostContext, { sessionId: args.sessionId, itemId: args.itemId, direction })
   },
 })
 
@@ -177,7 +116,7 @@ const queueHostApi = queueApi.host({
   },
   describe: async ({ input }) => {
     if (hostContext === undefined) return []
-    return describeQueueOrder(hostContext, input.sessionId) as never
+    return describeQueueOrder(hostContext, input.sessionId)
   },
 })
 
@@ -189,8 +128,7 @@ export default defineHost({
   setup: (ctx: Context) => {
     hostContext = ctx
     ctx.provide('queueOrder', {
-      move: (request: { readonly sessionId: string; readonly itemId: string; readonly direction: Direction }) =>
-        moveQueueItem(ctx, request),
+      move: (request: QueueMoveRequest) => moveQueueItem(ctx, request),
       describe: (sessionId: string) => describeQueueOrder(ctx, sessionId),
     })
   },
