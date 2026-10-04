@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { DshInspectBridgeProvider, inspectBridgeStatus } from '../src/inspect/bridge.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 
@@ -42,6 +43,31 @@ async function endpoint(envRoot: string, response: string): Promise<() => Promis
     await new Promise<void>(resolve => server.close(() => resolve()))
     await rm(envRoot, { recursive: true, force: true })
   }
+}
+
+const requestSchema = z.object({ requestId: z.string(), target: z.string() })
+
+const replyingEndpoint = async ({
+  envRoot,
+  reply,
+}: {
+  readonly envRoot: string
+  readonly reply: (request: z.infer<typeof requestSchema>) => object
+}): Promise<() => Promise<void>> => {
+  const directory = join(envRoot, 'runtime', 'dshx', 'inspect')
+  await mkdir(directory, { recursive: true })
+  const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
+  const socketPath = join(directory, `${name}.sock`)
+  const server = createServer(socket => socket.once('data', data => socket.end(`${JSON.stringify(reply(requestSchema.parse(JSON.parse(data.toString()))))}\n`)))
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(socketPath, resolve)
+  })
+  await writeFile(
+    join(directory, `${name}.json`),
+    JSON.stringify({ version: 1, packageId: project.packageId, root: project.root, pid: process.pid, socketPath, token: randomUUID() }) + '\n',
+  )
+  return () => new Promise<void>(resolve => server.close(() => resolve()))
 }
 
 afterEach(async () => {
@@ -187,5 +213,51 @@ describe('DshInspectBridgeProvider', () => {
     ])
     await expect(provider.listTools()).rejects.toMatchObject({ code: 'DSHX3204' })
     await new Promise<void>(resolve => server.close(() => resolve()))
+  })
+  it.each([
+    ['an item without a name', { items: [{ provider: 'Service' }] }],
+    ['an item with an empty name', { items: [{ name: '  ' }] }],
+    ['a non-string optional field', { items: [{ name: 'logger', scope: 42 }] }],
+    ['a non-object metadata field', { items: [{ name: 'logger', metadata: 'composition' }] }],
+    ['a missing item list', {}],
+  ])('rejects a bridge response carrying %s', async (_label, body) => {
+    const root = await mkdtemp(join('/tmp', 'dx-'))
+    tempRoots.push(root)
+    const close = await replyingEndpoint({
+      envRoot: root,
+      reply: request => ({ version: 1, requestId: request.requestId, ok: true, target: request.target, ...body }),
+    })
+    const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
+    await expect(provider.listServices()).rejects.toMatchObject({
+      name: 'DshxError',
+      code: 'DSHX3203',
+      message: expect.stringContaining('invalid services item list'),
+    })
+    await close()
+  })
+
+  it('rejects a response whose header does not echo the request', async () => {
+    const root = await mkdtemp(join('/tmp', 'dx-'))
+    tempRoots.push(root)
+    const close = await replyingEndpoint({ envRoot: root, reply: request => ({ version: 1, requestId: 'other', ok: true, target: request.target, items: [] }) })
+    const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
+    await expect(provider.listEvents()).rejects.toMatchObject({ code: 'DSHX3203', message: expect.stringContaining('invalid protocol header') })
+    await close()
+  })
+
+  it('surfaces a well-formed bridge error and rejects a malformed one', async () => {
+    const root = await mkdtemp(join('/tmp', 'dx-'))
+    tempRoots.push(root)
+    const close = await replyingEndpoint({
+      envRoot: root,
+      reply: request =>
+        request.target === 'events'
+          ? { version: 1, requestId: request.requestId, ok: false, target: request.target, error: { code: 'DSHX3204', message: 'Events are not exposed.' } }
+          : { version: 1, requestId: request.requestId, ok: false, target: request.target, error: { code: 'BOOM', message: 'nope' } },
+    })
+    const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
+    await expect(provider.listEvents()).rejects.toMatchObject({ code: 'DSHX3204', message: expect.stringContaining('Events are not exposed.') })
+    await expect(provider.listServices()).rejects.toMatchObject({ code: 'DSHX3203', message: expect.stringContaining('invalid error response') })
+    await close()
   })
 })

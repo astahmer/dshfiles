@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises'
 import { createConnection } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
+import { z } from 'zod'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -12,22 +13,92 @@ const PROTOCOL_VERSION = 1
 const MAX_MESSAGE_BYTES = 64 * 1024
 const DEFAULT_TIMEOUT_MS = 10_000
 
-interface BridgeMetadata {
-  readonly version?: unknown
-  readonly packageId?: unknown
-  readonly root?: unknown
-  readonly pid?: unknown
-  readonly socketPath?: unknown
-  readonly token?: unknown
-}
+const absolutePathSchema = z.string().refine(isAbsolute)
 
-interface BridgeResponse {
-  readonly version?: unknown
-  readonly requestId?: unknown
-  readonly ok?: unknown
-  readonly target?: unknown
-  readonly items?: unknown
-  readonly error?: unknown
+const bridgeEndpointSchema = z.looseObject({
+  version: z.literal(PROTOCOL_VERSION),
+  packageId: z.string(),
+  root: absolutePathSchema,
+  pid: z.int(),
+  socketPath: absolutePathSchema,
+})
+
+const bridgeCredentialsSchema = z.object({
+  version: z.literal(PROTOCOL_VERSION),
+  packageId: z.string(),
+  root: z.string(),
+  pid: z.int(),
+  socketPath: z.string(),
+  token: z.string().min(1),
+})
+
+const bridgeResponseHeaderSchema = z.object({
+  version: z.literal(PROTOCOL_VERSION),
+  requestId: z.string(),
+  target: z.string(),
+  ok: z.boolean(),
+})
+
+const bridgeErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.enum(['DSHX3201', 'DSHX3202', 'DSHX3203', 'DSHX3204', 'DSHX3205']),
+    message: z.string(),
+  }),
+})
+
+const optionalStringSchema = z.string().exactOptional()
+const itemMetadataSchema = z.record(z.string(), z.unknown()).exactOptional()
+const itemNameSchema = z.string().trim().min(1)
+
+const slotItemsSchema = z.array(
+  z.looseObject({
+    name: itemNameSchema,
+    provider: optionalStringSchema,
+    kind: optionalStringSchema,
+    scope: optionalStringSchema,
+    metadata: itemMetadataSchema,
+  }),
+)
+const serviceItemsSchema = z.array(
+  z.looseObject({ name: itemNameSchema, provider: optionalStringSchema, scope: optionalStringSchema, metadata: itemMetadataSchema }),
+)
+const eventItemsSchema = z.array(z.looseObject({ name: itemNameSchema, provider: optionalStringSchema, metadata: itemMetadataSchema }))
+
+type BridgeCredentials = z.infer<typeof bridgeCredentialsSchema>
+
+const bridgeRetryHint = 'Restart the Composition and retry the Inspect command.'
+
+const decodeBridgeResponse = <Item>({
+  line,
+  requestId,
+  target,
+  itemsSchema,
+}: {
+  readonly line: string
+  readonly requestId: string
+  readonly target: string
+  readonly itemsSchema: z.ZodType<readonly Item[]>
+}): readonly Item[] => {
+  let value: unknown
+  try {
+    value = JSON.parse(line)
+  } catch (cause) {
+    throw fail('DSHX3203', `Host Inspect bridge returned invalid JSON: ${String(cause)}`, bridgeRetryHint)
+  }
+  const header = bridgeResponseHeaderSchema.safeParse(value)
+  if (!header.success || header.data.requestId !== requestId || header.data.target !== target) {
+    throw fail('DSHX3203', 'Host Inspect bridge response has an invalid protocol header.', bridgeRetryHint)
+  }
+  if (!header.data.ok) {
+    const failure = bridgeErrorResponseSchema.safeParse(value)
+    if (!failure.success) throw fail('DSHX3203', 'Host Inspect bridge returned an invalid error response.', bridgeRetryHint)
+    throw fail(failure.data.error.code, failure.data.error.message, 'Inspect the running Composition and retry the command.')
+  }
+  const items = z.object({ items: itemsSchema }).safeParse(value)
+  if (!items.success) {
+    throw fail('DSHX3203', `Host Inspect bridge returned an invalid ${target} item list: ${z.prettifyError(items.error)}`, bridgeRetryHint)
+  }
+  return items.data.items
 }
 
 export interface DshInspectBridgeProviderOptions {
@@ -118,17 +189,8 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  if (
-    !isRecord(value) ||
-    value.version !== PROTOCOL_VERSION ||
-    typeof value.packageId !== 'string' ||
-    typeof value.root !== 'string' ||
-    !isAbsolute(value.root) ||
-    typeof value.pid !== 'number' ||
-    !Number.isInteger(value.pid) ||
-    typeof value.socketPath !== 'string' ||
-    !isAbsolute(value.socketPath)
-  ) {
+  const parsed = bridgeEndpointSchema.safeParse(value)
+  if (!parsed.success) {
     return {
       state: 'invalid',
       diagnostics: [
@@ -142,7 +204,12 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  if (value.packageId !== project.packageId || resolve(value.root) !== resolve(project.root) || resolve(value.socketPath) !== resolve(paths.socketPath)) {
+  const endpoint = parsed.data
+  if (
+    endpoint.packageId !== project.packageId ||
+    resolve(endpoint.root) !== resolve(project.root) ||
+    resolve(endpoint.socketPath) !== resolve(paths.socketPath)
+  ) {
     return {
       state: 'invalid',
       diagnostics: [
@@ -156,10 +223,10 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  if (!processAlive(value.pid)) {
+  if (!processAlive(endpoint.pid)) {
     return {
       state: 'stale',
-      metadata: publicMetadata(value),
+      metadata: publicMetadata(endpoint),
       diagnostics: [
         {
           code: 'DSHX5103',
@@ -172,11 +239,11 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
     }
   }
   try {
-    await access(value.socketPath)
+    await access(endpoint.socketPath)
   } catch {
     return {
       state: 'stale',
-      metadata: publicMetadata(value),
+      metadata: publicMetadata(endpoint),
       diagnostics: [
         {
           code: 'DSHX5103',
@@ -188,11 +255,11 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
       ],
     }
   }
-  const runtimePlugins = Array.isArray(value.runtimePlugins) ? value.runtimePlugins : []
+  const runtimePlugins = Array.isArray(endpoint.runtimePlugins) ? endpoint.runtimePlugins : []
   const failed = runtimePlugins.some(item => isRecord(item) && (item.status === 'failed' || item.status === 'missing'))
   return {
     state: failed ? 'unavailable' : 'running',
-    metadata: publicMetadata(value),
+    metadata: publicMetadata(endpoint),
     diagnostics: failed
       ? [
           {
@@ -207,11 +274,7 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
   }
 }
 
-async function readMetadata(
-  path: string,
-  project: ResolvedDshxConfig,
-  expectedSocket: string,
-): Promise<{ metadata: Required<Pick<BridgeMetadata, 'packageId' | 'root' | 'pid' | 'socketPath' | 'token'>>; socketPath: string }> {
+async function readMetadata(path: string, project: ResolvedDshxConfig, expectedSocket: string): Promise<BridgeCredentials> {
   let text: string
   try {
     text = await readFile(path, 'utf8')
@@ -233,53 +296,58 @@ async function readMetadata(
       'Restart the current DSH Composition so DSHX can recreate its endpoint metadata.',
     )
   }
-  if (
-    !isRecord(value) ||
-    value.version !== PROTOCOL_VERSION ||
-    typeof value.packageId !== 'string' ||
-    typeof value.root !== 'string' ||
-    typeof value.pid !== 'number' ||
-    !Number.isInteger(value.pid) ||
-    typeof value.socketPath !== 'string' ||
-    typeof value.token !== 'string' ||
-    value.token === ''
-  ) {
+  const parsed = bridgeCredentialsSchema.safeParse(value)
+  if (!parsed.success) {
     throw fail('DSHX3203', 'Host Inspect bridge metadata is invalid.', 'Restart the current DSH Composition so DSHX can recreate its endpoint metadata.')
   }
-  if (!isAbsolute(value.root) || !isAbsolute(value.socketPath) || value.packageId !== project.packageId || resolve(value.root) !== resolve(project.root)) {
+  const credentials = parsed.data
+  if (
+    !isAbsolute(credentials.root) ||
+    !isAbsolute(credentials.socketPath) ||
+    credentials.packageId !== project.packageId ||
+    resolve(credentials.root) !== resolve(project.root)
+  ) {
     throw fail(
       'DSHX3202',
       'Host Inspect bridge metadata does not belong to this project.',
       'Close stale DSH processes and restart the project from its configured root.',
     )
   }
-  if (resolve(value.socketPath) !== resolve(expectedSocket)) {
+  if (resolve(credentials.socketPath) !== resolve(expectedSocket)) {
     throw fail(
       'DSHX3202',
       'Host Inspect bridge socket path does not match its package endpoint.',
       'Restart the current DSH Composition and retry the Inspect command.',
     )
   }
-  if (!processAlive(value.pid)) {
+  if (!processAlive(credentials.pid)) {
     throw fail('DSHX3205', 'The Host Inspect bridge belongs to an exited Composition.', 'Restart the DSH Composition, then retry Inspect.')
   }
-  return { metadata: value as Required<Pick<BridgeMetadata, 'packageId' | 'root' | 'pid' | 'socketPath' | 'token'>>, socketPath: value.socketPath }
+  return credentials
 }
 
-async function request(
-  project: ResolvedDshxConfig,
-  target: 'services' | 'events' | 'slots',
-  options: DshInspectBridgeProviderOptions,
-  input?: Record<string, unknown>,
-): Promise<readonly Record<string, unknown>[]> {
+const request = async <Item>({
+  project,
+  target,
+  options,
+  input,
+  itemsSchema,
+}: {
+  readonly project: ResolvedDshxConfig
+  readonly target: 'services' | 'events' | 'slots'
+  readonly options: DshInspectBridgeProviderOptions
+  readonly input: { readonly root: string } | undefined
+  readonly itemsSchema: z.ZodType<readonly Item[]>
+}): Promise<readonly Item[]> => {
   const env = { ...process.env, ...options.env }
   const paths = endpointPaths(project.packageId, env)
-  const { metadata, socketPath } = await readMetadata(paths.metadataPath, project, paths.socketPath)
+  const metadata = await readMetadata(paths.metadataPath, project, paths.socketPath)
+  const socketPath = metadata.socketPath
   const requestId = `inspect-${randomUUID()}`
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const payload =
     JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
-  return await new Promise((resolveRequest, rejectRequest) => {
+  return await new Promise<readonly Item[]>((resolveRequest, rejectRequest) => {
     const socket = createConnection(socketPath)
     let buffer = ''
     let settled = false
@@ -288,7 +356,7 @@ async function request(
       rejectRequest(fail('DSHX3202', 'Timed out while querying the Host Inspect bridge.', 'Check the running Composition and retry the Inspect command.'))
       settled = true
     }, timeoutMs)
-    const finish = (error?: unknown, items?: readonly Record<string, unknown>[]) => {
+    const finish = (error?: unknown, items?: readonly Item[]) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
@@ -313,38 +381,11 @@ async function request(
       }
       const newline = buffer.indexOf('\n')
       if (newline < 0) return
-      let value: unknown
       try {
-        value = JSON.parse(buffer.slice(0, newline))
-      } catch (cause) {
-        finish(fail('DSHX3203', `Host Inspect bridge returned invalid JSON: ${String(cause)}`, 'Restart the Composition and retry the Inspect command.'))
-        return
+        finish(undefined, decodeBridgeResponse({ line: buffer.slice(0, newline), requestId, target, itemsSchema }))
+      } catch (error) {
+        finish(error)
       }
-      if (!isRecord(value)) {
-        finish(fail('DSHX3203', 'Host Inspect bridge returned an invalid response object.', 'Restart the Composition and retry the Inspect command.'))
-        return
-      }
-      const response = value as BridgeResponse
-      if (response.version !== PROTOCOL_VERSION || response.requestId !== requestId || response.target !== target || typeof response.ok !== 'boolean') {
-        finish(fail('DSHX3203', 'Host Inspect bridge response has an invalid protocol header.', 'Restart the Composition and retry the Inspect command.'))
-        return
-      }
-      if (response.ok === false) {
-        const error = isRecord(response.error) ? response.error : undefined
-        const code = error?.code
-        const message = error?.message
-        if ((code !== 'DSHX3201' && code !== 'DSHX3202' && code !== 'DSHX3203' && code !== 'DSHX3204' && code !== 'DSHX3205') || typeof message !== 'string') {
-          finish(fail('DSHX3203', 'Host Inspect bridge returned an invalid error response.', 'Restart the Composition and retry the Inspect command.'))
-        } else {
-          finish(fail(code, message, 'Inspect the running Composition and retry the command.'))
-        }
-        return
-      }
-      if (!Array.isArray(response.items) || response.items.some(item => !isRecord(item))) {
-        finish(fail('DSHX3203', 'Host Inspect bridge returned an invalid item list.', 'Restart the Composition and retry the Inspect command.'))
-        return
-      }
-      finish(undefined, response.items as readonly Record<string, unknown>[])
     })
     socket.on('connect', () => socket.write(payload))
   })
@@ -361,12 +402,13 @@ export class DshInspectBridgeProvider implements InspectProvider {
     if (options.root !== undefined && (typeof options.root !== 'string' || options.root.trim() === '')) {
       throw fail('DSHX3203', 'Slot Inspect root must be a non-empty string.', 'Pass a valid Slot name or omit --root.')
     }
-    return (await request(
-      this.project,
-      'slots',
-      this.options,
-      options.root === undefined ? undefined : { root: options.root },
-    )) as unknown as readonly SlotSummary[]
+    return await request({
+      project: this.project,
+      target: 'slots',
+      options: this.options,
+      input: options.root === undefined ? undefined : { root: options.root },
+      itemsSchema: slotItemsSchema,
+    })
   }
 
   listTools(): Promise<readonly ToolSummary[]> {
@@ -376,10 +418,10 @@ export class DshInspectBridgeProvider implements InspectProvider {
   }
 
   async listServices(): Promise<readonly ServiceSummary[]> {
-    return (await request(this.project, 'services', this.options)) as unknown as readonly ServiceSummary[]
+    return await request({ project: this.project, target: 'services', options: this.options, input: undefined, itemsSchema: serviceItemsSchema })
   }
 
   async listEvents(): Promise<readonly EventSummary[]> {
-    return (await request(this.project, 'events', this.options)) as unknown as readonly EventSummary[]
+    return await request({ project: this.project, target: 'events', options: this.options, input: undefined, itemsSchema: eventItemsSchema })
   }
 }
