@@ -94,11 +94,13 @@ const modelsFor = (
     provider: COMMANDCODE_KIND,
     baseUrl,
     reasoning: false,
-    input: ['text'],
+    // Annotated, because an inline literal widens `string[]` and no longer satisfies
+    // the tuple the contract declares.
+    input: ['text'] as const,
     contextWindow: 128_000,
     maxTokens: 8_192,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  })) as unknown as readonly Model<CommandCodeApi>[]
+  }))
 
 export const createCommandCodeProvider = (options: CommandCodeProviderOptions = {}) => {
   const base = providerBase(options.baseUrl)

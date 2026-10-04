@@ -203,6 +203,16 @@ export function assessProjectCompatibility(manifest: Readonly<Record<string, unk
 const HOST_PROVIDED_SCOPE = '@deepseek-ai/'
 
 /**
+ * Packages under the Host scope that are ordinary libraries rather than Host
+ * services. These are real runtime dependencies: the profile happens to carry
+ * them, but a plugin that imports one resolves it like any other library.
+ *
+ * `schemastery` is here because DSH's own plugin config is schemastery, so every
+ * profile has a copy — which is not the same as the Host providing it to plugins.
+ */
+const HOST_SCOPE_LIBRARIES = new Set(['@deepseek-ai/schemastery'])
+
+/**
  * Reject a Host-provided package declared as a runtime dependency.
  *
  * The correct shape is a `peerDependencies` range plus the concrete version in
@@ -216,7 +226,7 @@ export function projectHostProvidedDependencyDiagnostics(
   const section = manifest['dependencies']
   if (section === null || typeof section !== 'object' || Array.isArray(section)) return []
   const offenders = Object.keys(section as Record<string, unknown>)
-    .filter(name => name.startsWith(HOST_PROVIDED_SCOPE))
+    .filter(name => name.startsWith(HOST_PROVIDED_SCOPE) && !HOST_SCOPE_LIBRARIES.has(name))
     .sort()
   if (offenders.length === 0) return []
   return [

@@ -902,6 +902,43 @@ const exists = async (path: string): Promise<boolean> => {
   }
 }
 
+/**
+ * Boot a throwaway profile and report whether the plugin loads.
+ *
+ * The stage that catches what build, typecheck and manifest validation cannot: a
+ * module that resolves against the wrong tree, an entry that throws at import, a
+ * registration the Host rejects at activation.
+ */
+async function runBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
+  const io = options.io ?? defaultIO()
+  const { checkPluginBoot } = await import('../project/boot-check.js')
+  const result = await checkPluginBoot({
+    projectRoot: project.root,
+    profile: 'dshx-boot',
+    port: args.port ?? 0,
+  })
+  if (args.json) {
+    write(io.stdout, `${JSON.stringify({ project: projectSummary(project), boot: result }, null, 2)}\n`)
+    return result.ok ? 0 : 1
+  }
+  if (result.ok) {
+    write(io.stdout, `Booted cleanly at ${result.url ?? 'an announced URL'}.\n`)
+    return 0
+  }
+  const item = {
+    code: 'DSHX4109',
+    severity: 'error' as const,
+    message: result.timedOut
+      ? 'The Host did not start within the boot window.'
+      : `The Host started but the plugin did not load cleanly (${String(result.failures.length)} failing line(s)).`,
+    file: project.packageFile,
+    hint: 'The lines above come from the Host itself; the usual cause is a Host-provided package resolved from the wrong tree.',
+  }
+  printDiagnostic(io, item)
+  for (const line of result.failures) write(io.stdout, `  ${line}\n`)
+  return 1
+}
+
 async function runAddPreset(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
   const preset = args.addTarget === 'panel' ? 'panel' : 'api'
@@ -1194,7 +1231,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|commands|config> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, commands, config\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1241,7 +1278,13 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       write(io.stdout, `Packaged ${relativePath(project.root, tarball)}\n`)
       return 0
     }
-    if (args.command === 'check') return await runCheck(args, options, project)
+    if (args.command === 'check') {
+      const code = await runCheck(args, options, project)
+      // Boot last: it is the only stage that can see a load-time failure, and it
+      // costs a process, so it runs once everything cheaper has already passed.
+      if (code === 0 && args.boot) return await runBootCheck(args, options, project)
+      return code
+    }
     if (args.command === 'inspect') return await runInspect(args, options, project)
     if (args.command === 'add') {
       if (args.addTarget === 'tool') return await runAddTool(args, options, project)
