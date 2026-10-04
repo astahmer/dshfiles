@@ -17,16 +17,6 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
-  {
-    files: ['packages/plugin-marketplace/src/**/*.{ts,tsx}', 'packages/plugin-marketplace/tests/**/*.{ts,tsx}'],
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    languageOptions: {
-      globals: { ...globals.node, ...globals.browser },
-    },
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-    },
   },
   {
     files: ['eslint.config.js', 'scripts/**/*.mjs'],

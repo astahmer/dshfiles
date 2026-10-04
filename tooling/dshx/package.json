@@ -4,16 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @dshfiles/dshx build && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx-plugin-marketplace build",
-    "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src packages/plugin-marketplace/src packages/plugin-marketplace/tests scripts",
-    "format:check": "prettier --check README.md DECISIONS.md docs packages/*/README.md package.json pnpm-workspace.yaml prettier.core.json && prettier --check eslint.config.js packages/dshx/src packages/create-dshx/src packages/plugin-marketplace/src packages/plugin-marketplace/tests packages/plugin-marketplace/*.ts scripts --config prettier.core.json",
+    "build": "pnpm --filter @dshfiles/dshx build && pnpm --filter create-dshx build",
+    "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src scripts",
+    "format:check": "prettier --check README.md DECISIONS.md docs packages/*/README.md package.json pnpm-workspace.yaml prettier.core.json && prettier --check eslint.config.js packages/dshx/src packages/create-dshx/src scripts --config prettier.core.json",
     "deps:check": "knip",
     "typecheck": "pnpm --filter @dshfiles/dshx typecheck",
     "test": "pnpm --filter @dshfiles/dshx test",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test && pnpm --filter @dshfiles/dshx-plugin-marketplace typecheck && pnpm --filter @dshfiles/dshx-plugin-marketplace test",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test",
     "phase-a:build": "pnpm run build && pnpm --filter @dshx/phase-a-fixture build",
-    "smoke:dsh": "pnpm run build && node scripts/smoke-dsh.mjs",
-    "smoke:marketplace": "pnpm --filter @dshfiles/dshx-plugin-marketplace build && pnpm --dir packages/plugin-marketplace exec vitest run --config vitest.smoke.config.ts"
+    "smoke:dsh": "pnpm run build && node scripts/smoke-dsh.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

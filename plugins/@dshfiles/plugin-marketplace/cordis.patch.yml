@@ -1,0 +1,3 @@
+- insert:
+    - id: dshx-plugin-marketplace
+      name: '@dshfiles/plugin-marketplace'

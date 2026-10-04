@@ -14,7 +14,7 @@ const marketplaceTab = defineSlot('settings.plugins.tab', {
 })
 
 export default defineClient({
-  name: '@dshfiles/dshx-plugin-marketplace',
+  name: '@dshfiles/plugin-marketplace',
   locales: [marketplaceLocale],
   slots: [marketplaceTab],
   setup(ctx) {

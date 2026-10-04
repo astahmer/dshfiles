@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import type { SettingsScope } from '@deepseek-ai/dsh-settings'
+import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 export const DEFAULT_HUB_BASE_URL = 'https://dshx.io'
 

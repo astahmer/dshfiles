@@ -15,7 +15,7 @@ const marketplaceHostApi = pluginMarketplaceApi.host({
 })
 
 export default defineHost({
-  name: '@dshfiles/dshx-plugin-marketplace',
+  name: '@dshfiles/plugin-marketplace',
   settings: [marketplaceSettingsHost],
   apis: [marketplaceHostApi],
 })

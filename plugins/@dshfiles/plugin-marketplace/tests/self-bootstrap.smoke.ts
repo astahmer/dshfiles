@@ -109,7 +109,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
       timeout: 5 * 60_000,
     })
     const initialManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-    expect(initialManifest.dsh.profile.bundles).toContain('@dshfiles/dshx-plugin-marketplace')
+    expect(initialManifest.dsh.profile.bundles).toContain('@dshfiles/plugin-marketplace')
 
     hub = createServer((request, response) => {
       response.setHeader('content-type', 'application/json')
@@ -197,7 +197,7 @@ describe('plugin marketplace self-bootstrap smoke', () => {
       restartRequired: true,
     })
     const installedManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-    expect(installedManifest.dsh.profile.bundles).toEqual(expect.arrayContaining(['@dshfiles/dshx-plugin-marketplace', '@dshx-smoke/marketplace-target']))
+    expect(installedManifest.dsh.profile.bundles).toEqual(expect.arrayContaining(['@dshfiles/plugin-marketplace', '@dshx-smoke/marketplace-target']))
 
     const restarted = execa(dshCli, ['--profile', 'web', '--no-open', '--port', '0'], {
       cwd: workspace,
