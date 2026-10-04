@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
-import ts from 'typescript'
+import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
 
@@ -23,6 +23,7 @@ export const SHIPPED_SLOT_OCCUPANTS: ReadonlyMap<string, ReadonlySet<string>> = 
 async function sourceFile(specifier: string, importer: string): Promise<string | undefined> {
   const target = resolve(importer, '..', specifier)
   const extension = extname(target)
+  if (extension !== '' && !SOURCE_EXTENSIONS.some(candidate => candidate === extension)) return undefined
   const candidates =
     extension === ''
       ? [...SOURCE_EXTENSIONS.map(item => `${target}${item}`), ...SOURCE_EXTENSIONS.map(item => resolve(target, `index${item}`))]
@@ -38,18 +39,6 @@ async function sourceFile(specifier: string, importer: string): Promise<string |
   return undefined
 }
 
-function unwrap(expression: ts.Expression): ts.Expression {
-  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression) || ts.isNonNullExpression(expression))
-    return unwrap(expression.expression)
-  return expression
-}
-
-function propertyName(name: ts.PropertyName): string | undefined {
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text
-  if (ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression)) return name.expression.text
-  return undefined
-}
-
 /** One `ctx.slots.register({ name, id }, …)` call, with both keys read from literals. */
 export interface SlotRegistration {
   readonly slot: string
@@ -57,36 +46,28 @@ export interface SlotRegistration {
   readonly file: string
 }
 
-function registrationsIn(source: string, file: string): SlotRegistration[] {
-  const node = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+const registrationsIn = (source: string, file: string): SlotRegistration[] => {
+  const program = parseSource({ source, file })
   const found: SlotRegistration[] = []
-  const visit = (current: ts.Node): void => {
-    if (
-      ts.isCallExpression(current) &&
-      ts.isPropertyAccessExpression(current.expression) &&
-      current.expression.name.text === 'register' &&
-      current.arguments[0] !== undefined
-    ) {
-      const options = unwrap(current.arguments[0])
-      if (ts.isObjectLiteralExpression(options)) {
-        let slot: string | undefined
-        let id: string | undefined
-        for (const property of options.properties) {
-          if (ts.isSpreadAssignment(property)) continue
-          const name = propertyName(property.name)
-          if (name === undefined) continue
-          if (name !== 'name' && name !== 'id') continue
-          const initializer = ts.isPropertyAssignment(property) ? unwrap(property.initializer) : undefined
-          if (initializer === undefined || !ts.isStringLiteralLike(initializer)) continue
-          if (name === 'name') slot = initializer.text
-          else id = initializer.text
-        }
-        if (slot !== undefined && id !== undefined) found.push({ slot, id, file })
+  visitSource({ program, visitor: {
+    CallExpression(current) {
+      if (current.callee.type !== 'MemberExpression' || propertyName(current.callee.property) !== 'register') return
+      const argument = current.arguments[0]
+      if (argument === undefined || argument.type === 'SpreadElement') return
+      const options = unwrapExpression(argument)
+      if (options.type !== 'ObjectExpression') return
+      let slot: string | undefined
+      let id: string | undefined
+      for (const property of options.properties) {
+        if (property.type !== 'Property') continue
+        const name = propertyName(property.key)
+        const value = stringValue(unwrapExpression(property.value))
+        if (name === 'name') slot = value
+        if (name === 'id') id = value
       }
-    }
-    ts.forEachChild(current, visit)
-  }
-  visit(node)
+      if (slot !== undefined && id !== undefined) found.push({ slot, id, file })
+    },
+  } })
   return found
 }
 
@@ -109,18 +90,12 @@ export async function clientSlotRegistrations(entry: string, root: string): Prom
     } catch {
       continue
     }
-    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const parsed = parseSource({ source, file })
     found.push(...registrationsIn(source, file))
-    for (const statement of parsed.statements) {
-      if (
-        ts.isImportDeclaration(statement) &&
-        statement.moduleSpecifier !== undefined &&
-        ts.isStringLiteral(statement.moduleSpecifier) &&
-        statement.moduleSpecifier.text.startsWith('.')
-      ) {
-        const target = await sourceFile(statement.moduleSpecifier.text, file)
-        if (target !== undefined && !visited.has(target)) pending.push(target)
-      }
+    for (const statement of parsed.body) {
+      if (statement.type !== 'ImportDeclaration' || !statement.source.value.startsWith('.')) continue
+      const target = await sourceFile(statement.source.value, file)
+      if (target !== undefined && !visited.has(target)) pending.push(target)
     }
   }
   return found
