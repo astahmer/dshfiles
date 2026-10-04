@@ -1,13 +1,11 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { checkPackageTargets, checkProjectManifest } from '../src/project/index.js'
+import { writePluginFixture } from './plugin-fixture.js'
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const fixtureRoot = resolve(packageRoot, '../../fixtures/phase-a')
 const temporaryDirectories: string[] = []
 
 function fullManifest(): Record<string, unknown> {
@@ -125,8 +123,11 @@ describe('checkProjectManifest', () => {
     )
   })
 
-  it('accepts the checked-in Phase A fixture', async () => {
-    const resolved = await resolveDshxConfig({ cwd: fixtureRoot })
+  it('accepts the checked-in plugin fixture', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'dshx-manifest-fixture-'))
+    temporaryDirectories.push(root)
+    await writePluginFixture(root)
+    const resolved = await resolveDshxConfig({ cwd: root })
     await expect(checkProjectManifest(resolved)).resolves.toEqual([])
   })
 
@@ -160,13 +161,13 @@ describe('checkProjectManifest', () => {
     expect(diagnostics.filter(item => item.severity === 'warning')).toHaveLength(2)
   })
 
-  it('validates Client arrays, booleans, self requests, and the rc.8 baseline', async () => {
+  it('validates Client arrays, booleans, self requests, and the protocol-2 baseline', async () => {
     const root = await temporaryProject()
     const manifest = fullManifest()
     ;(manifest.dsh as { client: Record<string, unknown> }).client = {
       platform: 'web',
       inject: ['ok', 'ok', '', 1],
-      external: ['@test/plugin/internal', 'react', '@deepseek-ai/dsh-client-runtime/client', '@example/extra', '@example/extra'],
+      external: ['@test/plugin/internal', 'react', '@deepseek-ai/dsh-client-connection/client', '@example/extra', '@example/extra'],
       immediately: 'false',
     }
     await writeManifest(root, manifest)
@@ -175,7 +176,7 @@ describe('checkProjectManifest', () => {
     expect(diagnostics.filter(item => item.code === 'DSHX4212')).toHaveLength(2)
     expect(diagnostics.filter(item => item.code === 'DSHX4213')).toHaveLength(1)
     expect(diagnostics.filter(item => item.code === 'DSHX4214')).toHaveLength(1)
-    expect(diagnostics.filter(item => item.code === 'DSHX4215')).toHaveLength(2)
+    expect(diagnostics.filter(item => item.code === 'DSHX4215')).toHaveLength(3)
   })
 
   it('previews the hook-driven Settings provider edge through the local Client graph', async () => {
@@ -332,7 +333,7 @@ describe('checkProjectManifest', () => {
     )
 
     const manifest = fullManifest()
-    ;(manifest.dsh as { client: { inject: string[] } }).client.inject.push('@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation')
+    ;(manifest.dsh as { client: { inject: string[] } }).client.inject.push('@deepseek-ai/dsh-client-ui-conversation')
     await writeManifest(root, manifest)
     const complete = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4217' }))

@@ -5,14 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @dshfiles/dshx build && pnpm --filter create-dshx build",
-    "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src scripts",
-    "format:check": "prettier --check README.md DECISIONS.md docs packages/*/README.md package.json pnpm-workspace.yaml prettier.core.json && prettier --check eslint.config.js packages/dshx/src packages/create-dshx/src scripts --config prettier.core.json",
+    "lint": "eslint eslint.config.js packages/dshx/src packages/create-dshx/src",
+    "format:check": "prettier --check README.md DECISIONS.md docs packages/*/README.md package.json pnpm-workspace.yaml prettier.core.json && prettier --check eslint.config.js packages/dshx/src packages/create-dshx/src --config prettier.core.json",
     "deps:check": "knip",
     "typecheck": "pnpm --filter @dshfiles/dshx typecheck",
     "test": "pnpm --filter @dshfiles/dshx test",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test",
-    "phase-a:build": "pnpm run build && pnpm --filter @dshx/phase-a-fixture build",
-    "smoke:dsh": "pnpm run build && node scripts/smoke-dsh.mjs"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

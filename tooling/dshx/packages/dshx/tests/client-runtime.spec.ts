@@ -7,12 +7,11 @@ import { slotContributionParts } from '../src/client/define.js'
 import { localeDefinitionParts } from '../src/client/locale.js'
 import type { ClientConversationContribution } from '../src/client/types.js'
 import { defineConversation } from '../src/conversation/index.js'
-import { getConversationContributionParts } from '../src/conversation/define.js'
 import { createClientModule, createClientPlugin } from '../src/client/runtime.js'
 import { createSettingsClientRuntime } from '../src/settings/client.js'
 import { defineSettings } from '../src/settings/index.js'
 import Schema from '@deepseek-ai/schemastery'
-import { PROTOCOL_1_COMPATIBILITY } from '../src/compat/protocol-1.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -256,69 +255,13 @@ describe('Client runtime adapter', () => {
     expect(inject).toHaveBeenCalledWith('test.slot', expect.any(Function))
   })
 
-  it('registers each Conversation Definition before its paired keyed renderer and then setup', () => {
-    const calls: string[] = []
-    const first = conversationContribution('review-job')
-    const second = conversationContribution('audit-job')
-    const firstParts = getConversationContributionParts(first)
-    const secondParts = getConversationContributionParts(second)
-    const setup = vi.fn(() => {
-      calls.push('setup')
-    })
-    const plugin = createClientPlugin(
-      {
-        inject: ['conversationEvents', 'conversationEvents'],
-        conversations: [first, second],
-        setup,
-      },
-      { packageId: '@test/plugin', compatibility: PROTOCOL_1_COMPATIBILITY },
-    )
-    expect(plugin.inject).toEqual(['conversationEvents', 'slots'])
-
-    const definitions: unknown[] = []
-    const renderers: unknown[] = []
-    const disposers: Array<ReturnType<typeof vi.fn>> = []
-    plugin.apply({
-      conversationEvents: {
-        register(definition: { kind: string }) {
-          calls.push(`definition:${definition.kind}`)
-          definitions.push(definition)
-          const dispose = vi.fn()
-          disposers.push(dispose)
-          return dispose
-        },
-      },
-      slots: {
-        inject(name: string, register: () => unknown) {
-          calls.push(`inject:${name}`)
-          return register()
-        },
-        register(options: Record<string, unknown>, component: unknown) {
-          calls.push(`renderer:${String(options.key)}`)
-          renderers.push({ options, component })
-          const dispose = vi.fn()
-          disposers.push(dispose)
-          return dispose
-        },
-      },
-    } as unknown as Context)
-
-    expect(calls).toEqual([
-      'definition:review-job',
-      'inject:conversation.chat.node',
-      'renderer:review-job',
-      'definition:audit-job',
-      'inject:conversation.chat.node',
-      'renderer:audit-job',
-      'setup',
-    ])
-    expect(definitions).toEqual([firstParts.definition, secondParts.definition])
-    expect(renderers).toEqual([
-      { options: { name: 'conversation.chat.node', key: 'review-job', locale: 'conversation' }, component: firstParts.renderer.component },
-      { options: { name: 'conversation.chat.node', key: 'audit-job', locale: 'conversation' }, component: secondParts.renderer.component },
-    ])
-    expect(disposers).toHaveLength(4)
-    expect(disposers.every(dispose => dispose.mock.calls.length === 0)).toBe(true)
+  it('rejects Conversation contributions on a generation without a conversation event registry', () => {
+    expect(() =>
+      createClientPlugin(
+        { conversations: [conversationContribution()] },
+        { packageId: '@test/plugin', sourceFile: '/project/src/client.tsx', compatibility: PROTOCOL_2_COMPATIBILITY },
+      ),
+    ).toThrow(expect.objectContaining({ code: 'DSHX2302', file: '/project/src/client.tsx', hint: expect.stringContaining('slots') }))
   })
 
   it('does not register an empty Conversation list', () => {
@@ -327,39 +270,6 @@ describe('Client runtime adapter', () => {
     expect(plugin.inject).toEqual(['locale', 'slots'])
     plugin.apply({} as Context)
     expect(setup).toHaveBeenCalledOnce()
-  })
-
-  it('applies API and Settings providers to Conversation renderers without wrapping Definitions', async () => {
-    const conversation = conversationContribution()
-    const parts = getConversationContributionParts(conversation)
-    const definitions: unknown[] = []
-    const renderers: unknown[] = []
-    const get = vi.fn(() => undefined)
-    const plugin = createClientPlugin(
-      { conversations: [conversation] },
-      { packageId: '@test/plugin', settingsCapability: true, apiCapability: true, compatibility: PROTOCOL_1_COMPATIBILITY },
-    )
-    expect(plugin.inject).toEqual(['conversationEvents', 'slots', 'connection', 'settingsScope'])
-    await plugin.apply({
-      get,
-      conversationEvents: {
-        register: (definition: unknown) => {
-          definitions.push(definition)
-        },
-      },
-      slots: {
-        inject: (_name: string, register: () => unknown) => register(),
-        register: (_options: unknown, component: unknown) => {
-          renderers.push(component)
-        },
-      },
-    } as unknown as Context)
-    expect(definitions).toEqual([parts.definition])
-    expect(renderers).toHaveLength(1)
-    expect(renderers[0]).not.toBe(parts.renderer.component)
-    expect(get).toHaveBeenCalledWith('configForms')
-    // Connection remains lazy until the renderer actually calls useApi().
-    expect(get).not.toHaveBeenCalledWith('connection')
   })
 
   it('adds settingsScope from compiler metadata without a Client settings declaration', () => {

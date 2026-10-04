@@ -8,13 +8,13 @@ import type { InspectResult } from '../src/inspect/types.js'
 import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
 
 const compatibility = {
-  id: 'protocol-1',
-  protocolGeneration: 'protocol-1',
+  id: 'protocol-2',
+  protocolGeneration: 'protocol-2',
   lifecycle: 'active' as const,
-  version: '0.1.0-rc.8',
-  dshRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
-  verified: { minimum: '0.1.0-rc.8', latest: '0.1.0-rc.8' },
-  verifiedVersions: ['0.1.0-rc.8'],
+  version: '0.2.0-rc.1',
+  dshRange: '>=0.2.0-rc.1 <0.3.0-0',
+  verified: { minimum: '0.2.0-rc.1', latest: '0.2.0-rc.2' },
+  verifiedVersions: ['0.2.0-rc.1', '0.2.0-rc.2'],
   nodeRange: '^22.19.0 || >=24.0.0',
   profile: { listCommand: 'plugin-list-json' as const, addCommand: 'plugin-add' as const },
   inspect: { targets: ['slots', 'tools'] as const, provider: 'unavailable' as const },

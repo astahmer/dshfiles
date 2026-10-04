@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { inspectProjectComposition, normalizeSlots, normalizeTools } from '../src/inspect/index.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import { PROTOCOL_1_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 
 function project(): ResolvedDshxConfig {
   return {
@@ -23,13 +23,13 @@ function project(): ResolvedDshxConfig {
 
 function installation() {
   return {
-    version: '0.1.0-rc.8',
+    version: '0.2.0-rc.2',
     executable: 'local' as const,
     support: 'verified' as const,
-    adapterId: PROTOCOL_1_COMPATIBILITY.id,
-    protocolGeneration: PROTOCOL_1_COMPATIBILITY.protocolGeneration,
-    supportedRange: PROTOCOL_1_COMPATIBILITY.dshRange,
-    compatibility: PROTOCOL_1_COMPATIBILITY,
+    adapterId: PROTOCOL_2_COMPATIBILITY.id,
+    protocolGeneration: PROTOCOL_2_COMPATIBILITY.protocolGeneration,
+    supportedRange: PROTOCOL_2_COMPATIBILITY.dshRange,
+    compatibility: PROTOCOL_2_COMPATIBILITY,
     diagnostics: [],
   }
 }
@@ -39,8 +39,8 @@ describe('runtime inspect normalization', () => {
     expect(normalizeSlots([{ name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', order: 10 }])).toEqual([
       { name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', metadata: { order: 10 } },
     ])
-    expect(normalizeTools([{ name: 'status', provider: 'phase-a', description: 'Show status', input: { type: 'object' } }])).toEqual([
-      { name: 'status', provider: 'phase-a', description: 'Show status', metadata: { input: { type: 'object' } } },
+    expect(normalizeTools([{ name: 'status', provider: 'fixture', description: 'Show status', input: { type: 'object' } }])).toEqual([
+      { name: 'status', provider: 'fixture', description: 'Show status', metadata: { input: { type: 'object' } } },
     ])
   })
 

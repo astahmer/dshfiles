@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { PROTOCOL_1_COMPATIBILITY } from './protocol-1.js'
 import { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
 import { gt, intersects, prerelease, satisfies, subset, valid, validRange } from 'semver'
 import type {
@@ -12,7 +11,6 @@ import type {
   DshProjectCompatibilityAssessment,
 } from './types.js'
 
-export { PROTOCOL_1_COMPATIBILITY } from './protocol-1.js'
 export { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
 export type {
   DshCompatibility,
@@ -33,7 +31,7 @@ export type {
   DshxRuntimePluginSpec,
 } from './types.js'
 
-const ADAPTERS = [PROTOCOL_2_COMPATIBILITY, PROTOCOL_1_COMPATIBILITY] as const
+const ADAPTERS = [PROTOCOL_2_COMPATIBILITY] as const
 for (const compatibility of ADAPTERS) {
   const { minimum, latest } = compatibility.verified
   if (valid(minimum) === null || valid(latest) === null || gt(minimum, latest)) {
@@ -231,7 +229,7 @@ export function projectHostProvidedDependencyDiagnostics(
   if (offenders.length === 0) return []
   return [
     {
-      code: 'DSHX5107',
+      code: 'DSHX5110',
       severity: 'error',
       message: `The Host already provides ${offenders.map(name => `"${name}"`).join(', ')}; a plugin must not depend on a second copy.`,
       file: packageFile,

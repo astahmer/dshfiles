@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import { PROTOCOL_1_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 import type { BuildHostOptions } from '../src/compiler/host/build.js'
 import type { ResolvedDshxConfig } from '../src/tooling/index.js'
 import { startDevSession } from '../src/dev/index.js'
@@ -83,13 +83,13 @@ function prepared(projectValue: ResolvedDshxConfig): PreparedProjectProfile {
     link: 'existing',
     diagnostics: [],
     dsh: {
-      version: '0.1.0-rc.8',
-      adapterId: 'protocol-1',
-      protocolGeneration: 'protocol-1',
-      supportedRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
+      version: '0.2.0-rc.2',
+      adapterId: 'protocol-2',
+      protocolGeneration: 'protocol-2',
+      supportedRange: '>=0.2.0-rc.1 <0.3.0-0',
       support: 'verified',
       diagnostics: [],
-      compatibility: PROTOCOL_1_COMPATIBILITY,
+      compatibility: PROTOCOL_2_COMPATIBILITY,
     },
   }
 }
@@ -429,7 +429,7 @@ describe('development process orchestration', () => {
       severity: 'warning' as const,
       message: 'unsupported version',
       file: projectValue.packageFile,
-      hint: 'use rc.8',
+      hint: 'use rc.2',
     }
     const profile = prepared(projectValue)
     const session = await startDevSession(projectValue, {

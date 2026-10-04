@@ -1,21 +1,18 @@
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Plugin } from 'vite'
-import { PROTOCOL_1_COMPATIBILITY } from '../src/compat/protocol-1.js'
 import { buildClient, watchClient } from '../src/compiler/index.js'
+import { writePluginFixture } from './plugin-fixture.js'
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const fixtureRoot = resolve(packageRoot, '../../fixtures/phase-a')
 const temporaryDirectories: string[] = []
 
 async function temporaryProject(): Promise<string> {
-  const directory = await mkdtemp(resolve(tmpdir(), 'dshx-phase-a-'))
+  const directory = await mkdtemp(resolve(tmpdir(), 'dshx-fixture-'))
   temporaryDirectories.push(directory)
-  await cp(fixtureRoot, directory, { recursive: true })
+  await writePluginFixture(directory)
   const clientEntry = resolve(directory, 'src/client.tsx')
   await writeFile(clientEntry, (await readFile(clientEntry, 'utf8')).replaceAll('useQuery', 'useApiQuery'))
   return directory
@@ -28,7 +25,7 @@ describe('client compiler', () => {
   it('emits one lazy-CJS bundle with external React, owned CSS, and a TSX sourcemap', async () => {
     const root = await temporaryProject()
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -40,7 +37,7 @@ describe('client compiler', () => {
       sources: string[]
       sourcesContent?: Array<string | null>
     }
-    expect(code).toMatch(/window\.__ModuleLoader__\.load\(\{\s*id: "@dshx\/phase-a-fixture"/)
+    expect(code).toMatch(/window\.__ModuleLoader__\.load\(\{\s*id: "@dshx\/fixture-plugin"/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(JSON.stringify(map)).not.toContain(root)
     expect(code).toContain('src/client.tsx')
@@ -77,7 +74,7 @@ describe('client compiler', () => {
         },
       },
     })
-    expect(registration?.id).toBe('@dshx/phase-a-fixture')
+    expect(registration?.id).toBe('@dshx/fixture-plugin')
     expect(styles).toHaveLength(0)
 
     const plugin = registration?.factory(id => {
@@ -104,8 +101,8 @@ describe('client compiler', () => {
       throw new Error(`unexpected require: ${id}`)
     })
     expect(styles).toHaveLength(1)
-    expect(styles[0]?.dataset.plugin).toBe('@dshx/phase-a-fixture')
-    expect(styles[0]?.dataset.pluginCss).toBe('@dshx/phase-a-fixture/client.css')
+    expect(styles[0]?.dataset.plugin).toBe('@dshx/fixture-plugin')
+    expect(styles[0]?.dataset.pluginCss).toBe('@dshx/fixture-plugin/client.css')
     expect(styles[0]?.textContent).toContain('background: #101b2a')
     const registered: unknown[] = []
     const clientPlugin = plugin as unknown as {
@@ -113,7 +110,7 @@ describe('client compiler', () => {
       inject: readonly string[]
       apply(ctx: unknown): unknown
     }
-    expect(clientPlugin.name).toBe('@dshx/phase-a-fixture')
+    expect(clientPlugin.name).toBe('@dshx/fixture-plugin')
     expect(clientPlugin.inject).toEqual(['slots', 'connection'])
     await clientPlugin.apply({
       slots: {
@@ -153,7 +150,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       logicalName: 'logical-client',
       root,
       entry: 'src/client.tsx',
@@ -191,7 +188,7 @@ describe('client compiler', () => {
 
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -217,7 +214,7 @@ describe('client compiler', () => {
 
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -228,7 +225,7 @@ describe('client compiler', () => {
     })
 
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -262,7 +259,7 @@ describe('client compiler', () => {
 
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -274,7 +271,7 @@ describe('client compiler', () => {
     })
 
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -318,7 +315,7 @@ describe('client compiler', () => {
     )
     await expect(
       watchClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -340,84 +337,16 @@ describe('client compiler', () => {
     )
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
-        inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'],
+        inject: ['@deepseek-ai/dsh-client-ui-conversation'],
       }),
     ).resolves.toEqual(expect.objectContaining({ face: 'client' }))
   })
 
-  it('retains declarative Conversation contributions and wires both official registries', async () => {
-    const root = await temporaryProject()
-    await writeFile(
-      resolve(root, 'src/client.tsx'),
-      [
-        "import { defineClient } from '@dshfiles/dshx/client'",
-        "import { defineConversation } from '@dshfiles/dshx/experimental/conversation'",
-        'const component = () => null',
-        'const review = defineConversation({',
-        "  kind: 'review-job',",
-        "  events: { 'review/job-started': { role: 'start', id: () => 'review-job' } },",
-        '  initial(_context, event) { return event.data },',
-        '  project(state) { return { data: state } },',
-        '})',
-        'const contribution = review.render(component)',
-        'export default defineClient({ conversations: [contribution] })',
-        '',
-      ].join('\n'),
-    )
-    await buildClient({
-      packageId: '@dshx/phase-a-fixture',
-      root,
-      entry: 'src/client.tsx',
-      compatibility: PROTOCOL_1_COMPATIBILITY,
-      outDir: 'dist',
-      inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'],
-    })
-
-    const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    expect(code).not.toContain('dshx.conversation-component.v1')
-    expect(code).toContain('getConversationContributionParts')
-    expect(code).not.toContain('@dshfiles/dshx/experimental/conversation')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(() => ({})) as {
-      inject: string[]
-      apply(ctx: unknown): void
-    }
-    expect(plugin.inject).toEqual(['conversationEvents', 'slots'])
-
-    const calls: string[] = []
-    plugin.apply({
-      conversationEvents: {
-        register: (value: { kind: string }) => {
-          calls.push(`definition:${value.kind}`)
-        },
-      },
-      slots: {
-        inject: (name: string, registerRenderer: () => unknown) => {
-          calls.push(`inject:${name}`)
-          return registerRenderer()
-        },
-        register: (options: { key: string }, renderer: unknown) => {
-          calls.push(`renderer:${options.key}:${typeof renderer}`)
-        },
-      },
-    })
-    expect(calls).toEqual(['definition:review-job', 'inject:conversation.chat.node', 'renderer:review-job:function'])
-  })
-
-  it('fails a retained Conversation component without both official provider package edges', async () => {
+  it('fails a retained Conversation component without its official provider package edge', async () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/client.tsx'),
@@ -430,11 +359,11 @@ describe('client compiler', () => {
     )
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
-        inject: ['@deepseek-ai/dsh-client-runtime'],
+        inject: [],
       }),
     ).rejects.toMatchObject({
       code: 'DSHX1203',
@@ -455,7 +384,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -478,7 +407,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -492,7 +421,7 @@ describe('client compiler', () => {
       ["import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({ conversations: [] })', ''].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -511,7 +440,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -531,7 +460,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -564,7 +493,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       logicalName: 'logical-client',
       root,
       entry: 'src/client.tsx',
@@ -601,7 +530,7 @@ describe('client compiler', () => {
     await writeFile(resolve(root, 'src/client.tsx'), "import { readFile } from 'node:fs/promises'\nexport const apply = readFile\n")
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -614,7 +543,7 @@ describe('client compiler', () => {
     await writeFile(resolve(root, 'src/client.tsx'), "import value from '@deepseek-ai/dsh-client-ui-layout/client'\nexport const apply = value\n")
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -626,7 +555,7 @@ describe('client compiler', () => {
     const root = await temporaryProject()
     await writeFile(resolve(root, 'src/client.tsx'), "import { marker } from '@deepseek-ai/dsh-client-ui-layout/client'\nexport const apply = marker\n")
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -644,7 +573,7 @@ describe('client compiler', () => {
         "import { defineClient, defineSlot, useSettings } from '@dshfiles/dshx/client'",
         "import { defineSettings } from '@dshfiles/dshx/settings'",
         "const schema = Object.assign(value => value, { toJSON: () => ({ type: 'object' }) })",
-        "const settings = defineSettings({ namespace: 'phase-a', schema })",
+        "const settings = defineSettings({ namespace: 'fixture', schema })",
         'function Status() {',
         '  const state = useSettings(settings)',
         '  return <div>{String(state.value)}</div>',
@@ -654,7 +583,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -690,7 +619,7 @@ describe('client compiler', () => {
       ["import { defineClient, useSettings } from '@dshfiles/dshx/client'", 'void useSettings', 'export default defineClient({ setup() {} })', ''].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -706,7 +635,7 @@ describe('client compiler', () => {
       resolve(root, 'src/client.tsx'),
       [
         "import { defineClient, useSettings } from '@dshfiles/dshx/client'",
-        "const contract = { namespace: 'phase-a' }",
+        "const contract = { namespace: 'fixture' }",
         'function Status() { useSettings(contract); return null }',
         'export default defineClient({ setup() { return Status() } })',
         '',
@@ -714,7 +643,7 @@ describe('client compiler', () => {
     )
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -736,7 +665,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -777,7 +706,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -795,7 +724,7 @@ describe('client compiler', () => {
       ["import { defineClient, useApi } from '@dshfiles/dshx/client'", 'void useApi', 'export default defineClient({ setup() {} })', ''].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -817,7 +746,7 @@ describe('client compiler', () => {
       ].join('\n'),
     )
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -838,7 +767,7 @@ describe('client compiler', () => {
       },
     }
     const report = await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -855,7 +784,7 @@ describe('client compiler', () => {
     await writeFile(resolve(root, 'src/icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="2" r="2"/></svg>')
     await writeFile(resolve(root, 'src/client.tsx'), "import icon from './icon.svg'\nexport const name = icon\nexport function apply() {}\n")
     const report = await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -872,7 +801,7 @@ describe('client compiler', () => {
     }
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -892,7 +821,7 @@ describe('client compiler', () => {
     }
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -907,7 +836,7 @@ describe('client compiler', () => {
     }
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -921,7 +850,7 @@ describe('client compiler', () => {
     const root = await temporaryProject()
     await expect(
       watchClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -934,7 +863,7 @@ describe('client compiler', () => {
     const root = await temporaryProject()
     const configureServer = vi.fn()
     const watcher = await watchClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -968,7 +897,7 @@ describe('client compiler', () => {
     )
     await expect(
       buildClient({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/client.tsx',
         outDir: 'dist',
@@ -981,7 +910,7 @@ describe('client compiler', () => {
     await mkdir(resolve(root, 'dist'), { recursive: true })
     await writeFile(resolve(root, 'dist/host.js'), 'export function apply() {}\n')
     await buildClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -993,7 +922,7 @@ describe('client compiler', () => {
   it('rewrites the client artifact after a watched source change', async () => {
     const root = await temporaryProject()
     const result = await watchClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -1045,7 +974,7 @@ describe('client compiler', () => {
     await writeFile(sourcePath, clientSource(true, 'initial-locale'))
 
     const result = await watchClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',
@@ -1095,7 +1024,7 @@ describe('client compiler', () => {
     await writeFile(sourcePath, clientSource(false, 'initial-client'))
 
     const result = await watchClient({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/client.tsx',
       outDir: 'dist',

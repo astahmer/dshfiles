@@ -61,7 +61,7 @@ export interface DshClientSettingsCompatibility {
 
 /** Official Client conversation seams declared for one protocol generation. */
 export interface DshClientConversationCompatibility {
-  readonly runtimePackageName: '@deepseek-ai/dsh-client-runtime' | (string & {})
+  readonly runtimePackageName: '@deepseek-ai/dsh-client-ui-conversation' | (string & {})
   readonly rendererPackageName: '@deepseek-ai/dsh-client-ui-conversation'
   readonly eventService?: 'conversationEvents'
   readonly slotService: 'slots'

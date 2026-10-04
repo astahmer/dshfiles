@@ -251,14 +251,14 @@ describe('CLI commands', () => {
     expect(calls).toEqual(['host:stub', 'client'])
   })
 
-  it('rejects a public peer range that extends beyond one artifact generation', async () => {
+  it('rejects a public peer range that extends beyond the supported artifact generation', async () => {
     const streams = io()
     const value = project()
     const invalid = {
       ...value,
       manifest: {
         ...value.manifest,
-        peerDependencies: { '@deepseek-ai/dsh': '>=0.1.0-rc.8 <0.3.0-0' },
+        peerDependencies: { '@deepseek-ai/dsh': '>=0.1.0 <0.3.0-0' },
       },
     }
     const buildHost = vi.fn()
@@ -270,7 +270,7 @@ describe('CLI commands', () => {
     expect(buildHost).not.toHaveBeenCalled()
     streams.out.end()
     streams.err.end()
-    expect(await text(streams.err)).toContain('DSHX5107')
+    expect(await text(streams.err)).toContain('DSHX5106')
   })
 
   it('check emits JSON and reports absent Profile links without adding them', async () => {

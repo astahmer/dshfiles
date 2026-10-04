@@ -312,7 +312,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       'DSHX2302',
       'This DSH version has no native conversation event registry.',
       metadata,
-      'Use ordinary typed UI slots instead. Experimental defineConversation renderers require the protocol-1 registry.',
+      'Use ordinary typed UI slots instead. defineConversation renderers need a DSH generation that ships a conversation event registry.',
     )
   }
   const hasApiCapability = metadata.apiCapability === true

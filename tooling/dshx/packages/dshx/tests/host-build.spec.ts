@@ -1,20 +1,19 @@
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Plugin } from 'vite'
 import { buildHost } from '../src/compiler/index.js'
 import { watchHost } from '../src/compiler/host/build.js'
+import { writePluginFixture } from './plugin-fixture.js'
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const fixtureRoot = resolve(packageRoot, '../../fixtures/phase-a')
 const temporaryDirectories: string[] = []
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-host-'))
   temporaryDirectories.push(directory)
-  await cp(fixtureRoot, directory, { recursive: true })
+  await writePluginFixture(directory)
   return directory
 }
 
@@ -40,8 +39,8 @@ describe('host compiler', () => {
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
-      logicalName: 'logical-phase-a',
+      packageId: '@dshx/fixture-plugin',
+      logicalName: 'logical-fixture',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -66,7 +65,7 @@ describe('host compiler', () => {
         },
       },
     }
-    expect(plugin.name).toBe('logical-phase-a')
+    expect(plugin.name).toBe('logical-fixture')
     expect(plugin.inject).toEqual(['agents', 'tools'])
     plugin.apply(ctx)
     expect(calls).toEqual(['tool:first', 'tool:second', 'setup'])
@@ -94,7 +93,7 @@ describe('host compiler', () => {
     )
 
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -136,7 +135,7 @@ describe('host compiler', () => {
     )
 
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -165,7 +164,7 @@ describe('host compiler', () => {
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -187,7 +186,7 @@ describe('host compiler', () => {
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -225,7 +224,7 @@ describe('host compiler', () => {
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -269,13 +268,13 @@ describe('host compiler', () => {
         "import { defineHost } from '@dshfiles/dshx/host'",
         "import { defineSettings } from '@dshfiles/dshx/settings'",
         "const schema = Object.assign(value => value, { toJSON: () => ({ type: 'object' }) })",
-        "const runtimeSettings = defineSettings({ namespace: 'phase-a', schema, applies: 'live' })",
+        "const runtimeSettings = defineSettings({ namespace: 'fixture', schema, applies: 'live' })",
         'export default defineHost({ settings: [runtimeSettings] })',
         '',
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -285,7 +284,7 @@ describe('host compiler', () => {
     expect(code).not.toContain('@dshfiles/dshx/host')
     expect(code).not.toContain('@deepseek-ai/dsh-settings')
     expect(code).toContain('settings: [defineSettings({')
-    expect(code).toContain('namespace: "phase-a"')
+    expect(code).toContain('namespace: "fixture"')
   })
 
   it('emits a Node ESM entry with a sourcemap and preserves package imports', async () => {
@@ -306,7 +305,7 @@ describe('host compiler', () => {
     await writeFile(resolve(root, 'src/host-helper.ts'), "export default 'dshx-host'\n")
 
     const report = await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -330,7 +329,7 @@ describe('host compiler', () => {
   it('builds a client-only project with the standard no-op Host entry', async () => {
     const root = await temporaryProject()
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       logicalName: 'client-only-host',
       root,
       outDir: 'dist',
@@ -355,7 +354,7 @@ describe('host compiler', () => {
       ].join('\n'),
     )
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       logicalName: 'fallback-name',
       root,
       entry: 'src/host.ts',
@@ -387,7 +386,7 @@ describe('host compiler', () => {
       },
     }
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -403,7 +402,7 @@ describe('host compiler', () => {
     }
     await expect(
       buildHost({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/host.ts',
         outDir: 'dist',
@@ -417,7 +416,7 @@ describe('host compiler', () => {
     }
     await expect(
       buildHost({
-        packageId: '@dshx/phase-a-fixture',
+        packageId: '@dshx/fixture-plugin',
         root,
         entry: 'src/host.ts',
         outDir: 'dist',
@@ -429,7 +428,7 @@ describe('host compiler', () => {
   it('can omit generated artifact declarations explicitly', async () => {
     const root = await temporaryProject()
     const report = await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -444,7 +443,7 @@ describe('host compiler', () => {
     await mkdir(resolve(root, 'dist'), { recursive: true })
     await writeFile(resolve(root, 'dist/client.js'), 'window.__ModuleLoader__\n')
     await buildHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -457,10 +456,10 @@ describe('host compiler', () => {
     const sourcePath = resolve(root, 'src/host.ts')
     await writeFile(
       sourcePath,
-      "import { defineHost } from '@dshfiles/dshx/host'\nexport default defineHost({ setup() { return 'Phase A has no Host behavior' } })\n",
+      "import { defineHost } from '@dshfiles/dshx/host'\nexport default defineHost({ setup() { return 'Fixture has no Host behavior' } })\n",
     )
     const result = await watchHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
@@ -498,12 +497,12 @@ describe('host compiler', () => {
       // Wait until the watcher's own initial build is idle. Writing while that build is
       // running can be coalesced into it on fast filesystems and never trigger a rebuild.
       await waitForEvent('END')
-      const first = await waitForArtifact(code => code.includes('Phase A has no Host behavior'))
+      const first = await waitForArtifact(code => code.includes('Fixture has no Host behavior'))
       events.length = 0
       const source = await readFile(sourcePath, 'utf8')
-      await writeFile(sourcePath, source.replace('Phase A has no Host behavior', 'Phase A Host rebuilt'))
+      await writeFile(sourcePath, source.replace('Fixture has no Host behavior', 'Fixture Host rebuilt'))
       await waitForEvent('END')
-      const second = await waitForArtifact(code => code.includes('Phase A Host rebuilt'))
+      const second = await waitForArtifact(code => code.includes('Fixture Host rebuilt'))
       expect(first).not.toBe(second)
     } finally {
       await result.close()
@@ -515,7 +514,7 @@ describe('host compiler', () => {
     const sourcePath = resolve(root, 'src/host.ts')
     await writeFile(sourcePath, 'export const = broken\n')
     const watcher = await watchHost({
-      packageId: '@dshx/phase-a-fixture',
+      packageId: '@dshx/fixture-plugin',
       root,
       entry: 'src/host.ts',
       outDir: 'dist',
