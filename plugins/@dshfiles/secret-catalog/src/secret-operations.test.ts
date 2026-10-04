@@ -39,6 +39,32 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect(run).toHaveBeenLastCalledWith({ args: ['print', '--all', '--json'], cwd: '/tmp/demo', captureStdout: true })
   })
 
+  it('refuses metadata a CLI would read as another flag, before running anything', async () => {
+    const requests: SecretCliRequest[] = []
+    const operations = createSecretCatalogOperations(async request => {
+      requests.push(request)
+      return '[]'
+    })
+    await expect(operations.create({
+      alias: 'SYNTHETIC',
+      scope: 'global',
+      cwd: null,
+      environment: 'prod',
+      valueMode: 'generate',
+      value: null,
+      name: '--global',
+    })).rejects.toThrow()
+    await expect(operations.update({
+      alias: 'SYNTHETIC',
+      scope: 'global',
+      cwd: null,
+      environment: 'prod',
+      value: null,
+      tags: '-f',
+    })).rejects.toThrow()
+    expect(requests.filter(request => request.args[0] !== 'print')).toEqual([])
+  })
+
   it('runs reveal and clipboard copy only when exact alias methods are called', async () => {
     const run = vi.fn(async (request: SecretCliRequest) => request.args[0] === 'get' ? 'synthetic-value\n' : '')
     const operations = createSecretCatalogOperations(run)

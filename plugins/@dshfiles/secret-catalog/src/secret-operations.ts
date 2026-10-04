@@ -1,10 +1,7 @@
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
-import { z } from 'zod'
+import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
 import { parseSecretPrintMetadata, type SecretMetadata } from './secret-metadata.js'
-
-const aliasSchema = z.string().min(1).max(128).regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
-const environmentSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/)
 
 export type SecretScope = 'global' | 'project' | 'local'
 
@@ -69,23 +66,14 @@ export interface SecretUpdateInput {
   readonly tags?: string
 }
 
-const createMetadataArguments = (input: Pick<SecretCreateInput, 'name' | 'source' | 'tags' | 'type' | 'field'>): string[] => {
-  const args: string[] = []
-  if (input.name !== undefined) args.push('--name', input.name)
-  if (input.source !== undefined) args.push('--source', input.source)
-  if (input.tags !== undefined) args.push('--tags', input.tags)
-  if (input.type !== undefined) args.push('--type', input.type)
-  if (input.field !== undefined) args.push('--field', input.field)
-  return args
-}
+const flagArguments = (metadata: Readonly<Record<string, string | undefined>>): string[] =>
+  Object.entries(metadata).flatMap(([flag, value]) => (value === undefined ? [] : [`--${flag}`, value]))
 
-const updateMetadataArguments = (input: Pick<SecretUpdateInput, 'name' | 'source' | 'tags'>): string[] => {
-  const args: string[] = []
-  if (input.name !== undefined) args.push('--name', input.name)
-  if (input.source !== undefined) args.push('--source', input.source)
-  if (input.tags !== undefined) args.push('--tags', input.tags)
-  return args
-}
+const createMetadataArguments = (input: Pick<SecretCreateInput, 'name' | 'source' | 'tags' | 'type' | 'field'>): string[] =>
+  flagArguments(createMetadataSchema.parse({ name: input.name, source: input.source, tags: input.tags, type: input.type, field: input.field }))
+
+const updateMetadataArguments = (input: Pick<SecretUpdateInput, 'name' | 'source' | 'tags'>): string[] =>
+  flagArguments(updateMetadataSchema.parse({ name: input.name, source: input.source, tags: input.tags }))
 
 const scopeArguments = (scope: SecretScope, cwd: string | null): string[] => {
   if (scope === 'global') return ['--global']

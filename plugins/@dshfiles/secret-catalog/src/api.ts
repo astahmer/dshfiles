@@ -1,23 +1,10 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
 import { secretMetadataSchema } from './secret-metadata.js'
 
 const cwdSchema = z.string().max(4096).nullable()
-const aliasSchema = z.string().min(1).max(128).regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
 const scopeSchema = z.enum(['global', 'project', 'local'])
-const environmentSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/)
-const createMetadataInput = {
-  name: z.string().max(512).optional(),
-  source: z.string().max(2048).optional(),
-  tags: z.string().max(1024).optional(),
-  type: z.string().max(64).optional(),
-  field: z.string().max(256).optional(),
-}
-const updateMetadataInput = {
-  name: z.string().max(512).optional(),
-  source: z.string().max(2048).optional(),
-  tags: z.string().max(1024).optional(),
-}
 
 export const secretCatalogApi = defineApi({
   id: 'secret-catalog',
@@ -41,7 +28,7 @@ export const secretCatalogApi = defineApi({
         environment: environmentSchema,
         valueMode: z.enum(['generate', 'manual']),
         value: z.string().max(262_144).nullable(),
-        ...createMetadataInput,
+        ...createMetadataSchema.shape,
       }).refine(input => input.valueMode === 'generate' ? input.value === null : input.value !== null && input.value.length > 0, {
         message: 'A manual value is required only for manual creation.',
       }),
@@ -54,7 +41,7 @@ export const secretCatalogApi = defineApi({
         scope: scopeSchema,
         value: z.string().max(262_144).nullable(),
         environment: environmentSchema,
-        ...updateMetadataInput,
+        ...updateMetadataSchema.shape,
       }),
       output: z.object({ updated: z.literal(true) }),
     }),
