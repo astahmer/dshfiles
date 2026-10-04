@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
 const PLUGIN_FIXTURE_FILES: Readonly<Record<string, string>> = {
@@ -398,4 +398,8 @@ export const writePluginFixture = async (directory: string): Promise<void> => {
     await mkdir(dirname(target), { recursive: true })
     await writeFile(target, content)
   }
+  // The fixture declares external imports but an install never happens under
+  // mkdtemp; link this package's node_modules so the built artifact's imports
+  // stay resolvable when the test imports dist/.
+  await symlink(resolve(import.meta.dirname, '../node_modules'), resolve(directory, 'node_modules'), 'dir')
 }
