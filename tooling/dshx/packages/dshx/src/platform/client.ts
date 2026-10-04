@@ -358,7 +358,7 @@ export interface ChangeResult {
 }
 
 export interface DshPlatformTransport {
-  rpc(namespace: string, method: string, args: readonly JsonValue[], signal?: AbortSignal): Promise<unknown>
+  rpc(namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown>
   sessionCursor(sessionId: string): Promise<number>
 }
 
@@ -660,48 +660,58 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
 
 function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   const listSessions = async (): Promise<readonly SessionSummary[]> => {
-    const result = z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', [{}]))
+    const result = z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', { _request: {} }))
     return result.items.map(mapSession)
   }
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
     const result = z.object({ records: z.array(jsonValueSchema), hasMore: z.boolean() }).parse(
-      await transport.rpc('session', 'page', [
-        {
+      await transport.rpc('session', 'page', {
+        request: {
           address: { kind: 'session', sessionId },
           throughSeq,
           ...(beforeSeq === undefined ? {} : { beforeSeq }),
           maxMessages,
         },
-      ]),
+      }),
     )
     return { records: result.records, hasMore: result.hasMore }
   }
 
-  const describe = async (): Promise<SettingsDescription> => mapSettings(await transport.rpc('settings', 'describe', []))
+  const describe = async (): Promise<SettingsDescription> => mapSettings(await transport.rpc('settings', 'describe', {}))
 
   return {
     sessions: {
       list: listSessions,
       search: async query => {
-        const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', [{ query }]))
+        const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', { request: { query } }))
         return { items: result.items, hasMore: result.hasMore }
       },
       create: async input => {
-        const parsed = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(await transport.rpc('session', 'create', [input]))
+        const parsed = z
+          .object({ sessionId: z.string(), agentPreset: z.string().optional() })
+          .parse(await transport.rpc('session', 'create', { request: input }))
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
       fork: async (sessionId, atSeq) =>
-        z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', [{ sessionId, ...(atSeq === undefined ? {} : { atSeq }) }])),
-      cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', [{ sessionId }])),
+        z
+          .object({ sessionId: z.string() })
+          .parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq === undefined ? {} : { atSeq }) } })),
+      cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', { request: { sessionId } })),
       rename: async (sessionId, title) =>
-        z.object({ title: z.string(), seq: z.number().safe().nonnegative() }).parse(await transport.rpc('session', 'rename', [{ sessionId, title }])),
+        z
+          .object({ title: z.string(), seq: z.number().safe().nonnegative() })
+          .parse(await transport.rpc('session', 'rename', { request: { sessionId, title } })),
       archive: async sessionId => {
-        const result = z.object({ archivedSessionIds: z.array(z.string()) }).parse(await transport.rpc('workspace', 'archiveSession', [{ sessionId }]))
+        const result = z
+          .object({ archivedSessionIds: z.array(z.string()) })
+          .parse(await transport.rpc('workspace', 'archiveSession', { request: { sessionId } }))
         return { archivedSessionIds: result.archivedSessionIds }
       },
       unarchive: async sessionId => {
-        const result = z.object({ archivedSessionIds: z.array(z.string()) }).parse(await transport.rpc('workspace', 'unarchiveSession', [{ sessionId }]))
+        const result = z
+          .object({ archivedSessionIds: z.array(z.string()) })
+          .parse(await transport.rpc('workspace', 'unarchiveSession', { request: { sessionId } }))
         return { archivedSessionIds: result.archivedSessionIds }
       },
       prompt: async (sessionId, text, mode, signal) => {
@@ -711,7 +721,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
           mode,
           content: [{ type: 'text', text }],
         }
-        return z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'prompt', [request], signal))
+        return z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'prompt', { request }, signal))
       },
       page,
       history: async (sessionId, maxMessages = 100) => {
@@ -746,15 +756,15 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     },
     plugins: {
       list: async () => {
-        const values = z.array(pluginSchema).parse(await transport.rpc('pluginManager', 'listPlugins', []))
+        const values = z.array(pluginSchema).parse(await transport.rpc('pluginManager', 'listPlugins', {}))
         return values.map(mapPlugin)
       },
-      check: async spec => mapPluginInspection(await transport.rpc('pluginManager', 'inspect', [spec, {}])),
-      setEnabled: async (id, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setPluginEnabled', [id, enabled])),
+      check: async spec => mapPluginInspection(await transport.rpc('pluginManager', 'inspect', { spec, options: {} })),
+      setEnabled: async (id, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setPluginEnabled', { id, enabled })),
     },
     bundles: {
       list: async () => {
-        const values = z.array(bundleSchema).parse(await transport.rpc('pluginManager', 'listBundles', []))
+        const values = z.array(bundleSchema).parse(await transport.rpc('pluginManager', 'listBundles', {}))
         return values.map(mapBundle)
       },
       install: async (spec, signal) => {
@@ -762,11 +772,11 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         const requestId = randomUUID()
         let cancellation: Promise<unknown> | undefined
         const cancelInstall = (): void => {
-          cancellation = transport.rpc('pluginManager', 'cancelInstall', [requestId]).catch(() => undefined)
+          cancellation = transport.rpc('pluginManager', 'cancelInstall', { requestId }).catch(() => undefined)
         }
         signal?.addEventListener('abort', cancelInstall, { once: true })
         try {
-          const result = mapChangeResult(await transport.rpc('pluginManager', 'installBundle', [spec, { requestId }]))
+          const result = mapChangeResult(await transport.rpc('pluginManager', 'installBundle', { spec, options: { requestId } }))
           if (signal?.aborted && result.application === 'cancelled')
             throw new DshPlatformError('cancelled', 'DSH bundle installation was cancelled and its profile files were restored.')
           return result
@@ -775,30 +785,30 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
           if (cancellation !== undefined) await cancellation
         }
       },
-      remove: async name => mapChangeResult(await transport.rpc('pluginManager', 'removeBundle', [name])),
-      setEnabled: async (name, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', [name, enabled])),
+      remove: async name => mapChangeResult(await transport.rpc('pluginManager', 'removeBundle', { name })),
+      setEnabled: async (name, enabled) => mapChangeResult(await transport.rpc('pluginManager', 'setBundleEnabled', { name, enabled })),
     },
     presets: {
-      list: async () => agentPresetRosterSchema.parse(await transport.rpc('agentPresets', 'list', [])).presets.map(mapAgentPresetRow),
-      show: async id => mapAgentPresetDocument(await transport.rpc('agentPresets', 'read', [id])),
+      list: async () => agentPresetRosterSchema.parse(await transport.rpc('agentPresets', 'list', {})).presets.map(mapAgentPresetRow),
+      show: async id => mapAgentPresetDocument(await transport.rpc('agentPresets', 'read', { agentPreset: id })),
     },
     models: {
-      list: async () => mapModelCatalog(await transport.rpc('session', 'modelCatalog', [])),
+      list: async () => mapModelCatalog(await transport.rpc('session', 'modelCatalog', {})),
       select: async (sessionId, selection) => {
         const request = { sessionId, ...selection }
-        const result = z.object({ selected: modelSelectionSchema }).parse(await transport.rpc('session', 'selectModel', [request]))
+        const result = z.object({ selected: modelSelectionSchema }).parse(await transport.rpc('session', 'selectModel', { request }))
         return mapModelSelection(result.selected)
       },
     },
     skills: {
       list: async sessionId => {
-        const result = z.object({ skills: z.array(skillEntrySchema) }).parse(await transport.rpc('skills', 'list', [{ sessionId }]))
+        const result = z.object({ skills: z.array(skillEntrySchema) }).parse(await transport.rpc('skills', 'list', { request: { sessionId } }))
         return result.skills.map(mapSkillEntry)
       },
     },
     commands: {
       list: async sessionId => {
-        const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', [sessionId]))
+        const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', { agentId: sessionId }))
         return values.map(item => ({
           ...(item.definitionId === undefined ? {} : { definitionId: item.definitionId }),
           name: item.name,
@@ -808,7 +818,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       },
       execute: async (sessionId, line, signal) => {
         if (!line.startsWith('/')) throw new DshPlatformError('invalid-command', 'DSH commands must start with / at byte 0.')
-        const result = await transport.rpc('commands', 'execute', [sessionId, line, []], signal)
+        const result = await transport.rpc('commands', 'execute', { agentId: sessionId, line, submittedAttachments: [] }, signal)
         return result === undefined ? null : decodeJsonValue(result, 'Command execution')
       },
     },
@@ -816,7 +826,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       describe,
       mutate: async (namespace, path, value, revision) => {
         const op = value === undefined ? { op: 'unset', path: [...path] } : { op: 'set', path: [...path], value }
-        await transport.rpc('settings', 'mutate', [namespace, [op], revision])
+        await transport.rpc('settings', 'mutate', { ns: namespace, ops: [op], expectedRevision: revision })
         return describe()
       },
     },
@@ -855,7 +865,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
   }
   if (!cookie) throw new DshPlatformError('authentication-failed', 'DSH did not issue an authenticated session cookie for the launch URL.')
 
-  const rpc = async (namespace: string, method: string, args: readonly JsonValue[], signal?: AbortSignal): Promise<unknown> => {
+  const rpc = async (namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown> => {
     const rpcId = randomUUID()
     let response: Response
     try {
@@ -917,7 +927,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
             streamId,
             endpoint: 'session/follow',
             payload: {
-              args: [{ address: { kind: 'session', sessionId }, maxMessages: 1 }],
+              args: { request: { address: { kind: 'session', sessionId }, maxMessages: 1 } },
             },
           }),
         )

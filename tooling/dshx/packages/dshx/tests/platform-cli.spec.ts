@@ -203,6 +203,8 @@ describe('DSH platform CLI', () => {
     expect(new Headers(apiCall?.init?.headers).get('cookie')).toBe('dsh.session=example-cookie')
     expect(commandCall?.url).toBe('http://127.0.0.1:3080/api/commands/execute')
     expect(commandCall?.init?.signal).toBe(controller.signal)
+    expect(JSON.parse(String(apiCall?.init?.body)).payload.args).toEqual({ _request: {} })
+    expect(JSON.parse(String(commandCall?.init?.body)).payload.args).toEqual({ agentId: 'session-1', line: '/help', submittedAttachments: [] })
   })
 
   it('refuses non loopback launch URLs before making a request', async () => {
@@ -268,7 +270,7 @@ describe('DSH platform CLI', () => {
     const calls: {
       readonly namespace: string
       readonly method: string
-      readonly args: readonly unknown[]
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
     }[] = []
     const client = clientWith(async (namespace, method, args) => {
       calls.push({ namespace, method, args })
@@ -297,7 +299,7 @@ describe('DSH platform CLI', () => {
     expect(calls[1]).toMatchObject({
       namespace: 'settings',
       method: 'mutate',
-      args: ['plugin', [{ op: 'set', path: ['enabled'], value: true }], 7],
+      args: { ns: 'plugin', ops: [{ op: 'set', path: ['enabled'], value: true }], expectedRevision: 7 },
     })
     await expect(client.commands.execute('session-1', 'help')).rejects.toThrow('must start with /')
   })
@@ -309,7 +311,7 @@ describe('DSH platform CLI', () => {
       rpc: async (namespace, method, args) => {
         expect(namespace).toBe('session')
         expect(method).toBe('page')
-        const request = z.object({ beforeSeq: z.number().optional() }).parse(args[0])
+        const request = z.object({ beforeSeq: z.number().optional() }).parse(args.request)
         beforeSeqs.push(request.beforeSeq)
         if (request.beforeSeq === undefined) {
           return {
@@ -342,7 +344,7 @@ describe('DSH platform CLI', () => {
     const client = clientWith(async (namespace, method, args) => {
       expect(namespace).toBe('pluginManager')
       expect(method).toBe('setPluginEnabled')
-      expect(args).toEqual(['entry-1', true])
+      expect(args).toEqual({ id: 'entry-1', enabled: true })
       return {
         application: 'restart-required',
         changed: true,
@@ -500,7 +502,7 @@ describe('DSH platform CLI', () => {
     const calls: {
       readonly namespace: string
       readonly method: string
-      readonly args: readonly unknown[]
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
     }[] = []
     const client = clientWith(async (namespace, method, args) => {
       calls.push({ namespace, method, args })
@@ -636,9 +638,9 @@ describe('DSH platform CLI', () => {
       'session/selectModel',
       'skills/list',
     ])
-    expect(calls[2]?.args).toEqual([{ sessionId: 'session-1' }])
-    expect(calls[3]?.args).toEqual([{ sessionId: 'session-1' }])
-    expect(calls[4]?.args[0]).toMatchObject({
+    expect(calls[2]?.args).toEqual({ request: { sessionId: 'session-1' } })
+    expect(calls[3]?.args).toEqual({ request: { sessionId: 'session-1' } })
+    expect(calls[4]?.args.request).toMatchObject({
       sessionId: 'session-1',
       mode: 'queue',
       content: [{ type: 'text', text: 'synthetic prompt' }],
@@ -649,7 +651,7 @@ describe('DSH platform CLI', () => {
     const calls: {
       readonly namespace: string
       readonly method: string
-      readonly args: readonly unknown[]
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
     }[] = []
     let resolveInstall: ((result: unknown) => void) | undefined
     const client = clientWith(async (namespace, method, args) => {
@@ -673,16 +675,16 @@ describe('DSH platform CLI', () => {
     })
 
     await expect(installation).rejects.toMatchObject({ code: 'cancelled' })
-    const requestId = z.object({ requestId: z.string() }).parse(calls[0]?.args[1]).requestId
+    const requestId = z.object({ requestId: z.string() }).parse(calls[0]?.args.options).requestId
     expect(calls[0]).toMatchObject({
       namespace: 'pluginManager',
       method: 'installBundle',
-      args: ['@sample/bundle', { requestId }],
+      args: { spec: '@sample/bundle', options: { requestId } },
     })
     expect(calls[1]).toMatchObject({
       namespace: 'pluginManager',
       method: 'cancelInstall',
-      args: [requestId],
+      args: { requestId },
     })
   })
 
@@ -692,7 +694,7 @@ describe('DSH platform CLI', () => {
     const calls: {
       readonly namespace: string
       readonly method: string
-      readonly args: readonly unknown[]
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
     }[] = []
     const client = clientWith(async (namespace, method, args) => {
       calls.push({ namespace, method, args })
@@ -716,12 +718,12 @@ describe('DSH platform CLI', () => {
     expect(calls[0]).toMatchObject({
       namespace: 'session',
       method: 'prompt',
-      args: [
-        {
+      args: {
+        request: {
           sessionId: 'session-1',
           content: [{ type: 'text', text: 'secret-like synthetic message' }],
         },
-      ],
+      },
     })
   })
 })
