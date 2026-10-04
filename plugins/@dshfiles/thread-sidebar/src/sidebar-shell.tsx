@@ -1,7 +1,7 @@
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { moveSidebarEntry, orderSidebarEntries, type OrderedSidebarEntry } from './organization.js'
+import { orderSidebarEntries, reorderSidebarEntry, type OrderedSidebarEntry } from './organization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import styles from './sidebar-shell.module.css'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -42,13 +42,6 @@ interface FooterEntry extends OrderedSidebarEntry {
 }
 
 const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTranslate>[0]): string => translate(key)
-
-const updateOrder = (entries: readonly OrderedSidebarEntry[], savedOrder: readonly string[], id: string, direction: -1 | 1): string[] =>
-  moveSidebarEntry(
-    orderSidebarEntries(entries, savedOrder).map(entry => entry.id),
-    id,
-    direction,
-  )
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
@@ -122,12 +115,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const visibleFooterEntries = orderedFooterEntries.filter(entry => !preferences.hiddenFooterIds.includes(entry.id))
   const hiddenFooterEntries = orderedFooterEntries.filter(entry => preferences.hiddenFooterIds.includes(entry.id))
 
-  const updateHeaderOrder = (id: string, direction: -1 | 1): void => {
-    updatePreferences({ headerOrder: updateOrder(headerEntries, preferences.headerOrder, id, direction) })
-  }
-  const updateFooterOrder = (id: string, direction: -1 | 1): void => {
-    updatePreferences({ footerOrder: updateOrder(footerEntries, preferences.footerOrder, id, direction) })
-  }
   const renderFooterEntry = (entry: FooterEntry, renderWide: boolean): ReactNode => {
     if (entry.kind === 'settings') {
       return props.renderSlot('sidebar.settings', { wide: renderWide })
@@ -149,53 +136,88 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     if (entry.panelId !== undefined) props.selectPanel(entry.panelId)
   }
 
+  /**
+   * One customizable row, shaped like the reference: a drag handle, the entry's
+   * own icon, its label, and a filled toggle. Arrow buttons and a bare checkbox
+   * cannot express the same affordance, so reordering is by pointer drag and
+   * visibility is by the toggle.
+   */
+  const renderCustomizeRow = (entry: { id: string; label: string }, index: number, icon: ReactNode, hidden: boolean, onReorder: (from: number, to: number) => void, onToggle: () => void): JSX.Element => (
+    <div
+      className={styles.customizeRow}
+      key={entry.id}
+      draggable
+      onDragStart={event => {
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', String(index))
+      }}
+      onDragOver={event => event.preventDefault()}
+      onDrop={event => {
+        event.preventDefault()
+        const from = Number(event.dataTransfer.getData('text/plain'))
+        if (Number.isInteger(from)) onReorder(from, index)
+      }}
+    >
+      <span className={styles.dragHandle} aria-hidden="true">
+        ⠿
+      </span>
+      <span className={styles.customizeIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <span className={styles.customizeLabel}>{entry.label}</span>
+      <button
+        type="button"
+        className={styles.visibilityToggle}
+        role="switch"
+        aria-checked={!hidden}
+        aria-label={`${text(props.t, 'threadSidebarVisibility')}: ${entry.label}`}
+        onClick={onToggle}
+      >
+        <span className={styles.visibilityThumb} />
+      </button>
+    </div>
+  )
+
+  const headerIconFor = (entry: HeaderEntry): ReactNode => {
+    if (entry.kind === 'new-thread') return <span aria-hidden="true">＋</span>
+    if (entry.kind === 'search') return <span aria-hidden="true">⌕</span>
+    if (entry.panelId === undefined) return null
+    return props.renderSlot('sidebar.panellist', { size: 18, active: activePanelId === entry.panelId }, { only: entry.panelId })
+  }
+
   const renderHeaderCustomizeRows = (): JSX.Element[] =>
-    orderedHeaderEntries.map((entry, index) => (
-      <div className={styles.customizeRow} key={entry.id}>
-        <span className={styles.customizeLabel}>{entry.label}</span>
-        <button type="button" aria-label={text(props.t, 'threadSidebarMoveUp')} disabled={index === 0} onClick={() => updateHeaderOrder(entry.id, -1)}>
-          ↑
-        </button>
-        <button
-          type="button"
-          aria-label={text(props.t, 'threadSidebarMoveDown')}
-          disabled={index === orderedHeaderEntries.length - 1}
-          onClick={() => updateHeaderOrder(entry.id, 1)}
-        >
-          ↓
-        </button>
-        <input
-          type="checkbox"
-          aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
-          checked={!preferences.hiddenHeaderIds.includes(entry.id)}
-          onChange={() => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) })}
-        />
-      </div>
-    ))
+    orderedHeaderEntries.map((entry, index) =>
+      renderCustomizeRow(
+        entry,
+        index,
+        headerIconFor(entry),
+        preferences.hiddenHeaderIds.includes(entry.id),
+        (from, to) =>
+          updatePreferences({
+            headerOrder: reorderSidebarEntry(orderSidebarEntries(headerEntries, preferences.headerOrder).map(item => item.id), from, to),
+          }),
+        () => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) }),
+      ),
+    )
 
   const renderFooterCustomizeRows = (): JSX.Element[] =>
-    orderedFooterEntries.map((entry, index) => (
-      <div className={styles.customizeRow} key={entry.id}>
-        <span className={styles.customizeLabel}>{entry.label}</span>
-        <button type="button" aria-label={text(props.t, 'threadSidebarMoveUp')} disabled={index === 0} onClick={() => updateFooterOrder(entry.id, -1)}>
-          ↑
-        </button>
-        <button
-          type="button"
-          aria-label={text(props.t, 'threadSidebarMoveDown')}
-          disabled={index === orderedFooterEntries.length - 1}
-          onClick={() => updateFooterOrder(entry.id, 1)}
-        >
-          ↓
-        </button>
-        <input
-          type="checkbox"
-          aria-label={text(props.t, 'threadSidebarVisibility') + ': ' + entry.label}
-          checked={!preferences.hiddenFooterIds.includes(entry.id)}
-          onChange={() => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) })}
-        />
-      </div>
-    ))
+    orderedFooterEntries.map((entry, index) =>
+      renderCustomizeRow(
+        entry,
+        index,
+        entry.kind === 'settings' ? (
+          <span aria-hidden="true">⚙</span>
+        ) : (
+          props.renderSlot('sidebar.footer.action', { wide: true }, { only: entry.registrationId ?? undefined })
+        ),
+        preferences.hiddenFooterIds.includes(entry.id),
+        (from, to) =>
+          updatePreferences({
+            footerOrder: reorderSidebarEntry(orderSidebarEntries(footerEntries, preferences.footerOrder).map(item => item.id), from, to),
+          }),
+        () => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) }),
+      ),
+    )
 
   const compactHeader = props.collapsed || preferences.headerMode === 'compact'
 

@@ -13,6 +13,7 @@ import {
   sessionLineage,
   sectionForSession,
   type SidebarPreferences,
+  type SidebarSection,
   workspaceForLineage,
 } from './organization.js'
 import { loadPreferences, parseStoredPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences.js'
@@ -61,6 +62,21 @@ const idSets = {
   archivedSessionIds: new Set<string>(),
   pinnedSessionIds: new Set<string>(),
 }
+
+test('archived starts folded and the working sections start open', () => {
+  // Archived is storage rather than a place to work, so it opens folded; every
+  // other section holds threads a user comes here to act on.
+  assert.deepEqual(DEFAULT_PREFERENCES.collapsedSections, ['archived'])
+  const workingSections = (['pinned', 'active', 'parked', 'inactive'] as const).filter(section =>
+    DEFAULT_PREFERENCES.collapsedSections.includes(section),
+  )
+  assert.deepEqual(workingSections, [])
+})
+
+test('every default collapsed section is one the sidebar can actually render', () => {
+  const known = new Set<SidebarSection>(['pinned', 'active', 'parked', 'inactive', 'archived'])
+  for (const section of DEFAULT_PREFERENCES.collapsedSections) assert.ok(known.has(section), `unknown section ${section}`)
+})
 
 test('live running, pinned, parked, and archived state selects one stable sidebar section', () => {
   const parkedIds = new Set(['parked'])
@@ -192,6 +208,22 @@ test('header and footer entries use saved ordering and boundary-safe movement', 
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c'])
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c'])
   assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])
+})
+
+test('drag reordering moves to the dropped index in both directions', () => {
+  // Forward past the source must not skip a slot: removing index 0 then
+  // inserting at the pre-move index 2 would land the entry back at 1.
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 3, 1), ['a', 'd', 'b', 'c'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 1, 1), ['a', 'b', 'c'])
+})
+
+test('drag reordering ignores an out-of-range or non-integer index', () => {
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], -1, 1), ['a', 'b', 'c'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 0, 9), ['a', 'b', 'c'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 5, 0), ['a', 'b', 'c'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 0.5, 1), ['a', 'b', 'c'])
+  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], Number.NaN, 1), ['a', 'b', 'c'])
 })
 
 test('archive adapter explicitly refuses to stop Host activity', async () => {

@@ -25,7 +25,10 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
   parkedSessionIds: [],
-  collapsedSections: [],
+  // Everything in the sidebar's working set starts open: pinned, active and
+  // inactive are where a thread is found and acted on, and parked keeps its short
+  // rows in view. Archived is storage, so it starts folded until asked for.
+  collapsedSections: ['archived'],
   workspaceFilter: null,
   headerMode: 'compact',
   headerOrder: [],
@@ -134,6 +137,26 @@ export const moveSidebarEntry = (orderedIds: readonly string[], id: string, dire
   if (displaced === undefined) return next
   next[target] = id
   next[index] = displaced
+  return next
+}
+
+/**
+ * Reorder by drop index, the shape a pointer drag produces.
+ *
+ * `fromIndex` is read against the list before the move, so removing the dragged
+ * entry first and then inserting at the target index would skip a slot whenever
+ * the target sits after the source. An out-of-range or unknown source leaves the
+ * order untouched rather than dropping an unrelated entry.
+ */
+export const reorderSidebarEntry = (orderedIds: readonly string[], fromIndex: number, toIndex: number): string[] => {
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) return [...orderedIds]
+  if (fromIndex < 0 || fromIndex >= orderedIds.length) return [...orderedIds]
+  if (toIndex < 0 || toIndex >= orderedIds.length) return [...orderedIds]
+  if (fromIndex === toIndex) return [...orderedIds]
+  const next = [...orderedIds]
+  const [moved] = next.splice(fromIndex, 1)
+  if (moved === undefined) return [...orderedIds]
+  next.splice(toIndex, 0, moved)
   return next
 }
 
