@@ -22,6 +22,22 @@ afterEach(async () => {
 })
 
 describe('host compiler', () => {
+  it('bundles every runtime export of @dshfiles/dshx/host', async () => {
+    const publicExports = Object.keys(await import('../src/host/index.js'))
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        `import { ${publicExports.join(', ')} } from '@dshfiles/dshx/host'`,
+        `export default defineHost({ setup(ctx) { ctx.exports = [${publicExports.join(', ')}] } })`,
+        '',
+      ].join('\n'),
+    )
+    await expect(
+      buildHost({ packageId: '@dshx/fixture-plugin', logicalName: 'logical-fixture', root, entry: 'src/host.ts', outDir: 'dist' }),
+    ).resolves.toBeDefined()
+  })
+
   it('adapts a defineHost default export and inlines the DSHX Host runtime', async () => {
     const root = await temporaryProject()
     await writeFile(
