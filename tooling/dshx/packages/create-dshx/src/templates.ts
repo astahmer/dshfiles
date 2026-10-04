@@ -32,6 +32,11 @@ function packageSlug(packageId: string): string {
   return /^[a-z]/.test(candidate) ? candidate : `plugin-${candidate || 'settings'}`
 }
 
+function packageEntryId(packageId: string): string {
+  const scopedName = /^@([^/]+)\/(.+)$/.exec(packageId)
+  return packageSlug(scopedName === null ? packageId : `${scopedName[1]}-${scopedName[2]}`)
+}
+
 function toolName(packageId: string): string {
   return `${packageId.replace(/[^a-zA-Z0-9_-]/g, '_')}_status`
 }
@@ -671,7 +676,7 @@ export function renderProjectTemplate(context: TemplateContext, templateName: Te
     { path: 'tests/host.spec.ts', contents: renderHostTest(context, templateName) },
     {
       path: 'cordis.patch.yml',
-      contents: `- insert:\n    - id: ${packageSlug(context.packageId)}\n      name: "${context.packageId}"\n`,
+      contents: `- insert:\n    - id: ${packageEntryId(context.packageId)}\n      name: "${context.packageId}"\n`,
     },
     { path: 'README.md', contents: renderReadme(context, templateName, style) },
   ]

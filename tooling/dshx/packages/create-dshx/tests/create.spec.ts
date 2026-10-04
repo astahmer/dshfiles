@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createProject, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION, detectPackageManager, packageVersion, validateProjectName } from '../src/index.js'
+import { renderProjectTemplate } from '../src/templates.js'
 import { DEFAULT_COMPATIBILITY } from '../../dshx/src/compat/index.js'
 import { defaultFileSystem } from '../src/fs.js'
 import { runCreate } from '../src/cli.js'
@@ -16,6 +17,22 @@ describe('create-dshx', () => {
   it('keeps generated DSH defaults aligned with the core compatibility registry', () => {
     expect(DEFAULT_DSH_RANGE).toBe(DEFAULT_COMPATIBILITY.dshRange)
     expect(DEFAULT_DSH_VERSION).toBe(DEFAULT_COMPATIBILITY.verified.latest)
+  })
+
+  it('keeps the scope in generated Cordis loader ids', () => {
+    const patch = renderProjectTemplate(
+      {
+        packageId: '@dshfiles/shortcuts',
+        dshxVersion: packageVersion(),
+        dshVersion: DEFAULT_DSH_VERSION,
+        dshRange: DEFAULT_DSH_RANGE,
+      },
+      'starter',
+      'none',
+    ).find(file => file.path === 'cordis.patch.yml')?.contents
+
+    expect(patch).toContain('id: dshfiles-shortcuts')
+    expect(patch).not.toContain('id: shortcuts')
   })
 
   it('validates names and rejects existing targets before writing', async () => {

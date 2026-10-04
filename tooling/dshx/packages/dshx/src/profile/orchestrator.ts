@@ -185,8 +185,8 @@ function duplicateLoaderIds(project: ProfileProject, source: string): string[] {
     })
   }
 
-  // Top-level rows share the profile Loader namespace. Group children are
-  // scoped by their owning group when the Loader prepares them.
+  // Check the profile-level rows only. Preset groups intentionally reuse
+  // child ids and appear nested under their owning top-level Loader row.
   const ids = value.flatMap(entry => (isObject(entry) && typeof entry.id === 'string' ? [entry.id] : []))
   return [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))]
 }
@@ -214,8 +214,17 @@ async function inspectLoaderIds(project: ProfileProject, options: ProfileOrchest
 
 function packagePathSegments(packageId: string): string[] | undefined {
   const segments = packageId.split('/')
-  if (segments.length === 1 && !packageId.startsWith('@') && segments[0] !== '') return segments
-  if (segments.length === 2 && segments[0]?.startsWith('@') && segments[0].length > 1 && segments[1] !== '') return segments
+  if (segments.length === 1 && !packageId.startsWith('@') && segments[0] !== '' && segments[0] !== '.' && segments[0] !== '..') return segments
+  if (
+    segments.length === 2 &&
+    segments[0]?.startsWith('@') &&
+    segments[0].length > 1 &&
+    segments[1] !== '' &&
+    segments[1] !== '.' &&
+    segments[1] !== '..'
+  ) {
+    return segments
+  }
   return undefined
 }
 
@@ -228,7 +237,7 @@ async function resolveDependencyPath(
   const installedPath = await realpath(rawPath).catch(() => undefined)
   if (installedPath !== undefined) return installedPath
 
-  // DSH may report pnpm's virtual-store path when the profile uses the
+  // DSH can report pnpm's virtual-store path when the profile uses the
   // supported hoisted linker. In that layout the package is under node_modules.
   const segments = packagePathSegments(packageId)
   const hoistedPath =
