@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–2 done, Phase 3 next.
+Status: **in progress** — Phases 0–3 done, Phase 4 next.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and the next
@@ -101,13 +101,23 @@ Left for later phases: unreachable protocol-1 conversation wiring in
 
 ## Phase 3 — One workspace contract
 
-- [ ] Root task runner: one `check` runs typecheck, test, lint, fmt and build
-      across plugins and dshx
-- [ ] Every plugin has `build`, `test`, `typecheck`, `lint`
-- [ ] Tests for ai-accounts and queue-reorder; thread-sidebar moves to vitest;
-      mcp-servers typechecks its tests
-- [ ] Align peer ranges; remove duplicated `peerDependencyRules`; enable
-      `noUncheckedIndexedAccess` everywhere
+- [x] Root `package.json`: `pnpm check` runs the dshx check, lint and knip, then
+      the plugin workspace check; `pnpm install:all` installs both
+- [x] `plugins/`: `pnpm check` = contract, typecheck, test, build;
+      `scripts/check-workspace-contract.ts` fails when a package lacks a script
+      or strict compiler options (pnpm -r silently skips missing scripts)
+- [x] Tests for queue-reorder (pure `queue-order.ts`, `as never` casts gone)
+      and agent-communication (untrusted peer text boundary); thread-sidebar,
+      jujutsu and mcp-servers tests moved to typechecked vitest
+- [x] Peers derived from imports and `dsh.client.inject`; one DSH range, one
+      cordis range, pinned devDependencies; duplicated `peerDependencyRules`
+      removed; `noUncheckedIndexedAccess` everywhere; pnpm 12.5.1 in both
+      workspaces
+- [x] Toolchain rule earned by queue-reorder and ai-accounts: dshx `DSHX4224`
+      warns when an injected provider is not a peer; templates derive the peers
+
+Exit evidence: root `pnpm check` exit 0 — dshx 378 tests, create-dshx 20, all
+10 plugins typecheck, test (144) and build.
 
 ## Phase 4 — Toolchain
 
