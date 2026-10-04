@@ -3,7 +3,8 @@
 ## Context
 
 Survey date: 2026-10-05. Scope: useful product behavior from T3 Code,
-OpenCode 2, and BB, compared with our existing plugins, the installed DSH
+OpenCode 2, BB, Codex, Claude Code, Cursor, Pi, Oh My Pi, and Amp, compared
+with our existing plugins, the installed DSH
 runtime, and available community plugins. This is an investigation and phased
 plan; no plugin was installed, enabled, or changed for this survey.
 
@@ -20,6 +21,12 @@ ownership separate from presentation features.
 | T3 Code | `pingdotgg/t3code@efecd3cf8bcec3d1891b5f5a27dc2f6d797c6448`, upstream main fetched on survey date | Source archive: contracts, web feature modules, server services, user and orchestration documentation. The old installed Alpha app is 0.0.36; it is not the baseline for current feature claims. |
 | OpenCode2 | Installed Nix package 2.0.20; matching upstream tag `v2.0.20`, commit `84c9be93a56304a108f1a22df0c5d62c26d5b6ca` | Core service contracts and app session commands, review, context, terminal, and request modules. This is `anomalyco/opencode`, not one of the unrelated repositories named `opencode2`. |
 | BB | Installed `bb.app` / `bb-app` 0.44.0 | Installed CLI command index, thread-operation and creation references, plugin API index; local `../bb-plugins` behavior and implementation. No private conversations, credentials, or databases read. |
+| Codex | Installed CLI 0.159.2; current official OpenAI documentation retrieved on survey date | Local environments/actions, code review, hooks, and long-running work. Some Codex documentation now redirects to combined ChatGPT product pages; these are documented behavior references, not proof of CLI or account availability. |
+| Claude Code | Current official documentation retrieved on survey date | Hooks, agent teams, context inspection, memory/rules, and extension boundaries. Agent teams are explicitly experimental. No claim that the locally installed binary enables every documented feature. |
+| Cursor | Current official documentation retrieved on survey date | Agent overview, Plan Mode, Debug Mode, and rules. No proprietary implementation inspected or runtime comparison performed. |
+| Pi | `badlogic/pi-mono@b2b5c42f6138b73ec4b2f49ec0ca468800f88586` | Source and docs for extensions, branching, compaction, virtual models, Code Mode/MCP, and RPC UI. Local binary is 0.99.1; source snapshot is the comparison baseline. |
+| Oh My Pi | `can1357/oh-my-pi@1c0993c3d12e70042169a951663bb2702e2c0a9e` | Tool implementations and detailed docs: hash editing, LSP, DAP debugging, AST edits, context notebook, rollover, Python evaluation, read selectors, and rule matching. Experimental behavior is labelled below. |
+| Amp | Current official documentation retrieved on survey date | Dial, specialist subagents, tool routing, plugins, design workflow, and provider connections. No local runtime installed or tested. |
 | DSH | Actual executable resolves `@deepseek-ai/dsh@0.2.0-rc.2` | Installed declarations and implementation for Session, Agent, SubagentRuntime, WorkspaceRegistry, ScheduleService, SessionQueryEngine, workspace changes, skills, input, references, and sidebar tabs. |
 | Our plugins | Working checkout at survey time | Plugin READMEs and focused source outlines; existing customization, async questions, desktop, and boot integrity plans. Presence of source is not a runtime acceptance claim. |
 | Marketplace | `awesome-dsh-plugin.com/plugins.json`, reported updated 2026-10-01, 4,412 entries | Whole catalog searched across relevant feature terms; published package archives inspected for shortlisted candidates. Counts, stars, and descriptions are discovery aids, not adoption evidence. |
@@ -66,6 +73,23 @@ temporary survey files.
 | D2 | Installed `dsh-session-query/lib/types/index.d.ts`, `dsh-workspace/lib/types/index.d.ts`, `dsh-workspace-changes/lib/types/types.d.ts` |
 | D3 | Installed `dsh-schedule/lib/types/index.d.ts` and `types.d.ts`, `dsh-session-checkpoint-policy/lib/types/index.d.ts`, `dsh-skill/lib/types/index.d.ts` |
 | D4 | Installed `dsh-client-ui-conversation/lib/types/client/contract/{input,draft-editor}.d.ts`, `dsh-client-ui-sidebar-right/lib/types/client/contract/slots.d.ts`, and API workspace-file declarations |
+
+| C1 | Official OpenAI documentation: [local environments and actions](https://learn.chatgpt.com/docs/environments/local-environment), [code review](https://learn.chatgpt.com/docs/code-review), [long-running work](https://learn.chatgpt.com/docs/long-running-work) |
+| C2 | Official OpenAI documentation: [hooks](https://learn.chatgpt.com/docs/hooks) |
+| CL1 | Claude Code [feature boundaries](https://code.claude.com/docs/en/features-overview), [hooks](https://code.claude.com/docs/en/hooks), and [agent teams](https://code.claude.com/docs/en/agent-teams) |
+| CL2 | Claude Code [memory and scoped rules](https://code.claude.com/docs/en/memory), [context inspection](https://code.claude.com/docs/en/context-window), and [checkpointing](https://code.claude.com/docs/en/checkpointing) |
+| CU1 | Cursor [agent overview](https://cursor.com/docs/agent/overview), [Plan Mode](https://cursor.com/docs/agent/plan-mode), [Debug Mode](https://cursor.com/docs/agent/debug-mode), and [rules](https://cursor.com/docs/rules) |
+| P1 | [Pi extension API](https://github.com/badlogic/pi-mono/blob/b2b5c42f6138b73ec4b2f49ec0ca468800f88586/packages/coding-agent/docs/extensions.md), plus `sessions.md`, `compaction.md`, and `rpc-extension-ui.md` in that directory |
+| P2 | [Pi virtual models](https://github.com/badlogic/pi-mono/blob/b2b5c42f6138b73ec4b2f49ec0ca468800f88586/packages/coding-agent/docs/virtual-models.md), `codemode.md`, and `prompt-templates.md` in that directory; current [Pi documentation](https://pi.dev/docs/latest) |
+| H1 | [Oh My Pi edit contract](https://github.com/can1357/oh-my-pi/blob/1c0993c3d12e70042169a951663bb2702e2c0a9e/docs/tools/edit.md), `ast-edit.md`, and the implementations under `packages/coding-agent/src/tools/` |
+| H2 | [Oh My Pi LSP](https://github.com/can1357/oh-my-pi/blob/1c0993c3d12e70042169a951663bb2702e2c0a9e/docs/tools/lsp.md), `debug.md`, `read.md`, and `docs/python-repl.md` |
+| H3 | [Oh My Pi context notes](https://github.com/can1357/oh-my-pi/blob/1c0993c3d12e70042169a951663bb2702e2c0a9e/docs/tools/context-notes.md), `new-context.md`, and `docs/compaction.md` |
+| H4 | [Oh My Pi rulebook pipeline](https://github.com/can1357/oh-my-pi/blob/1c0993c3d12e70042169a951663bb2702e2c0a9e/docs/rulebook-matching-pipeline.md), `docs/handoff-generation-pipeline.md`, and `docs/memory.md` |
+| M1 | Amp [Dial](https://ampcode.com/docs/the-dial), [modes and specialists](https://ampcode.com/docs/models-and-subagents), [tools](https://ampcode.com/docs/tools), and [plugins](https://ampcode.com/docs/customize/plugins) |
+| M2 | Amp [design workflow](https://ampcode.com/docs/designing-ui), [model routing](https://ampcode.com/docs/customize/model-routing), and documentation index [llms.txt](https://ampcode.com/llms.txt) |
+| D5 | Installed `dsh-hook-protocol`, `dsh-hooks-codex`, `dsh-hooks-claude-code` READMEs and declarations; `dsh-agent/lib/types/runtime-types.d.ts` turn-stopping contract |
+| D6 | Installed `dsh-fs-observation-policy/README.md`, `dsh-fs/lib/types/index.d.ts`, `dsh-subprocess/lib/types/index.d.ts`, and `dsh-agent-instructions` README/declarations |
+| D7 | Installed `dsh-experimental-agent-team` README and roster/task/projection declarations; experimental team tools/profile/client packages present in bundle tree |
 
 Related work: [customization](dsh-customization/README.md),
 [integration review](dsh-customization/integration-review.md),
@@ -174,6 +198,45 @@ means the public seam is missing or insufficient for the promised behavior.
 | F64 | Activity log and failure/retry visibility (T5, T8, B1) | Session events, telemetry and existing boot diagnostics supply sources | Extend attention/diagnostics with bounded event history; no unbounded raw transport logger |
 | F65 | Plugin authoring inspector, RPC and safe development loop (B1) | Local dshx inspect/check/build and boot-integrity work cover the core need | Improve local dshx only where multiple plugins expose a concrete missing contract; no parallel plugin framework |
 
+#### Additional harnesses: coding reliability and context
+
+These are new deltas. Common capabilities already covered by F01–F65 are
+cross-referenced rather than counted twice. A workflow can be useful without
+justifying a new plugin.
+
+| ID | Reference behavior | DSH opportunity and disposition | Source |
+|---|---|---|---|
+| F66 | Project actions: named build/test/dev commands | **Build** a small project-actions surface using native terminal/subprocess ownership; extend existing command palette. Share validated action definitions with workspace setup F23 | C1 |
+| F67 | Verification before an agent declares completion | **Covered seam / build narrow policy** using native Stop bridge or awaited `agent/turn-stopping`; attach bounded failed-check evidence and allow user cancellation. No new hook engine | C2, CL1, D5 |
+| F68 | Inspect hook executions and compatibility | **Build** projection/UI over native hook results; show skipped hooks, timeouts and unsupported outputs. Input rewrite and hard run halt are **Host first** | C2, CL1, D5 |
+| F69 | Claude-style team task dependencies and claims | **Native experimental probe**: DSH already has DAG tasks, revision checks, durable mailbox, roster and browser projection. Extend F29 dashboard only after its experimental contract passes | CL1, D7 |
+| F70 | Path-specific rules and rule provenance | **Extend** context/instructions visibility: show loaded files, precedence, changes and budget. Native DSH already discovers scoped AGENTS/CLAUDE files; glob/frontmatter rules require an explicit matching contract | CL2, CU1, H4, D6 |
+| F71 | Context occupancy and survival inspection | **Extend F38** with source, size estimate, active/compacted state and instruction provenance. Do not claim an exact provider token breakdown without counters | CL2, P1, D6 |
+| F72 | Plan Mode with approval and read-only exploration | **Preset/configure first**, using actual tool restrictions and existing async decisions. Save actionable plan artifact; execution starts through explicit transition. Prompt text alone does not enforce read-only | CU1, CL1 |
+| F73 | Debug Mode: hypotheses, reproduce, evidence, fix, verify | **Skill/preset first**; optional evidence collector later. Reuse browser/terminal artifacts and removable instrumentation. Never install a second agent runner to get this workflow | CU1 |
+| F74 | LSP diagnostics, symbols, references and definitions | **Adopt probe** existing LSP packages, starting with diagnostics/symbols. Confirm advertised navigation coverage; add missing read-only operations only after measuring gap | H2 |
+| F75 | LSP rename, format and quick fixes | **Adopt probe**, separate write gate from F74. Preview whole WorkspaceEdit, enforce per-file version/sandbox checks; reject unsupported resource operations | H2 |
+| F76 | Hash-anchored edits and served-range checks | **Native baseline first / adopt probe** `dsh-better-edit`. DSH already rejects stale writes; the incremental value is range-aware editing and recovery. Benchmark both effectiveness and prompt overhead | H1, D6 |
+| F77 | Explicit conflict reporting and prepared batches | **Extend F76 if proven**. Prepared edits and recovery receipts useful; multi-file OS writes are not an atomic transaction. Keep successful prefix visible on partial failure | H1 |
+| F78 | AST query/rewrite with dry-run and scoped apply | **Adopt existing CLI through narrow tool**, initially ast-grep; source prebuilt binary from Nix. Bind apply to preview digest and cap total candidate/replacement counts | H1 |
+| F79 | DAP launch, breakpoints, stack, locals and stepping | **Build later** a narrow debugger adapter if terminal debugging leaves a measured gap. Own sessions per agent/workspace; avoid Oh My Pi's global active-session model | H2 |
+| F80 | Persistent Python evaluation for iterative data work | **Adopt kernel backend / build narrow adapter later**. Useful only for repeated analysis; native terminal already covers one-shot execution. Explicit reset, interruption, resource limits and disposal | H2 |
+| F81 | Bounded read selectors for archives, PDF and SQLite | **Adopt tools by format** after native/MCP inventory; archive traversal, read-only database opening, size/page/row bounds. Avoid importing a whole replacement read stack | H2 |
+| F82 | Durable session notebook that survives context rollover | **Build only after Host context gate**: branch-scoped revisions, provenance and explicit user visibility. Keep separate from cross-project memory; stale notes remain historical evidence | H3 |
+| F83 | Explicit fresh-context rollover retaining notebook/history | **Host first**: coordinate compaction with active tools, cancellation, branch/model changes, persistence and retrieval. Oh My Pi's notes-backed path is experimental and off by default | H3 |
+| F84 | Recover historical tool output through artifact references | **Extend F38 / reuse native spill and pruning**, with bounded read-back. Measure useful recovery rather than changing transcript/tool identities | P1, H3 |
+| F85 | Specialist Search / Advisor / Library Research roles | **Configure existing subagent profiles first**; bounded inputs, role tool sets and result artifacts. Probe advisor candidate only if native profile behavior is inadequate | M1, H4 |
+| F86 | Dial-like presets combining model, effort, prompt and tools | **Extend ai-accounts/preset UI**, show explicit bundle and capability checks; no hidden mid-run substitution. Amp's current Dial is low/medium/high/ultra, not an assumed old mode list | M1, P2 |
+| F87 | Role-based provider routing and explicit fallbacks | **Extend ai-accounts**, preserve account/session identity, capability requirements and retry boundaries. No automatic cross-provider transfer of private context | M2, P2 |
+| F88 | Context hooks / dynamic active tool sets | **Reuse Cordis/services first**. Pi's lifecycle hooks and tool activation are useful conventions; do not bridge its extension ABI wholesale. Add dshx helpers only after a repeated missing seam | P1 |
+| F89 | Code Mode and MCP discovery without huge schemas | **Native inventory/probe**, extending F49. Current Pi already supports Code Mode/MCP; do not use the obsolete no-MCP comparison. Verify permission and cancellation across generated orchestration | P2 |
+| F90 | Branch tree and branch summaries | **Covered by F13/F39/F40 plus native fork**. Improve navigation/provenance; rollback still requires Host contract | P1, CL2 |
+| F91 | Prompt templates and reusable slash workflows | **Covered by skills/presets F42–F45**. Add discoverability/arguments only if absent; another template engine would duplicate ownership | P2, CL1, CU1 |
+| F92 | Auto-memory and rule promotion | **Defer / extend F43**: user-reviewed scoped memory with source/evidence, expiry and edit history. No automatic conversion of uncertain notes into permanent instructions | CL2, H4 |
+| F93 | Design variants, visual comparison, then implementation | **Skill/preset first**, attach variants/evidence using F46/F47. A gallery plugin needs repeated usage, not just a compelling demo | M2, CU1 |
+| F94 | Background/cloud agents, multiplayer and remote portals | **Defer to multi-host/remote boundary**, F23/F54–F59. Auth, isolation, retention and durable execution are infrastructure, not a client-only plugin | C1, CL1, CU1, M2 |
+| F95 | RPC extension UI and arbitrary plugin-defined agent modes | **Reuse DSH slots, tools and profiles**; improve dshx authoring only for verified gaps. Pi/Amp plugin systems are references, not compatible runtime packages | P1, M1 |
+
 ### Marketplace adoption audit
 
 Actual npm names matter: several repository leaf names returned registry 404s
@@ -195,6 +258,22 @@ matching peers or a resolvable import.
 | `@idoall/dsh-notify@0.4.1` | Peer ranges admit 0.2; in-page status/toast implementation, not equivalent to OS notifications | Probe if native attention UI is inadequate; avoid two overlapping notification systems |
 | Unscoped `dsh-notify@0.1.7` | Windows PowerShell toast/tray package, different owner from `@idoall/dsh-notify`; empty dependencies | Reject for this macOS need |
 | `dsh-rewind@0.11.12` | References removed `dsh-client-runtime`; implementation includes rewind/event repair and file restore rather than a single native rollback operation | Reject unchanged; F39 is a Host contract project |
+
+Additional published archives inspected for F67/F74–F76/F85:
+
+| Candidate inspected | Findings against installed runtime | Choice |
+|---|---|---|
+| `dsh-lsp-actions@0.5.7` | Native service peers admit 0.2; uses `defineTool`, `ctx.fs`, `ctx.subprocess`, sandbox exports, optional LSP seam and a bounded stdio fallback. Default server table is empty; editor backend defaults off. Direct native dependencies absent | **Preferred LSP adoption probe** F74/F75. Keep editor backend off in web, verify named imports and observation/write events; don't promise definitions/references before operation inventory |
+| `dsh-tool-lsp@0.1.2` | Wildcard tools/schemastery peers offer little version evidence. Uses installed filesystem/subprocess method names, but inspected mutation calls `writeText(..., undefined, signal)` and direct reads; these do not themselves dispatch tool observation/write-intent events | **Alternative read-only probe**; block mutations until event/guard behavior is proven. README claims are insufficient |
+| `dsh-lsp-diagnostics@0.1.1` | Tools peer explicitly `<0.2.0-0` | Reject unchanged; prefer newer action package before porting |
+| `dsh-lint-loop@0.5.0` | Tools peer explicitly `<0.2.0-0` | Reject unchanged; verification gates and LSP diagnostics cover narrower need |
+| `dsh-better-edit@1.0.0` | No native peers declared, but static imports include tools, home paths and sandbox. Substantial hash/served-range/SQLite state; filesystem bridge dispatches write-intent and observed events. Replaces built-in tools and self-heals registrations | **Controlled adoption probe** F76 only after loader/import checks. Compare native guard first; exercise HMR, resume, ownership, partial reads, encodings, collisions and undo. Never install casually in web |
+| `dsh-advisor-plugin@0.2.6` | Agent/session/settings/tools peers target 0.1.5; incompatible with current settings generation | Reject unchanged; configure native specialist profile for F85 |
+| `dsh-agent-frugality@0.1.5` | Tools peer broadly admits 0.2 but direct native imports lack dependency wiring. Completion hook uses assistant-tail heuristic, a live success map and bounded steering; also bundles read dedup, permanent rules and review routing | Do not adopt wholesale for F67. Reuse native Stop/turn-stopping seam and narrowly bind verification to current revision/run; a past success or completion-shaped sentence is insufficient evidence |
+
+These are static findings, not boot or security acceptance. The absence of a
+clear generic DAP/notebook fit in this bounded catalog search justifies further
+contract work, not a claim that no community implementation can exist.
 
 Most shortlisted bundles rely on peers without direct native dependencies.
 This profile has a known import-resolution trap for that shape. A peer match
@@ -263,6 +342,20 @@ a generic orchestration service for this plan.
 Effort labels are relative, not calendar estimates. P1 is the proposed first
 implementation batch; the plan does not authorize automatic promotion to web.
 
+### Additional reliability track
+
+The original P1 usability batch remains intact. The follow-up adds narrow
+coding-reliability experiments, not thirty simultaneous implementations.
+
+| Order | Work | First measurable gate |
+|---|---|---|
+| R1 | Project verification/actions F66/F67; native hooks first | Intentionally failing check prevents completion claim; fixed revision reruns only needed checks; cancellation stops children and no endless stop loop |
+| R2 | LSP read-only F74, then guarded actions F75 | Fixed TS project resolves diagnostics/symbols with UTF-16/non-ASCII correctness; cancelled requests settle; external edit cannot be overwritten |
+| R3 | Hash editing comparison F76 | Fixed representative edit corpus: success/retry rates, tool/prompt tokens and latency against native observation policy; no blind or stale overwrite |
+| R4 | Debug workflow F73 + instructions/context visibility F70/F71 | Reproduced failure has hypothesis, evidence and verified repair; temporary instrumentation removed; displayed rule sources match actual injected context |
+| R5 | Specialist profiles/routing F85–F87 | Record cost/latency and successful task outcomes against one native agent; failures and fallback are visible; no unauthorized context transfer |
+| Later | AST preview F78; notebook F82/F83; DAP F79; Python F80 | Implement only after recurring need and owner/cancellation/retention contracts; notebook rollover requires Host support |
+
 ### Tech choices
 
 | Choice | Decision | Rationale |
@@ -280,7 +373,10 @@ The inspected T3 and OpenCode source LICENSE files both declare MIT; preserve
 their notices and source attribution when vendoring. The inspected personal BB
 plugin manifests do not declare a license. Reimplement behavior unless source
 ownership/license is established; preserve provenance for any copied code.
-No fork needs an upstream remote unless ongoing synchronization is requested.
+Pi and Oh My Pi also declare MIT in the inspected source snapshots. Preserve
+their notices when porting; proprietary Codex/Claude/Cursor/Amp documentation
+is behavioral reference, not permission to vendor implementation. No fork needs
+an upstream remote unless ongoing synchronization is requested.
 
 ### Architecture and contract gates
 
@@ -316,6 +412,46 @@ No fork needs an upstream remote unless ongoing synchronization is requested.
 7. **Browser:** OpenCode2 separates server tool/permission ownership from desktop tab/CDP ownership; this is a useful boundary, not permission to import its desktop runtime. A provider owns browser session, tab IDs, cancellation and archive
    cleanup; context UI owns only references and annotations. Local-only BrowserSkill
    observation routes do not establish remote pairing support.
+
+8. **Verification:** `agent/turn-stopping` is awaited and fresh steering keeps
+   the turn open. Native hook bridges already support Stop continuation, but
+   command-only compatibility is partial: updated tool input and global halt
+   are not honored, and unsupported hook shapes are skipped. Bind verification
+   receipts to workspace identity, checked content/revision, action definition
+   and run; invalidate after relevant writes. Cap corrections and surface blocked
+   checks rather than looping or treating a crash as success. Team quality gates
+   must use actual team transitions, not assume Claude event names map directly.
+9. **Language tools:** subprocess ownership is scoped to workspace/server and
+   disposal; decode LSP responses at the boundary, negotiate position encoding,
+   bound outputs, cancel requests and reject out-of-root edits. Direct `ctx.fs`
+   reads do not emit `fs/observed`; `writeText` with no explicit guard does not
+   prove freshness. Inspect the entire event path and use an explicit observed
+   version for writes. Reject multi-file mutations if safe partial completion
+   cannot be reported. Language servers come from prebuilt Nix artifacts/cache.
+10. **Editing:** native observation policy already supplies provider-owned
+    compare-and-swap, but windowed reads currently authorize full-file overwrites;
+    it enforces freshness, not view completeness. Hash/served-range additions
+    must improve that measured gap. Short hashes are locators, not sufficient
+    identity; validate full snapshot, range and owner. Oh My Pi's current hashline
+    contract uses file-content tags backed by snapshots, not a universal per-line
+    hash format. Never market prepared multi-file writes as atomic transactions.
+11. **Context and rules:** read native typed instruction sources and compaction
+    artifacts before creating parallel stores. Notebook writes need branch and
+    owner revalidation after awaits, durable flush and explicit clearing semantics.
+    Fresh-context commit must belong to the runtime maintenance boundary, with
+    in-flight tools protected. Rule match/exclusion and budget truncation should
+    be explainable. Historical notes are untrusted evidence, not new authority.
+12. **Debugger/kernel:** agent/workspace owns each process/session; explicit
+    launch/attach, timeout, interrupt, reset and disposal. Preserve borrowed targets
+    on detach; expression evaluation is execution. Adopt protocols rather than
+    Oh My Pi's entire debug tool, which also mixes harness profiling, raw logs,
+    archives, cache cleanup and a process-wide inspector. Keep those concerns in
+    existing diagnostics work. Never collect full transcripts/environment in a
+    default debug artifact.
+13. **Specialists/presets:** named role profiles use native providers and model
+    capabilities, limited tools and bounded result artifacts. A friendly dial
+    must expose what changes. Treat provider fallback as a new capability/privacy
+    decision and preserve resumable identity; no hidden switching on rate limits.
 
 ## What this allows
 
@@ -365,6 +501,13 @@ essential action; snooze should not promise cross-device behavior until durable.
 | Subscribe to PR | Shows scope, polling cadence and wake policy; unsubscribe cancels future checks |
 | Start isolated work | Shows resolved workspace/cwd and setup result before first agent turn |
 
+For reliability additions, project actions show the command, cwd, live output
+and last result. Verification shows checking/passed/failed/blocked/cancelled,
+checked revision and whether a later edit invalidated the receipt. Rule/context
+inspection links to the actual source and labels budget omissions. LSP writes
+show file/range previews and conflicts; roles show model, effort and tool scope
+before launch. These extend existing panels instead of adding six dashboards.
+
 ## Data model
 
 These are proposed domain records, not new parallel Session/Agent tables.
@@ -380,6 +523,11 @@ Validate persisted input and version migrations at each owning boundary.
 | PR subscription | Repository identity, PR URL, target session, enabled flag, cursor, last observed state, last delivery ID, wake policy | Host store; secrets resolved through existing auth, never subscription data |
 | Workspace provisioning | Repository identity, JJ workspace name/path, launch request ID, setup stage, created resources, target session | JJ domain, idempotent receipts; never infer ownership from path alone |
 | Browser evidence | Provider session/tab ID, URL, capture time, artifact handle, bounded selector/annotation | Browser provider owns lifecycle; renderer uses sanitized display fields |
+| Verification | Workspace identity, action/config digest, checked revision/content digest, run ID, status, exit code, bounded artifact references | Host check runner; invalidated on relevant change, no stale pass reuse |
+| Instructions/context | Native typed source IDs, path/scope, precedence, budget and compaction references | Derived native projection; UI preferences only, no second instruction authority |
+| Notebook later | Schema version, owning session/branch, revision, bounded text, provenance | Session journal through supported Host seam; clearing appends revision, history remains historical |
+| Specialist preset | Role ID, provider/model capability requirements, effort, allowed tools and result policy | Existing profiles/ai-accounts configuration; credentials stay in account store |
+| Language/debug execution | Workspace/server/session IDs, owned subprocess receipt, cancellation and disposal state | Scoped Host owner; diagnostic/debug artifacts bounded and explicitly retained |
 
 ## Implementation steps
 
@@ -416,6 +564,23 @@ Validate persisted input and version migrations at each owning boundary.
     Remove rejected experiments and stop only the probe processes we started.
 12. Keep each accepted implementation as a focused, described JJ revision.
     Preserve copied-source licenses/provenance and update this plan's decisions.
+
+### Reliability experiments
+
+1. Inventory native hooks, observation policy, instructions and experimental
+   team entries in the composed probe profile. Installed packages alone are not
+   activation proof. Record exact native contracts and unsupported hook outputs.
+2. Define trusted project action/check configuration and prototype a bounded
+   verification receipt using native hooks. Add UI only after the behavior works.
+3. Resolve LSP candidate imports with the actual bundle loader, configure one
+   prebuilt language server and prove read-only results before enabling mutations.
+4. Run the native-versus-hash editing comparison with real tools, representative
+   partial reads, repeated lines, concurrent writes, encodings and resumed sessions.
+5. Write Debug/Plan/design presets as small workflows; extend existing context
+   and AI-account surfaces for provenance and roles only when evidence needs UI.
+6. Leave DAP, kernels and notebook rollover unimplemented until their stated
+   recurring-need and Host gates pass. Record incompatible candidates rather than
+   widening peers or introducing old public native packages.
 
 ## Open questions
 
@@ -463,6 +628,21 @@ These are implementation gates, not requests blocking this investigation.
 - [ ] Each promotion states measured gain versus native/current baseline and
   reports focused tests, browser proof and unresolved limitations separately.
 
+- [ ] Completion checks are tied to current content/run; old pass receipts,
+  check crashes and a skipped hook cannot authorize a completion claim.
+- [ ] Hook UI distinguishes supported, skipped, failed and timed-out behavior;
+  hard halt/input rewrite remain labelled unsupported until Host contracts exist.
+- [ ] LSP diagnostics use correct coordinates; stale/out-of-root edits reject;
+  cancellation/disposal closes owned subprocesses; partial writes are explicit.
+- [ ] Hash editing demonstrates measurable gain over native guards and preserves
+  source bytes/encodings, session scope, served-range rules and external edits.
+- [ ] Context/rule inspector agrees with actual injected sources and labels
+  estimates/truncation; notebook is branch-scoped and does not replace memory policy.
+- [ ] Debug workflow retains reproduction/evidence/verification and removes
+  temporary instrumentation; any future DAP/kernel has scoped lifetime and reset.
+- [ ] Experimental teams are tested for stale claims, dependency cycles, queued
+  message recovery and reopen; shared checkout and ownership-release limits visible.
+
 ## Decisions log
 
 | Date | Decision | Rationale |
@@ -474,3 +654,8 @@ These are implementation gates, not requests blocking this investigation.
 | 2026-10-05 | Build review-progress against DSH rather than carry BB DOM adaptation | BB behavior is useful; BB integration architecture and weak count fingerprint are not |
 | 2026-10-05 | Keep rollback, synchronized snooze, live workspace transfer and arbitrary reparenting in Host backlog | Missing durable semantics cannot be supplied by UI alone |
 | 2026-10-05 | Investigate only; no profile mutation or feature implementation | User requested survey and Markdown plan |
+| 2026-10-05 | Extend survey to Codex, Claude Code, Cursor, Pi, Oh My Pi and Amp: 95 feature areas total | Additional harnesses contribute coding reliability and context behavior, while common capabilities reuse earlier rows |
+| 2026-10-05 | Add reliability track: verification/actions, LSP, editing comparison, Debug workflow, provenance and roles | Narrow experiments improve the tool loop before heavier infrastructure |
+| 2026-10-05 | Reuse native hook bridges, observation policy, scoped instructions and experimental teams | Installed runtime already owns core semantics; build visibility and measured deltas |
+| 2026-10-05 | Prefer LSP-actions probe; reject old diagnostics/lint/advisor bundles unchanged | Published version bounds and inspected contracts differ materially |
+| 2026-10-05 | Keep notebook rollover at Host boundary; DAP/kernel later; workflows begin as presets | Avoid duplicating runtimes or committing to expensive UI before recurring need |
