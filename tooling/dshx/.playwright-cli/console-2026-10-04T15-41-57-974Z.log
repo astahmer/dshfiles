@@ -1,0 +1,2 @@
+[     317ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3080/?token=luR3BRiLrEnGHQtHk28OMcQeoTpI99rHw5P9uSaMFzM:0
+[     398ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:3080/favicon.ico:0
