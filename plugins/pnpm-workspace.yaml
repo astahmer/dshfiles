@@ -13,11 +13,11 @@ peerDependencyRules:
 dedupePeerDependents: true
 
 allowBuilds:
-  '@deepseek-ai/dsh-subprocess-local': set this to true or false
-  '@google/genai': set this to true or false
-  koffi: set this to true or false
-  node-pty: set this to true or false
-  protobufjs: set this to true or false
+  '@deepseek-ai/dsh-subprocess-local': false
+  '@google/genai': false
+  koffi: false
+  node-pty: false
+  protobufjs: false
 
 # Keep one copy of the DSH type packages in this workspace so a cordis module
 # augmentation is visible from both the plugin and the fork that types it.
