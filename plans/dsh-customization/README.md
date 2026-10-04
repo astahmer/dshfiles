@@ -100,6 +100,10 @@ implement against DSH's real Host services and events.
 
 ## Status
 
+Packaging the web UI as a native app is tracked separately in
+[`desktop-shell/`](../desktop-shell/README.md); it adds no Host capability, so it
+is not a customization feature.
+
 | Feature | State | Where |
 |---|---|---|
 | Provider accounts (Codex, OpenCode Go, Command Code) | built with dshx | `plugins/@dshfiles/ai-accounts` |
