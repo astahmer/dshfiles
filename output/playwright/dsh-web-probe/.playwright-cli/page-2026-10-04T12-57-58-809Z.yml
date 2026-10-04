@@ -1,0 +1,45 @@
+- generic [ref=e4]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - button "New session" [ref=e9] [cursor=pointer]
+      - button "Collapse sidebar" [ref=e38] [cursor=pointer]
+    - button "New session" [ref=e41] [cursor=pointer]:
+      - generic [ref=e42]: New Session
+      - generic:
+        - generic:
+          - generic: ⌥
+          - generic: ⌘
+          - generic: "N"
+    - navigation "Global panels" [ref=e47]:
+      - button "Plugins" [ref=e48] [cursor=pointer]
+      - button "AI Accounts" [ref=e57] [cursor=pointer]
+      - button "Usage history" [ref=e65] [cursor=pointer]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]: Workspaces
+        - generic [ref=e78]:
+          - button "Search sessions" [ref=e79] [cursor=pointer]
+          - textbox "Search session names"
+        - generic [ref=e83]:
+          - button "View options" [ref=e85] [cursor=pointer]
+          - button "Add workspace" [ref=e89] [cursor=pointer]
+      - tree "Sessions" [ref=e94]:
+        - generic [ref=e95]: No sessions yet
+    - button "Settings" [ref=e104] [cursor=pointer]
+  - generic [ref=e113]:
+    - generic:
+      - banner
+    - generic [ref=e119]:
+      - generic [ref=e127]:
+        - generic [ref=e128]: Into the Unknown
+        - generic [ref=e129]: Preview
+      - button "Choose workspace" [ref=e131] [cursor=pointer]
+      - generic [ref=e139] [cursor=pointer]:
+        - generic [ref=e141]:
+          - textbox "Choose workspace" [ref=e142]
+          - generic: Choose a workspace to start
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - button "Add files or run commands" [disabled]
+          - generic [ref=e145]:
+            - button "Send message" [disabled]

@@ -138,13 +138,41 @@ rather than in a checked-in `electron-builder` config that nothing would run.
 | Phase | Work | Done when |
 |---|---|---|
 | 0 | **Spike**: a throwaway Electron window loads the tokenized URL and an RPC succeeds | `window.loadURL` → 200 on `/api/llm/listProviders` |
-| 1 | `apps/desktop` package: spawn, parse, load, quit | window opens and the Host exits when it closes |
+| 1 | `apps/desktop` package: spawn, parse, load, quit | ✅ verified, see below |
 | 2 | Lifecycle edges: child dies, port taken, second window | relaunch prompt works |
 | 3 | Nix packaging to a signed `.app` | `nix build .#desktop` yields an app that launches |
 | 4 | Auto-update, only with a real release channel | a published release updates a running install |
 
-Phases 0–1 are the substance. Phases 3–4 are distribution polish and can be
-deferred indefinitely without affecting daily use.
+Phases 0–1 are done. Phase 3 (Nix packaging to a `.app` and Linux packages) is the
+next real step; phase 4 is optional and blocked on having a release channel.
+
+## Phase 1 result — verified
+
+`apps/desktop` spawns the Host, loads the window, and stops the Host on quit:
+
+```
+$ DSH_DESKTOP_PROFILE=probe electron .
+  Host child: pid 4800  node .../dsh/lib/bin.js --profile probe --port 0 --no-open
+  after SIGTERM to the app: no matching process
+```
+
+Electron `43.7.7` from the pinned nixpkgs, fetched from `cache.nixos.org`. The
+package installs Electron's **types only** (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`), so
+the shell typechecks against the version it will run without fetching a second
+runtime.
+
+Two things the implementation had to discover, both invisible in a plan:
+
+- **The Host announces the token as a query, not a path segment** —
+  `http://127.0.0.1:<port>/?token=<token>`. A pattern written for a trailing
+  segment waits forever for a URL that has already been printed, which is exactly
+  the shape of a silent timeout.
+- **A missing `dsh` is the expected failure in a GUI launch**, because Finder does
+  not read shell profiles. It gets its own dialog rather than a generic failure.
+
+Typecheck also caught a real bug: `startHost` built the session object and returned
+nothing. It surfaced as a "missing return value" complaint, not as a shape
+mismatch, which is worth remembering.
 
 ## Risks
 
