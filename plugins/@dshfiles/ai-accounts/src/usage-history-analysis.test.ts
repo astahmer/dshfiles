@@ -65,12 +65,20 @@ describe('quota usage-history analysis', () => {
   })
 
   it('does not carry a trend across a provider reset boundary', () => {
-    const points = [point(0, 10, 1_000_000), point(1_800_000, 100, 8_000_000), point(3_600_000, 90, 8_000_000)]
-    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 90, resetsAt: 8_000_000, now: 3_600_000 })).toMatchObject({
-      status: 'insufficient-history',
-      sampleCount: 2,
+    const points = [point(0, 10, 1_000_000), point(1_800_000, 100, 6_000_000), point(3_600_000, 70, 6_000_000), point(5_400_000, 40, 6_000_000)]
+    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 40, resetsAt: 6_000_000, now: 5_400_000 })).toMatchObject({
+      status: 'reset-before-depletion',
+      sampleCount: 3,
     })
     expect(quotaHistoryCycles(points, 'Weekly')).toHaveLength(2)
+  })
+
+  it('reports reset-due once the current reset time has passed', () => {
+    const points = [point(0, 10, 1_000_000), point(1_800_000, 100, 2_000_000), point(3_600_000, 90, 2_000_000)]
+    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 90, resetsAt: 2_000_000, now: 3_600_000 })).toMatchObject({
+      status: 'reset-due',
+      sampleCount: 0,
+    })
   })
 
   it('reports reset-first when the current pace would run past the provider reset', () => {

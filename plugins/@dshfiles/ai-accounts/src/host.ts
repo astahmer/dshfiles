@@ -1,24 +1,38 @@
+import { accountRuntime, activateAccountRuntime } from './account-runtime.js'
+import { configFromAccountsFile, type AiAccountsConfig, type CodexAccountConfig } from './account-config.js'
+export { Config } from './account-config.js'
 import type { Context } from '@deepseek-ai/cordis'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import z from '@deepseek-ai/schemastery'
-import { aiAccountsApi, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
-import { buildAccountsFile, readAccountFile, readAccountFileSync, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
+import {
+  aiAccountsApi,
+  type AccountProfile,
+  type AccountsFile,
+  type AccountsUsage,
+  type UsageCard,
+} from './api.js'
+import {
+  buildAccountsFile,
+  readAccountFile,
+  readAccountFileSync,
+  readAccountIdentity,
+  removeAccount,
+  setDistribution,
+  upsertAccount,
+} from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
-import {
-  createUsageHistoryScheduler,
-  readUsageHistory,
-  readUsageHistorySettings,
-  saveUsageHistorySettings,
-  type UsageHistoryScheduler,
-} from './usage-recorder.js'
+import { createUsageHistoryScheduler, readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
-import { definePlugin } from '@dshfiles/dshx/host'
+import { defineHost, definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
-import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV, createCommandCodeProvider } from './commandcode-provider.js'
+import {
+  COMMANDCODE_KIND as CC_KIND,
+  DEFAULT_COMMANDCODE_KEY_ENV,
+  createCommandCodeProvider,
+} from './commandcode-provider.js'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -26,8 +40,19 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import { DEFAULT_DISTRIBUTION, DISTRIBUTIONS, createAccountPool, isRateLimitFailure, type Distribution } from './account-pool.js'
-import { materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
+import {
+  createAccountPool,
+  isRateLimitFailure,
+} from './account-pool.js'
+import {
+  authJsonPath,
+  codexLoginHint,
+  describeCodexAuth,
+  materializeCodexShadowHome,
+  CodexHomeError,
+  resolveCodexHomeLayout,
+  type CodexHomeLayout,
+} from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 
 /**
@@ -57,7 +82,9 @@ const normalizeInstanceId = (value: string, fallback: string): string => {
   const trimmed = value.trim()
   if (trimmed.length === 0) return fallback
   if (!SLUG_PATTERN.test(trimmed)) {
-    throw new TypeError(`Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`)
+    throw new TypeError(
+      `Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`,
+    )
   }
   return trimmed
 }
@@ -66,52 +93,6 @@ const displayNameFor = (explicit: string, kind: string, instanceId: string): str
   const trimmed = explicit.trim()
   if (trimmed.length > 0) return trimmed
   return instanceId === kind ? kind : `${kind} (${instanceId})`
-}
-
-const CodexAccount = z.object({
-  instanceId: z.string().default(CODEX_KIND),
-  displayName: z.string().default(''),
-  homePath: z.string().default(''),
-  shadowHomePath: z.string().default(''),
-  additionalModelIds: z.array(z.string()).default([]),
-  enabled: z.boolean().default(true),
-})
-
-const OpenCodeAccount = z.object({
-  instanceId: z.string().default(OPENCODE_KIND),
-  displayName: z.string().default(''),
-  enabled: z.boolean().default(true),
-})
-
-export interface CodexAccountConfig {
-  readonly instanceId: string
-  readonly displayName: string
-  readonly homePath: string
-  readonly shadowHomePath: string
-  readonly additionalModelIds: readonly string[]
-  readonly enabled: boolean
-}
-
-export interface KeyedAccountConfig {
-  readonly instanceId: string
-  readonly displayName: string
-  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND
-  /** Environment variable holding this account's key. */
-  readonly apiKeyEnv: string
-  /** Alternate API base, for a self-hosted or staging Command Code. */
-  readonly apiBaseUrl: string
-  readonly enabled: boolean
-}
-
-export type OpenCodeAccountConfig = KeyedAccountConfig
-
-export interface AiAccountsConfig {
-  readonly codexAccounts: readonly CodexAccountConfig[]
-  readonly opencodeAccounts: readonly OpenCodeAccountConfig[]
-  readonly opencodeApiKey: string
-  readonly distribution: Distribution
-  readonly cooldownMs: number
-  readonly codexShadowRoot: string
 }
 
 interface CodexRoute {
@@ -134,7 +115,11 @@ interface KeyedRoute {
 type Route = CodexRoute | KeyedRoute
 
 const keyEnvFor = (route: KeyedRoute): string =>
-  route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
+  route.apiKeyEnv.trim().length > 0
+    ? route.apiKeyEnv.trim()
+    : route.kind === COMMANDCODE_KIND
+      ? DEFAULT_COMMANDCODE_KEY_ENV
+      : 'OPENCODE_API_KEY'
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
@@ -186,7 +171,8 @@ const buildProfile = (params: {
     Object.entries(pins).flatMap(([modelId, effortId]) => {
       const model = models.find(candidate => candidate.id === modelId)
       if (model === undefined) return []
-      const levels = (model as { thinkingLevelMap?: Record<string, string | null> }).thinkingLevelMap
+      const levels = (model as { thinkingLevelMap?: Record<string, string | null> })
+        .thinkingLevelMap
       if (levels !== undefined && levels[effortId] === null) return []
       return [[modelId, { reasoningEfforts: { [effortId]: levels?.[effortId] ?? effortId } }]]
     }),
@@ -265,81 +251,40 @@ const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
   return { routes, rejected }
 }
 
-const defaultConfig: AiAccountsConfig = {
-  codexAccounts: [
-    {
-      instanceId: CODEX_KIND,
-      displayName: '',
-      homePath: '',
-      shadowHomePath: '',
-      additionalModelIds: [],
-      enabled: true,
-    },
-  ],
-  opencodeAccounts: [],
-  opencodeApiKey: '',
-  distribution: DEFAULT_DISTRIBUTION,
-  cooldownMs: 300_000,
-  codexShadowRoot: `${process.env.HOME ?? '~'}/.codex-dshx`,
-}
-
-export const Config = z.object({
-  codexAccounts: z
-    .array(CodexAccount)
-    .default([CodexAccount({})])
-    .volatile(),
-  opencodeAccounts: z.array(OpenCodeAccount).default([]).volatile(),
-  opencodeApiKey: z.string().default('').volatile(),
-  distribution: z.string().default(DEFAULT_DISTRIBUTION).volatile(),
-  cooldownMs: z.number().default(300_000).volatile(),
-  codexShadowRoot: z.string().default('').volatile(),
-})
-
-/** Live state the page and the status tool both read. */
-/** The context this plugin activated on, for handlers declared above setup. */
-let hostContext: Context | undefined
-let usageHistoryScheduler: UsageHistoryScheduler | undefined
-
-let activeAccounts:
-  | {
-      config: AiAccountsConfig
-      pool: ReturnType<typeof createAccountPool>
-    }
-  | undefined
-
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
  * pool's live health and each home's observed login, so the page and the agent's
  * `ai_accounts` tool can never describe different state.
  */
-const accountsFile = async (): Promise<AccountsFile> => buildAccountsFile(await readAccountFile(), activeAccounts?.pool.describe() ?? [])
+const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
+  buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [])
 
 export const accountsSnapshot = accountsFile
 
 const accountsHostApi = aiAccountsApi.host({
-  read: async () => {
+  read: async ({ ctx }) => {
     // A changed file means changed routes, so rebuild before answering.
-    await refreshRoutes()
-    return accountsFile()
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
   },
-  save: async ({ input }) => {
+  save: async ({ input, ctx }) => {
     await upsertAccount(input.draft)
-    await refreshRoutes()
-    return accountsFile()
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
   },
-  remove: async ({ input }) => {
+  remove: async ({ input, ctx }) => {
     await removeAccount(input.instanceId)
-    await refreshRoutes()
-    return accountsFile()
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
   },
-  setDistribution: async ({ input }) => {
+  setDistribution: async ({ input, ctx }) => {
     await setDistribution(input.distribution)
-    activeAccounts?.pool.setDistribution(input.distribution)
-    return accountsFile()
+    accountRuntime(ctx)?.accounts?.pool.setDistribution(input.distribution)
+    return accountsFile(ctx)
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
-  catalog: async ({ input }) => {
-    const llm = hostContext?.get('llm')
+  catalog: async ({ input, ctx }) => {
+    const llm = ctx.get('llm')
     if (llm === undefined) return { instanceId: input.instanceId, models: [] }
     const models = await llm.listModels(input.instanceId)
     const resolved = await Promise.all(
@@ -358,26 +303,14 @@ const accountsHostApi = aiAccountsApi.host({
     )
     return { instanceId: input.instanceId, models: resolved }
   },
-  usage: async () => readAccountsUsage(),
-  history: async ({ input }) => ({
+  usage: async ({ ctx }) => readAccountsUsage(ctx),
+  history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
-    points: [...(await readUsageHistory(hostContext as Context, input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
+    points: [...(await readUsageHistory(ctx, input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
   }),
-  historySettings: async () => {
-    if (hostContext === undefined) {
-      return { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90 }
-    }
-    return readUsageHistorySettings(hostContext)
-  },
-  saveHistorySettings: async ({ input }) => {
-    if (hostContext === undefined) throw new Error('AI Accounts is not active on this host.')
-    return saveUsageHistorySettings(hostContext, input)
-  },
-  collectUsage: async () => {
-    if (usageHistoryScheduler === undefined) return { recorded: 0 }
-    const recorded = await usageHistoryScheduler.collectNow()
-    return { recorded }
-  },
+  historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
+  saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
+  collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
 })
 
 /**
@@ -417,10 +350,10 @@ const unsupported = (): UsageCard => ({
  * on an interval, so a provider that is slow or down costs its own card rather
  * than the panel.
  */
-const readAccountsUsage = async (): Promise<AccountsUsage> => {
+const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
-  const file = await accountsFile()
+  const file = await accountsFile(ctx)
   const cards = await Promise.all(
     file.accounts.map(async account => ({
       instanceId: account.instanceId,
@@ -439,36 +372,11 @@ const readAccountsUsage = async (): Promise<AccountsUsage> => {
  * enabled flag actually changed are re-registered, because the adapter registry
  * rejects a duplicate route for one already taken.
  */
-const refreshRoutes = async (): Promise<void> => {
+const refreshRoutes = async (ctx: Context): Promise<void> => {
+  const activeAccounts = accountRuntime(ctx)?.accounts
   if (activeAccounts === undefined) return
   const file = await readAccountFile()
-  const config: AiAccountsConfig = {
-    codexAccounts: file.accounts
-      .filter(account => account.kind === 'codex')
-      .map(account => ({
-        instanceId: account.instanceId,
-        displayName: account.displayName,
-        homePath: account.homePath,
-        shadowHomePath: account.shadowHomePath,
-        additionalModelIds: account.additionalModelIds,
-        enabled: account.enabled,
-      })),
-    opencodeAccounts: file.accounts
-      // Codex is handled separately; every other kind is a keyed API provider.
-      .filter((account): account is typeof account & { kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND } => account.kind !== 'codex')
-      .map(account => ({
-        instanceId: account.instanceId,
-        displayName: account.displayName,
-        kind: account.kind,
-        apiKeyEnv: account.apiKeyEnv,
-        apiBaseUrl: account.apiBaseUrl,
-        enabled: account.enabled,
-      })),
-    opencodeApiKey: '',
-    distribution: file.distribution,
-    cooldownMs: file.cooldownMs,
-    codexShadowRoot: file.shadowRoot,
-  }
+  const config = configFromAccountsFile(file)
   activeAccounts.config = config
   activeAccounts.pool.setDistribution(file.distribution)
 }
@@ -480,23 +388,10 @@ export default definePlugin({
   tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
-    hostContext = ctx
-    ctx.effect(() => {
-      const scheduler = createUsageHistoryScheduler(ctx, async () => (await accountsFile()).accounts)
-      usageHistoryScheduler = scheduler
-      return () => {
-        scheduler.dispose()
-        if (usageHistoryScheduler === scheduler) usageHistoryScheduler = undefined
-      }
-    })
+    const runtime = activateAccountRuntime(ctx)
+    runtime.scheduler = createUsageHistoryScheduler(ctx, async () => (await accountsFile(ctx)).accounts)
     const file = readAccountFileSync()
-    const config = readConfig({
-      distribution: file.distribution,
-      cooldownMs: file.cooldownMs,
-      codexShadowRoot: file.shadowRoot,
-      codexAccounts: file.accounts,
-      opencodeAccounts: file.accounts,
-    })
+    const config = configFromAccountsFile(file)
     const { routes, rejected } = buildRoutes(config)
     for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
     if (routes.size === 0) return
@@ -540,7 +435,9 @@ export default definePlugin({
       account =>
         [
           account.instanceId,
-          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null ? (account.reasoningDefaults as Record<string, string>) : {},
+          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null
+            ? (account.reasoningDefaults as Record<string, string>)
+            : {},
         ] as const,
     )
 
@@ -551,11 +448,14 @@ export default definePlugin({
           upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
           provider: id,
           displayName: route.displayName,
-          reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
+          reasoningDefaults:
+            reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
           ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
           additionalModelIds:
             route.kind === CODEX_KIND
-              ? (config.codexAccounts.find(account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id)?.additionalModelIds ?? [])
+              ? (config.codexAccounts.find(
+                  account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id,
+                )?.additionalModelIds ?? [])
               : [],
         }),
       ]),
@@ -565,7 +465,7 @@ export default definePlugin({
       distribution: config.distribution,
       cooldownMs: config.cooldownMs,
     })
-    activeAccounts = { config, pool }
+    runtime.accounts = { config, pool }
     for (const [id, route] of routes) {
       pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
     }
@@ -588,12 +488,20 @@ export default definePlugin({
         const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
         const key = readKeyFromEnv(named) || sharedKey
         if (key.length === 0) {
-          throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
+          throw new LlmError(
+            `No key for '${provider}'. Export ${named}, or set a shared key on the entry.`,
+            'MISSING_CREDENTIAL',
+          )
         }
         return key
       },
       resolveAttachments: () => ctx.get('attachments'),
-      resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref),
+      resolveImageAccess: (attachments, ref) =>
+        resolveImageAttachmentAccess(
+          attachments,
+          hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
+          ref,
+        ),
       auth: {
         credentials: {
           read: async () => undefined,
@@ -634,7 +542,9 @@ export default definePlugin({
       if (route.kind !== COMMANDCODE_KIND) continue
       disposers.push(
         llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
-          const entries = await fetchCommandCodeCatalog(discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }))
+          const entries = await fetchCommandCodeCatalog(
+            discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }),
+          )
           return entries.map(entry => ({
             id: entry.id,
             contextWindow: 128_000,
@@ -644,6 +554,7 @@ export default definePlugin({
         }),
       )
     }
+
 
     ctx.effect(() => {
       disposers.push(
@@ -684,7 +595,9 @@ export default definePlugin({
               if (served?.id !== error.provider) return next()
               pool.noteRateLimited(error.provider, error.failure.providerRetryAfterMs)
               pool.unbind(id)
-              ctx.logger.info(`ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`)
+              ctx.logger.info(
+                `ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`,
+              )
               return next()
             })
             agent.ctx.on('agent/disposed', () => pool.unbind(id))
@@ -710,42 +623,3 @@ export default definePlugin({
     })
   },
 })
-
-const readConfig = (input: Record<string, unknown>): AiAccountsConfig => {
-  const raw = input ?? {}
-  const accounts = Array.isArray(raw.codexAccounts) ? raw.codexAccounts : []
-  const opencode = Array.isArray(raw.opencodeAccounts) ? raw.opencodeAccounts : []
-  const toCodex = (value: unknown): CodexAccountConfig => {
-    const record = (value ?? {}) as Record<string, unknown>
-    return {
-      instanceId: typeof record.instanceId === 'string' ? record.instanceId : CODEX_KIND,
-      displayName: typeof record.displayName === 'string' ? record.displayName : '',
-      homePath: typeof record.homePath === 'string' ? record.homePath : '',
-      shadowHomePath: typeof record.shadowHomePath === 'string' ? record.shadowHomePath : '',
-      additionalModelIds: Array.isArray(record.additionalModelIds) ? record.additionalModelIds.filter((id): id is string => typeof id === 'string') : [],
-      enabled: record.enabled !== false,
-    }
-  }
-  const toKeyed = (value: unknown): KeyedAccountConfig => {
-    const record = (value ?? {}) as Record<string, unknown>
-    const kind = record.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
-    return {
-      instanceId: typeof record.instanceId === 'string' ? record.instanceId : kind,
-      displayName: typeof record.displayName === 'string' ? record.displayName : '',
-      kind,
-      apiKeyEnv: typeof record.apiKeyEnv === 'string' ? record.apiKeyEnv : '',
-      apiBaseUrl: typeof record.apiBaseUrl === 'string' ? record.apiBaseUrl : '',
-      enabled: record.enabled !== false,
-    }
-  }
-  const distribution = raw.distribution
-  return {
-    codexAccounts: accounts.length === 0 ? defaultConfig.codexAccounts : accounts.map(toCodex),
-    opencodeAccounts: opencode.map(toKeyed),
-    opencodeApiKey: typeof raw.opencodeApiKey === 'string' && raw.opencodeApiKey.length > 0 ? raw.opencodeApiKey : (process.env.OPENCODE_API_KEY ?? ''),
-    distribution:
-      typeof distribution === 'string' && DISTRIBUTIONS.includes(distribution as Distribution) ? (distribution as Distribution) : DEFAULT_DISTRIBUTION,
-    cooldownMs: typeof raw.cooldownMs === 'number' ? raw.cooldownMs : defaultConfig.cooldownMs,
-    codexShadowRoot: typeof raw.codexShadowRoot === 'string' && raw.codexShadowRoot.length > 0 ? raw.codexShadowRoot : defaultConfig.codexShadowRoot,
-  }
-}

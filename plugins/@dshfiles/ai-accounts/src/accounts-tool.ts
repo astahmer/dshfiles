@@ -59,9 +59,11 @@ export const aiAccountsTool = defineTool({
       return [{ type: 'text', text: lines.join('\n') }]
     },
   },
-  execute: async () => {
+  execute: async (_args, exec) => {
+    const ctx = exec.agent?.ctx
+    if (ctx === undefined) throw new Error('AI Accounts requires an active agent context.')
     const { accountsSnapshot } = await import('./host.js')
-    const snapshot = await accountsSnapshot()
+    const snapshot = await accountsSnapshot(ctx)
     return {
       distribution: snapshot.distribution,
       cooldownMs: snapshot.cooldownMs,
