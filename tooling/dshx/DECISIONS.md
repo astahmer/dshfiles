@@ -1,5 +1,9 @@
 # Architecture Decisions
 
+> Upstream's decision log, kept as history. Entries about publishing, Framework
+> Hub, email, changesets, and protocol-1 no longer apply to this fork; see
+> [FORK.md](./FORK.md) and [docs/compatibility.md](./docs/compatibility.md).
+
 ## 2026-08-21: Phase A starts at the client artifact boundary
 
 DSHX will not implement `defineHost`, `defineClient`, `defineSlot`, the CLI, or scaffolding until a real DSH `0.1.0-rc.8` instance loads and hot-reloads the Phase A fixture.

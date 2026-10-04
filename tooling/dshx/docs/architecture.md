@@ -61,7 +61,7 @@ User Vite plugins are standard `PluginOption[]`, not a DSHX plugin abstraction. 
 
 The experimental Conversation helper creates one official node definition plus one keyed chat renderer. The official assembler still executes matching, folding, projection scheduling, replay, ordering, pagination, location, HMR rebuild, and disposal. Host interaction uses the ordinary typed Connection API.
 
-The verified `protocol-1` persistence contract has no out-of-tree durable event-vocabulary registry. Conversation event keys therefore remain limited to the official `SessionEventMap`; TypeScript declaration merging alone does not authorize persistence.
+Protocol-2 has neither a conversation event registry nor an out-of-tree durable event-vocabulary registry, so `defineConversation` renderers fail with `DSHX2302`. Conversation event keys therefore remain limited to the official `SessionEventMap`; TypeScript declaration merging alone does not authorize persistence.
 
 ## Compatibility and Inspect
 
@@ -71,10 +71,5 @@ Inspect is read-only and requires a running supported Composition. The Host-owne
 
 ## Repository layout
 
-- `packages/dshx`: authoring APIs, compiler kernel, compatibility, CLI, Inspect, and scaffolds.
-- `packages/create-dshx`: template/style initializer.
-- `packages/plugin-marketplace`: official self-hosting reference plugin built and run entirely through DSHX's public authoring workflow.
-- `packages/framework-hub-cli`: Hub verification and privileged operations client.
-- `apps/framework-hub`: bilingual Hub and catalog/community application.
-- `fixtures`: compatibility fixtures, not user-facing project modes.
-- `scripts`: packaging, release, browser, and real-runtime smoke orchestration.
+- `packages/dshx`: authoring APIs, compiler kernel, compatibility, CLI, Inspect, DSH platform commands, agent communication, and scaffolds.
+- `packages/create-dshx`: template/style initializer, also reachable as `dshx create`.

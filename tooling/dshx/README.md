@@ -1,44 +1,29 @@
 # DSHX
 
-**Build, check, and ship typed DeepSeek Harness plugins.**
+Build, check, and debug typed DeepSeek Harness (DSH) plugins.
 
-> Fork of [liyown/dshx](https://github.com/liyown/dshx). We build and run this tree directly; see [FORK.md](./FORK.md).
-[![create-dshx](https://img.shields.io/npm/v/create-dshx?label=create-dshx)](https://www.npmjs.com/package/create-dshx)
-[![Node.js](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)](./package.json)
-[![License](./LICENSE)](./LICENSE) — MIT, © DSHX contributors
+This is our hard fork of [liyown/dshx](https://github.com/liyown/dshx), owned
+as `@dshfiles/dshx` and maintained against the DSH generation this repository
+runs (`protocol-2`, DSH `0.2.x`). It is private: plugins under
+`plugins/@dshfiles` link it by path, and nothing is published. Provenance and
+license are in [FORK.md](./FORK.md); the original MIT license is in
+[LICENSE](./LICENSE).
 
-[简体中文](./README.zh-CN.md) · [Documentation](./docs/index.md) · [Framework Hub](https://dshx.io) · [Roadmap](./ROADMAP.md)
+DSHX is build-time tooling. Official DSH and Cordis services still own
+execution, registries, scopes, transport, persistence, assembly, HMR, and
+disposal.
 
-DSHX is a build-time toolchain for out-of-tree [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) plugins. It provides typed Host/Client authoring, a bounded Vite build, offline diagnostics, Profile-aware development, and reproducible templates. Official DSH/Cordis services still own execution, registries, scopes, transport, persistence, assembly, HMR, and disposal.
+## Create a plugin
 
-The first usable release is distributed through the npm `preview` tag. The existing `latest` tag remains on the earlier development build until Preview verification is complete.
-
-## Create a project
-
-```bash
-pnpm create dshx@preview my-plugin
-cd my-plugin
-pnpm check
-pnpm dev
-```
-
-The default is a minimal `starter + css-modules` project with one Host Tool and one visible Client Slot. Generate the complete Candidate API example with optional Tailwind:
+From the repository root, after building this tree:
 
 ```bash
-pnpm create dshx@preview my-plugin --template showcase --style tailwind
+node tooling/dshx/packages/dshx/dist/cli/bin.js create plugins/@dshfiles/my-plugin
 ```
 
-Templates are `starter | showcase`; styles are `css-modules | tailwind | none`. Tailwind uses the standard v4 Vite plugin, a `dshx:` prefix, and no Preflight.
-
-## Reference plugin
-
-[`@dshfiles/dshx-plugin-marketplace`](./packages/plugin-marketplace/README.md) is the workspace's official self-hosting reference plugin. It mounts **Settings → Plugins → Marketplace** as an ordinary DSH bundle and exercises `defineHost`, `defineSettings`, `defineApi`, `defineClient`, `defineLocale`, `defineSlot`, Standard Schema validation, `useApiQuery`, CSS Modules, Profile-aware installation, and Client HMR together.
-
-Run its real DSH development Profile with:
-
-```bash
-pnpm --filter @dshfiles/dshx-plugin-marketplace dev
-```
+Templates are `starter | showcase`; styles are `css-modules | tailwind | none`.
+Then link the package from `plugins/` and install it into a profile as the
+repository AGENTS.md describes.
 
 ## Authoring example
 
@@ -118,7 +103,7 @@ export default defineClient({ locales: [copy], slots: [statusSlot] });
 | `/experimental/conversation`    | Experimental           | Pure official event lifecycle plus React renderer                    |
 | `/tooling`                      | Tooling / Experimental | Node-only compiler, compatibility, diagnostics, CLI, and repair APIs |
 
-API Candidate is the intended `0.1.x` authoring shape; it is not a 1.0 stability guarantee. See the [0.1.1 to 0.1.2 migration](./docs/migrations/0.1.1-to-0.1.2.md) for removed fields, entries, and aliases.
+`0.x` shapes are not stability guarantees; this fork changes them when DSH does.
 
 ## Technical documentation
 
@@ -134,10 +119,6 @@ API Candidate is the intended `0.1.x` authoring shape; it is not a 1.0 stability
 | [Creator](./docs/guides/creator.md)                  | template/style matrix and programmatic generation                       |
 | [Tooling](./docs/guides/tooling.md)                  | programmatic build/watch, compatibility, diagnostics, repair            |
 
-Also see the [CLI reference](./docs/cli-reference.md), [Compatibility](./docs/compatibility.md), and [Architecture](./docs/architecture.md).
-
-Preview scope and known limits are recorded in [Preview](./docs/preview.md); plugin package release requirements are in [Publishing](./docs/guides/publishing.md).
-
 ## CLI
 
 ```bash
@@ -151,23 +132,20 @@ dshx add ui --slot <slot-name>
 
 `check` is read-only unless `--fix` is explicit. `build` does not rewrite source or manifest metadata. `inspect` requires a supported running Composition. See the [CLI reference](./docs/cli-reference.md) for all commands and JSON fields.
 
-## Compatibility
+Also see the [CLI reference](./docs/cli-reference.md),
+[Compatibility](./docs/compatibility.md), [Architecture](./docs/architecture.md),
+and [Agent communication](./docs/agent-communication.md).
 
-The active `protocol-1` adapter publishes the npm-safe peer range `>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2`; verified real-runtime boundaries are `0.1.0-rc.8` and `0.1.1-rc.2`. The explicit rc.2 arm avoids npm's cross-patch prerelease exclusion. Plugin public support belongs in `peerDependencies`; one concrete development version belongs in `devDependencies`.
-
-Conversation remains Experimental because the published protocol has no out-of-tree durable event-vocabulary registry. It accepts official `SessionEventMap` keys only.
-
-## Develop this repository
+## Develop this tree
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm check:all
-pnpm smoke:packages
-pnpm smoke:dsh -- --version 0.1.0-rc.8
-pnpm smoke:dsh -- --version 0.1.1-rc.2
+pnpm --filter create-dshx build
+pnpm --filter @dshfiles/dshx build
+pnpm check        # typecheck, test, build both packages
+pnpm lint
+pnpm deps:check   # knip
 ```
-
-Read [Contributing](./CONTRIBUTING.md), the [dependency policy](./docs/dependency-policy.md), and [Security](./SECURITY.md) before opening a change.
 
 ## License
 

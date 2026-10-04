@@ -1,121 +1,89 @@
 # Compatibility and verification
 
-DSHX manages DSH support by observable protocol generation. A generation changes only when an official contract, API seam, loader behavior, or runtime invariant requires different adaptation; a DSH patch or minor release alone does not create an adapter.
+DSHX tracks DSH support by observable protocol generation. A generation changes
+only when an official contract, API seam, loader behavior, or runtime invariant
+needs different adaptation; a DSH patch or minor release alone does not create
+one.
 
-## Three independent versions
+This fork supports one generation, `protocol-2`. Protocol-1 (DSH `0.1.x`) was
+retired with its adapter, fixtures, and smoke script; the adapter registry
+stays generic so a future generation can be added beside it.
 
-A plugin repository has three different version axes:
+## Source of truth
 
-- **DSH version:** the official runtime contract used to load and execute the plugin;
-- **plugin version:** the plugin's own product and release lifecycle;
-- **DSHX version:** the build-time compiler, diagnostics, and development tooling.
+`packages/dshx/src/compat/protocol-2.ts` is the generation record.
+`packages/dshx/src/compat/index.ts` validates the registry, analyzes plugin
+ranges, selects the adapter, and reports capabilities.
 
-They do not map one-to-one. A plugin declares public DSH support and pins one concrete local test runtime independently:
+| Field | Value |
+|---|---|
+| DSH range | `>=0.2.0-rc.1 <0.3.0-0` |
+| Verified versions | `0.2.0-rc.1`, `0.2.0-rc.2` |
+| Node range | `^22.19.0 \|\| >=24.0.0` |
+| Settings service | `configForms` from `@deepseek-ai/dsh-client-ui-settings` |
+| Conversation contracts | `@deepseek-ai/dsh-client-ui-conversation` |
+| Custom durable event vocabulary | not available |
+| Conversation component contributions | not available |
+
+## What protocol-2 changed
+
+- `@deepseek-ai/dsh-client-runtime` no longer exists. Its types moved to
+  `@deepseek-ai/dsh-client-ui-conversation/client`; `ChatConversationViewNode`,
+  `ChatNodeOwnerProps`, and `UseChatNodeTurnData` moved to
+  `@deepseek-ai/dsh-client-ui-chat/client`.
+- The `conversationEvents` registry is gone, so `defineConversation` renderers
+  fail with `DSHX2302`. Use ordinary typed UI slots.
+- Settings inverted. A plugin no longer registers a namespace object; a
+  namespace is identified by its Loader entry id and read through
+  `ctx.settings.describe()` and `update()`. The Host binds a scope façade and the
+  Client binds through `ConfigForms` (`ConfigForms.get(entryId)` plus
+  `ConfigForms.describe()` replace `SettingsScopeBinder`).
+- The context no longer carries the plugin's config. Generated Host code
+  forwards `apply(ctx, config)`'s config to `setup(ctx, config)`, unwrapping
+  schemastery's resolvers first.
+- `dshx/host` re-exports cordis's `Events` augmentation, so `ctx.on` accepts DSH
+  event names. This only holds when the plugin and the toolchain resolve one
+  cordis identity; see the repository AGENTS.md.
+
+## Versions in a plugin
+
+A plugin declares public support in `peerDependencies` and pins the concrete
+DSH it builds and tests against in `devDependencies`:
 
 ```json
 {
-  "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2"
-  },
-  "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.1-rc.2",
-    "@dshfiles/dshx": "0.1.4-preview.0"
-  }
+  "peerDependencies": { "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0" },
+  "devDependencies": { "@deepseek-ai/dsh": "0.2.0-rc.2" }
 }
 ```
 
-`peerDependencies` is the plugin's public compatibility claim. `devDependencies` selects the concrete DSH used by that repository for build, development, and local verification. The installed package/executable is the runtime source of truth; DSHX semver is independent.
-
-`0.1.4-preview.0` is the first planned Preview identifier; use the npm `preview` tag to receive the current Preview patch instead of copying this example indefinitely. Preview does not widen the verified DSH boundary: `protocol-1` remains verified at `0.1.0-rc.8` and `0.1.1-rc.2` and supports the declared range below.
-
-## Protocol-generation source of truth
-
-`packages/dshx/src/compat/protocol-1.ts` is the current generation record. `packages/dshx/src/compat/index.ts` validates the registry, analyzes plugin ranges, selects adapters, reports capabilities, and derives the CI matrix. Each adapter keeps together:
-
-- protocol generation, lifecycle, and non-overlapping DSH semver range;
-- the baseline contract version and adapter-owned runtime configuration;
-- Profile, manifest, loader, Host contribution, Client, Inspect, connection, and optional runtime-plugin capabilities;
-- minimum/latest smoke boundaries and the exact versions actually verified.
-
-The current `protocol-1` adapter uses the npm-safe peer range `>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2`. Its minimum and latest verified boundaries are `0.1.0-rc.8` and `0.1.1-rc.2`. The explicit rc.2 arm is required because package managers exclude prereleases with a different patch tuple from an otherwise broad semver comparator set; DSHX's internal compatibility classifier still evaluates the protocol range with prereleases included. The range reflects current evidence, not an assumption that every DSH minor changes protocol. If DSH `0.2` preserves all relevant contracts, the same adapter may be extended after real smoke; if a seam breaks, a new protocol adapter is required.
-
-One DSHX release may ship multiple adapters. The actual installed DSH version automatically selects one of them.
-
-## One artifact, one generation
-
-The default build produces one Host/Client artifact pair for one protocol generation. A plugin peer range must therefore be fully contained by one adapter range.
-
-`dshx build`, `dev`, and `check` report stable diagnostics when the declaration:
-
-- is missing or invalid;
-- extends beyond every range supported by the current DSHX release;
-- spans multiple incompatible protocol generations;
-- does not contain the DSH version actually installed;
-- uses a floating local DSH devDependency instead of one concrete version.
-
-A cross-generation range is not accepted merely because semver intersects each adapter. Multi-target publication requires an explicit artifact strategy from the official DSH ecosystem; DSHX does not fabricate one.
+`dshx build`, `dev`, and `check` report diagnostics when the peer range is
+missing or invalid, extends beyond the supported range, spans generations, does
+not contain the installed DSH, or when the devDependency floats.
 
 ## Status semantics
 
-| Status         | Runtime meaning                                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `verified`     | The exact installed DSH version completed the generic real-runtime scenario.                                              |
-| `compatible`   | An unverified stable version is inside one known generation range and may run with a warning.                             |
-| `experimental` | An unverified prerelease is inside one known generation range and may run with an explicit experimental warning.          |
-| `unsupported`  | No adapter owns the installed version. DSHX rejects it by default or uses `allowUnsupported` as a temporary escape hatch. |
+| Status | Meaning |
+|---|---|
+| `verified` | The installed DSH is one of the verified versions above. |
+| `compatible` | An unverified stable version inside the range; runs with a warning. |
+| `experimental` | An unverified prerelease inside the range; runs with an explicit warning. |
+| `unsupported` | Outside every range. Rejected unless `compatibility.allowUnsupported` is set for temporary diagnosis. |
 
-Semver membership never implies real-runtime verification. `dshx dev` prints the DSHX version, plugin peer range, installed DSH version, selected adapter/generation, lifecycle, status, and adapter capabilities. Offline `dshx check --json` reports the static compatibility assessment; `dshx check --runtime --json` additionally reports the resolved Profile, Composition, runtime plugins, bridge, and readiness state.
+Semver membership never implies a real boot. `dshx check --json` reports the
+static assessment; `dshx check --runtime --json` adds the resolved Profile,
+runtime plugins, bridge, and readiness.
 
-## Declarative and native compatibility
+## Verifying a DSH version
 
-DSHX may adapt the declarative surface it owns: Host Tools, Commands, Prompt Sections and Contexts, Host Settings ownership, hook-driven Client Settings scopes, Client Slots and Conversation Components, typed DSHX APIs, generated manifest fields, Profile operations, and compiler output. The adapter is carried into the compiled artifact while official runtime packages remain external.
+The evidence for a version is a real boot, not a range match:
 
-For Conversation Components, `protocol-1` records the official `conversationEvents` and keyed chat Slot seams separately from Session event vocabulary. Machine-readable capabilities keep the component adapter `experimental`: the generic real-DSH scenario verifies a minimal official `command/run` + `command/done` replay/render/HMR path, but not the broader pagination and active reconnect matrix. The component contribution is available, but custom required durable event types are not: the verified rc boundaries expose no out-of-tree vocabulary registry that persistence can consult before history load and resume. Event keys therefore remain limited to the official `SessionEventMap`; a TypeScript-only extension is not a compatibility guarantee.
+1. Run `dshx check --boot` in each plugin. It boots a throwaway profile with the
+   plugin installed and fails on any "did not activate" line.
+2. Boot the `web` profile with every owned bundle and read the activation
+   lines it prints.
+3. Only then add the version to `VERIFIED_PROTOCOL_2_VERSIONS`.
 
-Direct `setup(ctx)` logic and native named DSH modules call official APIs without a DSHX wrapper. Their source types come from the installed official packages, and their cross-version behavior remains the plugin author's responsibility. DSHX does not copy official DSH types into parallel versioned type trees. Settings and API Hooks are narrow exceptions: static checks validate declared provider edges, while build/dev make the authoritative capability decision from final chunk module metadata after tree-shaking.
-
-## Generic real-runtime scenario
-
-The single `scripts/smoke-dsh.mjs` scenario creates isolated Full, Host-only, Client-only, and native fixtures, installs the selected official DSH package set, and verifies:
-
-- compiler output, declarations, package entry points, and artifact installation;
-- Profile linking and manifest diagnostics;
-- Host and Client loading;
-- Tool, Hook, API, Command, Prompt, and Settings contribution registration;
-- global and Agent-scoped Prompt assembly, shadowing, dynamic context, Tool schema visibility, and disposal;
-- Settings defaults/base/user layering, official mutation writes, revision fences, validation recovery, secret redaction, persistence, and restart re-registration; the browser smoke separately verifies Hook-driven capability wiring and rendering;
-- typed API unary transport, Hook-driven capability wiring, version mismatch, and re-registration after Host restart;
-- CSS Modules and no-Preflight Tailwind output, inline assets, Client HMR, and owned-style replacement;
-- experimental Conversation over official `command/run` and `command/done` events, including history replay, reduce/project/render, ordering, Client HMR, and Host restart recovery;
-- runtime Inspect and Bridge behavior.
-
-Standard Schema transform-once semantics, caller abort handling, and query pause/reconnect states are covered by Core boundary tests. Conversation pagination/prepend behavior is covered by the official assembler test; pagination UI and an actively disconnected/reconnected browser have not yet entered the generic real-DSH scenario and are not part of the `verified` compatibility claim.
-
-Select a version through the CLI or environment:
-
-```bash
-pnpm smoke:dsh -- --version 0.1.1-rc.2
-DSH_VERSION=0.1.1-rc.2 pnpm smoke:dsh
-```
-
-Without either value, the registry's latest verified boundary is used. CLI input wins over `DSH_VERSION`. Set `DSHX_KEEP_SMOKE=1` only to preserve a failed temporary fixture for diagnosis.
-
-## CI matrix policy
-
-`getCompatibilitySmokeMatrix()` emits the minimum and latest verified boundary for every generation this DSHX release still resolves. If they are identical it emits one job. A new DSH patch does not add a script or job; update the latest boundary only after the generic scenario passes. A new job pair appears only when an actual contract change introduces an adapter.
-
-Prerelease or `next` probing may run as scheduled experimental coverage when its cost is justified. A known regression version belongs in the matrix only when it protects a concrete invariant.
-
-## Adapter and lifecycle policy
-
-A compatibility change follows this order:
-
-1. compare the official Profile, manifest, Host/Client loader, Tool/Command/Slot, connection, Inspect, restart, reconnect, and HMR seams;
-2. run the generic scenario against the candidate DSH version;
-3. extend the existing adapter range and verified boundary when the contract is unchanged;
-4. add a new adapter only when observable adaptation is required;
-5. update the generator peer range only after the target generation is supported and verified.
-
-Adapters move from `active` to `maintenance` before `end-of-life`. An EOL adapter may be removed in a later DSHX release with a changeset, changelog entry, migration note, and removal from the representative matrix. Projects that must remain on that DSH generation pin the last DSHX release that supports it. DSHX does not silently retarget old artifacts to a different generation.
-
-`compatibility.allowUnsupported` downgrades installed-version rejection for temporary diagnosis. It does not turn the version into `compatible` or `verified`, does not validate direct native API calls, and must not be used as evidence for a published compatibility claim.
+A seam that moved needs a new adapter, not a wider range. Compare the Profile,
+manifest, Host and Client loader, Tool, Command, Slot, connection, Inspect,
+restart, and HMR seams first, and record what changed in the list above.

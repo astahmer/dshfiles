@@ -7,9 +7,9 @@
 ## CLI
 
 ```bash
-pnpm create dshx@preview my-plugin --template starter --style css-modules
-pnpm create dshx@preview my-plugin --template showcase --style tailwind
-pnpm create dshx@preview my-plugin --template starter --style none
+dshx create my-plugin --template starter --style css-modules
+dshx create my-plugin --template showcase --style tailwind
+dshx create my-plugin --template starter --style none
 ```
 
 ```text

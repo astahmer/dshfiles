@@ -3,7 +3,7 @@
 Create a reproducible DeepSeek Harness plugin project with typed Host and Client entry points.
 
 ```bash
-pnpm create dshx@preview my-plugin
+dshx create my-plugin
 cd my-plugin
 pnpm dev
 ```
@@ -11,9 +11,9 @@ pnpm dev
 Choose a feature template and an independent Client styling setup:
 
 ```bash
-pnpm create dshx@preview my-plugin --template starter --style css-modules
-pnpm create dshx@preview my-plugin --template showcase --style tailwind
-pnpm create dshx@preview my-plugin --template starter --style none
+dshx create my-plugin --template starter --style css-modules
+dshx create my-plugin --template showcase --style tailwind
+dshx create my-plugin --template starter --style none
 ```
 
 - `starter` contains one Host Tool and one localized visible Client Slot. Its `defineLocale()` contribution supplies typed `zh`/`en` copy without `LocaleNamespaceMap` declaration merging.
@@ -29,8 +29,8 @@ Interactive dependency installation displays an animated status line until the p
 ## Automation
 
 ```bash
-pnpm create dshx@preview my-plugin --yes --no-install
-pnpm create dshx@preview my-plugin --package-manager pnpm
+dshx create my-plugin --yes --no-install
+dshx create my-plugin --package-manager pnpm
 ```
 
 - `--yes` disables interactive questions.
@@ -43,6 +43,6 @@ pnpm create dshx@preview my-plugin --package-manager pnpm
 
 Package-manager detection checks the explicit flag, existing lockfiles, the nearest `packageManager` declaration, the invoking package manager, and available commands on `PATH`, in that order.
 
-See the [DSHX documentation](https://dshx.io/docs) for the full development workflow.
+See [the DSHX README](../../README.md) for the full development workflow.
 
 MIT © DSHX contributors.

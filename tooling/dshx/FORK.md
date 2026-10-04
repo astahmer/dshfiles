@@ -29,16 +29,24 @@ fnm exec --using 22.23.3 pnpm --filter @dshfiles/dshx build
 fnm exec --using 22.23.3 pnpm --filter @dshfiles/dshx test --maxWorkers=1
 ```
 
-The package is owned here as `@dshfiles/dshx`. The plugin workspace at
-`plugins/@dshfiles/ai-accounts` links it by local path, so the CLI a plugin
-builds with is always the code in this tree — never a registry download.
+The package is owned here as `@dshfiles/dshx`. Every plugin under
+`plugins/@dshfiles` links it by local path, so the CLI a plugin builds with is
+always the code in this tree — never a registry download.
+
+## What we removed from upstream
+
+Upstream's dshx.io site (`apps/framework-hub`), its operations CLI and prompt,
+changesets, release and SEO scripts, GitHub workflows, and the npm publishing
+documentation were deleted: nothing here publishes. Protocol-1 (DSH `0.1.x`)
+was retired with its fixture and smoke script. The marketplace reference plugin
+moved to `plugins/@dshfiles/plugin-marketplace`. `DECISIONS.md` is upstream's
+decision log, kept as history.
 
 ## Native development dependencies
 
-The workspace contains archived protocol-1 fixtures as well as the protocol-2
-SDK. Root pnpm overrides keep Cordis, Include, and Loader on one type identity.
+Root pnpm overrides keep Cordis, Include, and Loader on one type identity.
 Package extensions attach protocol-2 slot declarations to the native packages
-that import them in public types but list them only as development dependencies.
-Without those edges, pnpm can resolve a protocol-1 hoisted slot package from a
-protocol-2 declaration. These are workspace dependency-resolution settings;
-they do not replace native services or modify DSH source.
+that import them in public types but list them only as development
+dependencies; without those edges pnpm can resolve a stale hoisted slot package
+from a protocol-2 declaration. These are dependency-resolution settings; they
+do not replace native services or modify DSH source.
