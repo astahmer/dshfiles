@@ -65,7 +65,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-const augmentLocaleNamespace = <Namespace extends string, Key extends string>(): void => {}
+const augmentLocaleNamespace = <_Namespace extends string, _Key extends string>(): void => {}
 
 /** Define one type-safe namespace without requiring LocaleNamespaceMap declaration merging. */
 export function defineLocale<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(

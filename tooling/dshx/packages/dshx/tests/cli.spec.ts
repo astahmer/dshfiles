@@ -7,6 +7,7 @@ import type { DevEvent, DevSession } from '../src/dev/index.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import type { PreparedProjectProfile } from '../src/profile/index.js'
 import type { InspectOptions, InspectTarget } from '../src/inspect/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 function project(): ResolvedDshxConfig {
   return {
@@ -25,8 +26,8 @@ function project(): ResolvedDshxConfig {
     manifest: {
       name: '@test/plugin',
       type: 'module',
-      devDependencies: { '@deepseek-ai/dsh': '0.1.0-rc.8' },
-      peerDependencies: { '@deepseek-ai/dsh': '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2' },
+      devDependencies: { '@deepseek-ai/dsh': '0.2.0-rc.2' },
+      peerDependencies: { '@deepseek-ai/dsh': PROTOCOL_2_COMPATIBILITY.dshRange },
     },
   }
 }
@@ -68,30 +69,19 @@ function profile(projectValue: ResolvedDshxConfig): PreparedProjectProfile {
     link: 'existing',
     diagnostics: [],
     dsh: {
-      version: '0.1.0-rc.8',
-      adapterId: 'protocol-1',
-      protocolGeneration: 'protocol-1',
-      supportedRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
+      version: '0.2.0-rc.2',
+      adapterId: 'protocol-2',
+      protocolGeneration: 'protocol-2',
+      supportedRange: PROTOCOL_2_COMPATIBILITY.dshRange,
       support: 'verified',
       diagnostics: [],
-      compatibility: {
-        id: 'protocol-1',
-        protocolGeneration: 'protocol-1',
-        lifecycle: 'active',
-        version: '0.1.0-rc.8',
-        dshRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
-        verified: { minimum: '0.1.0-rc.8', latest: '0.1.0-rc.8' },
-        verifiedVersions: ['0.1.0-rc.8'],
-        profile: { listCommand: 'plugin-list-json', addCommand: 'plugin-add' },
-        inspect: { targets: ['slots', 'tools'], provider: 'unavailable' },
-        nodeRange: '^22.19.0 || >=24.0.0',
-        client: { platformModules: [], preloadedExternals: [], manifest: { platform: 'web', moduleRequestsField: 'external', packageEdgesField: 'inject' } },
-      },
+      compatibility: PROTOCOL_2_COMPATIBILITY,
     },
   }
 }
 
 const offlineChecks = {
+  resolveDsh: async () => profile(project()).dsh,
   checkMigrations: async () => [],
   checkPackageTargets: async () => [],
   typecheckProject: async (root: string) => ({ status: 'passed' as const, configFile: `${root}/tsconfig.json`, diagnostics: [] }),
@@ -105,9 +95,11 @@ describe('CLI argument parser', () => {
     expect(parseCliArgs(['add', 'hook', '--event', 'agent.ready', '--file', 'src/ready.ts', '--dry-run', '--json'])).toMatchInlineSnapshot(`
       {
         "addTarget": "hook",
+        "boot": false,
         "command": "add",
         "dryRun": true,
         "event": "agent.ready",
+        "explain": false,
         "file": "src/ready.ts",
         "fix": false,
         "help": false,
@@ -125,7 +117,8 @@ describe('CLI argument parser', () => {
     expect(() => parseCliArgs(['build', '--json'])).toThrow('--json')
     expect(() => parseCliArgs(['dev', '--cwd'])).toThrow('requires a value')
     expect(() => parseCliArgs(['dev', '--port', '65536'])).toThrow('0 to 65535')
-    expect(() => parseCliArgs(['check', '--port', '3080'])).toThrow('--port is only valid with dev')
+    expect(() => parseCliArgs(['check', '--port', '3080'])).toThrow('--port is only valid with dev or check --boot')
+    expect(parseCliArgs(['check', '--boot', '--port', '3080'])).toMatchObject({ command: 'check', boot: true, port: 3080 })
     expect(() => parseCliArgs(['wat'])).toThrow('Unknown argument')
     expect(() => parseCliArgs(['inspect'])).toThrow('requires a target')
     expect(() => parseCliArgs(['inspect', 'unknown-target'])).toThrow('Unknown argument')
@@ -305,14 +298,14 @@ describe('CLI commands', () => {
       diagnostics: [{ code: 'DSHX4305', severity: 'error' }],
       compatibility: {
         dshxVersion: 'test-version',
-        declaredRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2',
-        installedVersion: '0.1.0-rc.8',
+        declaredRange: PROTOCOL_2_COMPATIBILITY.dshRange,
+        installedVersion: '0.2.0-rc.2',
         rangeStatus: 'single-generation',
         support: 'verified',
-        adapterId: 'protocol-1',
-        protocolGeneration: 'protocol-1',
+        adapterId: 'protocol-2',
+        protocolGeneration: 'protocol-2',
       },
-      dsh: { adapterId: 'protocol-1', protocolGeneration: 'protocol-1', supportedRange: '>=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2' },
+      dsh: { adapterId: 'protocol-2', protocolGeneration: 'protocol-2', supportedRange: PROTOCOL_2_COMPATIBILITY.dshRange },
       bridge: { state: 'disabled', metadata: null },
     })
   })
@@ -322,11 +315,11 @@ describe('CLI commands', () => {
     const value = project()
     const narrow = {
       ...value,
-      manifest: { ...value.manifest, peerDependencies: { '@deepseek-ai/dsh': '0.1.0-rc.8' } },
+      manifest: { ...value.manifest, peerDependencies: { '@deepseek-ai/dsh': '0.2.0-rc.1' } },
     }
     const installed = {
       ...profile(value).dsh,
-      version: '0.1.1-rc.2',
+      version: '0.2.0-rc.2',
       support: 'verified' as const,
     }
     const code = await runCli(['check', '--runtime', '--json'], {
@@ -349,7 +342,7 @@ describe('CLI commands', () => {
       compatibility: Record<string, unknown>
     }
     expect(output.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'DSHX5108', severity: 'error' })]))
-    expect(output.compatibility).toMatchObject({ installedVersion: '0.1.1-rc.2', installedWithinDeclaredRange: false })
+    expect(output.compatibility).toMatchObject({ installedVersion: '0.2.0-rc.2', installedWithinDeclaredRange: false })
   })
 
   it('supports check --fix dry-run with a machine-readable repair summary', async () => {
@@ -548,8 +541,8 @@ describe('CLI commands', () => {
     streams.err.end()
     const output = await text(streams.out)
     expect(output).toContain('DSHX: test-version')
-    expect(output).toContain('Installed DSH: 0.1.0-rc.8 (verified)')
-    expect(output).toContain('Plugin peer range: >=0.1.0-rc.8 <0.2.0-0 || 0.1.1-rc.2')
+    expect(output).toContain('Installed DSH: 0.2.0-rc.2 (verified)')
+    expect(output).toContain(`Plugin peer range: ${PROTOCOL_2_COMPATIBILITY.dshRange}`)
   })
 
   it('pauses TTY stdin after Ctrl+C so the dev command can exit cleanly', async () => {

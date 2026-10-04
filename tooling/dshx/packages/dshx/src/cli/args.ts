@@ -403,6 +403,107 @@ export const dshxCommand = defineCommand({
   },
 })
 
+const platformCommands: ReadonlySet<CliCommand> = new Set([
+  'status',
+  'info',
+  'doctor',
+  'sessions',
+  'plugins',
+  'bundles',
+  'presets',
+  'models',
+  'skills',
+  'commands',
+  'config',
+  'comm',
+])
+
+const isPlatformCommand = (command: CliCommand | undefined): boolean => command !== undefined && platformCommands.has(command)
+
+interface OptionContext {
+  readonly command: CliCommand | undefined
+  readonly action: string | undefined
+  readonly inspectTarget: CliInspectTarget | undefined
+  readonly addTarget: CliAddTarget | undefined
+  readonly boot: boolean
+  readonly fix: boolean
+}
+
+interface OptionScope {
+  readonly allows: (context: OptionContext) => boolean
+  readonly usage: string
+}
+
+const platformAction = (command: CliCommand, ...actions: string[]) => (context: OptionContext) =>
+  context.command === command && actions.includes(context.action ?? '')
+
+const addTargets = (...targets: CliAddTarget[]) => (context: OptionContext) =>
+  context.command === 'add' && targets.includes(context.addTarget ?? 'ui')
+
+const inspectSlots = (context: OptionContext) => context.command === 'inspect' && context.inspectTarget === 'slots'
+
+/** Where each option is accepted: the one place a command gains or loses an option. */
+const optionScopes: Readonly<Record<string, OptionScope>> = {
+  json: {
+    allows: ({ command }) => command === 'check' || command === 'inspect' || command === 'add' || isPlatformCommand(command),
+    usage: '--json is only valid with check, inspect, add, or DSH platform commands.',
+  },
+  open: { allows: ({ command }) => command === 'dev', usage: '--open is only valid with dev.' },
+  port: {
+    allows: ({ command, boot }) => command === 'dev' || (command === 'check' && boot),
+    usage: '--port is only valid with dev or check --boot.',
+  },
+  dryRun: {
+    allows: ({ command, fix }) => command === 'add' || (command === 'check' && fix),
+    usage: 'DSHX4147: --dry-run is only valid with add commands or check --fix.',
+  },
+  fix: { allows: ({ command }) => command === 'check', usage: 'DSHX4147: --fix is only valid with check.' },
+  runtime: { allows: ({ command }) => command === 'check', usage: '--runtime is only valid with check.' },
+  boot: { allows: ({ command }) => command === 'check', usage: '--boot is only valid with check.' },
+  url: {
+    allows: ({ command }) => isPlatformCommand(command) && command !== 'info' && command !== 'comm',
+    usage: '--url is not used by this DSH platform command.',
+  },
+  cwd: {
+    allows: context => !isPlatformCommand(context.command) || platformAction('sessions', 'create')(context),
+    usage: '--cwd is only valid with sessions create among DSH platform commands.',
+  },
+  session: {
+    allows: context => context.command === 'commands' || context.command === 'skills' || platformAction('models', 'select')(context),
+    usage: '--session is only valid with commands, models select, or skills.',
+  },
+  line: { allows: ({ command }) => command === 'commands', usage: '--line is only valid with commands run.' },
+  output: { allows: platformAction('sessions', 'export'), usage: '--output is only valid with sessions export.' },
+  agentPreset: { allows: platformAction('sessions', 'create'), usage: '--agent-preset is only valid with sessions create.' },
+  mode: { allows: platformAction('sessions', 'prompt'), usage: '--mode is only valid with sessions prompt.' },
+  reasoningEffort: { allows: platformAction('models', 'select'), usage: '--reasoning-effort is only valid with models select.' },
+  max: { allows: platformAction('sessions', 'history'), usage: '--max is only valid with sessions history.' },
+  atSeq: { allows: platformAction('sessions', 'fork'), usage: '--at-seq is only valid with sessions fork.' },
+  principal: { allows: ({ command }) => command === 'comm', usage: '--principal is only valid with comm commands.' },
+  delivery: { allows: platformAction('comm', 'subscribe'), usage: '--delivery is only valid with comm subscribe.' },
+  priority: { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' },
+  topic: { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' },
+  limit: { allows: platformAction('comm', 'inbox'), usage: '--limit is only valid with comm inbox.' },
+  slot: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
+  provider: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
+  order: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
+  id: { allows: ({ command }) => command === 'add', usage: '--id is only valid with add commands.' },
+  name: { allows: addTargets('tool', 'command'), usage: 'Name and description options are only valid with add tool or add command.' },
+  description: { allows: addTargets('tool', 'command'), usage: 'Name and description options are only valid with add tool or add command.' },
+  event: { allows: addTargets('hook'), usage: '--event is only valid with add hook.' },
+  root: { allows: inspectSlots, usage: '--root is only valid with inspect slots.' },
+  explain: { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' },
+}
+
+const isSet = (value: unknown): boolean => value !== undefined && value !== false
+
+const validateOptionScopes = (options: Readonly<Record<string, unknown>>, context: OptionContext): void => {
+  for (const [option, value] of Object.entries(options)) {
+    const scope = optionScopes[option]
+    if (scope !== undefined && isSet(value) && !scope.allows(context)) throw new CliUsageError(scope.usage)
+  }
+}
+
 function validateOptionTokens(argv: readonly string[]): void {
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]
@@ -470,6 +571,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       if (inspectTarget !== undefined) throw new CliUsageError('Only one inspect target may be specified.')
       inspectTarget = token
       continue
+    }
+    if (command !== 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events')) {
+      throw new CliUsageError('Inspect targets are only valid with the inspect command.')
     }
     if (command === 'add' && (token === 'ui' || token === 'tool' || token === 'command' || token === 'hook')) {
       if (addTarget !== undefined) throw new CliUsageError('Only one add target may be specified.')
@@ -546,49 +650,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     port = value
   }
 
-  const platformCommand =
-    command === 'status' ||
-    command === 'info' ||
-    command === 'doctor' ||
-    command === 'sessions' ||
-    command === 'plugins' ||
-    command === 'bundles' ||
-    command === 'presets' ||
-    command === 'models' ||
-    command === 'skills' ||
-    command === 'commands' ||
-    command === 'config' ||
-    command === 'comm'
-  if (json && command !== undefined && command !== 'check' && command !== 'inspect' && command !== 'add' && !platformCommand)
-    throw new CliUsageError('--json is only valid with check, inspect, or add.')
-  if (open && command !== undefined && command !== 'dev') throw new CliUsageError('--open is only valid with dev.')
-  if (port !== undefined && command !== 'dev') throw new CliUsageError('--port is only valid with dev.')
-  if (dryRun && command !== 'add' && !(command === 'check' && fix))
-    throw new CliUsageError('DSHX4147: --dry-run is only valid with add commands or check --fix.')
-  if (fix && command !== 'check') throw new CliUsageError('DSHX4147: --fix is only valid with check.')
-  if (runtime && command !== 'check') throw new CliUsageError('--runtime is only valid with check.')
-  if (url !== undefined && (!platformCommand || command === 'info' || command === 'comm'))
-    throw new CliUsageError('--url is not used by this DSH platform command.')
-  if (cwd !== undefined && platformCommand && !(command === 'sessions' && platformArgs[0] === 'create'))
-    throw new CliUsageError('--cwd is only valid with sessions create among DSH platform commands.')
-  if (session !== undefined && command !== 'commands' && command !== 'skills' && !(command === 'models' && platformArgs[0] === 'select'))
-    throw new CliUsageError('--session is only valid with commands, models select, or skills.')
-  if (line !== undefined && command !== 'commands') throw new CliUsageError('--line is only valid with commands run.')
-  if (output !== undefined && !(command === 'sessions' && platformArgs[0] === 'export')) throw new CliUsageError('--output is only valid with sessions export.')
-  if (agentPreset !== undefined && !(command === 'sessions' && platformArgs[0] === 'create'))
-    throw new CliUsageError('--agent-preset is only valid with sessions create.')
-  if (mode !== undefined && !(command === 'sessions' && platformArgs[0] === 'prompt')) throw new CliUsageError('--mode is only valid with sessions prompt.')
-  if (reasoningEffort !== undefined && !(command === 'models' && platformArgs[0] === 'select'))
-    throw new CliUsageError('--reasoning-effort is only valid with models select.')
-  if (max !== undefined && !(command === 'sessions' && platformArgs[0] === 'history')) throw new CliUsageError('--max is only valid with sessions history.')
-  if (atSeq !== undefined && !(command === 'sessions' && platformArgs[0] === 'fork')) throw new CliUsageError('--at-seq is only valid with sessions fork.')
-  if (principal !== undefined && command !== 'comm') throw new CliUsageError('--principal is only valid with comm commands.')
-  if (delivery !== undefined && !(command === 'comm' && platformArgs[0] === 'subscribe'))
-    throw new CliUsageError('--delivery is only valid with comm subscribe.')
-  if (priority !== undefined && !(command === 'comm' && ['publish', 'send'].includes(platformArgs[0] ?? '')))
-    throw new CliUsageError('--priority is only valid with comm publish or send.')
-  if (topic !== undefined && !(command === 'comm' && platformArgs[0] === 'inbox')) throw new CliUsageError('--topic is only valid with comm inbox.')
-  if (limit !== undefined && !(command === 'comm' && platformArgs[0] === 'inbox')) throw new CliUsageError('--limit is only valid with comm inbox.')
+  const platformCommand = isPlatformCommand(command)
+  if ((json || open || port !== undefined) && command === undefined) throw new CliUsageError('An option requires a command.')
+  validateOptionScopes(
+    { json, open, port, dryRun, fix, runtime, url, cwd, session, line, output, agentPreset, mode, reasoningEffort, max, atSeq, principal, delivery, priority, topic, limit, slot, provider, id, order, name, description, event, root, explain, boot },
+    { command, action: platformArgs[0], inspectTarget, addTarget, boot: boot === true, fix },
+  )
   if (command === 'comm' && !help) {
     const [action, first, ...extra] = platformArgs
     const actions = ['agents', 'topics', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
@@ -675,16 +742,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       throw new CliUsageError('config list accepts no namespace or path.')
   }
   if (!platformCommand && platformArgs.length > 0) throw new CliUsageError('Unexpected positional arguments.')
-  if ((slot !== undefined || provider !== undefined || id !== undefined || order !== undefined) && command !== 'add')
-    throw new CliUsageError('add ui options are only valid with add ui.')
-  if ((name !== undefined || description !== undefined) && command !== 'add')
-    throw new CliUsageError('add name options are only valid with add tool or add command.')
-  if (event !== undefined && command !== 'add') throw new CliUsageError('--event is only valid with add hook.')
-  if (root !== undefined && (command !== 'inspect' || inspectTarget !== 'slots')) throw new CliUsageError('--root is only valid with inspect slots.')
-  if (explain === true && (command !== 'inspect' || inspectTarget !== 'slots')) throw new CliUsageError('--explain is only valid with inspect slots.')
-  if (boot === true && command !== 'check') throw new CliUsageError('--boot is only valid with check.')
-  if (port !== undefined && boot !== true) throw new CliUsageError('--port is only valid with check --boot.')
-  if ((json || open || port !== undefined) && command === undefined) throw new CliUsageError('An option requires a command.')
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
@@ -700,17 +757,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     addTarget !== 'hook'
   )
     throw new CliUsageError('Only add ui, add tool, add command, and add hook are supported.')
-  if (
-    command === 'add' &&
-    addTarget !== 'ui' &&
-    addTarget !== 'panel' &&
-    addTarget !== 'api' &&
-    (slot !== undefined || provider !== undefined || order !== undefined)
-  )
-    throw new CliUsageError('Slot options are only valid with add ui.')
-  if (command === 'add' && addTarget !== 'tool' && addTarget !== 'command' && (name !== undefined || description !== undefined))
-    throw new CliUsageError('Name and description options are only valid with add tool or add command.')
-  if (command === 'add' && addTarget !== 'hook' && event !== undefined) throw new CliUsageError('--event is only valid with add hook.')
   if (help || version)
     return {
       explain: false,

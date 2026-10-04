@@ -1,5 +1,3 @@
-/// <reference path="./css-modules.d.ts" />
-
 export { defineClient, defineSlot } from './define.js'
 export { declareLocaleNamespace, defineLocale } from './locale.js'
 export {
