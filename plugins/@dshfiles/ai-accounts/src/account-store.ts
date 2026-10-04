@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { chmod } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile, chmod } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -51,9 +51,9 @@ const storeFileSchema = accountsFileSchema.extend({
  * an external edit is picked up on the next request.
  */
 /** Load the file into the cache so activation can read it synchronously. */
-export const primeAccountFile = async (): Promise<AccountStoreFile> => {
+export const primeAccountFile = (): AccountStoreFile => {
   try {
-    cachedRaw = await readFile(STORE_PATH, 'utf8')
+    cachedRaw = readFileSync(STORE_PATH, 'utf8')
   } catch {
     cachedRaw = undefined
   }
