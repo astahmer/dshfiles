@@ -52,9 +52,7 @@ const EDITABLE_SELECTOR =
 /** Whether the event landed somewhere that consumes plain character keys. */
 export const isEditableTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return false
-  if (target.matches(EDITABLE_SELECTOR)) return true
-  // A shortcut pressed while a dialog is open belongs to the dialog.
-  return target.closest('input, textarea, select, [contenteditable="true"]') !== null
+  return target.closest(EDITABLE_SELECTOR) !== null
 }
 
 /** Resolve the Host's logical `primary` to the physical modifier for this platform. */
