@@ -105,6 +105,14 @@ function commandRows(items: readonly { readonly name: string; readonly descripti
   ])
 }
 
+/** Narrow a JSON value to its object member; a JSON array has no string index. */
+const asJsonObject = (
+  value: JsonValue | undefined,
+): { readonly [key: string]: JsonValue } | undefined =>
+  value === null || typeof value !== 'object' || Array.isArray(value)
+    ? undefined
+    : (value as { readonly [key: string]: JsonValue })
+
 function findPath(root: JsonValue, path: string | undefined): JsonValue | undefined {
   if (path === undefined || path.length === 0) return root
   let current: JsonValue | undefined = root
@@ -115,8 +123,11 @@ function findPath(root: JsonValue, path: string | undefined): JsonValue | undefi
       current = current[index]
       continue
     }
-    if (current === null || typeof current !== 'object') return undefined
-    current = current[segment]
+    // The array and object members of the union cannot both be indexed by a bare
+    // string, so only the object member continues the walk.
+    const container = asJsonObject(current)
+    if (container === undefined) return undefined
+    current = container[segment]
   }
   return current
 }

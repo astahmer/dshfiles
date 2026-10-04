@@ -48,6 +48,32 @@ Two rules make the choice cheap to revisit:
 Report which option you chose and why. A fork nobody asked for is a liability;
 a workaround nobody flagged is worse.
 
+Do not stop at "dshx cannot express this". When the same wall shows up in one
+plugin, it is a missing abstraction rather than a one-off, so fix it in the
+toolchain first and let the plugin become ordinary: a change that removes a type
+cast, a hand-restated interface, or a workaround from every future plugin belongs
+in dshx. Reach for that before writing the second workaround. Keep it narrow — an
+abstraction that serves one caller is not one — and say which plugin forced it, so
+the next reader knows it was earned.
+
+A workaround is also a bug report about the toolchain. Two we shipped here were
+caused by dshx gaps and were invisible until the second one hurt: a declaration a
+UI plugin had to restate, and a `@deepseek-ai/*` dependency that resolves a second
+copy and fails only at boot. Both are now dshx's to refuse. When you catch
+yourself reaching for `as unknown as`, a local `declare module`, or a duplicated
+interface, ask which layer should own it before shipping the escape hatch.
+
+## Never delete source while a build is serving
+
+A plugin's `dist/` keeps working after its sources are gone, so deleting a file
+under a running build looks like a no-op until the next rebuild — which is how a
+whole plugin can be missing for hours while the served bundle still answers.
+
+Before removing a source file: confirm it is tracked, and confirm nothing serves
+it. When recovering, `jj file show -r <change> <path>` restores a file from any
+revision, which is faster and safer than rewriting it. Verify the build afterwards
+by importing the built entry, not by looking at it.
+
 ## Git
 
 This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.

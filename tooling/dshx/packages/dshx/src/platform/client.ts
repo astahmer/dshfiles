@@ -345,10 +345,12 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     sessions: {
       list: listSessions,
       create: async input => {
-        const result = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(
+        const parsed = z.object({ sessionId: z.string(), agentPreset: z.string().optional() }).parse(
           await transport.rpc('session', 'create', [input]),
         )
-        return result
+        return parsed.agentPreset === undefined
+          ? { sessionId: parsed.sessionId }
+          : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
       fork: async (sessionId, atSeq) => z.object({ sessionId: z.string() }).parse(
         await transport.rpc('session', 'fork', [{ sessionId, ...(atSeq === undefined ? {} : { atSeq }) }]),
