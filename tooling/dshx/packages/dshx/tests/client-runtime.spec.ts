@@ -114,7 +114,24 @@ describe('Client runtime adapter', () => {
     expect(plugin.name).toBe('explicit-client')
     expect(plugin.inject).toEqual(['remote', 'slots'])
     await plugin.apply(context)
-    expect(setup).toHaveBeenCalledWith(context)
+    // setup receives the component decorator as its second argument, so an
+    // imperatively registered component can still read this package's API
+    // context through useApi().
+    expect(setup).toHaveBeenCalledWith(context, expect.any(Function))
+  })
+
+  it('passes a decorator that returns a component using the API context', async () => {
+    const decorateCalls: unknown[] = []
+    const setup = vi.fn((_ctx: Context, decorate: (component: unknown) => unknown) => {
+      decorateCalls.push(decorate(() => null))
+    })
+    const plugin = createClientPlugin(
+      { inject: ['remote', 'slots'], setup },
+      { packageId: '@test/plugin' },
+    )
+    await plugin.apply({} as Context)
+    expect(decorateCalls).toHaveLength(1)
+    expect(typeof decorateCalls[0]).toBe('function')
   })
 
   it('registers Slots in order before setup and adds the slots dependency once', () => {

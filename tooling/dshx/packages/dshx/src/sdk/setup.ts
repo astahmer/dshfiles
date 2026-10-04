@@ -23,5 +23,7 @@ export function invokeHostSetup(setup: Setup | undefined, ctx: Context, config: 
   return setup === undefined ? undefined : hosts.has(setup) ? hosts.get(setup)!(ctx, config, metadata) : setup(ctx)
 }
 export function invokeClientSetup(setup: ClientDefinitionSetup | undefined, ctx: Context, decorate: (component: unknown) => unknown, metadata: Metadata): void | Effect<void> {
-  return setup === undefined ? undefined : clients.has(setup as Setup) ? clients.get(setup as Setup)!(ctx, decorate, metadata) : setup(ctx)
+  if (setup === undefined) return undefined
+  if (clients.has(setup as Setup)) return clients.get(setup as Setup)!(ctx, decorate, metadata)
+  return (setup as ClientSetup)(ctx, decorate, metadata)
 }

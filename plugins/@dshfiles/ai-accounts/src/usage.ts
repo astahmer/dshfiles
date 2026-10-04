@@ -109,7 +109,8 @@ const resetAtFrom = (window: z.infer<typeof codexWindowSchema>): number | null =
 }
 
 /** Read one Codex account's live quota using the credential in its own home. */
-export const readCodexUsage = async (codexHome: string): Promise<UsageCard> => {
+export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): Promise<UsageCard> => {
+  if (signal?.aborted) return error('Usage collection was cancelled.')
   const credits = await readCodexResetCredits(codexHome)
   let auth: z.infer<typeof codexAuthSchema>
   try {
@@ -131,7 +132,9 @@ export const readCodexUsage = async (codexHome: string): Promise<UsageCard> => {
         accept: 'application/json',
       },
       redirect: 'error',
-      signal: AbortSignal.timeout(5_000),
+      signal: signal === undefined
+        ? AbortSignal.timeout(5_000)
+        : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return error(`Codex returned ${String(response.status)} for usage.`)
     const body = codexUsageSchema.parse(await response.json())
@@ -195,12 +198,15 @@ const OPENCODE_WINDOW_LABELS: Readonly<Record<'rolling' | 'weekly' | 'monthly', 
 }
 
 /** Read OpenCode Go's live quota with the key the account names. */
-export const readOpenCodeUsage = async (apiKey: string): Promise<UsageCard> => {
+export const readOpenCodeUsage = async (apiKey: string, signal?: AbortSignal): Promise<UsageCard> => {
   if (apiKey.trim().length === 0) return empty('unauthenticated')
+  if (signal?.aborted) return error('Usage collection was cancelled.')
   try {
     const response = await fetch('https://opencode.ai/zen/go/v1/usage', {
       headers: { authorization: `Bearer ${apiKey.trim()}`, accept: 'application/json' },
-      signal: AbortSignal.timeout(5_000),
+      signal: signal === undefined
+        ? AbortSignal.timeout(5_000)
+        : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return error(`OpenCode returned ${String(response.status)} for usage.`)
     const body = opencodeUsageSchema.parse(await response.json())

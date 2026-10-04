@@ -1,12 +1,20 @@
 {
-  "name": "desktop",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "@dshfiles/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS and Linux Electron shell for the DSH web UI",
+  "main": "dist/main.js",
+  "os": [
+    "darwin",
+    "linux"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "43.7.7",
+    "typescript": "^5.9.0"
+  }
 }

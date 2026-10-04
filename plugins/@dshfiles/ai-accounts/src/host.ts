@@ -21,7 +21,13 @@ import {
 } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
-import { collectUsageHistory, readUsageHistory } from './usage-recorder.js'
+import {
+  createUsageHistoryScheduler,
+  readUsageHistory,
+  readUsageHistorySettings,
+  saveUsageHistorySettings,
+  type UsageHistoryScheduler,
+} from './usage-recorder.js'
 import { fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
 import { defineHost, definePlugin } from '@dshfiles/dshx/host'
@@ -76,9 +82,6 @@ import { readCodexAccessToken } from './read-codex-token.js'
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
 export const COMMANDCODE_KIND = CC_KIND
-
-/** How often quota is recorded when the panel is not driving collection. */
-const HISTORY_INTERVAL_MS = 15 * 60_000
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -333,6 +336,7 @@ export const Config = z.object({
 /** Live state the page and the status tool both read. */
 /** The context this plugin activated on, for handlers declared above setup. */
 let hostContext: Context | undefined
+let usageHistoryScheduler: UsageHistoryScheduler | undefined
 
 let activeAccounts: {
   config: AiAccountsConfig
@@ -400,9 +404,19 @@ const accountsHostApi = aiAccountsApi.host({
       Date.now() - input.days * 24 * 60 * 60_000,
     ))],
   }),
+  historySettings: async () => {
+    if (hostContext === undefined) {
+      return { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 15, retentionDays: 90 }
+    }
+    return readUsageHistorySettings(hostContext)
+  },
+  saveHistorySettings: async ({ input }) => {
+    if (hostContext === undefined) throw new Error('AI Accounts is not active on this host.')
+    return saveUsageHistorySettings(hostContext, input)
+  },
   collectUsage: async () => {
-    if (hostContext === undefined) return { recorded: 0 }
-    const recorded = await collectUsageHistory(hostContext, (await accountsFile()).accounts)
+    if (usageHistoryScheduler === undefined) return { recorded: 0 }
+    const recorded = await usageHistoryScheduler.collectNow()
     return { recorded }
   },
 })
@@ -503,12 +517,20 @@ const refreshRoutes = async (): Promise<void> => {
 
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm', 'connection', 'webServer'],
+  inject: ['llm', 'connection', 'webServer', 'storageDomain'],
   apis: [accountsHostApi],
   tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
     hostContext = ctx
+    ctx.effect(() => {
+      const scheduler = createUsageHistoryScheduler(ctx, async () => (await accountsFile()).accounts)
+      usageHistoryScheduler = scheduler
+      return () => {
+        scheduler.dispose()
+        if (usageHistoryScheduler === scheduler) usageHistoryScheduler = undefined
+      }
+    })
     const file = readAccountFileSync()
     const config = readConfig({ distribution: file.distribution, cooldownMs: file.cooldownMs, codexShadowRoot: file.shadowRoot, codexAccounts: file.accounts, opencodeAccounts: file.accounts })
     const { routes, rejected } = buildRoutes(config)
