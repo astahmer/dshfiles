@@ -9,8 +9,7 @@
     "catalog",
     "catalogReferences",
   ],
-  "ignoreBinaries": ["dsh", "dshx", "wrangler"],
-  "ignoreDependencies": ["@arethetypeswrong/cli", "publint"],
+  "ignoreBinaries": ["dsh", "dshx"],
   "workspaces": {
     "packages/dshx": {
       "entry": [
@@ -33,11 +32,6 @@
         "vitest.smoke.config.ts",
         "tests/self-bootstrap.smoke.ts",
       ],
-    },
-    "apps/framework-hub": {
-      "entry": ["src/lib/email/previews/*.tsx"],
-      "ignore": ["src/test/cloudflare-workers.ts"],
-      "ignoreDependencies": ["cloudflare"],
     },
   },
 }

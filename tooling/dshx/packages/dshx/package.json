@@ -1,6 +1,7 @@
 {
   "name": "@dshfiles/dshx",
   "version": "0.1.4-preview.3",
+  "private": true,
   "description": "Build and debug typed DeepSeek Harness Host and Client plugins with TypeScript and Vite.",
   "keywords": [
     "deepseek",
@@ -15,9 +16,6 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "homepage": "./README.md",
-  "publishConfig": {
-    "access": "public"
-  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

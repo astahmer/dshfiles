@@ -1,6 +1,7 @@
 {
   "name": "create-dshx",
   "version": "0.1.4-preview.3",
+  "private": true,
   "description": "Create a DeepSeek Harness plugin project.",
   "keywords": [
     "deepseek",
@@ -11,10 +12,7 @@
     "typescript"
   ],
   "license": "MIT",
-  "homepage": "https://dshx.io/docs",
-  "publishConfig": {
-    "access": "public"
-  },
+  "homepage": "./README.md",
   "type": "module",
   "bin": {
     "create-dshx": "./dist/cli.js"

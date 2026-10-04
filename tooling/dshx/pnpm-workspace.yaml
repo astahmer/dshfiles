@@ -1,7 +1,6 @@
 packages:
   - packages/*
   - fixtures/*
-  - apps/*
 
 catalog:
   '@types/node': 22.19.20
@@ -16,13 +15,11 @@ catalog:
 allowBuilds:
   '@deepseek-ai/dsh-subprocess-local': false
   '@google/genai': false
-  core-js-pure: false
   esbuild: true
   koffi: false
   lightningcss: true
   node-pty: false
   protobufjs: false
-  workerd: false
 
 overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
