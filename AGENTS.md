@@ -327,6 +327,15 @@ Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
 package row, `lib/` for the host half, `lib/client.js` for the browser half.
 That part is stable regardless of which build tool produced it.
 
+Top-level Loader ids share one namespace across every bundle in a profile.
+Keep a package's scope in its inserted row id (`@dshfiles/shortcuts` becomes
+`dshfiles-shortcuts`); using only the package leaf can silently replace the
+profile's index for a native row. DSHX scaffolds preserve the scope, and profile
+inspection runs DSH's offline `--dump-config` composition check before plugin
+development or a runtime check so duplicate top-level ids fail before boot.
+Point an owned plugin's `dshx.config.ts` at `profile: 'vanilla'` when debugging
+it without the rest of the adopted plugin set.
+
 ### Creator mode is NOT currently available
 
 `@deepseek-ai/dsh-agent-preset` ships a `skills/` directory that a "creator"

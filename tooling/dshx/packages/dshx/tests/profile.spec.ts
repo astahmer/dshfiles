@@ -49,8 +49,12 @@ function success(stdout = ''): DshCommandResult {
   return { exitCode: 0, stdout, stderr: '' }
 }
 
-function list(dependencies: Record<string, { path?: string; version?: string }> = {}): DshCommandResult {
-  return success(JSON.stringify([{ name: 'dsh-profile-web', private: true, dependencies }]))
+function list(dependencies: Record<string, { path?: string; version?: string }> = {}, path?: string): DshCommandResult {
+  return success(JSON.stringify([{ name: 'dsh-profile-web', ...(path === undefined ? {} : { path }), private: true, dependencies }]))
+}
+
+function composition(source = '[]\n'): DshCommandResult {
+  return success(source)
 }
 
 function queuedRunner(results: readonly DshCommandResult[], calls: RecordedCommand[] = []): DshCommandRunner {
@@ -171,7 +175,7 @@ describe('profile inspection', () => {
 
   it('reports an absent project from an empty profile', async () => {
     const project = await temporaryProject()
-    const state = await inspectProjectProfile(project, { runner: queuedRunner([list()]) })
+    const state = await inspectProjectProfile(project, { runner: queuedRunner([list(), composition()]) })
     expect(state).toEqual({
       state: 'absent',
       profile: 'web',
@@ -183,9 +187,51 @@ describe('profile inspection', () => {
   it('recognizes the exact package id and real project path', async () => {
     const project = await temporaryProject()
     const state = await inspectProjectProfile(project, {
-      runner: queuedRunner([list({ [project.packageId]: { path: project.root, version: `link:${project.root}` } })]),
+      runner: queuedRunner([list({ [project.packageId]: { path: project.root, version: `link:${project.root}` } }), composition()]),
     })
     expect(state.state).toBe('linked')
+  })
+
+  it('resolves pnpm-hoisted dependencies from the profile node_modules path', async () => {
+    const project = await temporaryProject()
+    const profileRoot = resolve(project.root, 'profile')
+    const hoistedPackagePath = resolve(profileRoot, 'node_modules/@test/plugin')
+    const reportedStorePath = resolve(profileRoot, 'node_modules/.pnpm/@test+plugin/node_modules/@test/plugin')
+    await mkdir(resolve(profileRoot, 'node_modules/@test'), { recursive: true })
+    await symlink(project.root, hoistedPackagePath)
+
+    const state = await inspectProjectProfile(project, {
+      runner: queuedRunner([list({ [project.packageId]: { path: reportedStorePath } }, profileRoot), composition()]),
+    })
+
+    expect(state.state).toBe('linked')
+  })
+
+  it('rejects duplicate top-level Loader ids in the composed profile', async () => {
+    const project = await temporaryProject()
+    const duplicate = '- id: shortcuts\n- id: shortcuts\n'
+
+    await expect(
+      inspectProjectProfile(project, { runner: queuedRunner([list(), composition(duplicate)]) }),
+    ).rejects.toMatchObject({
+      code: 'DSHX4306',
+      message: expect.stringContaining('shortcuts'),
+      hint: expect.stringContaining('unique id'),
+    })
+  })
+
+  it('allows repeated child ids under separate groups', async () => {
+    const project = await temporaryProject()
+    const groups = [
+      { id: 'preset-a', group: true, config: [{ id: 'tool-web' }] },
+      { id: 'preset-b', group: true, config: [{ id: 'tool-web' }] },
+    ]
+
+    const state = await inspectProjectProfile(project, {
+      runner: queuedRunner([list(), composition(`${JSON.stringify(groups)}\n`)]),
+    })
+
+    expect(state.state).toBe('absent')
   })
 
   it('rejects the package id when it points to another project', async () => {
@@ -246,17 +292,24 @@ describe('profile linking', () => {
     const project = await temporaryProject()
     const calls: RecordedCommand[] = []
     const prepared = await ensureProjectProfile(project, {
-      runner: queuedRunner([success('0.2.0-rc.2'), list({ [project.packageId]: { path: project.root } })], calls),
+      runner: queuedRunner([success('0.2.0-rc.2'), list({ [project.packageId]: { path: project.root } }), composition()], calls),
     })
     expect(prepared.link).toBe('existing')
-    expect(calls.map(call => call.args)).toEqual([['--version'], ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json']])
+    expect(calls.map(call => call.args)).toEqual([
+      ['--version'],
+      ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json'],
+      ['--profile', 'web', '--dump-config'],
+    ])
   })
 
   it('adds an absent project exactly once and verifies the resulting link', async () => {
     const project = await temporaryProject()
     const calls: RecordedCommand[] = []
     const prepared = await ensureProjectProfile(project, {
-      runner: queuedRunner([success('0.2.0-rc.2'), list(), success('installed'), list({ [project.packageId]: { path: project.root } })], calls),
+      runner: queuedRunner(
+        [success('0.2.0-rc.2'), list(), composition(), success('installed'), list({ [project.packageId]: { path: project.root } }), composition()],
+        calls,
+      ),
     })
     expect(prepared).toMatchObject({
       profile: 'web',
@@ -268,8 +321,10 @@ describe('profile linking', () => {
     expect(calls.map(call => call.args)).toEqual([
       ['--version'],
       ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json'],
+      ['--profile', 'web', '--dump-config'],
       ['plugin', '--profile', 'web', 'add', project.root],
       ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json'],
+      ['--profile', 'web', '--dump-config'],
     ])
   })
 
@@ -277,7 +332,7 @@ describe('profile linking', () => {
     const project = await temporaryProject()
     await expect(
       ensureProjectProfile(project, {
-        runner: queuedRunner([success('0.2.0-rc.2'), list(), { exitCode: 1, stdout: '', stderr: 'pnpm add failed' }]),
+        runner: queuedRunner([success('0.2.0-rc.2'), list(), composition(), { exitCode: 1, stdout: '', stderr: 'pnpm add failed' }]),
       }),
     ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('pnpm add failed') })
   })
@@ -286,7 +341,7 @@ describe('profile linking', () => {
     const project = await temporaryProject()
     await expect(
       ensureProjectProfile(project, {
-        runner: queuedRunner([success('0.2.0-rc.2'), list(), success(), list()]),
+        runner: queuedRunner([success('0.2.0-rc.2'), list(), composition(), success(), list(), composition()]),
       }),
     ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('still absent') })
   })

@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY, classifyCompatibility } from '../compat/index.js'
 import { DshxError } from '../diagnostics.js'
@@ -24,6 +24,11 @@ const DSH_NOT_FOUND_PATTERN = /(?:command ["']?dsh["']? not found|dsh: (?:comman
 interface InstalledDependency {
   packageId: string
   path: string
+}
+
+interface InstalledProfile {
+  dependencies: InstalledDependency[]
+  profileRoot?: string
 }
 
 function runnerOf(options: ProfileOrchestratorOptions): DshCommandRunner {
@@ -163,7 +168,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function duplicateLoaderIds(project: ProfileProject, source: string): string[] {
   let value: unknown
   try {
-    value = parse(source)
+    value = parse(source, {
+      customTags: [{ tag: 'tag:yaml.org,2002:js', resolve: (expression: string) => expression }],
+    })
   } catch (cause) {
     throw new DshxError('DSHX4302', 'DSH returned invalid YAML while composing the target profile.', {
       cause,
@@ -205,7 +212,38 @@ async function inspectLoaderIds(project: ProfileProject, options: ProfileOrchest
   }
 }
 
-async function parseDependencies(project: ProfileProject, source: string): Promise<InstalledDependency[]> {
+function packagePathSegments(packageId: string): string[] | undefined {
+  const segments = packageId.split('/')
+  if (segments.length === 1 && !packageId.startsWith('@') && segments[0] !== '') return segments
+  if (segments.length === 2 && segments[0]?.startsWith('@') && segments[0].length > 1 && segments[1] !== '') return segments
+  return undefined
+}
+
+async function resolveDependencyPath(
+  project: ProfileProject,
+  packageId: string,
+  rawPath: string,
+  profileRoot: string | undefined,
+): Promise<string> {
+  const installedPath = await realpath(rawPath).catch(() => undefined)
+  if (installedPath !== undefined) return installedPath
+
+  // DSH may report pnpm's virtual-store path when the profile uses the
+  // supported hoisted linker. In that layout the package is under node_modules.
+  const segments = packagePathSegments(packageId)
+  const hoistedPath =
+    profileRoot === undefined || segments === undefined
+      ? undefined
+      : await realpath(join(profileRoot, 'node_modules', ...segments)).catch(() => undefined)
+  if (hoistedPath !== undefined) return hoistedPath
+
+  throw new DshxError('DSHX4302', `Profile dependency ${JSON.stringify(packageId)} points to a missing path: ${rawPath}`, {
+    file: project.packageFile,
+    hint: `Repair the profile installation for ${packageId} and retry.`,
+  })
+}
+
+async function parseDependencies(project: ProfileProject, source: string): Promise<InstalledProfile> {
   let value: unknown
   try {
     value = JSON.parse(source)
@@ -223,14 +261,31 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
     })
   }
   const rawDependencies = value[0].dependencies
-  if (rawDependencies === undefined) return []
+  const rawProfileRoot = value[0].path
+  let profileRoot: string | undefined
+  if (rawProfileRoot !== undefined) {
+    if (typeof rawProfileRoot !== 'string' || !isAbsolute(rawProfileRoot)) {
+      throw new DshxError('DSHX4302', 'The inspected profile root must be an absolute path.', {
+        file: project.packageFile,
+        hint: `Run "pnpm exec dsh plugin --profile ${project.profile} list --depth 0 --json" and inspect its output.`,
+      })
+    }
+    profileRoot = await realpath(rawProfileRoot).catch((cause: unknown) => {
+      throw new DshxError('DSHX4302', `DSH profile root does not exist: ${rawProfileRoot}`, {
+        cause,
+        file: project.packageFile,
+        hint: `Repair profile ${project.profile} and retry.`,
+      })
+    })
+  }
+  if (rawDependencies === undefined) return { dependencies: [], ...(profileRoot === undefined ? {} : { profileRoot }) }
   if (!isObject(rawDependencies)) {
     throw new DshxError('DSHX4302', 'The inspected profile dependencies must be an object.', {
       file: project.packageFile,
       hint: `Repair the profile through "pnpm exec dsh plugin --profile ${project.profile}" commands.`,
     })
   }
-  return Promise.all(
+  const dependencies = await Promise.all(
     Object.entries(rawDependencies).map(async ([packageId, raw]) => {
       if (!isObject(raw) || typeof raw.path !== 'string' || raw.path.trim() === '' || !isAbsolute(raw.path)) {
         throw new DshxError('DSHX4302', `Profile dependency ${JSON.stringify(packageId)} has no valid resolved path.`, {
@@ -238,16 +293,11 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
           hint: `Remove and reinstall ${packageId} through the official dsh plugin command.`,
         })
       }
-      const path = await realpath(raw.path).catch((cause: unknown) => {
-        throw new DshxError('DSHX4302', `Profile dependency ${JSON.stringify(packageId)} points to a missing path: ${raw.path}`, {
-          cause,
-          file: project.packageFile,
-          hint: `Remove and reinstall ${packageId} through the official dsh plugin command.`,
-        })
-      })
+      const path = await resolveDependencyPath(project, packageId, raw.path, profileRoot)
       return { packageId, path }
     }),
   )
+  return { dependencies, ...(profileRoot === undefined ? {} : { profileRoot }) }
 }
 
 /** Inspect whether this exact package id and real project path are linked. */
@@ -269,7 +319,7 @@ export async function inspectProjectProfile(project: ProfileProject, options: Pr
       hint: `Run "pnpm exec dsh plugin --profile ${project.profile} list --depth 0 --json" and fix the reported failure.`,
     })
   }
-  const dependencies = await parseDependencies(project, result.stdout)
+  const { dependencies } = await parseDependencies(project, result.stdout)
   const desired = dependencies.find(dependency => dependency.packageId === project.packageId)
   const aliases = dependencies.filter(dependency => dependency.packageId !== project.packageId && dependency.path === project.root)
   if (desired !== undefined && desired.path !== project.root) {
