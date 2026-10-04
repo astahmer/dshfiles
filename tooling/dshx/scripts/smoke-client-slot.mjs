@@ -5,9 +5,9 @@
 // proves the browser mounts it, which is the only place the failure the guards
 // exist for was previously visible.
 //
-// Which plugins to check is discovered, not listed: every installed plugin that
-// declares a `dsh.client` and registers a UI Slot is a candidate, so adding a
-// plugin needs no edit here.
+// Which plugins and which seats to check are both discovered, not listed: every
+// installed plugin declaring a `dsh.client`, and every seat its bundle registers,
+// so neither a new plugin nor a new seat needs an edit here.
 //
 //   node scripts/smoke-client-slot.mjs                     # mount tier
 //   node scripts/smoke-client-slot.mjs --interact          # + reorder tier
@@ -24,11 +24,9 @@ const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const playwrightCli = join(repoRoot, 'node_modules/.bin', `playwright-cli${process.platform === 'win32' ? '.cmd' : ''}`)
 const outputDirectory = join(repoRoot, 'output/playwright/smoke-client-slot')
 const bootTimeoutMs = 180_000
-/** Slots whose occupant proves a plugin's UI actually mounted. */
-const DOCK_SLOT = 'conversation.input.dock'
 
 const parseArguments = argv => {
-  const options = { profile: 'web', plugins: [], interact: false, slot: DOCK_SLOT }
+  const options = { profile: 'web', plugins: [], interact: false, slot: null }
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     const next = () => {
@@ -59,7 +57,7 @@ const parseArguments = argv => {
             '',
             '  --profile <name>  dsh profile to boot (default: web)',
             '  --plugin <id>     restrict to this package id (repeatable)',
-            '  --slot <name>     Slot whose dock proves the plugin mounted',
+            '  --slot <name>     restrict to this Slot seat (default: every seat found)',
             '  --interact        also assert reordering (needs a configured model)',
             '',
           ].join('\n'),
@@ -133,16 +131,31 @@ function clientExport(manifest) {
   return undefined
 }
 
-/** Whether a plugin's own client bundle registers the checked Slot. */
-async function registersSlot(profileRoot, manifest, slot) {
+/**
+ * Every Slot seat a plugin's client bundle registers, read from the bundle
+ * itself. The failure this gate exists for is per-seat, so enumerating the seats
+ * keeps a plugin that occupies several surfaces — or a new seat entirely —
+ * covered without an edit here.
+ */
+async function registeredSlots(profileRoot, manifest) {
   const clientPath = clientExport(manifest)
-  if (clientPath === undefined) return false
+  if (clientPath === undefined) return []
+  let code
   try {
-    const code = await readFile(join(profileRoot, 'node_modules', manifest.name, clientPath), 'utf8')
-    return code.includes(slot)
+    code = await readFile(join(profileRoot, 'node_modules', manifest.name, clientPath), 'utf8')
   } catch {
-    return false
+    return []
   }
+  const seats = new Set()
+  // `ctx.slots.register({ name: "seat", … })`, `defineSlot("seat", …)` and
+  // `slots.inject("seat", …)` are the registration spellings; all of them put a
+  // quoted seat name in the bundle.
+  for (const pattern of [/name:\s*"([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+)+)"/g, /(?:defineSlot|slots\.inject)\(\s*"([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9]+)+)"/g]) {
+    for (const match of code.matchAll(pattern)) {
+      if (match[1] !== undefined) seats.add(match[1])
+    }
+  }
+  return [...seats]
 }
 
 const freePort = () =>
@@ -201,17 +214,20 @@ const main = async () => {
     options.plugins.length > 0
       ? await Promise.all(options.plugins.map(async id => ({ id, manifest: await readJson(join(profileRoot, 'node_modules', id, 'package.json')) })))
       : await clientPluginManifests(profileRoot)
-  const dockPlugins = (
-    await Promise.all(discovered.map(async target => ({ ...target, registers: await registersSlot(profileRoot, target.manifest, options.slot) })))
-  ).filter(target => target.registers)
+  // Each plugin is checked against every seat it registers, so a plugin that
+  // occupies several surfaces still has each one verified.
+  const seatWork = (
+    await Promise.all(
+      discovered.map(async target => ({
+        plugin: target.id,
+        seats: (await registeredSlots(profileRoot, target.manifest)).filter(seat => options.slot === null || seat === options.slot),
+      })),
+    )
+  ).flatMap(entry => entry.seats.map(seat => ({ plugin: entry.plugin, seat })))
 
-  if (dockPlugins.length === 0) {
+  if (seatWork.length === 0) {
     process.stdout.write(
-      `${JSON.stringify(
-        { profile: options.profile, slot: options.slot, checked: [], skipped: `no plugin installed in ${options.profile} registers ${options.slot}` },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify({ profile: options.profile, checked: [], skipped: `no plugin installed in ${options.profile} registers a Slot seat` }, null, 2)}\n`,
     )
     return
   }
@@ -266,13 +282,17 @@ const main = async () => {
           if (header) header.click()
         }
         await new Promise(done => setTimeout(done, 700))
-        const plugin = docks.find(dock => [...dock.querySelectorAll("button")].some(button => button.getAttribute("aria-label")?.startsWith("Move queued message")))
+        // Any dock exposing an up/down move control is orderable, so this tier
+        // does not depend on one plugin's aria-label wording.
+        const moveLabel = button => (button.getAttribute("aria-label") ?? button.textContent ?? "").trim()
+        const isUpControl = button => /(move.*up|up.*move|\u2191)/i.test(moveLabel(button))
+        const plugin = docks.find(dock => [...dock.querySelectorAll("button")].some(isUpControl))
         if (!plugin) return JSON.stringify({ mounted: false, docks: docks.map(dock => dock.textContent.trim().slice(0, 80)) })
         const order = () => [...plugin.querySelectorAll("li")].map(row => row.querySelector("span:nth-child(2)")?.textContent.trim().slice(0, 8))
         const before = order()
         if (before.length < 2) return JSON.stringify({ mounted: true, skipped: \`fewer than two queued messages (\${before.length})\` })
-        const moveUp = [...plugin.querySelectorAll("li")].map(row => [...row.querySelectorAll("button")].find(button => button.getAttribute("aria-label")?.endsWith("2 up")))
-        moveUp[1]?.click()
+        const upButtons = [...plugin.querySelectorAll("li")].map(row => [...row.querySelectorAll("button")].find(isUpControl))
+        upButtons[1]?.click()
         await new Promise(done => setTimeout(done, 1800))
         return JSON.stringify({ mounted: true, rows: before.length, before, after: order() })
       }`)
@@ -290,9 +310,9 @@ const main = async () => {
 
   const report = {
     profile: options.profile,
-    slot: options.slot,
+    seatFilter: options.slot,
     interact: options.interact,
-    checked: dockPlugins.map(plugin => plugin.id),
+    checked: seatWork,
     failures,
   }
   await writeFile(join(outputDirectory, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
