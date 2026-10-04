@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phase 0 done, Phase 1 next.
+Status: **in progress** — Phases 0 and 1 done, Phase 2 next.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and the next
@@ -41,23 +41,36 @@ phase starts only after review.
       drop the empty `.fork-history/`
 - [x] Replace the `allowBuilds` placeholders: no dependency builds natively in
       either workspace
-- [ ] Create the `main` bookmark once the parallel queue-reorder/thread-sidebar
-      stack (`fix(queue-reorder): own the queue dock locale namespace` and its
-      docs) is finished and rebased onto this one
+- [x] Create the `main` bookmark on this stack
+- [ ] Rebase the parallel queue-reorder/thread-sidebar stack
+      (`fix(queue-reorder): own the queue dock locale namespace` onward) onto
+      `main` once its agent stops editing; it also touches
+      `tooling/dshx/packages/dshx/src/client/locale.ts`
 
 ## Phase 1 — Security and red builds
 
-- [ ] ai-accounts: `apiKeyEnv` must match an env-name pattern and an allowlist
-      prefix; `apiBaseUrl` must be https on an allowed host
-- [ ] ai-accounts: model discovery passes the key value, not an env name; a
-      draft base URL never receives a stored key
-- [ ] ai-accounts: the OpenCode fallback key is only used for OpenCode routes
-- [ ] ai-accounts: `homePath` / `shadowHomePath` are canonicalised and contained
-- [ ] secret-catalog: pass free-text values as `--flag=value`; remove the
-      check-then-set race on create
-- [ ] dshx: validate options per command from one schema; `dev --port` works
-- [ ] dshx: bring `tests/cli.spec.ts` up to date; fix the eslint errors
-- [ ] Regression test for each fix above
+- [x] ai-accounts: key variables must end in `_API_KEY` and every read goes
+      through `readKeyFromEnv`; a Command Code base must be https on
+      `commandcode.ai` or a loopback address
+- [x] ai-accounts: model discovery passes the key value, not an env name; a
+      draft base URL never receives the stored key
+- [x] ai-accounts: the shared OpenCode key is only used for OpenCode routes
+- [x] ai-accounts: Codex homes must resolve inside the user's home; an invalid
+      account is skipped with a warning instead of failing every route
+- [x] secret-catalog: free-text metadata may not start with `-`; schemas
+      defined once in `secret-arguments.ts`
+- [ ] secret-catalog: check-then-set race on create — deferred. Whether
+      `secret set` without `--force` refuses an existing item when stdin is not
+      a TTY is unverified (the CLI is a compiled binary); verify against a
+      throwaway vault before changing it
+- [x] dshx: option scopes declared once in `cli/args.ts`; `dev --port` and
+      `check --boot --port` both work
+- [x] dshx: `tests/cli.spec.ts` ported to a protocol-2 fixture with the DSH
+      installation injected; eslint clean
+- [x] Regression tests: ai-accounts 27 (new), secret-catalog +1, dshx parser
+
+Exit evidence: dshx tsc and eslint clean, vitest 36/36 files, 378 tests;
+all 9 plugins typecheck; plugin tests 103/103.
 
 ## Phase 2 — Prune the fork
 
