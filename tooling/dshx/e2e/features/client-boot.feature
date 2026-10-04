@@ -23,5 +23,8 @@ Feature: Client plugin boot integrity
   Scenario: A boot failure names the entry that failed, not only the dependants
     Then every client entry that failed to activate is reported by id
 
+  Scenario: No Slot fell back to its error boundary
+    Then no Slot fell back to its error boundary
+
   Scenario: The Host shuts down when the scenario ends
     Then the Web UI is torn down cleanly

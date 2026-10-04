@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseBootText } from '../src/project/client-boot-check.js'
+import { slotRenderFailures } from '../src/project/browser-boot.js'
 
 /**
  * The boot card is the only surface that records why a client entry did not
@@ -53,5 +54,32 @@ describe('client boot card parsing', () => {
   it('ignores lines that are not entry states', () => {
     const text = ['Booting DSH', 'ready', 'some: thing'].join('\n')
     expect(parseBootText(text)).toEqual([])
+  })
+})
+
+/**
+ * A Slot that throws while rendering is invisible to the boot audit: its fiber
+ * already reached active, so only the renderer's error boundary records it. That
+ * is how a sidebar once rendered as <div data-slot-error="sidebar"> with a clean
+ * audit and every other check green.
+ */
+describe('slot render failures', () => {
+  it('reports nothing when every Slot rendered its entry', () => {
+    expect(slotRenderFailures([])).toEqual([])
+  })
+
+  it('reports the Slot named by the boundary marker', () => {
+    expect(slotRenderFailures(['sidebar'])).toEqual([{ slot: 'sidebar' }])
+  })
+
+  it('reports every failing Slot, not just the first', () => {
+    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([
+      { slot: 'sidebar' },
+      { slot: 'conversation.input.overlay' },
+    ])
+  })
+
+  it('ignores a marker with no Slot name', () => {
+    expect(slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar' }])
   })
 })

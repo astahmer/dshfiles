@@ -1028,6 +1028,17 @@ async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project
     })
     return 1
   }
+  if (result.slotFailures.length > 0) {
+    printDiagnostic(io, {
+      code: 'DSHX4112',
+      severity: 'error',
+      message: `The Web UI rendered ${String(result.slotFailures.length)} Slot(s) through their error boundary instead of their entry.`,
+      file: project.packageFile,
+      hint: 'An entry that throws while rendering still reaches active, so the boot audit stays clean and only the boundary catches it. A Slot that reads a Cordis service from outside setup, or inside a component rather than the Slot entry itself, is the usual cause.',
+    })
+    for (const failure of result.slotFailures) write(io.stdout, `  ${failure.slot}\n`)
+    return 1
+  }
   printDiagnostic(io, {
     code: 'DSHX4111',
     severity: 'error',

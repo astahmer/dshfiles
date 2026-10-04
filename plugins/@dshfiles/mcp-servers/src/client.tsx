@@ -77,7 +77,7 @@ export default defineClient({
   // setup(ctx) reads ctx.slots and ctx.commandUi; locales already inject locale.
   inject: ['slots', 'commandUi'],
   locales: [mcpServersLocale],
-  setup(ctx) {
+  setup(ctx, decorate) {
     const translate = ctx.locale.bind(MCP_LOCALE_NAMESPACE) as T
     const RootQuickPanel = ({ panel }: { panel: QuickPanelState }): JSX.Element => <McpQuickPanel t={translate} panel={panel} />
     const RootPanel = (): JSX.Element => <ManagerPage t={translate} />
@@ -86,7 +86,7 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: MCP_LOCALE_NAMESPACE }, () => icon()),
     )
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: MCP_LOCALE_NAMESPACE }, RootPanel))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: MCP_LOCALE_NAMESPACE }, decorate(RootPanel)))
     ctx.slots.inject('conversation.input.overlay', () =>
       ctx.slots.register(
         {
@@ -96,7 +96,7 @@ export default defineClient({
           locale: MCP_LOCALE_NAMESPACE,
           inject: sessionId => ({ panel: panels.forSession(sessionId) }),
         },
-        RootQuickPanel,
+        decorate(RootQuickPanel),
       ),
     )
 

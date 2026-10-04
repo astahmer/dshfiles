@@ -99,6 +99,17 @@ When('the plugin "{pluginId}" is opened', async ({ page }: { page: Page }, plugi
   await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
 })
 
+Then('no Slot fell back to its error boundary', async ({ page }: { page: Page }) => {
+  const slots = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-slot-error]')].map(element => element.getAttribute('data-slot-error') ?? ''),
+  )
+  const failures = slots.filter((slot): slot is string => slot !== '')
+  expect(
+    failures,
+    'these Slots mounted an error boundary instead of their entry, so their panel is blank even though every client entry activated:',
+  ).toEqual([])
+})
+
 Then('the plugin shuts down', async ({ page }: { page: Page }) => {
   const boots = isolatedBoots.get(page)
   if (boots === undefined) return

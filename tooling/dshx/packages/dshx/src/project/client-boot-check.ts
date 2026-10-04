@@ -43,6 +43,8 @@ export interface ClientBootCheckResult {
   readonly entries: readonly ClientBootCheckEntry[]
   /** Entries that failed, with their detail. */
   readonly failures: readonly ClientBootCheckEntry[]
+  /** Slots that mounted an error boundary instead of their entry. */
+  readonly slotFailures: readonly { readonly slot: string }[]
   readonly url?: string
   readonly timedOut: boolean
   /** Set when the browser could not be driven at all. */
@@ -127,6 +129,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   })
 
   let entries: ClientBootCheckEntry[] = []
+  let slotFailures: readonly { readonly slot: string }[] = []
   let browserError: string | undefined
   if (url !== undefined) {
     await new Promise(resolve => setTimeout(resolve, 2_000))
@@ -139,6 +142,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
         await page.goto(url, { waitUntil: 'domcontentloaded' })
         const { readClientBootOutcome } = await import('./browser-boot.js')
         const outcome = await readClientBootOutcome(page, { url, timeoutMs })
+        slotFailures = outcome.slotFailures
         if (!outcome.ok) entries = parseBootText(outcome.text)
       } finally {
         await browser.close()
@@ -164,9 +168,10 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   const timedOut = url === undefined
   const failures = entries.filter(entry => entry.state !== 'pending')
   return {
-    ok: !timedOut && browserError === undefined && failures.length === 0,
+    ok: !timedOut && browserError === undefined && failures.length === 0 && slotFailures.length === 0,
     entries,
     failures,
+    slotFailures,
     timedOut,
     ...(url === undefined ? {} : { url }),
     ...(browserError === undefined ? {} : { browserError }),
