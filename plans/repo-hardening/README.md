@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–3 done, Phase 4 underway.
+Status: **in progress** — Phases 0–3 done, Phase 4 implemented; Phase 5 next.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and phases continue autonomously under the user's 2026-10-04 instruction.
@@ -125,10 +125,18 @@ Exit evidence: root `pnpm check` exit 0 — dshx 378 tests, create-dshx 20, all
       with pinned revision provenance. Existing antislop findings are warnings
       pending Phase 6; correctness rules are errors. React behavior rules remain
       outside this mechanical migration.
-- [ ] TS 7 typecheck through `@typescript/native-preview`
-- [ ] dshx AST code (`project/typecheck.ts`, `project/migrations.ts`,
+- [x] Stable TypeScript 7.0.2 replaces TS 5 throughout both workspaces.
+      Project checks execute its native CLI (no unstable compiler API).
+- [x] dshx AST code (`project/typecheck.ts`, `project/migrations.ts`,
       `scaffold/*`, `compiler/client/capabilities.ts`) ported to `oxc-parser`
-- [ ] `create-dshx` templates target the new toolchain
+- [x] `create-dshx` templates target TS 7, Oxlint and Oxfmt; script/config
+      assertions cover all template/style combinations.
+
+Evidence: dshx 386 tests, create-dshx 20 tests, both typechecks and builds
+pass. Native compiler diagnostics and Unicode source offsets have regressions.
+Knip passes with the previously recorded temporary ownership exclusion.
+The full plugin gate still has inherited queue-reorder decorator typing and
+the rejected bash-parallel experiment; neither is claimed green.
 
 Takeover: current T3 thread owns `hardening`; prior audit thread interrupted.
 Lint exits 0; dshx 379 tests pass. Full plugin check currently exposes inherited

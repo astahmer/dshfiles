@@ -1,5 +1,6 @@
 import { dirname, relative, resolve } from 'node:path'
-import ts from 'typescript'
+import type { Program, ObjectProperty } from 'oxc-parser'
+import { parseSource, visitSource, defaultCall, objectProperty, propertyName, stringValue, lastImportEnd } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
@@ -58,91 +59,62 @@ function sourceForHook(event: string): string {
   return `import type { Context } from '@dshfiles/dshx/host'\n\nexport function ${registerName(event)}(ctx: Context) {\n  return ctx.on(${JSON.stringify(event)}, (...args: unknown[]) => {\n    void args\n    // Add hook behavior here.\n  })\n}\n`
 }
 
-function isNamed(node: ts.NamedDeclaration, name: string): boolean {
-  return node.name !== undefined && ts.isIdentifier(node.name) && node.name.text === name
-}
-
-function findHostCall(sourceFile: ts.SourceFile): ts.CallExpression | undefined {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isExportAssignment(statement)) continue
-    const expression = statement.expression
-    if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === 'defineHost') return expression
-  }
-  return undefined
-}
-
-function objectProperty(object: ts.ObjectLiteralExpression, name: string): ts.ObjectLiteralElementLike | undefined {
-  return object.properties.find(item => {
-    if (ts.isPropertyAssignment(item) || ts.isMethodDeclaration(item) || ts.isGetAccessorDeclaration(item) || ts.isSetAccessorDeclaration(item)) {
-      return isNamed(item, name)
-    }
-    return false
-  })
-}
-
-function hasHookRegistration(sourceFile: ts.SourceFile, event: string): boolean {
+const hasHookRegistration = (program: Program, event: string): boolean => {
   let found = false
-  const visit = (node: ts.Node): void => {
-    if (found) return
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'on') {
-      const first = node.arguments[0]
-      if (first !== undefined && ts.isStringLiteral(first) && first.text === event) found = true
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
+  visitSource({
+    program,
+    visitor: {
+      CallExpression(node) {
+        const callee = node.callee
+        if (callee.type !== 'MemberExpression' || propertyName(callee.property) !== 'on') return
+        const argument = node.arguments[0]
+        if (argument !== undefined && argument.type !== 'SpreadElement' && stringValue(argument) === event) found = true
+      },
+    },
+  })
   return found
 }
 
-function findSetupBody(setup: ts.ObjectLiteralElementLike): { body: ts.Block; parameter?: ts.ParameterDeclaration } | undefined {
-  if (ts.isMethodDeclaration(setup)) {
-    if (setup.body === undefined) return undefined
-    return setup.parameters[0] === undefined ? { body: setup.body } : { body: setup.body, parameter: setup.parameters[0] }
-  }
-  if (ts.isPropertyAssignment(setup)) {
-    const initializer = setup.initializer
-    if (ts.isFunctionExpression(initializer) || ts.isArrowFunction(initializer)) {
-      if (!ts.isBlock(initializer.body)) return undefined
-      return initializer.parameters[0] === undefined ? { body: initializer.body } : { body: initializer.body, parameter: initializer.parameters[0] }
-    }
-  }
-  return undefined
+const findSetupBody = (setup: ObjectProperty) => {
+  const value = setup.value
+  if (setup.kind !== 'init' || (value.type !== 'FunctionExpression' && value.type !== 'ArrowFunctionExpression')) return undefined
+  if (value.body?.type !== 'BlockStatement') return undefined
+  return { body: value.body, parameter: value.params[0] }
 }
 
 function modifyHost(source: string, hostFile: string, hookFile: string, event: string): { source?: string; duplicate: boolean; invalidSetup: boolean } {
-  const sourceFile = ts.createSourceFile(hostFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const sourceFile = parseSource({ file: hostFile, source })
   if (hasHookRegistration(sourceFile, event)) return { duplicate: true, invalidSetup: false }
-  const call = findHostCall(sourceFile)
+  const call = defaultCall({ program: sourceFile, name: 'defineHost' })
   const argument = call?.arguments[0]
-  if (call === undefined || call.arguments.length !== 1 || argument === undefined || !ts.isObjectLiteralExpression(argument))
+  if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { duplicate: false, invalidSetup: false }
-  const setup = objectProperty(argument, 'setup')
+  const setup = objectProperty({ expression: argument, name: 'setup' })
   const edits: Array<{ start: number; end: number; text: string }> = []
   const name = registerName(event)
   if (setup === undefined) {
-    const close = argument.getEnd() - 1
+    const close = argument.end - 1
     const prefix = argument.properties.length === 0 ? '' : '\n'
     const suffix = argument.properties.length === 0 ? '\n' : ''
     edits.push({ start: close, end: close, text: `${prefix}  setup(ctx) {\n    ${name}(ctx)\n  },${suffix}` })
   } else {
     const body = findSetupBody(setup)
     if (body === undefined) return { duplicate: false, invalidSetup: true }
-    const contextName = body.parameter === undefined ? 'ctx' : ts.isIdentifier(body.parameter.name) ? body.parameter.name.text : undefined
+    const contextName = body.parameter === undefined ? 'ctx' : body.parameter.type === 'Identifier' ? body.parameter.name : undefined
     if (contextName === undefined) return { duplicate: false, invalidSetup: true }
     if (body.parameter === undefined) {
-      const open = setup.getStart(sourceFile)
-      const text = source.slice(open, body.body.getStart(sourceFile))
+      const open = setup.start
+      const text = source.slice(open, body.body.start)
       const paren = text.indexOf('(')
       if (paren < 0) return { duplicate: false, invalidSetup: true }
       edits.push({ start: open + paren + 1, end: open + paren + 1, text: 'ctx' })
     }
-    const start = body.body.getStart(sourceFile) + 1
-    const existing = source.slice(start, body.body.getEnd())
+    const start = body.body.start + 1
+    const existing = source.slice(start, body.body.end)
     const indent = /\n([ \t]*)[^\s]/.exec(existing)?.[1] ?? '  '
     edits.push({ start, end: start, text: `\n${indent}${name}(${contextName})\n` })
   }
-  const imports = sourceFile.statements.filter(ts.isImportDeclaration)
-  const importEnd = imports.length === 0 ? 0 : imports[imports.length - 1]!.end
+  const importEnd = lastImportEnd(sourceFile)
   edits.push({
     start: importEnd,
     end: importEnd,
@@ -217,7 +189,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
   }
   const existingHook = await readOptionalFile(hookFile)
   if (existingHook !== undefined) {
-    const ast = ts.createSourceFile(hookFile, existingHook, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const ast = parseSource({ file: hookFile, source: existingHook })
     if (hasHookRegistration(ast, options.event))
       return makeResult(
         project,

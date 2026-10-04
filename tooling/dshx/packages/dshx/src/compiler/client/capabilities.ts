@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
-import ts from 'typescript'
+import type { Program, Expression, ObjectProperty, Function, ArrowFunctionExpression, ParamPattern } from 'oxc-parser'
+import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
 
 const CLIENT_PUBLIC = '@dshfiles/dshx/client'
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
@@ -59,6 +60,7 @@ interface ClientDefinitionSourceAnalysis extends ClientSetupServiceAnalysis {
 async function sourceFile(specifier: string, importer: string): Promise<string | undefined> {
   const target = resolve(importer, '..', specifier)
   const extension = extname(target)
+  if (extension !== '' && !SOURCE_EXTENSIONS.some(item => item === extension)) return undefined
   const candidates =
     extension === ''
       ? [...SOURCE_EXTENSIONS.map(item => `${target}${item}`), ...SOURCE_EXTENSIONS.map(item => resolve(target, `index${item}`))]
@@ -74,425 +76,245 @@ async function sourceFile(specifier: string, importer: string): Promise<string |
   return undefined
 }
 
-function staticPropertyName(name: ts.PropertyName): string | undefined {
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text
-  if (ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression)) return name.expression.text
-  return undefined
-}
+const nameOf = (property: ObjectProperty): string | undefined =>
+  property.computed && property.key.type === 'Identifier' ? undefined : propertyName(property.key)
 
-function unwrapExpression(expression: ts.Expression): ts.Expression {
-  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression) || ts.isNonNullExpression(expression)) {
-    return unwrapExpression(expression.expression)
-  }
-  return expression
-}
+type SetupFunction = Function | ArrowFunctionExpression
 
-function objectUsesDefinitionProperty(expression: ts.Expression | undefined, field: 'conversations' | 'locales'): boolean {
-  if (expression === undefined) return false
-  const value = unwrapExpression(expression)
-  // An indirect definition cannot prove that conversations are absent. The
-  // final build check intentionally requires provider edges in that case.
-  if (!ts.isObjectLiteralExpression(value)) return true
-  for (const property of value.properties) {
-    if (ts.isSpreadAssignment(property)) {
-      if (field === 'conversations') return true
-      continue
-    }
-    const name = staticPropertyName(property.name)
-    if (name === undefined && ts.isComputedPropertyName(property.name)) {
-      if (field === 'conversations') return true
-      continue
-    }
-    if (name !== field) continue
-    if (ts.isPropertyAssignment(property)) {
-      const initializer = unwrapExpression(property.initializer)
-      if (ts.isArrayLiteralExpression(initializer) && initializer.elements.length === 0) continue
-    }
-    return true
-  }
-  return false
-}
-
-function sourceCapabilities(source: string, file: string): SourceCapabilityAnalysis {
-  const node = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const settingsHookNames = new Set<string>()
-  const apiHookNames = new Set<string>()
+const sourceBindings = ({ source, file }: { source: string; file: string }) => {
+  const program = parseSource({ source, file })
+  const named = new Map<string, string>()
   const namespaces = new Set<string>()
+  const initializers = new Map<string, Expression>()
+  const functions = new Map<string, SetupFunction>()
   const imports: string[] = []
-  for (const statement of node.statements) {
-    if (ts.isExportDeclaration(statement) && statement.moduleSpecifier !== undefined && ts.isStringLiteral(statement.moduleSpecifier)) {
-      if (statement.moduleSpecifier.text.startsWith('.')) imports.push(statement.moduleSpecifier.text)
-      continue
-    }
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue
-    const request = statement.moduleSpecifier.text
-    if (request.startsWith('.')) imports.push(request)
-    if (request !== CLIENT_PUBLIC) continue
-    const bindings = statement.importClause?.namedBindings
-    if (bindings === undefined) continue
-    if (ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text)
-    else {
-      for (const element of bindings.elements) {
-        const importedName = element.propertyName?.text ?? element.name.text
-        if (importedName === 'useSettings') settingsHookNames.add(element.name.text)
-        if (importedName === 'useApi' || importedName === 'useApiQuery') apiHookNames.add(element.name.text)
-      }
-    }
-  }
-  let settings = false
-  let api = false
-  const visit = (current: ts.Node): void => {
-    if (ts.isCallExpression(current)) {
-      const expression = current.expression
-      if (ts.isIdentifier(expression) && settingsHookNames.has(expression.text)) settings = true
-      if (ts.isIdentifier(expression) && apiHookNames.has(expression.text)) api = true
-      if (
-        ts.isPropertyAccessExpression(expression) &&
-        ts.isIdentifier(expression.expression) &&
-        namespaces.has(expression.expression.text) &&
-        expression.name.text === 'useSettings'
-      )
-        settings = true
-      if (
-        ts.isPropertyAccessExpression(expression) &&
-        ts.isIdentifier(expression.expression) &&
-        namespaces.has(expression.expression.text) &&
-        (expression.name.text === 'useApi' || expression.name.text === 'useApiQuery')
-      )
-        api = true
-    }
-    ts.forEachChild(current, visit)
-  }
-  visit(node)
-  return { settings, api, imports }
-}
-
-function declarativeClientDefinition(source: string, file: string, field: 'conversations' | 'locales'): ConversationDefinitionAnalysis {
-  const node = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const clientNames = new Set<string>()
-  const namespaces = new Set<string>()
-  const initializers = new Map<string, ts.Expression>()
   const reexports: string[] = []
   let unknownReexport = false
-  for (const statement of node.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === CLIENT_PUBLIC) {
-      const bindings = statement.importClause?.namedBindings
-      if (bindings === undefined) continue
-      if (ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text)
-      else {
-        for (const element of bindings.elements) {
-          if (['defineClient', 'defineClientPlugin'].includes(element.propertyName?.text ?? element.name.text)) clientNames.add(element.name.text)
+  let defaultExpression: Expression | undefined
+  let defaultLocal: string | undefined
+  for (const statement of program.body) {
+    if (statement.type === 'ImportDeclaration') {
+      if (statement.source.value.startsWith('.')) imports.push(statement.source.value)
+      if (statement.source.value === CLIENT_PUBLIC)
+        for (const specifier of statement.specifiers) {
+          if (specifier.type === 'ImportNamespaceSpecifier') namespaces.add(specifier.local.name)
+          if (specifier.type === 'ImportSpecifier') {
+            const imported = propertyName(specifier.imported)
+            if (imported !== undefined) named.set(specifier.local.name, imported)
+          }
         }
-      }
-      continue
     }
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && declaration.initializer !== undefined) {
-          initializers.set(declaration.name.text, declaration.initializer)
-        }
-      }
-      continue
+    if (statement.type === 'ExportDefaultDeclaration') {
+      const declaration = statement.declaration
+      if (declaration.type !== 'FunctionDeclaration' && declaration.type !== 'ClassDeclaration' && declaration.type !== 'TSInterfaceDeclaration')
+        defaultExpression = declaration
     }
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      statement.moduleSpecifier.text.startsWith('.') &&
-      statement.exportClause !== undefined &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      for (const element of statement.exportClause.elements) {
-        if (element.name.text !== 'default') continue
-        if (element.propertyName === undefined || element.propertyName.text === 'default') reexports.push(statement.moduleSpecifier.text)
-        else unknownReexport = true
+    if (statement.type === 'ExportNamedDeclaration') {
+      if (statement.source?.value.startsWith('.')) imports.push(statement.source.value)
+      for (const specifier of statement.specifiers) {
+        if (propertyName(specifier.exported) !== 'default') continue
+        if (statement.source !== null) {
+          if (propertyName(specifier.local) === 'default') reexports.push(statement.source.value)
+          else unknownReexport = true
+        } else defaultLocal = propertyName(specifier.local)
       }
     }
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'VariableDeclaration')
+      for (const variable of declaration.declarations) {
+        if (variable.id.type === 'Identifier' && variable.init !== null) initializers.set(variable.id.name, variable.init)
+      }
+    if (declaration?.type === 'FunctionDeclaration' && declaration.id !== null) functions.set(declaration.id.name, declaration)
   }
-
-  const inspect = (input: ts.Expression, seen = new Set<string>()): boolean => {
+  if (defaultExpression === undefined && defaultLocal !== undefined) defaultExpression = initializers.get(defaultLocal)
+  const importedName = (expression: Expression): string | undefined => {
+    if (expression.type === 'Identifier') return named.get(expression.name)
+    if (expression.type === 'MemberExpression' && !expression.computed && expression.object.type === 'Identifier' && namespaces.has(expression.object.name))
+      return propertyName(expression.property)
+    return undefined
+  }
+  const resolveExpression = (input: Expression, seen = new Set<string>()): Expression | undefined => {
     const expression = unwrapExpression(input)
-    if (ts.isObjectLiteralExpression(expression)) return objectUsesDefinitionProperty(expression, field)
-    if (ts.isIdentifier(expression)) {
-      if (seen.has(expression.text)) return true
-      const initializer = initializers.get(expression.text)
-      if (initializer === undefined) return true
-      const next = new Set(seen)
-      next.add(expression.text)
-      return inspect(initializer, next)
-    }
-    if (ts.isCallExpression(expression)) {
-      const callee = expression.expression
-      const defineClientCall =
-        (ts.isIdentifier(callee) && clientNames.has(callee.text)) ||
-        (ts.isPropertyAccessExpression(callee) &&
-          ts.isIdentifier(callee.expression) &&
-          namespaces.has(callee.expression.text) &&
-          ['defineClient', 'defineClientPlugin'].includes(callee.name.text))
-      const argument = expression.arguments[0]
-      return defineClientCall ? (argument === undefined ? false : inspect(argument, seen)) : true
-    }
-    return true
+    if (expression.type !== 'Identifier') return expression
+    if (seen.has(expression.name)) return undefined
+    const initializer = initializers.get(expression.name)
+    if (initializer === undefined) return undefined
+    const next = new Set(seen)
+    next.add(expression.name)
+    return resolveExpression(initializer, next)
   }
-
-  for (const statement of node.statements) {
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) return { uses: inspect(statement.expression), reexports }
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.moduleSpecifier === undefined &&
-      statement.exportClause !== undefined &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      const defaultExport = statement.exportClause.elements.find(element => element.name.text === 'default')
-      if (defaultExport !== undefined) {
-        const localName = defaultExport.propertyName?.text ?? defaultExport.name.text
-        const initializer = initializers.get(localName)
-        return { uses: initializer === undefined ? true : inspect(initializer), reexports }
-      }
-    }
+  const resolveFunction = (input: Expression, seen = new Set<string>()): SetupFunction | undefined => {
+    const expression = unwrapExpression(input)
+    if (expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression') return expression
+    if (expression.type !== 'Identifier' || seen.has(expression.name)) return undefined
+    const declaration = functions.get(expression.name)
+    if (declaration !== undefined) return declaration
+    const initializer = initializers.get(expression.name)
+    if (initializer === undefined) return undefined
+    const next = new Set(seen)
+    next.add(expression.name)
+    return resolveFunction(initializer, next)
   }
-  return { uses: unknownReexport, reexports }
+  return { program, named, namespaces, initializers, imports, reexports, unknownReexport, defaultExpression, importedName, resolveExpression, resolveFunction }
 }
 
-function functionUsesSetupService(declaration: ts.FunctionLikeDeclaration, service: keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES): boolean {
-  const parameter = declaration.parameters[0]
+const sourceCapabilities = (source: string, file: string): SourceCapabilityAnalysis => {
+  const bindings = sourceBindings({ source, file })
+  let settings = false
+  let api = false
+  visitSource({
+    program: bindings.program,
+    visitor: {
+      CallExpression(node) {
+        if (node.callee.type === 'Super') return
+        const name = bindings.importedName(node.callee)
+        if (name === 'useSettings') settings = true
+        if (name === 'useApi' || name === 'useApiQuery') api = true
+      },
+    },
+  })
+  return { settings, api, imports: bindings.imports }
+}
+
+const declarativeClientDefinition = (source: string, file: string, field: 'conversations' | 'locales'): ConversationDefinitionAnalysis => {
+  const bindings = sourceBindings({ source, file })
+  const inspect = (input: Expression, seen = new Set<string>()): boolean => {
+    const expression = unwrapExpression(input)
+    if (expression.type === 'Identifier') {
+      if (seen.has(expression.name)) return true
+      const initializer = bindings.initializers.get(expression.name)
+      if (initializer === undefined) return true
+      const next = new Set(seen)
+      next.add(expression.name)
+      return inspect(initializer, next)
+    }
+    if (expression.type === 'CallExpression' && expression.callee.type !== 'Super') {
+      if (!['defineClient', 'defineClientPlugin'].includes(bindings.importedName(expression.callee) ?? '')) return true
+      const argument = expression.arguments[0]
+      if (argument === undefined) return false
+      return argument.type === 'SpreadElement' ? true : inspect(argument, seen)
+    }
+    if (expression.type !== 'ObjectExpression') return true
+    for (const property of expression.properties) {
+      if (property.type === 'SpreadElement') {
+        if (field === 'conversations') return true
+        continue
+      }
+      const name = nameOf(property)
+      if (name === undefined && property.computed && field === 'conversations') return true
+      if (name !== field) continue
+      const value = unwrapExpression(property.value)
+      if (value.type === 'ArrayExpression' && value.elements.length === 0) continue
+      return true
+    }
+    return false
+  }
+  return { uses: bindings.defaultExpression === undefined ? bindings.unknownReexport : inspect(bindings.defaultExpression), reexports: bindings.reexports }
+}
+
+const destructuresService = (parameter: ParamPattern, service: string): boolean => {
+  if (parameter.type !== 'ObjectPattern') return false
+  return parameter.properties.some(property => property.type === 'Property' && propertyName(property.key) === service)
+}
+
+const functionUsesSetupService = ({
+  program,
+  declaration,
+  service,
+}: {
+  program: Program
+  declaration: SetupFunction
+  service: keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES
+}): boolean => {
+  const parameter = declaration.params[0]
   if (parameter === undefined) return false
-  if (ts.isObjectBindingPattern(parameter.name)) {
-    return parameter.name.elements.some(element => (element.propertyName?.getText() ?? element.name.getText()) === service)
-  }
-  if (!ts.isIdentifier(parameter.name) || declaration.body === undefined) return false
-  const contextName = parameter.name.text
+  if (destructuresService(parameter, service)) return true
+  if (parameter.type !== 'Identifier') return false
+  const contextName = parameter.name
+  const activeScopes: boolean[] = []
   let used = false
-  const visit = (node: ts.Node): void => {
-    if (used) return
-    if (node !== declaration && ts.isFunctionLike(node)) {
-      const shadowsContext = node.parameters.some(item => ts.isIdentifier(item.name) && item.name.text === contextName)
-      if (shadowsContext) return
-    }
-    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === contextName && node.name.text === service) {
-      used = true
+  const enter = (node: SetupFunction): void => {
+    if (node === declaration) {
+      activeScopes.push(true)
       return
     }
-    if (
-      ts.isElementAccessExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === contextName &&
-      ts.isStringLiteral(node.argumentExpression) &&
-      node.argumentExpression.text === service
-    ) {
-      used = true
-      return
-    }
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isObjectBindingPattern(node.name) &&
-      node.initializer !== undefined &&
-      ts.isIdentifier(unwrapExpression(node.initializer)) &&
-      (unwrapExpression(node.initializer) as ts.Identifier).text === contextName &&
-      node.name.elements.some(element => (element.propertyName?.getText() ?? element.name.getText()) === service)
-    ) {
-      used = true
-      return
-    }
-    ts.forEachChild(node, visit)
+    activeScopes.push(Boolean(activeScopes.at(-1)) && !node.params.some(item => item.type === 'Identifier' && item.name === contextName))
   }
-  visit(declaration.body)
+  const leave = (): void => {
+    activeScopes.pop()
+  }
+  visitSource({
+    program,
+    visitor: {
+      FunctionDeclaration: enter,
+      'FunctionDeclaration:exit': leave,
+      FunctionExpression: enter,
+      'FunctionExpression:exit': leave,
+      ArrowFunctionExpression: enter,
+      'ArrowFunctionExpression:exit': leave,
+      MemberExpression(node) {
+        if (!activeScopes.at(-1) || node.object.type !== 'Identifier' || node.object.name !== contextName) return
+        if (
+          (!node.computed && propertyName(node.property) === service) ||
+          (node.computed && node.property.type === 'Literal' && node.property.value === service)
+        )
+          used = true
+      },
+      VariableDeclarator(node) {
+        if (!activeScopes.at(-1) || node.init === null) return
+        const initializer = unwrapExpression(node.init)
+        if (initializer.type === 'Identifier' && initializer.name === contextName && destructuresService(node.id, service)) used = true
+      },
+    },
+  })
   return used
 }
 
-function clientSetupServicesInSource(source: string, file: string): ClientDefinitionSourceAnalysis {
-  const node = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const clientNames = new Set<string>()
-  const sdkNames = new Set<string>()
-  const namespaces = new Set<string>()
-  const initializers = new Map<string, ts.Expression>()
-  const functions = new Map<string, ts.FunctionLikeDeclaration>()
-  const reexports: string[] = []
-
-  for (const statement of node.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === CLIENT_PUBLIC) {
-      const bindings = statement.importClause?.namedBindings
-      if (bindings === undefined) continue
-      if (ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text)
-      else {
-        for (const element of bindings.elements) {
-          if (['defineClient', 'defineClientPlugin'].includes(element.propertyName?.text ?? element.name.text)) clientNames.add(element.name.text)
-          if ((element.propertyName?.text ?? element.name.text) === 'defineClientPlugin') sdkNames.add(element.name.text)
-        }
-      }
-      continue
-    }
-    if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) functions.set(statement.name.text, statement)
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && declaration.initializer !== undefined) initializers.set(declaration.name.text, declaration.initializer)
-      }
-    }
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      statement.moduleSpecifier.text.startsWith('.') &&
-      statement.exportClause !== undefined &&
-      ts.isNamedExports(statement.exportClause) &&
-      statement.exportClause.elements.some(element => element.name.text === 'default' && (element.propertyName?.text ?? 'default') === 'default')
-    ) {
-      reexports.push(statement.moduleSpecifier.text)
-    }
-  }
-
-  const resolveExpression = (input: ts.Expression, seen = new Set<string>()): ts.Expression | undefined => {
-    const expression = unwrapExpression(input)
-    if (!ts.isIdentifier(expression)) return expression
-    if (seen.has(expression.text)) return undefined
-    const initializer = initializers.get(expression.text)
-    if (initializer === undefined) return undefined
-    const next = new Set(seen)
-    next.add(expression.text)
-    return resolveExpression(initializer, next)
-  }
-
-  const resolveFunction = (input: ts.Expression, seen = new Set<string>()): ts.FunctionLikeDeclaration | undefined => {
-    const expression = unwrapExpression(input)
-    if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return expression
-    if (!ts.isIdentifier(expression) || seen.has(expression.text)) return undefined
-    const declaration = functions.get(expression.text)
-    if (declaration !== undefined) return declaration
-    const initializer = initializers.get(expression.text)
-    const next = new Set(seen)
-    next.add(expression.text)
-    return initializer === undefined ? undefined : resolveFunction(initializer, next)
-  }
-
-  let defaultExpression: ts.Expression | undefined
-  for (const statement of node.statements) {
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) defaultExpression = statement.expression
-    if (
-      ts.isExportDeclaration(statement) &&
-      statement.moduleSpecifier === undefined &&
-      statement.exportClause !== undefined &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      const exported = statement.exportClause.elements.find(element => element.name.text === 'default')
-      if (exported !== undefined) {
-        const local = exported.propertyName?.text ?? exported.name.text
-        defaultExpression = initializers.get(local)
-      }
-    }
-  }
-  if (defaultExpression === undefined)
-    return {
-      services: [],
-      inject: undefined,
-      autoInject: [],
-      sourceFile: undefined,
-      reexports,
-    }
-  const resolvedDefault = resolveExpression(defaultExpression)
-  if (resolvedDefault === undefined || !ts.isCallExpression(resolvedDefault)) {
-    return {
-      services: [],
-      inject: undefined,
-      autoInject: [],
-      sourceFile: undefined,
-      reexports,
-    }
-  }
-  const callee = resolvedDefault.expression
-  const isDefineClient =
-    (ts.isIdentifier(callee) && clientNames.has(callee.text)) ||
-    (ts.isPropertyAccessExpression(callee) &&
-      ts.isIdentifier(callee.expression) &&
-      namespaces.has(callee.expression.text) &&
-      ['defineClient', 'defineClientPlugin'].includes(callee.name.text))
-  if (!isDefineClient || resolvedDefault.arguments[0] === undefined) {
-    return {
-      services: [],
-      inject: undefined,
-      autoInject: [],
-      sourceFile: undefined,
-      reexports,
-    }
-  }
-  const definition = resolveExpression(resolvedDefault.arguments[0])
-  if (definition === undefined || !ts.isObjectLiteralExpression(definition)) {
-    return { services: [], inject: undefined, autoInject: [], sourceFile: file, reexports }
-  }
-
+const clientSetupServicesInSource = (source: string, file: string): ClientDefinitionSourceAnalysis => {
+  const bindings = sourceBindings({ source, file })
+  const absent = { services: [], inject: undefined, autoInject: [], sourceFile: undefined, reexports: bindings.reexports }
+  if (bindings.defaultExpression === undefined) return absent
+  const defaultExpression = bindings.resolveExpression(bindings.defaultExpression)
+  if (defaultExpression?.type !== 'CallExpression' || defaultExpression.callee.type === 'Super') return absent
+  const name = bindings.importedName(defaultExpression.callee)
+  if (name !== 'defineClient' && name !== 'defineClientPlugin') return absent
+  const argument = defaultExpression.arguments[0]
+  if (argument === undefined) return absent
+  const definition = argument.type === 'SpreadElement' ? undefined : bindings.resolveExpression(argument)
+  if (definition?.type !== 'ObjectExpression') return { ...absent, sourceFile: file }
   const properties = definition.properties
-  const spreadIndex = properties.reduce((last, property, index) => (ts.isSpreadAssignment(property) ? index : last), -1)
-  const isSdk = (ts.isIdentifier(callee) && sdkNames.has(callee.text)) || (ts.isPropertyAccessExpression(callee) && callee.name.text === 'defineClientPlugin')
-  const usesIndex = properties.reduce(
-    (last, property, index) => (!ts.isSpreadAssignment(property) && staticPropertyName(property.name) === 'uses' ? index : last),
-    -1,
-  )
-  const usesProperty = usesIndex >= 0 && spreadIndex <= usesIndex ? properties[usesIndex] : undefined
-  const usesExpression =
-    usesProperty &&
-    (ts.isPropertyAssignment(usesProperty)
-      ? resolveExpression(usesProperty.initializer)
-      : ts.isShorthandPropertyAssignment(usesProperty)
-        ? resolveExpression(usesProperty.name)
-        : undefined)
-  const sdkUses =
-    usesExpression && ts.isArrayLiteralExpression(usesExpression) && usesExpression.elements.every(element => ts.isStringLiteralLike(element))
-      ? usesExpression.elements.map(element => (element as ts.StringLiteralLike).text)
-      : usesIndex < 0 && spreadIndex < 0
-        ? []
-        : undefined
-  const sdkAnalysis = isSdk ? { sdk: { uses: sdkUses } } : {}
-  const injectIndex = properties.reduce(
-    (last, property, index) => (!ts.isSpreadAssignment(property) && staticPropertyName(property.name) === 'inject' ? index : last),
-    -1,
-  )
-  let inject: readonly string[] | undefined = []
-  if (injectIndex >= 0 && spreadIndex <= injectIndex) {
-    const property = properties[injectIndex]
-    const initializer =
-      property !== undefined && ts.isPropertyAssignment(property)
-        ? resolveExpression(property.initializer)
-        : property !== undefined && ts.isShorthandPropertyAssignment(property)
-          ? resolveExpression(property.name)
-          : undefined
-    inject =
-      initializer !== undefined &&
-      ts.isArrayLiteralExpression(initializer) &&
-      initializer.elements.every(element => ts.isStringLiteral(element) || ts.isNoSubstitutionTemplateLiteral(element))
-        ? initializer.elements.map(element => (element as ts.StringLiteralLike).text)
-        : undefined
-  } else if (spreadIndex >= 0) {
-    inject = undefined
-  }
-
-  const localeIndex = properties.reduce(
-    (last, property, index) => (!ts.isSpreadAssignment(property) && staticPropertyName(property.name) === 'locales' ? index : last),
-    -1,
-  )
-  const localeProperty = localeIndex >= 0 && spreadIndex <= localeIndex ? properties[localeIndex] : undefined
-  const localeInitializer =
-    localeProperty !== undefined && ts.isPropertyAssignment(localeProperty)
-      ? resolveExpression(localeProperty.initializer)
-      : localeProperty !== undefined && ts.isShorthandPropertyAssignment(localeProperty)
-        ? resolveExpression(localeProperty.name)
-        : undefined
-  const autoInject =
-    localeInitializer !== undefined && ts.isArrayLiteralExpression(localeInitializer) && localeInitializer.elements.length > 0 ? (['locale'] as const) : []
-
-  let setup: ts.FunctionLikeDeclaration | undefined
-  for (let index = properties.length - 1; index >= 0; index -= 1) {
-    if (index < spreadIndex) break
+  const spreadIndex = properties.reduce((last, property, index) => (property.type === 'SpreadElement' ? index : last), -1)
+  const propertyAt = (name: string): ObjectProperty | undefined => {
+    const index = properties.reduce((last, property, index) => (property.type === 'Property' && nameOf(property) === name ? index : last), -1)
+    if (index < 0 || spreadIndex > index) return undefined
     const property = properties[index]
-    if (property === undefined || ts.isSpreadAssignment(property) || staticPropertyName(property.name) !== 'setup') continue
-    if (ts.isMethodDeclaration(property)) setup = property
-    else if (ts.isPropertyAssignment(property)) setup = resolveFunction(property.initializer)
-    else if (ts.isShorthandPropertyAssignment(property)) setup = functions.get(property.name.text) ?? resolveFunction(property.name)
-    break
+    return property?.type === 'Property' ? property : undefined
   }
-  if (setup === undefined) return { services: [], inject, autoInject, sourceFile: file, reexports, ...sdkAnalysis }
-  const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(service =>
-    functionUsesSetupService(setup!, service),
-  )
-  return { services, inject, autoInject, sourceFile: file, reexports, ...sdkAnalysis }
+  const arrayField = (name: string): readonly string[] | undefined => {
+    const property = propertyAt(name)
+    if (property === undefined) return spreadIndex < 0 ? [] : undefined
+    const value = bindings.resolveExpression(property.value)
+    if (value?.type !== 'ArrayExpression') return undefined
+    const values: string[] = []
+    for (const element of value.elements) {
+      if (element === null || element.type === 'SpreadElement') return undefined
+      const text = stringValue(element)
+      if (text === undefined) return undefined
+      values.push(text)
+    }
+    return values
+  }
+  const inject = arrayField('inject')
+  const localeProperty = propertyAt('locales')
+  const locales = localeProperty === undefined ? undefined : bindings.resolveExpression(localeProperty.value)
+  const autoInject: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
+  const setupProperty = propertyAt('setup')
+  const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
+  const services: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> =
+    setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service: 'locale' }) ? ['locale'] : []
+  const result: ClientDefinitionSourceAnalysis = { services, inject, autoInject, sourceFile: file, reexports: bindings.reexports }
+  if (name === 'defineClientPlugin') return { ...result, sdk: { uses: arrayField('uses') } }
+  return result
 }
 
 /** Conservative source-level capability preview; the post-tree-shake build check is authoritative. */

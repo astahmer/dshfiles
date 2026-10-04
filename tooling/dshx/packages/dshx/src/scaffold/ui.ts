@@ -1,7 +1,8 @@
 import { createRequire } from 'node:module'
 import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
-import ts from 'typescript'
+import type { Program } from 'oxc-parser'
+import { parseSource, visitSource, defaultCall, objectProperty, propertyName, stringValue, lastImportEnd } from '../project/syntax.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -234,59 +235,44 @@ function relativeImport(fromFile: string, targetFile: string): string {
   return value.replace(/\.(?:tsx?|jsx?)$/, '.js')
 }
 
-function findDefaultDefineClient(sourceFile: ts.SourceFile): ts.CallExpression | undefined {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isExportAssignment(statement)) continue
-    const expression = statement.expression
-    if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === 'defineClient') return expression
-  }
-  return undefined
-}
-
-function propertyNamed(object: ts.ObjectLiteralExpression, name: string): ts.PropertyAssignment | undefined {
-  return object.properties.find(
-    (property): property is ts.PropertyAssignment => ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === name,
-  )
-}
-
-function hasSlotRegistration(sourceFile: ts.SourceFile, slotName: string): boolean {
+const hasSlotRegistration = (program: Program, slotName: string): boolean => {
   let found = false
-  const visit = (node: ts.Node): void => {
-    if (found) return
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'defineSlot') {
-      const first = node.arguments[0]
-      if (first !== undefined && ts.isStringLiteral(first) && first.text === slotName) found = true
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
+  visitSource({
+    program,
+    visitor: {
+      CallExpression(node) {
+        if (node.callee.type !== 'Identifier' || node.callee.name !== 'defineSlot') return
+        const argument = node.arguments[0]
+        if (argument !== undefined && argument.type !== 'SpreadElement' && stringValue(argument) === slotName) found = true
+      },
+    },
+  })
   return found
 }
 
 function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string): { source: string | undefined; duplicate: boolean } {
-  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const sourceFile = parseSource({ file, source })
   if (hasSlotRegistration(sourceFile, slotName)) return { source: undefined, duplicate: true }
-  const call = findDefaultDefineClient(sourceFile)
+  const call = defaultCall({ program: sourceFile, name: 'defineClient' })
   const argument = call?.arguments[0]
-  if (call === undefined || call.arguments.length !== 1 || argument === undefined || !ts.isObjectLiteralExpression(argument))
+  if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { source: undefined, duplicate: false }
   const object = argument
-  const slots = propertyNamed(object, 'slots')
-  const slotProperty = object.properties.find(property => property.name !== undefined && ts.isIdentifier(property.name) && property.name.text === 'slots')
-  if (slotProperty !== undefined && (slots === undefined || !ts.isArrayLiteralExpression(slots.initializer))) return { source: undefined, duplicate: false }
+  const slots = objectProperty({ expression: object, name: 'slots' })
+  const slotProperty = object.properties.find(property => property.type === 'Property' && propertyName(property.key) === 'slots')
+  if (slotProperty !== undefined && (slots === undefined || slots.value.type !== 'ArrayExpression')) return { source: undefined, duplicate: false }
   const importPath = relativeImport(file, contributionFile)
   const identifier = contributionIdentifier(slotName)
   const importLine = `import { generatedSlot as ${identifier} } from ${JSON.stringify(importPath)}\n`
   const edits: Array<{ start: number; end: number; text: string }> = []
-  const imports = sourceFile.statements.filter(ts.isImportDeclaration)
-  const importEnd = imports.length === 0 ? 0 : imports[imports.length - 1]!.end
+  const importEnd = lastImportEnd(sourceFile)
   edits.push({ start: importEnd, end: importEnd, text: `${importEnd === 0 ? '' : '\n'}${importLine}` })
-  if (slots !== undefined && ts.isArrayLiteralExpression(slots.initializer)) {
-    const array = slots.initializer
+  if (slots !== undefined && slots.value.type === 'ArrayExpression') {
+    const array = slots.value
     const hasItems = array.elements.length > 0
     edits.push({ start: array.end - 1, end: array.end - 1, text: `${hasItems ? ', ' : ''}${identifier}` })
   } else {
-    const openBrace = object.getStart(sourceFile) + source.slice(object.getStart(sourceFile), object.getEnd()).indexOf('{') + 1
+    const openBrace = object.start + source.slice(object.start, object.end).indexOf('{') + 1
     const hasProperties = object.properties.length > 0
     edits.push({ start: openBrace, end: openBrace, text: `${hasProperties ? '\n' : ''}  slots: [${identifier}],${hasProperties ? '' : '\n'}` })
   }
@@ -542,7 +528,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   }
   const existingGenerated = await readExisting(fs, targetFile)
   if (existingGenerated !== undefined) {
-    const generatedAst = ts.createSourceFile(targetFile, existingGenerated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const generatedAst = parseSource({ file: targetFile, source: existingGenerated })
     if (hasSlotRegistration(generatedAst, slot.name)) {
       const item = diagnostic(
         'DSHX6109',

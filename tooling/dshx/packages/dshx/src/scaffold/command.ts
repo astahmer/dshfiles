@@ -1,5 +1,6 @@
 import { dirname, relative, resolve } from 'node:path'
-import ts from 'typescript'
+import type { Program } from 'oxc-parser'
+import { parseSource, visitSource, defaultCall, objectProperty, stringValue, lastImportEnd } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
@@ -47,35 +48,20 @@ function sourceForCommand(name: string, description: string): string {
   return `import { defineCommand } from '@dshfiles/dshx/host'\n\nexport const ${identifier} = defineCommand({\n  name: ${JSON.stringify(name)},\n  description: ${JSON.stringify(description)},\n  handler() {\n    return { kind: 'success', text: ${JSON.stringify(`Implement /${name}`)} }\n  },\n})\n`
 }
 
-function findDefineHost(sourceFile: ts.SourceFile): ts.CallExpression | undefined {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isExportAssignment(statement)) continue
-    const expression = statement.expression
-    if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === 'defineHost') return expression
-  }
-  return undefined
-}
-
-function property(object: ts.ObjectLiteralExpression, name: string): ts.PropertyAssignment | undefined {
-  return object.properties.find(item => ts.isPropertyAssignment(item) && ts.isIdentifier(item.name) && item.name.text === name) as
-    | ts.PropertyAssignment
-    | undefined
-}
-
-function hasCommand(sourceFile: ts.SourceFile, name: string): boolean {
+const hasCommand = (program: Program, name: string): boolean => {
   let found = false
-  const visit = (node: ts.Node): void => {
-    if (found) return
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'defineCommand') {
-      const first = node.arguments[0]
-      if (first !== undefined && ts.isObjectLiteralExpression(first)) {
-        const nameProperty = property(first, 'name')
-        if (nameProperty !== undefined && ts.isStringLiteral(nameProperty.initializer) && nameProperty.initializer.text === name) found = true
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
+  visitSource({
+    program,
+    visitor: {
+      CallExpression(node) {
+        if (node.callee.type !== 'Identifier' || node.callee.name !== 'defineCommand') return
+        const argument = node.arguments[0]
+        if (argument === undefined || argument.type === 'SpreadElement') return
+        const property = objectProperty({ expression: argument, name: 'name' })
+        if (property !== undefined && stringValue(property.value) === name) found = true
+      },
+    },
+  })
   return found
 }
 
@@ -86,17 +72,16 @@ function importPath(from: string, to: string): string {
 }
 
 function modifyHost(source: string, hostFile: string, commandFile: string, name: string): { source?: string; duplicate: boolean; invalidCommands: boolean } {
-  const sourceFile = ts.createSourceFile(hostFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const sourceFile = parseSource({ file: hostFile, source })
   if (hasCommand(sourceFile, name)) return { duplicate: true, invalidCommands: false }
-  const call = findDefineHost(sourceFile)
+  const call = defaultCall({ program: sourceFile, name: 'defineHost' })
   const argument = call?.arguments[0]
-  if (call === undefined || call.arguments.length !== 1 || argument === undefined || !ts.isObjectLiteralExpression(argument))
+  if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { duplicate: false, invalidCommands: false }
-  const commands = property(argument, 'commands')
-  if (commands !== undefined && !ts.isArrayLiteralExpression(commands.initializer)) return { duplicate: false, invalidCommands: true }
+  const commands = objectProperty({ expression: argument, name: 'commands' })
+  if (commands !== undefined && commands.value.type !== 'ArrayExpression') return { duplicate: false, invalidCommands: true }
   const identifier = commandIdentifier(name)
-  const imports = sourceFile.statements.filter(ts.isImportDeclaration)
-  const importEnd = imports.length === 0 ? 0 : imports[imports.length - 1]!.end
+  const importEnd = lastImportEnd(sourceFile)
   const edits: Array<{ start: number; end: number; text: string }> = [
     {
       start: importEnd,
@@ -104,15 +89,15 @@ function modifyHost(source: string, hostFile: string, commandFile: string, name:
       text: `${importEnd === 0 ? '' : '\n'}import { ${identifier} } from ${JSON.stringify(importPath(hostFile, commandFile))}\n`,
     },
   ]
-  if (commands !== undefined && ts.isArrayLiteralExpression(commands.initializer)) {
+  if (commands !== undefined && commands.value.type === 'ArrayExpression') {
     edits.push({
-      start: commands.initializer.end - 1,
-      end: commands.initializer.end - 1,
-      text: `${commands.initializer.elements.length > 0 ? ', ' : ''}${identifier}`,
+      start: commands.value.end - 1,
+      end: commands.value.end - 1,
+      text: `${commands.value.elements.length > 0 ? ', ' : ''}${identifier}`,
     })
   } else {
-    const objectText = source.slice(argument.getStart(sourceFile), argument.getEnd())
-    const openBrace = argument.getStart(sourceFile) + objectText.indexOf('{') + 1
+    const objectText = source.slice(argument.start, argument.end)
+    const openBrace = argument.start + objectText.indexOf('{') + 1
     edits.push({
       start: openBrace,
       end: openBrace,
@@ -191,7 +176,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
   }
   const existingCommandFile = await readOptionalFile(commandFile)
   if (existingCommandFile !== undefined) {
-    const ast = ts.createSourceFile(commandFile, existingCommandFile, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const ast = parseSource({ file: commandFile, source: existingCommandFile })
     if (hasCommand(ast, options.name))
       return result(
         project,

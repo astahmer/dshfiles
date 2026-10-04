@@ -361,7 +361,7 @@ const LEGACY_TEMPLATE_REGISTRY = {
       react: '^18.3.1',
       'react-dom': '^18.3.1',
       '@deepseek-ai/cordis': '~4.0.4',
-      typescript: '^5.9.3',
+      typescript: '^7.0.2',
     }),
     peerDependencies: context => ({
       '@deepseek-ai/dsh': context.dshRange,
@@ -396,7 +396,7 @@ const LEGACY_TEMPLATE_REGISTRY = {
       react: '^18.3.1',
       'react-dom': '^18.3.1',
       '@deepseek-ai/cordis': '~4.0.4',
-      typescript: '^5.9.3',
+      typescript: '^7.0.2',
     }),
     peerDependencies: context => ({
       '@deepseek-ai/dsh': context.dshRange,
@@ -423,7 +423,7 @@ function sdkDependencies(context: TemplateContext): DependencyMap {
     '@deepseek-ai/dsh': context.dshVersion,
     '@deepseek-ai/cordis': '~4.0.4',
     '@types/node': '^22.19.0',
-    typescript: '^5.9.3',
+    typescript: '^7.0.2',
   }
 }
 
@@ -558,7 +558,11 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
             }),
       },
       scripts: {
-        check: 'dshx check',
+        check: 'dshx check && pnpm lint && pnpm fmt:check',
+        typecheck: 'tsc --noEmit -p tsconfig.json',
+        lint: 'oxlint src tests dshx.config.ts',
+        fmt: 'oxfmt .',
+        'fmt:check': 'oxfmt --check .',
         test: 'dshx test',
         build: 'dshx build',
         dev: 'dshx dev --open',
@@ -568,6 +572,8 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
         ...template.devDependencies(context),
         ...(template.hostOnly ? {} : styleDefinition.devDependencies),
         vitest: '^4.1.11',
+        oxlint: '1.86.0',
+        oxfmt: '0.71.0',
       },
       peerDependencies: {
         ...Object.fromEntries(template.clientProviders.map(provider => [provider, context.dshRange])),
@@ -654,6 +660,21 @@ export function renderProjectTemplate(context: TemplateContext, templateName: Te
     { path: 'dshx.config.ts', contents: renderConfig(template.hostOnly ? 'none' : style, template.hostOnly) },
     { path: 'package.json', contents: renderManifest(context, templateName, style) },
     { path: 'tsconfig.json', contents: renderTsconfig() },
+    {
+      path: '.oxlintrc.json',
+      contents:
+        JSON.stringify({ plugins: ['typescript', 'oxc'], categories: { correctness: 'error' }, ignorePatterns: ['dist/**', 'node_modules/**'] }, null, 2) +
+        '\n',
+    },
+    {
+      path: '.oxfmtrc.json',
+      contents:
+        JSON.stringify(
+          { semi: false, singleQuote: true, arrowParens: 'avoid', printWidth: 160, ignorePatterns: ['dist/**', 'node_modules/**', 'pnpm-lock.yaml'] },
+          null,
+          2,
+        ) + '\n',
+    },
     { path: 'tests/host.spec.ts', contents: renderHostTest(context, templateName) },
     {
       path: 'cordis.patch.yml',

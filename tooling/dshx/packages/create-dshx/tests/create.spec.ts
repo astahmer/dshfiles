@@ -59,10 +59,19 @@ describe('create-dshx', () => {
       dsh: { client: { inject: string[] } }
     }
     expect(manifest.devDependencies['@dshfiles/dshx']).toBe(packageVersion())
+    expect(manifest.devDependencies.typescript).toBe('^7.0.2')
+    expect(manifest.devDependencies.oxlint).toBe('1.86.0')
+    expect(manifest.devDependencies.oxfmt).toBe('0.71.0')
+    expect(relativeFiles).toContain('.oxlintrc.json')
+    expect(relativeFiles).toContain('.oxfmtrc.json')
     expect(manifest.devDependencies['@deepseek-ai/dsh']).toBe(DEFAULT_DSH_VERSION)
     expect(manifest.peerDependencies['@deepseek-ai/dsh']).toBe(DEFAULT_DSH_RANGE)
     expect(manifest.scripts).toEqual({
-      check: 'dshx check',
+      check: 'dshx check && pnpm lint && pnpm fmt:check',
+      typecheck: 'tsc --noEmit -p tsconfig.json',
+      lint: 'oxlint src tests dshx.config.ts',
+      fmt: 'oxfmt .',
+      'fmt:check': 'oxfmt --check .',
       test: 'dshx test',
       build: 'dshx build',
       dev: 'dshx dev --open',

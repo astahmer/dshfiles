@@ -1,6 +1,7 @@
+import { execFile } from 'node:child_process'
 import { access } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
-import ts from 'typescript'
 import type { DshxDiagnostic } from '../diagnostics.js'
 
 export interface ProjectTypecheckResult {
@@ -9,72 +10,60 @@ export interface ProjectTypecheckResult {
   readonly diagnostics: readonly DshxDiagnostic[]
 }
 
-function diagnosticFile(diagnostic: ts.Diagnostic): { file: string; location: string } {
-  if (diagnostic.file === undefined || diagnostic.start === undefined) return { file: '', location: '' }
-  const position = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
-  return {
-    file: diagnostic.file.fileName,
-    location: `${position.line + 1}:${position.character + 1}: `,
-  }
-}
+const compiler = resolve(createRequire(import.meta.url).resolve('typescript/package.json'), '..', 'bin/tsc')
 
-function convertDiagnostic(diagnostic: ts.Diagnostic, fallbackFile: string): DshxDiagnostic {
-  const location = diagnosticFile(diagnostic)
-  return {
-    code: `TS${diagnostic.code}`,
-    severity: diagnostic.category === ts.DiagnosticCategory.Error ? 'error' : 'warning',
-    message: `${location.location}${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`,
-    file: location.file === '' ? fallbackFile : location.file,
-    hint: 'Fix the TypeScript diagnostic before building the plugin.',
-  }
-}
-
-/** Type-check a plugin exactly as an offline CI gate without emitting files. */
-export async function typecheckProject(root: string): Promise<ProjectTypecheckResult> {
+export const typecheckProject = async (root: string): Promise<ProjectTypecheckResult> => {
   const configFile = resolve(root, 'tsconfig.json')
   try {
     await access(configFile)
   } catch {
-    const diagnostic: DshxDiagnostic = {
-      code: 'DSHX4401',
-      severity: 'error',
-      message: 'No tsconfig.json was found at the plugin project root.',
-      file: configFile,
-      hint: 'Create a tsconfig.json that includes the Host, Client, shared contracts, and dshx.config.ts.',
+    return {
+      status: 'failed',
+      configFile,
+      diagnostics: [
+        {
+          code: 'DSHX4401',
+          severity: 'error',
+          message: 'No tsconfig.json was found at the plugin project root.',
+          file: configFile,
+          hint: 'Create a tsconfig.json that includes the Host, Client, shared contracts, and dshx.config.ts.',
+        },
+      ],
     }
-    return { status: 'failed', configFile, diagnostics: [diagnostic] }
   }
-
-  const loaded = ts.readConfigFile(configFile, ts.sys.readFile)
-  if (loaded.error !== undefined) {
-    const diagnostics = [convertDiagnostic(loaded.error, configFile)]
-    return { status: 'failed', configFile, diagnostics }
-  }
-  const parsed = ts.parseJsonConfigFileContent(
-    loaded.config,
-    ts.sys,
-    root,
-    {
-      noEmit: true,
-      incremental: false,
-      composite: false,
-    },
-    configFile,
-  )
-  const parseDiagnostics = parsed.errors.map(diagnostic => convertDiagnostic(diagnostic, configFile))
-  if (parseDiagnostics.some(diagnostic => diagnostic.severity === 'error')) {
-    return { status: 'failed', configFile, diagnostics: parseDiagnostics }
-  }
-
-  const program = ts.createProgram({
-    rootNames: parsed.fileNames,
-    options: parsed.options,
-    ...(parsed.projectReferences === undefined ? {} : { projectReferences: parsed.projectReferences }),
+  const result = await new Promise<{ output: string; failed: boolean }>(resolveResult => {
+    execFile(
+      process.execPath,
+      [compiler, '--project', configFile, '--noEmit', '--incremental', 'false', '--composite', 'false', '--pretty', 'false'],
+      { cwd: root, timeout: 120_000, maxBuffer: 8 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        resolveResult({ output: [stdout, stderr].filter(Boolean).join('\n'), failed: error !== null })
+      },
+    )
   })
-  const diagnostics = [...parseDiagnostics, ...ts.getPreEmitDiagnostics(program).map(diagnostic => convertDiagnostic(diagnostic, configFile))]
-  return {
-    status: diagnostics.some(diagnostic => diagnostic.severity === 'error') ? 'failed' : 'passed',
-    configFile,
-    diagnostics,
+  const diagnostics: DshxDiagnostic[] = []
+  for (const line of result.output.split(/\r?\n/)) {
+    const match = /^(?:(.*?)\((\d+),(\d+)\): )?error (TS\d+): (.*)$/.exec(line)
+    if (match !== null) {
+      diagnostics.push({
+        code: match[4] ?? 'DSHX4402',
+        severity: 'error',
+        file: match[1] ? resolve(root, match[1]) : configFile,
+        message: `${match[2] === undefined ? '' : `${match[2]}:${match[3]}: `}${match[5] ?? ''}`,
+        hint: 'Fix the TypeScript diagnostic before building the plugin.',
+      })
+      continue
+    }
+    const previous = diagnostics.at(-1)
+    if (previous !== undefined && line.trim().length > 0) diagnostics[diagnostics.length - 1] = { ...previous, message: `${previous.message}\n${line}` }
   }
+  if (result.failed && diagnostics.length === 0)
+    diagnostics.push({
+      code: 'DSHX4402',
+      severity: 'error',
+      file: configFile,
+      message: result.output.trim() || 'TypeScript compiler failed without diagnostics.',
+      hint: 'Check the compiler installation and project configuration.',
+    })
+  return { status: result.failed || diagnostics.length > 0 ? 'failed' : 'passed', configFile, diagnostics }
 }
