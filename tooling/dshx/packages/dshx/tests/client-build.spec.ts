@@ -181,9 +181,11 @@ describe('client compiler', () => {
     const entry = resolve(root, 'src/client.tsx')
     await writeFile(
       entry,
-      ["import { defineClient } from '@dshfiles/dshx/client'", "export default defineClient({ setup(ctx) { ctx.locale.register('demo', {}) } })", ''].join(
-        '\n',
-      ),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        "export default defineClient({ inject: ['slots'], setup(ctx) { ctx.locale.register('demo', {}) } })",
+        '',
+      ].join('\n'),
     )
 
     await expect(
@@ -492,7 +494,9 @@ describe('client compiler', () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/client.tsx'),
-      ["import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({ setup(ctx) { return ctx.locale } })', ''].join('\n'),
+      ["import { defineClient } from '@dshfiles/dshx/client'", "export default defineClient({ inject: ['slots'], setup(ctx) { return ctx.locale } })", ''].join(
+        '\n',
+      ),
     )
     await expect(
       watchClient({
@@ -1149,7 +1153,7 @@ describe('client compiler', () => {
     const clientSource = (inject: boolean, marker: string) =>
       [
         "import { defineClient } from '@dshfiles/dshx/client'",
-        `export default defineClient({ ${inject ? "inject: ['locale'], " : ''}setup(ctx) { ctx.locale.register('demo', { marker: '${marker}' }) } })`,
+        `export default defineClient({ inject: [${inject ? "'slots', 'locale'" : "'slots'"}], setup(ctx) { ctx.locale.register('demo', { marker: '${marker}' }) } })`,
         '',
       ].join('\n')
     await writeFile(sourcePath, clientSource(true, 'initial-locale'))

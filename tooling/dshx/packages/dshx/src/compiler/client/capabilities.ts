@@ -17,12 +17,23 @@ interface ConversationDefinitionAnalysis {
   readonly reexports: readonly string[]
 }
 
-/** Optional Cordis services that Client setup code may consume directly. */
-export const CLIENT_SETUP_SERVICE_CAPABILITIES = {
-  locale: { provider: '@deepseek-ai/dsh-client-locale' },
-  slots: { provider: '@deepseek-ai/dsh-client-ui-conversation' },
-  sessions: { provider: '@deepseek-ai/dsh-api-session-controller' },
-} as const
+type ClientSetupService = 'locale' | 'slots' | 'sessions'
+
+/**
+ * Optional Cordis services that Client setup code may consume directly.
+ *
+ * `fullRuntime` marks what the runtime injects into a setup that declares no
+ * inject of its own (see `usesFullRuntime` in `client/runtime.ts`). `slots` has no
+ * provider edge: the renderer owns it and DSH loads the renderer immediately.
+ */
+export const CLIENT_SETUP_SERVICE_CAPABILITIES: Readonly<Record<ClientSetupService, { readonly provider: string | undefined; readonly fullRuntime: boolean }>> =
+  {
+    locale: { provider: '@deepseek-ai/dsh-client-locale', fullRuntime: true },
+    slots: { provider: undefined, fullRuntime: true },
+    sessions: { provider: '@deepseek-ai/dsh-api-session-controller', fullRuntime: false },
+  }
+
+const CLIENT_SETUP_SERVICES: readonly ClientSetupService[] = ['locale', 'slots', 'sessions']
 
 /** Native package load edges; this is compiler metadata, not a second service registry. */
 export const CLIENT_SDK_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
@@ -34,11 +45,13 @@ export const CLIENT_SDK_PROVIDERS: Readonly<Record<string, readonly string[]>> =
 }
 
 export interface ClientSetupServiceAnalysis {
-  readonly services: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
+  readonly services: readonly ClientSetupService[]
   /** Undefined means a dynamic definition prevented a safe static conclusion. */
   readonly inject: readonly string[] | undefined
   /** Services supplied by declarative Client fields such as non-empty locales. */
-  readonly autoInject: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
+  readonly autoInject: readonly ClientSetupService[]
+  /** Services the runtime injects because setup declares no inject of its own. */
+  readonly runtimeInject: readonly ClientSetupService[]
   readonly sourceFile: string | undefined
   readonly localeNamespaces: readonly string[] | undefined
   /** Present only for a statically recognized SDK definition; undefined means dynamic uses. */
@@ -217,7 +230,7 @@ const functionUsesSetupService = ({
 }: {
   program: Program
   declaration: SetupFunction
-  service: keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES
+  service: ClientSetupService
 }): boolean => {
   const parameter = declaration.params[0]
   if (parameter === undefined) return false
@@ -265,7 +278,15 @@ const functionUsesSetupService = ({
 
 const clientSetupServicesInSource = (source: string, file: string): ClientDefinitionSourceAnalysis => {
   const bindings = sourceBindings({ source, file })
-  const absent = { services: [], inject: undefined, autoInject: [], localeNamespaces: undefined, sourceFile: undefined, reexports: bindings.reexports }
+  const absent = {
+    services: [],
+    inject: undefined,
+    autoInject: [],
+    runtimeInject: [],
+    localeNamespaces: undefined,
+    sourceFile: undefined,
+    reexports: bindings.reexports,
+  }
   if (bindings.defaultExpression === undefined) return absent
   const defaultExpression = bindings.resolveExpression(bindings.defaultExpression)
   if (defaultExpression?.type !== 'CallExpression' || defaultExpression.callee.type === 'Super') return absent
@@ -300,7 +321,7 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   const inject = arrayField('inject')
   const localeProperty = propertyAt('locales')
   const locales = localeProperty === undefined ? undefined : bindings.resolveExpression(localeProperty.value)
-  const autoInject: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
+  const autoInject: ClientSetupService[] = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
   const localeNamespaces: string[] = []
   let knownLocaleNamespaces = localeProperty === undefined && spreadIndex < 0
   if (locales?.type === 'ArrayExpression') {
@@ -320,13 +341,16 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   }
   const setupProperty = propertyAt('setup')
   const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
-  const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
+  const services = CLIENT_SETUP_SERVICES.filter(
     service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
   )
+  const runtimeInject =
+    setup !== undefined && inject?.length === 0 ? CLIENT_SETUP_SERVICES.filter(service => CLIENT_SETUP_SERVICE_CAPABILITIES[service].fullRuntime) : []
   const result: ClientDefinitionSourceAnalysis = {
     services,
     inject,
     autoInject,
+    runtimeInject,
     sourceFile: file,
     localeNamespaces: knownLocaleNamespaces ? localeNamespaces : undefined,
     reexports: bindings.reexports,
@@ -452,7 +476,7 @@ export async function clientSetupServices(entry: string, root: string): Promise<
       if (target !== undefined && !visited.has(target)) pending.push(target)
     }
   }
-  return { services: [], inject: undefined, autoInject: [], localeNamespaces: undefined, sourceFile: undefined }
+  return { services: [], inject: undefined, autoInject: [], runtimeInject: [], localeNamespaces: undefined, sourceFile: undefined }
 }
 
 const localeNamespace = ({ expression, bindings }: { expression: Expression; bindings: ReturnType<typeof sourceBindings> }): string | undefined => {

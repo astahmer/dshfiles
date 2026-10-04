@@ -243,14 +243,19 @@ async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolv
       })
   }
   for (const service of analysis.services) {
-    if (analysis.inject !== undefined && !analysis.inject.includes(service) && !analysis.autoInject.includes(service)) {
+    if (
+      analysis.inject !== undefined &&
+      !analysis.inject.includes(service) &&
+      !analysis.autoInject.includes(service) &&
+      !analysis.runtimeInject.includes(service)
+    ) {
       throw new DshxError('DSHX1204', `defineClient().setup uses ctx.${service}, but defineClient.inject does not declare ${JSON.stringify(service)}.`, {
         file: analysis.sourceFile ?? paths.entry,
         hint: `Add inject: [${JSON.stringify(service)}] to defineClient({...}). dsh.client.inject loads provider packages; it does not inject runtime Cordis services.`,
       })
     }
     const provider = CLIENT_SETUP_SERVICE_CAPABILITIES[service].provider
-    if (!(options.inject ?? []).includes(provider) && !analysis.autoInject.includes(service)) {
+    if (provider !== undefined && !(options.inject ?? []).includes(provider) && !analysis.autoInject.includes(service)) {
       throw new DshxError('DSHX1203', `ctx.${service} requires the official ${service} provider package edge.`, {
         file: analysis.sourceFile ?? paths.entry,
         hint: `Add ${JSON.stringify(provider)} to package.json dsh.client.inject, then rebuild.`,

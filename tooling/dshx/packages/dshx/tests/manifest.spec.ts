@@ -254,7 +254,7 @@ describe('checkProjectManifest', () => {
       resolve(root, 'src/client.tsx'),
       [
         "import { defineClient } from '@dshfiles/dshx/client'",
-        "export default defineClient({ setup(ctx) { ctx.effect(() => ctx.locale.register('demo', {})) } })",
+        "export default defineClient({ inject: ['slots'], setup(ctx) { ctx.effect(() => ctx.locale.register('demo', {})) } })",
         '',
       ].join('\n'),
     )
@@ -310,6 +310,27 @@ describe('checkProjectManifest', () => {
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4219' }))
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4220' }))
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4221' }))
+  })
+
+  it('accepts what the runtime injects into a setup that declares no inject', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        "export default defineClient({ setup(ctx) { ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'demo' }, () => null)) } })",
+        '',
+      ].join('\n'),
+    )
+    const slotsOnly = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))
+    expect(slotsOnly).not.toContainEqual(expect.objectContaining({ code: 'DSHX4219' }))
+    expect(slotsOnly).not.toContainEqual(expect.objectContaining({ code: 'DSHX4220' }))
+
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      ["import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({ setup(ctx) { ctx.effect(() => ctx.sessions) } })', ''].join('\n'),
+    )
+    expect(await checkProjectManifest(await resolveDshxConfig({ cwd: root }))).toContainEqual(expect.objectContaining({ code: 'DSHX4219' }))
   })
 
   it('does not mistake base Context methods for optional setup services', async () => {

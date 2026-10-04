@@ -376,7 +376,12 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
       )
   }
   for (const service of analysis.services) {
-    if (analysis.inject !== undefined && !analysis.inject.includes(service) && !analysis.autoInject.includes(service)) {
+    if (
+      analysis.inject !== undefined &&
+      !analysis.inject.includes(service) &&
+      !analysis.autoInject.includes(service) &&
+      !analysis.runtimeInject.includes(service)
+    ) {
       diagnostics.push(
         issue(
           'DSHX4219',
@@ -388,7 +393,7 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
       )
     }
     const provider = CLIENT_SETUP_SERVICE_CAPABILITIES[service].provider
-    if (!packageInject.includes(provider) && !analysis.autoInject.includes(service)) {
+    if (provider !== undefined && !packageInject.includes(provider) && !analysis.autoInject.includes(service)) {
       diagnostics.push(
         issue(
           'DSHX4220',
