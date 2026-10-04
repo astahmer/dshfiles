@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-// Brings in the CSS-module and `llm/stream` declarations a plugin would
-// otherwise restate locally.
+// Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import z from '@deepseek-ai/schemastery'
 import {

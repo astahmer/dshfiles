@@ -1,6 +1,5 @@
 packages:
   - packages/*
-  - fixtures/*
 
 catalog:
   '@types/node': 22.19.20
@@ -10,7 +9,6 @@ catalog:
   vite: 8.2.2
   vitest: 4.1.11
   yaml: 2.9.0
-  zod: 4.4.3
 
 allowBuilds:
   '@deepseek-ai/dsh-subprocess-local': false
