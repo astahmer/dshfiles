@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0 and 1 done, Phase 2 next.
+Status: **in progress** — Phases 0–2 done, Phase 3 next.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and the next
@@ -42,10 +42,9 @@ phase starts only after review.
 - [x] Replace the `allowBuilds` placeholders: no dependency builds natively in
       either workspace
 - [x] Create the `main` bookmark on this stack
-- [ ] Rebase the parallel queue-reorder/thread-sidebar stack
-      (`fix(queue-reorder): own the queue dock locale namespace` onward) onto
-      `main` once its agent stops editing; it also touches
-      `tooling/dshx/packages/dshx/src/client/locale.ts`
+- [x] Rebase the parallel queue-reorder/thread-sidebar stack onto `main`
+      (done by hand); `zsqq` had swept in 21 lines of another agent's unfinished
+      dshx `capabilities.ts` work, moved back into that agent's change
 
 ## Phase 1 — Security and red builds
 
@@ -59,10 +58,10 @@ phase starts only after review.
       account is skipped with a warning instead of failing every route
 - [x] secret-catalog: free-text metadata may not start with `-`; schemas
       defined once in `secret-arguments.ts`
-- [ ] secret-catalog: check-then-set race on create — deferred. Whether
-      `secret set` without `--force` refuses an existing item when stdin is not
-      a TTY is unverified (the CLI is a compiled binary); verify against a
-      throwaway vault before changing it
+- [x] secret-catalog: check-then-set race on create is benign. Verified in
+      `~/dev/secret-cli` (`secret/Sources/secret/main.swift`, set overwrite
+      branch): without `--force` and with no TTY, `set` fails with "item
+      already exists"; the plugin never passes `--force` on create
 - [x] dshx: option scopes declared once in `cli/args.ts`; `dev --port` and
       `check --boot --port` both work
 - [x] dshx: `tests/cli.spec.ts` ported to a protocol-2 fixture with the DSH
@@ -74,15 +73,31 @@ all 9 plugins typecheck; plugin tests 103/103.
 
 ## Phase 2 — Prune the fork
 
-- [ ] Delete `apps/framework-hub`, `framework-hub-cli`, `hub-ops-prompt`, hub,
-      SEO and release scripts, `.changeset/`, nested `.github/`, `renovate.json5`
-- [ ] Move `plugin-marketplace` to `plugins/@dshfiles/plugin-marketplace`
-- [ ] Retire protocol-1: adapter, `phase-a` fixture, conversation-assembly spec
-- [ ] Delete public-project docs (PRD, technical design, roadmap, releasing,
-      contributing, CoC, security, zh-CN, changelog, platform CLI plan)
-- [ ] Rewrite the dshx README and `docs/compatibility.md` around protocol-2;
-      fix `getting-started.md` (`applies`, `dshx create`)
-- [ ] knip covers every `exports` subpath; drop unused dependencies
+- [x] Delete `apps/framework-hub`, `framework-hub-cli`, `hub-ops-prompt`, hub,
+      SEO and release scripts, `.changeset/`, nested `.github/`, `renovate.json5`;
+      both packages private (−142k lines)
+- [x] Move `plugin-marketplace` to `plugins/@dshfiles/plugin-marketplace`; it
+      had never been ported to DSH 0.2 (icons, SettingsScope)
+- [x] Retire protocol-1: adapter, conversation-assembly spec, smoke script. The
+      `phase-a` fixture was really a 0.2 fixture; tests write it from
+      `tests/plugin-fixture.ts`
+- [x] Delete public-project docs; rewrite the dshx README and
+      `docs/compatibility.md` around protocol-2; package READMEs and creator docs
+      use `dshx create`
+- [x] knip covers every `exports` subpath; dead `client/ambient.ts` and three
+      unused devDependencies removed
+- [x] Found on the way: Settings types accepted `base`, `validate` and
+      `applies: 'restart'` that the DSH 0.2 runtime rejects (the marketplace
+      would have failed at activation); `DSHX5107` was shared by two errors,
+      the Host-provided one is now `DSHX5110`
+
+Exit evidence: dshx tsc, eslint and knip clean; vitest 35/35 files, 377 tests
+(`--maxWorkers=4`; machine load average ~30 makes the default run time out a few
+watcher tests that pass alone); all 10 plugins typecheck; plugin tests 136/136.
+
+Left for later phases: unreachable protocol-1 conversation wiring in
+`src/client/runtime.ts` (`conversationEvents`) and `compat/types.ts`
+(`eventService`) — Phase 6, with `defineConversation` itself.
 
 ## Phase 3 — One workspace contract
 
