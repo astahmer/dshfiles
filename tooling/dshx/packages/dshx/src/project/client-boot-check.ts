@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { findAnnouncedUrl, stopProcessGroup } from './boot-check.js'
 
 /**
  * Client boot verification.
@@ -155,6 +156,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
       cwd: options.projectRoot,
       env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
     })
     const collect = (chunk: Buffer): void => {
       output += chunk.toString('utf8')
@@ -164,10 +166,10 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
 
     url = await new Promise<string | undefined>(resolve => {
       const timer = setInterval(() => {
-        const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output)
-        if (match?.[0] !== undefined) {
+        const announced = findAnnouncedUrl({ output })
+        if (announced !== undefined) {
           clearInterval(timer)
-          resolve(match[0])
+          resolve(announced)
         }
         if (Date.now() - startedAt > timeoutMs) {
           clearInterval(timer)
@@ -201,17 +203,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
       }
     }
 
-    child.kill('SIGTERM')
-    await new Promise<void>(resolve => {
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL')
-        resolve()
-      }, 3000)
-      child.once('exit', () => {
-        clearTimeout(timer)
-        resolve()
-      })
-    })
+    await stopProcessGroup({ child, graceMs: 3000 })
   }
 
   if (ownedProfileRoot) await rm(profileRoot, { recursive: true, force: true })

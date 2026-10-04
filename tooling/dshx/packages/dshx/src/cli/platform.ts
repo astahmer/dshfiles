@@ -23,6 +23,7 @@ export interface PlatformCliRuntime {
   readonly dshxVersion: string
   readonly connect?: typeof connectDshPlatformClient
   readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
+  readonly readDshVersion?: () => Promise<string | undefined>
 }
 
 interface DoctorCheck {
@@ -44,6 +45,9 @@ function safeMessage(error: unknown): {
   readonly code: string
   readonly message: string
 } {
+  if (error instanceof z.ZodError) {
+    return { code: 'invalid-response', message: `DSH returned data outside its API contract:\n${z.prettifyError(error)}` }
+  }
   const code = error instanceof DshPlatformError ? error.code : 'command-failed'
   const message = error instanceof Error ? error.message : 'The DSH operation failed.'
   return {
@@ -297,7 +301,7 @@ async function runDoctor(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
   const nodeCompatible = semver.satisfies(process.version, engineRange)
   checks.push(doctorCheck('node', nodeCompatible ? 'pass' : 'fail', `${process.version}; required ${engineRange}`))
   checks.push(doctorCheck('dshx', 'pass', `Dshx ${runtime.dshxVersion}`))
-  const dshVersion = await localDshVersion()
+  const dshVersion = await (runtime.readDshVersion ?? localDshVersion)()
   checks.push(doctorCheck('dsh-cli', dshVersion === undefined ? 'unknown' : 'pass', dshVersion ?? 'Could not read the local dsh launcher version.'))
 
   const connect = runtime.connect ?? connectDshPlatformClient

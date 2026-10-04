@@ -30,6 +30,8 @@ import type { InspectResult, InspectTarget } from '../inspect/index.js'
 import { inspectBridgeStatus } from '../inspect/bridge.js'
 import type { InspectBridgeStatus } from '../inspect/bridge.js'
 import { inspectRuntimePlugins } from '../runtime-status.js'
+import type { checkPluginBoot } from '../project/boot-check.js'
+import type { checkClientBoot } from '../project/client-boot-check.js'
 import type { RuntimePluginReport } from '../runtime-status.js'
 import { createCommandScaffold, createHookScaffold, createToolScaffold, createUiScaffold } from '../scaffold/index.js'
 import type { AddPresetOptions, AddPresetResult } from '../scaffold/preset.js'
@@ -88,6 +90,8 @@ export interface CliRuntime {
   readonly addPreset?: (options: AddPresetOptions) => Promise<AddPresetResult>
   readonly connectPlatform?: (options?: ConnectDshPlatformClientOptions) => Promise<DshPlatformClient>
   readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
+  readonly checkPluginBoot?: typeof checkPluginBoot
+  readonly checkClientBoot?: typeof checkClientBoot
 }
 
 export interface CliRunOptions {
@@ -958,8 +962,8 @@ function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record
  */
 async function runBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
-  const { checkPluginBoot } = await import('../project/boot-check.js')
-  const result = await checkPluginBoot({
+  const check = options.runtime?.checkPluginBoot ?? (await import('../project/boot-check.js')).checkPluginBoot
+  const result = await check({
     projectRoot: project.root,
     profile: 'dshx-boot',
     port: args.port ?? 0,
@@ -971,6 +975,16 @@ async function runBootCheck(args: CliArgs, options: CliRunOptions, project: Reso
   if (result.ok) {
     write(io.stdout, `Booted cleanly at ${result.url ?? 'an announced URL'}.\n`)
     return 0
+  }
+  if (result.unsupportedNode) {
+    printDiagnostic(io, {
+      code: 'DSHX4112',
+      severity: 'error',
+      message: 'The Host cannot run on the Node build it resolved: its native loader probe failed with "node-addon-require-builtin unsupported".',
+      file: project.packageFile,
+      hint: 'Run dsh on the official Node build pinned by .node-version (fnm), not a Nix-provided nodejs; check `node -v` and `which node` in this shell.',
+    })
+    return 1
   }
   const item = {
     code: 'DSHX4109',
@@ -988,8 +1002,8 @@ async function runBootCheck(args: CliArgs, options: CliRunOptions, project: Reso
 
 async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
-  const { checkClientBoot } = await import('../project/client-boot-check.js')
-  const result = await checkClientBoot({
+  const check = options.runtime?.checkClientBoot ?? (await import('../project/client-boot-check.js')).checkClientBoot
+  const result = await check({
     projectRoot: project.root,
     profile: 'dshx-boot',
     port: args.port ?? 0,
