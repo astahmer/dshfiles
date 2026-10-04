@@ -28,15 +28,9 @@ export default defineClientPlugin({
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
     const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
     const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
-    const AccountsPanelView = (): JSX.Element => (
-      <AccountsPanel onOpenUsageHistory={openUsageHistory} />
-    )
-    const UsageHistoryPanelView = (): JSX.Element => (
-      <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
-    )
-    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element | null => (
-      <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
-    )
+    const AccountsPanelView = (): JSX.Element => <AccountsPanel onOpenUsageHistory={openUsageHistory} />
+    const UsageHistoryPanelView = (): JSX.Element => <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element | null => <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
     // The footer owns its whole surface, so quota lives there as a compact
     // disclosure: the number you want without opening the panel.
     api.ui.register(
@@ -70,14 +64,8 @@ export default defineClientPlugin({
       },
       UsageHistoryGlyph,
     )
-    api.ui.register(
-      { name: 'main', key: PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
-      AccountsPanelView,
-    )
-    api.ui.register(
-      { name: 'main', key: USAGE_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
-      UsageHistoryPanelView,
-    )
+    api.ui.register({ name: 'main', key: PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, AccountsPanelView)
+    api.ui.register({ name: 'main', key: USAGE_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, UsageHistoryPanelView)
   },
 })
 

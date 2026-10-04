@@ -211,9 +211,7 @@ describe('profile inspection', () => {
     const project = await temporaryProject()
     const duplicate = '- id: shortcuts\n- id: shortcuts\n'
 
-    await expect(
-      inspectProjectProfile(project, { runner: queuedRunner([list(), composition(duplicate)]) }),
-    ).rejects.toMatchObject({
+    await expect(inspectProjectProfile(project, { runner: queuedRunner([list(), composition(duplicate)]) })).rejects.toMatchObject({
       code: 'DSHX4306',
       message: expect.stringContaining('shortcuts'),
       hint: expect.stringContaining('unique id'),

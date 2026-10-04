@@ -30,12 +30,7 @@ describe('quota usage-history analysis', () => {
 
   it('bounds long history reads while preserving recent forecasts and reset-bank changes', () => {
     const snapshots = Array.from({ length: 10_000 }, (_, index) => ({
-      ...point(
-        index * 60_000,
-        100 - index % 100,
-        (Math.floor(index / 1_000) + 1) * 1_000_000,
-        Math.floor(index / 200),
-      ),
+      ...point(index * 60_000, 100 - (index % 100), (Math.floor(index / 1_000) + 1) * 1_000_000, Math.floor(index / 200)),
       instanceId: 'codex',
     }))
     const bounded = boundUsageHistoryPoints(snapshots)

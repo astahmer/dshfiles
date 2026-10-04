@@ -7,14 +7,12 @@ import { CodexHomeError, describeCodexAuth, resolveCodexHomeLayout } from './cod
 const layoutFor = (homePath: string) => resolveCodexHomeLayout({ homePath })
 
 /** A Codex home must sit inside the user home, so the fixture lives there. */
-const homeInUserHome = async (): Promise<string> =>
-  mkdtemp(join(homedir(), '.codex-home-test-'))
+const homeInUserHome = async (): Promise<string> => mkdtemp(join(homedir(), '.codex-home-test-'))
 
 const idTokenWith = (claims: Record<string, unknown>): string =>
   `${Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.`
 
-const authJsonWith = (claims: Record<string, unknown>): string =>
-  JSON.stringify({ tokens: { access_token: 'token', id_token: idTokenWith(claims) } })
+const authJsonWith = (claims: Record<string, unknown>): string => JSON.stringify({ tokens: { access_token: 'token', id_token: idTokenWith(claims) } })
 
 describe('resolveCodexHomeLayout', () => {
   it('resolves homes inside the user home', () => {
@@ -34,9 +32,12 @@ describe('resolveCodexHomeLayout', () => {
 describe('describeCodexAuth', () => {
   it('reports the signed-in email', async () => {
     const home = await homeInUserHome()
-    await writeFile(join(home, 'auth.json'), authJsonWith({
-      'https://api.openai.com/profile': { email: 'person@example.com' },
-    }))
+    await writeFile(
+      join(home, 'auth.json'),
+      authJsonWith({
+        'https://api.openai.com/profile': { email: 'person@example.com' },
+      }),
+    )
     const view = await describeCodexAuth(layoutFor(home))
     expect(view.signedIn).toBe(true)
     expect(view.identity).toBe('person@example.com')
@@ -44,13 +45,16 @@ describe('describeCodexAuth', () => {
 
   it('never reports an internal account id as the identity', async () => {
     const home = await homeInUserHome()
-    await writeFile(join(home, 'auth.json'), authJsonWith({
-      'https://api.openai.com/auth': {
-        chatgpt_account_id: '09b65132-578c-4e25-858f-1507116bd1b',
-        user_id: 'user-abcdefgh1234',
-        chatgpt_plan_type: 'plus',
-      },
-    }))
+    await writeFile(
+      join(home, 'auth.json'),
+      authJsonWith({
+        'https://api.openai.com/auth': {
+          chatgpt_account_id: '09b65132-578c-4e25-858f-1507116bd1b',
+          user_id: 'user-abcdefgh1234',
+          chatgpt_plan_type: 'plus',
+        },
+      }),
+    )
     const view = await describeCodexAuth(layoutFor(home))
     expect(view.signedIn).toBe(true)
     expect(view.plan).toBe('plus')

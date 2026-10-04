@@ -49,25 +49,28 @@ export interface SlotRegistration {
 const registrationsIn = (source: string, file: string): SlotRegistration[] => {
   const program = parseSource({ source, file })
   const found: SlotRegistration[] = []
-  visitSource({ program, visitor: {
-    CallExpression(current) {
-      if (current.callee.type !== 'MemberExpression' || propertyName(current.callee.property) !== 'register') return
-      const argument = current.arguments[0]
-      if (argument === undefined || argument.type === 'SpreadElement') return
-      const options = unwrapExpression(argument)
-      if (options.type !== 'ObjectExpression') return
-      let slot: string | undefined
-      let id: string | undefined
-      for (const property of options.properties) {
-        if (property.type !== 'Property') continue
-        const name = propertyName(property.key)
-        const value = stringValue(unwrapExpression(property.value))
-        if (name === 'name') slot = value
-        if (name === 'id') id = value
-      }
-      if (slot !== undefined && id !== undefined) found.push({ slot, id, file })
+  visitSource({
+    program,
+    visitor: {
+      CallExpression(current) {
+        if (current.callee.type !== 'MemberExpression' || propertyName(current.callee.property) !== 'register') return
+        const argument = current.arguments[0]
+        if (argument === undefined || argument.type === 'SpreadElement') return
+        const options = unwrapExpression(argument)
+        if (options.type !== 'ObjectExpression') return
+        let slot: string | undefined
+        let id: string | undefined
+        for (const property of options.properties) {
+          if (property.type !== 'Property') continue
+          const name = propertyName(property.key)
+          const value = stringValue(unwrapExpression(property.value))
+          if (name === 'name') slot = value
+          if (name === 'id') id = value
+        }
+        if (slot !== undefined && id !== undefined) found.push({ slot, id, file })
+      },
     },
-  } })
+  })
   return found
 }
 

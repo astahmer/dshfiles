@@ -323,7 +323,14 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
     service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
   )
-  const result: ClientDefinitionSourceAnalysis = { services, inject, autoInject, sourceFile: file, localeNamespaces: knownLocaleNamespaces ? localeNamespaces : undefined, reexports: bindings.reexports }
+  const result: ClientDefinitionSourceAnalysis = {
+    services,
+    inject,
+    autoInject,
+    sourceFile: file,
+    localeNamespaces: knownLocaleNamespaces ? localeNamespaces : undefined,
+    reexports: bindings.reexports,
+  }
   if (name === 'defineClientPlugin') return { ...result, sdk: { uses: arrayField('uses') } }
   return result
 }

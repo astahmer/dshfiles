@@ -1,12 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  aiAccountsApi,
-  type AccountsFile,
-  type AccountsUsage,
-  type UsageHistoryMeta,
-  type UsageHistoryPoint,
-} from './api.js'
+import { aiAccountsApi, type AccountsFile, type AccountsUsage, type UsageHistoryMeta, type UsageHistoryPoint } from './api.js'
 import { MAX_USAGE_HISTORY_POINTS } from './usage-history-model.js'
 import { changedBankedResetSnapshots, forecastQuotaWindow, quotaHistoryCycles } from './usage-history-analysis.js'
 import styles from './accounts.module.css'
@@ -18,9 +12,7 @@ const CHART_POINT_LIMIT = 500
 const BANK_EVENT_LIMIT = 100
 
 const formatTimestamp = (value: number | null | undefined): string =>
-  value === null || value === undefined || !Number.isFinite(value)
-    ? 'Not reported'
-    : new Date(value).toLocaleString()
+  value === null || value === undefined || !Number.isFinite(value) ? 'Not reported' : new Date(value).toLocaleString()
 
 const formatReset = (value: number | null): string => {
   if (value === null || !Number.isFinite(value)) return 'Reset time unavailable'
@@ -54,8 +46,7 @@ const downsample = <T,>(values: readonly T[], limit: number): readonly T[] => {
   if (values.length <= limit) return values
   if (limit < 2) return values.slice(-limit)
   const last = values.length - 1
-  return Array.from({ length: limit }, (_, index) => values[Math.round(index * last / (limit - 1))])
-    .filter((value): value is T => value !== undefined)
+  return Array.from({ length: limit }, (_, index) => values[Math.round((index * last) / (limit - 1))]).filter((value): value is T => value !== undefined)
 }
 
 const QuotaHistoryPlot = (props: { points: readonly UsageHistoryPoint[] }): JSX.Element => {
@@ -87,7 +78,9 @@ const QuotaHistoryPlot = (props: { points: readonly UsageHistoryPoint[] }): JSX.
         {[0, 25, 50, 75, 100].map(percent => (
           <g key={percent}>
             <line x1="0" x2="1000" y1={140 - percent * 1.3} y2={140 - percent * 1.3} className={styles.historyGrid} />
-            <text x="0" y={136 - percent * 1.3} className={styles.historyAxisLabel}>{String(percent)}%</text>
+            <text x="0" y={136 - percent * 1.3} className={styles.historyAxisLabel}>
+              {String(percent)}%
+            </text>
           </g>
         ))}
         {labels.map((label, index) => {
@@ -96,12 +89,14 @@ const QuotaHistoryPlot = (props: { points: readonly UsageHistoryPoint[] }): JSX.
           return cycles.map((cycle, cycleIndex) => {
             const plotted = downsample(cycle, perCycleLimit)
             const color = colors[index % colors.length] ?? colors[0]
-            const coords = plotted.map(point => {
-              const x = ((point.at - start) / span) * 1000
-              const percent = point.windows[label] ?? 0
-              const y = 140 - Math.max(0, Math.min(100, percent)) * 1.3
-              return `${x.toFixed(2)},${y.toFixed(2)}`
-            }).join(' ')
+            const coords = plotted
+              .map(point => {
+                const x = ((point.at - start) / span) * 1000
+                const percent = point.windows[label] ?? 0
+                const y = 140 - Math.max(0, Math.min(100, percent)) * 1.3
+                return `${x.toFixed(2)},${y.toFixed(2)}`
+              })
+              .join(' ')
             return (
               <g key={`${label}:${cycle[0]?.resetsAt[label] ?? 'unknown'}:${cycleIndex}`}>
                 {plotted.length > 1 ? <polyline points={coords} className={styles.historyPlotLine} style={{ stroke: color }} /> : null}
@@ -109,7 +104,11 @@ const QuotaHistoryPlot = (props: { points: readonly UsageHistoryPoint[] }): JSX.
                   const x = ((point.at - start) / span) * 1000
                   const percent = point.windows[label] ?? 0
                   const y = 140 - Math.max(0, Math.min(100, percent)) * 1.3
-                  return <circle key={point.at} cx={x} cy={y} r="2.2" style={{ fill: color }}><title>{`${label}: ${String(percent)}% remaining · ${formatTimestamp(point.at)}`}</title></circle>
+                  return (
+                    <circle key={point.at} cx={x} cy={y} r="2.2" style={{ fill: color }}>
+                      <title>{`${label}: ${String(percent)}% remaining · ${formatTimestamp(point.at)}`}</title>
+                    </circle>
+                  )
                 })}
               </g>
             )
@@ -117,9 +116,17 @@ const QuotaHistoryPlot = (props: { points: readonly UsageHistoryPoint[] }): JSX.
         })}
       </svg>
       <div className={styles.historyLegend}>
-        {labels.map((label, index) => <span key={label}><i style={{ background: colors[index % colors.length] ?? colors[0] }} />{label}</span>)}
+        {labels.map((label, index) => (
+          <span key={label}>
+            <i style={{ background: colors[index % colors.length] ?? colors[0] }} />
+            {label}
+          </span>
+        ))}
       </div>
-      <div className={styles.historyAxis}><span>{formatTimestamp(start)}</span><span>{formatTimestamp(end)}</span></div>
+      <div className={styles.historyAxis}>
+        <span>{formatTimestamp(start)}</span>
+        <span>{formatTimestamp(end)}</span>
+      </div>
       <p className={styles.historyFootnote}>Lines break at provider reset boundaries; each point is a stored quota reading.</p>
     </div>
   )
@@ -134,8 +141,18 @@ const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null })
     <div className={styles.historyCurrentGrid}>
       {card.windows.map(window => (
         <article className={styles.historyCurrentCard} key={window.label}>
-          <div className={styles.historyCurrentHeading}><strong>{window.label}</strong><span>{String(window.percentRemaining)}% left</span></div>
-          <div className={styles.historyCurrentTrack} role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.percentRemaining}>
+          <div className={styles.historyCurrentHeading}>
+            <strong>{window.label}</strong>
+            <span>{String(window.percentRemaining)}% left</span>
+          </div>
+          <div
+            className={styles.historyCurrentTrack}
+            role="progressbar"
+            aria-label={`${window.label} remaining`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={window.percentRemaining}
+          >
             <span style={{ width: `${Math.max(0, Math.min(100, window.percentRemaining))}%` }} />
           </div>
           <small>{formatReset(window.resetsAt)}</small>
@@ -143,10 +160,17 @@ const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null })
       ))}
       {card.bankedResets > 0 ? (
         <article className={styles.historyCurrentCard}>
-          <div className={styles.historyCurrentHeading}><strong>Banked resets</strong><span>{String(card.bankedResets)}</span></div>
-          {card.bankedResetExpiries.length === 0 ? <small>Individual expiry dates are not reported.</small> : (
+          <div className={styles.historyCurrentHeading}>
+            <strong>Banked resets</strong>
+            <span>{String(card.bankedResets)}</span>
+          </div>
+          {card.bankedResetExpiries.length === 0 ? (
+            <small>Individual expiry dates are not reported.</small>
+          ) : (
             <ul className={styles.historyExpiryList}>
-              {card.bankedResetExpiries.map((expiry, index) => <li key={`${expiry ?? 'unknown'}:${index}`}>{expiry === null ? 'Expiry not reported' : `Expires ${formatTimestamp(expiry)}`}</li>)}
+              {card.bankedResetExpiries.map((expiry, index) => (
+                <li key={`${expiry ?? 'unknown'}:${index}`}>{expiry === null ? 'Expiry not reported' : `Expires ${formatTimestamp(expiry)}`}</li>
+              ))}
             </ul>
           )}
         </article>
@@ -183,37 +207,63 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         setSettings(nextSettings)
         setSelectedId(current => current || nextFile.accounts.find(account => account.enabled)?.instanceId || nextFile.accounts[0]?.instanceId || '')
       })
-      .catch(() => { if (live) setNotice('Usage data could not be loaded.') })
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
+      .catch(() => {
+        if (live) setNotice('Usage data could not be loaded.')
+      })
+      .finally(() => {
+        if (live) setLoading(false)
+      })
+    return () => {
+      live = false
+    }
   }, [accounts])
 
   useEffect(() => {
     let live = true
     if (selectedId === '') {
       setPoints([])
-      return () => { live = false }
+      return () => {
+        live = false
+      }
     }
     setPoints([])
     setLoading(true)
-    void accounts.history({ instanceId: selectedId, days })
-      .then(result => { if (live) setPoints(result.points) })
-      .catch(() => { if (live) { setPoints([]); setNotice('Quota history could not be loaded.') } })
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
+    void accounts
+      .history({ instanceId: selectedId, days })
+      .then(result => {
+        if (live) setPoints(result.points)
+      })
+      .catch(() => {
+        if (live) {
+          setPoints([])
+          setNotice('Quota history could not be loaded.')
+        }
+      })
+      .finally(() => {
+        if (live) setLoading(false)
+      })
+    return () => {
+      live = false
+    }
   }, [accounts, selectedId, days])
 
   useEffect(() => {
     let live = true
-    const refresh = () => void accounts.usage().then(next => { if (live) setUsage(next) }).catch(() => undefined)
+    const refresh = () =>
+      void accounts
+        .usage()
+        .then(next => {
+          if (live) setUsage(next)
+        })
+        .catch(() => undefined)
     const timer = setInterval(refresh, 60_000)
-    return () => { live = false; clearInterval(timer) }
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
   }, [accounts])
 
-  const selected = useMemo(
-    () => file?.accounts.find(account => account.instanceId === selectedId),
-    [file, selectedId],
-  )
+  const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId), [file, selectedId])
   const current = usage?.cards.find(card => card.instanceId === selectedId)?.usage
   const forecasts = useMemo(() => {
     if (current?.status !== 'ok') return []
@@ -247,7 +297,11 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
       if (selectedQueryRef.current.selectedId === query.selectedId && selectedQueryRef.current.days === query.days) {
         setPoints(nextHistory.points)
       }
-      setNotice(result.recorded > 0 ? `Recorded quota for ${String(result.recorded)} account${result.recorded === 1 ? '' : 's'}.` : 'No new quota readings were available.')
+      setNotice(
+        result.recorded > 0
+          ? `Recorded quota for ${String(result.recorded)} account${result.recorded === 1 ? '' : 's'}.`
+          : 'No new quota readings were available.',
+      )
     } catch {
       setNotice('Could not record usage right now. Check the provider sign-in and try again.')
     } finally {
@@ -279,29 +333,47 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
     <main className={styles.usageHistoryPage}>
       <header className={styles.usageHistoryHeader}>
         <div>
-          <button type="button" className={styles.historyBack} onClick={props.onBack}>← AI Accounts</button>
+          <button type="button" className={styles.historyBack} onClick={props.onBack}>
+            ← AI Accounts
+          </button>
           <h1 className={styles.title}>Usage history</h1>
           <p className={styles.subtitle}>Quota snapshots, observed depletion pace, and banked reset changes for each configured account.</p>
         </div>
         <div className={styles.historyControls}>
           <label>
             <span>Account</span>
-            <select value={selectedId} onChange={event => {
-              const nextId = event.target.value
-              selectedQueryRef.current = { ...selectedQueryRef.current, selectedId: nextId }
-              setSelectedId(nextId)
-            }} aria-label="Usage history account">
-              {(file?.accounts ?? []).map(account => <option value={account.instanceId} key={account.instanceId}>{account.displayName || account.instanceId}</option>)}
+            <select
+              value={selectedId}
+              onChange={event => {
+                const nextId = event.target.value
+                selectedQueryRef.current = { ...selectedQueryRef.current, selectedId: nextId }
+                setSelectedId(nextId)
+              }}
+              aria-label="Usage history account"
+            >
+              {(file?.accounts ?? []).map(account => (
+                <option value={account.instanceId} key={account.instanceId}>
+                  {account.displayName || account.instanceId}
+                </option>
+              ))}
             </select>
           </label>
           <label>
             <span>Range</span>
-            <select value={String(days)} onChange={event => {
-              const nextDays = Number(event.target.value)
-              selectedQueryRef.current = { ...selectedQueryRef.current, days: nextDays }
-              setDays(nextDays)
-            }} aria-label="Usage history range">
-              {RANGE_OPTIONS.map(option => <option key={option} value={String(option)}>{String(option)} days</option>)}
+            <select
+              value={String(days)}
+              onChange={event => {
+                const nextDays = Number(event.target.value)
+                selectedQueryRef.current = { ...selectedQueryRef.current, days: nextDays }
+                setDays(nextDays)
+              }}
+              aria-label="Usage history range"
+            >
+              {RANGE_OPTIONS.map(option => (
+                <option key={option} value={String(option)}>
+                  {String(option)} days
+                </option>
+              ))}
             </select>
           </label>
           <button type="button" className={styles.secondary} disabled={refreshing || selectedId === ''} onClick={() => void recordNow()}>
@@ -310,68 +382,168 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         </div>
       </header>
 
-      {notice === null ? null : <p className={styles.historyNotice} role="status">{notice}</p>}
+      {notice === null ? null : (
+        <p className={styles.historyNotice} role="status">
+          {notice}
+        </p>
+      )}
       {loading && points.length === 0 ? <p className={styles.historyEmpty}>Loading usage history…</p> : null}
-      {selected === undefined ? <p className={styles.empty}>Add an account to start collecting usage history.</p> : <>
-        <details className={styles.historySettings}>
-          <summary>Collection and retention</summary>
-          <div className={styles.historySettingsBody}>
-            <label><span>Provider polling</span><select disabled={savingSettings || settings === null} value={String(settings?.intervalMinutes ?? 5)} onChange={event => void saveSettings({ intervalMinutes: Number(event.target.value) })}>{INTERVAL_OPTIONS.map(value => <option key={value} value={String(value)}>Every {String(value)} minute{value === 1 ? '' : 's'}</option>)}</select></label>
-            <label><span>Keep quota snapshots</span><select disabled={savingSettings || settings === null} value={String(settings?.retentionDays ?? 90)} onChange={event => void saveSettings({ retentionDays: Number(event.target.value) })}>{RETENTION_OPTIONS.map(value => <option key={value} value={String(value)}>{String(value)} days</option>)}</select></label>
-            <p>Snapshots contain quota percentages, reset times, and reset-bank expiry metadata. They do not store provider credentials or response bodies.</p>
-            <p>Last successful read: {formatTimestamp(settings?.lastReadAt)} · Last attempt: {formatTimestamp(settings?.lastAttemptAt)}</p>
-          </div>
-        </details>
-
-        <section className={styles.historyBlock}>
-          <div className={styles.historyBlockHeading}><div><h2>Current limits</h2><p>{selected.displayName || selected.instanceId}{selected.kind ? ` · ${selected.kind}` : ''}</p></div></div>
-          <CurrentQuota accountId={selectedId} usage={usage} />
-        </section>
-
-        <section className={styles.historyBlock}>
-          <div className={styles.historyBlockHeading}><div><h2>Usage pace</h2><p>Linear estimates use recent snapshots from the current reset cycle. They are a guide, not provider forecasts.</p></div></div>
-          {forecasts.length === 0 ? <p className={styles.historyEmpty}>A current quota reading is not available for this account.</p> : (
-            <div className={styles.historyForecastGrid}>
-              {forecasts.map(entry => <article className={styles.historyForecast} key={entry.label}>
-                <div><strong>{entry.label}</strong><span>{String(entry.remaining)}% left</span></div>
-                <p>{formatForecast(entry.forecast)}</p>
-                {'percentPerHour' in entry.forecast ? <small>Observed change: {entry.forecast.percentPerHour.toFixed(1)} percentage points/hour · {String(entry.forecast.sampleCount)} snapshots</small> : null}
-              </article>)}
+      {selected === undefined ? (
+        <p className={styles.empty}>Add an account to start collecting usage history.</p>
+      ) : (
+        <>
+          <details className={styles.historySettings}>
+            <summary>Collection and retention</summary>
+            <div className={styles.historySettingsBody}>
+              <label>
+                <span>Provider polling</span>
+                <select
+                  disabled={savingSettings || settings === null}
+                  value={String(settings?.intervalMinutes ?? 5)}
+                  onChange={event => void saveSettings({ intervalMinutes: Number(event.target.value) })}
+                >
+                  {INTERVAL_OPTIONS.map(value => (
+                    <option key={value} value={String(value)}>
+                      Every {String(value)} minute{value === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Keep quota snapshots</span>
+                <select
+                  disabled={savingSettings || settings === null}
+                  value={String(settings?.retentionDays ?? 90)}
+                  onChange={event => void saveSettings({ retentionDays: Number(event.target.value) })}
+                >
+                  {RETENTION_OPTIONS.map(value => (
+                    <option key={value} value={String(value)}>
+                      {String(value)} days
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                Snapshots contain quota percentages, reset times, and reset-bank expiry metadata. They do not store provider credentials or response bodies.
+              </p>
+              <p>
+                Last successful read: {formatTimestamp(settings?.lastReadAt)} · Last attempt: {formatTimestamp(settings?.lastAttemptAt)}
+              </p>
             </div>
-          )}
-        </section>
+          </details>
 
-        <section className={styles.historyBlock}>
-          <div className={styles.historyBlockHeading}><div><h2>Quota over time</h2><p>{points.length >= MAX_USAGE_HISTORY_POINTS ? `Showing up to ${String(MAX_USAGE_HISTORY_POINTS)} sampled readings from the last ${String(days)} days.` : `${String(points.length)} snapshots in the last ${String(days)} days.`}</p></div></div>
-          <QuotaHistoryPlot points={points} />
-        </section>
-
-        <section className={styles.historyBlock}>
-          <div className={styles.historyBlockHeading}><div><h2>Banked reset history</h2><p>{String(resetCount)} reset credits in the latest snapshot across {String(points.length)} quota snapshots.</p></div></div>
-          {bankChanges.length === 0 || !bankChanges.some(point => point.bankedResets > 0) ? (
-            <p className={styles.historyEmpty}>This provider has not reported banked resets in the selected period.</p>
-          ) : (
-            <div className={styles.historyTableWrap}>
-              <table className={styles.historyTable}>
-                <thead><tr><th>Recorded</th><th>Balance</th><th>Individual expiry dates</th></tr></thead>
-                <tbody>{bankChanges.map(point => {
-                  const expiries = point.bankedResetExpiries ?? []
-                  const unknown = Math.max(0, point.bankedResets - expiries.length)
-                  return <tr key={point.at}>
-                    <td>{formatTimestamp(point.at)}</td>
-                    <td>{String(point.bankedResets)}</td>
-                    <td>
-                      {expiries.length === 0 ? 'No individual expiries reported' : expiries.map((expiry, index) => <span className={styles.historyExpiry} key={`${expiry ?? 'unknown'}:${index}`}>{expiry === null ? 'Expiry not reported' : formatTimestamp(expiry)}</span>)}
-                      {unknown > 0 ? <span className={styles.historyExpiry}>{String(unknown)} reset{unknown === 1 ? '' : 's'} without a reported expiry</span> : null}
-                    </td>
-                  </tr>
-                })}</tbody>
-              </table>
-              {changedBankedResetSnapshots(points).length > BANK_EVENT_LIMIT ? <p className={styles.historyFootnote}>Showing the latest {String(BANK_EVENT_LIMIT)} reset-bank changes.</p> : null}
+          <section className={styles.historyBlock}>
+            <div className={styles.historyBlockHeading}>
+              <div>
+                <h2>Current limits</h2>
+                <p>
+                  {selected.displayName || selected.instanceId}
+                  {selected.kind ? ` · ${selected.kind}` : ''}
+                </p>
+              </div>
             </div>
-          )}
-        </section>
-      </>}
+            <CurrentQuota accountId={selectedId} usage={usage} />
+          </section>
+
+          <section className={styles.historyBlock}>
+            <div className={styles.historyBlockHeading}>
+              <div>
+                <h2>Usage pace</h2>
+                <p>Linear estimates use recent snapshots from the current reset cycle. They are a guide, not provider forecasts.</p>
+              </div>
+            </div>
+            {forecasts.length === 0 ? (
+              <p className={styles.historyEmpty}>A current quota reading is not available for this account.</p>
+            ) : (
+              <div className={styles.historyForecastGrid}>
+                {forecasts.map(entry => (
+                  <article className={styles.historyForecast} key={entry.label}>
+                    <div>
+                      <strong>{entry.label}</strong>
+                      <span>{String(entry.remaining)}% left</span>
+                    </div>
+                    <p>{formatForecast(entry.forecast)}</p>
+                    {'percentPerHour' in entry.forecast ? (
+                      <small>
+                        Observed change: {entry.forecast.percentPerHour.toFixed(1)} percentage points/hour · {String(entry.forecast.sampleCount)} snapshots
+                      </small>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className={styles.historyBlock}>
+            <div className={styles.historyBlockHeading}>
+              <div>
+                <h2>Quota over time</h2>
+                <p>
+                  {points.length >= MAX_USAGE_HISTORY_POINTS
+                    ? `Showing up to ${String(MAX_USAGE_HISTORY_POINTS)} sampled readings from the last ${String(days)} days.`
+                    : `${String(points.length)} snapshots in the last ${String(days)} days.`}
+                </p>
+              </div>
+            </div>
+            <QuotaHistoryPlot points={points} />
+          </section>
+
+          <section className={styles.historyBlock}>
+            <div className={styles.historyBlockHeading}>
+              <div>
+                <h2>Banked reset history</h2>
+                <p>
+                  {String(resetCount)} reset credits in the latest snapshot across {String(points.length)} quota snapshots.
+                </p>
+              </div>
+            </div>
+            {bankChanges.length === 0 || !bankChanges.some(point => point.bankedResets > 0) ? (
+              <p className={styles.historyEmpty}>This provider has not reported banked resets in the selected period.</p>
+            ) : (
+              <div className={styles.historyTableWrap}>
+                <table className={styles.historyTable}>
+                  <thead>
+                    <tr>
+                      <th>Recorded</th>
+                      <th>Balance</th>
+                      <th>Individual expiry dates</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankChanges.map(point => {
+                      const expiries = point.bankedResetExpiries ?? []
+                      const unknown = Math.max(0, point.bankedResets - expiries.length)
+                      return (
+                        <tr key={point.at}>
+                          <td>{formatTimestamp(point.at)}</td>
+                          <td>{String(point.bankedResets)}</td>
+                          <td>
+                            {expiries.length === 0
+                              ? 'No individual expiries reported'
+                              : expiries.map((expiry, index) => (
+                                  <span className={styles.historyExpiry} key={`${expiry ?? 'unknown'}:${index}`}>
+                                    {expiry === null ? 'Expiry not reported' : formatTimestamp(expiry)}
+                                  </span>
+                                ))}
+                            {unknown > 0 ? (
+                              <span className={styles.historyExpiry}>
+                                {String(unknown)} reset{unknown === 1 ? '' : 's'} without a reported expiry
+                              </span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {changedBankedResetSnapshots(points).length > BANK_EVENT_LIMIT ? (
+                  <p className={styles.historyFootnote}>Showing the latest {String(BANK_EVENT_LIMIT)} reset-bank changes.</p>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }

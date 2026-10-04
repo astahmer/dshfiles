@@ -36,15 +36,13 @@ const spreadIndexes = (indexes: readonly number[], count: number): readonly numb
     return last === undefined ? [] : [last]
   }
   return Array.from({ length: count }, (_, index) => {
-    const candidate = indexes[Math.round(index * (indexes.length - 1) / (count - 1))]
+    const candidate = indexes[Math.round((index * (indexes.length - 1)) / (count - 1))]
     return candidate
   }).filter((index): index is number => index !== undefined)
 }
 
 /** Keep history reads bounded while retaining the detail used by the page. */
-export const boundUsageHistoryPoints = (
-  points: readonly QuotaSnapshot[],
-): readonly QuotaSnapshot[] => {
+export const boundUsageHistoryPoints = (points: readonly QuotaSnapshot[]): readonly QuotaSnapshot[] => {
   const ordered = [...points].sort((left, right) => left.at - right.at)
   if (ordered.length <= MAX_USAGE_HISTORY_POINTS) return ordered
 
@@ -77,9 +75,7 @@ export const boundUsageHistoryPoints = (
   const resetIndexes = [...resetBoundaries].filter(index => !selected.has(index)).sort((left, right) => left - right)
   for (const index of spreadIndexes(resetIndexes, MAX_USAGE_HISTORY_POINTS - selected.size)) selected.add(index)
 
-  const remainingIndexes = ordered
-    .map((_, index) => index)
-    .filter(index => !selected.has(index))
+  const remainingIndexes = ordered.map((_, index) => index).filter(index => !selected.has(index))
   const remainingSlots = MAX_USAGE_HISTORY_POINTS - selected.size
   for (const index of spreadIndexes(remainingIndexes, remainingSlots)) selected.add(index)
 
@@ -107,9 +103,7 @@ export const usageHistoryDomain = defineDomain({
 export const usageBucketKey = (instanceId: string, at: number, intervalMinutes: number): string =>
   `v2:${encodeURIComponent(instanceId)}:${String(intervalMinutes)}:${String(Math.floor(at / (intervalMinutes * MINUTE_MS)))}`
 
-export const parseUsageBucketKey = (
-  key: string,
-): { readonly instanceId: string; readonly bucket: number; readonly intervalMinutes: number } | null => {
+export const parseUsageBucketKey = (key: string): { readonly instanceId: string; readonly bucket: number; readonly intervalMinutes: number } | null => {
   if (key.startsWith('v2:')) {
     const [, encodedId, intervalToken, bucketToken] = key.split(':')
     if (encodedId === undefined || intervalToken === undefined || bucketToken === undefined) return null
@@ -122,13 +116,14 @@ export const parseUsageBucketKey = (
     const intervalMinutes = Number(intervalToken)
     const bucket = Number(bucketToken)
     if (
-      instanceId.length === 0
-      || !Number.isInteger(intervalMinutes)
-      || intervalMinutes < 1
-      || intervalMinutes > 60
-      || !Number.isSafeInteger(bucket)
-      || bucket < 0
-    ) return null
+      instanceId.length === 0 ||
+      !Number.isInteger(intervalMinutes) ||
+      intervalMinutes < 1 ||
+      intervalMinutes > 60 ||
+      !Number.isSafeInteger(bucket) ||
+      bucket < 0
+    )
+      return null
     return { instanceId, bucket, intervalMinutes }
   }
 

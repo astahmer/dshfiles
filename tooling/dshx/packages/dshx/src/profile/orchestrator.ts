@@ -215,25 +215,13 @@ async function inspectLoaderIds(project: ProfileProject, options: ProfileOrchest
 function packagePathSegments(packageId: string): string[] | undefined {
   const segments = packageId.split('/')
   if (segments.length === 1 && !packageId.startsWith('@') && segments[0] !== '' && segments[0] !== '.' && segments[0] !== '..') return segments
-  if (
-    segments.length === 2 &&
-    segments[0]?.startsWith('@') &&
-    segments[0].length > 1 &&
-    segments[1] !== '' &&
-    segments[1] !== '.' &&
-    segments[1] !== '..'
-  ) {
+  if (segments.length === 2 && segments[0]?.startsWith('@') && segments[0].length > 1 && segments[1] !== '' && segments[1] !== '.' && segments[1] !== '..') {
     return segments
   }
   return undefined
 }
 
-async function resolveDependencyPath(
-  project: ProfileProject,
-  packageId: string,
-  rawPath: string,
-  profileRoot: string | undefined,
-): Promise<string> {
+async function resolveDependencyPath(project: ProfileProject, packageId: string, rawPath: string, profileRoot: string | undefined): Promise<string> {
   const installedPath = await realpath(rawPath).catch(() => undefined)
   if (installedPath !== undefined) return installedPath
 
@@ -241,9 +229,7 @@ async function resolveDependencyPath(
   // supported hoisted linker. In that layout the package is under node_modules.
   const segments = packagePathSegments(packageId)
   const hoistedPath =
-    profileRoot === undefined || segments === undefined
-      ? undefined
-      : await realpath(join(profileRoot, 'node_modules', ...segments)).catch(() => undefined)
+    profileRoot === undefined || segments === undefined ? undefined : await realpath(join(profileRoot, 'node_modules', ...segments)).catch(() => undefined)
   if (hoistedPath !== undefined) return hoistedPath
 
   throw new DshxError('DSHX4302', `Profile dependency ${JSON.stringify(packageId)} points to a missing path: ${rawPath}`, {

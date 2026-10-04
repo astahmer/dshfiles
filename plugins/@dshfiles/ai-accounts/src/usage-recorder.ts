@@ -1,14 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveCodexHomeLayout } from './codex-home.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
-import {
-  USAGE_HISTORY_DOMAIN,
-  boundUsageHistoryPoints,
-  parseUsageBucketKey,
-  usageBucketKey,
-  usageHistoryDomain,
-  type QuotaSnapshot,
-} from './usage-history.js'
+import { USAGE_HISTORY_DOMAIN, boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
 import type { AccountProfile } from './api.js'
 import { readKeyFromEnv } from './credentials.js'
@@ -51,10 +44,7 @@ export const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta>
   return domain.global.get()
 }
 
-export const saveUsageHistorySettings = async (
-  ctx: Context,
-  settings: UsageHistorySettings,
-): Promise<UsageMeta> => {
+export const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySettings): Promise<UsageMeta> => {
   const facility = ctx.get('storageDomain')
   if (facility === undefined) throw new Error('Usage history storage is unavailable.')
   const domain = await facility.open(usageHistoryDomain)
@@ -70,11 +60,7 @@ export const saveUsageHistorySettings = async (
  * Exported so the API can offer a manual refresh, which uses the same path and
  * therefore cannot diverge from the scheduled one.
  */
-export const collectUsageHistory = async (
-  ctx: Context,
-  accounts: readonly AccountProfile[],
-  signal?: AbortSignal,
-): Promise<number> => {
+export const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfile[], signal?: AbortSignal): Promise<number> => {
   const facility = ctx.get('storageDomain')
   if (facility === undefined) return 0
   const domain = await facility.open(usageHistoryDomain)
@@ -88,13 +74,15 @@ export const collectUsageHistory = async (
   for (let offset = 0; offset < enabled.length; offset += PROVIDER_READ_CONCURRENCY) {
     if (signal?.aborted) break
     const batch = enabled.slice(offset, offset + PROVIDER_READ_CONCURRENCY)
-    const results = await Promise.all(batch.map(async account => {
-      try {
-        return { account, usage: await readAccountWindows(account, signal) }
-      } catch {
-        return { account, usage: undefined }
-      }
-    }))
+    const results = await Promise.all(
+      batch.map(async account => {
+        try {
+          return { account, usage: await readAccountWindows(account, signal) }
+        } catch {
+          return { account, usage: undefined }
+        }
+      }),
+    )
     if (signal?.aborted) break
 
     for (const { account, usage } of results) {
@@ -129,10 +117,7 @@ export const collectUsageHistory = async (
 }
 
 /** Oldest snapshot worth keeping, given the configured retention. */
-export const pruneUsageHistory = async (
-  ctx: Context,
-  retentionDays: number,
-): Promise<number> => {
+export const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<number> => {
   const facility = ctx.get('storageDomain')
   if (facility === undefined) return 0
   const domain = await facility.open(usageHistoryDomain)
@@ -149,11 +134,7 @@ export const pruneUsageHistory = async (
 }
 
 /** Readings for one account, oldest first, so a chart reads left to right. */
-export const readUsageHistory = async (
-  ctx: Context,
-  instanceId: string,
-  sinceMs: number,
-): Promise<readonly QuotaSnapshot[]> => {
+export const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number): Promise<readonly QuotaSnapshot[]> => {
   const facility = ctx.get('storageDomain')
   if (facility === undefined) return []
   const domain = await facility.open(usageHistoryDomain)

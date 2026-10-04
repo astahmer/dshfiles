@@ -35,11 +35,9 @@ export interface Shortcut {
   readonly run: (event: KeyboardEvent) => void
 }
 
-export const isMacPlatform = (platform: string): boolean =>
-  platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
+export const isMacPlatform = (platform: string): boolean => platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
 
-const EDITABLE_SELECTOR =
-  'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"])'
+const EDITABLE_SELECTOR = 'input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"])'
 
 /** Whether the event landed somewhere that consumes plain character keys. */
 export const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -50,8 +48,7 @@ export const isEditableTarget = (target: EventTarget | null): boolean => {
 }
 
 /** Resolve the Host's logical `primary` to the physical modifier for this platform. */
-const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean =>
-  mac ? event.metaKey : event.ctrlKey
+const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? event.metaKey : event.ctrlKey)
 
 /**
  * Count how many modifiers the event carries, ignoring the one the chord claims.
@@ -62,11 +59,7 @@ const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean =>
  * predictable enough to document.
  */
 const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
-  (event.ctrlKey ? 1 : 0) +
-  (event.metaKey ? 1 : 0) +
-  (event.altKey ? 1 : 0) +
-  (event.shiftKey ? 1 : 0) -
-  (isPrimaryHeld(event, mac) ? 1 : 0)
+  (event.ctrlKey ? 1 : 0) + (event.metaKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0) - (isPrimaryHeld(event, mac) ? 1 : 0)
 
 /**
  * Whether this event is exactly this chord.
@@ -74,11 +67,7 @@ const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
  * "Exactly" matters: a chord that also matched `primary+shift+p` would fire both,
  * because a keydown carries every modifier that is down.
  */
-export const matchesShortcut = (
-  event: KeyboardEvent,
-  shortcut: Shortcut,
-  mac: boolean,
-): boolean => {
+export const matchesShortcut = (event: KeyboardEvent, shortcut: Shortcut, mac: boolean): boolean => {
   if (event.code !== shortcut.key && event.key !== shortcut.key) return false
   if (!isPrimaryHeld(event, mac)) return false
   // Exactly one extra modifier is allowed, and only when the chord asks for it.
@@ -93,10 +82,7 @@ export const matchesShortcut = (
  * claiming a browser chord here is possible at all. The listener is passive about
  * anything it does not own and calls nothing when no binding matches.
  */
-export const installShortcuts = (
-  target: Window,
-  shortcuts: readonly Shortcut[],
-): (() => void) => {
+export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[]): (() => void) => {
   const mac = isMacPlatform(target.navigator.platform)
 
   const onKeyDown = (event: KeyboardEvent): void => {

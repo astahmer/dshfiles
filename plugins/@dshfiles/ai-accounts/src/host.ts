@@ -4,35 +4,17 @@ export { Config } from './account-config.js'
 import type { Context } from '@deepseek-ai/cordis'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import {
-  aiAccountsApi,
-  type AccountProfile,
-  type AccountsFile,
-  type AccountsUsage,
-  type UsageCard,
-} from './api.js'
-import {
-  buildAccountsFile,
-  readAccountFile,
-  readAccountFileSync,
-  readAccountIdentity,
-  removeAccount,
-  setDistribution,
-  upsertAccount,
-} from './account-store.js'
+import { aiAccountsApi, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
+import { buildAccountsFile, readAccountFile, readAccountFileSync, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { createUsageHistoryScheduler, readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
-import { defineHost, definePlugin } from '@dshfiles/dshx/host'
+import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
-import {
-  COMMANDCODE_KIND as CC_KIND,
-  DEFAULT_COMMANDCODE_KEY_ENV,
-  createCommandCodeProvider,
-} from './commandcode-provider.js'
+import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV, createCommandCodeProvider } from './commandcode-provider.js'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -40,19 +22,8 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import {
-  createAccountPool,
-  isRateLimitFailure,
-} from './account-pool.js'
-import {
-  authJsonPath,
-  codexLoginHint,
-  describeCodexAuth,
-  materializeCodexShadowHome,
-  CodexHomeError,
-  resolveCodexHomeLayout,
-  type CodexHomeLayout,
-} from './codex-home.js'
+import { createAccountPool, isRateLimitFailure } from './account-pool.js'
+import { materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 
 /**
@@ -82,9 +53,7 @@ const normalizeInstanceId = (value: string, fallback: string): string => {
   const trimmed = value.trim()
   if (trimmed.length === 0) return fallback
   if (!SLUG_PATTERN.test(trimmed)) {
-    throw new TypeError(
-      `Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`,
-    )
+    throw new TypeError(`Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`)
   }
   return trimmed
 }
@@ -115,11 +84,7 @@ interface KeyedRoute {
 type Route = CodexRoute | KeyedRoute
 
 const keyEnvFor = (route: KeyedRoute): string =>
-  route.apiKeyEnv.trim().length > 0
-    ? route.apiKeyEnv.trim()
-    : route.kind === COMMANDCODE_KIND
-      ? DEFAULT_COMMANDCODE_KEY_ENV
-      : 'OPENCODE_API_KEY'
+  route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
@@ -171,8 +136,7 @@ const buildProfile = (params: {
     Object.entries(pins).flatMap(([modelId, effortId]) => {
       const model = models.find(candidate => candidate.id === modelId)
       if (model === undefined) return []
-      const levels = (model as { thinkingLevelMap?: Record<string, string | null> })
-        .thinkingLevelMap
+      const levels = (model as { thinkingLevelMap?: Record<string, string | null> }).thinkingLevelMap
       if (levels !== undefined && levels[effortId] === null) return []
       return [[modelId, { reasoningEfforts: { [effortId]: levels?.[effortId] ?? effortId } }]]
     }),
@@ -435,9 +399,7 @@ export default definePlugin({
       account =>
         [
           account.instanceId,
-          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null
-            ? (account.reasoningDefaults as Record<string, string>)
-            : {},
+          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null ? (account.reasoningDefaults as Record<string, string>) : {},
         ] as const,
     )
 
@@ -448,14 +410,11 @@ export default definePlugin({
           upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
           provider: id,
           displayName: route.displayName,
-          reasoningDefaults:
-            reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
+          reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
           ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
           additionalModelIds:
             route.kind === CODEX_KIND
-              ? (config.codexAccounts.find(
-                  account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id,
-                )?.additionalModelIds ?? [])
+              ? (config.codexAccounts.find(account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id)?.additionalModelIds ?? [])
               : [],
         }),
       ]),
@@ -488,20 +447,12 @@ export default definePlugin({
         const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
         const key = readKeyFromEnv(named) || sharedKey
         if (key.length === 0) {
-          throw new LlmError(
-            `No key for '${provider}'. Export ${named}, or set a shared key on the entry.`,
-            'MISSING_CREDENTIAL',
-          )
+          throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
         }
         return key
       },
       resolveAttachments: () => ctx.get('attachments'),
-      resolveImageAccess: (attachments, ref) =>
-        resolveImageAttachmentAccess(
-          attachments,
-          hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
-          ref,
-        ),
+      resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref),
       auth: {
         credentials: {
           read: async () => undefined,
@@ -542,9 +493,7 @@ export default definePlugin({
       if (route.kind !== COMMANDCODE_KIND) continue
       disposers.push(
         llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
-          const entries = await fetchCommandCodeCatalog(
-            discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }),
-          )
+          const entries = await fetchCommandCodeCatalog(discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }))
           return entries.map(entry => ({
             id: entry.id,
             contextWindow: 128_000,
@@ -554,7 +503,6 @@ export default definePlugin({
         }),
       )
     }
-
 
     ctx.effect(() => {
       disposers.push(
@@ -595,9 +543,7 @@ export default definePlugin({
               if (served?.id !== error.provider) return next()
               pool.noteRateLimited(error.provider, error.failure.providerRetryAfterMs)
               pool.unbind(id)
-              ctx.logger.info(
-                `ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`,
-              )
+              ctx.logger.info(`ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`)
               return next()
             })
             agent.ctx.on('agent/disposed', () => pool.unbind(id))

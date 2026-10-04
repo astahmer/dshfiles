@@ -41,12 +41,7 @@ const STATE_LABEL: Record<AccountProfile['state'], string> = {
   unconfigured: 'Not signed in',
 }
 
-const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = [
-  'sticky',
-  'priority',
-  'round-robin',
-  'balanced',
-]
+const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = ['sticky', 'priority', 'round-robin', 'balanced']
 
 const DISTRIBUTION_HINT: Record<AccountsFile['distribution'], string> = {
   sticky: 'One account per conversation, so the upstream prompt cache stays warm. A rate-limited account is skipped and the retry lands on the next one.',
@@ -79,18 +74,18 @@ const blankAccount = (kind: AccountProfile['kind']): AccountDraft => ({
 })
 
 const sameDraft = (profile: AccountProfile, draft: AccountDraft): boolean =>
-  profile.instanceId === draft.instanceId
-  && profile.kind === draft.kind
-  && profile.displayName === draft.displayName
-  && profile.enabled === draft.enabled
-  && profile.homePath === draft.homePath
-  && profile.shadowHomePath === draft.shadowHomePath
-  && profile.apiKeyEnv === draft.apiKeyEnv
-  && profile.apiBaseUrl === draft.apiBaseUrl
-  && profile.badge === draft.badge
-  && profile.accentColor === draft.accentColor
-  && profile.providerIcon === draft.providerIcon
-  && profile.additionalModelIds.join() === draft.additionalModelIds.join()
+  profile.instanceId === draft.instanceId &&
+  profile.kind === draft.kind &&
+  profile.displayName === draft.displayName &&
+  profile.enabled === draft.enabled &&
+  profile.homePath === draft.homePath &&
+  profile.shadowHomePath === draft.shadowHomePath &&
+  profile.apiKeyEnv === draft.apiKeyEnv &&
+  profile.apiBaseUrl === draft.apiBaseUrl &&
+  profile.badge === draft.badge &&
+  profile.accentColor === draft.accentColor &&
+  profile.providerIcon === draft.providerIcon &&
+  profile.additionalModelIds.join() === draft.additionalModelIds.join()
 
 /** Up to three initials, the same tag the reference page derives by default. */
 const badgeFromName = (displayName: string): string =>
@@ -102,11 +97,7 @@ const badgeFromName = (displayName: string): string =>
     .slice(0, 3)
     .toUpperCase()
 
-const Field = (props: {
-  readonly label: string
-  readonly hint?: string
-  readonly children: JSX.Element
-}): JSX.Element => (
+const Field = (props: { readonly label: string; readonly hint?: string; readonly children: JSX.Element }): JSX.Element => (
   <label className={styles.field}>
     <span className={styles.fieldLabel}>{props.label}</span>
     {props.children}
@@ -114,14 +105,8 @@ const Field = (props: {
   </label>
 )
 
-
 /** Percent remaining, coloured by how much is left rather than by provider. */
-const remainingTone = (percent: number): string =>
-  percent <= 10
-    ? String(styles.barCritical)
-    : percent <= 30
-      ? String(styles.barLow)
-      : String(styles.barOk)
+const remainingTone = (percent: number): string => (percent <= 10 ? String(styles.barCritical) : percent <= 30 ? String(styles.barLow) : String(styles.barOk))
 
 const formatReset = (resetsAt: number | null): string | null => {
   if (resetsAt === null || Number.isNaN(resetsAt)) return null
@@ -132,9 +117,7 @@ const formatReset = (resetsAt: number | null): string | null => {
   return `Resets in ${String(Math.round(hours / 24))}d`
 }
 
-const UsageCardView = (props: {
-  readonly usage: UsageCard | undefined
-}): JSX.Element | null => {
+const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined || usage.status !== 'ok' || usage.windows.length === 0) return null
   return (
@@ -151,9 +134,7 @@ const UsageCardView = (props: {
               style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
             />
           </div>
-          {formatReset(window.resetsAt) === null ? null : (
-            <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>
-          )}
+          {formatReset(window.resetsAt) === null ? null : <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>}
         </div>
       ))}
       {usage.bankedResets > 0 ? (
@@ -205,11 +186,7 @@ const UsageHistoryChart = (props: {
 }): JSX.Element => {
   const points = props.points ?? []
   if (points.length < 2) {
-    return (
-      <p className={styles.historyEmpty}>
-        Not enough history yet. Quota is recorded on an interval; check back shortly.
-      </p>
-    )
+    return <p className={styles.historyEmpty}>Not enough history yet. Quota is recorded on an interval; check back shortly.</p>
   }
   const labels = [...new Set(points.flatMap(point => Object.keys(point.windows)))]
   const from = points[0]?.at ?? Date.now()
@@ -338,9 +315,7 @@ const ModelCuration = (props: {
                 value={reasoningDefaults[model.id] ?? model.defaultEffort ?? ''}
                 onChange={event => setEffort(model.id, event.target.value)}
               >
-                {model.defaultEffort === null || reasoningDefaults[model.id] !== undefined
-                  ? null
-                  : <option value="">Provider default</option>}
+                {model.defaultEffort === null || reasoningDefaults[model.id] !== undefined ? null : <option value="">Provider default</option>}
                 {model.efforts.map(effort => (
                   <option key={effort.id} value={effort.id}>
                     {effort.name}
@@ -398,9 +373,7 @@ const ModelCuration = (props: {
           {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden
         </span>
       </div>
-      {ordered.length === 0 ? (
-        <p className={styles.empty}>No models returned yet. Sign in, then refresh the provider catalog.</p>
-      ) : null}
+      {ordered.length === 0 ? <p className={styles.empty}>No models returned yet. Sign in, then refresh the provider catalog.</p> : null}
       {favoriteModels.length > 0 ? (
         <>
           <h4 className={styles.modelGroup}>Favorites</h4>
@@ -437,11 +410,7 @@ const AccountGroup = (props: {
       <h2>{KIND_LABEL[props.kind].toUpperCase()}</h2>
       {props.accounts.map(profile => (
         <div
-          className={
-            profile.instanceId === props.selectedId
-              ? `${styles.accountRow} ${styles.accountRowSelected}`
-              : styles.accountRow
-          }
+          className={profile.instanceId === props.selectedId ? `${styles.accountRow} ${styles.accountRowSelected}` : styles.accountRow}
           key={profile.instanceId}
         >
           <button
@@ -450,11 +419,7 @@ const AccountGroup = (props: {
             aria-current={profile.instanceId === props.selectedId ? 'true' : undefined}
             onClick={() => props.onSelect(profile.instanceId)}
           >
-            <span
-              className={styles.mark}
-              style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }}
-              aria-hidden
-            >
+            <span className={styles.mark} style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }} aria-hidden>
               {profile.badge === '' ? badgeFromName(profile.displayName).slice(0, 2) : profile.badge}
             </span>
             <span className={styles.accountCopy}>
@@ -559,10 +524,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     }
   }, [accounts])
 
-  const selected = useMemo(
-    () => file?.accounts.find(account => account.instanceId === selectedId) ?? null,
-    [file, selectedId],
-  )
+  const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
   // The editor follows the selection, and keeps unsaved edits across re-reads.
   useEffect(() => {
@@ -570,11 +532,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
       setDraft(null)
       return
     }
-    setDraft(current =>
-      current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current)
-        ? current
-        : { ...selected },
-    )
+    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : { ...selected }))
   }, [selected])
 
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
@@ -648,15 +606,12 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     return <div className={styles.notice}>{notice ?? 'Loading accounts…'}</div>
   }
 
-  const kicker = draft?.kind === 'opencode-go'
-    ? 'OPENCODE SUBSCRIPTION'
-    : draft?.kind === 'commandcode'
-      ? 'COMMAND CODE'
-      : 'CHATGPT SUBSCRIPTION'
+  const kicker = draft?.kind === 'opencode-go' ? 'OPENCODE SUBSCRIPTION' : draft?.kind === 'commandcode' ? 'COMMAND CODE' : 'CHATGPT SUBSCRIPTION'
 
-  const launchCommand = draft !== null && draft.kind === 'codex' && draft.shadowHomePath.trim() !== ''
-    ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex`
-    : null
+  const launchCommand =
+    draft !== null && draft.kind === 'codex' && draft.shadowHomePath.trim() !== ''
+      ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex`
+      : null
 
   return (
     <div className={styles.page}>
@@ -719,7 +674,11 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                         setAddingKind(kind)
                       }}
                     >
-                      <span className={styles.addMenuMark} style={{ background: kind === 'codex' ? '#2563EB' : kind === 'opencode-go' ? '#7C3AED' : '#0E7490' }} aria-hidden>
+                      <span
+                        className={styles.addMenuMark}
+                        style={{ background: kind === 'codex' ? '#2563EB' : kind === 'opencode-go' ? '#7C3AED' : '#0E7490' }}
+                        aria-hidden
+                      >
                         {KIND_LABEL[kind].slice(0, 2).toUpperCase()}
                       </span>
                       {KIND_LABEL[kind]} account
@@ -729,9 +688,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               ) : null}
             </span>
           </div>
-          {file.accounts.length === 0 ? (
-            <p className={styles.empty}>Add an account to publish its own model route.</p>
-          ) : null}
+          {file.accounts.length === 0 ? <p className={styles.empty}>Add an account to publish its own model route.</p> : null}
           {KIND_GROUPS.map(kind => (
             <AccountGroup
               kind={kind}
@@ -742,20 +699,14 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               key={kind}
             />
           ))}
-          <p className={styles.railFoot}>
-            Credentials stay in each provider&apos;s own account directory.
-          </p>
+          <p className={styles.railFoot}>Credentials stay in each provider&apos;s own account directory.</p>
         </aside>
 
         {draft !== null ? (
           <section className={styles.detail}>
             <div className={styles.detailTop}>
               <div className={styles.detailTitleBlock}>
-                <span
-                  className={styles.markLarge}
-                  style={{ background: draft.accentColor === '' ? undefined : draft.accentColor }}
-                  aria-hidden
-                >
+                <span className={styles.markLarge} style={{ background: draft.accentColor === '' ? undefined : draft.accentColor }} aria-hidden>
                   {draft.badge === '' ? 'AI' : draft.badge}
                 </span>
                 <div>
@@ -765,11 +716,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               </div>
               <label className={styles.switchLabel}>
                 <span>{draft.enabled ? 'Enabled in model picker' : 'Hidden from model picker'}</span>
-                <input
-                  type="checkbox"
-                  checked={draft.enabled}
-                  onChange={event => void persist({ enabled: event.target.checked })}
-                />
+                <input type="checkbox" checked={draft.enabled} onChange={event => void persist({ enabled: event.target.checked })} />
                 <span className={styles.switchTrack}>
                   <span className={draft.enabled ? styles.knobOn : styles.knobOff} />
                 </span>
@@ -790,11 +737,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                       void accounts
                         .identity({ instanceId: selectedId })
                         .then(identity => {
-                          setNotice(
-                            identity.signedIn
-                              ? 'Codex account identity refreshed.'
-                              : 'No signed-in account was found at this home yet.',
-                          )
+                          setNotice(identity.signedIn ? 'Codex account identity refreshed.' : 'No signed-in account was found at this home yet.')
                           if (identity.signedIn) void load()
                         })
                         .catch(() => setNotice('Could not read the Codex account identity.'))
@@ -806,11 +749,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               >
                 <div className={styles.fieldGrid}>
                   <Field label="Route slug" hint={SLUG_HINT}>
-                    <input
-                      className={styles.input}
-                      value={draft.instanceId}
-                      onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
-                    />
+                    <input className={styles.input} value={draft.instanceId} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} />
                   </Field>
                   <Field label="Display name">
                     <input
@@ -825,10 +764,8 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                       className={styles.input}
                       readOnly
                       value={
-                        selected?.identity
-                        ?? (draft.kind === 'codex'
-                          ? 'Sign in, then refresh'
-                          : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+                        selected?.identity ??
+                        (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
                       }
                     />
                   </Field>
@@ -850,11 +787,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                     />
                   </Field>
                   <Field label="Picker icon">
-                    <select
-                      className={styles.input}
-                      value={draft.providerIcon}
-                      onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}
-                    >
+                    <select className={styles.input} value={draft.providerIcon} onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}>
                       {PROVIDER_ICONS.map(icon => (
                         <option key={icon} value={icon}>
                           {icon}
@@ -874,12 +807,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                     <button
                       type="button"
                       className={styles.quiet}
-                      onClick={() =>
-                        void copy(
-                          launchCommand,
-                          'Launch command copied. Run it in a terminal to open interactive Codex for this account.',
-                        )
-                      }
+                      onClick={() => void copy(launchCommand, 'Launch command copied. Run it in a terminal to open interactive Codex for this account.')}
                     >
                       Copy launch command
                     </button>
@@ -889,11 +817,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 <div className={styles.pathField}>
                   <span>
                     {draft.kind === 'codex' ? 'CODEX_HOME' : 'API KEY'}
-                    <small>
-                      {draft.kind === 'codex'
-                        ? 'Shared sessions, skills and plugins.'
-                        : 'Named, never valued: the key stays in the environment.'}
-                    </small>
+                    <small>{draft.kind === 'codex' ? 'Shared sessions, skills and plugins.' : 'Named, never valued: the key stays in the environment.'}</small>
                   </span>
                   <input
                     className={styles.input}
@@ -902,11 +826,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                     value={draft.kind === 'codex' ? draft.homePath : draft.apiKeyEnv}
                     placeholder={draft.kind === 'codex' ? '~/.codex' : 'OPENCODE_API_KEY'}
                     onChange={event =>
-                      setDraft(
-                        draft.kind === 'codex'
-                          ? { ...draft, homePath: event.target.value }
-                          : { ...draft, apiKeyEnv: event.target.value },
-                      )
+                      setDraft(draft.kind === 'codex' ? { ...draft, homePath: event.target.value } : { ...draft, apiKeyEnv: event.target.value })
                     }
                   />
                 </div>
@@ -962,14 +882,9 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 }
               >
                 <span className={styles.sectionHelp}>
-                  Show or hide models in the picker, star the ones you reach for, and pin a default
-                  reasoning effort per model.
+                  Show or hide models in the picker, star the ones you reach for, and pin a default reasoning effort per model.
                 </span>
-                <ModelCuration
-                  account={draft}
-                  catalog={catalog?.models ?? []}
-                  onChange={next => setDraft({ ...draft, ...next })}
-                />
+                <ModelCuration account={draft} catalog={catalog?.models ?? []} onChange={next => setDraft({ ...draft, ...next })} />
               </Section>
 
               <Section
@@ -1015,11 +930,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                 title="Session"
                 action={
                   selected === null || selected.signedIn ? null : (
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      onClick={() => void copy(selected.loginHint, 'Sign-in command copied.')}
-                    >
+                    <button type="button" className={styles.quiet} onClick={() => void copy(selected.loginHint, 'Sign-in command copied.')}>
                       ↗ Copy sign-in command
                     </button>
                   )
@@ -1033,18 +944,12 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
                   <div>
                     <span className={styles.factLabel}>Mode</span>
                     <span className={styles.factValue}>
-                      {draft.kind === 'codex'
-                        ? draft.shadowHomePath === ''
-                          ? 'Shared auth'
-                          : 'Shared state, private auth'
-                        : 'Key from the environment'}
+                      {draft.kind === 'codex' ? (draft.shadowHomePath === '' ? 'Shared auth' : 'Shared state, private auth') : 'Key from the environment'}
                     </span>
                   </div>
                   <div>
                     <span className={styles.factLabel}>Account</span>
-                    <span className={styles.factValue}>
-                      {selected?.identity ?? STATE_LABEL[selected?.state ?? 'unconfigured']}
-                    </span>
+                    <span className={styles.factValue}>{selected?.identity ?? STATE_LABEL[selected?.state ?? 'unconfigured']}</span>
                   </div>
                 </div>
                 <p className={styles.spreadingNote}>
@@ -1069,36 +974,25 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               >
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
-              <button
-                type="button"
-                className={styles.quiet}
-                disabled={!dirty}
-                onClick={() => setDraft(selected === null ? null : { ...selected })}
-              >
+              <button type="button" className={styles.quiet} disabled={!dirty} onClick={() => setDraft(selected === null ? null : { ...selected })}>
                 Revert
               </button>
-              <button
-                type="button"
-                className={styles.quiet}
-                onClick={props.onOpenUsageHistory}
-              >
+              <button type="button" className={styles.quiet} onClick={props.onOpenUsageHistory}>
                 Usage history
               </button>
               <span className={styles.footerNotice}>
                 {notice ?? (dirty ? 'Unsaved changes.' : 'Provider and account are separate entries in the model picker.')}
               </span>
-              <button
-                type="button"
-                className={styles.danger}
-                onClick={() => selected !== null && void remove(selected)}
-              >
+              <button type="button" className={styles.danger} onClick={() => selected !== null && void remove(selected)}>
                 Remove profile
               </button>
             </footer>
           </section>
         ) : (
           <section className={styles.welcome}>
-            <span className={styles.welcomeMark} aria-hidden>✳</span>
+            <span className={styles.welcomeMark} aria-hidden>
+              ✳
+            </span>
             <h2>Your accounts, side by side.</h2>
             <p>Create a Codex, OpenCode Go, or Command Code profile. Each one becomes its own route in the model picker.</p>
           </section>
@@ -1108,9 +1002,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
           <div className={styles.addOverlay} role="dialog" aria-modal="true" aria-label={`New ${KIND_LABEL[addingKind]} account`}>
             <div className={styles.addCard}>
               <h2 className={styles.detailTitle}>New {KIND_LABEL[addingKind]} account</h2>
-              <p className={styles.detailSub}>
-                Give it a route slug; each account becomes its own provider in the picker.
-              </p>
+              <p className={styles.detailSub}>Give it a route slug; each account becomes its own provider in the picker.</p>
               <NewAccountForm
                 kind={addingKind}
                 onCancel={() => setAddingKind(null)}
@@ -1155,11 +1047,7 @@ const NewAccountForm = (props: {
       </Field>
       {props.kind === 'codex' ? (
         <Field label="CODEX_HOME path" hint="Where shared sessions and skills live.">
-          <input
-            className={styles.input}
-            value={draft.homePath}
-            onChange={event => setDraft({ ...draft, homePath: event.target.value })}
-          />
+          <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
         </Field>
       ) : (
         <Field label="API key environment variable">
@@ -1172,12 +1060,7 @@ const NewAccountForm = (props: {
         </Field>
       )}
       <div className={styles.detailActions}>
-        <button
-          type="button"
-          className={styles.primary}
-          disabled={invalid}
-          onClick={() => void props.onCreate(draft)}
-        >
+        <button type="button" className={styles.primary} disabled={invalid} onClick={() => void props.onCreate(draft)}>
           Create
         </button>
         <button type="button" className={styles.quiet} onClick={props.onCancel}>
@@ -1187,4 +1070,3 @@ const NewAccountForm = (props: {
     </>
   )
 }
-

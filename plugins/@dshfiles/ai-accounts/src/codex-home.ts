@@ -178,8 +178,7 @@ const readString = (value: unknown): string | undefined => (typeof value === 'st
  * the plan plus the tail of the user id is what a person can recognise. The full
  * id stays out of the page and the agent tool.
  */
-const labelFromUserId = (userId: string, plan: string | undefined): string =>
-  `${plan === undefined ? 'ChatGPT' : `ChatGPT ${plan}`} ·${userId.slice(-4)}`
+const labelFromUserId = (userId: string, plan: string | undefined): string => `${plan === undefined ? 'ChatGPT' : `ChatGPT ${plan}`} ·${userId.slice(-4)}`
 
 /** Account identity read from Codex's own id token. Never the access token. */
 export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexAuthView> => {
@@ -211,9 +210,7 @@ export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexA
   return {
     path,
     signedIn: readString(tokens.access_token) !== undefined,
-    identity:
-      readString(profile.email)
-      ?? (userId === undefined ? undefined : labelFromUserId(userId, plan)),
+    identity: readString(profile.email) ?? (userId === undefined ? undefined : labelFromUserId(userId, plan)),
     plan,
     error: undefined,
   }

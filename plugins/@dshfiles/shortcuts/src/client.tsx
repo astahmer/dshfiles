@@ -82,9 +82,7 @@ export default defineClient({
  * Host does not expose to a plugin.
  */
 const focusComposer = (): void => {
-  const composer = document.querySelector<HTMLTextAreaElement | HTMLInputElement>(
-    'textarea:not([disabled]), input[type="text"]:not([disabled])',
-  )
+  const composer = document.querySelector<HTMLTextAreaElement | HTMLInputElement>('textarea:not([disabled]), input[type="text"]:not([disabled])')
   if (composer === null) return
   composer.focus()
   composer.setSelectionRange(composer.value.length, composer.value.length)
