@@ -104,6 +104,9 @@ const splitCommands = (command: string): Split[] => {
     }
     if (char === '\\') { current += char + (command[index + 1] ?? ''); index += 1; continue }
     if (char === '"' || char === "'") { quote = char; current += char; continue }
+    // An `&` directly after a redirection operator belongs to that redirect
+    // (`>&1`, `2>&1`), not to command sequencing.
+    if (char === '&' && /[0-9]?>$/.test(current)) { current += char; continue }
     if (char === ';' || char === '\n') {
       segments.push({ segment: current, terminated: true })
       current = ''
@@ -148,14 +151,25 @@ const tokenize = (segment: string): string[] => {
   return tokens
 }
 
-/** Command substitution hides arbitrary work; `$(` or a backtick disqualifies. */
+/**
+ * Command substitution hides arbitrary work. Single quotes suppress it, but
+ * double quotes do not: `echo "$(ls)"` runs `ls`, so only `'` is a real barrier.
+ */
 const hasCommandSubstitution = (command: string): boolean => {
   let quote: '"' | "'" | null = null
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index]!
-    if (quote !== null) { if (char === quote && command[index - 1] !== '\\') quote = null; continue }
+    if (quote === "'") { if (char === "'" && command[index - 1] !== '\\') quote = null; continue }
+    if (quote === '"') {
+      if (char === '\\') { index += 1; continue }
+      if (char === '"') { quote = null; continue }
+      if (char === '$' && command[index + 1] === '(') return true
+      if (char === '`') return true
+      continue
+    }
     if (char === '\\') { index += 1; continue }
-    if (char === '"' || char === "'") { quote = char; continue }
+    if (char === "'") { quote = "'"; continue }
+    if (char === '"') { quote = '"'; continue }
     if (char === '$' && command[index + 1] === '(') return true
     if (char === '`') return true
   }
@@ -178,19 +192,20 @@ const redirectionVerdict = (segment: string): Verdict | undefined => {
     if (char === '<' && segment[index + 1] === '<') {
       return exclusive('here-doc writes a temporary file')
     }
-    // read redirect `<` and fd duplication `>&` / `<&` name no writable file
+    // `<` forms: read redirect, process substitution, or here-doc. `<(cmd)` runs
+    // a subshell, so it disqualifies; a plain `<file` only reads.
+    if (char === '<' && segment[index + 1] === '(') return exclusive('process substitution')
+    // `>` forms: `>(cmd)` writes through a process substitution, `>&n` and
+    // `>&-` only move or close a descriptor, everything else names a file.
     if (char === '>') {
-      const fdDup = segment[index - 1] === '&' || segment[index - 1] === '0'
-      if (fdDup && segment[index + 1] === '&') continue
-      const rest = segment.slice(index + 1).trim()
-      const target = /^(?:&|-|\d+\b)?\s*(?:"([^"]*)"|'([^']*)'|([^\s|&;]+))/.exec(rest)
+      if (segment[index + 1] === '(') return exclusive('write process substitution')
+      if (segment[index + 1] === '&') continue
+      const rest = segment.slice(index + 1).trimStart()
+      const target = /^(?:&\d*|-|\d+)?\s*(?:"([^"]*)"|'([^']*)'|([^\s|&;]+))/.exec(rest)
       const path = target?.[1] ?? target?.[2] ?? target?.[3] ?? ''
       if (path === '/dev/null') continue
       return exclusive(`write redirect to ${path || 'unknown target'}`)
     }
-    // process substitution with a write side
-    if (char === '>' && segment[index + 1] === '(') return exclusive('write process substitution')
-    if (char === '<' && segment[index + 1] === '(') return exclusive('process substitution')
   }
   return undefined
 }

@@ -114,10 +114,14 @@ describe('Client runtime adapter', () => {
     expect(plugin.name).toBe('explicit-client')
     expect(plugin.inject).toEqual(['remote', 'slots'])
     await plugin.apply(context)
-    // setup receives the component decorator as its second argument, so an
+    // setup receives the component decorator and the package metadata, so an
     // imperatively registered component can still read this package's API
     // context through useApi().
-    expect(setup).toHaveBeenCalledWith(context, expect.any(Function))
+    expect(setup).toHaveBeenCalledWith(context, expect.any(Function), {
+      packageId: '@test/plugin',
+      logicalName: 'logical-client',
+      sourceFile: '/project/src/client.tsx',
+    })
   })
 
   it('passes a decorator that returns a component using the API context', async () => {

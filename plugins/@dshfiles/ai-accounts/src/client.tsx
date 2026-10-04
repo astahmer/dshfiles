@@ -1,4 +1,4 @@
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { useApi } from '@dshfiles/dshx/client'
@@ -19,7 +19,7 @@ const USAGE_PANEL_ID = 'ai-accounts-usage'
 export default defineClient({
   name: '@dshfiles/ai-accounts',
   locales: [aiAccountsLocale],
-  setup(ctx) {
+  setup(ctx, decorate) {
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
     const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
     const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
