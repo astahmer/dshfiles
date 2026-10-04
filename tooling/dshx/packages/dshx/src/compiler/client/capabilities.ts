@@ -16,9 +16,20 @@ interface ConversationDefinitionAnalysis {
   readonly reexports: readonly string[]
 }
 
-/** Optional Cordis services that Client setup code may consume directly. */
+/**
+ * Optional Cordis services a Client `setup(ctx)` may consume directly, and the
+ * provider package that supplies each one.
+ *
+ * A service missing from this table still builds, but it escapes the "setup used
+ * a service without declaring it" check, so the plugin loads and then fails at
+ * runtime with Cordis' `cannot get property "<name>" without inject`. Keep this
+ * list in step with the services the compatibility generation's client runtime
+ * actually provides.
+ */
 export const CLIENT_SETUP_SERVICE_CAPABILITIES = {
   locale: { provider: '@deepseek-ai/dsh-client-locale' },
+  slots: { provider: '@deepseek-ai/dsh-client-ui-conversation' },
+  sessions: { provider: '@deepseek-ai/dsh-api-session-controller' },
 } as const
 
 /** Native package load edges; this is compiler metadata, not a second service registry. */

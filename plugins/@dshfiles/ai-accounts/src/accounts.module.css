@@ -506,3 +506,340 @@
 .stateOk {
   color: var(--dsw-alias-state-success-primary);
 }
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.secondary {
+  padding: 7px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.secondary:hover,
+.footerHistoryLink:hover,
+.footerHistoryIcon:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.secondary:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.usageHistoryPage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 1120px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.usageHistoryHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.historyBack {
+  margin: 0 0 9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.historyBack:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.historyControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.historyControls > label,
+.historySettingsBody > label {
+  display: grid;
+  gap: 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.historyControls select,
+.historySettingsBody select {
+  min-height: 32px;
+  max-width: 220px;
+  padding: 5px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.historyNotice {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.historySettings {
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.historySettings > summary {
+  padding: 11px 14px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.historySettingsBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 16px;
+  padding: 0 14px 12px;
+}
+
+.historySettingsBody > p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.historyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.historyBlockHeading h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.historyBlockHeading p {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.historyCurrentGrid,
+.historyForecastGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 9px;
+}
+
+.historyCurrentCard,
+.historyForecast {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.historyCurrentHeading,
+.historyForecast > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.historyCurrentHeading > span,
+.historyCurrentCard > small,
+.historyForecast > small {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.historyCurrentTrack {
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l1);
+}
+
+.historyCurrentTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dsw-alias-brand-primary);
+}
+
+.historyExpiryList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.historyForecast > p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.historyPlotWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.historyPlot {
+  display: block;
+  width: 100%;
+  height: 220px;
+  overflow: visible;
+}
+
+.historyGrid {
+  stroke: currentColor;
+  stroke-opacity: .12;
+  stroke-width: 1;
+}
+
+.historyAxisLabel {
+  fill: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+}
+
+.historyPlotLine {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.historyLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.historyLegend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.historyLegend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.historyFootnote {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+}
+
+.historyTableWrap {
+  overflow-x: auto;
+}
+
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.historyTable th,
+.historyTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  text-align: left;
+  vertical-align: top;
+}
+
+.historyTable th {
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+}
+
+.historyExpiry {
+  display: block;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.historyExpiry + .historyExpiry {
+  margin-top: 3px;
+}
+
+.footerHistoryLink,
+.footerHistoryIcon {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.footerHistoryLink {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 4px 7px;
+  font-size: 10px;
+}
+
+.footerHistoryIcon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 820px) {
+  .usageHistoryHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .historyControls {
+    justify-content: flex-start;
+  }
+}

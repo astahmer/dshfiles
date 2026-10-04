@@ -405,7 +405,7 @@ const accountsHostApi = aiAccountsApi.host({
   }),
   historySettings: async () => {
     if (hostContext === undefined) {
-      return { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 15, retentionDays: 90 }
+      return { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90 }
     }
     return readUsageHistorySettings(hostContext)
   },

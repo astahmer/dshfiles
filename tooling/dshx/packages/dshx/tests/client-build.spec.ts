@@ -307,6 +307,83 @@ describe('client compiler', () => {
     expect(bind).toHaveBeenCalledWith('demo')
   })
 
+  it('fails before runtime when setup uses ctx.sessions without declaring it', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'export default defineClient({ setup(ctx) { ctx.sessions.scope("s") } })',
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/phase-a-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+        inject: ['@deepseek-ai/dsh-api-session-controller'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'DSHX1204',
+      hint: expect.stringContaining('defineClient'),
+    })
+  })
+
+  it('requires the provider package edge for every declared setup service', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'export default defineClient({ inject: ["slots", "sessions"], setup(ctx) { ctx.sessions.scope("s"); ctx.slots.inject("main", () => null) } })',
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/phase-a-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+        inject: ['@deepseek-ai/dsh-client-ui-conversation'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'DSHX1203',
+      hint: expect.stringContaining('@deepseek-ai/dsh-api-session-controller'),
+    })
+  })
+
+  it('accepts a setup that declares the services it uses', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'export default defineClient({ inject: ["slots", "sessions"], setup(ctx) { ctx.sessions.scope("s"); ctx.slots.inject("main", () => null) } })',
+        '',
+      ].join('\n'),
+    )
+
+    await buildClient({
+      packageId: '@dshx/phase-a-fixture',
+      root,
+      entry: 'src/client.tsx',
+      outDir: 'dist',
+      inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation'],
+    })
+    const registration: {
+      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
+    } = {} as never
+    vm.runInNewContext(await readFile(resolve(root, 'dist/client.js'), 'utf8'), {
+      window: { __ModuleLoader__: { load: (value: typeof registration) => Object.assign(registration, value) } },
+    })
+    expect((registration.factory(() => ({})) as { inject: string[] }).inject).toEqual(['slots', 'sessions'])
+  })
+
   it('applies the same setup-service validation to the dev watcher', async () => {
     const root = await temporaryProject()
     await writeFile(

@@ -13,7 +13,7 @@ export const quotaSnapshotSchema = z.object({
 export const usageMetaSchema = z.object({
   lastReadAt: z.number().nullable().default(null),
   lastAttemptAt: z.number().nullable().default(null),
-  intervalMinutes: z.number().int().min(1).max(60).default(15),
+  intervalMinutes: z.number().int().min(1).max(60).default(5),
   retentionDays: z.number().int().min(1).max(365).default(90),
 })
 

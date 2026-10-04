@@ -1,7 +1,14 @@
 import { invokeClientSetup } from '../sdk/setup.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { DshxError } from '../diagnostics.js'
-import type { ClientConversationContribution, ClientDefinition, LocaleDefinition, LocaleDictionaries, SlotContribution } from './types.js'
+import type {
+  ClientComponentDecorator,
+  ClientConversationContribution,
+  ClientDefinition,
+  LocaleDefinition,
+  LocaleDictionaries,
+  SlotContribution,
+} from './types.js'
 import { isSlotContribution, slotContributionParts } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
 import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
@@ -274,7 +281,7 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
   return value as ClientDefinition
 }
 
-type ComponentDecorator = (component: unknown) => unknown
+type ComponentDecorator = ClientComponentDecorator
 
 function normalizedSlotOptions(options: object): object {
   const locale = (options as Record<string, unknown>).locale
@@ -340,15 +347,20 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       registerLocales(client, definition)
       const settings = metadata.settingsCapability === true ? createSettingsClientRuntime(ctx) : undefined
       if (!hasApiCapability) {
-        const decorate: ComponentDecorator = component => (settings === undefined ? component : provideSettingsContext(component as any, settings))
+        const decorate = ((component: unknown): unknown =>
+          settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
         registerContributions(client, definition, decorate)
         return invokeClientSetup(definition.setup, ctx, decorate, metadata)
       }
       const apiClient = createApiClientRuntime(ctx, metadata.packageId)
-      const decorate: ComponentDecorator = component => {
+      // The decorator returns a context-providing wrapper, which is a different
+      // function type than the component it wraps. The contract callers rely on
+      // is "renders the same component", so the wrapper is asserted once here
+      // rather than leaking provider props into every registration site.
+      const decorate = ((component: unknown): unknown => {
         const apiComponent = provideApiContext(component as any, apiClient)
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
-      }
+      }) as ComponentDecorator
       registerContributions(client, definition, decorate)
       return invokeClientSetup(definition.setup, ctx, decorate, metadata)
     },

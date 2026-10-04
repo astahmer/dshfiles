@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseUsageBucketKey, usageBucketKey } from './usage-history.js'
 import { changedBankedResetSnapshots, forecastQuotaWindow, quotaHistoryCycles } from './usage-history-analysis.js'
 import type { UsageHistoryPoint } from './usage-history-model.js'
 
@@ -11,6 +12,22 @@ const point = (at: number, remaining: number, resetsAt: number, bankedResets = 0
 })
 
 describe('quota usage-history analysis', () => {
+  it('keys snapshots by the configured interval and still recognizes legacy 15-minute buckets', () => {
+    const at = 3_600_123
+    expect(usageBucketKey('codex:personal', at, 5)).toBe(`v2:codex%3Apersonal:5:${String(Math.floor(at / (5 * 60_000)))}`)
+    expect(parseUsageBucketKey('codex:personal:240')).toEqual({
+      instanceId: 'codex:personal',
+      bucket: 240,
+      intervalMinutes: 15,
+    })
+    expect(parseUsageBucketKey(usageBucketKey('codex:personal', at, 5))).toEqual({
+      instanceId: 'codex:personal',
+      bucket: Math.floor(at / (5 * 60_000)),
+      intervalMinutes: 5,
+    })
+    expect(usageBucketKey('codex:personal', at, 5)).not.toBe(usageBucketKey('codex:personal', at, 15))
+  })
+
   it('projects depletion from recent snapshots in the same reset cycle', () => {
     const points = [point(0, 100, 7_200_000), point(1_800_000, 70, 7_200_000), point(3_600_000, 40, 7_200_000)]
     expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 40, resetsAt: 7_200_000, now: 3_600_000 })).toMatchObject({
@@ -21,8 +38,8 @@ describe('quota usage-history analysis', () => {
   })
 
   it('does not carry a trend across a provider reset boundary', () => {
-    const points = [point(0, 10, 1_000_000), point(1_800_000, 100, 2_000_000), point(3_600_000, 90, 2_000_000)]
-    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 90, resetsAt: 2_000_000, now: 3_600_000 })).toMatchObject({
+    const points = [point(0, 10, 1_000_000), point(1_800_000, 100, 8_000_000), point(3_600_000, 90, 8_000_000)]
+    expect(forecastQuotaWindow({ points, label: 'Weekly', remainingPercent: 90, resetsAt: 8_000_000, now: 3_600_000 })).toMatchObject({
       status: 'insufficient-history',
       sampleCount: 2,
     })

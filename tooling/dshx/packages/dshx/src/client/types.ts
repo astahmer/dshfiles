@@ -50,8 +50,12 @@ export type ClientConversationContribution = ConversationContribution
  * is not, and calling a capability hook in it throws
  * `API "…" is unavailable outside a DSHX Client Slot component` on first
  * render. Pass such a component through this helper at registration.
+ *
+ * The signature stays opaque because the decorator erases the component's own
+ * prop type and hands the framework its own; narrowing it would reject valid
+ * registrations rather than catch a mistake.
  */
-export type ClientComponentDecorator = (component: unknown) => unknown
+export type ClientComponentDecorator = <Component>(component: Component) => Component
 
 export interface ClientDefinition {
   readonly name?: string

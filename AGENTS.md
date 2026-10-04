@@ -119,6 +119,37 @@ dsh --profile web --dump-config          # full composed tree
 dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
 ```
 
+### Experiment in a scratch profile, promote on evidence
+
+Do not register a plugin in `~/.dsh/profiles/web/` to try it out. The `web`
+profile is the one every session runs; an experiment that boots badly, changes
+tool behavior, or turns out not to be worth it then has already contaminated the
+setup you actually use.
+
+`~/.dsh/profiles/probe/` exists for this and is deliberately **not** Nix-managed
+(`modules/dsh.nix` wires `web` only), so nothing in the Nix setup can pull an
+experiment back in. It has its own `node_modules` and its own port lifecycle.
+
+```sh
+# 1. write the plugin in this repo, under plugins/@dshfiles/<name>/
+# 2. verify it without touching web
+dsh --profile probe plugin add @dshfiles/<name>
+dsh --profile probe web                     # separate boot, read the stdout lines
+# 3. benchmark against the default it claims to beat
+node --test plugins/@dshfiles/<name>/src/*.test.ts
+# 4. only once it earns its place
+dsh --profile web plugin add @dshfiles/<name>
+```
+
+`dsh web` binds `127.0.0.1:3080` **once per profile**, so `web` and `probe` can
+run side by side — the second boot gets its own port and its own tokenized URL.
+Stop the `probe` server when the experiment ends.
+
+Promote on measured evidence, not on the idea sounding right. A plugin that
+cannot state the number it improves is not ready for `web`. When the experiment
+is abandoned, remove it from `probe` — and if it was ever added to `web`, remove
+it from there too.
+
 ### Peer dependencies are a real trap
 
 `~/.dsh/profiles/web/pnpm-workspace.yaml` sets `autoInstallPeers: false`, and
@@ -330,6 +361,43 @@ Presets are declared as entries in `@deepseek-ai/dsh-agent-preset`; the active
 default comes from `agent-preset-registry`'s `default` config key. Sessions
 store the preset identity they were created with, so changing the default does
 not move existing sessions — start a new one to pick it up.
+
+## Shell command batching
+
+The `bash` tool is **exclusive**: the scheduler serializes it against every other
+tool call, so N `bash` calls in one assistant turn run one after another. Only
+tools that declare `isConcurrencySafe` join a parallel group — currently `read`,
+`read_image`, `web_search`, `web_fetch`, `subagent`, and `subagent_fork`.
+`glob`, `grep`, `write`, and `edit` are **not** concurrency-safe; each falls back
+to the exclusive path.
+
+Independent shell reads belong in **one** call, chained:
+
+```sh
+# bad: 3 tool calls, each paying the exclusive barrier
+jj file show -r @ a.ts
+jj file show -r @ b.ts
+diff -u /tmp/base.a a.ts
+
+# good: 1 tool call, 1 process
+jj file show -r @ a.ts > /tmp/base.a && jj file show -r @ b.ts > /tmp/base.b
+diff -u /tmp/base.a a.ts; diff -u /tmp/base.b b.ts
+```
+
+- `;` separates independent commands, `&&` chains dependent ones.
+- Put `echo "---LABEL---"` between sections when output needs attribution.
+- Pipe noisy commands into `head`/`tail` **inside** the same call, never in a
+  second call.
+- Prefer `read` for single-file lookups: it is concurrency-safe and never hits
+  the barrier. `glob` and `grep` do not, so batch them inside one `bash` call
+  when you have several to run.
+- Reserve several `bash` calls for work that genuinely must be separate, and
+  accept the serialization.
+
+Measured over 37 sessions of this repo's own history: 93.8% of steps already
+issued a single tool call, and 66% of the multi-call steps that did contain bash
+were already gated by bash being the slowest call — so parallelizing bash is
+worth less than batching it.
 
 ## Verifying anything
 

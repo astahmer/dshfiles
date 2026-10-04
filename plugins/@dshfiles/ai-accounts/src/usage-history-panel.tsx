@@ -1,5 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   aiAccountsApi,
   type AccountsFile,
@@ -11,7 +11,7 @@ import { changedBankedResetSnapshots, forecastQuotaWindow, quotaHistoryCycles } 
 import styles from './accounts.module.css'
 
 const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90] as const
-const INTERVAL_OPTIONS = [5, 15, 30, 60] as const
+const INTERVAL_OPTIONS = Array.from({ length: 60 }, (_, index) => index + 1)
 const RETENTION_OPTIONS = [30, 90, 180, 365] as const
 const CHART_POINT_LIMIT = 500
 const BANK_EVENT_LIMIT = 100
@@ -166,6 +166,11 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
   const [refreshing, setRefreshing] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const selectedQueryRef = useRef({ selectedId, days })
+
+  useEffect(() => {
+    selectedQueryRef.current = { selectedId, days }
+  }, [selectedId, days])
 
   useEffect(() => {
     let live = true
@@ -225,19 +230,22 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
   const bankChanges = useMemo(() => changedBankedResetSnapshots(points).slice(-BANK_EVENT_LIMIT).reverse(), [points])
 
   const recordNow = async (): Promise<void> => {
+    const query = { selectedId, days }
     setRefreshing(true)
     setNotice(null)
     try {
-      await accounts.collectUsage()
+      const result = await accounts.collectUsage()
       const [nextUsage, nextSettings, nextHistory] = await Promise.all([
         accounts.usage(),
         accounts.historySettings(),
-        selectedId === '' ? Promise.resolve({ points: [] as UsageHistoryPoint[] }) : accounts.history({ instanceId: selectedId, days }),
+        query.selectedId === '' ? Promise.resolve({ points: [] as UsageHistoryPoint[] }) : accounts.history({ instanceId: query.selectedId, days: query.days }),
       ])
       setUsage(nextUsage)
       setSettings(nextSettings)
-      setPoints(nextHistory.points)
-      setNotice('Usage history recorded.')
+      if (selectedQueryRef.current.selectedId === query.selectedId && selectedQueryRef.current.days === query.days) {
+        setPoints(nextHistory.points)
+      }
+      setNotice(result.recorded > 0 ? `Recorded quota for ${String(result.recorded)} account${result.recorded === 1 ? '' : 's'}.` : 'No new quota readings were available.')
     } catch {
       setNotice('Could not record usage right now. Check the provider sign-in and try again.')
     } finally {
@@ -276,13 +284,21 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         <div className={styles.historyControls}>
           <label>
             <span>Account</span>
-            <select value={selectedId} onChange={event => setSelectedId(event.target.value)} aria-label="Usage history account">
+            <select value={selectedId} onChange={event => {
+              const nextId = event.target.value
+              selectedQueryRef.current = { ...selectedQueryRef.current, selectedId: nextId }
+              setSelectedId(nextId)
+            }} aria-label="Usage history account">
               {(file?.accounts ?? []).map(account => <option value={account.instanceId} key={account.instanceId}>{account.displayName || account.instanceId}</option>)}
             </select>
           </label>
           <label>
             <span>Range</span>
-            <select value={String(days)} onChange={event => setDays(Number(event.target.value))} aria-label="Usage history range">
+            <select value={String(days)} onChange={event => {
+              const nextDays = Number(event.target.value)
+              selectedQueryRef.current = { ...selectedQueryRef.current, days: nextDays }
+              setDays(nextDays)
+            }} aria-label="Usage history range">
               {RANGE_OPTIONS.map(option => <option key={option} value={String(option)}>{String(option)} days</option>)}
             </select>
           </label>
@@ -298,7 +314,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         <details className={styles.historySettings}>
           <summary>Collection and retention</summary>
           <div className={styles.historySettingsBody}>
-            <label><span>Provider polling</span><select disabled={savingSettings || settings === null} value={String(settings?.intervalMinutes ?? 15)} onChange={event => void saveSettings({ intervalMinutes: Number(event.target.value) })}>{INTERVAL_OPTIONS.map(value => <option key={value} value={String(value)}>Every {String(value)} minutes</option>)}</select></label>
+            <label><span>Provider polling</span><select disabled={savingSettings || settings === null} value={String(settings?.intervalMinutes ?? 5)} onChange={event => void saveSettings({ intervalMinutes: Number(event.target.value) })}>{INTERVAL_OPTIONS.map(value => <option key={value} value={String(value)}>Every {String(value)} minute{value === 1 ? '' : 's'}</option>)}</select></label>
             <label><span>Keep quota snapshots</span><select disabled={savingSettings || settings === null} value={String(settings?.retentionDays ?? 90)} onChange={event => void saveSettings({ retentionDays: Number(event.target.value) })}>{RETENTION_OPTIONS.map(value => <option key={value} value={String(value)}>{String(value)} days</option>)}</select></label>
             <p>Snapshots contain quota percentages, reset times, and reset-bank expiry metadata. They do not store provider credentials or response bodies.</p>
             <p>Last successful read: {formatTimestamp(settings?.lastReadAt)} · Last attempt: {formatTimestamp(settings?.lastAttemptAt)}</p>

@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-subprocess'
 import { defineTool } from '@dshfiles/dshx/host'
 import { classifyBashCommand } from './classify.js'
 
@@ -16,41 +17,37 @@ export const readOnlyBashTool = defineTool({
     + 'Any command that writes, or that cannot be proven to read only, is refused — use the regular `bash` tool for those. '
     + 'Pass complete command strings; each runs in its own shell and must be self-contained.',
   parameters: {
-    type: 'object',
-    properties: {
-      commands: {
-        type: 'array',
-        description: `Complete shell commands to run concurrently, between 2 and ${MAX_COMMANDS} entries.`,
-        items: { type: 'string' },
-        minItems: 2,
-        maxItems: MAX_COMMANDS,
-      },
-      workdir: {
-        type: 'string',
-        description: 'Absolute directory to run in. Defaults to the session workspace.',
-      },
+    commands: {
+      type: 'array',
+      description: `Complete shell commands to run concurrently, between 2 and ${MAX_COMMANDS} entries.`,
+      items: { type: 'string' },
+      required: true,
     },
-    required: ['commands'],
+    workdir: {
+      type: 'string',
+      description: 'Absolute directory to run in. Defaults to the session workspace.',
+    },
   },
   output: {
     schema: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         results: {
           type: 'array',
           items: {
             type: 'object',
+            additionalProperties: false,
             properties: {
               command: { type: 'string' },
-              exitCode: { type: 'number' },
+              exitCode: { type: 'integer' },
               output: { type: 'string' },
               truncated: { type: 'boolean' },
             },
-            required: ['command', 'exitCode', 'output', 'truncated'],
           },
+          required: true,
         },
       },
-      required: ['results'],
     },
     render: (_args, value) => value.results.map((result, index) => {
       const header = `[${index + 1}/${value.results.length}] ${result.command}`
@@ -74,16 +71,18 @@ export const readOnlyBashTool = defineTool({
         return { command: label, exitCode: -1, output: `command exceeds ${MAX_COMMAND_LENGTH} characters`, truncated: false }
       }
       try {
-        const handle = subprocess.spawn({
+        const spec = {
           argv: ['bash', '-c', command],
-          ...args.workdir !== undefined ? { cwd: args.workdir } : {},
           stdio: {
-            stdin: 'ignore',
+            stdin: 'ignore' as const,
             stdout: { maxBytes: MAX_OUTPUT },
             stderr: { maxBytes: MAX_OUTPUT },
           },
           signal: exec.signal,
-        })
+          graceMs: 1_500,
+          ...args.workdir !== undefined ? { cwd: args.workdir } : {},
+        }
+        const handle = subprocess.spawn(spec)
         const outcome = await handle.done
         if (!(await handle.waitForExit(exec.signal))) handle.terminate()
         const stdout = handle.collected.stdout?.readFrom(0)

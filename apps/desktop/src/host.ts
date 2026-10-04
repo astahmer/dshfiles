@@ -14,7 +14,7 @@ import type { Readable } from 'node:stream'
  * later code path — an error, a log line, a crash report — can reach it.
  */
 
-const ANNOUNCED_URL = /http:\/\/127\.0\.0\.1:\d+\/\?token=\S+/
+const ANNOUNCED_URL = /http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/
 
 /** The Host is spawned with stdin ignored and both output streams piped. */
 type HostChild = ChildProcessByStdio<null, Readable, Readable>

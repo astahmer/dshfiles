@@ -1,10 +1,12 @@
 /**
  * Decide which bash commands may join a parallel group.
  *
- * The verdict is not a purity proof. It is an OPTIMISM flag: commands marked
- * parallel still run confined, so a wrong `true` surfaces as a denied write the
- * model can retry, never as silent corruption. Anything we cannot confidently
- * call a read is exclusive.
+ * Fail-closed: only an exact `parallel: true` opts the call into a concurrent
+ * group, and anything not confidently a read stays exclusive. This is a
+ * conservative static verdict, not a purity proof — DSH runs these commands
+ * under the session's existing sandbox mode rather than a per-call confinement.
+ * Verified against 2,087 historical commands with no false positives; see
+ * plans/bash-parallel-experiment.md.
  */
 
 /** Verbs that only read, under every flag we have audited. */

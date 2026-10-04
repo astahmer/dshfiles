@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { resolveCodexHomeLayout } from './codex-home.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import {
   USAGE_HISTORY_DOMAIN,
@@ -30,11 +31,11 @@ const PROVIDER_READ_CONCURRENCY = 4
 const readAccountWindows = async (account: AccountProfile, signal?: AbortSignal) => {
   if (signal?.aborted) return undefined
   if (account.kind === 'codex') {
-    const usage = await readCodexUsage(
-      account.shadowHomePath === '' ? account.homePath : account.shadowHomePath,
-      signal,
-    )
-    return usage
+    const layout = resolveCodexHomeLayout({
+      homePath: account.homePath,
+      shadowHomePath: account.shadowHomePath,
+    })
+    return readCodexUsage(layout.effectiveHomePath, signal)
   }
   if (account.kind === 'commandcode') return undefined
   return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv), signal)
@@ -77,6 +78,7 @@ export const collectUsageHistory = async (
   if (facility === undefined) return 0
   const domain = await facility.open(usageHistoryDomain)
   const quota = domain.table('quota')
+  const settings = domain.global.get()
 
   let written = 0
   const enabled = accounts.filter(account => account.enabled && account.kind !== 'commandcode')
@@ -111,12 +113,11 @@ export const collectUsageHistory = async (
         bankedResets: usage.bankedResets,
         bankedResetExpiries: usage.bankedResetExpiries,
       }
-      await quota.put(usageBucketKey(account.instanceId, at), snapshot)
+      await quota.put(usageBucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
       written += 1
     }
   }
 
-  const settings = domain.global.get()
   const attemptedAt = Date.now()
   await domain.global.set({
     ...settings,
@@ -137,11 +138,8 @@ export const pruneUsageHistory = async (
   const quota = domain.table('quota')
   const cutoff = Date.now() - retentionDays * 24 * 60 * MINUTE_MS
   let removed = 0
-  for (const key of [...quota.keys()]) {
-    const parsed = parseUsageBucketKey(key)
-    // The bucket is an epoch division, so a stale row is recognized without
-    // reading it back off the medium.
-    if (parsed !== null && parsed.bucket * 15 * MINUTE_MS < cutoff) {
+  for (const [key, snapshot] of [...quota.entries()]) {
+    if (snapshot.at < cutoff) {
       await quota.delete(key)
       removed += 1
     }
@@ -159,9 +157,8 @@ export const readUsageHistory = async (
   if (facility === undefined) return []
   const domain = await facility.open(usageHistoryDomain)
   const rows = [...domain.table('quota').entries()]
-    .filter(([key]) => key.startsWith(`${instanceId}:`))
+    .filter(([key, value]) => parseUsageBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
     .map(([, value]) => value)
-    .filter(value => value.at >= sinceMs)
     .sort((left, right) => left.at - right.at)
     .map(value => ({ ...value, bankedResetExpiries: value.bankedResetExpiries ?? [] }))
   return rows
