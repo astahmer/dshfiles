@@ -7,14 +7,14 @@ limits that remain.
 
 ## Delivered packages and implementation choices
 
-| Capability | Package | Choice |
-|---|---|---|
-| Thread organization, settle/archive, header links, sidebar/footer customization | [thread-sidebar](../../plugins/@dshfiles/thread-sidebar/README.md) | Build with local dshx; the audited candidates did not cover this behavior on the installed rc.2 runtime. |
-| MCP manager, composer quick panel and searchable catalog | [mcp-servers](../../plugins/@dshfiles/mcp-servers/README.md) | Build with local dshx; inspected marketplace candidates used weaker loopback routes, bypassed ConfigEditor, or had incompatible peers. |
-| Shared project/folder selection | [project-folder-picker](../../plugins/@dshfiles/project-folder-picker/README.md) | Build as a reusable local package; adjacent marketplace project managers did not provide the component/API needed here. |
-| Secret CLI catalog | [secret-catalog](../../plugins/@dshfiles/secret-catalog/README.md) | Build with local dshx; no listing found manages aliases from the `secret` CLI. [`dsh-vault`](https://dshmarket.com/p/Ox0400/dsh-vault/) is a separate encrypted vault with its own storage and peer set ([source](https://github.com/Ox0400/dsh-vault)). |
-| Settings search | [settings-search](../../plugins/@dshfiles/settings-search/README.md) | Build with local dshx; the candidate depended on a removed runtime package and DOM selectors. |
-| Jujutsu graph and Source Control | [jujutsu](../../plugins/@dshfiles/jujutsu/README.md) | Build with local dshx; the inspected changes-tab candidate was read-only and built for an older runtime. |
+| Capability | Package | Choice | Installed |
+|---|---|---|---|
+| Thread organization, settle/archive, header links, sidebar/footer customization | [thread-sidebar](../../plugins/@dshfiles/thread-sidebar/README.md) | Build with local dshx; the audited candidates did not cover this behavior on the installed rc.2 runtime. | probe |
+| MCP manager, composer quick panel and searchable catalog | [mcp-servers](../../plugins/@dshfiles/mcp-servers/README.md) | Build with local dshx; inspected marketplace candidates used weaker loopback routes, bypassed ConfigEditor, or had incompatible peers. | probe |
+| Shared project/folder selection | [project-folder-picker](../../plugins/@dshfiles/project-folder-picker/README.md) | Build as a reusable local package; adjacent marketplace project managers did not provide the component/API needed here. | via secret-catalog |
+| Secret CLI catalog | [secret-catalog](../../plugins/@dshfiles/secret-catalog/README.md) | Build with local dshx; no listing found manages aliases from the `secret` CLI. [`dsh-vault`](https://dshmarket.com/p/Ox0400/dsh-vault/) is a separate encrypted vault with its own storage and peer set ([source](https://github.com/Ox0400/dsh-vault)). | probe |
+| Settings search | [settings-search](../../plugins/@dshfiles/settings-search/README.md) | Build with local dshx; the candidate depended on a removed runtime package and DOM selectors. | probe |
+| Jujutsu graph and Source Control | [jujutsu](../../plugins/@dshfiles/jujutsu/README.md) | Build with local dshx; the inspected changes-tab candidate was read-only and built for an older runtime. | probe |
 
 The implementations use DSH 0.2.0-rc.2 contracts rather than carrying over BB
 plugin architecture. The local dshx fork now supports authenticated exact Fetch
@@ -139,22 +139,17 @@ secrets were copied into the isolated profile.
 
 ## Local profile composition
 
-The five DSH bundles are `@dshfiles/thread-sidebar`,
-`@dshfiles/mcp-servers`, `@dshfiles/secret-catalog`,
-`@dshfiles/settings-search`, and `@dshfiles/jujutsu`. Add each package to
-the profile's `dependencies` using a `link:<repo-path>/plugins/@dshfiles/<name>`
-specifier, add the corresponding bundle IDs
-(`thread-sidebar`, `mcp-servers`, `secret-catalog`,
-`settings-search`, and `dshfiles-jujutsu`) to
-`dsh.profile.bundles`, then run `pnpm install` in that profile. Build the five
-bundles with `pnpm run build` in their package directories before starting
-DSH. The shared picker is linked as a dependency of Secret Catalog and does not
-get its own bundle row. The standard web base already supplies the MCP
-subprocess provider.
+`pnpm profile:sync --profile <name>` links every owned bundle into a profile
+and installs it; `docs/profile-installs.md` explains why `pnpm add <path>` and
+`plugin_manager install_bundle` cannot. `dsh.profile.bundles` lists package
+names (`@dshfiles/thread-sidebar`), not the Loader row ids the bundles insert
+(`thread-sidebar`), which is what an earlier version of this section
+said. The shared picker is a dependency of Secret Catalog, not a bundle.
 
-This uses the local-path workflow documented in the repository instructions;
-do not use `plugin_manager install_bundle`/ `pnpm add <path>` for these local
-bundles. The active profile is intentionally not composed by this work.
+The Installed column above records where each bundle runs as of 2026-10-04:
+`probe` boots all ten owned bundles with no activation failure
+(`pnpm profile:boot --profile probe`). `web` runs ai-accounts, queue-reorder and
+shortcuts; the rest wait on reconciling the nixfiles `web` asset.
 
 ## Workstream history
 

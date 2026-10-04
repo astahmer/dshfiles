@@ -1,6 +1,6 @@
 # Repo hardening
 
-Status: **in progress** — Phases 0–5 done; Phase 6 underway.
+Status: **in progress** — Phases 0–6 done; 7 and 8 partly done; 9 not started.
 
 Progress is tracked here and nowhere else. Tick a box in the same jj change
 that does the work. Each phase closes with the full check run, and phases continue autonomously under the user's 2026-10-04 instruction.
@@ -181,28 +181,77 @@ wildcard declaration is a global script, so a module import cannot replace it.
 
 - [x] ai-accounts: module singleton replaced by a context-owned runtime;
       `account-config.ts` builds config from the zod-validated store
-- [ ] ai-accounts: split `accounts-panel.tsx` (1072 lines) and `host.ts`
+- [x] ai-accounts: `accounts-panel.tsx` 1072 → 63 lines over a state hook
+      and per-section files; `host.ts` 571 → 73 lines over route, profile,
+      registration, listener, API and sweep modules
 - [x] queue-reorder: `as never` gone; dshx's decorator keeps component props
-- [ ] zod at the remaining hand-narrowed boundaries; redacted debug logs
-      instead of swallowed errors; arrow functions in mcp-servers
-- [ ] Locales for jujutsu, secret-catalog, settings-search
-- [ ] dshx: tests for the boot check and platform commands; decode inspect
-      bridge RPC results
+- [x] mcp-servers: start failures reach the Host log through the redacting
+      logger instead of vanishing; reconciler generic over its target (cast
+      gone); arrow functions throughout
+- [x] Locales for jujutsu, secret-catalog, settings-search (en, zh; typed keys)
+- [x] dshx: inspect bridge replies decoded with zod (DSHX3203); unreachable
+      `conversationEvents` wiring removed
+- [x] dshx: boot check parses "did not activate" (it never did, despite the
+      docs), stops the Host's process group (the pnpm shim orphaned it), and
+      names a Nix-built Node (DSHX4112); 44 boot and platform tests
+
+Phase 6 evidence: root `pnpm check` exit 0 — dshx 460 tests, create-dshx 21,
+plugins 173; lint and format clean.
+
+Left open: the remaining catch blocks in jujutsu and ai-accounts convert errors
+into fail-closed domain messages on purpose and stay; the `as` casts warned by
+antislop outside the files touched here.
 
 ## Phase 7 — Install and verify
 
-- [ ] Profile sync script links every owned bundle into `web` and installs
-- [ ] Boot smoke test fails on any "did not activate" line
-- [ ] Browser walk-through of every plugin
-- [ ] Correct the integration review install steps; add an installed column
+- [x] `pnpm profile:sync` links every owned bundle into a profile and installs
+- [x] `pnpm profile:boot` checks the composed config, boots, and fails on any
+      activation line; proven red by hiding jujutsu's built entry
+- [x] `probe` runs all ten owned bundles and boots clean
+- [ ] `web` gets all ten — blocked: nixfiles declares `web/package.json` from a
+      stale asset (`~/dev/dsh-plugins` era), so `nixapply` would revert it; and
+      a live `web` server is serving now
+- [x] Browser walk on probe (all ten bundles): four client crashes no other
+      gate saw, now fixed: undeclared `inject` for services beyond dshx's
+      full-runtime set (mcp-servers, secret-catalog, thread-sidebar's empty
+      sidebar), imperative Slot components without `decorate` (useApi threw),
+      and an unbound store `getSnapshot`. Jujutsu, MCP, Secret Catalog,
+      Accounts and Settings panels then open with no console error
+- [ ] Polish seen in the walk: Secret Catalog heading and variable names are
+      near-invisible on the light theme; the ai-accounts quota footer overlaps
+      text in the sidebar
+- [ ] Toolchain gap behind two of those crashes, earned by three plugins:
+      dshx should either check every `ctx.<service>` against `inject` (it
+      knows only locale, slots and sessions) or decorate imperative
+      `ctx.slots.register` components itself. `profile:boot` covers the Host
+      only; a client pass (dshx's browser boot check) belongs in the smoke
+- [x] Integration review install steps corrected (bundles list package names,
+      not row ids); Installed column added
+
+Found: most bundles insert unscoped Loader row ids (`mcp-servers`,
+`settings-search`, `thread-sidebar`…), which AGENTS.md says can replace a native
+row. None collides today (probe composes clean). Renaming orphans stored
+settings, so it is a decision, not a fix.
 
 ## Phase 8 — Docs and Nix
 
-- [ ] Root README with a plugin inventory table
-- [ ] AGENTS.md: resolve contradictions, move pnpm traps and creator-mode notes
-      to `docs/`
-- [ ] Remove or rehome `scripts/dsh-session-status.mjs`
-- [ ] Multi-system flake; one pnpm source; pure dshx package
+- [x] Root README with a plugin inventory table
+- [x] AGENTS.md: `pnpm add <path>` contradiction resolved, upstream create
+      command, `node --test` and `lib/` corrected; pnpm traps in
+      `docs/profile-installs.md`, creator mode in `docs/creator-mode.md`
+- [x] `scripts/dsh-session-status.mjs` removed (one session title hardcoded)
+- [x] Flake outputs for aarch64-darwin, aarch64-linux and x86_64-linux
+      (pinned nixpkgs dropped x86_64-darwin)
+- [x] Pure dshx package: hash-pinned `fetchPnpmDeps` (fetcher 4), offline
+      install, `pnpm deploy --prod` so no symlink points back at the build tree.
+      pnpm 12 writes unpacked packages to the store's `links/`, whose
+      comment-bearing `tsconfig.json` files broke nixpkgs' jq normalization;
+      the fetch drops that derived directory. Built and run on aarch64-darwin;
+      Linux outputs only evaluated
+- [ ] One pnpm source: the dev shell still adds nixpkgs' pnpm 12.3.4 beside
+      corepack's 12.5.1
+- [ ] The desktop derivation still runs `pnpm install` with network inside
+      the build; same fix applies, left to its owner
 
 ## Phase 9 — New capability
 
