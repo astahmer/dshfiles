@@ -91,4 +91,22 @@ Discovered facts recorded for P2 design:
   bundles; runtime store reads silently discarded the whole accounts file
   instead of reporting the defect.
 
-P1 exit gate satisfied; the boundary holds and P2 proceeds.
+P1 and P2 exit gates satisfied. P3 through P5 have the evidence and remaining
+gates recorded below.
+
+## P2–P5 — multi-host implementation and rollout evidence (2026-10-05)
+
+| Gate | Result |
+|---|---|
+| P2 identity and CLI | Passed on one manager: two isolated local runtimes, one Pi runtime, and one VPS runtime remained separately qualified. Each opened `/tmp/dsh-mh-shared-20261005` under a distinct native workspace and session identity. CLI created an additional Pi session. A duplicated local host selector returned `runtime-ambiguous`; an unknown runtime returned `runtime-not-found`. |
+| P2 authentication | Passed: a deliberately altered launch token returned `authentication-failed` and did not add the runtime to the directory. |
+| P2 persistence | Passed on Pi: a controlled service restart retained its runtime identity, workspace, and sessions. Local directory tests cover concurrent writes, atomic private writes, migration, and corrupt-directory preservation. |
+| P3 outage and recovery | Passed: stopping only the scratch Pi service returned stale `gateway-unreachable`; VPS and both local runtimes remained online. Restarting the Pi service restored the same runtime identity and its workspace/session inventory. |
+| P3 protocol and host-key rejection | Runtime identity schema pins protocol version `1`; the focused regression check rejects version `2`. A live Pi connection through the real SSH connector and OpenSSH rejected a deliberately mismatched temporary known-host key as `host-key-rejected`; the temporary key store and wrapper were discarded without changing saved SSH trust. |
+| P3 admitted-mutation loss | Synthetic failure injection passed: a real `connectGateway`/`callNativeRpc` request reached a local HTTP fixture, the fixture admitted the full create and dropped its reply, the API returned `unknown-mutation-outcome`, and a subsequent list found exactly one created session with no replay. A remote-runtime reply-drop was not proven: two exploratory Pi calls returned normally and each created one additional blank scratch session. No model ran; those sessions remain in the retained scratch home. |
+| P4 browser flow | Passed earlier in the collaborative preview for online host switching and session creation across local and remote runtimes. Offline stale-card rendering, reconnect UI, and approval/upload/terminal routing remain unverified because the preview automation host became unavailable during the outage pass. VPS PTY behavior was verified through the native CLI path in P1. |
+| P5 second machine | Passed: official Node 24.20.0 ARM64 was signature-checked and used for the disposable Pi runtime; VPS x64 and two isolated local runtimes were online concurrently. The Pi package install ran with lifecycle scripts disabled and used prebuilt artifacts. |
+| P5 profile source | Isolated nixfiles workspace contains one owned bundle and patch row. Its `link:../../../dev/dshfiles/plugins/@dshfiles/multi-host` resolves from `~/.dsh/profiles/web` to this plugin and its package name matches. A scratch `--dump-config` saw the patch row, but bundle activation was skipped because the scratch profile had no `node_modules`; this is source-composition evidence, not boot proof. The shared web profile was not edited or restarted. |
+| P5 durable deployment | Pending owner choice: current infrastructure repo is a scaffold, nixfiles manages neither remote, and the Pi belongs to a separate Swarm setup. Only disposable scratch user units were used; no persistent service, upgrade/rollback path, or provider credential was installed. |
+
+Temporary local managers and owned scratch units are stopped after validation. Remote journals and scratch runtime homes are retained. No shared DSH 3080 process or original VPS runtime was touched.

@@ -60,3 +60,10 @@ Post-state invariants (verified):
 - conflict count across all commits: 0
 - divergent change-ids: 0
 - bookmarks: `main` + `recovery-20261005`
+
+## Addendum — stale checkout dirs removed
+
+`dshfiles-dshx-boot` and `dshfiles-hardening` (unregistered shelf dirs, empty
+jj `.jj/repos` bindings) were removed. Every "new" blob they contained was
+verified present in the repository's object store (a hidden recover ancestor
+holds it), so the removal lost no content.

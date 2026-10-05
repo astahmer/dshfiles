@@ -306,6 +306,16 @@ Do not stop infrastructure services, remove shared volumes or change firewall/SS
 policy. At experiment completion, remove disposable credentials/test processes;
 retain sanitized evidence and the test home's disposition.
 
+## Execution status
+
+| Phase | Status | Evidence boundary |
+|---|---|---|
+| P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see `validation.md`. |
+| P2 — identity, directory, CLI | Complete | Local x2, Pi, and VPS; distinct native IDs for identical workspace paths; remote CLI session creation, ambiguity rejection, wrong-token rejection, and restart persistence. |
+| P3 — reliability | Partial | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, and one-host outage isolation passed. Synthetic lost-reply handling and no-replay reconciliation passed; the remote-runtime reply-drop gate remains unverified. |
+| P4 — first-class UI | Partial | Online host switching and session creation passed. Offline stale-card/reconnect UI and approval/upload/terminal routing lack final preview evidence. |
+| P5 — second machine and rollout | Partial | Pi ARM64 plus VPS and local runtimes passed concurrently; source profile registration was checked in an isolated nixfiles workspace. Durable declarative supervision and daily-profile activation remain pending. |
+
 ## Acceptance criteria
 
 | Gate | Assertion | Model needed? |
@@ -329,18 +339,19 @@ suites or format unrelated shared changes.
 
 ## Open questions
 
-1. Exact native runtime identity/discovery contract; companion metadata plugin
-   only if required by P1/P2 evidence.
-2. Which chosen account/model supports bounded tools and complete session headers
-   on our actual adapter? The public catalog and secret aliases establish candidates,
-   not authenticated entitlement or successful agent execution.
-3. Runtime supervision on the selected account and exact available matching
-   prebuilt artifacts. Neither is proved by the SSH read-only checks.
-4. Agent lifetime without listeners, terminal retention, and native MCP cancellation
-   behavior in the installed composition. These are P1 acceptance questions.
-5. Matching LSP availability and client-context isolation for a later unified UI.
-
-These can be resolved from source and bounded tests; no user decision is pending.
+1. Which infrastructure target should own the durable runtime service and its
+   declarative upgrade/rollback path? The current infrastructure repository is a
+   scaffold, nixfiles does not manage either remote, and the Pi is managed by a
+   separate Swarm setup. The acceptance services remain disposable user units.
+2. Which existing secret source should supply provider credentials to a durable
+   service, if agent turns are expected to survive host logouts? The accepted model
+   turn used a disposable credential already present on the VPS; this plan does not
+   persist or migrate that credential.
+3. Browser proof for an offline runtime's stale card, reconnect flow, and native
+   approval/upload/terminal routing is still pending. The collaborative preview
+   automation host was unavailable during the final outage pass.
+4. Matching LSP availability and client-context isolation for a later unified UI
+   remain deferred; the installed DSH composition advertises no remote LSP contract.
 
 ## Decisions log
 
@@ -350,4 +361,5 @@ These can be resolved from source and bounded tests; no user decision is pending
 | 2026-10-05 | VPS first; Pi second | Both trusted SSH routes work; x86_64 is simpler initial artifact target, ARM64 adds useful coverage |
 | 2026-10-05 | Deterministic tests first, free/included models preferred, Luna 6 low fallback | User's explicit cost preference; most guarantees need no model |
 | 2026-10-05 | Preserve native session ownership and `sessions` CLI vocabulary | Existing native APIs/client already provide this boundary |
+| 2026-10-05 | Keep persistent deployment and daily-profile activation as explicit rollout gates | The isolated profile declaration resolves to the owned plugin, but neither remote is managed declaratively here and the shared web profile was not changed or restarted |
 | 2026-10-05 | Plan-only update with read-only machine checks | User asks to make a plan; deployment and paid inference belong to P1 execution |
