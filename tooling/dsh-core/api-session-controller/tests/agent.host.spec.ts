@@ -15,6 +15,7 @@ import {
   ApiSessionAgentController,
   ApiSessionCwdConflict,
   ApiSessionNotFound,
+  ApiSessionRuntimeBindingConflict,
   ApiSessionSubagentOwnership,
   inspectApiSession,
 } from '../src/agent.ts'
@@ -142,7 +143,10 @@ describe('ApiSession identity failures', () => {
 describe('ApiSession Agent lookup and recovery', () => {
   it('resumes directly from a retained observation and rejects an invalid observed header', async () => {
     const { ctx, agents } = await harness()
-    const meta = header('observed-resume')
+    const meta = {
+      ...header('observed-resume'),
+      runtimeBinding: { driverKind: 'codex-cli', instanceId: 'work-account' },
+    }
     const resumed = unpublishedAgent(ctx, meta)
     const resume = vi.spyOn(ctx.agents, 'resume').mockResolvedValue({
       agent: resumed,
@@ -159,7 +163,10 @@ describe('ApiSession Agent lookup and recovery', () => {
     } as unknown as SessionObservation
 
     await expect(agents.resolveObservedAgent(observed)).resolves.toEqual({ agent: resumed })
-    expect(resume).toHaveBeenCalledWith(expect.objectContaining({ resumeSessionId: meta.id }))
+    expect(resume).toHaveBeenCalledWith(expect.objectContaining({
+      resumeSessionId: meta.id,
+      runtimeBinding: meta.runtimeBinding,
+    }))
 
     const invalid = {
       ...observed,
@@ -409,7 +416,11 @@ describe('ApiSession create or adoption', () => {
 
   it('resumes a matching persisted identity and preserves its selected preset', async () => {
     const { ctx, agents } = await harness()
-    const meta = { ...header('stored'), agentPreset: 'minimal' }
+    const meta = {
+      ...header('stored'),
+      agentPreset: 'minimal',
+      runtimeBinding: { driverKind: 'codex-cli', instanceId: 'work-account' },
+    }
     const events = [{
       type: 'agent-preset/selected',
       seq: 0,
@@ -442,7 +453,16 @@ describe('ApiSession create or adoption', () => {
     })
 
     await expect(agents.ensureSession(meta.id, '/workspace', true, 'minimal')).resolves.toBe(resumed)
-    expect(resume).toHaveBeenCalledWith(expect.objectContaining({ resumeSessionId: meta.id }))
+    expect(resume).toHaveBeenCalledWith(expect.objectContaining({
+      resumeSessionId: meta.id,
+      runtimeBinding: meta.runtimeBinding,
+    }))
+
+    await expect(agents.ensureSession(meta.id, '/workspace', true, 'minimal', {
+      driverKind: 'other-driver',
+      instanceId: 'work-account',
+    })).rejects.toBeInstanceOf(ApiSessionRuntimeBindingConflict)
+    expect(resume).toHaveBeenCalledTimes(1)
   })
 
   it('rejects an ownership race before resume and a persisted cwd conflict', async () => {

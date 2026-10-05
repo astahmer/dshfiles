@@ -16,7 +16,7 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { buildForkSeed } from '@deepseek-ai/dsh-session/fork'
-import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset, SessionSeq, sessionRuntimeSelectionSchema } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
@@ -29,6 +29,7 @@ import {
   ApiSessionCwdConflict,
   ApiSessionNotFound,
   ApiSessionPresetConflict,
+  ApiSessionRuntimeBindingConflict,
   ApiSessionSubagentOwnership,
   apiSessionSubagentOwnershipError,
   hasApiSessionSubagentOwner,
@@ -107,6 +108,14 @@ export class SessionCommandController {
       throw new RemoteError('gateway/bad-request', 'session.create accepts workspaceId or cwd, not both', {})
     }
     const sessionId = request.sessionId ?? brandString<SessionId>(`session-${randomUUID()}`)
+    let runtimeSelection: SessionCreateRequest['runtimeBinding']
+    try {
+      runtimeSelection = request.runtimeBinding === undefined
+        ? undefined
+        : sessionRuntimeSelectionSchema.parse(request.runtimeBinding)
+    } catch {
+      throw new RemoteError('gateway/bad-request', 'session.create runtimeBinding is invalid', {})
+    }
     let workspace: Workspace | undefined
     if (request.workspaceId !== undefined) {
       workspace = this.ctx.workspaceRegistry.get(request.workspaceId)
@@ -124,6 +133,7 @@ export class SessionCommandController {
         cwd,
         request.sessionId !== undefined,
         request.agentPreset,
+        runtimeSelection,
       )
     } catch (error) {
       this.rejectCreation(sessionId, error)
@@ -140,7 +150,14 @@ export class SessionCommandController {
       }
     }
     const agentPreset = this.agents.presetForSession(adopted.session)
-    return { sessionId, ...(agentPreset === undefined ? {} : { agentPreset }) }
+    const runtimeBinding = adopted.session.header.runtimeBinding
+    return {
+      sessionId,
+      ...(agentPreset === undefined ? {} : { agentPreset }),
+      ...(runtimeBinding === undefined ? {} : {
+        runtimeBinding: { driverKind: runtimeBinding.driverKind, instanceId: runtimeBinding.instanceId },
+      }),
+    }
   }
 
   /**
@@ -278,6 +295,14 @@ export class SessionCommandController {
           ...(composition.agentPreset === undefined
             ? {}
             : { agentPreset: composition.agentPreset }),
+          ...(source.header.runtimeBinding === undefined
+            ? {}
+            : {
+              runtimeBinding: {
+                driverKind: source.header.runtimeBinding.driverKind,
+                instanceId: source.header.runtimeBinding.instanceId,
+              },
+            }),
         },
         agentOptions: { provider, model },
         setup: composition.setup,
@@ -540,6 +565,13 @@ export class SessionCommandController {
         sessionId: error.sessionId,
         requestedPreset: error.requestedPreset,
         ...(error.existingPreset === undefined ? {} : { existingPreset: error.existingPreset }),
+      })
+    }
+    if (error instanceof ApiSessionRuntimeBindingConflict) {
+      throw new RemoteError('session/runtime-binding-conflict', error.message, {
+        sessionId: error.sessionId,
+        requestedBinding: error.requestedBinding,
+        ...(error.existingBinding === undefined ? {} : { existingBinding: error.existingBinding }),
       })
     }
     if (error instanceof ApiSessionCwdConflict) {

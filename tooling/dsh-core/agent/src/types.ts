@@ -5,16 +5,44 @@
  */
 
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
+import type { Context } from '@deepseek-ai/cordis'
+import type { AgentCancelCause, Session } from '@deepseek-ai/dsh-session'
 // Type-only: the Workspace registry's archive-admission family map this registry merges `turn` into.
 import type {} from '@deepseek-ai/dsh-workspace/types'
 import type { OptionalSessionSeq, SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { TypertContext, TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import type { AgentOptions, AgentStatus, CancelOptions, Inbox } from './runtime-types.ts'
 
 /** Public live-agent handle; the runtime face augments its live capabilities. */
 export interface Agent {
   /** Session-backed Agent identity. */
   readonly id: SessionId
+  /** Durable conversation owned by this live runtime. */
+  readonly session: Session
+  /** Agent-scoped Host services and event listeners. */
+  readonly ctx: Context
+  /** Provider-neutral creation options retained by this runtime. */
+  readonly options: AgentOptions
+  /** Durable pending input exposed through the common inbox contract. */
+  readonly inbox: Inbox
+  /** Current cancellable activity state. */
+  readonly status: AgentStatus
+
+  /** Insert work into a named inbox boundary and optionally wake the driver. */
+  send(message: UserMessage, target: InboxTarget, wakeup: boolean): void
+  /** Queue input for the next turn and wake the driver. */
+  followup(input: UserMessage): void
+  /** Queue input for the next step and wake the driver. */
+  steer(input: UserMessage): void
+  /** Queue input for the next step without waking the driver. */
+  inject(input: UserMessage): void
+  /** Cancel current work, optionally retaining queued input. */
+  cancel(cause: AgentCancelCause, options?: CancelOptions): void
+  /** Run Host-owned setup or state work within the agent lifecycle. */
+  runMaintenance<T>(job: (signal: AbortSignal) => Promise<T>): Promise<T>
+  /** Resolve after current driver activity reaches idle. */
+  whenIdle(): Promise<void>
 }
 
 declare module '@deepseek-ai/dsh-workspace/types' {
@@ -53,17 +81,6 @@ export interface InboxState {
 export interface InboxWireState {
   readonly 'next-turn': readonly JsonValue[]
   readonly 'next-step': readonly JsonValue[]
-}
-
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionStateMap {
-    /** Pending agent input reconstructed from durable inbox splices. */
-    inbox: InboxState
-  }
-  interface SessionProjectionMap {
-    /** Pending agent input reconstructed from durable inbox splices. */
-    inbox: InboxWireState
-  }
 }
 
 /**

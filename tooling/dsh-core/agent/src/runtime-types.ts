@@ -11,6 +11,7 @@ import type {
   LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
+import type { RuntimeDriverEvent } from './runtime-driver.ts'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
 import type { Agent, InboxTarget } from './types.ts'
 export type { Agent } from './types.ts'
@@ -361,6 +362,8 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'agent/assistant-stream'(this: Scoped<Agent>, payload: { agent: Agent; frame: AssistantStreamFrame }): void
+    /** Provider-neutral activity observed while an external runtime owns a step. */
+    'agent/runtime-event'(this: Scoped<Agent>, payload: { agent: Agent; event: RuntimeDriverEvent }): void
     /**
      * The turn is about to close: the model owes no response (no live tool
      * calls, no fresh steering). Awaited before the boundary commits — a

@@ -1,0 +1,5 @@
+- insert:
+    - id: dshfiles-cursor-agent
+      name: '@dshfiles/cursor-agent'
+      config:
+        instances: []

@@ -11,8 +11,15 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { isPromise } from 'node:util/types'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
-import type { SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
-import { runtimeDriverDescriptorSchema, type RuntimeDriverDescriptor } from './runtime-driver.ts'
+import type { SessionEvent, SessionId, SessionLogOffset, SessionRuntimeBinding } from '@deepseek-ai/dsh-session'
+import {
+  runtimeDriverDescriptorSchema,
+  runtimeDriverStatusSchema,
+  type RuntimeDriverAdapter,
+  type RuntimeDriverDescriptor,
+  type RuntimeDriverOpenRequest,
+  type RuntimeDriverStatusRequest,
+} from './runtime-driver.ts'
 import { installTurnArchiveAdmission } from './archive-admission.ts'
 import type { Agent } from './types.ts'
 import type { AgentOptions, SessionStartSource } from './runtime-types.ts'
@@ -20,7 +27,6 @@ import type { AgentOptions, SessionStartSource } from './runtime-types.ts'
 export * from './runtime-driver.ts'
 export * from './runtime-types.ts'
 export * from './types.ts'
-export type * from './projection.ts'
 export * from './consumed-work.ts'
 export * from './model-selection.ts'
 export { agentCarrier, agentEvents, assembleContextFor, emitAgentEvent } from './dispatch.ts'
@@ -63,7 +69,6 @@ export type AgentSetup = (
  * lineage); the factory creates the session and agent under that identity.
  */
 export interface CreateAgentOptions {
-  readonly runtimeDriver?: string
   /** The live agent/session identity. */
   readonly sessionId: SessionId
   /** Live parent Agent for runtime ownership; omit for a root Agent. */
@@ -71,7 +76,8 @@ export interface CreateAgentOptions {
   /**
    * Session creation metadata: validated absolute `cwd`, `parentSession`
    * fork lineage, the `isSeeded` fork marker, the coarse `origin`
-   * classification, and the `delegationDepth` recursion budget. Mirrors the
+   * classification, the `delegationDepth` recursion budget, and optional
+   * pinned runtime/account identity. Mirrors the
    * `cwd`/`parentSession`/`isSeeded`/`origin`/`delegationDepth` fields of
    * {@link CreateSessionOptions.meta} in dsh-session (the internal-only
    * `createdAt`, used when reconstructing a persisted session, is deliberately
@@ -86,6 +92,7 @@ export interface CreateAgentOptions {
     readonly origin?: 'subagent'
     readonly delegationDepth?: number
     readonly agentPreset?: string
+    readonly runtimeBinding?: SessionRuntimeBinding
   }
   /** Exact fork-inherited prefix length when the session metadata sets `isSeeded`. */
   readonly inheritedEventCount?: SessionLogOffset
@@ -126,9 +133,10 @@ export interface CreateAgentOptions {
  * ({@link AgentRegistry.resume}).
  */
 export interface ResumeAgentOptions {
-  readonly runtimeDriver?: string
   /** The persisted session id to load and use as the live agent/session identity. */
   readonly resumeSessionId: SessionId
+  /** Exact persisted runtime/account identity used to select the resume factory. */
+  readonly runtimeBinding?: SessionRuntimeBinding
   /** Live parent Agent for runtime ownership; omit for a root Agent. */
   readonly parentAgent?: Agent
   /** Per-agent options (model, …). */
@@ -249,7 +257,7 @@ interface FactorySlot {
 export class AgentRegistry extends Service {
   private store = new Map<SessionId, AgentEntry>()
   private factory: FactorySlot | undefined
-  private readonly runtimeDrivers = new Map<string, { readonly slot: FactorySlot; readonly descriptor: RuntimeDriverDescriptor }>()
+  private readonly runtimeDrivers = new Map<string, { readonly adapter: RuntimeDriverAdapter; readonly descriptor: RuntimeDriverDescriptor }>()
   private readonly initiators = new AsyncLocalStorage<Agent | undefined>()
   private readonly initiatorRuns = new AsyncLocalStorage<InitiatorRun>()
   private initiatorState: 'active' | 'closing' | 'disposed' = 'active'
@@ -378,12 +386,21 @@ export class AgentRegistry extends Service {
     return dispose
   }
 
-  registerRuntimeDriver(options: { readonly descriptor: RuntimeDriverDescriptor; readonly factory: AgentFactory }): () => void {
-    const descriptor = runtimeDriverDescriptorSchema.parse(options.descriptor)
+  registerRuntimeDriver(adapter: RuntimeDriverAdapter): () => void {
+    const parsed = runtimeDriverDescriptorSchema.parse(adapter.descriptor)
+    const descriptor = Object.freeze({
+      ...parsed,
+      capabilities: Object.freeze({ ...parsed.capabilities }),
+    })
+    const registeredAdapter: RuntimeDriverAdapter = Object.freeze({
+      descriptor,
+      create: (request: RuntimeDriverOpenRequest) => adapter.create(request),
+      resume: (request: RuntimeDriverOpenRequest) => adapter.resume(request),
+      status: (request: RuntimeDriverStatusRequest) => adapter.status(request),
+    })
     const dispose = this.ctx.effect(() => {
       if (this.runtimeDrivers.has(descriptor.id)) throw new Error(`runtime driver already registered: ${descriptor.id}`)
-      const target = (options.factory as AgentFactory & { [symbols.original]?: AgentFactory })[symbols.original] ?? options.factory
-      const registration = { slot: { target }, descriptor }
+      const registration = { adapter: registeredAdapter, descriptor }
       this.runtimeDrivers.set(descriptor.id, registration)
       return () => {
         if (this.runtimeDrivers.get(descriptor.id) === registration) this.runtimeDrivers.delete(descriptor.id)
@@ -396,12 +413,23 @@ export class AgentRegistry extends Service {
     return [...this.runtimeDrivers.values()].map(registration => runtimeDriverDescriptorSchema.parse(registration.descriptor))
   }
 
-  private requireRuntimeFactory(options: { readonly runtimeDriver?: string; readonly operation: 'create' | 'resume' }): FactorySlot {
-    if (options.runtimeDriver === undefined) return this.requireFactory()
-    const registration = this.runtimeDrivers.get(options.runtimeDriver)
-    if (registration === undefined) throw new Error(`runtime driver unavailable: ${options.runtimeDriver}`)
-    if (!registration.descriptor.capabilities[options.operation]) throw new Error(`runtime driver does not support ${options.operation}: ${options.runtimeDriver}`)
-    return registration.slot
+  runtimeDriver(id: string): RuntimeDriverAdapter | undefined {
+    return this.runtimeDrivers.get(id)?.adapter
+  }
+
+  async runtimeDriverStatus(id: string, request: RuntimeDriverStatusRequest) {
+    const adapter = this.runtimeDriver(id)
+    if (adapter === undefined) throw new Error(`runtime driver unavailable: ${id}`)
+    return runtimeDriverStatusSchema.parse(await adapter.status(request))
+  }
+
+  private requireRuntimeFactory(options: { readonly runtimeBinding?: SessionRuntimeBinding; readonly operation: 'create' | 'resume' | 'fork' }): FactorySlot {
+    if (options.runtimeBinding === undefined) return this.requireFactory()
+    const driverKind = options.runtimeBinding.driverKind
+    const registration = this.runtimeDrivers.get(driverKind)
+    if (registration === undefined) throw new Error(`runtime driver unavailable: ${driverKind}`)
+    if (!registration.descriptor.capabilities[options.operation]) throw new Error(`runtime driver does not support ${options.operation}: ${driverKind}`)
+    return this.requireFactory()
   }
 
   /** Return the active creation factory. */
@@ -425,7 +453,11 @@ export class AgentRegistry extends Service {
     // explicitly. This preserves AgentLoop's dependency origin while binding
     // its effects to ownerCtx; plain factories receive ownerCtx as an explicit
     // capability and need no Cordis tracker magic.
-    const { target } = this.requireRuntimeFactory({ runtimeDriver: options.runtimeDriver, operation: 'create' })
+    const operation = options.meta?.isSeeded === true ? 'fork' : 'create'
+    const { target } = this.requireRuntimeFactory({
+      ...(options.meta?.runtimeBinding === undefined ? {} : { runtimeBinding: options.meta.runtimeBinding }),
+      operation,
+    })
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
     return Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
@@ -440,7 +472,10 @@ export class AgentRegistry extends Service {
    */
   async resume(options: ResumeAgentOptions): Promise<AgentHandle> {
     const ownerCtx = this.ctx
-    const { target } = this.requireRuntimeFactory({ runtimeDriver: options.runtimeDriver, operation: 'resume' })
+    const { target } = this.requireRuntimeFactory({
+      ...(options.runtimeBinding === undefined ? {} : { runtimeBinding: options.runtimeBinding }),
+      operation: 'resume',
+    })
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
     return Reflect.apply(target.resume, receiver, [ownerCtx, options])

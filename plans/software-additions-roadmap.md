@@ -16,16 +16,16 @@ Establish reliable runtime and UI ownership first, deliver useful coding and rev
 
 ## What
 
-| Phase | Priority | Outcome |
-|---|---|---|
-| 0 | Prerequisite | Verified gaps, exact owners and isolated acceptance environment |
-| 1 | Architectural, highest | Durable execution, provider lifecycle and bounded continuity contracts |
-| 2 | Architectural, high | Stateful panel composition, evidence and feedback contracts |
-| 3 | Features, highest | Search, drafts, context explanation, review and project checks |
-| 4 | Features, high | Movable workspace, visual feedback, recorded tests and attention |
-| 5 | Features, medium | Provider continuity, isolated workspace launch and PR wake-ups |
-| 6 | Conditional expansion | Advanced tooling/content/remote workflows with demonstrated need |
-| 7 | Cosmetic, last | Appearance, animation and optional presentation refinements |
+| Phase | Priority               | Outcome                                                                |
+| ----- | ---------------------- | ---------------------------------------------------------------------- |
+| 0     | Prerequisite           | Verified gaps, exact owners and isolated acceptance environment        |
+| 1     | Architectural, highest | Durable execution, provider lifecycle and bounded continuity contracts |
+| 2     | Architectural, high    | Stateful panel composition, evidence and feedback contracts            |
+| 3     | Features, highest      | Search, drafts, context explanation, review and project checks         |
+| 4     | Features, high         | Movable workspace, visual feedback, recorded tests and attention       |
+| 5     | Features, medium       | Provider continuity, isolated workspace launch and PR wake-ups         |
+| 6     | Conditional expansion  | Advanced tooling/content/remote workflows with demonstrated need       |
+| 7     | Cosmetic, last         | Appearance, animation and optional presentation refinements            |
 
 Phase order expresses priority, not a requirement to finish every Host change before shipping any independent plugin. Each work item waits for its own dependencies. Do not invent a common abstraction solely to make unrelated features wait on it.
 
@@ -59,16 +59,16 @@ Select a missing increment, verify its owning contract, probe adoption candidate
 
 ### Tech choices
 
-| Concern | Decision | Reason |
-|---|---|---|
-| Runtime | DSH core owns lifecycle; adapters use capability registry exposed by dshx | Do not register a competing Agent factory or bypass persistence |
-| Durability | Extend native persistence/inbox/jobs; reconcile effects | Persisted transcript alone does not recover unfinished work |
-| UI layout | Trellis adoption probe behind supported panel descriptors | Moving panels must preserve runtime and component identity |
-| Visual feedback | Agentation through existing MCP domain | Avoid rebuilding annotation protocol and connection management |
-| Context | Probe dsh-context; add only remaining provenance gaps | Existing dashboard candidate beats bespoke duplicate |
-| E2E | Existing Playwright acceptance; compare optional TesterArmy tooling | Deterministic assertions remain test oracle |
-| Dependencies | Prebuilt artifacts/cache and Nix wiring; pinned packages | Respect binary-first machine/toolchain contract |
-| State validation | Installed Effect Schema/zod conventions at boundaries | Decode external state once; version persisted records |
+| Concern          | Decision                                                                  | Reason                                                          |
+| ---------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Runtime          | DSH core owns lifecycle; adapters use capability registry exposed by dshx | Do not register a competing Agent factory or bypass persistence |
+| Durability       | Extend native persistence/inbox/jobs; reconcile effects                   | Persisted transcript alone does not recover unfinished work     |
+| UI layout        | Trellis adoption probe behind supported panel descriptors                 | Moving panels must preserve runtime and component identity      |
+| Visual feedback  | Agentation through existing MCP domain                                    | Avoid rebuilding annotation protocol and connection management  |
+| Context          | Probe dsh-context; add only remaining provenance gaps                     | Existing dashboard candidate beats bespoke duplicate            |
+| E2E              | Existing Playwright acceptance; compare optional TesterArmy tooling       | Deterministic assertions remain test oracle                     |
+| Dependencies     | Prebuilt artifacts/cache and Nix wiring; pinned packages                  | Respect binary-first machine/toolchain contract                 |
+| State validation | Installed Effect Schema/zod conventions at boundaries                     | Decode external state once; version persisted records           |
 
 ### Architecture
 
@@ -96,27 +96,27 @@ Use a narrow-screen stacked layout for the retained features. Preserve question 
 
 ### Common interactions
 
-| Action | Result |
-|---|---|
-| Move panel | View remains mounted with same runtime subscriptions |
-| Restore draft | Existing draft preserved on conflict or unsupported content |
-| Mark reviewed | Receipt binds exact content; subsequent change invalidates it |
-| Answer document question | Answer binds question ID and document revision |
+| Action                      | Result                                                              |
+| --------------------------- | ------------------------------------------------------------------- |
+| Move panel                  | View remains mounted with same runtime subscriptions                |
+| Restore draft               | Existing draft preserved on conflict or unsupported content         |
+| Mark reviewed               | Receipt binds exact content; subsequent change invalidates it       |
+| Answer document question    | Answer binds question ID and document revision                      |
 | Switch provider during work | Request waits in order; current work retains owner until transition |
-| Resume interrupted work | Uncertain effects listed; only eligible operations continue |
-| Open evidence | Run outcome, assertion results and recording coverage visible |
+| Resume interrupted work     | Uncertain effects listed; only eligible operations continue         |
+| Open evidence               | Run outcome, assertion results and recording coverage visible       |
 
 ## Data model
 
-| Record | Required identity / ownership |
-|---|---|
-| Capability projection | Provider instance, supported operations, option schema and protocol version; Host adapter |
-| Recovery receipt | Operation/run/session, last durable result, uncertain effects, cancellation generation and eligibility; Host |
-| Handoff | Ordered source history IDs, destination, budget, omissions and resume outcome; Host |
-| Panel descriptor/layout | Stable instance/type, owning session/workspace, disposal policy; versioned layout preferences |
-| Evidence | Run/revision, action/frame timestamps, assertions, outcome and bounded artifact references; evidence adapter |
-| Feedback | Target revision/locator, question ID, answer and resolution revisions; feedback owner |
-| Review/check receipt | Scope/path/content digest or action digest, checked revision and status; review/check owner |
+| Record                  | Required identity / ownership                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Capability projection   | Provider instance, supported operations, option schema and protocol version; Host adapter                    |
+| Recovery receipt        | Operation/run/session, last durable result, uncertain effects, cancellation generation and eligibility; Host |
+| Handoff                 | Ordered source history IDs, destination, budget, omissions and resume outcome; Host                          |
+| Panel descriptor/layout | Stable instance/type, owning session/workspace, disposal policy; versioned layout preferences                |
+| Evidence                | Run/revision, action/frame timestamps, assertions, outcome and bounded artifact references; evidence adapter |
+| Feedback                | Target revision/locator, question ID, answer and resolution revisions; feedback owner                        |
+| Review/check receipt    | Scope/path/content digest or action digest, checked revision and status; review/check owner                  |
 
 These are requirements for existing owner schemas, not a proposal for one central database or generic service.
 
@@ -124,17 +124,19 @@ These are requirements for existing owner schemas, not a proposal for one centra
 
 ### Execution status (2026-10-05)
 
-| Work | Status | Evidence / remaining gate |
-|---|---|---|
-| Phase 0 — scope and acceptance baseline | Complete | Scratch profile composition and candidate boot receipts below; no active-profile experiment. |
-| Phase 1A — provider driver seam | Partial | Core driver registry and native-loop routing are recorded below. External adapter and credentialed model turn remain open. |
-| Phase 1B–1D — recovery, continuity, decisions | Pending | No acceptance receipts yet. |
-| Phase 2 — panel, evidence, feedback | Pending | Native lifecycle contracts and stateful-view acceptance still required. |
-| Phase 3 — daily features | Partial | Five candidate bundles passed scratch composition and boot; behavior-level browser acceptance and owned gaps remain. |
-| Phase 4 — workspace and visual evidence | Pending | No phase exit evidence yet. |
-| Phase 5 — continuity and automation | Partial implementation only | Multi-host and goal-stall work exists in separate plans; count it only after isolated acceptance. Provider switching and rewind remain open. |
-| Phase 6 — conditional expansion | Gate review pending | Each track must be admitted or explicitly deferred with evidence. |
-| Phase 7 — polish | Pending | Wait for functional exits; no cosmetics counted yet. |
+| Work                                    | Status                      | Evidence / remaining gate                                                                                                                                                                                                                     |
+| --------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0 — scope and acceptance baseline | Refresh required            | Historical scratch receipts are retained below, but their `/private/tmp` root is gone; re-create an isolated profile before using them as current activation proof.                                                                           |
+| Phase 1A — provider driver seam         | Partial                     | Agent/AgentLoop/API/Cursor source and focused checks pass. DSH's linked-package runtime path still selects installation-scoped peers; V5 session creation needs the persistence integration below. No credentialed Cursor turn was attempted. |
+| Phase 1B — restart reconciliation       | Pending                     | No accepted recovery receipt yet.                                                                                                                                                                                                             |
+| Phase 1C — continuity format            | Partial                     | V5 codec and V4-to-V5 migration checks pass, but the installed JSONL writer still uses the V4 catalog and rejects V5 headers. Portable ordered history and omission behavior remain open.                                                     |
+| Phase 1D — continuation decisions       | Pending                     | Reuse native question/queue semantics; no added behavior has passed acceptance yet.                                                                                                                                                           |
+| Phase 2 — panel, evidence, feedback     | Pending                     | Native lifecycle contracts and stateful-view acceptance still required.                                                                                                                                                                       |
+| Phase 3 — daily features                | Partial                     | Five candidate bundles have historical scratch composition and boot receipts below; their scratch root is gone, and behavior-level browser acceptance and owned gaps remain.                                                                  |
+| Phase 4 — workspace and visual evidence | Pending                     | No phase exit evidence yet.                                                                                                                                                                                                                   |
+| Phase 5 — continuity and automation     | Partial implementation only | Multi-host and goal-stall work exists in separate plans; count it only after isolated acceptance. Provider switching and rewind remain open.                                                                                                  |
+| Phase 6 — conditional expansion         | Gate review pending         | Each track must be admitted or explicitly deferred with evidence.                                                                                                                                                                             |
+| Phase 7 — polish                        | Pending                     | Wait for functional exits; no cosmetics counted yet.                                                                                                                                                                                          |
 
 ### Phase 0 — verify scope and acceptance baseline
 
@@ -190,15 +192,15 @@ Exit: context budgets enforced; fresh prompt unshortened; selected fork boundary
 
 ### Phase 6 — conditional functional expansion
 
-| Track | Reference IDs | Admission gate |
-|---|---|---|
-| Language/editing | F60/F74/F75/F76/F77/F78 | Demonstrated baseline gap; read-only LSP first, then stale-safe edits and preview-bound apply; hash editing earns benefit against native guards |
-| Debugger/kernel/format readers | F79/F80/F81 | Repeated need beyond terminal/MCP; owned process cancellation, reset and disposal |
-| Notebook/rollover/memory | F43/F82/F83/F92 | Context inspection demonstrates loss; supported Host maintenance seam, branch-safe revisioned notes, user-reviewed promotion |
-| Collaborative content | I13 | Actual page/drawing/table workflow; selected licensed component port, concurrency and export proof |
-| Task boards/stacked forges | F36/F22 | Repeated workflow need; no duplicate scheduler or speculative multi-forge framework |
-| Remote/browser credentials | F48/F49 | Existing multi-host plan passes auth/ownership/reconnect gates; explicit scoped credential import |
-| Process diagnostics | F51 | Measured resource problem; bounded process metrics, no fictitious per-plugin heap attribution |
+| Track                          | Reference IDs           | Admission gate                                                                                                                                  |
+| ------------------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language/editing               | F60/F74/F75/F76/F77/F78 | Demonstrated baseline gap; read-only LSP first, then stale-safe edits and preview-bound apply; hash editing earns benefit against native guards |
+| Debugger/kernel/format readers | F79/F80/F81             | Repeated need beyond terminal/MCP; owned process cancellation, reset and disposal                                                               |
+| Notebook/rollover/memory       | F43/F82/F83/F92         | Context inspection demonstrates loss; supported Host maintenance seam, branch-safe revisioned notes, user-reviewed promotion                    |
+| Collaborative content          | I13                     | Actual page/drawing/table workflow; selected licensed component port, concurrency and export proof                                              |
+| Task boards/stacked forges     | F36/F22                 | Repeated workflow need; no duplicate scheduler or speculative multi-forge framework                                                             |
+| Remote/browser credentials     | F48/F49                 | Existing multi-host plan passes auth/ownership/reconnect gates; explicit scoped credential import                                               |
+| Process diagnostics            | F51                     | Measured resource problem; bounded process metrics, no fictitious per-plugin heap attribution                                                   |
 
 Exit per admitted track: measured improvement, focused regression coverage and isolated live acceptance. Reject/defer tracks with no demonstrated gap. These features are functional, not cosmetic.
 
@@ -216,18 +218,19 @@ Each subphase gets focused described JJ revision(s), source-first generation whe
 
 These are investigation gates, not questions the user must answer now:
 
-1. Where is the editable DSH core source and supported delivery path for Phase 1 changes?
+1. Which Host resolver change or owned persistence package will route the V5 Session and catalog through the installed JSONL writer?
 2. Which native views expose sufficient panel lifecycle contracts for Trellis, and what does its pinned license permit?
 3. Which recovery/answerability behaviors already work after an actual scratch-instance crash?
 4. Which community candidate survives combined rc.2 loader and browser acceptance?
 
 Resolve by source inspection and isolated probes before asking for product decisions.
 
-### Resolved
+### Confirmed source and runtime constraints
 
-| Question | Resolution |
-|---|---|
-| 1. Editable DSH core source and supported delivery path for Phase 1 changes | `tooling/dsh-core/agent` in this worktree: a narrow fork of the official `@deepseek-ai/dsh-agent` package (MIT, tag `dsh-v0.2.0-rc.2`, provenance in [dsh-core/FORK.md](../tooling/dsh-core/FORK.md)). Scratch profiles bind `@deepseek-ai/dsh-agent` to this directory with a pnpm `link:` override so every runtime consumer shares one identity; the installed global package and the running web profile are never patched. Build and use rules are in [dsh-core/FORK.md](../tooling/dsh-core/FORK.md). |
+| Question                 | Resolution                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editable DSH core source | Narrow official `dsh-v0.2.0-rc.2` snapshots live under `tooling/dsh-core` (MIT; provenance in [dsh-core/FORK.md](../tooling/dsh-core/FORK.md)). The source is editable, but a profile `link:` dependency is not a validated delivery path for dependencies imported from installation-scoped DSH packages.        |
+| V5 persistence boundary  | The installed JSONL persistence package imports the installed V4 catalog. A scratch-only materialized copy of that package with the local V5 catalog wrote V5 headers, but no persistence fork or Host resolver change is present in this worktree. Do not treat that experiment as a supported runtime override. |
 
 ## Acceptance criteria
 
@@ -242,20 +245,26 @@ Resolve by source inspection and isolated probes before asking for product decis
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|---|---|---|
-| 2026-10-05 | Architecture first, features next, cosmetics last | User's requested priority |
-| 2026-10-05 | Keep roadmap separate from source survey | Evidence and delivery order have distinct owners |
-| 2026-10-05 | Trellis foundation early; cosmetic treatment last | Stateful panel composition is architectural software |
-| 2026-10-05 | Dependency gates rather than one global blockade | Missing provider Host seam should not prevent search/review delivery |
-| 2026-10-05 | Advanced tooling/content/remote features conditional | Avoid committing to speculative maintenance scope |
-| 2026-10-05 | Phase 1A ships as a narrow agent-package fork | The officialPublished `@deepseek-ai/dsh-agent` package has no runtime-driver registration seam; registry edits can only land in a retained-name copy, and the link: override keeps every consumer on one identity |
+| Date       | Decision                                             | Rationale                                                                                                                                                                                                         |
+| ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-05 | Architecture first, features next, cosmetics last    | User's requested priority                                                                                                                                                                                         |
+| 2026-10-05 | Keep roadmap separate from source survey             | Evidence and delivery order have distinct owners                                                                                                                                                                  |
+| 2026-10-05 | Trellis foundation early; cosmetic treatment last    | Stateful panel composition is architectural software                                                                                                                                                              |
+| 2026-10-05 | Dependency gates rather than one global blockade     | Missing provider Host seam should not prevent search/review delivery                                                                                                                                              |
+| 2026-10-05 | Advanced tooling/content/remote features conditional | Avoid committing to speculative maintenance scope                                                                                                                                                                 |
+| 2026-10-05 | Phase 1A ships as a narrow agent-package fork        | The officialPublished `@deepseek-ai/dsh-agent` package has no runtime-driver registration seam; registry edits can only land in a retained-name copy, and the link: override keeps every consumer on one identity |
 
 ## Acceptance receipts
 
-| Date | Item | Receipt |
-|---|---|---|
-| 2026-10-05 | Phase 0: isolated acceptance environment exists (scratch, repeatable) | Probe root `DSH_HOME=/private/tmp/dsh-software-additions-probe`, profile `software` defined by its manifest (`probe/profiles/software/package.json`: DSH 0.2.0-rc.2 base + web-app + the five candidates), pnpm 12 manifest install, boot `dsh --profile software --port 3289 --no-open` on fnm Node 22.23.3 (3199 is held by an unrelated running instance; only 3289 belongs to this receipt) |
-| 2026-10-05 | Candidate adoption: boot + composition acceptance | `dsh --profile software --dump-config` composes clean (1292 lines, no warnings, no missing/inactive entries); all five bundles present: `@hyzyn/dsh-search` (global-search), `dsh-context`, `@linxin666/dsh-client-ui-skill-explorer`, `dsh-github-picker`, `dsh-lsp-actions` (host tools with inject tools/fs/subprocess and empty `servers` config); second-instance boot log shows one mount line + tokenized URL and no activation failures |
-| 2026-10-05 | Phase 1A: override activation is runtime-proven, not just source-level | Booted client graph lists the four client candidate bundles (69 entries); a session consumer inside the pnpm store resolves `@deepseek-ai/dsh-agent` to this worktree's `tooling/dsh-core/agent/lib/types/index.js` (realpath check); live API on the scratch instance: `session/modelCatalog` ok, `session/create` (standard preset) ok, queued `session/prompt` accepted, `session/projections` reports the admitted turn with assembled context; the model call itself could not complete (scratch home has no provider credentials, `llmMs: 0`), so a credentialed model turn remains an open exit item for 1A |
-| 2026-10-05 | Phase 1A: seam engine checks (source/build proof, distinct from live acceptance) | `tooling/dsh-core/agent` `pnpm test` 4/4 green (driver selection through caller-owned registry without replacing the default factory, unknown/unsupported target rejection without session load, plugin-lifetime binding + capability snapshot + duplicate rejection, failed-setup rollback through the real loop lifecycle), `tsc --noEmit` clean |
+| Date       | Item                                                                             | Receipt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-05 | Phase 0: isolated acceptance environment exists (scratch, repeatable)            | Probe root `DSH_HOME=/private/tmp/dsh-software-additions-probe`, profile `software` defined by its manifest (`probe/profiles/software/package.json`: DSH 0.2.0-rc.2 base + web-app + the five candidates), pnpm 12 manifest install, boot `dsh --profile software --port 3289 --no-open` on fnm Node 22.23.3 (3199 is held by an unrelated running instance; only 3289 belongs to this receipt)                                                                                                                                                                                                                    |
+| 2026-10-05 | Candidate adoption: boot + composition acceptance                                | `dsh --profile software --dump-config` composes clean (1292 lines, no warnings, no missing/inactive entries); all five bundles present: `@hyzyn/dsh-search` (global-search), `dsh-context`, `@linxin666/dsh-client-ui-skill-explorer`, `dsh-github-picker`, `dsh-lsp-actions` (host tools with inject tools/fs/subprocess and empty `servers` config); second-instance boot log shows one mount line + tokenized URL and no activation failures                                                                                                                                                                    |
+| 2026-10-05 | Phase 1A: historical override runtime receipt (not current acceptance)           | Booted client graph lists the four client candidate bundles (69 entries); a session consumer inside the pnpm store resolves `@deepseek-ai/dsh-agent` to this worktree's `tooling/dsh-core/agent/lib/types/index.js` (realpath check); live API on the scratch instance: `session/modelCatalog` ok, `session/create` (standard preset) ok, queued `session/prompt` accepted, `session/projections` reports the admitted turn with assembled context; the model call itself could not complete (scratch home has no provider credentials, `llmMs: 0`), so a credentialed model turn remains an open exit item for 1A |
+| 2026-10-05 | Phase 1A: seam engine checks (source/build proof, distinct from live acceptance) | `tooling/dsh-core/agent` `pnpm test` 5/5 green; AgentLoop `test:runtime` 10/10 green; `tsc --noEmit` clean. The Agent checks cover registry selection, unsupported targets, plugin-lifetime binding and capability snapshot, duplicate rejection, and failed-setup rollback through the real loop lifecycle.                                                                                                                                                                                                                                                                                                       |
+| 2026-10-05 | Phase 1A/1C: focused package checks                                              | Frozen offline installs, builds, and typechecks passed for Session, Agent, AgentLoop, API controller declarations, V4→V5 migration, catalog, and Cursor plugin. Session: 536 passed across 17 files; catalog: 39 passed across 6 files; Cursor plugin: 7 passed across 2 files and `dshx check`/build pass. API host suites typecheck, but their Vitest alias setup is missing from this narrow snapshot.                                                                                                                                                                                                          |
+| 2026-10-05 | Phase 1A/1C: linked-profile runtime failure                                      | Scratch `DSH_HOME=/private/tmp/dsh-phase1a-acceptance-20261005`, DSH 0.2.0-rc.2, Node 22.23.3, port 3199. The composed config had 1264 lines and included Cursor; booting with profile `link:` dependencies failed imports because linked AgentLoop/API packages resolved installation-scoped V4 Agent/Session packages. No production profile or port 3080 was touched.                                                                                                                                                                                                                                           |
+| 2026-10-05 | Phase 1A/1C: persistence integration gate                                        | Materializing local core packages under the scratch profile allowed the UI to boot, but the first Session write failed with `encodeCurrent requires Session format v4` from the installed JSONL writer. A scratch-only copy of the installed JSONL package, paired with the local V5 catalog, then wrote two compressed V5 session headers; those default sessions had no `runtimeBinding`, and the preview browser's remote WebSocket remained disconnected. This isolates the missing persistence/resolver work; it is not supported activation or Cursor-turn proof.                                            |
+| 2026-10-05 | Phase 1A: workspace package identity                                             | `createRequire` from Agent, Session, V4→V5, and catalog resolves Session to this worktree's `session/lib/index.js`; this proves workspace-local identity only. DSH profile `link:` runtime identity remains unproven and failed in the isolated boot.                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-10-05 | Phase 0 receipt freshness                                                        | `/private/tmp/dsh-software-additions-probe` is absent; port 3289 is held by an unrelated process and was not used. Port 3080 remains owned by the user's live web process; it was not restarted or changed. Previous candidate receipts are historical until recreated.                                                                                                                                                                                                                                                                                                                                            |
+| 2026-10-05 | Phase 1A: API test runtime gap                                                   | Both changed API host suites typecheck, but the narrow source snapshot lacks upstream `tsconfig.base*.json` and its test-only Vitest alias run fails during module loading before tests execute. Do not count API host behavior as runtime-proven from this receipt.                                                                                                                                                                                                                                                                                                                                               |

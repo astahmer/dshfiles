@@ -9,7 +9,7 @@ import type {
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import type { Session, SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionId, SessionRuntimeBinding, SessionRuntimeSelection } from '@deepseek-ai/dsh-session'
 import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
@@ -54,6 +54,20 @@ export class ApiSessionPresetConflict extends Error {
         ? `session "${sessionId}" records no agent preset and cannot be adopted under "${requestedPreset}"`
         : `session "${sessionId}" runs agent preset "${existingPreset}", not "${requestedPreset}"`,
     )
+  }
+}
+
+/** Explicit-id creation requested a different provider binding than the Session owns. */
+export class ApiSessionRuntimeBindingConflict extends Error {
+  constructor(
+    readonly sessionId: SessionId,
+    readonly requestedBinding: SessionRuntimeSelection,
+    readonly existingBinding: SessionRuntimeSelection | undefined,
+  ) {
+    super(`session "${sessionId}" is pinned to ${existingBinding === undefined
+      ? 'the native runtime'
+      : `${existingBinding.driverKind}/${existingBinding.instanceId}`}, not ${requestedBinding.driverKind}/${requestedBinding.instanceId}`)
+    this.name = 'ApiSessionRuntimeBindingConflict'
   }
 }
 
@@ -241,10 +255,11 @@ export class ApiSessionAgentController {
     cwd: string,
     checkPersistedIdentity: boolean,
     presetId?: string,
+    runtimeSelection?: SessionRuntimeSelection,
   ): Promise<Agent> {
     let creation = this.creations.get(sessionId)
     if (creation === undefined) {
-      creation = this.createOrAdopt(sessionId, cwd, checkPersistedIdentity, presetId)
+      creation = this.createOrAdopt(sessionId, cwd, checkPersistedIdentity, presetId, runtimeSelection)
         .catch((error: unknown) => {
           const live = this.ctx.agents.get(sessionId)
           if (live !== undefined) {
@@ -269,6 +284,7 @@ export class ApiSessionAgentController {
     if (presetId !== undefined) {
       this.assertPresetUnchanged(sessionId, presetId, this.presetForSession(agent.session))
     }
+    this.assertRuntimeBindingUnchanged(sessionId, runtimeSelection, agent.session.header.runtimeBinding)
     if (agent.session.header.cwd !== cwd) {
       throw new ApiSessionCwdConflict(sessionId, cwd, agent.session.header.cwd)
     }
@@ -436,6 +452,9 @@ export class ApiSessionAgentController {
     }
     return (await this.ctx.agents.resume({
       resumeSessionId: sessionId,
+      ...(observation.header.runtimeBinding === undefined
+        ? {}
+        : { runtimeBinding: observation.header.runtimeBinding }),
       agentOptions: this.agentOptions(),
       setup: composition.setup,
     })).agent
@@ -446,6 +465,7 @@ export class ApiSessionAgentController {
     cwd: string,
     checkPersistedIdentity: boolean,
     presetId: string | undefined,
+    runtimeSelection: SessionRuntimeSelection | undefined,
   ): Promise<Agent> {
     const attached = this.ctx.sessions.get(sessionId)
     const live = this.ctx.agents.get(sessionId)
@@ -465,9 +485,13 @@ export class ApiSessionAgentController {
         }
         const storedPreset = this.presetForObservation(observation)
         this.assertPresetUnchanged(sessionId, presetId, storedPreset)
+        this.assertRuntimeBindingUnchanged(sessionId, runtimeSelection, observation.header.runtimeBinding)
         const composition = await this.composeAgent(storedPreset)
         return (await this.ctx.agents.resume({
           resumeSessionId: sessionId,
+          ...(observation.header.runtimeBinding === undefined
+            ? {}
+            : { runtimeBinding: observation.header.runtimeBinding }),
           agentOptions: this.agentOptions(),
           setup: composition.setup,
         })).agent
@@ -489,6 +513,7 @@ export class ApiSessionAgentController {
       meta: {
         cwd,
         ...(composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset }),
+        ...(runtimeSelection === undefined ? {} : { runtimeBinding: runtimeSelection }),
       },
       setup: composition.setup,
     })).agent
@@ -522,6 +547,20 @@ export class ApiSessionAgentController {
   ): void {
     if (requested === undefined || requested === existing) return
     throw new ApiSessionPresetConflict(sessionId, requested, existing)
+  }
+
+  private assertRuntimeBindingUnchanged(
+    sessionId: SessionId,
+    requested: SessionRuntimeSelection | undefined,
+    existing: SessionRuntimeBinding | undefined,
+  ): void {
+    if (requested === undefined) return
+    if (existing?.driverKind === requested.driverKind && existing.instanceId === requested.instanceId) return
+    throw new ApiSessionRuntimeBindingConflict(
+      sessionId,
+      requested,
+      existing === undefined ? undefined : { driverKind: existing.driverKind, instanceId: existing.instanceId },
+    )
   }
 }
 

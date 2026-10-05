@@ -7,7 +7,7 @@ import type {
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { TextBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
+import type { SessionId, SessionRuntimeSelection, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
@@ -209,6 +209,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       readonly requestedCwd: string
       readonly existingCwd?: string
     }
+    'session/runtime-binding-conflict': {
+      readonly sessionId: SessionId
+      readonly requestedBinding: SessionRuntimeSelection
+      readonly existingBinding?: SessionRuntimeSelection
+    }
     'session/projections-unavailable': Record<string, never>
     'session/writer-held': { readonly sessionId: SessionId }
     'session/agent-busy': { readonly reason: string }
@@ -287,12 +292,15 @@ export interface SessionCreateRequest {
   readonly cwd?: string
   readonly sessionId?: SessionId
   readonly agentPreset?: string
+  /** Runtime/account selection for a new session; persisted selections win on resume. */
+  readonly runtimeBinding?: SessionRuntimeSelection
 }
 
 /** Session creation response value. */
 export interface SessionCreateValue {
   readonly sessionId: SessionId
   readonly agentPreset?: string
+  readonly runtimeBinding?: SessionRuntimeSelection
 }
 
 /** Session model-selection request. */
@@ -440,6 +448,8 @@ export interface SessionWireHeader {
   readonly origin?: 'subagent'
   readonly delegationDepth?: number
   readonly agentPreset?: string
+  /** Public driver/account identity; provider-native IDs remain adapter-owned. */
+  readonly runtimeBinding?: SessionRuntimeSelection
 }
 
 /** Browser wire surface operation; replacement endpoints are earlier event seqs in surface order. */

@@ -4,6 +4,7 @@ import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-ag
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { Workspace, WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { describe, expect, it, vi } from 'vitest'
@@ -44,8 +45,9 @@ describe('Session creation failures', () => {
   it('mints an identity with the default cwd when no explicit target is supplied', async () => {
     const ctx = await baseContext()
     ctx.provide('workspaceRegistry', { get: () => undefined, list: () => [] } as never)
+    const runtimeBinding = { driverKind: 'codex-cli', instanceId: 'work-account' }
     const ensureSession = vi.fn((sessionId: SessionId, cwd: string) => {
-      const session = ctx.sessions.create(sessionId, { meta: { cwd } })
+      const session = ctx.sessions.create(sessionId, { meta: { cwd, runtimeBinding } })
       return Promise.resolve({ id: sessionId, session } as Agent)
     })
     const controller = new SessionCommandController(
@@ -54,15 +56,17 @@ describe('Session creation failures', () => {
       '/default-workspace',
     )
 
-    const created = await controller.create({})
+    const created = await controller.create({ runtimeBinding })
 
     expect(created.sessionId).toMatch(/^session-/)
     expect(created).not.toHaveProperty('agentPreset')
+    expect(created.runtimeBinding).toEqual(runtimeBinding)
     expect(ensureSession).toHaveBeenCalledWith(
       created.sessionId,
       '/default-workspace',
       false,
       undefined,
+      runtimeBinding,
     )
     await ctx.fiber.dispose()
   })
@@ -159,7 +163,11 @@ function completedSession(
   ctx: Context,
   id: string,
   cwd?: string,
-  lineage: { parentSession?: SessionId; origin?: 'subagent' } = {},
+  lineage: {
+    parentSession?: SessionId
+    origin?: 'subagent'
+    runtimeBinding?: SessionHeader['runtimeBinding']
+  } = {},
 ) {
   const session = ctx.sessions.create(SessionId(id), {
     meta: { ...(cwd === undefined ? {} : { cwd }), ...lineage },
@@ -275,7 +283,8 @@ describe('Session fork failures', () => {
   it('carries the composed Agent preset into the child metadata', async () => {
     const ctx = await baseContext()
     ctx.provide('workspaceRegistry', { list: () => [] } as never)
-    const source = completedSession(ctx, 'preset-source', '/workspace')
+    const runtimeBinding = { driverKind: 'codex-cli', instanceId: 'work-account' }
+    const source = completedSession(ctx, 'preset-source', '/workspace', { runtimeBinding })
     const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
       (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
     )
@@ -288,6 +297,7 @@ describe('Session fork failures', () => {
     const options = create.mock.calls[0]?.[0]
     if (options === undefined) throw new Error('Agent creation was not attempted')
     expect(options.meta?.agentPreset).toBe('minimal')
+    expect(options.meta?.runtimeBinding).toEqual(runtimeBinding)
     await ctx.fiber.dispose()
   })
 })

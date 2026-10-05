@@ -428,7 +428,23 @@ function paginate(
 
 /** Translate current logical Session metadata to the browser wire. */
 function wireHeader(header: SessionHeader): SessionWireHeader {
-  return { ...header }
+  return {
+    version: header.version,
+    id: header.id,
+    createdAt: header.createdAt,
+    ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
+    ...(header.parentSession === undefined ? {} : { parentSession: header.parentSession }),
+    isSeeded: header.isSeeded,
+    ...(header.origin === undefined ? {} : { origin: header.origin }),
+    ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
+    ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+    ...(header.runtimeBinding === undefined ? {} : {
+      runtimeBinding: {
+        driverKind: header.runtimeBinding.driverKind,
+        instanceId: header.runtimeBinding.instanceId,
+      },
+    }),
+  }
 }
 
 function entryFor(event: SessionEvent): SessionEventEntry {

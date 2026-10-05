@@ -2,9 +2,6 @@
   "name": "@deepseek-ai/dsh-agent",
   "description": "Agent interface, registry, initiator scope, and event vocabulary for the DeepSeek Harness",
   "version": "0.2.0-rc.2",
-  "publishConfig": {
-    "access": "public"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
@@ -65,10 +62,12 @@
     "@deepseek-ai/dsh-util-values": "0.2.0-rc.2",
     "@deepseek-ai/dsh-workspace": "0.2.0-rc.2",
     "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cordis-plugin-include": "1.0.9",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.5",
     "typescript": "7.0.2",
     "vitest": "4.1.11",
     "@types/node": "22.20.5",
-    "@deepseek-ai/dsh-agent-loop": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent-loop": "link:../agent-loop",
     "@deepseek-ai/dsh-agent-loop-testkit": "0.2.0-rc.2"
   },
   "private": true,
