@@ -28,6 +28,15 @@
   padding: 0;
 }
 
+.headerRegion {
+  flex: 0 1 auto;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
 .brandButton,
 .headerLink,
 .selectedLink,
@@ -407,8 +416,46 @@
 .regionArea {
   display: flex;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 120px;
   overflow: hidden;
+}
+
+.rail .regionArea {
+  min-height: 0;
+}
+
+.splitter {
+  position: relative;
+  flex: 0 0 12px;
+  min-height: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: row-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.splitter::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--dsw-alias-label-tertiary);
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+.splitter:hover::before,
+.splitter:focus-visible::before {
+  background: var(--dsw-alias-label-primary);
+}
+
+.splitter:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color);
+  outline-offset: -2px;
 }
 
 .regionArea > * {

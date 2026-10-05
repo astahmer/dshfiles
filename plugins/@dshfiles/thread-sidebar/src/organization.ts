@@ -2,6 +2,10 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 
 export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
 
+export const SIDEBAR_HEADER_MIN_HEIGHT = 56
+export const SIDEBAR_THREAD_MIN_HEIGHT = 120
+export const SIDEBAR_SPLITTER_HEIGHT = 12
+
 export interface SidebarPreferences {
   autoArchiveEnabled: boolean
   idleMinutes: number
@@ -12,6 +16,7 @@ export interface SidebarPreferences {
   collapsedSections: SidebarSection[]
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
+  headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
   footerOrder: string[]
@@ -31,6 +36,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   collapsedSections: ['archived'],
   workspaceFilter: null,
   headerMode: 'compact',
+  headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],
   footerOrder: [],

@@ -16,6 +16,7 @@ const preferencesSchema = z
     collapsedSections: z.array(sidebarSectionSchema).max(5),
     workspaceFilter: z.string().max(256).nullable(),
     headerMode: z.enum(['compact', 'expanded']),
+    headerRegionHeight: z.number().int().min(56).max(10000).nullable().default(null),
     headerOrder: z.array(z.string().min(1).max(256)).max(300),
     hiddenHeaderIds: z.array(z.string().min(1).max(256)).max(300),
     footerOrder: z.array(z.string().min(1).max(256)).max(300),

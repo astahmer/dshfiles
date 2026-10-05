@@ -10,8 +10,24 @@ import {
   Switch,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { orderSidebarEntries, reorderSidebarEntry, type OrderedSidebarEntry } from './organization.js'
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
+import {
+  orderSidebarEntries,
+  reorderSidebarEntry,
+  SIDEBAR_HEADER_MIN_HEIGHT,
+  SIDEBAR_SPLITTER_HEIGHT,
+  SIDEBAR_THREAD_MIN_HEIGHT,
+  type OrderedSidebarEntry,
+} from './organization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import styles from './sidebar-shell.module.css'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -51,20 +67,196 @@ interface FooterEntry extends OrderedSidebarEntry {
   registrationId: string | null
 }
 
+interface SidebarSplitBounds {
+  value: number
+  minimum: number
+  maximum: number
+}
+
 const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTranslate>[0]): string => translate(key)
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
+
+const readSidebarSplitBounds = (elements: {
+  shell: HTMLDivElement | null
+  headerRegion: HTMLDivElement | null
+  threadRegion: HTMLDivElement | null
+  footer: HTMLElement | null
+  splitter: HTMLButtonElement | null
+}): SidebarSplitBounds | null => {
+  const { shell, headerRegion, threadRegion, footer, splitter } = elements
+  if (shell === null || headerRegion === null || threadRegion === null) return null
+
+  const footerHeight = footer?.getBoundingClientRect().height ?? 0
+  const splitterHeight = splitter?.getBoundingClientRect().height ?? SIDEBAR_SPLITTER_HEIGHT
+  const availableMaximum = shell.clientHeight - footerHeight - splitterHeight - SIDEBAR_THREAD_MIN_HEIGHT
+  const maximum = Math.max(SIDEBAR_HEADER_MIN_HEIGHT, Math.floor(availableMaximum))
+  const value = headerRegion.getBoundingClientRect().height
+  return {
+    value: Math.round(Math.min(maximum, Math.max(SIDEBAR_HEADER_MIN_HEIGHT, value))),
+    minimum: SIDEBAR_HEADER_MIN_HEIGHT,
+    maximum,
+  }
+}
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const { preferences, updatePreferences, threadQuery, setThreadQuery } = useSidebarState()
+  const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
+  const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
+    value: SIDEBAR_HEADER_MIN_HEIGHT,
+    minimum: SIDEBAR_HEADER_MIN_HEIGHT,
+    maximum: SIDEBAR_HEADER_MIN_HEIGHT,
+  })
   const [footerSnapshot, setFooterSnapshot] = useState(props.readFooterSnapshot)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const searchInput = useRef<HTMLInputElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const headerRegionRef = useRef<HTMLDivElement>(null)
+  const threadRegionRef = useRef<HTMLDivElement>(null)
+  const footerRegionRef = useRef<HTMLElement>(null)
+  const splitterRef = useRef<HTMLButtonElement>(null)
+  const resizeDragRef = useRef<{
+    pointerId: number
+    startY: number
+    startHeight: number
+    currentHeight: number
+    minimum: number
+    maximum: number
+  } | null>(null)
+  const headerRegionId = `thread-sidebar-header-${useId()}`
+  const threadRegionId = `thread-sidebar-threads-${useId()}`
   const wide = !props.collapsed
+  const effectiveHeaderHeight = previewHeaderHeight ?? preferences.headerRegionHeight
+
+  useEffect(() => {
+    const measure = (): void => {
+      const bounds = readSidebarSplitBounds({
+        shell: shellRef.current,
+        headerRegion: headerRegionRef.current,
+        threadRegion: threadRegionRef.current,
+        footer: footerRegionRef.current,
+        splitter: splitterRef.current,
+      })
+      if (bounds === null) return
+      setSplitBounds(current =>
+        current.value === bounds.value && current.minimum === bounds.minimum && current.maximum === bounds.maximum ? current : bounds,
+      )
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    if (typeof ResizeObserver === 'undefined') return () => window.removeEventListener('resize', measure)
+
+    const observer = new ResizeObserver(measure)
+    if (shellRef.current !== null) observer.observe(shellRef.current)
+    if (headerRegionRef.current !== null) observer.observe(headerRegionRef.current)
+    if (threadRegionRef.current !== null) observer.observe(threadRegionRef.current)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [wide])
+
+  useEffect(() => {
+    if (previewHeaderHeight !== null) return
+    const bounds = readSidebarSplitBounds({
+      shell: shellRef.current,
+      headerRegion: headerRegionRef.current,
+      threadRegion: threadRegionRef.current,
+      footer: footerRegionRef.current,
+      splitter: splitterRef.current,
+    })
+    if (bounds !== null) setSplitBounds(bounds)
+  }, [preferences.headerRegionHeight, previewHeaderHeight, wide])
+
+  const resizeHeaderRegion = (height: number): void => {
+    const bounds = readSidebarSplitBounds({
+      shell: shellRef.current,
+      headerRegion: headerRegionRef.current,
+      threadRegion: threadRegionRef.current,
+      footer: footerRegionRef.current,
+      splitter: splitterRef.current,
+    })
+    if (bounds === null) return
+    const nextHeight = Math.round(Math.min(bounds.maximum, Math.max(bounds.minimum, height)))
+    setSplitBounds({ ...bounds, value: nextHeight })
+    setPreviewHeaderHeight(null)
+    updatePreferences({ headerRegionHeight: nextHeight })
+  }
+
+  const pointerHeightAt = (clientY: number): number | null => {
+    const drag = resizeDragRef.current
+    if (drag === null) return null
+    return Math.min(drag.maximum, Math.max(drag.minimum, drag.startHeight + clientY - drag.startY))
+  }
+
+  const moveSplitter = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    const drag = resizeDragRef.current
+    if (drag === null || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const height = pointerHeightAt(event.clientY)
+    if (height === null) return
+    drag.currentHeight = height
+    setPreviewHeaderHeight(height)
+  }
+
+  const startSplitterDrag = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    if (event.button !== 0) return
+    const bounds = readSidebarSplitBounds({
+      shell: shellRef.current,
+      headerRegion: headerRegionRef.current,
+      threadRegion: threadRegionRef.current,
+      footer: footerRegionRef.current,
+      splitter: splitterRef.current,
+    })
+    if (bounds === null) return
+    event.preventDefault()
+    resizeDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startHeight: bounds.value,
+      currentHeight: bounds.value,
+      minimum: bounds.minimum,
+      maximum: bounds.maximum,
+    }
+    setPreviewHeaderHeight(bounds.value)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const finishSplitterDrag = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    const drag = resizeDragRef.current
+    if (drag === null || drag.pointerId !== event.pointerId) return
+    const height = pointerHeightAt(event.clientY) ?? drag.currentHeight
+    drag.currentHeight = height
+    resizeDragRef.current = null
+    resizeHeaderRegion(height)
+  }
+
+  const cancelSplitterDrag = (): void => {
+    if (resizeDragRef.current === null) return
+    resizeDragRef.current = null
+    setPreviewHeaderHeight(null)
+  }
+
+  const resizeSplitterFromKeyboard = (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
+    if (event.key === '0') {
+      event.preventDefault()
+      setPreviewHeaderHeight(null)
+      updatePreferences({ headerRegionHeight: null })
+      return
+    }
+    let nextHeight: number | null = null
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextHeight = splitBounds.value - 24
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextHeight = splitBounds.value + 24
+    if (event.key === 'Home') nextHeight = splitBounds.minimum
+    if (event.key === 'End') nextHeight = splitBounds.maximum
+    if (nextHeight === null) return
+    event.preventDefault()
+    resizeHeaderRegion(nextHeight)
+  }
 
   useEffect(() => {
     const sync = (): void => setFooterSnapshot(props.readFooterSnapshot())
@@ -251,8 +443,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const compactHeader = props.collapsed || preferences.headerMode === 'compact'
 
   return (
-    <div className={props.collapsed ? styles.shell + ' ' + styles.rail : styles.shell} style={{ width: props.width }}>
-      <div className={styles.brandRow}>
+    <div ref={shellRef} className={props.collapsed ? styles.shell + ' ' + styles.rail : styles.shell} style={{ width: props.width }}>
+      <div
+        ref={headerRegionRef}
+        className={styles.headerRegion}
+        id={headerRegionId}
+        style={wide && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px` } : undefined}
+      >
+        <div className={styles.brandRow}>
         <button
           className={styles.brandButton}
           type="button"
@@ -311,6 +509,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         </div>
       ) : null}
 
+      </div>
+
       {customizeOpen && wide ? (
         <section className={styles.customizePanel} aria-label={text(props.t, 'threadSidebarCustomize')}>
           <div className={styles.customizeTitle}>
@@ -354,7 +554,30 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         </section>
       ) : null}
 
-      <div className={styles.regionArea}>
+      {wide ? (
+        <button
+          ref={splitterRef}
+          type="button"
+          className={styles.splitter}
+          role="separator"
+          aria-label={text(props.t, 'threadSidebarResize')}
+          aria-orientation="horizontal"
+          aria-controls={`${headerRegionId} ${threadRegionId}`}
+          aria-valuemin={splitBounds.minimum}
+          aria-valuemax={splitBounds.maximum}
+          aria-valuenow={previewHeaderHeight === null ? splitBounds.value : Math.round(previewHeaderHeight)}
+          title={text(props.t, 'threadSidebarResizeHint')}
+          onPointerDown={startSplitterDrag}
+          onPointerMove={moveSplitter}
+          onPointerUp={finishSplitterDrag}
+          onPointerCancel={cancelSplitterDrag}
+          onLostPointerCapture={cancelSplitterDrag}
+          onKeyDown={resizeSplitterFromKeyboard}
+          onDoubleClick={() => updatePreferences({ headerRegionHeight: null })}
+        />
+      ) : null}
+
+      <div ref={threadRegionRef} className={styles.regionArea} id={threadRegionId}>
         {wide
           ? props.renderSlot('sidebar.workspaces', {
               wide,
@@ -365,7 +588,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           : null}
       </div>
 
-      <footer className={styles.footer}>
+      <footer ref={footerRegionRef} className={styles.footer}>
         {visibleFooterEntries.map(entry => (
           <Tooltip key={entry.id} label={entry.label} side={props.collapsed ? 'right' : 'top'} delayMs={500} portal>
             <div className={styles.footerItem}>{renderFooterEntry(entry, wide)}</div>

@@ -265,10 +265,12 @@ settings, so it is a decision, not a fix.
 
 ## Phase 9 — New capability
 
-- [ ] Port sidebar-resize into thread-sidebar — blocked on the Host:
-      `dsh-client-ui-layout` exposes only `toggleSidebar()`, the frame starts at a
-      hardcoded 280px and forgets a dragged width. Needs a public width setter
-      and a persisted start width
+- [x] Thread-sidebar navigation/thread split — accessible horizontal handle
+      resizes the vertical space for the header controls and the project/thread
+      middle region. Compact mode keeps the header controls in a horizontal
+      icon row; expanded mode keeps labeled controls vertical. The selected
+      header height persists with sidebar preferences, with keyboard resizing
+      and a double-click reset; the actual collapsed Host rail hides the handle.
 - [x] `@dshfiles/sidebar-commands`: `/goto` popup over sidebar panels and
       recent sessions (built: `dsh-spotlight` targets the removed client runtime)
 - [x] `@dshfiles/diff-viewed`: Viewed toggle and n/m count in

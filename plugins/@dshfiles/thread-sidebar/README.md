@@ -61,12 +61,13 @@ slot, and retained native declarations do not transfer render authorization.
 The custom root and workspace browser both register at priority `-1000`, below
 the Host's default priority `0`; lower priority wins the live single slot.
 
-Sidebar width is user-draggable, not fixed. The frame renders a `col-resize`
-handle at the sidebar's edge whenever the sidebar is open, and dragging it calls
-the frame's own `setSidebar`, which clamps to 264-420px. Measured live: 279px
-before, 419px after dragging right, 263px after dragging back left. The width is
-not persisted and the plugin does not control it; an earlier claim in this work
-that no width control existed was wrong on both counts.
+The shell has a horizontal drag handle between its navigation header and the
+project/thread region. It adjusts the header's height while preserving at least
+120px for the thread list. The height is saved with the other browser
+preferences; double-clicking the handle restores the content-sized default.
+Arrow keys resize in 24px steps, and Home/End move to the smallest/largest
+available header size. The handle is hidden when the Host collapses the sidebar
+to its narrow rail, where the thread region is not rendered.
 
 ## Installed DSH 0.2.0-rc.2 sidebar contract
 
