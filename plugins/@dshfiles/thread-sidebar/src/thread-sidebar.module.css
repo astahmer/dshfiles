@@ -14,7 +14,6 @@
 }
 
 .titleRow,
-.projectFilter,
 .groupHeader,
 .row,
 .actions,
@@ -56,8 +55,16 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/*
+ * The reference sets the project filter as the sidebar's one large label: its
+ * cap-to-descender span measures 22px, which is roughly a 21px font, and it is
+ * inset to 29px with the chevron pushed to the far edge. Ours rendered at
+ * 13.28px on a 13px inset, which read as a form control rather than the
+ * sidebar's primary scope switch.
+ */
 .projectFilter {
   position: relative;
+  margin: 0.25rem 1rem;
 }
 
 .projectFilter > summary {
@@ -65,9 +72,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-primary);
   cursor: pointer;
-  font-size: 0.83rem;
+  font-size: 1.3rem;
+  font-weight: 500;
   list-style: none;
 }
 
@@ -77,11 +85,11 @@
 
 .projectFilter > summary::after {
   content: '';
-  width: 0.4rem;
-  height: 0.4rem;
+  width: 0.5rem;
+  height: 0.5rem;
   flex: 0 0 auto;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
   transform: rotate(45deg) translate(-0.1rem, -0.1rem);
   transition: transform 120ms ease;
 }
