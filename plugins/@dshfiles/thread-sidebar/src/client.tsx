@@ -484,6 +484,23 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                           title={new Date(session.updatedAt).toLocaleString()}
                           onClick={() => openThread(session.id)}
                         >
+                          {/*
+                            The reference leads each row with its title, then a
+                            single dimmer line of context beneath it. A project
+                            name stacked above the title made the title the
+                            second line and pushed the row past the reference
+                            height, so the project and the run state now share
+                            one trailing line.
+                          */}
+                          <span className={styles.rowTitle}>
+                            {session.running ? (
+                              <span className={styles.runningDot} title={props.tSidebar('threadSidebarWorking')}>
+                                <span aria-hidden="true">●</span>
+                                <span className={styles.srOnly}>{props.tSidebar('threadSidebarWorking')}</span>
+                              </span>
+                            ) : null}
+                            {session.displayTitle}
+                          </span>
                           <span className={styles.rowProject}>
                             {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
                             {lineage.parentTitle === undefined ? null : (
@@ -493,8 +510,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                               </span>
                             )}
                           </span>
-                          <span className={styles.rowTitle}>{session.displayTitle}</span>
-                          {session.running ? <span className={styles.running}>{props.tSidebar('threadSidebarWorking')}</span> : null}
                         </button>
                         <div className={styles.actions}>
                           {!archived ? (
