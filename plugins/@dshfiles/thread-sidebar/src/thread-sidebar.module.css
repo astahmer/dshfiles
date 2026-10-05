@@ -466,7 +466,6 @@ body[data-ds-dark-theme] .rowTime {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .projectFilter > summary::after,
   .actions {
     transition: none;

@@ -435,7 +435,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       {pickerOpen && (
         <ProjectFolderPicker
           directoryPicker={props.directoryPicker}
-          machineName={machineName}
+          machineName={displayedMachineName}
           onClose={() => setPickerOpen(false)}
           onRegisterWorkspace={async canonicalPath => {
             const workspace = await props.registerWorkspace(canonicalPath)

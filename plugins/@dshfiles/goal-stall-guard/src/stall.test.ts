@@ -34,7 +34,11 @@ describe('isGoalOpeningPrompt', () => {
 })
 
 describe('StallDetector', () => {
-  const runRound = (detector: ReturnType<typeof StallDetector>, round: number, produced: boolean): ReturnType<ReturnType<typeof StallDetector>['turnEnded']> => {
+  const runRound = (
+    detector: ReturnType<typeof StallDetector>,
+    round: number,
+    produced: boolean,
+  ): ReturnType<ReturnType<typeof StallDetector>['turnEnded']> => {
     detector.turnStarted()
     detector.promptEntered(roundPrompt(round))
     detector.turnIdentified(round)

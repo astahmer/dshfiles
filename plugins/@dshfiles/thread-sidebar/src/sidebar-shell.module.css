@@ -312,7 +312,6 @@
 }
 
 .dragHandle {
-
   color: var(--dsw-alias-label-tertiary);
   cursor: grab;
   font-size: 14px;
@@ -521,7 +520,6 @@
  * guard to the shell rather than leaving the preference half-honoured.
  */
 @media (prefers-reduced-motion: reduce) {
-
   .visibilityToggle,
   .visibilityThumb,
   .projectFilter > summary::after {

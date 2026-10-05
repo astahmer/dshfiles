@@ -124,9 +124,7 @@ const modelsFor = (entries: readonly CatalogEntry[], baseUrl: string): readonly 
  * Both stream shapes are wrapped, not just completions: the Responses API can
  * produce the same reasoning-only settlement on a different route.
  */
-const rejectEmptyCompletion = <Streams extends { stream: (...args: never[]) => AsyncIterable<unknown> }>(
-  api: Streams,
-): Streams => {
+const rejectEmptyCompletion = <Streams extends { stream: (...args: never[]) => AsyncIterable<unknown> }>(api: Streams): Streams => {
   const original = api.stream.bind(api)
   return {
     ...api,

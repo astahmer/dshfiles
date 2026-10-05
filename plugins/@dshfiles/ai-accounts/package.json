@@ -25,8 +25,8 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
     "@earendil-works/pi-ai": "~0.87.1",
-    "zod": "^4.4.3",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",

@@ -25,12 +25,7 @@ const frame = (delta: Record<string, unknown>, finish: string | null): string =>
 
 /** Reasoning only, then a clean `stop`: the shape that ended turns silently. */
 const reasoningOnlyBody = (): string =>
-  [
-    frame({ role: 'assistant' }, null),
-    frame({ reasoning_content: 'thinking about the answer' }, null),
-    frame({}, 'stop'),
-    'data: [DONE]\n\n',
-  ].join('')
+  [frame({ role: 'assistant' }, null), frame({ reasoning_content: 'thinking about the answer' }, null), frame({}, 'stop'), 'data: [DONE]\n\n'].join('')
 
 /** The same response, plus answer text. */
 const answeredBody = (): string =>
@@ -68,8 +63,7 @@ const CONTEXT = {
 
 const complete = async (body: string): Promise<StreamOutcome> => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () =>
-    new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
+  globalThis.fetch = (async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
   try {
     const api = openAICompletionsApi()
     const stream = api.stream(MODEL, CONTEXT, { apiKey: 'test-key' } as never)

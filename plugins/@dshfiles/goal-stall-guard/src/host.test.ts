@@ -11,8 +11,7 @@ import { describe, expect, it, vi } from 'vitest'
  * `message.content` is empty, and `turn/end` with `{ kind: 'completed' }`.
  */
 
-const roundPrompt = (round: number): string =>
-  `<goal_round>\nObjective: "restyle the sidebar"\nRound: ${round}/256\n\nContinue working toward the objective.`
+const roundPrompt = (round: number): string => `<goal_round>\nObjective: "restyle the sidebar"\nRound: ${round}/256\n\nContinue working toward the objective.`
 
 interface Harness {
   readonly pause: ReturnType<typeof vi.fn>
@@ -29,10 +28,9 @@ interface BuiltPlugin {
   readonly apply: (ctx: unknown, config?: unknown) => unknown
 }
 
-const loadPlugin = async (): Promise<BuiltPlugin> => {
-  const module = (await import('../dist/index.js')) as unknown as BuiltPlugin
-  return module
-}
+const builtEntry = new URL('../dist/index.js', import.meta.url).href
+
+const loadPlugin = async (): Promise<BuiltPlugin> => import(builtEntry)
 
 /**
  * `createBaseApi` binds cordis's whole event surface when it builds the plugin

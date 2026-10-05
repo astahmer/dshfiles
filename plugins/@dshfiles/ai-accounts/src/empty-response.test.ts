@@ -39,8 +39,7 @@ const answered = (): string =>
   ].join('')
 
 /** Answer text only, no reasoning: the common case must not be disturbed. */
-const textOnly = (): string =>
-  [frame({ role: 'assistant' }, null), frame({ content: 'the answer' }, null), frame({}, 'stop'), 'data: [DONE]\n\n'].join('')
+const textOnly = (): string => [frame({ role: 'assistant' }, null), frame({ content: 'the answer' }, null), frame({}, 'stop'), 'data: [DONE]\n\n'].join('')
 
 /** Whitespace is not an answer. */
 const whitespaceOnly = (): string =>
@@ -64,8 +63,7 @@ const MODEL = 'stealth/space-bunny-alpha'
 
 const run = async (body: string): Promise<Outcome> => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () =>
-    new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
+  globalThis.fetch = (async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
   try {
     const provider = createCommandCodeProvider()
     // `getModels()` is the sync catalog; the fallback entry is the OpenAI shape,
@@ -74,11 +72,9 @@ const run = async (body: string): Promise<Outcome> => {
     if (model === undefined) throw new Error('Command Code provider advertised no models.')
     const deltas: string[] = []
     let settled: readonly { type?: string; text?: string }[] | undefined
-    for await (const event of provider.stream(
-      model,
-      { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 0 }] } as never,
-      { apiKey: 'test-key' },
-    )) {
+    for await (const event of provider.stream(model, { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 0 }] } as never, {
+      apiKey: 'test-key',
+    })) {
       if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_delta') deltas.push(event.type)
       if (event.type === 'done') settled = (event.message as { content?: readonly { type?: string; text?: string }[] }).content
     }
@@ -125,9 +121,7 @@ describe('settlement classification', () => {
   })
 
   it('names the model and both stop reasons', () => {
-    expect(
-      describeEmptyResponse({ model: 'stealth/space-bunny-alpha', stopReason: 'stop', rawStopReason: 'stop' }),
-    ).toContain('stealth/space-bunny-alpha')
+    expect(describeEmptyResponse({ model: 'stealth/space-bunny-alpha', stopReason: 'stop', rawStopReason: 'stop' })).toContain('stealth/space-bunny-alpha')
   })
 })
 

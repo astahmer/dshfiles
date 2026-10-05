@@ -1,6 +1,7 @@
 {
   "name": "@dshfiles/shortcuts",
   "version": "0.1.0",
+  "private": true,
   "description": "Capture-phase keyboard shortcuts that claim their chords before the browser does",
   "license": "MIT",
   "files": [
@@ -17,10 +18,9 @@
     "./client": "./dist/client.js"
   },
   "scripts": {
-    "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build"
-  },
-  "dependencies": {
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx"
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -28,11 +28,14 @@
     "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.9.0"
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "jsdom": "^26.1.0",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
+    "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0"
