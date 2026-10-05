@@ -92,7 +92,7 @@ const describe = result => {
   if (result.evidence === 'blank') return 'booted a blank page: the kernel-owned boot element never appeared, so nothing was verified'
   if (result.evidence === 'stalled') return 'left the boot element up for the whole window without reporting a failure'
   if (result.slotFailures.length > 0) {
-    return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}`
+    return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}, so those panels are blank even though every entry activated`
   }
   if (result.failures.length > 0) return result.failures.map(entry => `${entry.id} (${entry.state})`).join(', ')
   if (!result.ok) return 'the Web UI did not mount cleanly'
