@@ -109,6 +109,32 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
 - Shared checkout: if another agent's files are in `jj status`, they are not
   yours. Commit only your own paths.
 
+### T3 threads and JJ workspaces
+
+- This repository uses one shared JJ store. Parallel checkouts created with
+  `jj workspace add` may sit beside the repository directory; they are still
+  linked and versioned when `jj workspace list` shows them.
+- For independent code work, create a named workspace from this repository,
+  based on the intended local revision:
+
+  ```sh
+  jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r main
+  ```
+
+- Before editing, verify `jj root`, `jj status`, and `jj workspace list` from
+  that path. Record the T3 thread ID, workspace name, and absolute path in the
+  task handoff. Do not use an ad-hoc copy or a T3-generated project directory
+  as a code checkout.
+- T3's null `worktreePath` means the thread is bound to the project's main
+  checkout; it does not discover a manually created JJ workspace. Enter the
+  named workspace explicitly before editing, and confirm its workspace name
+  still appears in `jj workspace list`. A T3 Git worktree is not a JJ
+  workspace unless JJ confirms that it shares this repository.
+- Keep active source workspaces untouched during consolidation. Duplicate a
+  fixed revision snapshot into an integration workspace, rebase that copy onto
+  `main`, and retain the source workspace until tree equality and status prove
+  it safe to forget.
+
 ## Environment
 
 Node comes from **fnm**, pinned by `.node-version`, not from Nix.
