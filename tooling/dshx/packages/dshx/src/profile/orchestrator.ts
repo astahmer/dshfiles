@@ -1,5 +1,6 @@
-import { realpath } from 'node:fs/promises'
+import { readFile, realpath, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
+import { spawn } from 'node:child_process'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY, classifyCompatibility } from '../compat/index.js'
 import { DshxError } from '../diagnostics.js'
@@ -165,6 +166,41 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * The pnpm install that materializes the profile's `link:` dependencies. The
+ * failure detail is bounded: an install log names its cause in the tail.
+ */
+const defaultInstall = (profileRoot: string, options: ProfileOrchestratorOptions) => async (): Promise<void> => {
+  const result = await new Promise<{ readonly code: number; readonly detail: string }>(resolve => {
+    const child = spawn('pnpm', ['install', '--prefer-offline'], {
+      cwd: profileRoot,
+      env: options.env === undefined ? process.env : { ...process.env, ...options.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let detail = ''
+    child.stdout.on('data', (chunk: Buffer) => {
+      detail += chunk.toString('utf8')
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      detail += chunk.toString('utf8')
+    })
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      resolve({ code: -1, detail: `pnpm install did not finish within ${String(ADD_TIMEOUT_MS)}ms` })
+    }, ADD_TIMEOUT_MS)
+    child.once('exit', code => {
+      clearTimeout(timer)
+      resolve({ code: code ?? -1, detail: detail.slice(-800) })
+    })
+  })
+  if (result.code !== 0) {
+    throw new DshxError('DSHX4304', `Failed to install the profile after linking the project: ${result.detail}`, {
+      file: join(profileRoot, 'package.json'),
+      hint: `Run "pnpm install" in ${profileRoot} and fix the reported failure.`,
+    })
+  }
+}
+
 function duplicateLoaderIds(project: ProfileProject, source: string): string[] {
   let value: unknown
   try {
@@ -314,7 +350,7 @@ export async function inspectProjectProfile(project: ProfileProject, options: Pr
       hint: `Run "pnpm exec dsh plugin --profile ${project.profile} list --depth 0 --json" and fix the reported failure.`,
     })
   }
-  const { dependencies } = await parseDependencies(project, result.stdout)
+  const { dependencies, profileRoot } = await parseDependencies(project, result.stdout)
   const desired = dependencies.find(dependency => dependency.packageId === project.packageId)
   const aliases = dependencies.filter(dependency => dependency.packageId !== project.packageId && dependency.path === project.root)
   if (desired !== undefined && desired.path !== project.root) {
@@ -336,10 +372,21 @@ export async function inspectProjectProfile(project: ProfileProject, options: Pr
     profile: project.profile,
     packageId: project.packageId,
     root: project.root,
+    ...(profileRoot === undefined ? {} : { profileRoot }),
   }
 }
 
-/** Ensure the project is linked once through the official DSH profile command. */
+/**
+ * Install the project into the profile through the repository-proven local
+ * route: a `link:` manifest dependency plus a package-manager install.
+ *
+ * `dsh plugin add <path>` resolves the directory through registry name
+ * resolution and refuses essentially every local layout, so linking a project
+ * means editing the profile's own package.json — preserving every unrelated
+ * dependency, bundle, and config row — and letting pnpm materialize it. The
+ * re-inspection afterwards is what proves the link rather than trusting the
+ * install's exit code.
+ */
 export async function ensureProjectProfile(project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<PreparedProjectProfile> {
   validateProfileName(project)
   const dsh = await resolveDshInstallation(project, options)
@@ -358,13 +405,56 @@ export async function ensureProjectProfile(project: ProfileProject, options: Pro
       diagnostics: dsh.diagnostics,
     }
   }
-  const result = await runDsh(project, ['plugin', '--profile', project.profile, 'add', project.root], ADD_TIMEOUT_MS, options)
-  if (result.exitCode !== 0) {
-    throw new DshxError('DSHX4304', `Failed to link the project into DSH profile ${JSON.stringify(project.profile)}: ${commandDetail(result)}`, {
-      cause: result.cause,
+  if (existing.profileRoot === undefined) {
+    throw new DshxError('DSHX4304', `Profile ${JSON.stringify(project.profile)} has no directory DSH reported, so the project cannot be linked.`, {
       file: project.packageFile,
-      hint: `Run "pnpm exec dsh plugin --profile ${project.profile} add ${project.root}" and fix the reported failure.`,
+      hint: `Boot the profile once, or create it under the profiles root with a package.json, then retry.`,
     })
+  }
+  const profileRoot = existing.profileRoot
+  const manifestFile = join(profileRoot, 'package.json')
+  let manifest: Record<string, unknown>
+  try {
+    manifest = JSON.parse(await readFile(manifestFile, 'utf8')) as Record<string, unknown>
+  } catch (cause) {
+    throw new DshxError('DSHX4304', `The profile manifest is not valid JSON: ${manifestFile}`, {
+      cause,
+      file: project.packageFile,
+      hint: 'Repair the profile manifest before linking this project.',
+    })
+  }
+  const dependencies = isObject(manifest.dependencies) ? { ...manifest.dependencies } : {}
+  const existingLink = dependencies[project.packageId]
+  if (typeof existingLink === 'string' && existingLink !== `link:${project.root}`) {
+    throw new DshxError('DSHX4303', `The profile already links ${JSON.stringify(project.packageId)} from ${existingLink}.`, {
+      file: project.packageFile,
+      hint: `Remove the dependency from ${manifestFile} if it is stale, then retry.`,
+    })
+  }
+  const dshConfig = isObject(manifest.dsh) ? { ...manifest.dsh } : {}
+  const profileConfig = isObject(dshConfig.profile) ? { ...dshConfig.profile } : {}
+  const bundles = Array.isArray(profileConfig.bundles) ? [...(profileConfig.bundles as unknown[])] : []
+  const withoutProject = bundles.filter(bundle => bundle !== project.packageId)
+  dependencies[project.packageId] = `link:${project.root}`
+  manifest.dependencies = dependencies
+  profileConfig.bundles = [...withoutProject, project.packageId]
+  dshConfig.profile = profileConfig
+  manifest.dsh = dshConfig
+  await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  const install = options.install ?? defaultInstall(profileRoot, options)
+  try {
+    await install(profileRoot)
+  } catch (cause) {
+    if (cause instanceof DshxError) throw cause
+    throw new DshxError(
+      'DSHX4304',
+      `Failed to install the profile after linking ${JSON.stringify(project.packageId)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      {
+        cause,
+        file: manifestFile,
+        hint: `Run "pnpm install" in ${profileRoot} and fix the reported failure.`,
+      },
+    )
   }
   const installed = await inspectProjectProfile(project, {
     ...options,
@@ -372,8 +462,8 @@ export async function ensureProjectProfile(project: ProfileProject, options: Pro
     ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
   })
   if (installed.state !== 'linked') {
-    throw new DshxError('DSHX4304', 'DSH reported a successful plugin add, but the project is still absent from the profile.', {
-      file: project.packageFile,
+    throw new DshxError('DSHX4304', 'The profile install finished, but the project is still absent from the profile.', {
+      file: manifestFile,
       hint: `Inspect the profile with "pnpm exec dsh plugin --profile ${project.profile} list --depth 0 --json".`,
     })
   }

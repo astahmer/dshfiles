@@ -32,6 +32,8 @@ export interface ProfileOrchestratorOptions {
   readonly runner?: DshCommandRunner
   readonly executable?: 'local' | 'global'
   readonly compatibility?: DshCompatibility
+  /** Materialize the profile's link: dependencies; defaults to a pnpm install. */
+  readonly install?: (profileRoot: string) => Promise<void>
 }
 
 /** Installed DSH version and the adapter DSHX will use for it. */
@@ -53,12 +55,15 @@ export type ProjectProfileLink =
       readonly profile: string
       readonly packageId: string
       readonly root: string
+      /** The profile's own directory, when DSH reported one. */
+      readonly profileRoot?: string
     }
   | {
       readonly state: 'linked'
       readonly profile: string
       readonly packageId: string
       readonly root: string
+      readonly profileRoot?: string
     }
 
 /** Profile state ready for a later dev process manager. */

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -55,6 +55,14 @@ function list(dependencies: Record<string, { path?: string; version?: string }> 
 
 function composition(source = '[]\n'): DshCommandResult {
   return success(source)
+}
+
+/** A minimal profile directory: what `dsh plugin list` reports as its root. */
+async function temporaryProfile(): Promise<string> {
+  const root = await realpath(await mkdtemp(resolve(tmpdir(), 'dshx-profiledir-')))
+  temporaryDirectories.push(root)
+  await writeFile(resolve(root, 'package.json'), `${JSON.stringify({ name: 'dsh-profile-web', private: true }, null, 2)}\n`)
+  return root
 }
 
 function queuedRunner(results: readonly DshCommandResult[], calls: RecordedCommand[] = []): DshCommandRunner {
@@ -300,14 +308,19 @@ describe('profile linking', () => {
     ])
   })
 
-  it('adds an absent project exactly once and verifies the resulting link', async () => {
+  it('links an absent project through the profile manifest and verifies the resulting link', async () => {
     const project = await temporaryProject()
+    const profileRoot = await temporaryProfile()
     const calls: RecordedCommand[] = []
+    const installs: string[] = []
     const prepared = await ensureProjectProfile(project, {
       runner: queuedRunner(
-        [success('0.2.0-rc.2'), list(), composition(), success('installed'), list({ [project.packageId]: { path: project.root } }), composition()],
+        [success('0.2.0-rc.2'), list({}, profileRoot), composition(), list({ [project.packageId]: { path: project.root } }, profileRoot), composition()],
         calls,
       ),
+      install: async root => {
+        installs.push(root)
+      },
     })
     expect(prepared).toMatchObject({
       profile: 'web',
@@ -316,32 +329,66 @@ describe('profile linking', () => {
       link: 'added',
       diagnostics: [],
     })
+    expect(installs).toEqual([profileRoot])
+    const manifest = JSON.parse(await readFile(resolve(profileRoot, 'package.json'), 'utf8'))
+    expect(manifest.dependencies[project.packageId]).toBe(`link:${project.root}`)
+    expect(manifest.dsh.profile.bundles).toContain(project.packageId)
     expect(calls.map(call => call.args)).toEqual([
       ['--version'],
       ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json'],
       ['--profile', 'web', '--dump-config'],
-      ['plugin', '--profile', 'web', 'add', project.root],
       ['plugin', '--profile', 'web', 'list', '--depth', '0', '--json'],
       ['--profile', 'web', '--dump-config'],
     ])
   })
 
-  it('reports an official add failure', async () => {
+  it('refuses to retarget a manifest link from another path', async () => {
     const project = await temporaryProject()
+    const profileRoot = await temporaryProfile()
+    await writeFile(
+      resolve(profileRoot, 'package.json'),
+      `${JSON.stringify({ name: 'dsh-profile-web', private: true, dependencies: { [project.packageId]: 'link:/somewhere/else' } }, null, 2)}\n`,
+    )
     await expect(
       ensureProjectProfile(project, {
-        runner: queuedRunner([success('0.2.0-rc.2'), list(), composition(), { exitCode: 1, stdout: '', stderr: 'pnpm add failed' }]),
+        runner: queuedRunner([success('0.2.0-rc.2'), list({}, profileRoot), composition()]),
+        install: async () => undefined,
       }),
-    ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('pnpm add failed') })
+    ).rejects.toMatchObject({ code: 'DSHX4303', message: expect.stringContaining('/somewhere/else') })
   })
 
-  it('rejects a successful add whose link remains absent', async () => {
+  it('reports an install failure with the bounded detail', async () => {
+    const project = await temporaryProject()
+    const profileRoot = await temporaryProfile()
+    await expect(
+      ensureProjectProfile(project, {
+        runner: queuedRunner([success('0.2.0-rc.2'), list({}, profileRoot), composition()]),
+        install: async () => {
+          throw new Error('pnpm install failed: ERR_PNPM_UNEXPECTED_STORE')
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('ERR_PNPM_UNEXPECTED_STORE') })
+  })
+
+  it('rejects a successful install whose link remains absent', async () => {
+    const project = await temporaryProject()
+    const profileRoot = await temporaryProfile()
+    await expect(
+      ensureProjectProfile(project, {
+        runner: queuedRunner([success('0.2.0-rc.2'), list({}, profileRoot), composition(), list({}, profileRoot), composition()]),
+        install: async () => undefined,
+      }),
+    ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('still absent') })
+  })
+
+  it('refuses to link when DSH reports no profile directory', async () => {
     const project = await temporaryProject()
     await expect(
       ensureProjectProfile(project, {
-        runner: queuedRunner([success('0.2.0-rc.2'), list(), composition(), success(), list(), composition()]),
+        runner: queuedRunner([success('0.2.0-rc.2'), list(), composition()]),
+        install: async () => undefined,
       }),
-    ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('still absent') })
+    ).rejects.toMatchObject({ code: 'DSHX4304', message: expect.stringContaining('no directory') })
   })
 })
 
