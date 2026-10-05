@@ -174,7 +174,16 @@ const hostBoot = (result: Partial<BootCheckResult>): NonNullable<CliRuntime['che
   vi.fn(async () => ({ ok: true, failures: [], timedOut: false, unsupportedNode: false, url: 'http://127.0.0.1:4100/?token=abc', ...result }))
 
 const clientBoot = (result: Partial<ClientBootCheckResult>): NonNullable<CliRuntime['checkClientBoot']> =>
-  vi.fn(async () => ({ ok: true, entries: [], failures: [], timedOut: false, url: 'http://127.0.0.1:4100/?token=abc', ...result }))
+  vi.fn(async () => ({
+    ok: true,
+    entries: [],
+    failures: [],
+    slotFailures: [],
+    compositionFailures: [],
+    timedOut: false,
+    url: 'http://127.0.0.1:4100/?token=abc',
+    ...result,
+  }))
 
 describe('dshx check --boot', () => {
   it('boots the throwaway profile on the requested port once the static check passes', async () => {

@@ -63,7 +63,8 @@ const signalProcessGroup = ({ child, signal }: { readonly child: ChildProcess; r
     process.kill(-child.pid, signal)
     return true
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ESRCH') return false
+    // macOS answers EPERM, not ESRCH, for a group whose members are all unreaped zombies.
+    if (error instanceof Error && 'code' in error && (error.code === 'ESRCH' || error.code === 'EPERM')) return false
     throw error
   }
 }

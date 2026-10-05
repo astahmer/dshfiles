@@ -10,6 +10,7 @@
     "catalogReferences",
   ],
   "ignoreBinaries": ["dsh"],
+  "ignore": ["scripts/smoke-multi-host*.mjs"],
   "workspaces": {
     ".": {
       "entry": ["e2e/support/steps.ts", "scripts/smoke-client-slot.mjs"],

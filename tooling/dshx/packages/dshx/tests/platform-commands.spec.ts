@@ -262,8 +262,8 @@ describe('dshx config get/set', () => {
     expect(set.code).toBe(0)
     expect(unset.code).toBe(0)
     expect(settings.mutate.mock.calls).toEqual([
-      [['plugin', [{ op: 'set', path: ['enabled'], value: true }], 3]],
-      [['plugin', [{ op: 'unset', path: ['servers'] }], 3]],
+      [{ ns: 'plugin', ops: [{ op: 'set', path: ['enabled'], value: true }], expectedRevision: 3 }],
+      [{ ns: 'plugin', ops: [{ op: 'unset', path: ['servers'] }], expectedRevision: 3 }],
     ])
   })
 })
