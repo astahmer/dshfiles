@@ -40,18 +40,6 @@ export const cursorSessionRecordForResume = (record: CursorSessionRecord | undef
   return record
 }
 
-  record: CursorSessionRecord | undefined,
-  instanceId: string,
-  operationId: string,
-): ReadyCursorSessionRecord => {
-  if (record === undefined) throw new Error('Cursor provider session record is missing; refusing to change recovery state.')
-  if (record.instanceId !== instanceId) throw new Error('Cursor provider session belongs to a different runtime instance.')
-  if (record.state === 'creating') throw new Error('Cursor session creation outcome is uncertain; prompt reconciliation cannot resolve it.')
-  if (record.pendingOperation === undefined) throw new Error('Cursor provider has no uncertain prompt receipt to reconcile.')
-  if (record.pendingOperation.id !== operationId) throw new Error('Cursor prompt receipt changed; refusing to clear a different operation.')
-  return { state: 'ready', instanceId: record.instanceId, nativeSessionId: record.nativeSessionId }
-}
-
 export const cursorSessionDomain = defineDomain({
   name: 'cursor_agent_sessions',
   version: 1,
