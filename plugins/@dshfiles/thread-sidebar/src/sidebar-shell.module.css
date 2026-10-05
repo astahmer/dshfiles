@@ -79,6 +79,18 @@
 }
 
 /*
+ * The collapsed rail is 55px wide while the expanded compact row uses 68px
+ * targets, so the widest button was clipped at the rail's edge. The rail keeps
+ * the square shape and drops to a size that fits rather than losing a row.
+ */
+.rail .headerCompact .headerLink,
+.rail .headerCompact .selectedLink {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--dsw-radius-md);
+}
+
+/*
  * Reference 03 sets expanded rows 64px apart with the label inset to 73px, so
  * a row carries real vertical presence and the label clears the icon. Ours was
  * 43px apart with the label at 22px, which packed eight entries into a strip.
