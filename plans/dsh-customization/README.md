@@ -120,9 +120,9 @@ is not a customization feature.
 |---|---|---|
 | Provider accounts (Codex, OpenCode Go, Command Code) | built with dshx | `plugins/@dshfiles/ai-accounts` |
 | Queue reordering | built with dshx | `plugins/@dshfiles/queue-reorder` |
-| Independent Agent communication | built with dshx; profile activation pending | `plugins/@dshfiles/agent-communication` |
+| Independent Agent communication | built with dshx; profile activation verified | `plugins/@dshfiles/agent-communication` |
 | Thread sidebar and lifecycle | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
-| Thread links and recursive delegation context | implemented; full runtime acceptance pending | `plugins/@dshfiles/thread-sidebar` and DSH standard web preset |
+| Thread links and recursive delegation context | implemented; runtime acceptance verified | `plugins/@dshfiles/thread-sidebar` and DSH standard web preset |
 | Sidebar header links | implemented; combined DSH boot verified | `plugins/@dshfiles/thread-sidebar` |
 | MCP server management and catalog | implemented; combined DSH boot verified | `plugins/@dshfiles/mcp-servers` |
 | Secret catalog | implemented; synthetic CLI tests and combined DSH boot verified | `plugins/@dshfiles/secret-catalog` |
