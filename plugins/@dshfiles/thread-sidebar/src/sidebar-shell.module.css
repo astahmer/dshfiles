@@ -288,7 +288,31 @@
   min-height: 86px;
 }
 
+/*
+ * The shell declares no focus ring of its own, so every control here inherits
+ * whatever the Host's global styles happen to provide. The visibility switch
+ * measured 0px/none when focused, and the header links only matched the Host's
+ * rule by accident of specificity. Keyboard focus has to be visible here, not
+ * inherited by luck.
+ */
+.brandButton:focus-visible,
+.headerLink:focus-visible,
+.selectedLink:focus-visible,
+.moreButton:focus-visible,
+.visibilityToggle:focus-visible,
+.projectFilter > summary:focus-visible,
+.dragHandle:focus-visible,
+.headerTools button:focus-visible,
+.customizeTitle button:focus-visible,
+.customizeRow button:focus-visible,
+.projectMenu button:focus-visible,
+.editorActions button:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 .dragHandle {
+
   color: var(--dsw-alias-label-tertiary);
   cursor: grab;
   font-size: 14px;
