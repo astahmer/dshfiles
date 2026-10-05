@@ -95,6 +95,7 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@standard-schema/spec": "^1.1.0",
     "@types/ws": "^8.5.13",
+    "chokidar": "5.0.0",
     "citty": "0.2.2",
     "create-dshx": "workspace:*",
     "diff": "9.0.0",
