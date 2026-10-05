@@ -98,4 +98,3 @@ export const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
   }
   return { routes, rejected }
 }
-

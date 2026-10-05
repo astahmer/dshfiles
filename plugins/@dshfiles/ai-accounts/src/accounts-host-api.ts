@@ -7,7 +7,6 @@ import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { readKeyFromEnv } from './credentials.js'
 import { resolveCodexHomeLayout } from './codex-home.js'
-import { COMMANDCODE_KIND } from './provider-routes.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -150,4 +149,3 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
   activeAccounts.config = config
   activeAccounts.pool.setDistribution(file.distribution)
 }
-

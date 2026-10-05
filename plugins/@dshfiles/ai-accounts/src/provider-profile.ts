@@ -120,4 +120,3 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     }))
   }
 }
-
