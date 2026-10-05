@@ -250,13 +250,18 @@
 }
 
 /* The reference row is handle · icon · label · toggle, all on one grid. */
+/*
+ * Reference 10 sets customize rows 60px apart on a uniform panel with no
+ * separator, so the pitch alone carries the grouping. Ours was 44px with a
+ * hairline, which read as a dense settings list rather than the reference's
+ * unhurried rows.
+ */
 .customizeRow {
   display: grid;
   grid-template-columns: 16px 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  min-height: 56px;
 }
 
 .dragHandle {
@@ -295,14 +300,18 @@
  * A filled track with a light thumb reads as on without relying on the host
  * accent colour, and `role="switch"` keeps the state announced.
  */
+/*
+ * The reference's switch is a 32x32 rounded square, not a wide pill, so the
+ * thumb is a circle that fills it rather than a track with a sliding knob.
+ */
 .visibilityToggle {
   position: relative;
-  width: 40px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   padding: 0;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-multi-select);
   cursor: pointer;
   transition: background 120ms ease;
@@ -315,20 +324,26 @@
 
 .visibilityThumb {
   position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 18px;
-  height: 18px;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--dsw-alias-label-tertiary);
   transition:
-    transform 120ms ease,
+    opacity 120ms ease,
     background 120ms ease;
+  transform: translate(-50%, -50%);
 }
 
+/*
+ * On, the square is the accent and the thumb is the light check; off, the track
+ * recedes and the thumb reads as the outline. That is the reference's two-state
+ * language, expressed with opacity rather than a sliding knob.
+ */
 .visibilityToggle[aria-checked='true'] .visibilityThumb {
   background: var(--dsw-alias-switch-thumb);
-  transform: translateX(18px);
+  opacity: 1;
 }
 
 .regionArea {
