@@ -133,13 +133,14 @@ button:disabled {
 }
 .pageHeader h1 {
   margin: 0 0 6px;
-  font-size: 25px;
+  font-size: 1.8rem;
   line-height: 1.2;
 }
 .pageHeader p {
   max-width: 760px;
   margin: 0;
   color: var(--dsw-alias-label-secondary);
+  font-size: 1.05rem;
   line-height: 1.5;
 }
 .actions {
@@ -155,7 +156,7 @@ button:disabled {
 }
 .sectionHeading h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.3rem;
 }
 .sectionHeading > span {
   text-align: right;
