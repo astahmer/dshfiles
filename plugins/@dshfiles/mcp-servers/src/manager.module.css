@@ -7,7 +7,7 @@
   font: inherit;
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   border-radius: 9px;
-  background: var(--dsw-alias-surface-2, Canvas);
+  background: var(--dsw-alias-bg-layer-2);
   cursor: pointer;
 }
 
@@ -23,8 +23,8 @@
   padding: 12px;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 14px;
-  background: var(--dsw-alias-surface-1, Canvas);
-  box-shadow: 0 10px 34px color-mix(in srgb, #000 24%, transparent);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 
 .quickHeader,
@@ -70,7 +70,7 @@
 .hint,
 .registryFooter,
 .sectionHeading > span {
-  color: var(--dsw-alias-text-secondary, color-mix(in srgb, currentColor 68%, transparent));
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
 }
 .quickInfo strong,
@@ -106,8 +106,8 @@
 }
 .primary,
 .primarySmall {
-  color: var(--dsw-alias-text-on-accent, Canvas);
-  background: var(--dsw-alias-accent, Highlight);
+  color: var(--dsw-alias-label-primary-foreground);
+  background: var(--dsw-alias-state-business-primary);
   border-color: transparent;
 }
 .primarySmall {
@@ -124,7 +124,7 @@ button:disabled {
   width: min(1220px, 100%);
   margin: 0 auto;
   padding: 24px clamp(14px, 3vw, 40px) 48px;
-  color: var(--dsw-alias-text-primary, CanvasText);
+  color: var(--dsw-alias-label-primary);
 }
 
 .pageHeader {
@@ -139,7 +139,7 @@ button:disabled {
 .pageHeader p {
   max-width: 760px;
   margin: 0;
-  color: var(--dsw-alias-text-secondary, color-mix(in srgb, currentColor 68%, transparent));
+  color: var(--dsw-alias-label-secondary);
   line-height: 1.5;
 }
 .actions {
@@ -164,7 +164,7 @@ button:disabled {
   padding: 0 16px;
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   border-radius: 14px;
-  background: var(--dsw-alias-surface-1, Canvas);
+  background: var(--dsw-alias-bg-layer-1);
 }
 .serverCard {
   display: flex;
@@ -190,7 +190,7 @@ button:disabled {
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  background: var(--dsw-alias-surface-2, color-mix(in srgb, currentColor 8%, transparent));
+  background: var(--dsw-alias-bg-module-platform);
 }
 .serverCopy {
   display: grid;
@@ -208,7 +208,7 @@ button:disabled {
   padding: 22px;
   border: 1px dashed color-mix(in srgb, currentColor 24%, transparent);
   border-radius: 14px;
-  color: var(--dsw-alias-text-secondary, color-mix(in srgb, currentColor 68%, transparent));
+  color: var(--dsw-alias-label-secondary);
   text-align: center;
 }
 .emptySmall {
@@ -233,7 +233,7 @@ button:disabled {
   border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
   border-radius: 9px;
   color: inherit;
-  background: var(--dsw-alias-surface-2, Canvas);
+  background: var(--dsw-alias-bg-layer-2);
   font: inherit;
 }
 .textarea {
@@ -255,7 +255,7 @@ button:disabled {
   padding: 14px;
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   border-radius: 13px;
-  background: var(--dsw-alias-surface-1, Canvas);
+  background: var(--dsw-alias-bg-layer-1);
 }
 .catalogIcon {
   width: 42px;
@@ -273,7 +273,7 @@ button:disabled {
 }
 .catalogCopy p {
   margin: 8px 0 12px;
-  color: var(--dsw-alias-text-secondary, color-mix(in srgb, currentColor 68%, transparent));
+  color: var(--dsw-alias-label-secondary);
   line-height: 1.4;
 }
 .badge {
@@ -303,7 +303,7 @@ button:disabled {
   padding: 18px;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 14px;
-  background: var(--dsw-alias-surface-1, Canvas);
+  background: var(--dsw-alias-bg-layer-1);
 }
 .editor h2 {
   margin: 0 0 14px;
@@ -328,7 +328,7 @@ button:disabled {
   font-size: 13px;
 }
 .checkField input {
-  accent-color: var(--dsw-alias-accent, Highlight);
+  accent-color: var(--dsw-alias-state-business-primary);
 }
 .field small,
 .hint {
@@ -355,7 +355,7 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: color-mix(in srgb, #000 52%, transparent);
+  background: var(--dsw-alias-bg-mask-1);
 }
 .dialog {
   display: flex;
@@ -365,9 +365,9 @@ button:disabled {
   overflow: auto;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 16px;
-  background: var(--dsw-alias-background, Canvas);
-  color: var(--dsw-alias-text-primary, CanvasText);
-  box-shadow: 0 20px 70px color-mix(in srgb, #000 30%, transparent);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-shadow-lv3);
 }
 .dialogHeader {
   position: sticky;
@@ -375,7 +375,7 @@ button:disabled {
   z-index: 1;
   padding: 12px 18px;
   border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  background: var(--dsw-alias-background, Canvas);
+  background: var(--dsw-alias-bg-layer-1);
 }
 .dialogHeader strong {
   font-size: 17px;

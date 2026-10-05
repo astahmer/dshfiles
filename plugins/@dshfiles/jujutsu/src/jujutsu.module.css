@@ -1,16 +1,36 @@
+/*
+ * The --jj-* layer is the single place this panel resolves a colour, so the
+ * theme decision lives here once. Every fallback was a dark literal reached
+ * through a `--dsh-*` custom property that DSH does not define -- the namespace
+ * is `--dsw-alias-*` and `--dsw-*` -- so each one silently fell through to its
+ * hardcoded dark value in light mode. The fallbacks stay as last-resort values
+ * for a page served without the Host token set.
+ */
 .panel {
-  --jj-bg: var(--dsh-surface, #17191d);
-  --jj-raised: var(--dsh-surface-raised, #202329);
-  --jj-border: var(--dsh-border, #34383f);
-  --jj-text: var(--dsh-text, #f1f3f5);
-  --jj-muted: var(--dsh-text-muted, #a2a7af);
-  --jj-accent: var(--dsh-accent, #38bdf8);
+  --jj-bg: var(--dsw-alias-bg-layer-1, #17191d);
+  --jj-raised: var(--dsw-alias-bg-module-platform, #202329);
+  --jj-border: var(--dsw-alias-border-l2, #34383f);
+  --jj-text: var(--dsw-alias-label-primary, #f1f3f5);
+  --jj-muted: var(--dsw-alias-label-secondary, #a2a7af);
+  --jj-accent: var(--dsw-alias-state-business-primary, #38bdf8);
+  --jj-danger: var(--dsw-alias-state-error-primary, #a33c46);
+  --jj-danger-soft: var(--dsw-alias-state-error-secondary, #ffc4c9);
+  --jj-danger-bg: var(--dsw-alias-file-diff-deleted-bg, #391e24);
+  --jj-warn: var(--dsw-alias-state-warn-primary, #dfc58b);
+  --jj-warn-bg: var(--dsw-alias-state-warn-tertiary, #493e27);
+  --jj-bookmark: var(--dsw-alias-label-primary-bluish, #d5e8ff);
+  --jj-bookmark-bg: var(--dsw-alias-state-business-tertiary, #254563);
+  --jj-tag: var(--dsw-alias-label-primary-bluish, #d7c8ff);
+  --jj-tag-bg: var(--dsw-alias-bg-multi-select, #3a3150);
+  --jj-remote: var(--dsw-alias-label-secondary, #aab3bf);
+  --jj-remote-bg: var(--dsw-alias-bg-module-platform, #30343a);
+  --jj-on-accent: var(--dsw-alias-label-primary-foreground, #071018);
   box-sizing: border-box;
   min-height: 100%;
   padding: 20px 24px 36px;
   color: var(--jj-text);
   background: var(--jj-bg);
-  font: 14px/1.45 var(--dsh-font-sans, Inter, system-ui, sans-serif);
+  font: var(--dsw-font-s-14, 14px/1.45 system-ui, sans-serif);
 }
 
 .panel * {
@@ -91,7 +111,7 @@
   border: 1px solid color-mix(in srgb, var(--jj-accent), transparent 30%);
   border-radius: 7px;
   padding: 7px 12px;
-  color: #071018;
+  color: var(--jj-on-accent);
   background: var(--jj-accent);
   font-weight: 650;
 }
@@ -140,9 +160,9 @@
   padding: 10px 12px;
 }
 .error {
-  border-color: #a33c46;
-  color: #ffc4c9;
-  background: #391e24;
+  border-color: var(--jj-danger);
+  color: var(--jj-danger-soft);
+  background: var(--jj-danger-bg);
 }
 .loading {
   color: var(--jj-muted);
@@ -293,7 +313,7 @@
   white-space: nowrap;
 }
 .currentBadge {
-  color: #071018;
+  color: var(--jj-on-accent);
   background: var(--jj-accent);
   font-size: 10px;
 }
@@ -301,8 +321,8 @@
   border: 1px solid var(--jj-border);
 }
 .immutableBadge {
-  color: #dfc58b;
-  background: #493e27;
+  color: var(--jj-warn);
+  background: var(--jj-warn-bg);
 }
 .parentLink {
   color: var(--jj-muted);
@@ -312,17 +332,17 @@
   color: var(--jj-muted);
 }
 .bookmark {
-  color: #d5e8ff;
-  background: #254563;
+  color: var(--jj-bookmark);
+  background: var(--jj-bookmark-bg);
   cursor: grab;
 }
 .remoteBookmark {
-  color: #aab3bf;
-  background: #30343a;
+  color: var(--jj-remote);
+  background: var(--jj-remote-bg);
 }
 .tag {
-  color: #d7c8ff;
-  background: #3a3150;
+  color: var(--jj-tag);
+  background: var(--jj-tag-bg);
 }
 .relative {
   color: var(--jj-muted);
@@ -482,7 +502,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: #0009;
+  background: var(--dsw-alias-bg-mask-1, #0009);
 }
 .modal {
   width: min(680px, 100%);
@@ -492,7 +512,7 @@
   border-radius: 12px;
   padding: 20px;
   background: var(--jj-bg);
-  box-shadow: 0 20px 70px #0008;
+  box-shadow: var(--dsw-shadow-lv3);
 }
 .modal > strong {
   display: block;

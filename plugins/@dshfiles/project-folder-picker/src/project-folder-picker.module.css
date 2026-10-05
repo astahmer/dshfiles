@@ -1,164 +1,199 @@
+/*
+ * This picker is shared by several plugins and opens over the Host page, so it
+ * reads DSH's tokens like every other surface. It previously carried its own
+ * dark palette -- #242424 dialog, #171717 fields, #66b4ff focus -- which made
+ * it a second, differently-themed application over whichever theme was active.
+ */
 .backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.64);
   padding: 24px;
+  background: var(--dsw-alias-bg-mask-1);
 }
+
 .dialog {
   display: flex;
   flex-direction: column;
   width: min(720px, 100%);
   max-height: min(78vh, 760px);
   padding: 12px;
-  background: #242424;
-  border: 1px solid #414141;
-  border-radius: 14px;
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.55);
-  color: #f4f4f4;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-shadow-lv3);
 }
+
 .searchRow {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid #414141;
   padding-bottom: 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
+
 .searchRow input,
 .createFolder input {
-  min-width: 0;
   flex: 1;
-  background: #171717;
-  color: inherit;
-  border: 1px solid #4a4a4a;
-  border-radius: 7px;
+  min-width: 0;
   padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
 }
+
 .searchRow input:focus,
 .createFolder input:focus {
-  outline: 2px solid #66b4ff;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
+
 .dialog button {
-  background: #303030;
-  color: inherit;
-  border: 1px solid #4a4a4a;
-  border-radius: 7px;
   padding: 9px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   cursor: pointer;
 }
+
+.dialog button:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
 .dialog button:disabled {
-  opacity: 0.55;
+  color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
+
 .sectionLabel {
   margin: 12px 8px 6px;
-  color: #aaa;
+  color: var(--dsw-alias-label-secondary);
 }
+
 .path {
   margin: 9px 8px 2px;
-  color: #aaa;
+  color: var(--dsw-alias-label-secondary);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
+
 .list {
-  overflow: auto;
   min-height: 48px;
+  overflow: auto;
 }
+
 .item {
-  width: 100%;
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 12px;
-  text-align: left;
+  padding: 10px !important;
   border-color: transparent !important;
   background: transparent !important;
-  padding: 10px !important;
+  text-align: left;
 }
+
 .item.active,
 .item:hover {
-  background: #3a3a3a !important;
+  background: var(--dsw-specific-sidebar-nav-item-hover) !important;
 }
+
 .itemText {
   display: flex;
   flex: 1;
-  min-width: 0;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
+
 .itemText strong {
   font-weight: 600;
 }
+
 .itemText small {
-  color: #aaa;
   overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .projectGlyph,
 .folderGlyph {
   display: grid;
-  place-items: center;
   flex: none;
+  place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 7px;
-  background: #124c70;
-  color: #66b4ff;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
   font-weight: 700;
 }
+
 .folderGlyph {
   background: transparent;
-  color: #66b4ff;
+  color: var(--dsw-alias-state-business-primary);
 }
+
 .item kbd,
 .footer kbd {
-  border: 1px solid #555;
-  border-radius: 4px;
   padding: 1px 5px;
-  color: #ddd;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-xs);
+  color: var(--dsw-alias-label-secondary);
 }
+
 .badge {
-  color: #aaa;
+  color: var(--dsw-alias-label-secondary);
   font-size: 0.8rem;
 }
+
 .empty {
   padding: 16px 10px;
-  color: #aaa;
+  color: var(--dsw-alias-label-secondary);
 }
+
 .folderActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid #414141;
   padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
+
 .createFolder {
   display: flex;
-  gap: 8px;
   flex: 1;
+  gap: 8px;
   min-width: min(100%, 360px);
 }
+
 .createFolder input {
   padding: 8px;
 }
+
 .muted {
-  color: #999;
+  color: var(--dsw-alias-label-tertiary);
 }
+
 .error {
   margin: 10px 6px 0;
-  color: #ff8b8b;
+  color: var(--dsw-alias-state-error-primary);
 }
+
 .footer {
   display: flex;
   gap: 18px;
   margin-top: 8px;
   padding: 10px 4px 0;
-  border-top: 1px solid #414141;
-  color: #aaa;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-secondary);
   font-size: 0.85rem;
 }
