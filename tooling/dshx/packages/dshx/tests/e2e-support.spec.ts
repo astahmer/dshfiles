@@ -2,15 +2,13 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  createScratchProfile,
-  isolatedHostEnvironment,
-} from '../../../e2e/support/scratch-profile.js'
+import { createScratchProfile, isolatedHostEnvironment } from '../../../e2e/support/scratch-profile.js'
 import {
   completeEvidenceStep,
   createEvidenceRun,
   finishEvidenceRun,
   pruneEvidenceRuns,
+  renderEvidenceReport,
   sourceRunFromEnvironment,
   storeEvidenceFrame,
 } from '../../../e2e/support/evidence-runs.js'
@@ -111,8 +109,45 @@ describe('bounded E2E evidence', () => {
       expect(manifest.status).toBe('failed')
       expect(manifest.sourceRun).toBe('https://github.com/acme/dshfiles/actions/runs/12001')
       const serialized = await readFile(join(run.runDirectory, 'manifest.json'), 'utf8')
+      const report = await readFile(join(run.runDirectory, 'report.html'), 'utf8')
       expect(serialized).not.toContain('private title is hashed')
       expect(serialized).not.toContain('127.0.0.1')
+      expect(report).toContain('Screenshot timeline')
+      expect(report).toContain('./frames/frame-001.jpg')
+      expect(report).toContain('failed')
+      expect(report).toContain('assertion-complete')
+      expect(report).toContain('host-cleanup')
+      expect(report).toContain('https://github.com/acme/dshfiles/actions/runs/12001')
+      expect(report).not.toContain('private title is hashed')
+      expect(report).not.toContain('127.0.0.1')
+      expect(report).not.toContain('<script')
+      expect(renderEvidenceReport(manifest)).toBe(report)
+      const catalog = await readFile(join(outputRoot, 'catalog/index.html'), 'utf8')
+      expect(catalog).toContain(manifest.runId)
+      expect(catalog).toContain('failed')
+      expect(catalog).toContain('../')
+      expect(catalog).not.toContain('<script')
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps skipped runs distinct and leaves expected coverage missing', async () => {
+    const outputRoot = await mkdtemp(join(tmpdir(), 'dshx-evidence-skipped-'))
+    try {
+      const run = await createEvidenceRun({
+        suiteId: 'client-plugin-boot',
+        scenarioPath: ['skipped scenario'],
+        expectedStepIds: ['assertion-complete'],
+        outputRoot,
+      })
+      const manifest = await finishEvidenceRun(run, 'skipped', {
+        sourceRun: null,
+        sourceRunMissingReason: 'ci-metadata-absent',
+      })
+      expect(manifest.status).toBe('skipped')
+      expect(manifest.missingStepIds).toEqual(['assertion-complete'])
+      await expect(readFile(join(run.runDirectory, 'report.html'), 'utf8')).resolves.toContain('skipped')
     } finally {
       await rm(outputRoot, { recursive: true, force: true })
     }
@@ -120,16 +155,20 @@ describe('bounded E2E evidence', () => {
 
   it('accepts only safe HTTPS source run links and states when CI identity is absent', () => {
     expect(sourceRunFromEnvironment({})).toEqual({ sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' })
-    expect(sourceRunFromEnvironment({
-      GITHUB_SERVER_URL: 'https://github.com',
-      GITHUB_REPOSITORY: 'acme/dshfiles',
-      GITHUB_RUN_ID: '12001',
-    })).toEqual({ sourceRun: 'https://github.com/acme/dshfiles/actions/runs/12001', sourceRunMissingReason: null })
-    expect(sourceRunFromEnvironment({
-      GITHUB_SERVER_URL: 'http://github.com',
-      GITHUB_REPOSITORY: 'acme/dshfiles',
-      GITHUB_RUN_ID: '12001',
-    })).toEqual({ sourceRun: null, sourceRunMissingReason: 'ci-metadata-invalid' })
+    expect(
+      sourceRunFromEnvironment({
+        GITHUB_SERVER_URL: 'https://github.com',
+        GITHUB_REPOSITORY: 'acme/dshfiles',
+        GITHUB_RUN_ID: '12001',
+      }),
+    ).toEqual({ sourceRun: 'https://github.com/acme/dshfiles/actions/runs/12001', sourceRunMissingReason: null })
+    expect(
+      sourceRunFromEnvironment({
+        GITHUB_SERVER_URL: 'http://github.com',
+        GITHUB_REPOSITORY: 'acme/dshfiles',
+        GITHUB_RUN_ID: '12001',
+      }),
+    ).toEqual({ sourceRun: null, sourceRunMissingReason: 'ci-metadata-invalid' })
   })
 
   it('prunes only complete DSH-owned run directories', async () => {
@@ -154,6 +193,11 @@ describe('bounded E2E evidence', () => {
       await expect(readFile(join(malformedRun, 'user-file.txt'), 'utf8')).resolves.toBe('preserve')
       await expect(readFile(join(createdRuns[0] ?? '', 'manifest.json'), 'utf8')).rejects.toThrow()
       await expect(readFile(join(createdRuns.at(-1) ?? '', 'manifest.json'), 'utf8')).resolves.toContain('dshx-e2e')
+      await expect(readFile(join(createdRuns.at(-1) ?? '', 'report.html'), 'utf8')).resolves.toContain('DSHX E2E evidence')
+      const catalog = await readFile(join(outputRoot, 'catalog/index.html'), 'utf8')
+      expect(catalog).toContain(createdRuns.at(-1)?.split('/').at(-1) ?? '')
+      expect(catalog).not.toContain(createdRuns[0]?.split('/').at(-1) ?? '')
+      expect(catalog.match(/<tr><td/g)).toHaveLength(10)
     } finally {
       await rm(outputRoot, { recursive: true, force: true })
     }
