@@ -125,18 +125,20 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   that path. Record the T3 thread ID, workspace name, and absolute path in the
   task handoff. Do not use an ad-hoc copy or a T3-generated project directory
   as a code checkout.
-- Create the JJ workspace before launching an independent top-level T3 thread,
-  then pass it with `workspaceStrategy: { type: "existing_worktree",
-  worktreePath: "<absolute-path>", branch: "<bookmark>" }`. An omitted
-  strategy binds the thread to the project root, even when its caller is in a
-  sibling workspace. Running `cd` or `jj workspace add` after launch does not
-  update T3's binding.
-- After launch, verify `t3_thread_read` reports the requested `worktreePath`
-  and `t3_worktree_status` reports the same attached path. Then confirm
-  `jj workspace list` from that path contains the named workspace. If T3 cannot
-  bind the JJ workspace, do not let the thread edit until its checkout is
-  prepared as a JJ workspace and the T3 binding is verified. A T3 Git worktree
-  is not a JJ workspace unless JJ confirms that it shares this repository.
+- Create the JJ workspace before launching an independent top-level T3 thread.
+  Keep the thread in this dshfiles project (`workspaceStrategy: { type: "root" }`)
+  and put the workspace name and absolute path in its task message. T3's
+  `existing_worktree` strategy is Git-worktree-oriented; do not pass it a JJ
+  workspace path unless `t3_worktree_status` confirms that exact path and
+  `jj root` confirms it belongs to this shared JJ repository. Do not use a
+  scratch thread or an unlinked project directory for repository code.
+- Run every edit and JJ command from the named workspace path. T3 metadata does
+  not record a plain JJ workspace, so record the T3 thread ID, JJ workspace
+  name, and absolute path in the task handoff, then verify `jj root`,
+  `jj status`, and `jj workspace list` from that path before editing. Treat
+  `branch: null` / `worktreePath: null` in T3 metadata as unbound, not as proof
+  that the thread inherited a sibling workspace. If using a T3-managed Git
+  worktree, first verify with JJ that it shares this repository.
 - Keep active source workspaces untouched during consolidation. Duplicate a
   fixed revision snapshot into an integration workspace, rebase that copy onto
   `main`, and retain the source workspace until tree equality and status prove
