@@ -180,9 +180,9 @@ None. Stateless UI; persisted data stays in each plugin's Host half.
 
 1. ✅ Audit: Host primitives, dshx platform modules, `useApiQuery`, theme tokens, per-plugin control inventory.
 2. ✅ Build `@dshfiles/plugin-ui`: gap components, `/query`, `/table`, `/form`, `/chart`, a shared Host-primitives test double, README.
-3. ✅ Pilot `project-folder-picker` + `secret-catalog`, then migrate `ai-accounts`, `jujutsu`, `mcp-servers`, `plugin-marketplace`, `queue-reorder`, `settings-search`, `thread-sidebar`. One jj revision per plugin.
-4. ✅ Verify: workspace typecheck/test/build; every client bundle keeps React and the primitives external; per-plugin isolated boot (`tooling/dshx/scripts/boot-check-web.mjs`).
-5. ⏭ Not migrated: `shortcuts`, `agent-communication`, `goal-stall-guard` have no UI. `multi-host` lives as uncommitted work in another checkout; migrate it when it lands.
+3. ✅ Pilot `project-folder-picker` + `secret-catalog`, then migrate `ai-accounts`, `jujutsu`, `mcp-servers`, `multi-host`, `plugin-marketplace`, `queue-reorder`, `settings-search`, `thread-sidebar`. One jj revision per plugin.
+4. ✅ Verify the migrated packages with typecheck/build; existing focused tests remain recorded below. Client bundles keep React and the Host primitives external. MultiHost and Jujutsu also passed isolated browser boot checks with scratch DSH homes and ephemeral ports.
+5. ⏭ Not migrated: `shortcuts`, `agent-communication`, `goal-stall-guard` have no UI.
 6. ⏭ BB: kept separate. BB's runtime and content-script surfaces cannot consume DSH's platform module; BB stays a source of usage evidence.
 
 ## Results
@@ -198,8 +198,9 @@ None. Stateless UI; persisted data stays in each plugin's Host half.
 | settings-search | 186 → 120 | ✅ save/reset mutation | — | — | — | 10 → 10 |
 | thread-sidebar | 1015 → 803 | — (sync stores) | — | — | — | 17 → 17 |
 | queue-reorder | 231 → 224 | ✅ queue writes | — | — | — | 5 → 5 |
+| multi-host | 444 → 313 | ✅ query reads and mutation cache updates | — (card/list layout) | ✅ host/runtime/workspace/session forms | — | not added; E2E later |
 
-Total across the migration: ~7.0k lines removed, ~5.3k added (plugin-ui included). Client bundles are unminified (dshx sets `minify: false`); TanStack adds ~120 KB (Query) to ~1 MB (ai-accounts, all four libraries) per plugin, loaded from localhost.
+Total before the MultiHost migration: ~7.0k lines removed, ~5.3k added (plugin-ui included). MultiHost client output is an unminified 778,506-byte bundle with React, Host primitives, and TanStack packages external. Other client bundles are unminified (dshx sets `minify: false`); TanStack adds ~120 KB (Query) to ~1 MB (ai-accounts, all four libraries) per plugin, loaded from localhost.
 
 ### Kept local, by reason
 
@@ -214,12 +215,13 @@ Total across the migration: ~7.0k lines removed, ~5.3k added (plugin-ui included
 1. ai-accounts: the rail switch toggled twice and saved nothing — fixed. Model curation now marks the editor dirty. Profile removal asks first. Slug validation enforces the documented pattern.
 2. secret-catalog: item type is always sent (it showed "Login" but sent nothing). Old rows are not kept while another folder loads, so actions cannot target the wrong folder.
 3. thread-sidebar: park/unpark use the Host pause/play icons. The context menu lost its accessible name (Host `Menu` has no label prop).
-4. jujutsu: sticky offsets were tuned for the old header; check them visually.
-5. Wide dialogs (mcp-servers manager, secret-catalog) size the Host `Modal` via `className`, which relies on plugin CSS loading after Host CSS.
+4. jujutsu: the revision graph now opens in the right-side tab and follows BB's graph styling; per-file review progress is tracked. Isolated client boot passed; visual comparison is pending.
+5. multi-host: host removal now asks for confirmation; host, runtime, workspace, and session forms share TanStack Form and common plugin UI controls.
+6. Wide dialogs (mcp-servers manager, secret-catalog) size the Host `Modal` via `className`, which relies on plugin CSS loading after Host CSS.
 
 ### Follow-ups
 
-1. Interactive component tests: most plugins lack `jsdom` + `@testing-library/react`. The shared double (`plugin-ui/testing/host-primitives.tsx`) is ready; first targets are "removal never fires before confirmation" in secret-catalog and mcp-servers.
+1. Add Playwright BDD end-to-end coverage later, as requested. Prioritize Jujutsu right-side panel opening, BB-style graph appearance, and per-file progress; MultiHost host/runtime lifecycle, form submissions, and removal confirmation; then shared-component behavior in migrated plugins.
 2. Host gaps: `Menu` label prop, `Tag` attribute pass-through, a danger `Button` variant, a disclosure primitive.
 3. Consider enabling minification in dshx client builds.
 
@@ -233,12 +235,13 @@ Total across the migration: ~7.0k lines removed, ~5.3k added (plugin-ui included
 ## Acceptance criteria
 
 - [x] `@dshfiles/plugin-ui` typechecks and tests independently.
-- [x] Every migrated plugin typechecks, tests, and builds; client bundles keep React and `dsh-client-ui-primitives` external.
+- [x] Previously migrated plugins typecheck, test, and build; MultiHost and Jujutsu typecheck/build evidence is recorded in their revisions. Client bundles keep React and `dsh-client-ui-primitives` external.
 - [x] Shared styles are CSS Modules on `--dsw-*` tokens with no global reset or unscoped element rule.
 - [x] Controls keep accessible names, label/error association, focus visibility, disabled semantics, and Host dialog behavior.
 - [x] Hand-rolled async loaders in migrated plugins use TanStack Query; remaining local primitives have a recorded reason (above).
-- [x] Isolated per-plugin boot (`boot-check-web.mjs`, scratch DSH_HOME, port 0): all 11 bundles reach active and mount.
-- [ ] Visual pass in the user's browser on a second instance (never restart the live web profile).
+- [x] MultiHost and Jujutsu isolated client boot on scratch DSH homes and ephemeral ports; expected client entries mounted without missing-entry or slot failures.
+- [ ] Visual BB comparison on a second instance (never restart the live web profile); the collaborative preview returned `Authentication required` in this run.
+- Deferred by user to a later Playwright BDD end-to-end pass; follow-up scenarios are listed above.
 
 ## Decisions log
 
@@ -256,3 +259,6 @@ Total across the migration: ~7.0k lines removed, ~5.3k added (plugin-ui included
 | 2026-10-05 | Keep dshx `useApiQuery` but stop using it in owned plugins | Toolchain API stays for other authors; TanStack Query supersedes it here. |
 | 2026-10-05 | Use Query even for a lone mutation (queue-reorder, settings-search) | Consistency with the TanStack preference; the unminified bundle cost is served from localhost. |
 | 2026-10-05 | Keep Host-reference surfaces local where the primitives do not match | Fidelity to the shipped dock and sidebar outranks shared styling. |
+| 2026-10-06 | Add MultiHost to the shared UI migration and record Jujutsu side-panel/review progress | These completed plugin revisions join the mainline library adoption; runtime/browser evidence remains explicit. |
+| 2026-10-06 | Defer automated browser coverage to Playwright BDD | User preference; retain the key plugin scenarios as a follow-up instead of introducing component-test infrastructure now. |
+| 2026-10-06 | Boot MultiHost and Jujutsu in isolated browser checks | Node 22.23.3, scratch DSH homes, and ephemeral ports; both expected client entries mounted with no missing-entry or slot failures. |
