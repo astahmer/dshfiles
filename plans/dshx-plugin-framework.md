@@ -2,7 +2,7 @@
 
 ## Context
 
-Delivery date: **2026-10-05**. This document records the completed DSHX framework work. The native DSH `0.2.0-rc.2` Client Slots Inspect provider is available; a DSHX bridge defect that rejected Factory nodes and duplicated nested trees has been fixed and verified against an isolated second instance. The original framework delivery is integrated into local `main`; this final correction is a focused child changeset in the isolated `dshx-complete` workspace while the repository's active history-unification thread owns shared bookmark integration. Nothing has been promoted into the live `web` profile.
+Delivery date: **2026-10-05**. This document records the completed DSHX framework work. The native DSH `0.2.0-rc.2` Client Slots Inspect provider is available; a DSHX bridge defect that rejected Factory nodes and duplicated nested trees has been fixed and verified against an isolated second instance. The delivery and its final correction are recorded as focused JJ revisions based on local `main`. Nothing has been promoted into the live `web` profile.
 
 The maintained fork is already the right foundation. Continue **building with our local `@dshfiles/dshx` hard fork**: it owns compilation, authoring adapters, inspection, scaffolding, and diagnostics. DSH/Cordis own activation, scope, transport, state, registries, and cleanup. Another framework adoption or another fork would duplicate the work we have already earned. BB and OpenCode2 supply implementation ideas; they are not target runtimes or dependencies.
 
