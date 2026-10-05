@@ -261,11 +261,17 @@
   background: var(--dsw-specific-sidebar-nav-item-hover);
 }
 
+/*
+ * The three-line stack is what makes a row 2px taller than the reference's 70px:
+ * 15 + 18 + 15 glyphs plus two 0.18rem gaps came to 56 inside the button, and
+ * 8px of padding either side finished at 72. The gap is the slack that costs
+ * nothing typographically, so it takes the trim rather than the line heights.
+ */
 .openButton {
   display: grid;
   min-width: 0;
   flex: 1;
-  gap: 0.18rem;
+  gap: 0.1rem;
   border: 0;
   background: transparent;
   color: inherit;
