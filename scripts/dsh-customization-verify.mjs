@@ -77,6 +77,10 @@ const EXPECTED = {
   '02 compact target': 68,
   '03 expanded label inset': 73,
   '03 expanded pitch': 64,
+  '04 heading': '28.8px',
+  '05 menu lists MCP': true,
+  '06 quick panel open': true,
+  '06 quick panel heading': '16.8px',
   '09 picker row height': 43,
   '09 picker title font': '15.2px',
   '10 header row pitch': 60,
@@ -188,6 +192,47 @@ const measurePanels = async () => {
         }
       }),
     )
+    await context.close()
+  }
+
+  // References 05 and 06: the composer's + menu carries the MCP row, and picking
+  // it opens the quick panel. The row has to be addressed by id rather than by
+  // role -- the sidebar's header link shares its accessible name, so a name-based
+  // lookup opens the manager page instead and reports the wrong surface.
+  {
+    const { context, page } = await openPage()
+    await page.locator('[class*="_rowTitle_"]').first().click()
+    await page.waitForTimeout(3000)
+    await page.locator('button[aria-label="Add files or run commands"]').first().click()
+    await page.waitForTimeout(1800)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const row = document.querySelector('#dsh-slash-option-command-9')
+        const menu = document.querySelector('[class*="_dock"]')
+        const items = menu === null ? [] : [...menu.querySelectorAll('button,[role="menuitem"]')].map(n => (n.innerText ?? '').trim())
+        return {
+          '05 menu lists MCP': row !== null,
+          '05 menu item count': items.length,
+        }
+      }),
+    )
+    await page.locator('#dsh-slash-option-command-9').click().catch(() => {})
+    await page.waitForTimeout(3000)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const panel = document.querySelector('[class*="_quickPanel"]')
+        const heading = panel?.querySelector('strong')
+        return {
+          '06 quick panel open': panel !== null,
+          '06 quick panel heading': heading === null ? null : getComputedStyle(heading).fontSize,
+          '06 quick panel actions': panel === null ? 0 : panel.querySelectorAll('button').length,
+        }
+      }),
+    )
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
     await context.close()
   }
 
