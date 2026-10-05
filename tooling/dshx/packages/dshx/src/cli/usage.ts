@@ -442,6 +442,7 @@ const simpleHelpCommand = (command: CliCommand, details: Partial<Pick<CliOptionC
   )
 
 const helpCommands: Record<CliCommand, CommandDef> = {
+  create: simpleHelpCommand('create'),
   test: simpleHelpCommand('test'),
   package: simpleHelpCommand('package'),
   build: simpleHelpCommand('build'),

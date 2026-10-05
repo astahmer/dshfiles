@@ -123,6 +123,9 @@ describe('CLI argument parser', () => {
     expect(() => parseCliArgs(['inspect'])).toThrow('requires a target')
     expect(() => parseCliArgs(['inspect', 'unknown-target'])).toThrow('Unknown argument')
     expect(() => parseCliArgs(['build', 'slots'])).toThrow('only valid with the inspect command')
+    expect(() => parseCliArgs(['commands', 'list', '--line', '/status'])).toThrow('--line')
+    expect(() => parseCliArgs(['add', 'api', '--slot', 'sidebar'])).toThrow('Slot options')
+    expect(() => parseCliArgs(['add', 'panel', '--file', 'src/panel.ts'])).toThrow('--file')
   })
 
   it('parses inspect targets and JSON mode', () => {
@@ -187,6 +190,7 @@ describe('CLI commands', () => {
     rootStreams.err.end()
     const rootOutput = await text(rootStreams.out)
     expect(rootOutput).toContain('USAGE dshx [OPTIONS] test|package|build')
+    expect(rootOutput).toContain('create')
     expect(rootOutput).toContain('sessions')
     expect(rootOutput).toContain('Check the authenticated local DSH Host connection.')
 

@@ -21,6 +21,7 @@ const platformCommandNames = [
 const cliInspectTargets = ['slots', 'tools', 'services', 'events', 'capabilities'] as const
 
 export const cliCommandMetadata = {
+  create: 'Create a DSHX plugin project.',
   test: 'Run project-local Vitest tests.',
   package: 'Build, validate, and pack a native plugin bundle.',
   build: 'Build Host and Client plugin artifacts.',
@@ -351,6 +352,10 @@ export const dshxCommand = defineCommand({
   },
   args: sharedArgs,
   subCommands: {
+    create: defineCommand({
+      meta: { name: 'create', description: cliCommandMetadata.create },
+      args: sharedArgs,
+    }),
     test: defineCommand({
       meta: { name: 'test', description: cliCommandMetadata.test },
       args: sharedArgs,
@@ -476,6 +481,8 @@ export const dshxCommand = defineCommand({
 })
 
 export const cliCommandDescription = (command: CliCommand): string => cliCommandMetadata[command]
+
+const isCliCommand = (value: string | undefined): value is CliCommand => value !== undefined && Object.hasOwn(cliCommandMetadata, value)
 
 const platformCommands: ReadonlySet<CliCommand> = new Set(platformCommandNames)
 
@@ -650,30 +657,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       platformArgs.push(token)
       continue
     }
-    if (
-      token === 'build' ||
-      token === 'check' ||
-      token === 'dev' ||
-      token === 'inspect' ||
-      token === 'add' ||
-      token === 'test' ||
-      token === 'package' ||
-      token === 'status' ||
-      token === 'info' ||
-      token === 'doctor' ||
-      token === 'sessions' ||
-      token === 'plugins' ||
-      token === 'bundles' ||
-      token === 'presets' ||
-      token === 'models' ||
-      token === 'skills' ||
-      token === 'commands' ||
-      token === 'config' ||
-      token === 'host' ||
-      token === 'runtime' ||
-      token === 'workspace' ||
-      token === 'comm'
-    ) {
+    if (isCliCommand(token)) {
       if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
       command = token
       continue
