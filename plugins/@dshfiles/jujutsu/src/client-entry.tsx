@@ -36,7 +36,7 @@ export default defineClientPlugin({
         }),
       'dshfiles-jujutsu: right pane tab type',
     )
-    api.ui.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, JujutsuRightPane)
+    api.ui.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, inject: () => ({ t: translate }) }, JujutsuRightPane)
   },
 })
 

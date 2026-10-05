@@ -112,6 +112,14 @@
   align-items: start;
 }
 
+.graphOnly {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.graphOnly .revisionList {
+  border-right: 0;
+}
+
 .revisionList {
   min-width: 0;
   border-right: 1px solid var(--dsw-alias-border-l2);
@@ -441,4 +449,379 @@
   .relative {
     display: none;
   }
+}
+
+.panel {
+  padding: 14px 18px 24px;
+}
+
+.title {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.repoPathControls,
+.repoActionGroup {
+  display: contents;
+}
+
+.revision,
+.revisionSelected {
+  grid-template-columns: auto minmax(0, 1fr) auto auto 22px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 1px 8px 1px 0;
+}
+
+.graphSvg {
+  display: block;
+  align-self: stretch;
+  overflow: visible;
+}
+
+.graphPath {
+  fill: none;
+  stroke: var(--dsw-alias-state-business-primary);
+  stroke-linecap: round;
+  stroke-width: 1.7;
+  opacity: 0.9;
+}
+
+.graphPath[data-lane='1'],
+.graphNode[data-lane='1'],
+.graphNodeCurrent[data-lane='1'] {
+  filter: hue-rotate(58deg);
+}
+
+.graphPath[data-lane='2'],
+.graphNode[data-lane='2'],
+.graphNodeCurrent[data-lane='2'] {
+  filter: hue-rotate(116deg);
+}
+
+.graphPath[data-lane='3'],
+.graphNode[data-lane='3'],
+.graphNodeCurrent[data-lane='3'] {
+  filter: hue-rotate(174deg);
+}
+
+.graphPath[data-lane='4'],
+.graphNode[data-lane='4'],
+.graphNodeCurrent[data-lane='4'] {
+  filter: hue-rotate(232deg);
+}
+
+.graphNode {
+  fill: var(--dsw-alias-bg-layer-1);
+  stroke: var(--dsw-alias-state-business-primary);
+  stroke-width: 1.8;
+}
+
+.graphNodeCurrent {
+  fill: var(--dsw-alias-state-business-primary);
+  stroke: var(--dsw-alias-bg-layer-1);
+  stroke-width: 1.5;
+}
+
+.revisionBody {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.revisionTitle {
+  display: flex;
+  flex: 1 1 58%;
+  min-width: 0;
+  height: 22px;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.revisionSummary {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.revisionMeta {
+  display: flex;
+  flex: 0 1 38%;
+  min-width: 0;
+  height: 22px;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.labels {
+  display: flex;
+  min-width: 0;
+  max-width: 40%;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  overflow: hidden;
+  grid-column: auto;
+}
+
+.relative {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.changeId {
+  font-size: 10px;
+}
+
+.dragHandle {
+  width: 22px;
+  min-width: 22px;
+  opacity: 0.5;
+}
+
+.revision:hover .dragHandle,
+.revisionSelected .dragHandle {
+  opacity: 1;
+}
+
+.dayHeading {
+  padding: 7px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sidePanel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  font-size: 12px;
+}
+
+.sidePanel > .header {
+  flex: none;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.sidePanel > .header .titleRow {
+  min-height: 18px;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0;
+}
+
+.sidePanel > .header .titleRow > div {
+  display: none;
+}
+
+.sidePanel .title {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.sidePanel > .header .titleRow button {
+  height: 22px;
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.sidePanel .repoForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 5px;
+  margin: 4px 0 5px;
+}
+
+.sidePanel .repoPathControls {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+
+.sidePanel .repoActionGroup {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+
+.sidePanel .repoPathControls > *,
+.sidePanel .repoActionGroup > * {
+  min-width: 0;
+}
+
+.sidePanel .repoPathControls button,
+.sidePanel .repoActionGroup button {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.sidePanel .repoPath {
+  height: 26px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.sidePanel .repoPath input,
+.sidePanel .filterInput input {
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.sidePanel .tabs {
+  display: block;
+  margin-top: 4px;
+}
+
+.sidePanel .statusLine {
+  display: none;
+}
+
+.sidePanel .messages {
+  max-height: 90px;
+  flex: none;
+  overflow: auto;
+  padding: 0 8px;
+}
+
+.sidePanel > section[role='tabpanel'] {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidePanel .filters {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.sidePanel .filters .filterInput {
+  height: 26px;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 auto;
+}
+
+.sidePanel .graphColumns {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidePanel .revisionList {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  border: 0;
+  overscroll-behavior: contain;
+}
+
+.sidePanel .dayHeading {
+  display: none;
+}
+
+.sidePanel .revision,
+.sidePanel .revisionSelected {
+  grid-template-columns: auto minmax(0, 1fr) auto auto 20px;
+  gap: 3px;
+  min-height: 26px;
+  padding: 0 4px 0 0;
+}
+
+.sidePanel .revisionTitle {
+  height: 22px;
+  gap: 4px;
+}
+
+.sidePanel .revisionSummary {
+  font-size: 11px;
+}
+
+.sidePanel .revisionMeta {
+  height: 22px;
+  flex-basis: 37%;
+  gap: 3px;
+  font-size: 9px;
+  line-height: 11px;
+}
+
+.sidePanel .labels {
+  max-width: 35%;
+}
+
+.sidePanel .relative {
+  display: inline;
+  font-size: 9px;
+}
+
+.sidePanel .changeId {
+  max-width: 34px;
+  font-size: 9px;
+}
+
+.sidePanel .dragHandle {
+  width: 20px;
+  min-width: 20px;
+}
+
+.sidePanel .details {
+  display: none;
+}
+
+.sidePanel .sideDetailsOpen .revisionList {
+  flex: 1 1 60%;
+}
+
+.sidePanel .sideDetailsOpen .details {
+  display: block;
+  position: static;
+  max-height: 40%;
+  flex: 0 1 40%;
+  overflow: auto;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  padding: 9px 10px;
+}
+
+.sidePanel .sideDetailsOpen .details .fullDescription {
+  margin: 6px 0;
 }

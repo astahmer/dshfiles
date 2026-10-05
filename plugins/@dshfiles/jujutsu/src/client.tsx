@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import type { JujutsuState, Mutation, Revision } from './api.js'
-import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.js'
+import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch } from './graph.js'
 import { jujutsuApi } from './api.js'
 import type { JujutsuTranslate } from './locales.js'
 import styles from './jujutsu.module.css'
@@ -191,6 +191,14 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate; readonly sur
   }, [state, mineOnly, hideImmutable, authorFilter, textFilter, fromDate, toDate])
 
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
+  const graphRows = useMemo(() => {
+    if (state === null) return []
+    const graphRevisions = hideImmutable ? state.revisions.filter(revision => !revision.immutable) : state.revisions
+    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
+  }, [state, revisionsByCommitId, hideImmutable])
+  const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
+  const graphLaneCount = graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1)
+  const graphWidth = graphLaneCount * 14
 
   const groups = useMemo(() => groupRows({ revisions: visibleRevisions, t }), [visibleRevisions, t])
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
@@ -444,86 +452,113 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate; readonly sur
               {groups.map(group => (
                 <div className={styles.dayGroup} key={group.day}>
                   <div className={styles.dayHeading}>{group.day}</div>
-                  {group.rows.map(revision => (
-                    <article
-                      className={selectedId === revision.commitId ? styles.revisionSelected : styles.revision}
-                      key={revision.commitId}
-                      onDragOver={event => event.preventDefault()}
-                      onDrop={event => dropOn(event, revision)}
-                    >
-                      <div className={styles.graphRail} aria-hidden>
-                        <span className={revision.workingCopy ? styles.nodeCurrent : styles.node} />
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.revisionBody}
-                        onClick={() => {
-                          selectedRevisionRef.current = revision
-                          setSelectedId(revision.commitId)
-                        }}
+                  {group.rows.map(revision => {
+                    const graphLayout = graphRowsByCommitId.get(revision.commitId)
+                    if (graphLayout === undefined) return null
+                    const rowHeight = sidePanel ? 26 : 30
+                    const graphCenter = Math.floor(rowHeight / 2)
+                    const laneCenter = (lane: number): number => lane * 14 + 7
+                    return (
+                      <article
+                        className={selectedId === revision.commitId ? styles.revisionSelected : styles.revision}
+                        key={revision.commitId}
+                        onDragOver={event => event.preventDefault()}
+                        onDrop={event => dropOn(event, revision)}
                       >
-                        <div className={styles.revisionTitle}>
-                          {revision.workingCopy && <span className={styles.currentBadge}>{t('editingBadge')}</span>}
-                          <span>{revision.description.split('\n')[0] || t('noDescription')}</span>
-                        </div>
-                        <div className={styles.revisionMeta}>
-                          <span>{revision.author || t('unknownAuthor')}</span>
-                          {revision.workspaces.map(workspace => (
-                            <span className={styles.workspaceBadge} key={workspace}>
-                              {workspace}
-                            </span>
+                        <svg aria-hidden="true" className={styles.graphSvg} height={rowHeight} viewBox={`0 0 ${graphWidth} ${rowHeight}`} width={graphWidth}>
+                          {graphLayout.topLanes.map(lane => (
+                            <path className={styles.graphPath} d={`M ${laneCenter(lane)} 0 V ${graphCenter}`} data-lane={lane % 5} key={`top-${lane}`} />
                           ))}
-                          {graphParentLinks(revision, revisionsByCommitId, hideImmutable).map(link => (
-                            <span
-                              className={link.hiddenImmutableCount > 0 ? styles.ancestryBridge : styles.parentLink}
-                              key={link.commitId}
-                              title={link.hiddenImmutableCount > 0 ? t('ancestryBridgeHint') : t('directParentHint')}
-                            >
-                              {link.hiddenImmutableCount > 0
-                                ? t(link.terminal ? 'ancestryBridgeRoot' : 'ancestryBridge', { count: link.hiddenImmutableCount, label: link.label })
-                                : t('parentLink', { label: link.label })}
-                            </span>
+                          {graphLayout.bottomLanes.map(lane => (
+                            <path className={styles.graphPath} d={`M ${laneCenter(lane)} ${graphCenter} V ${rowHeight}`} data-lane={lane % 5} key={`bottom-${lane}`} />
                           ))}
-                          {revision.immutable && <span className={styles.immutableBadge}>{t('immutableBadge')}</span>}
-                          {revision.evolved && <span className={styles.tag}>{t('evolvedBadge')}</span>}
-                          {revision.divergent && <span className={styles.tag}>{t('divergentBadge')}</span>}
-                        </div>
-                      </button>
-                      <span className={styles.relative}>{relativeTime({ value: revision.authorTime, t })}</span>
-                      <span className={styles.changeId} title={revision.changeId}>
-                        {revision.shortestChangeId}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.dragHandle}
-                        draggable
-                        onDragStart={event => startDrag(event, revision)}
-                        title={t('dragRevisionHint')}
-                      >
-                        ⠿
-                      </button>
-                      <div className={styles.labels}>
-                        {revision.bookmarks.map(name => (
-                          <span
-                            draggable={revision.localBookmarks.includes(name)}
-                            onDragStart={event => {
-                              event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
-                              event.dataTransfer.effectAllowed = 'move'
-                            }}
-                            className={revision.localBookmarks.includes(name) ? styles.bookmark : styles.remoteBookmark}
-                            key={name}
-                          >
-                            {name}
-                          </span>
-                        ))}
-                        {revision.tags.map(name => (
-                          <span className={styles.tag} key={name}>
-                            {t('tagLabel', { name })}
-                          </span>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
+                          {graphLayout.edges.map((edge, index) => {
+                            const fromX = laneCenter(edge.fromLane)
+                            const toX = laneCenter(edge.toLane)
+                            const path =
+                              fromX === toX
+                                ? `M ${fromX} ${graphCenter} V ${rowHeight}`
+                                : `M ${fromX} ${graphCenter} C ${fromX} ${graphCenter + 5}, ${toX} ${graphCenter + 5}, ${toX} ${rowHeight}`
+                            return (
+                              <path
+                                className={styles.graphPath}
+                                d={path}
+                                data-lane={edge.toLane % 5}
+                                key={`${edge.fromLane}-${edge.toLane}-${index}`}
+                                strokeDasharray={edge.dashed ? '3 3' : undefined}
+                              />
+                            )
+                          })}
+                          <circle
+                            className={revision.workingCopy ? styles.graphNodeCurrent : styles.graphNode}
+                            cx={laneCenter(graphLayout.commitLane)}
+                            cy={graphCenter}
+                            data-lane={graphLayout.commitLane % 5}
+                            r={revision.workingCopy ? 4.1 : 3.2}
+                          />
+                        </svg>
+                        <button
+                          type="button"
+                          className={styles.revisionBody}
+                          onClick={() => {
+                            selectedRevisionRef.current = revision
+                            setSelectedId(revision.commitId)
+                          }}
+                        >
+                          <div className={styles.revisionTitle}>
+                            {revision.workingCopy && <span className={styles.currentBadge}>{t('editingBadge')}</span>}
+                            <span className={styles.revisionSummary}>{revision.description.split('\n')[0] || t('noDescription')}</span>
+                            <span className={styles.labels}>
+                              {revision.bookmarks.map(name => (
+                                <span
+                                  draggable={revision.localBookmarks.includes(name)}
+                                  onDragStart={event => {
+                                    event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
+                                    event.dataTransfer.effectAllowed = 'move'
+                                  }}
+                                  className={revision.localBookmarks.includes(name) ? styles.bookmark : styles.remoteBookmark}
+                                  key={name}
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                              {revision.tags.map(name => (
+                                <span className={styles.tag} key={name}>
+                                  {t('tagLabel', { name })}
+                                </span>
+                              ))}
+                            </span>
+                          </div>
+                          <div className={styles.revisionMeta}>
+                            <span>{revision.author || t('unknownAuthor')}</span>
+                            {revision.workspaces.map(workspace => (
+                              <span className={styles.workspaceBadge} key={workspace}>
+                                {workspace}
+                              </span>
+                            ))}
+                            {revision.immutable && <span className={styles.immutableBadge}>{t('immutableBadge')}</span>}
+                            {revision.evolved && <span className={styles.tag}>{t('evolvedBadge')}</span>}
+                            {revision.divergent && <span className={styles.tag}>{t('divergentBadge')}</span>}
+                          </div>
+                        </button>
+                        <time className={styles.relative} dateTime={revision.authorTime}>
+                          {relativeTime({ value: revision.authorTime, t })}
+                        </time>
+                        <span className={styles.changeId} title={revision.changeId}>
+                          {revision.shortestChangeId}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.dragHandle}
+                          draggable
+                          onDragStart={event => startDrag(event, revision)}
+                          title={t('dragRevisionHint')}
+                        >
+                          ⠿
+                        </button>
+                      </article>
+                    )
+                  })}
                 </div>
               ))}
               {visibleRevisions.length === 0 && <p className={styles.muted}>{t('noMatchingRevisions')}</p>}

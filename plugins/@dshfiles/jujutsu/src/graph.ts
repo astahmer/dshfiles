@@ -3,6 +3,21 @@ import type { Revision } from './api.js'
 type SearchableRevision = Pick<Revision, 'description' | 'changeId' | 'commitId' | 'shortestChangeId' | 'bookmarks' | 'tags' | 'workspaces'>
 type ParentRevision = Pick<Revision, 'commitId' | 'parents' | 'shortestChangeId' | 'immutable'>
 
+export interface GraphLaneEdge {
+  readonly fromLane: number
+  readonly toLane: number
+  readonly dashed: boolean
+}
+
+export interface RevisionGraphRow {
+  readonly commitId: string
+  readonly commitLane: number
+  readonly laneCount: number
+  readonly topLanes: readonly number[]
+  readonly bottomLanes: readonly number[]
+  readonly edges: readonly GraphLaneEdge[]
+}
+
 export interface GraphParentLink {
   readonly commitId: string
   readonly label: string
@@ -59,4 +74,57 @@ export const graphParentLinks = (revision: ParentRevision, revisionsById: Readon
   }
   for (const parentId of revision.parents) visit(parentId, 0, new Set([revision.commitId]))
   return [...links.values()]
+}
+
+const firstOpenLane = (lanes: readonly (string | null)[], startLane: number): number => {
+  for (let lane = startLane; lane < lanes.length; lane += 1) {
+    if (lanes[lane] === null) return lane
+  }
+  return Math.max(lanes.length, startLane)
+}
+
+/** Assign stable graph lanes in the order the revision list is rendered. */
+export const layoutRevisionGraph = (
+  revisions: readonly Revision[],
+  revisionsById: ReadonlyMap<string, ParentRevision>,
+  hideImmutable: boolean,
+): readonly RevisionGraphRow[] => {
+  const lanes: Array<string | null> = []
+  const rows: RevisionGraphRow[] = []
+
+  for (const revision of revisions) {
+    let commitLane = lanes.indexOf(revision.commitId)
+    if (commitLane < 0) {
+      const rightmostActiveLane = lanes.reduce((rightmost, commitId, lane) => (commitId === null ? rightmost : lane), -1)
+      commitLane = firstOpenLane(lanes, rightmostActiveLane < 0 ? 0 : rightmostActiveLane + 1)
+      lanes[commitLane] = revision.commitId
+    }
+
+    const topLanes = lanes.flatMap((commitId, lane) => (commitId === null || lane === commitLane ? [] : [lane]))
+    const nextLanes = [...lanes]
+    nextLanes[commitLane] = null
+    const parentLinks = graphParentLinks(revision, revisionsById, hideImmutable)
+    const edges = parentLinks.map((parent, parentIndex): GraphLaneEdge => {
+      let targetLane = nextLanes.indexOf(parent.commitId)
+      if (targetLane < 0) {
+        targetLane = parentIndex === 0 && nextLanes[commitLane] === null ? commitLane : firstOpenLane(nextLanes, commitLane + 1)
+        nextLanes[targetLane] = parent.commitId
+      }
+      return { fromLane: commitLane, toLane: targetLane, dashed: parent.hiddenImmutableCount > 0 }
+    })
+
+    while (nextLanes.length > 0 && nextLanes.at(-1) === null) nextLanes.pop()
+    const bottomLanes = nextLanes.flatMap((commitId, lane) => (commitId === null || edges.some(edge => edge.toLane === lane) ? [] : [lane]))
+    rows.push({
+      commitId: revision.commitId,
+      commitLane,
+      laneCount: Math.max(lanes.length, nextLanes.length, commitLane + 1),
+      topLanes,
+      bottomLanes,
+      edges,
+    })
+    lanes.splice(0, lanes.length, ...nextLanes)
+  }
+
+  return rows
 }
