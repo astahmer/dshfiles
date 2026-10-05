@@ -28,6 +28,7 @@ marketplace plugin instead of writing one.
 | `secret-catalog` | bundle | Browse and manage `secret` CLI aliases per project |
 | `settings-search` | bundle | Search every Settings field and edit it in place |
 | `shortcuts` | bundle | Capture-phase keyboard shortcuts that beat the browser's own |
+| `sidebar-commands` | bundle | `/goto` slash command that opens a sidebar panel or a recent session |
 | `thread-sidebar` | bundle | Project-scoped thread groups replacing the DSH sidebar |
 
 A bundle is a cordis bundle with a `cordis.patch.yml`; a library is imported by

@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-sidebar-commands
+      name: '@dshfiles/sidebar-commands'
