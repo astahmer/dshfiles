@@ -108,12 +108,90 @@ const measure = async () => {
 
 const control = await runControl()
 const measured = control.detected ? await measure() : null
+
+/**
+ * The panels beyond the sidebar, measured against their own references. Each
+ * needs its own page because opening one leaves the previous one mounted, and
+ * the settings dialog's mask blocks the next navigation.
+ */
+const measurePanels = async () => {
+  const values = {}
+
+  {
+    const { context, page } = await openPage({ width: 1762, height: 1092 })
+    await page.locator('button[aria-label="MCP servers"]').first().click()
+    await page.waitForTimeout(3000)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const h1 = document.querySelector('[class*="_pageHeader"] h1')
+        const h2 = document.querySelector('[class*="_sectionHeading"] h2')
+        const cards = [...document.querySelectorAll('[class*="_catalogCard"]')]
+        const grid = document.querySelector('[class*="_catalogGrid"]')
+        return {
+          '04 heading': h1 === null ? null : getComputedStyle(h1).fontSize,
+          '04 section': h2 === null ? null : getComputedStyle(h2).fontSize,
+          '07 catalog columns': grid === null ? null : getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+          '07 catalog rows': cards.length,
+        }
+      }),
+    )
+    await context.close()
+  }
+
+  {
+    const { context, page } = await openPage()
+    await page.locator('button[aria-label="Secret Catalog"]').first().click()
+    await page.waitForTimeout(3500)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const th = document.querySelector('[class*="_table"] th')
+        const rows = [...document.querySelectorAll('[class*="_table"] tbody tr')]
+        return {
+          '08 header font': th === null ? null : getComputedStyle(th).fontSize,
+          '08 rows': rows.length,
+          '08 values masked': document.querySelectorAll('[class*="_mask"]').length,
+        }
+      }),
+    )
+    await context.close()
+  }
+
+  {
+    const { context, page } = await openPage()
+    await page.locator('button[aria-label="Settings"]').first().click({ timeout: 10000 })
+    await page.waitForTimeout(2500)
+    await page.evaluate(() => {
+      ;[...document.querySelectorAll('[role="dialog"] button')].find(button => button.innerText.trim() === 'Search')?.click()
+    })
+    await page.waitForTimeout(2500)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]')
+        const heading = dialog?.querySelector('h1')
+        const section = dialog?.querySelector('[class*="_namespaceList"] h2')
+        return {
+          '12 heading': heading === null ? null : getComputedStyle(heading).fontSize,
+          '13 section': section === null ? null : getComputedStyle(section).fontSize,
+        }
+      }),
+    )
+    await context.close()
+  }
+
+  return values
+}
+
+const panels = control.detected ? await measurePanels() : null
+const allMeasured = measured === null || panels === null ? null : { ...measured, ...panels }
 const mismatches =
-  measured === null
+  allMeasured === null
     ? ['not measured: the control failed']
     : Object.entries(EXPECTED)
-        .filter(([key, want]) => measured[key] !== want)
-        .map(([key, want]) => `${key}: expected ${want}, measured ${measured[key]}`)
+        .filter(([key, want]) => allMeasured[key] !== want)
+        .map(([key, want]) => `${key}: expected ${want}, measured ${allMeasured[key]}`)
 
 process.stdout.write(
   `${JSON.stringify(
@@ -121,7 +199,7 @@ process.stdout.write(
       controlPassed: control.detected,
       control,
       trusted: control.detected,
-      measured,
+      measured: allMeasured,
       mismatches,
       verdict: !control.detected
         ? 'UNTRUSTED: the probe was shown a fault and missed it'
