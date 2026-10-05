@@ -34,6 +34,7 @@ import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, isRateLimitFailure } from './account-pool.js'
 import { materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
+import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -468,10 +469,23 @@ export default definePlugin({
       resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref),
       auth: {
         credentials: {
-          read: async () => undefined,
-          list: async () => [],
-          modify: async () => {
-            throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+          read: async provider => {
+            const route = routes.get(provider)
+            if (route === undefined || route.kind !== CODEX_KIND) return undefined
+            await materializeCodexShadowHome(route.layout)
+            return readCodexOAuthCredential(route.layout.effectiveHomePath)
+          },
+          list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
+          modify: async (provider, mutate) => {
+            const route = routes.get(provider)
+            if (route === undefined || route.kind !== CODEX_KIND) {
+              throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+            }
+            await materializeCodexShadowHome(route.layout)
+            const codexHome = route.layout.effectiveHomePath
+            const next = await mutate(await readCodexOAuthCredential(codexHome))
+            if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
+            return next
           },
           delete: async () => {
             throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
