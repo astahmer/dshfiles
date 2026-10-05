@@ -44,8 +44,17 @@
   gap: 10px;
 }
 
+/*
+ * Reference 06 sets the quick panel's title as a real heading: its band is 22px,
+ * about a 17px font. The panel used a bare <strong> that inherited body size, so
+ * the dialog's only label read as body copy.
+ */
 .quickHeader {
   padding: 2px 2px 10px;
+}
+.quickHeader > strong {
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 .quickRow {
   display: flex;
