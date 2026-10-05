@@ -122,6 +122,20 @@ These are requirements for existing owner schemas, not a proposal for one centra
 
 ## Implementation steps
 
+### Execution status (2026-10-05)
+
+| Work | Status | Evidence / remaining gate |
+|---|---|---|
+| Phase 0 — scope and acceptance baseline | Complete | Scratch profile composition and candidate boot receipts below; no active-profile experiment. |
+| Phase 1A — provider driver seam | Partial | Core driver registry and native-loop routing are recorded below. External adapter and credentialed model turn remain open. |
+| Phase 1B–1D — recovery, continuity, decisions | Pending | No acceptance receipts yet. |
+| Phase 2 — panel, evidence, feedback | Pending | Native lifecycle contracts and stateful-view acceptance still required. |
+| Phase 3 — daily features | Partial | Five candidate bundles passed scratch composition and boot; behavior-level browser acceptance and owned gaps remain. |
+| Phase 4 — workspace and visual evidence | Pending | No phase exit evidence yet. |
+| Phase 5 — continuity and automation | Partial implementation only | Multi-host and goal-stall work exists in separate plans; count it only after isolated acceptance. Provider switching and rewind remain open. |
+| Phase 6 — conditional expansion | Gate review pending | Each track must be admitted or explicitly deferred with evidence. |
+| Phase 7 — polish | Pending | Wait for functional exits; no cosmetics counted yet. |
+
 ### Phase 0 — verify scope and acceptance baseline
 
 1. Refresh active composition and installed contracts. Build a per-feature coverage ledger: provided, partial missing increment, absent, or unknown.
