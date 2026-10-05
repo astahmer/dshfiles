@@ -2,7 +2,7 @@
 
 ## Context
 
-Delivery date: **2026-10-05**. This document records the completed dshx framework work and the remaining DSH-owned seam. All work owned by this repository is implemented in the isolated `dshx-complete` JJ workspace; it has not been promoted into the live `web` profile. One limitation remains outside this repository: DSH `0.2.0-rc.2` does not expose a Client Slots Inspect provider, so live Slot scaffolding and occupancy cannot be proven until DSH adds that provider.
+Delivery date: **2026-10-05**. This document records the completed DSHX framework work. The native DSH `0.2.0-rc.2` Client Slots Inspect provider is available; a DSHX bridge defect that rejected Factory nodes and duplicated nested trees has been fixed and verified against an isolated second instance. The original framework delivery is integrated into local `main`; this final correction is a focused child changeset in the isolated `dshx-complete` workspace while the repository's active history-unification thread owns shared bookmark integration. Nothing has been promoted into the live `web` profile.
 
 The maintained fork is already the right foundation. Continue **building with our local `@dshfiles/dshx` hard fork**: it owns compilation, authoring adapters, inspection, scaffolding, and diagnostics. DSH/Cordis own activation, scope, transport, state, registries, and cleanup. Another framework adoption or another fork would duplicate the work we have already earned. BB and OpenCode2 supply implementation ideas; they are not target runtimes or dependencies.
 
@@ -67,7 +67,7 @@ Ten packages are bundles; `project-folder-picker` is a source library. Inventory
 
 ### Gaps reproduced before implementation
 
-The following were verified in the starting tree. Their delivered fixes and the one external Host dependency are recorded under [Implementation record](#implementation-record) and [Resolved questions and Host request](#resolved-questions-and-host-request).
+The following were verified in the starting tree. Their delivered fixes and final runtime evidence are recorded under [Implementation record](#implementation-record) and [Resolved questions and runtime Slot discovery](#resolved-questions-and-runtime-slot-discovery).
 
 1. **Advertised scaffold commands currently fail.** From `plugins/@dshfiles/ai-accounts`, `fnm exec --using 22.23.3 node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js add panel --id framework-plan-probe --dry-run --json` exits 2 with `Unknown argument "panel"`; substituting `api` produces the same failure. Help lists both. `src/cli/args.ts` accepts only `ui`, `tool`, `command`, and `hook` in its add-target branch. Source and built behavior agree here; this is not merely a stale bundle hypothesis.
 2. **The underlying presets are incomplete workflows.** `cli/run.ts::runAddPreset` writes files with direct `writeFile`, then tells panel authors to register them manually. `panelClientEntry` and `apiHostEntry` exist in `scaffold/presets.ts`, but this path does not use them. Generated API helpers remain unregistered until hand wiring, and repeated APIs share `src/api.ts`.
@@ -231,7 +231,7 @@ Extend existing types where possible (`FilePlan`, `DshxDiagnostic`, build and bo
 
 ## Implementation record
 
-All seven dshx-owned phases are delivered in this workspace. The phase descriptions below record outcomes, not pending instructions. Live Slots discovery and rendering remain dependent on the Host request at the end of this document.
+All seven dshx-owned phases are delivered in this workspace. The phase descriptions below record outcomes, not pending instructions. Live Slot discovery and exact occupancy are verified through the native Client provider; rendered contribution behavior remains a separate plugin/browser assertion.
 
 ### 1. Close the baseline and advertised-command gaps — delivered
 
@@ -259,7 +259,7 @@ Two real plugins now use declaration-following UI registration. `queue-reorder` 
 
 ### 7. Complete the discovery and authoring loop — delivered
 
-Create/add dry-runs, versioned JSON inspection, source-aware diagnostics, capability summaries, and the recipe guide now form one documented path. The scratch Basic-to-Slot experiment confirms the UI scaffold can install and build with all known first-party package metadata generated automatically when supplied an exact Inspect response. Runtime Slot discovery is still blocked by the missing DSH provider documented below.
+Create/add dry-runs, versioned JSON inspection, source-aware diagnostics, capability summaries, and the recipe guide now form one documented path. The scratch Basic-to-Slot experiment confirms the UI scaffold can install and build with first-party package metadata generated from an exact Inspect response. Live Slot discovery, exact occupancy, and the built-in Factory node are now verified through the native Client provider on an isolated second instance.
 
 ## Validation and measured authoring
 
@@ -275,13 +275,13 @@ All timing samples used official fnm Node **22.23.3**. Create measurements ran f
 
 The measured improvement is workflow completeness: the original built CLI rejected `add panel` and `add api`; generated Slot work previously needed hand-maintained provider metadata. Current tests cover the CLI wiring, and a clean scratch UI template plus Basic-to-Slot scaffold both install and pass typecheck/build/tests. The latter used an injected exact Inspect fixture because the installed Host has no Slots provider; it does not claim live Slot activation.
 
-Final validation on 2026-10-05:
+Initial framework validation on 2026-10-05:
 
 - `fnm exec --using 22.23.3 pnpm check` passed. This includes 469 dshx tests across 46 files, 25 create-dshx tests across two files, all 11 isolated plugin boots, plugin contracts/typechecks/tests/builds, Knip, Oxlint, and Oxfmt. Oxlint emitted warnings but no errors.
 - `fnm exec --using 22.23.3 pnpm --dir tooling/dshx run test:e2e` passed **13/13**: three composed browser boot-integrity scenarios and ten isolated plugin boots. The suite cleaned up its scratch Host.
-- The additional clean Basic-to-Slot fixture passed install, typecheck, build, its generated test, and static `dshx check`. Runtime Slot Inspect itself remains an external Host limitation, not a passed live scenario.
+- The additional clean Basic-to-Slot fixture passed install, typecheck, build, its generated test, and static `dshx check`.
 
-## Resolved questions and Host request
+## Resolved questions and runtime Slot discovery
 
 1. **Isolated profiles:** The boot gate builds an owned scratch home and profile, verifies the composed bundle list before launch, and cleans up its own process. Runtime evidence comes from a second scratch instance, never the user's `web` instance.
 2. **Native conversation typing:** Yes. The public `IConversation` contract supports the queue operation; plugins now import and use it directly.
@@ -290,13 +290,11 @@ Final validation on 2026-10-05:
 5. **Timing:** Basic scaffold creation is already below 100 ms and shows no measurable reduction. Fresh install costs dominate; this work targets missing wiring and failure diagnosis, not a speculative cache.
 6. **Tool schema derivation:** Native Tool schemas, rendering, policy, and cancellation remain explicit. No generic Standard Schema converter was justified by the installed contract or two real callers.
 
-### External DSH Host capability
+### Native Client Slots Inspect provider
 
-On DSH `0.2.0-rc.2`, the scratch runtime reports `DSHX3201: The official Slots Inspect provider is not registered.` `dsh-tool-cordis` registers Service, Event, Config, and Tool Inspect providers; `dsh-client-ui-slots` has no Inspect adapter. `add ui` translates the missing provider to actionable `DSHX6102` and exits before writing. A regression test asserts the error and zero filesystem changes.
+DSH `0.2.0-rc.2` includes the first-party `Slots.listSubTree` Inspect provider in `@deepseek-ai/dsh-cordis-client-runner`. It returns a discriminated tree: Slot nodes have `type: "slot"`, `kind`, and `scope`; Factory nodes have `type: "factory"`, `scope`, and children, but no `kind`. The Host bridge previously required `kind` on every node, so the real provider failed with `DSHX3203`. After accepting both variants, the compact topology response also exceeded the bridge limit because each flattened row repeated its nested `children`; the bridge now returns each node once and keeps the exact catalog/occupancy metadata on exact-root queries.
 
-The DSHX generation path is separately proven using an exact synthetic Inspect response: a Basic project receives the Client contribution, native provider/renderer/Slot packages, React dependencies, and `dsh.client.inject`, then passes install, typecheck, build, tests, and static check. This proves the DSHX authoring boundary, not Host runtime discovery or rendered Slot behavior.
-
-**Request to DSH:** register a first-party Client Slots Inspect provider that returns the native owner, mode and scope, registration fields, owner props, provider packages, replacement risk, required children, and current occupants. Until then, the offline `inspect slots --explain` catalog remains declaration guidance only, and `add ui` must not guess occupancy.
+On the isolated `dshx-verify` profile at port `3201`, `dshx inspect slots --json` returned 91 live nodes, including the `conversation.content` Factory, with no diagnostics. An exact query for `sidebar.brand.mark` returned its `single`/`root` contract, the active `mf` occupant, and the native `shadows-shipped-ui` replacement risk. DSHX exposes Factory nodes for inspection but filters them from interactive UI contribution choices and rejects an explicit Factory target with `DSHX6110` before writing. The remaining DSH-owned gap is rendered contribution behavior, which still requires a plugin contribution and browser assertion; Inspect no longer needs a Host change.
 
 ## Acceptance criteria
 
@@ -308,13 +306,13 @@ The DSHX generation path is separately proven using an exact synthetic Inspect r
 - [x] At least two real UI consumers use the safe registration path; native props, scope, cleanup, replacement, and HMR semantics remain covered.
 - [x] Typed config is opt-in, inferred, decoded once, and redacted; raw/native extension behavior remains supported.
 - [x] Local bundle linking uses the `link:` manifest plus pnpm install route and preserves unrelated profile state; component libraries are not treated as bundles.
-- [x] Minimal and composed scratch-profile checks prove composition and browser readiness; the missing live Slots seam is reported separately rather than simulated.
+- [x] Minimal and composed scratch-profile checks prove composition and browser readiness; live Slot topology and occupancy are queried through the native DSH provider.
 - [x] Built Host artifacts import on official Node; Client bundles and public declarations are covered by artifact checks.
 - [x] Check-owned Hosts and profiles are cleaned on tested exit paths; existing sessions and `web` remain unaffected.
-- [x] Shared capability helpers have multiple consumers; unsupported DSH behavior is a Host request, not a plugin workaround.
+- [x] Shared capability helpers have multiple consumers; unavailable or unsupported runtime facts remain explicit diagnostics rather than guessed plugin metadata.
 - [x] Before/after create medians and separate delivered-tree fresh-store/warm-store stage timings are recorded without claiming a speedup.
 - [x] Framework/plugin tests, typechecks, lint/format, boot checks, and E2E evidence are reported after final validation.
-- [ ] **External DSH dependency:** a first-party runtime Slots Inspect provider is needed to prove live Slot discovery, occupancy, and rendering on DSH `0.2.0-rc.2`.
+- [x] **Native Slots Inspect:** the DSH `0.2.0-rc.2` provider, Slot/Factory discriminant, compact topology, and exact live occupancy are verified through the DSHX bridge on an isolated second instance.
 
 ## Decisions log
 
@@ -326,3 +324,4 @@ The DSHX generation path is separately proven using an exact synthetic Inspect r
 | 2026-10-05 | Keep domain recipes ahead of persistence/jobs/tool-schema abstractions | Repeated syntax alone does not establish shared semantics. |
 | 2026-10-05 | Require native Inspect facts for live Slot scaffolding | The offline catalog cannot prove current provider ownership or occupants. |
 | 2026-10-05 | Do not promote changes into the active `web` profile from this work | The isolated workspace and second instance provide reviewable evidence without disrupting active sessions. |
+| 2026-10-05 | Preserve native Slot and Factory node variants across the DSHX bridge | The installed Client provider returns Factories without `kind`; flattening their nested trees while retaining every recursive `children` value exceeded the bounded bridge response. |

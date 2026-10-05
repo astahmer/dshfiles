@@ -45,27 +45,24 @@ ranges, selects the adapter, and reports capabilities.
   event names. This only holds when the plugin and the toolchain resolve one
   cordis identity; see the repository AGENTS.md.
 
-## Current Slot Inspect limitation
+## Live Slot Inspect
 
-The installed DSH `0.2.0-rc.2` runtime exposes the native Client Slot registry
-and declaration types, but it does not register a Slot Inspect provider.
-`dshx inspect slots` therefore reports `DSHX3201`; `dshx add ui` translates
-that into `DSHX6102` and exits before writing files. The local
-`dsh-tool-cordis` Inspect provider covers Services, Events, Config, and Tools,
-not Client Slots. The `dsh-client-ui-slots` package has no Inspect adapter.
+DSH `0.2.0-rc.2` registers the first-party `Slots.listSubTree` provider in
+`@deepseek-ai/dsh-cordis-client-runner`. `dshx inspect slots` reports the live
+Client composition as flat rows. Each row preserves its `type`: Slot nodes have
+a registration `kind`, while Factory nodes are topology containers without a
+`kind`. Factory children appear as their own rows; nested `children` are omitted
+from each flattened row so a large composition is not duplicated in the bounded
+Host bridge response.
 
-`dshx add ui` can complete manifest and provider metadata once Inspect returns
-the exact native Slot contract. That generation path is tested with a supplied
-Inspect fixture and a generated project; it is not live-runtime proof. The
-offline `dshx inspect slots --explain` catalog describes verified declarations
-and known shipped occupants only. It does not claim current profile occupancy.
-
-The missing provider belongs to DSH's Host/Client Inspect seam. DSH should
-register a first-party Client Slots provider that reports the owner, mode and
-scope, registration fields, native props, required provider packages,
-replacement risk, required children, and current occupants. Until that exists,
-DSHX refuses UI scaffolding when exact runtime facts are unavailable instead
-of guessing from the offline catalog.
+Use `dshx inspect slots --root <slot-name>` for that live Slot's declaration,
+catalog, and current occupants. `dshx add ui` uses those exact facts, offers
+only Slot nodes as contribution targets, and reports `DSHX6110` without writing
+when a Factory is selected. `dshx inspect slots --explain` remains a separate
+offline view of declarations and known shipped occupants; it does not claim
+current profile occupancy. Missing browser synchronization or unavailable
+runtime facts still produce explicit diagnostics rather than a successful empty
+result.
 
 ## Versions in a plugin
 
