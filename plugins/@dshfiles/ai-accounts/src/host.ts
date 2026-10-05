@@ -1,40 +1,40 @@
 import { accountRuntime, activateAccountRuntime } from './account-runtime.js'
-import { configFromAccountsFile, type AiAccountsConfig, type CodexAccountConfig } from './account-config.js'
+import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 import type { Context } from '@deepseek-ai/cordis'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import { aiAccountsApi, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
-import {
-  buildAccountsFile,
-  primeAccountFile,
-  readAccountFile,
-  readAccountFileSync,
-  readAccountIdentity,
-  removeAccount,
-  setDistribution,
-  upsertAccount,
-} from './account-store.js'
+import { accountsFile, accountsHostApi } from './accounts-host-api.js'
+export { accountsSnapshot } from './accounts-host-api.js'
+import { primeAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
-import { readCodexUsage, readOpenCodeUsage } from './usage.js'
-import { createUsageHistoryScheduler, readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
-import { fetchCommandCodeCatalog } from './commandcode-provider.js'
+import { createUsageHistoryScheduler } from './usage-recorder.js'
+import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
-import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV, createCommandCodeProvider } from './commandcode-provider.js'
-import type { GenerateOptions, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, ReasoningEffortId, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
-import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, isRateLimitFailure } from './account-pool.js'
-import { materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
+import { materializeCodexShadowHome } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
+import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
+import {
+  COMMANDCODE_KIND,
+  CODEX_KIND,
+  buildRoutes,
+  keyEnvFor,
+  normalizeInstanceId,
+  type KeyedRoute,
+  type Route,
+} from './provider-routes.js'
+export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -51,354 +51,6 @@ import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-c
  * Account layout and the shadow-home trick follow T3 Code's
  * `provider/Drivers/CodexHomeLayout.ts`.
  */
-
-export const CODEX_KIND = 'codex'
-export const OPENCODE_KIND = 'opencode-go'
-export const COMMANDCODE_KIND = CC_KIND
-
-const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
-
-/** An empty instance id means "the driver's own default route". */
-const normalizeInstanceId = (value: string, fallback: string): string => {
-  const trimmed = value.trim()
-  if (trimmed.length === 0) return fallback
-  if (!SLUG_PATTERN.test(trimmed)) {
-    throw new TypeError(`Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`)
-  }
-  return trimmed
-}
-
-const displayNameFor = (explicit: string, kind: string, instanceId: string): string => {
-  const trimmed = explicit.trim()
-  if (trimmed.length > 0) return trimmed
-  return instanceId === kind ? kind : `${kind} (${instanceId})`
-}
-
-interface CodexRoute {
-  readonly kind: typeof CODEX_KIND
-  readonly instanceId: string
-  readonly displayName: string
-  readonly enabled: boolean
-  readonly layout: CodexHomeLayout
-}
-
-interface KeyedRoute {
-  readonly kind: typeof OPENCODE_KIND | typeof COMMANDCODE_KIND
-  readonly instanceId: string
-  readonly displayName: string
-  readonly apiKeyEnv: string
-  readonly apiBaseUrl: string
-  readonly enabled: boolean
-}
-
-type Route = CodexRoute | KeyedRoute
-
-const keyEnvFor = (route: KeyedRoute): string =>
-  route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
-
-const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
-  const explicit = account.shadowHomePath.trim()
-  if (explicit.length > 0) return explicit
-  // One shadow per account under a single root keeps the T3 trick without
-  // making every account restate the path.
-  return `${root.replace(/\/$/, '')}/${instanceId}`
-}
-
-const buildProfile = (params: {
-  /** Per-model default effort ids this account pins. */
-  readonly reasoningDefaults?: Readonly<Record<string, string>>
-  /** Ids this account never offers. */
-  readonly hiddenModelIds?: readonly string[]
-  /** Ids offered ahead of the rest. */
-  readonly favoriteModelIds?: readonly string[]
-  /** Explicit ordering; unlisted ids keep provider order after these. */
-  readonly modelOrder?: readonly string[]
-  readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider>
-  readonly provider: string
-  readonly displayName: string
-  readonly additionalModelIds: readonly string[]
-}): ResolvedPiAiProviderProfile => {
-  const hidden = new Set(params.hiddenModelIds ?? [])
-  const favorites = new Set(params.favoriteModelIds ?? [])
-  const order = params.modelOrder ?? []
-  const rank = (id: string): number => {
-    const listed = order.indexOf(id)
-    if (listed >= 0) return listed
-    // Unlisted models follow the explicit ones, favorites first among them, then
-    // the provider's own order, so adding a model never reshuffles the rest.
-    return order.length + (favorites.has(id) ? 0 : 1)
-  }
-  const models = params.upstream
-    .getModels()
-    .filter(model => !hidden.has(model.id))
-    .map(model => ({ ...model, provider: params.provider }))
-    .sort((left, right) => rank(left.id) - rank(right.id))
-  const template = models.find(model => model.id.startsWith('gpt-'))
-  for (const id of params.additionalModelIds) {
-    if (template === undefined || models.some(model => model.id === id)) continue
-    models.push({ ...template, id, provider: params.provider })
-  }
-  // A pinned effort is offered as an override on the model it belongs to, which
-  // is the seam the adapter materializes a default through: an explicit caller
-  // choice still wins, and an unpinned model keeps the provider's own default.
-  const pins = params.reasoningDefaults ?? {}
-  const modelOverrides = Object.fromEntries(
-    Object.entries(pins).flatMap(([modelId, effortId]) => {
-      const model = models.find(candidate => candidate.id === modelId)
-      if (model === undefined) return []
-      const levels = (model as { thinkingLevelMap?: Record<string, string | null> }).thinkingLevelMap
-      if (levels !== undefined && levels[effortId] === null) return []
-      return [[modelId, { reasoningEfforts: { [effortId]: levels?.[effortId] ?? effortId } }]]
-    }),
-  )
-
-  return {
-    provider: params.provider,
-    displayName: params.displayName,
-    ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
-    transport: 'sse',
-    streamIdleTimeoutMs: 120_000,
-    maxRequestImageBytes: 20_971_520,
-    requestImagePixelBudget: 4_194_304,
-    requestImageMaxBytes: 1_048_576,
-    modelErrors: new Map(),
-    configuredMaxTokens: new Map(),
-    retryPolicy: {
-      mode: 'normal',
-      maxRetries: 2,
-      retryableCodes: ['RATE_LIMIT', 'OVERLOADED', 'TRANSPORT', 'TIMEOUT'],
-      initialDelayMs: 1_000,
-      maxDelayMs: 30_000,
-      jitterRatio: 0.2,
-    },
-    piProvider: {
-      ...params.upstream,
-      id: params.provider,
-      name: params.displayName,
-      getModels: () => models,
-    },
-  }
-}
-
-interface BuiltRoutes {
-  readonly routes: Map<string, Route>
-  /** Accounts left out because their Codex home is invalid, with the reason. */
-  readonly rejected: readonly string[]
-}
-
-const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
-  const routes = new Map<string, Route>()
-  const rejected: string[] = []
-  for (const account of config.codexAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, CODEX_KIND)
-    let layout: CodexHomeLayout
-    try {
-      layout = resolveCodexHomeLayout({
-        homePath: account.homePath,
-        shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
-      })
-    } catch (error) {
-      if (!(error instanceof CodexHomeError)) throw error
-      rejected.push(`${instanceId}: ${error.message}`)
-      continue
-    }
-    routes.set(instanceId, {
-      kind: CODEX_KIND,
-      instanceId,
-      displayName: displayNameFor(account.displayName, CODEX_KIND, instanceId),
-      enabled: account.enabled,
-      layout,
-    })
-  }
-  for (const account of config.opencodeAccounts) {
-    const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
-    const instanceId = normalizeInstanceId(account.instanceId, kind)
-    routes.set(instanceId, {
-      kind,
-      instanceId,
-      displayName: displayNameFor(account.displayName, kind, instanceId),
-      apiKeyEnv: account.apiKeyEnv,
-      apiBaseUrl: account.apiBaseUrl,
-      enabled: account.enabled,
-    })
-  }
-  return { routes, rejected }
-}
-
-/**
- * The one read operation. Profiles come from the accounts file, joined with the
- * pool's live health and each home's observed login, so the page and the agent's
- * `ai_accounts` tool can never describe different state.
- */
-const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
-  buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [])
-
-export const accountsSnapshot = accountsFile
-
-const accountsHostApi = aiAccountsApi.host({
-  read: async ({ ctx }) => {
-    // A changed file means changed routes, so rebuild before answering.
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
-  },
-  save: async ({ input, ctx }) => {
-    await upsertAccount(input.draft)
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
-  },
-  remove: async ({ input, ctx }) => {
-    await removeAccount(input.instanceId)
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
-  },
-  setDistribution: async ({ input, ctx }) => {
-    await setDistribution(input.distribution)
-    accountRuntime(ctx)?.accounts?.pool.setDistribution(input.distribution)
-    return accountsFile(ctx)
-  },
-  identity: async ({ input }) => readAccountIdentity(input.instanceId),
-  catalog: async ({ input, ctx }) => {
-    const llm = ctx.get('llm')
-    if (llm === undefined) return { instanceId: input.instanceId, models: [] }
-    const models = await llm.listModels(input.instanceId)
-    const resolved = await Promise.all(
-      models.map(async model => {
-        const info = await llm.resolveModelInfo(input.instanceId, model.id)
-        return {
-          id: model.id,
-          name: model.name,
-          efforts: (info.reasoning?.efforts ?? []).map(effort => ({
-            id: effort.id,
-            name: effort.name,
-          })),
-          defaultEffort: info.reasoning?.defaultEffort ?? null,
-        }
-      }),
-    )
-    return { instanceId: input.instanceId, models: resolved }
-  },
-  usage: async ({ ctx }) => readAccountsUsage(ctx),
-  history: async ({ input, ctx }) => ({
-    instanceId: input.instanceId,
-    points: [...(await readUsageHistory(ctx, input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
-  }),
-  historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
-  saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
-  overlaySettings: async ({ ctx }) => (await readUsageHistorySettings(ctx)).overlays,
-  saveOverlaySettings: async ({ input, ctx }) => {
-    const meta = await readUsageHistorySettings(ctx)
-    const next = await saveUsageHistorySettings(ctx, { overlays: { ...meta.overlays, ...input.patch } })
-    return next.overlays
-  },
-  collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
-})
-
-/**
- * One account's live quota.
- *
- * A keyed provider reports against its own key, and Codex against the login in
- * its own home. A provider with no reachable quota endpoint is reported as
- * unsupported rather than failing the sweep.
- */
-const readAccountUsage = async (account: AccountProfile): Promise<UsageCard> => {
-  if (account.kind === 'codex') {
-    return readCodexUsage(
-      resolveCodexHomeLayout({
-        homePath: account.homePath,
-        shadowHomePath: account.shadowHomePath,
-      }).effectiveHomePath,
-    )
-  }
-  if (account.kind === 'commandcode') return unsupported()
-  return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv))
-}
-
-const unsupported = (): UsageCard => ({
-  status: 'unsupported',
-  message: null,
-  identity: null,
-  plan: null,
-  windows: [],
-  bankedResets: 0,
-  bankedResetExpiries: [],
-})
-
-/**
- * Live quota for every account, read with each account's own credential.
- *
- * One sweep covers the whole panel: the Client renders it as cards and refreshes
- * on an interval, so a provider that is slow or down costs its own card rather
- * than the panel.
- */
-const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
-  // Read the observed file so a Codex account uses the same shadow home the
-  // panel already shows, not a re-derived guess.
-  const file = await accountsFile(ctx)
-  const cards = await Promise.all(
-    file.accounts.map(async account => ({
-      instanceId: account.instanceId,
-      usage: await readAccountUsage(account),
-    })),
-  )
-  return { readAt: Date.now(), cards }
-}
-
-/**
- * Rebuild provider routes from the accounts file.
- *
- * Routes are derived state, so editing a profile changes the model picker. The
- * pool is reused across a rebuild so a rate-limited account stays cooling rather
- * than being reset by an unrelated save, and only accounts whose identity or
- * enabled flag actually changed are re-registered, because the adapter registry
- * rejects a duplicate route for one already taken.
- */
-const refreshRoutes = async (ctx: Context): Promise<void> => {
-  const activeAccounts = accountRuntime(ctx)?.accounts
-  if (activeAccounts === undefined) return
-  const file = await readAccountFile()
-  const config = configFromAccountsFile(file)
-  activeAccounts.config = config
-  activeAccounts.pool.setDistribution(file.distribution)
-}
-
-/** Apply the account's pin to one request whose caller did not choose an effort. */
-const pinnedCall = (options: GenerateOptions, pins: ReadonlyMap<string, Readonly<Record<string, string>>>): GenerateOptions => {
-  if (options.reasoningEffort !== undefined) return options
-  const effort = pins.get(options.provider)?.[options.model]
-  if (effort === undefined) return options
-  return { ...options, reasoningEffort: ReasoningEffortId(effort) }
-}
-
-/**
- * One default per model, not one per route.
- *
- * pi-ai materializes a default effort through the route-wide `profile.reasoning`
- * field, so a per-model pin cannot be expressed there without reshuffling every
- * other model the account serves. The adapter's `stream` entry point sees the
- * fully-assembled request after the loop built it, so overriding there applies
- * exactly one pin — the caller's explicit choice still wins, a different model
- * on the same route keeps the provider default, and an effort-only switch
- * (no provider or model change) stays silent the way `sameRoute` wants.
- */
-class EffortPinnedAdapter extends PiAiAdapter {
-  private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
-
-  constructor(config: ConstructorParameters<typeof PiAiAdapter>[0], deps: { reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>> }) {
-    super(config)
-    this.reasoningDefaults = deps.reasoningDefaults
-  }
-
-  override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return super.stream(pinnedCall(options, this.reasoningDefaults))
-  }
-
-  override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
-    return super.prepareCall(provider, model, signal).then(call => ({
-      ...call,
-      stream: (options: GenerateOptions) => call.stream(pinnedCall(options, this.reasoningDefaults)),
-    }))
-  }
-}
 
 export default definePlugin({
   id: 'llm-ai-accounts',
