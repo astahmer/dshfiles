@@ -35,3 +35,60 @@ agent/model turns, filesystem/process tools, native terminals, LSP, MCP, browser
 composition or supervised remote startup. The interrupted mutation test drops the
 connection before sending; admitted mutations with lost replies remain an open
 failure-injection acceptance gate.
+
+## P1 — real remote acceptance (2026-10-05, VPS)
+
+Target: documented `deploy@` Hetzner runtime, reached only through the
+host's Tailscale address (direct public SSH refuses the key; the tailnet
+route is the trusted path). Provisioned under `/home/deploy/dsh-mh`:
+
+- official Node `v24.20.0` linux-x64 tarball from nodejs.org, unpacked in
+  `dsh-mh/node`, `node -v` verified remotely; no source build, no global
+  install, no shared Node touched.
+- official `@deepseek-ai/dsh@0.2.0-rc.2` from npm into `dsh-pkg`
+  (`dsh-pkg/node_modules/.bin/dsh --version` returned `0.2.0-rc.2`).
+- disposable runtime: `DSH_HOME=/home/deploy/dsh-mh/runtime-a-home`,
+  loopback bind, `--port 0`, supervised by a transient systemd user unit
+  (`systemd-run --user --unit=dsh-mh-a …boot-remote.sh`).
+- workspace: `/home/deploy/dsh-mh/workspace`, owned by `deploy`.
+- model route for the agent-turn gate: the owned `@dshfiles/ai-accounts`
+  plugin runs on the remote runtime with a `go-free` opencode-go draft in
+  `/home/deploy/.dsh/plugins/ai-accounts/accounts.json` (key env
+  `OPENCODE_API_KEY`, free-model entitlement resolved live) delivering the
+  `longcat-2.0` model through the OpenCode Go upstream.
+
+Verified gates (all assertions executed by
+`tooling/dshx/scripts/smoke-multi-host-ssh.mjs` with tokens redacted in its
+output, plus a follow-up manual agent-survival run):
+
+| Gate | Result |
+|---|---|
+| Placement (local `dsh` + remote runtime, isolated parallel sessions) | Passed — same workspace path stays in separate runtime/session namespaces |
+| Remote session creation + history over SSH-tunnelled native API | Passed |
+| Remote PTY: spawn in workspace cwd, screen snapshot frames, same-attachment write, foreign-attachment resize rejected, owning-attachment resize accepted, exit state `exited` | Passed |
+| Remote workspace marker file written only through the remote PTY shell; absent locally | Passed |
+| Tunnel loss → • `rpc-unreachable` on stale client, • runtime stays alive, • rebuilt tunnel restores native access with the same cookie, • no replayed mutation | Passed |
+| Runtime restart (systemd): fresh token, same cookie still works, workspace/session identity + history preserved, stale handles rebuild | Passed |
+| Authentication: wrong token rejected, dead forwarded endpoint fails closed, loopback-only exposure confirmed on remote `ss` | Passed |
+| Agent continuity (the one model turn): remote session with `go-free`/`longcat-2.0`, tunnel dropped and all UI subscribers torn down mid-turn, agent completed on the remote runtime, persisted assistant `DONE` and title recovered after reconnect | Passed |
+| MCP: credential-free local stdio fixture server registered in the remote profile patch via native `@deepseek-ai/dsh-mcp-client`, `active` phase | Passed |
+| LSP | No advertised remote LSP contract — recorded as UNSUPPORTED, no support claim. Separate gate promised only when the installed runtime advertises a matching LSP |
+
+Discovered facts recorded for P2 design:
+
+- The runtime cookie survives a restart (durable signing authority under the
+  runtime home) so reconnecting callers must verify identity facts, not just
+  reachability; a stale cookie is not proof of authenticity.
+- Without loginctl linger, systemd user services die when the last session
+  ends; the smoke holds a detach (`ssh -fN`) session, which is exactly the
+  bootstrap lifetime a real connector must keep.
+- dshx host artifacts had to run the server environment: a bare
+  `process.env.X` in plugin source compiled to an empty-object lookup when
+  Vite 8 resolved `node:process` through the browser-external shim. The fork
+  now builds Host with `build.ssr: true`
+  (`tooling/dshx/packages/dshx/src/compiler/host/build.ts`).
+- The ai-accounts additionalModelIds field lost its zod default in earlier
+  bundles; runtime store reads silently discarded the whole accounts file
+  instead of reporting the defect.
+
+P1 exit gate satisfied; the boundary holds and P2 proceeds.
