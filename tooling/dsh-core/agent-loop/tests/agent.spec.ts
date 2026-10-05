@@ -149,7 +149,7 @@ describe('Agent', () => {
         id: 'test-driver',
         title: 'Test driver',
         protocolVersion: 1,
-        capabilities: { create: true, resume: true, fork: false, steering: true, rollback: false },
+        capabilities: { create: true, resume: true, fork: false, historyReplay: false, steering: true, rollback: false },
       },
       create: async request => {
         operations.push('create')
@@ -177,6 +177,59 @@ describe('Agent', () => {
       .filter(event => event.type === 'user/message')
       .map(event => event.data.id)
     expect(userMessages).toEqual([first.id, continuation.id])
+
+    await handle.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('recreates a driver from bounded public history without shortening the new prompt', async () => {
+    const ctx = await harness(new MockAdapter([]))
+    const openRequests: RuntimeDriverOpenRequest[] = []
+    const promptTexts: string[][] = []
+    const continuation = createUserMessage({ content: [{ type: 'text', text: 'continue without truncation' }], source: { kind: 'user' } })
+    let promptCount = 0
+    const makeSession = (request: RuntimeDriverOpenRequest): RuntimeDriverSession => {
+      openRequests.push(request)
+      return {
+        prompt: async (prompt, publish) => {
+          promptTexts.push(prompt.messages.flatMap(message => message.content
+            .flatMap(block => block.type === 'text' ? [block.text] : [])))
+          promptCount += 1
+          if (promptCount === 1) request.agent.steer(continuation)
+          publish({ type: 'text-delta', text: `reply-${promptCount}` })
+          return { outcome: 'completed' }
+        },
+        acknowledgePrompt: async () => undefined,
+        cancel: () => undefined,
+        dispose: async () => undefined,
+      }
+    }
+    const runtime: RuntimeDriverAdapter = {
+      descriptor: {
+        id: 'history-driver',
+        title: 'History replay driver',
+        protocolVersion: 1,
+        capabilities: { create: true, resume: false, fork: false, historyReplay: true, steering: true, rollback: false },
+      },
+      create: async request => makeSession(request),
+      resume: async () => { throw new Error('Native resume is unavailable.') },
+      status: async () => ({ availability: 'available', authentication: 'authenticated' }),
+    }
+    ctx.agents.registerRuntimeDriver(runtime)
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('runtime-history-backed'),
+      meta: { runtimeBinding: { driverKind: 'history-driver', instanceId: 'test-account' } },
+    })
+    const first = createUserMessage({ content: [{ type: 'text', text: 'start' }], source: { kind: 'user' } })
+
+    handle.agent.followup(first)
+    await handle.agent.whenIdle()
+
+    expect(promptCount).toBe(2)
+    expect(promptTexts).toEqual([['start'], ['continue without truncation']])
+    expect(openRequests.map(request => request.history?.messages.map(message => message.parts.join('')) ?? []))
+      .toEqual([[], ['start', 'reply-1']])
+    expect(openRequests[1]?.history?.messages.at(-1)?.parts.join('')).not.toContain('continue without truncation')
 
     await handle.dispose()
     await ctx.fiber.dispose()

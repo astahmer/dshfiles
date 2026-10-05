@@ -33,7 +33,7 @@ import {
 import { assertNever, deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import { createScope } from '@deepseek-ai/dsh-scope'
-import type { EpochHeader, RequestContext, Session, SessionId, SessionSeq, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
+import type { EpochHeader, RequestContext, Session, SessionEvent, SessionId, SessionSeq, TurnEndReason, UserMessage } from '@deepseek-ai/dsh-session'
 import { canonicalHeader, headerEquals, ToolCallRecovery } from '@deepseek-ai/dsh-session'
 import { joinContextSections, renderContextSections, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
@@ -45,6 +45,7 @@ import { RuntimeContextProjection } from './runtime-context.ts'
 import { AssistantStreamAttempt } from './assistant-stream.ts'
 import { SystemPromptProjection } from './runtime-context.ts'
 import { executeToolCalls } from './tool-calls.ts'
+import { projectRuntimeDriverHistory } from './runtime-history.ts'
 
 type Phase =
   | { kind: 'idle'; lastTurn: number }
@@ -330,13 +331,22 @@ export class ReactLoopAgent implements Agent {
       if (turnEnds !== null && decision.messages.length === 0) break
       if (phase.step === 0 && decision.messages.length === 0) return { kind: 'completed' }
       phase.abort.signal.throwIfAborted()
+      const capabilities = driver.adapter.descriptor.capabilities
+      const needsPortableHistory = capabilities.historyReplay
+        && (!this.runtimeDriverStarted || !capabilities.resume)
+      const historyEvents = needsPortableHistory ? this.session.snapshotEvents() : undefined
       this.session.append('step/start', { turn, step })
       phase.step = step
       for (const message of decision.messages) {
         this.session.append('user/message', message, { surfaceOp: 'append' })
       }
       try {
-        const stepEnd = await this.runRuntimeStep(driver, decision.messages, { turn, step, signal: phase.abort.signal })
+        const stepEnd = await this.runRuntimeStep(driver, decision.messages, {
+          turn,
+          step,
+          signal: phase.abort.signal,
+          ...historyEvents === undefined ? {} : { historyEvents },
+        })
         if (turnEnds?.kind !== 'max-tokens') turnEnds = stepEnd
       } finally {
         this.session.append('step/end', { turn, step })
@@ -355,12 +365,26 @@ export class ReactLoopAgent implements Agent {
   private async runRuntimeStep(
     driver: { readonly adapter: RuntimeDriverAdapter; readonly driverKind: string; readonly instanceId: string },
     messages: UserMessage[],
-    position: { readonly turn: number; readonly step: number; readonly signal: AbortSignal },
+    position: {
+      readonly turn: number
+      readonly step: number
+      readonly signal: AbortSignal
+      readonly historyEvents?: readonly SessionEvent[]
+    },
   ): Promise<StepEndReason> {
+    const capabilities = driver.adapter.descriptor.capabilities
+    const nativeResume = this.runtimeDriverStarted && capabilities.resume
+    if (this.runtimeDriverStarted && !nativeResume && !capabilities.historyReplay) {
+      throw new Error(`runtime driver cannot resume or replay history: ${driver.driverKind}`)
+    }
+    const history = position.historyEvents === undefined
+      ? undefined
+      : projectRuntimeDriverHistory(position.historyEvents)
     const openRequest = {
       agent: this,
       session: this.session,
       instanceId: driver.instanceId,
+      ...history === undefined ? {} : { history },
       signal: position.signal,
       requestPermission: async (request: { toolName: string; callId?: string; reason?: string; signal: AbortSignal }) => {
         const approval = this.ctx.get('approval')
@@ -374,7 +398,7 @@ export class ReactLoopAgent implements Agent {
         })
       },
     }
-    const runtime = this.runtimeDriverStarted
+    const runtime = nativeResume
       ? await driver.adapter.resume(openRequest)
       : await driver.adapter.create(openRequest)
     this.runtimeDriverStarted = true

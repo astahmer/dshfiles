@@ -428,7 +428,11 @@ export class AgentRegistry extends Service {
     const driverKind = options.runtimeBinding.driverKind
     const registration = this.runtimeDrivers.get(driverKind)
     if (registration === undefined) throw new Error(`runtime driver unavailable: ${driverKind}`)
-    if (!registration.descriptor.capabilities[options.operation]) throw new Error(`runtime driver does not support ${options.operation}: ${driverKind}`)
+    const capabilities = registration.descriptor.capabilities
+    const canResumeWithHistory = options.operation === 'resume' && capabilities.create && capabilities.historyReplay
+    if (!capabilities[options.operation] && !canResumeWithHistory) {
+      throw new Error(`runtime driver does not support ${options.operation}: ${driverKind}`)
+    }
     return this.requireFactory()
   }
 

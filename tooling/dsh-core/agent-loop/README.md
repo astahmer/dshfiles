@@ -218,6 +218,10 @@ These limits define when the loop needs special care. They are current package c
 - **Config agents have no per-agent persona field or setup hook** — they use the deployment persona; scoped persona and tool composition are available only through the programmatic `ctx.agents.create()` / `resume()` factory options.
 - **No built-in turn budget** — tool calls or steering continue the current turn; a policy that bounds runaway turns must cancel from an existing lifecycle extension point such as `agent/turn-stopping`.
 
+### Runtime driver history replay
+
+A runtime driver declares `historyReplay` only when it can rebuild a provider session from the bounded portable history passed to `create()`. The replay includes ordered user and assistant text, attributes each item by speaker, and indexes omitted attachments, private content, tool state, and history removed by the budget. The current prompt is passed separately and is never shortened by the history budget. A declared native `resume()` remains authoritative: failures or uncertain provider effects do not trigger replay. Replay is used only when the driver declares that native resume is unavailable and explicitly opts into `historyReplay`.
+
 <a id="dev-note"></a>
 ### Dev Note
 

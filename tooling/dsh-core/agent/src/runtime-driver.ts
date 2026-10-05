@@ -11,6 +11,7 @@ export const runtimeDriverDescriptorSchema = z.object({
     create: z.boolean(),
     resume: z.boolean(),
     fork: z.boolean(),
+    historyReplay: z.boolean().default(false),
     steering: z.boolean(),
     rollback: z.boolean(),
   }).strict(),
@@ -46,10 +47,33 @@ export interface RuntimeDriverPermissionRequest {
 
 export type RuntimeDriverEvent = z.infer<typeof runtimeDriverEventSchema>
 
+export interface RuntimeDriverHistoryMessage {
+  readonly seq: number
+  readonly speaker: 'user' | 'assistant'
+  readonly parts: readonly string[]
+}
+
+export interface RuntimeDriverHistoryOmission {
+  readonly fromSeq: number
+  readonly throughSeq: number
+  readonly reason: 'agent-context' | 'attachment' | 'private-content' | 'tool-state' | 'history-budget'
+  readonly count: number
+}
+
+export interface RuntimeDriverHistory {
+  readonly throughSeq: number
+  readonly messages: readonly RuntimeDriverHistoryMessage[]
+  readonly omissions: readonly RuntimeDriverHistoryOmission[]
+  readonly omittedCount: number
+  readonly omissionIndexComplete: boolean
+}
+
 export interface RuntimeDriverOpenRequest {
   readonly agent: Agent
   readonly session: Session
   readonly instanceId: string
+  /** Safe, bounded prior conversation only when the adapter opted into replay. */
+  readonly history?: RuntimeDriverHistory
   readonly signal: AbortSignal
   readonly requestPermission: (request: RuntimeDriverPermissionRequest) => Promise<RuntimeDriverApprovalOutcome>
 }

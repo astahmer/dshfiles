@@ -10,7 +10,7 @@ import SessionStore, { SessionLogOffset, SessionSeq, Session, SessionId, TOOL_NO
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture, TOOL_RUNTIME_SCHEDULER } from '@deepseek-ai/dsh-tools'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent, type RuntimeDriverAdapter, type RuntimeDriverHistoryMessage } from '@deepseek-ai/dsh-agent'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -1076,6 +1076,73 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     const turnStarts = a2.session.snapshotEvents().filter(e => e.type === 'turn/start')
     expect(turnStarts.map(e => e.type === 'turn/start' && e.data.turn)).toEqual([1, 2])
     await ctx2.fiber.dispose()
+  })
+
+  it('replays bounded public history when a resumed runtime has no native resume', async () => {
+    const sessionId = SessionId('portable-runtime-resume')
+    const runtimeBinding = { driverKind: 'history-replay-driver', instanceId: 'local' }
+    const descriptor = {
+      id: 'history-replay-driver',
+      title: 'History replay driver',
+      protocolVersion: 1 as const,
+      capabilities: { create: true, resume: false, fork: false, historyReplay: true, steering: true, rollback: false },
+    }
+    const createAdapter = (
+      answer: string,
+      observedHistory: Array<readonly RuntimeDriverHistoryMessage[]>,
+      observedPrompts: string[][],
+    ): RuntimeDriverAdapter => ({
+      descriptor,
+      create: async request => {
+        observedHistory.push(request.history?.messages ?? [])
+        return {
+          prompt: async (prompt, publish) => {
+            observedPrompts.push(prompt.messages.flatMap(message => message.content
+              .flatMap(block => block.type === 'text' ? [block.text] : [])))
+            publish({ type: 'text-delta', text: answer })
+            return { outcome: 'completed' }
+          },
+          acknowledgePrompt: async () => undefined,
+          cancel: () => undefined,
+          dispose: async () => undefined,
+        }
+      },
+      resume: async () => { throw new Error('Native resume is unavailable.') },
+      status: async () => ({ availability: 'available', authentication: 'authenticated' }),
+    })
+
+    const firstHistory: Array<readonly RuntimeDriverHistoryMessage[]> = []
+    const firstPrompts: string[][] = []
+    const { ctx: firstContext, root } = await persistentHarness(new MockAdapter([]))
+    firstContext.agents.registerRuntimeDriver(createAdapter('first answer', firstHistory, firstPrompts))
+    const firstHandle = await firstContext.agents.create({ sessionId, meta: { cwd: '/w', runtimeBinding } })
+    firstHandle.agent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'first question' }],
+      source: { kind: 'user' },
+    }))
+    await firstHandle.agent.whenIdle()
+    await firstHandle.dispose()
+    await firstContext.fiber.dispose()
+
+    const resumedHistory: Array<readonly RuntimeDriverHistoryMessage[]> = []
+    const resumedPrompts: string[][] = []
+    const resumedContext = await mountPersistentHarness(root, new MockAdapter([]))
+    resumedContext.agents.registerRuntimeDriver(createAdapter('second answer', resumedHistory, resumedPrompts))
+    const resumedHandle = await resumedContext.agents.resume({ resumeSessionId: sessionId, runtimeBinding })
+    resumedHandle.agent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'second question remains intact' }],
+      source: { kind: 'user' },
+    }))
+    await resumedHandle.agent.whenIdle()
+
+    expect(firstHistory.map(messages => messages.map(message => message.parts.join('')))).toEqual([[]])
+    expect(firstPrompts).toEqual([['first question']])
+    expect(resumedHistory.map(messages => messages.map(message => message.parts.join(''))))
+      .toEqual([['first question', 'first answer']])
+    expect(resumedPrompts).toEqual([['second question remains intact']])
+
+    await resumedHandle.dispose()
+    await resumedContext.fiber.dispose()
   })
 
   it('resume rejects when session persistence is not configured', async () => {

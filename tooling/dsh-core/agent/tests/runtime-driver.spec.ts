@@ -10,7 +10,7 @@ const descriptorFor = (resume: boolean): RuntimeDriverDescriptor => runtimeDrive
   id: 'secondary-loop',
   title: 'Secondary runtime route',
   protocolVersion: 1,
-  capabilities: { create: true, resume, fork: false, steering: true, rollback: false },
+  capabilities: { create: true, resume, fork: false, historyReplay: false, steering: true, rollback: false },
 })
 
 const createRuntimeDriver = (descriptor: RuntimeDriverDescriptor) => {
@@ -48,6 +48,16 @@ const createRuntime = async () => {
 }
 
 describe('named runtime drivers', () => {
+  it('defaults portable history replay off for adapters with older descriptors', () => {
+    const descriptor = runtimeDriverDescriptorSchema.parse({
+      id: 'legacy-driver',
+      title: 'Legacy runtime driver',
+      protocolVersion: 1,
+      capabilities: { create: true, resume: false, fork: false, steering: true, rollback: false },
+    })
+    expect(descriptor.capabilities.historyReplay).toBe(false)
+  })
+
   it('keeps DSH lifecycle ownership while substituting only the external turn runner', async () => {
     const context = await createRuntime()
     const runtime = createRuntimeDriver(descriptorFor(true))

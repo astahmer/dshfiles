@@ -73,6 +73,18 @@ describe('Cursor Agent config and recovery records', () => {
     expect(() => cursorSessionRecordForResume(record, 'work')).toThrow('creation outcome is uncertain')
   })
 
+  it('resumes only a settled receipt owned by the selected runtime instance', () => {
+    const record = cursorSessionRecordSchema.parse({
+      state: 'ready',
+      instanceId: 'work',
+      nativeSessionId: 'provider-owned-id',
+    })
+
+    expect(cursorSessionRecordForResume(record, 'work')).toEqual(record)
+    expect(() => cursorSessionRecordForResume(record, 'other')).toThrow('different runtime instance')
+    expect(() => cursorSessionRecordForResume(undefined, 'work')).toThrow('record is missing')
+  })
+
   it('refuses to replay a persisted prompt receipt after restart', () => {
     const record = cursorSessionRecordSchema.parse({
       state: 'ready',

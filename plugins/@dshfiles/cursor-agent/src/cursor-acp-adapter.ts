@@ -465,7 +465,7 @@ export class CursorAcpAdapter implements RuntimeDriverAdapter {
     id: DRIVER_KIND,
     title: 'Cursor Agent ACP',
     protocolVersion: 1 as const,
-    capabilities: Object.freeze({ create: true, resume: true, fork: false, steering: true, rollback: false }),
+    capabilities: Object.freeze({ create: true, resume: true, fork: false, historyReplay: false, steering: true, rollback: false }),
   })
 
   private readonly sessions = new Set<CursorRuntimeSession>()
