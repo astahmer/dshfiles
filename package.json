@@ -7,6 +7,8 @@
     "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile",
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
+    "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
+    "verify:dsh-customization:a11y": "node scripts/dsh-customization-a11y.mjs",
     "check": "pnpm run check:dshx && pnpm run check:plugins && pnpm run lint && pnpm run fmt:check",
     "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
     "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
