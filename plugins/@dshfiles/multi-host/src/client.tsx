@@ -1,13 +1,60 @@
-import { z } from 'zod'
+import { Button, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { ConfirmDialog, EmptyState, Notice } from '@dshfiles/plugin-ui'
+import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { z } from 'zod'
 import { multiHostApi, type HostSummary, type RuntimeSummary, type RuntimeStatus } from './api.js'
 import styles from './multi-host.module.css'
 
 type Directory = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
 type ViewWindow = { readonly popup: Window; readonly timer: number; readonly runtimeId: string }
 
+const emptyDirectory: Directory = { hosts: [], runtimes: [] }
+const directoryQueryKey = ['multi-host', 'directory'] as const
+const runtimeStatusQueryKey = (runtimeId: string) => ['multi-host', 'runtime-status', runtimeId] as const
+
 const sessionCreatedSchema = z.object({ sessionId: z.string().min(1) })
+const hostFormSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1, 'Host id is required.')
+      .max(64)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'Use letters, numbers, dots, underscores, or hyphens.'),
+    name: z.string().trim().min(1, 'Display name is required.').max(120),
+    kind: z.enum(['local', 'ssh']),
+    sshTarget: z.string().trim().max(255),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === 'ssh' && value.sshTarget.length === 0) context.addIssue({ code: 'custom', path: ['sshTarget'], message: 'SSH target is required.' })
+  })
+
+const runtimeFormSchema = (hosts: readonly HostSummary[]) =>
+  z
+    .object({
+      hostId: z.string().min(1, 'Choose a recorded host.'),
+      name: z.string().trim().min(1, 'Runtime name is required.').max(120),
+      launchUrl: z.string().trim().max(2048),
+      unit: z.string().trim().max(128),
+      remoteHome: z.string().trim().max(1024),
+    })
+    .superRefine((value, context) => {
+      const host = hosts.find(item => item.id === value.hostId)
+      if (host === undefined) return
+      if (host.connector.kind === 'local' && value.launchUrl.length === 0) {
+        context.addIssue({ code: 'custom', path: ['launchUrl'], message: 'Tokenized launch URL is required.' })
+      }
+      if (host.connector.kind === 'ssh') {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/.test(value.unit)) context.addIssue({ code: 'custom', path: ['unit'], message: 'Enter a valid systemd user unit.' })
+        if (value.remoteHome.length === 0) context.addIssue({ code: 'custom', path: ['remoteHome'], message: 'Remote DSH_HOME is required.' })
+      }
+    })
+
+const workspaceFormSchema = z.object({ path: z.string().trim().min(1, 'Workspace path is required.').max(1024) })
+const sessionFormSchema = z.object({ cwd: z.string().trim().max(1024) })
 
 const errorMessage = (reason: unknown): string => (reason instanceof Error ? reason.message : 'The multi-host request failed.')
 
@@ -23,93 +70,79 @@ const releaseRequestController = (controllers: Set<AbortController>, controller:
 
 export const MultiHostPanel = (): JSX.Element => {
   const api = useApi(multiHostApi)
-  const [directory, setDirectory] = useState<Directory>({ hosts: [], runtimes: [] })
-  const [selectedRuntimeId, setSelectedRuntimeId] = useState('')
-  const [status, setStatus] = useState<RuntimeStatus | null>(null)
+  const queryClient = useQueryClient()
+  const [preferredRuntimeId, setPreferredRuntimeId] = useState('')
   const [openViewRuntimeIds, setOpenViewRuntimeIds] = useState<ReadonlySet<string>>(new Set())
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [hostKind, setHostKind] = useState<'local' | 'ssh'>('ssh')
-  const [hostId, setHostId] = useState('')
-  const [hostName, setHostName] = useState('')
-  const [sshTarget, setSshTarget] = useState('')
-  const [runtimeHostId, setRuntimeHostId] = useState('')
-  const [runtimeName, setRuntimeName] = useState('')
-  const [launchUrl, setLaunchUrl] = useState('')
-  const [unit, setUnit] = useState('')
-  const [remoteHome, setRemoteHome] = useState('')
-  const [workspacePath, setWorkspacePath] = useState('')
-  const [newSessionCwd, setNewSessionCwd] = useState('')
-  const generations = useRef({ directory: 0, status: 0 })
+  const [removingHost, setRemovingHost] = useState<HostSummary | null>(null)
   const viewWindows = useRef(new Map<string, ViewWindow>())
   const requestControllers = useRef(new Set<AbortController>())
-
+  const directoryQuery = useQuery({
+    queryKey: directoryQueryKey,
+    queryFn: ({ signal }) => api.list(undefined, { signal }),
+    retry: false,
+  })
+  const directory = directoryQuery.data ?? emptyDirectory
+  const selectedRuntimeId = directory.runtimes.some(runtime => runtime.id === preferredRuntimeId) ? preferredRuntimeId : (directory.runtimes[0]?.id ?? '')
   const selectedRuntime = useMemo(() => directory.runtimes.find(runtime => runtime.id === selectedRuntimeId), [directory.runtimes, selectedRuntimeId])
   const selectedHost = directory.hosts.find(host => host.id === selectedRuntime?.hostId)
+  const runtimeStatusQuery = useQuery({
+    queryKey: runtimeStatusQueryKey(selectedRuntimeId),
+    enabled: selectedRuntime !== undefined,
+    queryFn: async ({ signal }): Promise<RuntimeStatus> => {
+      if (selectedRuntime === undefined) throw new Error('Choose a runtime first.')
+      try {
+        return await api.runtimeStatus({ runtimeId: selectedRuntime.id }, { signal })
+      } catch (reason) {
+        if (signal.aborted) throw reason
+        return {
+          ok: false,
+          hostId: selectedRuntime.hostId,
+          runtimeId: selectedRuntime.id,
+          code: 'runtime-unavailable',
+          message: errorMessage(reason),
+          stale: true,
+          ...(selectedRuntime.lastSeenAt === undefined ? {} : { lastSeenAt: selectedRuntime.lastSeenAt }),
+        }
+      }
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+  const hostUpsertMutation = useMutation({ mutationFn: (input: Parameters<typeof api.hostUpsert>[0]) => api.hostUpsert(input) })
+  const runtimeUpsertMutation = useMutation({
+    mutationFn: (args: Parameters<typeof api.runtimeUpsert>) => api.runtimeUpsert(...args),
+  })
+  const workspaceOpenMutation = useMutation({
+    mutationFn: (args: Parameters<typeof api.workspaceOpen>) => api.workspaceOpen(...args),
+  })
+  const sessionCreateMutation = useMutation({
+    mutationFn: (args: Parameters<typeof api.runtimeCall>) => api.runtimeCall(...args),
+  })
+  const hostRemoveMutation = useMutation({ mutationFn: (input: Parameters<typeof api.hostRemove>[0]) => api.hostRemove(input) })
+  const saving =
+    hostUpsertMutation.isPending ||
+    runtimeUpsertMutation.isPending ||
+    workspaceOpenMutation.isPending ||
+    sessionCreateMutation.isPending ||
+    hostRemoveMutation.isPending
+  const status = selectedRuntime === undefined ? null : (runtimeStatusQuery.data ?? null)
+  const loading = directoryQuery.isFetching
+  const visibleError = error ?? (directoryQuery.isFetching || directoryQuery.error === undefined ? null : errorMessage(directoryQuery.error))
 
   const refresh = useCallback(async (): Promise<void> => {
-    const generation = ++generations.current.directory
-    const controller = createRequestController(requestControllers.current)
-    setLoading(true)
     setError(null)
-    try {
-      const next = await api.list(undefined, { signal: controller.signal })
-      if (generation !== generations.current.directory) return
-      setDirectory(next)
-      setSelectedRuntimeId(current => (next.runtimes.some(runtime => runtime.id === current) ? current : (next.runtimes[0]?.id ?? '')))
-      setRuntimeHostId(current => (next.hosts.some(host => host.id === current) ? current : (next.hosts[0]?.id ?? '')))
-    } catch (reason) {
-      if (!controller.signal.aborted && generation === generations.current.directory) setError(errorMessage(reason))
-    } finally {
-      releaseRequestController(requestControllers.current, controller)
-      if (generation === generations.current.directory) setLoading(false)
-    }
-  }, [api])
+    await queryClient.invalidateQueries({ queryKey: directoryQueryKey })
+  }, [queryClient])
 
-  useEffect(() => {
-    void refresh()
-    return () => {
-      generations.current.directory += 1
+  useEffect(
+    () => () => {
       for (const controller of requestControllers.current) controller.abort()
       requestControllers.current.clear()
-    }
-  }, [refresh])
-
-  useEffect(() => {
-    if (selectedRuntime === undefined) {
-      setStatus(null)
-      return
-    }
-    const generation = ++generations.current.status
-    const controller = createRequestController(requestControllers.current)
-    let current = true
-    setStatus(null)
-    void api
-      .runtimeStatus({ runtimeId: selectedRuntime.id }, { signal: controller.signal })
-      .then(value => {
-        if (current && generation === generations.current.status) setStatus(value)
-      })
-      .catch(reason => {
-        if (current && !controller.signal.aborted && generation === generations.current.status) {
-          setStatus({
-            ok: false,
-            hostId: selectedRuntime.hostId,
-            runtimeId: selectedRuntime.id,
-            code: 'runtime-unavailable',
-            message: errorMessage(reason),
-            stale: true,
-            ...(selectedRuntime.lastSeenAt === undefined ? {} : { lastSeenAt: selectedRuntime.lastSeenAt }),
-          })
-        }
-      })
-      .finally(() => releaseRequestController(requestControllers.current, controller))
-    return () => {
-      current = false
-      controller.abort()
-    }
-  }, [api, selectedRuntime])
+    },
+    [],
+  )
 
   useEffect(
     () => () => {
@@ -123,57 +156,139 @@ export const MultiHostPanel = (): JSX.Element => {
     [api],
   )
 
-  const submitHost = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-    setSaving(true)
-    setError(null)
-    setNotice(null)
-    try {
-      const connector = hostKind === 'local' ? { kind: 'local' as const } : { kind: 'ssh' as const, sshTarget: sshTarget.trim() }
-      await api.hostUpsert({ id: hostId.trim(), name: hostName.trim(), connector })
-      setHostId('')
-      setHostName('')
-      setSshTarget('')
-      setNotice('Host recorded. Add one or more DSH runtimes to it.')
-      await refresh()
-    } catch (reason) {
-      setError(errorMessage(reason))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const hostForm = useAppForm({
+    defaultValues: { id: '', name: '', kind: 'ssh' as 'local' | 'ssh', sshTarget: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: hostFormSchema },
+    onSubmit: async ({ value }) => {
+      setError(null)
+      setNotice(null)
+      try {
+        const connector = value.kind === 'local' ? { kind: 'local' as const } : { kind: 'ssh' as const, sshTarget: value.sshTarget }
+        await hostUpsertMutation.mutateAsync({ id: value.id, name: value.name, connector })
+        hostForm.reset()
+        setNotice('Host recorded. Add one or more DSH runtimes to it.')
+        await refresh()
+      } catch (reason) {
+        setError(errorMessage(reason))
+      }
+    },
+  })
 
-  const submitRuntime = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-    const host = directory.hosts.find(item => item.id === runtimeHostId)
-    if (host === undefined) {
-      setError('Choose a recorded host first.')
-      return
-    }
-    setSaving(true)
-    setError(null)
-    setNotice(null)
-    const controller = createRequestController(requestControllers.current)
-    try {
-      const locator =
-        host.connector.kind === 'local' ? { kind: 'local' as const, launchUrl } : { kind: 'ssh' as const, unit: unit.trim(), remoteHome: remoteHome.trim() }
-      const registration = await api.runtimeUpsert({ hostId: host.id, name: runtimeName.trim(), locator }, { signal: controller.signal })
-      if (!registration.ok) throw new Error(`${registration.code}: ${registration.message}`)
-      const runtime = registration.runtime
-      setSelectedRuntimeId(runtime.id)
-      setRuntimeName('')
-      setLaunchUrl('')
-      setUnit('')
-      setRemoteHome('')
-      setNotice(`Runtime ${runtime.id} authenticated and identity pinned.`)
-      await refresh()
-    } catch (reason) {
-      if (!controller.signal.aborted) setError(errorMessage(reason))
-    } finally {
-      releaseRequestController(requestControllers.current, controller)
-      setSaving(false)
-    }
-  }
+  const runtimeSchema = useMemo(() => runtimeFormSchema(directory.hosts), [directory.hosts])
+  const runtimeForm = useAppForm({
+    defaultValues: { hostId: '', name: '', launchUrl: '', unit: '', remoteHome: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: runtimeSchema },
+    onSubmit: async ({ value }) => {
+      const host = directory.hosts.find(item => item.id === value.hostId)
+      if (host === undefined) {
+        setError('Choose a recorded host first.')
+        return
+      }
+      setError(null)
+      setNotice(null)
+      const controller = createRequestController(requestControllers.current)
+      try {
+        const locator =
+          host.connector.kind === 'local'
+            ? { kind: 'local' as const, launchUrl: value.launchUrl }
+            : { kind: 'ssh' as const, unit: value.unit, remoteHome: value.remoteHome }
+        const registration = await runtimeUpsertMutation.mutateAsync([{ hostId: host.id, name: value.name, locator }, { signal: controller.signal }])
+        if (!registration.ok) throw new Error(`${registration.code}: ${registration.message}`)
+        setPreferredRuntimeId(registration.runtime.id)
+        runtimeForm.reset()
+        setNotice(`Runtime ${registration.runtime.id} authenticated and identity pinned.`)
+        await refresh()
+      } catch (reason) {
+        if (!controller.signal.aborted) setError(errorMessage(reason))
+      } finally {
+        releaseRequestController(requestControllers.current, controller)
+      }
+    },
+  })
+
+  const runtimeHostId = directory.hosts.some(host => host.id === runtimeForm.state.values.hostId)
+    ? runtimeForm.state.values.hostId
+    : (directory.hosts[0]?.id ?? '')
+
+  useEffect(() => {
+    if (directory.hosts.some(host => host.id === runtimeForm.getFieldValue('hostId'))) return
+    runtimeForm.setFieldValue('hostId', directory.hosts[0]?.id ?? '')
+  }, [directory.hosts, runtimeForm])
+
+  const workspaceForm = useAppForm({
+    defaultValues: { path: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: workspaceFormSchema },
+    onSubmit: async ({ value }) => {
+      if (selectedRuntime === undefined) return
+      setError(null)
+      setNotice(null)
+      const controller = createRequestController(requestControllers.current)
+      try {
+        const workspace = await workspaceOpenMutation.mutateAsync([{ runtimeId: selectedRuntime.id, path: value.path }, { signal: controller.signal }])
+        workspaceForm.reset()
+        sessionForm.setFieldValue('cwd', workspace.path)
+        setNotice(`Workspace ${workspace.workspaceId} opened on ${selectedRuntime.id}.`)
+        queryClient.setQueryData<RuntimeStatus>(runtimeStatusQueryKey(selectedRuntime.id), current =>
+          current?.ok === true
+            ? { ...current, workspaces: [...current.workspaces.filter(item => item.workspaceId !== workspace.workspaceId), workspace] }
+            : current,
+        )
+      } catch (reason) {
+        if (!controller.signal.aborted) setError(errorMessage(reason))
+      } finally {
+        releaseRequestController(requestControllers.current, controller)
+      }
+    },
+  })
+
+  const sessionForm = useAppForm({
+    defaultValues: { cwd: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: sessionFormSchema },
+    onSubmit: async ({ value }) => {
+      if (selectedRuntime === undefined) return
+      setError(null)
+      setNotice(null)
+      const controller = createRequestController(requestControllers.current)
+      try {
+        const result = await sessionCreateMutation.mutateAsync([
+          {
+            runtimeId: selectedRuntime.id,
+            request: { namespace: 'session', method: 'create', args: { request: value.cwd === '' ? {} : { cwd: value.cwd } } },
+          },
+          { signal: controller.signal },
+        ])
+        if (!result.ok) throw new Error(result.message)
+        const created = sessionCreatedSchema.parse(result.value)
+        setNotice(`Created Session ${created.sessionId} on ${selectedRuntime.id}.`)
+        queryClient.setQueryData<RuntimeStatus>(runtimeStatusQueryKey(selectedRuntime.id), current =>
+          current?.ok === true
+            ? {
+                ...current,
+                sessions: [
+                  ...current.sessions,
+                  {
+                    runtimeId: selectedRuntime.id,
+                    sessionId: created.sessionId,
+                    ...(value.cwd === '' ? {} : { cwd: value.cwd }),
+                    running: false,
+                    blank: true,
+                    updatedAt: Date.now(),
+                  },
+                ],
+              }
+            : current,
+        )
+      } catch (reason) {
+        if (!controller.signal.aborted) setError(errorMessage(reason))
+      } finally {
+        releaseRequestController(requestControllers.current, controller)
+      }
+    },
+  })
 
   const openRuntimeView = async (): Promise<void> => {
     if (selectedRuntime === undefined) return
@@ -241,87 +356,17 @@ export const MultiHostPanel = (): JSX.Element => {
     }
   }
 
-  const openWorkspace = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-    if (selectedRuntime === undefined) return
-    setSaving(true)
-    setError(null)
-    setNotice(null)
-    const controller = createRequestController(requestControllers.current)
-    try {
-      const workspace = await api.workspaceOpen({ runtimeId: selectedRuntime.id, path: workspacePath.trim() }, { signal: controller.signal })
-      setWorkspacePath('')
-      setNewSessionCwd(workspace.path)
-      setNotice(`Workspace ${workspace.workspaceId} opened on ${selectedRuntime.id}.`)
-      setStatus(current =>
-        current?.ok === true
-          ? { ...current, workspaces: [...current.workspaces.filter(item => item.workspaceId !== workspace.workspaceId), workspace] }
-          : current,
-      )
-    } catch (reason) {
-      if (!controller.signal.aborted) setError(errorMessage(reason))
-    } finally {
-      releaseRequestController(requestControllers.current, controller)
-      setSaving(false)
-    }
-  }
-
-  const createSession = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-    if (selectedRuntime === undefined) return
-    setSaving(true)
-    setError(null)
-    setNotice(null)
-    const controller = createRequestController(requestControllers.current)
-    try {
-      const cwd = newSessionCwd.trim()
-      const result = await api.runtimeCall(
-        {
-          runtimeId: selectedRuntime.id,
-          request: { namespace: 'session', method: 'create', args: { request: cwd === '' ? {} : { cwd } } },
-        },
-        { signal: controller.signal },
-      )
-      if (!result.ok) throw new Error(result.message)
-      const created = sessionCreatedSchema.parse(result.value)
-      setNotice(`Created Session ${created.sessionId} on ${selectedRuntime.id}.`)
-      setStatus(current =>
-        current?.ok === true
-          ? {
-              ...current,
-              sessions: [
-                ...current.sessions,
-                {
-                  runtimeId: selectedRuntime.id,
-                  sessionId: created.sessionId,
-                  ...(newSessionCwd.trim() === '' ? {} : { cwd: newSessionCwd.trim() }),
-                  running: false,
-                  blank: true,
-                  updatedAt: Date.now(),
-                },
-              ],
-            }
-          : current,
-      )
-    } catch (reason) {
-      if (!controller.signal.aborted) setError(errorMessage(reason))
-    } finally {
-      releaseRequestController(requestControllers.current, controller)
-      setSaving(false)
-    }
-  }
-
-  const removeHost = async (host: HostSummary): Promise<void> => {
-    setSaving(true)
+  const removeHost = async (): Promise<void> => {
+    if (removingHost === null) return
+    const host = removingHost
     setError(null)
     try {
-      await api.hostRemove({ id: host.id, removeDirectory: true })
+      await hostRemoveMutation.mutateAsync({ id: host.id, removeDirectory: true })
+      setRemovingHost(null)
       setNotice(`Removed ${host.name} and its local directory references. Remote runtime data remains intact.`)
       await refresh()
     } catch (reason) {
       setError(errorMessage(reason))
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -335,21 +380,13 @@ export const MultiHostPanel = (): JSX.Element => {
             Connect to full DSH runtimes. Sessions, workspaces, tools, and providers stay owned by each runtime, with browser storage scoped per runtime.
           </p>
         </div>
-        <button type="button" className={styles.secondaryButton} disabled={loading} onClick={() => void refresh()}>
+        <Button disabled={loading} onClick={() => void refresh()} size="sm" type="button" variant="outline">
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        </Button>
       </header>
 
-      {error !== null && (
-        <div className={styles.error} role="alert">
-          {error}
-        </div>
-      )}
-      {notice !== null && (
-        <div className={styles.notice} role="status">
-          {notice}
-        </div>
-      )}
+      {visibleError !== null && <Notice tone="danger">{visibleError}</Notice>}
+      {notice !== null && <Notice tone="success">{notice}</Notice>}
 
       <section className={styles.section} aria-labelledby="host-list-title">
         <div className={styles.sectionHeading}>
@@ -357,10 +394,10 @@ export const MultiHostPanel = (): JSX.Element => {
             <p className={styles.eyebrow}>Machines</p>
             <h2 id="host-list-title">Host directory</h2>
           </div>
-          <span className={styles.count}>{directory.hosts.length}</span>
+          <Tag tone="neutral">{directory.hosts.length}</Tag>
         </div>
         {directory.hosts.length === 0 ? (
-          <p className={styles.empty}>No hosts recorded yet.</p>
+          <EmptyState compact description="Record a local machine or SSH host to start attaching DSH runtimes." title="No hosts recorded yet" />
         ) : (
           <ul className={styles.hostList}>
             {directory.hosts.map(host => (
@@ -376,9 +413,9 @@ export const MultiHostPanel = (): JSX.Element => {
                     </span>
                   </div>
                 </div>
-                <button type="button" className={styles.textButton} disabled={saving} onClick={() => void removeHost(host)}>
+                <Button className={styles.removeButton} disabled={saving} onClick={() => setRemovingHost(host)} size="sm" type="button" variant="ghost">
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -386,111 +423,100 @@ export const MultiHostPanel = (): JSX.Element => {
       </section>
 
       <section className={styles.forms} aria-label="Add execution host and runtime">
-        <form className={styles.formCard} onSubmit={event => void submitHost(event)}>
+        <form
+          className={styles.formCard}
+          noValidate
+          onSubmit={event => {
+            event.preventDefault()
+            void hostForm.handleSubmit()
+          }}
+        >
           <div>
             <p className={styles.eyebrow}>Step 1</p>
             <h2>Add host</h2>
           </div>
-          <label>
-            Host id
-            <input
-              required
-              maxLength={64}
-              pattern="[A-Za-z0-9][A-Za-z0-9._\-]*"
-              value={hostId}
-              onChange={event => setHostId(event.target.value)}
-              placeholder="workstation"
-            />
-          </label>
-          <label>
-            Display name
-            <input required maxLength={120} value={hostName} onChange={event => setHostName(event.target.value)} placeholder="Workstation" />
-          </label>
-          <label>
-            Connection
-            <select value={hostKind} onChange={event => setHostKind(event.target.value === 'local' ? 'local' : 'ssh')}>
-              <option value="local">Local machine</option>
-              <option value="ssh">SSH host</option>
-            </select>
-          </label>
-          {hostKind === 'ssh' && (
-            <label>
-              SSH target
-              <input
-                required
-                maxLength={255}
-                value={sshTarget}
-                onChange={event => setSshTarget(event.target.value)}
-                placeholder="deploy@host.example"
-                autoComplete="off"
+          <hostForm.AppField name="id">
+            {field => <field.TextField description="Letters, numbers, dots, underscores, and hyphens." label="Host id" placeholder="workstation" required />}
+          </hostForm.AppField>
+          <hostForm.AppField name="name">{field => <field.TextField label="Display name" placeholder="Workstation" required />}</hostForm.AppField>
+          <hostForm.AppField name="kind">
+            {field => (
+              <field.SelectField
+                label="Connection"
+                options={[
+                  { value: 'local', label: 'Local machine' },
+                  { value: 'ssh', label: 'SSH host' },
+                ]}
               />
-            </label>
-          )}
-          <button className={styles.primaryButton} type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Record host'}
-          </button>
+            )}
+          </hostForm.AppField>
+          <hostForm.Subscribe selector={state => state.values.kind}>
+            {kind =>
+              kind === 'ssh' ? (
+                <hostForm.AppField name="sshTarget">
+                  {field => <field.TextField label="SSH target" placeholder="deploy@host.example" required />}
+                </hostForm.AppField>
+              ) : null
+            }
+          </hostForm.Subscribe>
+          <hostForm.AppForm>
+            <hostForm.SubmitButton disabled={saving}>{saving ? 'Saving…' : 'Record host'}</hostForm.SubmitButton>
+          </hostForm.AppForm>
         </form>
 
-        <form className={styles.formCard} onSubmit={event => void submitRuntime(event)}>
+        <form
+          className={styles.formCard}
+          noValidate
+          onSubmit={event => {
+            event.preventDefault()
+            void runtimeForm.handleSubmit()
+          }}
+        >
           <div>
             <p className={styles.eyebrow}>Step 2</p>
             <h2>Attach runtime</h2>
           </div>
-          <label>
-            Host
-            <select required value={runtimeHostId} onChange={event => setRuntimeHostId(event.target.value)}>
-              <option value="">Choose a host</option>
-              {directory.hosts.map(host => (
-                <option key={host.id} value={host.id}>
-                  {host.name} · {host.connector.kind}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Runtime name
-            <input required maxLength={120} value={runtimeName} onChange={event => setRuntimeName(event.target.value)} placeholder="Web profile" />
-          </label>
-          {directory.hosts.find(host => host.id === runtimeHostId)?.connector.kind === 'local' ? (
-            <label>
-              Tokenized launch URL
-              <input
+          <runtimeForm.AppField name="hostId">
+            {field => (
+              <field.SelectField
+                label="Host"
+                options={[
+                  { value: '', label: 'Choose a host' },
+                  ...directory.hosts.map(host => ({ value: host.id, label: `${host.name} · ${host.connector.kind}` })),
+                ]}
                 required
-                type="password"
-                autoComplete="off"
-                value={launchUrl}
-                onChange={event => setLaunchUrl(event.target.value)}
-                placeholder="Paste from DSH startup output"
               />
-            </label>
+            )}
+          </runtimeForm.AppField>
+          <runtimeForm.AppField name="name">{field => <field.TextField label="Runtime name" placeholder="Web profile" required />}</runtimeForm.AppField>
+          {directory.hosts.find(host => host.id === runtimeHostId)?.connector.kind === 'local' ? (
+            <runtimeForm.AppField name="launchUrl">
+              {field => <field.TextField label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />}
+            </runtimeForm.AppField>
           ) : (
             <>
-              <label>
-                systemd user unit
-                <input
-                  required
-                  maxLength={128}
-                  pattern="[A-Za-z0-9][A-Za-z0-9_.@\-]*"
-                  value={unit}
-                  onChange={event => setUnit(event.target.value)}
-                  placeholder="dsh-runtime"
-                />
-              </label>
-              <label>
-                Remote DSH_HOME
-                <input
-                  required
-                  maxLength={1024}
-                  value={remoteHome}
-                  onChange={event => setRemoteHome(event.target.value)}
-                  placeholder="/home/user/.dsh/runtime"
-                />
-              </label>
+              {directory.hosts.find(host => host.id === runtimeHostId)?.connector.kind === 'ssh' && (
+                <>
+                  <runtimeForm.AppField name="unit">
+                    {field => (
+                      <field.TextField
+                        description="Letters, numbers, dots, underscores, @, and hyphens."
+                        label="systemd user unit"
+                        placeholder="dsh-runtime"
+                        required
+                      />
+                    )}
+                  </runtimeForm.AppField>
+                  <runtimeForm.AppField name="remoteHome">
+                    {field => <field.TextField label="Remote DSH_HOME" placeholder="/home/user/.dsh/runtime" required />}
+                  </runtimeForm.AppField>
+                </>
+              )}
             </>
           )}
-          <button className={styles.primaryButton} type="submit" disabled={saving || directory.hosts.length === 0}>
-            {saving ? 'Connecting…' : 'Authenticate and pin identity'}
-          </button>
+          <runtimeForm.AppForm>
+            <runtimeForm.SubmitButton disabled={saving}>{saving ? 'Connecting…' : 'Authenticate and pin identity'}</runtimeForm.SubmitButton>
+          </runtimeForm.AppForm>
         </form>
       </section>
 
@@ -500,10 +526,10 @@ export const MultiHostPanel = (): JSX.Element => {
             <p className={styles.eyebrow}>Execution targets</p>
             <h2 id="runtime-title">Registered runtimes</h2>
           </div>
-          <span className={styles.count}>{directory.runtimes.length}</span>
+          <Tag tone="neutral">{directory.runtimes.length}</Tag>
         </div>
         {directory.runtimes.length === 0 ? (
-          <p className={styles.empty}>Attach a runtime to enable remote workspace and Session placement.</p>
+          <EmptyState compact description="Attach a runtime to enable remote workspace and Session placement." title="No runtimes registered" />
         ) : (
           <div className={styles.runtimeLayout}>
             <nav className={styles.runtimeList} aria-label="Runtimes">
@@ -512,7 +538,7 @@ export const MultiHostPanel = (): JSX.Element => {
                   key={item.id}
                   type="button"
                   className={`${styles.runtimeChoice} ${selectedRuntimeId === item.id ? styles.runtimeChoiceSelected : ''}`}
-                  onClick={() => setSelectedRuntimeId(item.id)}
+                  onClick={() => setPreferredRuntimeId(item.id)}
                 >
                   <span className={status?.ok === true && status.runtime.id === item.id ? styles.onlineDot : styles.unknownDot} aria-hidden />
                   <span>
@@ -527,7 +553,7 @@ export const MultiHostPanel = (): JSX.Element => {
 
             <div className={styles.runtimeDetail}>
               {selectedRuntime === undefined ? (
-                <p className={styles.empty}>Choose a runtime.</p>
+                <EmptyState compact title="Choose a runtime" />
               ) : (
                 <>
                   <div className={styles.runtimeTitle}>
@@ -536,11 +562,9 @@ export const MultiHostPanel = (): JSX.Element => {
                       <h3>{selectedRuntime.name}</h3>
                       <p className={styles.runtimeId}>{selectedRuntime.id}</p>
                     </div>
-                    <span
-                      className={`${styles.statusPill} ${status?.ok === true ? styles.statusOnline : status === null ? styles.statusChecking : styles.statusOffline}`}
-                    >
-                      {status === null ? 'Checking' : status.ok ? 'Online' : 'Stale'}
-                    </span>
+                    <Tag tone={status === null ? 'quiet' : status.ok ? 'success' : 'warning'}>
+                      {status === null ? (runtimeStatusQuery.isFetching ? 'Checking' : 'Unavailable') : status.ok ? 'Online' : 'Stale'}
+                    </Tag>
                   </div>
                   {status?.ok === true ? (
                     <>
@@ -556,64 +580,63 @@ export const MultiHostPanel = (): JSX.Element => {
                         </span>
                       </div>
                       <div className={styles.actions}>
-                        <button
-                          className={styles.primaryButton}
-                          type="button"
-                          disabled={openViewRuntimeIds.has(selectedRuntime.id)}
-                          onClick={() => void openRuntimeView()}
-                        >
+                        <Button disabled={openViewRuntimeIds.has(selectedRuntime.id)} onClick={() => void openRuntimeView()} type="button" variant="primary">
                           {openViewRuntimeIds.has(selectedRuntime.id) ? 'Runtime view open' : 'Open native runtime view'}
-                        </button>
-                        <button
-                          className={styles.secondaryButton}
-                          type="button"
-                          onClick={() => void closeRuntimeViews()}
-                          disabled={viewWindows.current.size === 0}
-                        >
+                        </Button>
+                        <Button onClick={() => void closeRuntimeViews()} disabled={viewWindows.current.size === 0} type="button" variant="outline">
                           Close runtime views
-                        </button>
+                        </Button>
                       </div>
-                      <form className={styles.inlineForm} onSubmit={event => void openWorkspace(event)}>
-                        <label>
-                          Open workspace path
-                          <input
-                            required
-                            maxLength={1024}
-                            value={workspacePath}
-                            onChange={event => setWorkspacePath(event.target.value)}
-                            placeholder="/absolute/path/on/runtime"
-                          />
-                        </label>
-                        <button className={styles.secondaryButton} type="submit" disabled={saving}>
-                          Open workspace
-                        </button>
+                      <form
+                        className={styles.inlineForm}
+                        noValidate
+                        onSubmit={event => {
+                          event.preventDefault()
+                          void workspaceForm.handleSubmit()
+                        }}
+                      >
+                        <workspaceForm.AppField name="path">
+                          {field => <field.TextField label="Open workspace path" placeholder="/absolute/path/on/runtime" required />}
+                        </workspaceForm.AppField>
+                        <workspaceForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
+                          {([canSubmit, isSubmitting]) => (
+                            <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
+                              Open workspace
+                            </Button>
+                          )}
+                        </workspaceForm.Subscribe>
                       </form>
-                      <form className={styles.inlineForm} onSubmit={event => void createSession(event)}>
-                        <label>
-                          New Session working directory
-                          <input
-                            maxLength={1024}
-                            value={newSessionCwd}
-                            onChange={event => setNewSessionCwd(event.target.value)}
-                            placeholder="Optional runtime-local path"
-                          />
-                        </label>
-                        <button className={styles.secondaryButton} type="submit" disabled={saving}>
-                          Create Session here
-                        </button>
+                      <form
+                        className={styles.inlineForm}
+                        noValidate
+                        onSubmit={event => {
+                          event.preventDefault()
+                          void sessionForm.handleSubmit()
+                        }}
+                      >
+                        <sessionForm.AppField name="cwd">
+                          {field => <field.TextField label="New Session working directory" placeholder="Optional runtime-local path" />}
+                        </sessionForm.AppField>
+                        <sessionForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
+                          {([canSubmit, isSubmitting]) => (
+                            <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
+                              Create Session here
+                            </Button>
+                          )}
+                        </sessionForm.Subscribe>
                       </form>
                       <div className={styles.dataColumns}>
                         <section>
                           <h4>
-                            Workspaces <span>{status.workspaces.length}</span>
+                            Workspaces <Tag tone="quiet">{status.workspaces.length}</Tag>
                           </h4>
                           {status.workspaces.length === 0 ? (
-                            <p className={styles.empty}>No workspaces reported.</p>
+                            <EmptyState compact title="No workspaces reported" />
                           ) : (
                             <ul className={styles.dataList}>
                               {status.workspaces.map(workspace => (
                                 <li key={workspace.workspaceId}>
-                                  <button type="button" className={styles.workspaceButton} onClick={() => setNewSessionCwd(workspace.path)}>
+                                  <button type="button" className={styles.workspaceButton} onClick={() => sessionForm.setFieldValue('cwd', workspace.path)}>
                                     <strong>{workspace.title}</strong>
                                     <span>{workspace.path}</span>
                                   </button>
@@ -624,10 +647,10 @@ export const MultiHostPanel = (): JSX.Element => {
                         </section>
                         <section>
                           <h4>
-                            Sessions <span>{status.sessions.length}</span>
+                            Sessions <Tag tone="quiet">{status.sessions.length}</Tag>
                           </h4>
                           {status.sessions.length === 0 ? (
-                            <p className={styles.empty}>No sessions reported.</p>
+                            <EmptyState compact title="No sessions reported" />
                           ) : (
                             <ul className={styles.dataList}>
                               {status.sessions.map(session => (
@@ -645,12 +668,9 @@ export const MultiHostPanel = (): JSX.Element => {
                       </div>
                     </>
                   ) : (
-                    <div className={styles.staleCard} role="status">
-                      <strong>{status === null ? 'Checking runtime identity…' : status.message}</strong>
-                      <span>
-                        {status?.lastSeenAt === undefined ? 'No successful connection yet.' : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
-                      </span>
-                    </div>
+                    <Notice tone="warning" title={status === null ? 'Checking runtime identity…' : status.message}>
+                      {status?.lastSeenAt === undefined ? 'No successful connection yet.' : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
+                    </Notice>
                   )}
                 </>
               )}
@@ -658,6 +678,18 @@ export const MultiHostPanel = (): JSX.Element => {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        busy={saving}
+        cancelLabel="Keep host"
+        closeLabel="Close remove host dialog"
+        confirmLabel="Remove host"
+        description="This removes the host and its local directory references. Remote runtime data stays intact."
+        onCancel={() => setRemovingHost(null)}
+        onConfirm={() => void removeHost()}
+        open={removingHost !== null}
+        title={removingHost === null ? 'Remove host?' : `Remove ${removingHost.name}?`}
+        tone="danger"
+      />
     </main>
   )
 }

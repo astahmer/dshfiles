@@ -1,11 +1,11 @@
 .panel {
-  --mh-bg: color-mix(in srgb, var(--background, #111318) 88%, white 12%);
-  --mh-panel: color-mix(in srgb, var(--background, #111318) 94%, white 6%);
-  --mh-line: color-mix(in srgb, var(--foreground, #f3f4f6) 14%, transparent);
-  --mh-muted: color-mix(in srgb, var(--foreground, #f3f4f6) 62%, transparent);
-  --mh-strong: var(--foreground, #f3f4f6);
-  --mh-accent: var(--primary, #9e8cff);
-  --mh-danger: #ed7a78;
+  --mh-bg: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 92%, var(--dsw-alias-label-primary) 8%);
+  --mh-panel: var(--dsw-alias-bg-layer-1);
+  --mh-line: var(--dsw-alias-border-l2);
+  --mh-muted: var(--dsw-alias-label-secondary);
+  --mh-strong: var(--dsw-alias-label-primary);
+  --mh-accent: var(--dsw-alias-state-business-primary);
+  --mh-danger: var(--dsw-alias-state-error-primary);
   box-sizing: border-box;
   display: grid;
   gap: 1.4rem;
@@ -77,16 +77,6 @@
 .formCard h2 {
   font-size: 1.08rem;
 }
-.count {
-  display: grid;
-  min-width: 1.8rem;
-  height: 1.8rem;
-  place-items: center;
-  border: 1px solid var(--mh-line);
-  border-radius: 999px;
-  color: var(--mh-muted);
-  font-size: 0.75rem;
-}
 .hostList,
 .dataList {
   display: grid;
@@ -150,64 +140,9 @@
   border-radius: 1rem;
   background: var(--mh-bg);
 }
-.formCard label,
-.inlineForm label {
-  display: grid;
-  gap: 0.38rem;
-  color: var(--mh-muted);
-  font-size: 0.76rem;
-  font-weight: 600;
+.removeButton {
+  color: var(--mh-danger);
 }
-.panel input,
-.panel select {
-  width: 100%;
-  min-width: 0;
-  padding: 0.65rem 0.72rem;
-  border: 1px solid var(--mh-line);
-  border-radius: 0.6rem;
-  outline: none;
-  background: color-mix(in srgb, var(--background, #111318) 84%, white 16%);
-  color: var(--mh-strong);
-  font: inherit;
-  font-size: 0.82rem;
-}
-.panel input:focus,
-.panel select:focus {
-  border-color: var(--mh-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mh-accent) 23%, transparent);
-}
-.panel input::placeholder {
-  color: color-mix(in srgb, var(--mh-muted) 75%, transparent);
-}
-.primaryButton,
-.secondaryButton {
-  display: inline-flex;
-  min-height: 2.25rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.52rem 0.8rem;
-  border: 1px solid transparent;
-  border-radius: 0.62rem;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  transition:
-    transform 0.15s ease,
-    opacity 0.15s ease,
-    border-color 0.15s ease;
-}
-.primaryButton {
-  background: var(--mh-accent);
-  color: #15131e;
-}
-.secondaryButton {
-  border-color: var(--mh-line);
-  background: transparent;
-  color: var(--mh-strong);
-}
-.textButton,
 .workspaceButton {
   padding: 0.2rem;
   border: 0;
@@ -217,19 +152,8 @@
   font: inherit;
   font-size: 0.76rem;
 }
-.textButton:hover {
+.removeButton:hover {
   color: var(--mh-danger);
-}
-.primaryButton:hover,
-.secondaryButton:hover {
-  transform: translateY(-1px);
-}
-.primaryButton:disabled,
-.secondaryButton:disabled,
-.textButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-  transform: none;
 }
 .runtimeLayout {
   display: grid;
@@ -264,12 +188,12 @@
   height: 0.55rem;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: #54cb94;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #54cb94 14%, transparent);
+  background: var(--dsw-alias-state-success-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
 }
 .unknownDot {
-  background: #e1ad5f;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #e1ad5f 14%, transparent);
+  background: var(--dsw-alias-state-warn-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-warn-primary) 14%, transparent);
 }
 .runtimeDetail {
   display: grid;
@@ -293,27 +217,6 @@
   color: var(--mh-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.7rem;
-}
-.statusPill {
-  flex: 0 0 auto;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--mh-line);
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-.statusOnline {
-  border-color: color-mix(in srgb, #54cb94 40%, transparent);
-  background: color-mix(in srgb, #54cb94 10%, transparent);
-  color: #71d8a7;
-}
-.statusOffline {
-  border-color: color-mix(in srgb, var(--mh-danger) 35%, transparent);
-  background: color-mix(in srgb, var(--mh-danger) 9%, transparent);
-  color: var(--mh-danger);
-}
-.statusChecking {
-  color: var(--mh-muted);
 }
 .identityFacts {
   flex-wrap: wrap;
@@ -343,8 +246,12 @@
   padding-top: 0.75rem;
   border-top: 1px solid var(--mh-line);
 }
-.inlineForm label {
+.inlineForm > :first-child {
   flex: 1;
+  min-width: 0;
+}
+.inlineForm > button {
+  flex: 0 0 auto;
 }
 .dataColumns {
   display: grid;
@@ -356,10 +263,6 @@
   justify-content: space-between;
   margin: 0.15rem 0 0.6rem;
   font-size: 0.8rem;
-}
-.dataColumns h4 span {
-  color: var(--mh-muted);
-  font-weight: 500;
 }
 .dataList li {
   min-width: 0;
@@ -394,40 +297,6 @@
   color: var(--mh-accent);
   font-size: 0.66rem;
 }
-.staleCard,
-.error,
-.notice {
-  display: grid;
-  gap: 0.28rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--mh-line);
-  border-radius: 0.7rem;
-  background: color-mix(in srgb, var(--mh-panel) 80%, transparent);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-.staleCard {
-  border-color: color-mix(in srgb, var(--mh-danger) 30%, transparent);
-}
-.staleCard span {
-  color: var(--mh-muted);
-  font-size: 0.72rem;
-}
-.error {
-  border-color: color-mix(in srgb, var(--mh-danger) 45%, transparent);
-  color: var(--mh-danger);
-}
-.notice {
-  border-color: color-mix(in srgb, #54cb94 32%, transparent);
-  color: #71d8a7;
-}
-.empty {
-  margin: 0;
-  color: var(--mh-muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
 @media (max-width: 760px) {
   .forms,
   .runtimeLayout,

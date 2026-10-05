@@ -2,16 +2,23 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { MultiHostPanel } from './client.js'
 
 const panelId = 'dshfiles-multi-host'
+
+const QueryProvidedMultiHostPanel = (): JSX.Element => (
+  <PluginQueryProvider>
+    <MultiHostPanel />
+  </PluginQueryProvider>
+)
 
 export default defineClient({
   name: '@dshfiles/multi-host',
   inject: ['slots'],
   setup(ctx, decorate) {
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: panelId, order: 3, label: 'Hosts' }, PanelGlyph))
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: panelId }, decorate(MultiHostPanel)))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: panelId }, decorate(QueryProvidedMultiHostPanel)))
   },
 })
 
