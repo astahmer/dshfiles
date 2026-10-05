@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "outDir": "lib/types",
+    "rootDir": "src",
+    "paths": {
+      "@deepseek-ai/dsh-agent": [
+        "./src/index.ts"
+      ],
+      "@deepseek-ai/dsh-agent/types": [
+        "./src/types.ts"
+      ]
+    },
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

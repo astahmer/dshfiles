@@ -1,0 +1,3 @@
+dedupePeerDependents: true
+overrides:
+  '@deepseek-ai/dsh-agent': 'link:.'

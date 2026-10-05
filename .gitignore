@@ -13,3 +13,6 @@ test-results/
 playwright-report/
 
 .playwright-cli/
+
+# Generated narrow core fork output.
+tooling/dsh-core/agent/lib/

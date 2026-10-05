@@ -209,6 +209,12 @@ These are investigation gates, not questions the user must answer now:
 
 Resolve by source inspection and isolated probes before asking for product decisions.
 
+### Resolved
+
+| Question | Resolution |
+|---|---|
+| 1. Editable DSH core source and supported delivery path for Phase 1 changes | `tooling/dsh-core/agent` in this worktree: a narrow fork of the official `@deepseek-ai/dsh-agent` package (MIT, tag `dsh-v0.2.0-rc.2`, provenance in [dsh-core/FORK.md](../tooling/dsh-core/FORK.md)). Scratch profiles bind `@deepseek-ai/dsh-agent` to this directory with a pnpm `link:` override so every runtime consumer shares one identity; the installed global package and the running web profile are never patched. Build and use rules are in [dsh-core/FORK.md](../tooling/dsh-core/FORK.md). |
+
 ## Acceptance criteria
 
 - [ ] Every retained reference feature and inspiration maps to a phase or conditional track.
@@ -229,3 +235,13 @@ Resolve by source inspection and isolated probes before asking for product decis
 | 2026-10-05 | Trellis foundation early; cosmetic treatment last | Stateful panel composition is architectural software |
 | 2026-10-05 | Dependency gates rather than one global blockade | Missing provider Host seam should not prevent search/review delivery |
 | 2026-10-05 | Advanced tooling/content/remote features conditional | Avoid committing to speculative maintenance scope |
+| 2026-10-05 | Phase 1A ships as a narrow agent-package fork | The officialPublished `@deepseek-ai/dsh-agent` package has no runtime-driver registration seam; registry edits can only land in a retained-name copy, and the link: override keeps every consumer on one identity |
+
+## Acceptance receipts
+
+| Date | Item | Receipt |
+|---|---|---|
+| 2026-10-05 | Phase 0: isolated acceptance environment exists (scratch, repeatable) | Probe root `DSH_HOME=/private/tmp/dsh-software-additions-probe`, profile `software` defined by its manifest (`probe/profiles/software/package.json`: DSH 0.2.0-rc.2 base + web-app + the five candidates), pnpm 12 manifest install, boot `dsh --profile software --port 3199 --no-open` on fnm Node 22.23.3 |
+| 2026-10-05 | Candidate adoption: boot + composition acceptance | `dsh --profile software --dump-config` composes clean (1292 lines, no warnings, no missing/inactive entries); all five bundles present: `@hyzyn/dsh-search` (global-search), `dsh-context`, `@linxin666/dsh-client-ui-skill-explorer`, `dsh-github-picker`, `dsh-lsp-actions` (host tools with inject tools/fs/subprocess and empty `servers` config); second-instance boot log shows one mount line + tokenized URL and no activation failures |
+| 2026-10-05 | Phase 1A: override activation is runtime-proven, not just source-level | Booted client graph lists the four client candidate bundles (69 entries); a session consumer inside the pnpm store resolves `@deepseek-ai/dsh-agent` to this worktree's `tooling/dsh-core/agent/lib/types/index.js` (realpath check); live API on the scratch instance: `session/modelCatalog` ok, `session/create` (standard preset) ok, queued `session/prompt` accepted, `session/projections` reports the admitted turn with assembled context; the model call itself could not complete (scratch home has no provider credentials, `llmMs: 0`), so a credentialed model turn remains an open exit item for 1A |
+| 2026-10-05 | Phase 1A: seam engine checks (source/build proof, distinct from live acceptance) | `tooling/dsh-core/agent` `pnpm test` 4/4 green (driver selection through caller-owned registry without replacing the default factory, unknown/unsupported target rejection without session load, plugin-lifetime binding + capability snapshot + duplicate rejection, failed-setup rollback through the real loop lifecycle), `tsc --noEmit` clean |
