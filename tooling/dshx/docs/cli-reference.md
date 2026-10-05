@@ -70,7 +70,7 @@ dshx add command --name <name> [--description <text>]
 dshx add hook --event <event>
 ```
 
-All add commands accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add api`, `add settings`, `add prompt`, or `add conversation` commands.
+All add commands accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add settings`, `add prompt`, or `add conversation` commands.
 
 ## Shared options
 
@@ -285,17 +285,24 @@ generated entry compiles as written.
 Scaffold the two contributions that follow a slot in every real plugin.
 
 ```bash
-dshx add panel --id usage      # panel component, its stylesheet, the client entry shape
-dshx add api   --id usage      # zod contract plus the Host handler that serves it
+dshx add panel --id usage      # component + stylesheet + registration test, wired into src/client.tsx
+dshx add api   --id usage      # contract + Host handler + Client usage example, wired into src/host.ts
 dshx add tool  --name report   # a tool with the fields it needs to be offered
 ```
 
-`add ui` covers one slot. These cover the rest: a panel is a sidebar row **and** a
-main view, and emitting only the row leaves a button that goes nowhere; an API is a
-contract **and** the handler, and emitting only one leaves the other uncalled. The
-generated panel includes the type-only imports that make `sidebar.panellist` and
-`main` typecheck, and the generated tool declares `output.schema` and
-`output.render`, without which a registered tool is never offered to the model with a
-usable shape.
+`add ui` covers one slot. These cover the rest, as one transaction: a panel is a
+sidebar row **and** a main view, and emitting only the row leaves a button that
+goes nowhere; an API is a contract **and** the handler, and emitting only one
+leaves the other uncalled. Both presets write their new files only after the
+target entry is proven wireable, then patch the existing entry with the
+registration — `api.panels.register` into the `defineClientPlugin` setup (adding
+the `panels` capability and the type-only layout import), or the handler symbol
+into `definePlugin`'s `apis` list. The API contract lives in its own
+`src/api/<id>.ts`, so a second `add api` never collides with the first. A refusal
+— missing entry, source that does not parse, an id that already exists, or a
+shape the parser cannot safely extend — leaves zero writes and names the stage
+that stopped it. Each preset also emits a mount/unmount test (panel) or a
+Host-channel test (API) that exercises the contribution instead of snapshotting
+it, and `--dry-run` previews the full diff without touching anything.
 
 Presets refuse to overwrite an existing file, and `--dry-run` reports the paths.
