@@ -251,10 +251,13 @@
 
 /* The reference row is handle · icon · label · toggle, all on one grid. */
 /*
- * Reference 10 sets customize rows 60px apart on a uniform panel with no
+ * Reference 10's header-links rows sit 60px apart on a uniform panel with no
  * separator, so the pitch alone carries the grouping. Ours was 44px with a
- * hairline, which read as a dense settings list rather than the reference's
- * unhurried rows.
+ * hairline, which read as a dense settings list.
+ *
+ * Reference 11's footer rows are a different density at 90px, so the two
+ * sections override this rather than sharing one pitch: they are distinct
+ * panels in the reference, and forcing one value on both matches neither.
  */
 .customizeRow {
   display: grid;
@@ -262,6 +265,15 @@
   align-items: center;
   gap: 10px;
   min-height: 56px;
+}
+
+.headerRows {
+  min-height: 56px;
+}
+
+/* Reference 11's footer rows are 90px apart. */
+.footerRows {
+  min-height: 86px;
 }
 
 .dragHandle {
@@ -277,16 +289,24 @@
   cursor: grabbing;
 }
 
+/*
+ * A footer entry renders its own component, so it can be a whole widget rather
+ * than a glyph. Sizing the slot does not scale it -- the content kept its own
+ * intrinsic width and overlapped the label. The slot clips instead, which is
+ * what the reference's single-line rows do with an over-wide entry.
+ */
 .customizeIcon {
   display: inline-flex;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
   color: var(--dsw-alias-label-secondary);
 }
 
 .customizeIcon > * {
-  width: 18px;
-  height: 18px;
+  max-width: 20px;
+  max-height: 20px;
+  overflow: hidden;
 }
 
 .customizeLabel {

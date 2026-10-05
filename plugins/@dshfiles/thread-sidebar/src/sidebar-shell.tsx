@@ -149,9 +149,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     hidden: boolean,
     onReorder: (from: number, to: number) => void,
     onToggle: () => void,
+    className: string,
   ): JSX.Element => (
     <div
-      className={styles.customizeRow}
+      className={className}
       key={entry.id}
       draggable
       onDragStart={event => {
@@ -208,6 +209,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ),
           }),
         () => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) }),
+        `${styles.customizeRow} ${styles.headerRows}`,
       ),
     )
 
@@ -219,7 +221,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         entry.kind === 'settings' ? (
           <span aria-hidden="true">⚙</span>
         ) : (
-          props.renderSlot('sidebar.footer.action', { wide: true }, { only: entry.registrationId ?? undefined })
+          props.renderSlot('sidebar.footer.action', { wide: false }, { only: entry.registrationId ?? undefined })
         ),
         preferences.hiddenFooterIds.includes(entry.id),
         (from, to) =>
@@ -231,6 +233,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ),
           }),
         () => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) }),
+        `${styles.customizeRow} ${styles.footerRows}`,
       ),
     )
 
