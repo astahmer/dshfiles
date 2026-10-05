@@ -1,0 +1,211 @@
+.trigger,
+.primaryButton,
+.quietButton,
+.dangerButton {
+  border: 1px solid ButtonBorder;
+  border-radius: 0.5rem;
+  color: ButtonText;
+  font: inherit;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.trigger,
+.quietButton {
+  background: ButtonFace;
+}
+
+.trigger:focus-visible,
+.primaryButton:focus-visible,
+.quietButton:focus-visible,
+.dangerButton:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+
+.panel {
+  background: Canvas;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.75rem;
+  bottom: 5rem;
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 24%);
+  color: CanvasText;
+  display: grid;
+  gap: 0.75rem;
+  max-height: min(34rem, calc(100vh - 7rem));
+  overflow: auto;
+  padding: 1rem;
+  position: fixed;
+  right: 1rem;
+  width: min(34rem, calc(100vw - 2rem));
+  z-index: 1000;
+}
+
+.header,
+.listHeader,
+.item,
+.actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.header,
+.listHeader {
+  justify-content: space-between;
+}
+
+.header {
+  align-items: flex-start;
+}
+
+.heading,
+.title,
+.description,
+.preview,
+.empty,
+.counter,
+.notice,
+.conflict {
+  margin: 0;
+}
+
+.heading {
+  font-size: 1rem;
+}
+
+.description,
+.preview,
+.empty,
+.counter,
+.notice,
+.conflict {
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.description,
+.preview,
+.counter {
+  opacity: 0.78;
+}
+
+.listHeader {
+  font-size: 0.82rem;
+}
+
+.list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  align-items: flex-start;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.55rem;
+  justify-content: space-between;
+  padding: 0.65rem;
+}
+
+.copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.title {
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.primaryButton {
+  background: Highlight;
+  border-color: Highlight;
+  color: HighlightText;
+}
+
+.dangerButton {
+  background: ButtonFace;
+  color: Mark;
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field input,
+.field textarea {
+  background: Field;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.4rem;
+  color: FieldText;
+  font: inherit;
+  padding: 0.55rem;
+  width: 100%;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.editor {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.counter {
+  text-align: right;
+}
+
+.conflict {
+  border-left: 3px solid Mark;
+  padding-left: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    left: 0.5rem;
+    max-height: calc(100vh - 6rem - env(safe-area-inset-bottom, 0px));
+    right: 0.5rem;
+    width: auto;
+  }
+
+  .item {
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    scroll-behavior: auto;
+  }
+}

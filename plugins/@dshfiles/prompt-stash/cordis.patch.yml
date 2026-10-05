@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-prompt-stash
+      name: '@dshfiles/prompt-stash'
