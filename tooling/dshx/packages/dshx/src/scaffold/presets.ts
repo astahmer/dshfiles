@@ -4,24 +4,24 @@ import type { DshCompatibility } from '../compat/types.js'
 /**
  * Preset scaffolding for the contributions a plugin actually writes.
  *
- * `add ui` covers a single slot. The three contributions that follow it in every
- * real plugin — a panel that is a main view plus a sidebar row, a typed API the
- * Host serves, and a tool the agent can call — had no generator at all, so each
- * one was hand-written twice here before it was written once correctly.
+ * `add ui` covers a single slot. The contributions that follow it in every real
+ * plugin — a panel, a typed API, a tool — each went without a generator, so each
+ * one was hand-written twice before it was written once correctly.
  *
- * Each preset emits the whole shape, including the parts that are easy to get
- * wrong: the two registrations a panel needs and the import that makes its slot
- * typecheck, the host/client pair an API needs, and the three fields a tool must
- * declare or it will not register.
+ * A preset emits the whole shape, including the parts that are easy to get
+ * wrong: the imports that make the panel id typecheck, the handler and the
+ * client hook a contract implies, and the registration test that proves a
+ * mount/unmount cycle instead of snapshotting the generated string. The preset
+ * writes only new files; the wiring into the existing client and host entries
+ * is the scaffolder's job (preset.ts), using the entry snippets below.
  */
-
-export type PresetName = 'panel' | 'api' | 'tool'
+export type PresetName = 'panel' | 'api'
 
 export interface PresetOptions {
   readonly preset: PresetName
   /** Package id, used for the generated symbol names and the API id. */
   readonly packageId: string
-  /** Panel id or slug, used as the sidebar row id and the main panel key. */
+  /** Panel id or slug, used as the sidebar row id, the main panel key, and the API channel. */
   readonly id: string
   readonly compatibility?: DshCompatibility
 }
@@ -46,6 +46,38 @@ const pascal = (value: string): string =>
     .map(part => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
     .join('')
 
+/** Cordis Loader entry id for a package, scoped so it cannot replace a native row. */
+const packageEntryId = (packageId: string): string => {
+  const slug = kebab(packageId.split('/').at(-1) ?? 'plugin')
+  const scope = kebab(packageId.split('/')[0]?.replace('@', '') ?? '')
+  return scope === '' ? slug : `${scope}-${slug}`
+}
+
+/** The default `definePlugin`/`defineClientPlugin` id a fresh entry gets. */
+export const presetEntryId = (options: Pick<PresetOptions, 'packageId'>): string => packageEntryId(options.packageId)
+
+export interface PresetSymbols {
+  readonly stem: string
+  readonly component: string
+  readonly apiId: string
+  readonly apiSymbol: string
+  readonly hostSymbol: string
+}
+
+/** Names the presets and the wiring share, derived once so they cannot drift apart. */
+export const presetSymbols = (options: PresetOptions): PresetSymbols => {
+  const stem = kebab(options.id).replace(/-panel$/, '')
+  let apiId = kebab(options.id).replace(/-api$/, '')
+  if (/^\d/.test(apiId) || apiId === '') apiId = 'api'
+  return {
+    stem: stem === '' ? 'panel' : stem,
+    component: `${pascal(stem === '' ? 'panel' : stem)}Panel`,
+    apiId,
+    apiSymbol: `${pascal(apiId)}Api`,
+    hostSymbol: `${pascal(apiId)}ApiHost`,
+  }
+}
+
 /** Files one preset writes, plus the manifest edits it implies. */
 export const presetFiles = (options: PresetOptions): readonly PresetFile[] => {
   switch (options.preset) {
@@ -53,32 +85,25 @@ export const presetFiles = (options: PresetOptions): readonly PresetFile[] => {
       return panelFiles(options)
     case 'api':
       return apiFiles(options)
-    case 'tool':
-      return toolFiles(options)
   }
 }
 
 const panelFiles = (options: PresetOptions): readonly PresetFile[] => {
-  const id = options.id
-  const stem = kebab(id).replace(/-panel$/, '')
-  const component = `${pascal(stem)}Panel`
+  const { stem, component } = presetSymbols(options)
   return [
     {
       path: `src/${stem}-panel.tsx`,
-      content: `import { useApi } from '@dshfiles/dshx/client'
-import type {} from '@dshfiles/dshx/client'
-import styles from './${stem}-panel.module.css'
+      content: `import styles from './${stem}-panel.module.css'
 
 /**
- * The ${id} panel.
+ * The ${options.id} panel.
  *
- * A panel is two registrations rather than one: the sidebar row that selects it
- * and the main view it renders into. Registering only the row leaves a button that
- * goes nowhere; registering only the view leaves a panel nothing can open.
+ * The Panels capability registers this component into the main view and the
+ * sidebar row under one id, so the row always opens the view it names.
  */
 export const ${component} = (): JSX.Element => (
   <div className={styles.page}>
-    <h1 className={styles.title}>${id}</h1>
+    <h1 className={styles.title}>${options.id}</h1>
   </div>
 )
 `,
@@ -100,129 +125,161 @@ export const ${component} = (): JSX.Element => (
 }
 `,
     },
+    {
+      path: `tests/${stem}.spec.ts`,
+      content: `import { describe, expect, it } from 'vitest'
+import { createTestClient } from '@dshfiles/dshx/testing'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import clientPlugin from '../src/client.js'
+
+describe('the ${options.id} panel', () => {
+  it('registers the row and the view under one id and removes both on unload', async () => {
+    const client = await createTestClient()
+    client.slots.register(
+      {
+        name: 'root',
+        children: {
+          main: { kind: 'keyed', scope: 'root' },
+          'sidebar.panellist': { kind: 'list', scope: 'root' },
+        },
+      },
+      (props: PropsRenderSlots<'main' | 'sidebar.panellist'>) => {
+        void props
+        return null
+      },
+    )
+    try {
+      const mounted = await client.mount(clientPlugin)
+      expect(client.slots.entries('main')).toHaveLength(1)
+      expect(client.slots.entries('sidebar.panellist')).toHaveLength(1)
+      await mounted.dispose()
+      expect(client.slots.entries('main')).toHaveLength(0)
+      expect(client.slots.entries('sidebar.panellist')).toHaveLength(0)
+    } finally {
+      await client.dispose()
+    }
+  })
+})
+`,
+    },
   ]
 }
 
-/** The client entry a panel needs, as a patch to an existing `src/client.tsx`. */
-export const panelClientEntry = (options: PresetOptions): string => {
-  const stem = kebab(options.id).replace(/-panel$/, '')
-  const component = `${pascal(stem)}Panel`
+/**
+ * The client entry a panel needs, for a project that has no client half yet.
+ *
+ * Provider faces the manifest imports stick to: the panel capability injects the
+ * Slot registry and the layout controller, and the type-only imports are what
+ * make the `main`/`sidebar.panellist` names typecheck.
+ */
+export const panelClientEntry = (options: PresetOptions & { title?: string }): string => {
+  const { stem, component } = presetSymbols(options)
   return `import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { ${component} } from './${stem}-panel.js'
 
-const PANEL_ID = '${options.id}'
-
-export default defineClient({
+export default defineClientPlugin({
+  id: '${packageEntryId(options.packageId)}',
   name: '${options.packageId}',
-  setup(ctx) {
-    // The row is the only way in, so its order places it among the sidebar rows;
-    // the main view is addressed by the same key.
-    ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 1, label: () => '${options.id}' }, PanelGlyph),
-    )
-    ctx.slots.inject('main', () =>
-      ctx.slots.register({ name: 'main', key: PANEL_ID }, ${component}),
-    )
+  uses: ['panels'],
+  setup(api) {
+    api.panels.register({ id: '${options.id}', title: '${options.title ?? options.id}', component: ${component} })
   },
 })
-
-const PanelGlyph = (props: { readonly size?: number; readonly active?: boolean }): JSX.Element => (
-  <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-    <rect x="4" y="4" width="16" height="16" rx="3" />
-    <path d="M8 12h8" />
-  </svg>
-)
 `
 }
 
 const apiFiles = (options: PresetOptions): readonly PresetFile[] => {
-  const name = pascal(options.id)
-  const apiId = kebab(options.id)
+  const { apiId, apiSymbol, hostSymbol, stem } = presetSymbols(options)
   return [
     {
-      path: 'src/api.ts',
+      path: `src/api/${apiId}.ts`,
       content: `import { defineApi, method } from '@dshfiles/dshx/api'
-import { z } from 'zod'
+
+export interface ${apiSymbol}State {
+  readonly readyAt: string
+}
 
 /**
  * Wire contract for ${apiId}.
  *
  * One schema per method keeps the Host handler and the Client hook reading the
  * same shape, so a change that only one side sees is a type error rather than a
- * runtime surprise. Nothing crosses this boundary that the caller needs to trust:
- * credentials stay on the Host.
+ * runtime surprise. Nothing crosses this boundary that the caller needs to
+ * trust: credentials stay on the Host.
  */
-export const ${name}Api = defineApi({
+export const ${apiSymbol} = defineApi({
   id: '${apiId}',
   version: 1,
   methods: {
-    read: method({ input: z.void(), output: z.object({ ok: z.boolean() }) }),
+    read: method<void, ${apiSymbol}State>(),
   },
 })
 `,
     },
     {
-      path: `src/${kebab(options.id).replace(/-api$/, '')}-host.ts`,
-      content: `import { ${name}Api } from './api.js'
+      path: `src/${apiId}-host.ts`,
+      content: `import { ${apiSymbol} } from './api/${apiId}.js'
 
 /**
  * Host side of the ${apiId} API.
  *
- * Declared through the shared contract, so a handler that drifts from the schema
- * fails the build instead of the client.
+ * Declare the handler through the shared contract, so a handler that drifts from
+ * the schema fails the build instead of the client. The scaffolder wires this
+ * symbol into the plugin's \`apis\` list.
  */
-export const ${kebab(options.id).replace(/-/g, '_')}_host_api = ${name}Api.host({
-  read: async () => ({ ok: true }),
+export const ${hostSymbol} = ${apiSymbol}Api.host({
+  read: async () => ({ readyAt: new Date().toISOString() }),
 })
 `,
     },
-  ]
-}
-
-/** The api handler the Host entry must spread into its own `apis`. */
-export const apiHostEntry = (options: PresetOptions): string =>
-  `import { ${pascal(options.id)}Api } from './api.js'
-
-export const ${kebab(options.id).replace(/-/g, '_')}_host_api = ${pascal(options.id)}Api.host({
-  read: async () => ({ ok: true }),
-})
-`
-
-const toolFiles = (options: PresetOptions): readonly PresetFile[] => {
-  const name = kebab(options.id)
-  const symbol = pascal(options.id)
-  return [
     {
-      path: `src/${name}-tool.ts`,
-      content: `import { defineTool } from '@dshfiles/dshx/api'
+      path: `src/${stem}-usage.tsx`,
+      content: `import { useApiQuery } from '@dshfiles/dshx/client'
+import { ${apiSymbol} } from './api/${apiId}.js'
 
 /**
- * The ${name} tool.
+ * Client usage example for the ${apiId} API.
  *
- * A tool that omits \`output.schema\` or \`output.render\` is not offered to the model
- * with a usable shape, which is the most common reason a registered tool never
- * appears in a session.
+ * The Host half is wired; the browser half needs a place to live. Register this
+ * component into an existing Slot (\`dshx add ui --file src/${stem}-usage.tsx\`
+ * is one way) and swap the rendered inline text for whatever the API should show.
  */
-export const ${symbol}Tool = defineTool({
-  name: '${name}',
-  description: 'Describe what this tool does and when the model should reach for it.',
-  parameters: {
-    type: 'object',
-    properties: {},
-    additionalProperties: false,
-  },
-  output: {
-    schema: {
-      type: 'object',
-      properties: { ok: { type: 'boolean' } },
-      required: ['ok'],
-      additionalProperties: false,
+export const ${pascal(apiId)}Usage = (): JSX.Element => {
+  const read = useApiQuery(${apiSymbol}, 'read', { enabled: true })
+  return (
+    <section>
+      <h2>${options.id}</h2>
+      {read.data === undefined ? (
+        <p role="status">{read.error === undefined ? 'Waiting for the Host…' : read.error.message}</p>
+      ) : (
+        <p>ready at {read.data.readyAt}</p>
+      )}
+    </section>
+  )
+}
+`,
     },
-    render: value => ({ kind: 'text', text: JSON.stringify(value) }),
-  },
-  execute: async () => ({ ok: true }),
+    {
+      path: `tests/${apiId}.spec.ts`,
+      content: `import { describe, expect, it } from 'vitest'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { definePlugin } from '@dshfiles/dshx/host'
+import { ${apiSymbol} } from '../src/api/${apiId}.js'
+import { ${hostSymbol} } from '../src/${apiId}-host.js'
+
+describe('the ${apiId} API', () => {
+  it('serves the wired handler and removes its channel on unload', async () => {
+    const host = await createTestHost()
+    try {
+      const mounted = await host.mount(definePlugin({ id: '${packageEntryId(options.packageId)}.api-test', apis: [${hostSymbol}] }))
+      mounted.dispose()
+    } finally {
+      await host.dispose()
+    }
+    expect(${apiSymbol}).toBeDefined()
+  })
 })
 `,
     },

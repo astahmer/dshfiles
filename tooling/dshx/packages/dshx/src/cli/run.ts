@@ -1,5 +1,3 @@
-import { access, mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Readable, Writable } from 'node:stream'
 import { createRequire } from 'node:module'
@@ -34,6 +32,7 @@ import type { InspectBridgeStatus } from '../inspect/bridge.js'
 import { inspectRuntimePlugins } from '../runtime-status.js'
 import type { RuntimePluginReport } from '../runtime-status.js'
 import { createCommandScaffold, createHookScaffold, createToolScaffold, createUiScaffold } from '../scaffold/index.js'
+import type { AddPresetOptions, AddPresetResult } from '../scaffold/preset.js'
 import type {
   AddCommandOptions,
   AddCommandResult,
@@ -86,6 +85,7 @@ export interface CliRuntime {
   readonly addTool?: (options: AddToolOptions) => Promise<AddToolResult>
   readonly addCommand?: (options: AddCommandOptions) => Promise<AddCommandResult>
   readonly addHook?: (options: AddHookOptions) => Promise<AddHookResult>
+  readonly addPreset?: (options: AddPresetOptions) => Promise<AddPresetResult>
   readonly connectPlatform?: (options?: ConnectDshPlatformClientOptions) => Promise<DshPlatformClient>
   readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
 }
@@ -950,22 +950,6 @@ function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record
 }
 
 /**
- * Scaffold a panel or an API preset.
- *
- * Both emit a whole shape rather than a fragment: a panel is a row and a view,
- * and an API is a contract plus the handler that serves it. Emitting only half of
- * either is what produces a row that goes nowhere or a handler nothing calls.
- */
-const exists = async (path: string): Promise<boolean> => {
-  try {
-    await access(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
  * Boot a throwaway profile and report whether the plugin loads.
  *
  * The stage that catches what build, typecheck and manifest validation cannot: a
@@ -1066,44 +1050,53 @@ async function runAddPreset(args: CliArgs, options: CliRunOptions, project: Reso
     printDiagnostic(io, item)
     return 2
   }
-  const { presetFiles } = await import('../scaffold/presets.js')
-  const files = presetFiles({ preset, id, packageId: project.packageId })
-  const planned = files.map(file => ({
-    path: resolvePath(project.root, file.path),
-    create: file.content,
-  }))
-  if (!args.dryRun) {
-    for (const file of planned) {
-      if (await exists(file.path)) {
-        const item = {
-          code: 'DSHX6302',
-          severity: 'error' as const,
-          message: `${file.path} already exists.`,
-          file: file.path,
-          hint: 'Remove it or choose another id; the preset refuses to overwrite.',
-        }
-        printDiagnostic(io, item)
-        return 1
-      }
-    }
-    for (const file of planned) {
-      await mkdir(dirname(file.path), { recursive: true })
-      await writeFile(file.path, file.create, 'utf8')
-    }
+  const createPreset =
+    options.runtime?.addPreset ??
+    (async (presetOptions: AddPresetOptions) => {
+      const { createPresetScaffold } = await import('../scaffold/preset.js')
+      return await createPresetScaffold(presetOptions)
+    })
+  let result: AddPresetResult
+  try {
+    result = await createPreset({ project, preset, id, dryRun: args.dryRun })
+  } catch (error) {
+    const item = diagnosticFromError(error, project.packageFile)
+    if (args.json)
+      write(
+        io.stdout,
+        `${JSON.stringify({ project: projectSummary(project), preset, id, changedFiles: [], generatedFiles: [], diagnostics: [item], dryRun: args.dryRun }, null, 2)}\n`,
+      )
+    else printDiagnostic(io, item)
+    if (args.verbose) printVerboseCause(io, error)
+    return 1
   }
   if (args.json) {
     write(
       io.stdout,
-      `${JSON.stringify({ project: projectSummary(project), preset, id, generatedFiles: files.map(file => file.path), dryRun: args.dryRun }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          project: projectSummary(project),
+          preset,
+          id,
+          changedFiles: result.changedFiles,
+          generatedFiles: result.generatedFiles,
+          diagnostics: result.diagnostics,
+          dryRun: args.dryRun,
+          ...(result.diff === undefined ? {} : { diff: result.diff }),
+        },
+        null,
+        2,
+      )}\n`,
     )
-    return 0
+  } else {
+    for (const item of result.diagnostics) printDiagnostic(io, item)
+    if (result.diagnostics.some(item => item.severity === 'error')) return 1
+    write(io.stdout, `${args.dryRun ? 'Planned' : 'Generated'} ${preset} ${id}\n`)
+    for (const file of result.changedFiles) write(io.stdout, `  ${file}\n`)
+    if (result.diagnostics.some(item => item.severity === 'warning' && item.code === 'DSHX6302')) return 1
+    if (result.diff !== undefined) write(io.stdout, result.diff)
   }
-  write(io.stdout, `${args.dryRun ? 'Planned' : 'Generated'} ${preset} ${id}\n`)
-  for (const file of planned) write(io.stdout, `  ${file.path}\n`)
-  if (preset === 'panel') {
-    write(io.stdout, 'Register the row and the view in src/client.tsx: see docs/cli-reference.md for the shape.\n')
-  }
-  return 0
+  return result.diagnostics.some(item => item.severity === 'error') ? 1 : 0
 }
 
 async function runAddHook(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
