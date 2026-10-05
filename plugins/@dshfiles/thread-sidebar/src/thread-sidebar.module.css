@@ -258,24 +258,19 @@
 }
 
 /*
- * The reference row is 70px tall (measured from 01-thread-sidebar.png). At 0.55rem
- * of vertical padding around a three-line stack this landed on 73px, so the
- * block padding is trimmed to close the difference rather than the line height.
- */
-/*
- * Two lines to the reference's two, padded to its measured height: the
- * reference's inactive row spans about 87px from its title band to its machine
- * line, which is 53px at 0.5rem and 65px here, so the block padding is what
- * carries the difference.
+ * Row pitch is the measured one. Reading 01-thread-sidebar.png at its native
+ * 144dpi and halving to CSS px, the title bands of consecutive rows sit 55.5px
+ * and 55.0px apart, so the reference pitch is 55.2px. Ours measured 70px.
  *
- * The 1.1rem inset is measured, not chosen: the reference indents its title
- * column to 33px, and the section's 0.45rem gutter plus this inset plus the
- * open button's own leading edge lands the title on 33px rather than 23px.
+ * The stack inside is fixed by the type scale: a 17px title on a 1.25 line box,
+ * a 13px project line, and a 13px machine line, with the two 0.1rem gaps already
+ * in .openButton. That leaves the whole 15px of excess in the block padding, so
+ * the padding is what carries the correction and the type stays legible.
  */
 .row {
   gap: 0.1rem;
   min-width: 0;
-  padding: 1.05rem 1.1rem;
+  padding: 0.5rem 1.1rem;
   border-radius: var(--dsw-radius-sm);
 }
 
@@ -285,10 +280,9 @@
 }
 
 /*
- * The three-line stack is what makes a row 2px taller than the reference's 70px:
- * 15 + 18 + 15 glyphs plus two 0.18rem gaps came to 56 inside the button, and
- * 8px of padding either side finished at 72. The gap is the slack that costs
- * nothing typographically, so it takes the trim rather than the line heights.
+ * The three-line stack owns the type, not the rhythm: 17px title, 13px project
+ * line, 13px machine line, and the two 0.1rem gaps. The row's pitch is set by
+ * .row's padding, so this block only has to keep the three lines from merging.
  */
 .openButton {
   display: grid;
@@ -332,8 +326,13 @@ body[data-ds-dark-theme] .rowProject {
   color: var(--dsw-alias-label-secondary);
 }
 
+/*
+ * The reference's title ink measures 12px cap-to-descender, which is a 17px
+ * font; it inherited .row's 16px rem here and read a size down.
+ */
 .rowTitle {
   overflow: hidden;
+  font-size: 1.0625rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
