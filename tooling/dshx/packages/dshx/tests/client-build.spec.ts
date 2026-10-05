@@ -203,13 +203,14 @@ describe('client compiler', () => {
     })
   })
 
-  it('requires both the locale runtime service and its provider package edge', async () => {
+  it('requires the Locale provider package edge for declarative locale contributions', async () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/client.tsx'),
       [
-        "import { defineClient } from '@dshfiles/dshx/client'",
-        "export default defineClient({ inject: ['locale'], setup({ locale }) { locale.register('demo', {}) } })",
+        "import { defineClient, defineLocale } from '@dshfiles/dshx/client'",
+        "const copy = defineLocale('demo', { zh: { title: '标题' }, en: { title: 'Title' } })",
+        "export default defineClient({ locales: [copy], setup({ locale }) { locale.bind('demo') } })",
         '',
       ].join('\n'),
     )
@@ -244,7 +245,7 @@ describe('client compiler', () => {
         },
       },
     })
-    expect((registration.factory(() => ({})) as { inject: string[] }).inject).toEqual(['locale'])
+    expect((registration.factory(() => ({})) as { inject: string[] }).inject).toEqual(['locale', 'slots'])
   })
 
   it('builds declarative locales through the virtual Client API without a duplicate service injection', async () => {
@@ -333,6 +334,32 @@ describe('client compiler', () => {
       code: 'DSHX1206',
       message: expect.stringContaining('conversation.input.dock'),
       file: expect.stringContaining('/src/client.tsx'),
+    })
+  })
+
+  it('fails the build when a Client replaces the sidebar shell without a registration key', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        'const Sidebar = (): null => null',
+        "export default defineClient({ inject: ['slots'], setup(ctx) { ctx.slots.register({ name: 'sidebar' }, Sidebar) } })",
+        '',
+      ].join('\n'),
+    )
+
+    await expect(
+      buildClient({
+        packageId: '@dshx/sidebar-replacement-fixture',
+        root,
+        entry: 'src/client.tsx',
+        outDir: 'dist',
+      }),
+    ).rejects.toMatchObject({
+      code: 'DSHX1206',
+      message: expect.stringContaining('ui-sidebar'),
+      hint: expect.stringContaining('inner Slots'),
     })
   })
 

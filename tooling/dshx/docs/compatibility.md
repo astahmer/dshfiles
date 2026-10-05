@@ -45,6 +45,28 @@ ranges, selects the adapter, and reports capabilities.
   event names. This only holds when the plugin and the toolchain resolve one
   cordis identity; see the repository AGENTS.md.
 
+## Current Slot Inspect limitation
+
+The installed DSH `0.2.0-rc.2` runtime exposes the native Client Slot registry
+and declaration types, but it does not register a Slot Inspect provider.
+`dshx inspect slots` therefore reports `DSHX3201`; `dshx add ui` translates
+that into `DSHX6102` and exits before writing files. The local
+`dsh-tool-cordis` Inspect provider covers Services, Events, Config, and Tools,
+not Client Slots. The `dsh-client-ui-slots` package has no Inspect adapter.
+
+`dshx add ui` can complete manifest and provider metadata once Inspect returns
+the exact native Slot contract. That generation path is tested with a supplied
+Inspect fixture and a generated project; it is not live-runtime proof. The
+offline `dshx inspect slots --explain` catalog describes verified declarations
+and known shipped occupants only. It does not claim current profile occupancy.
+
+The missing provider belongs to DSH's Host/Client Inspect seam. DSH should
+register a first-party Client Slots provider that reports the owner, mode and
+scope, registration fields, native props, required provider packages,
+replacement risk, required children, and current occupants. Until that exists,
+DSHX refuses UI scaffolding when exact runtime facts are unavailable instead
+of guessing from the offline catalog.
+
 ## Versions in a plugin
 
 A plugin declares public support in `peerDependencies` and pins the concrete

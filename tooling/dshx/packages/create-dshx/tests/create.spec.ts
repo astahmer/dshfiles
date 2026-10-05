@@ -1,22 +1,116 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { PassThrough } from 'node:stream'
 import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createProject, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION, detectPackageManager, packageVersion, validateProjectName } from '../src/index.js'
 import { renderProjectTemplate } from '../src/templates.js'
 import { DEFAULT_COMPATIBILITY } from '../../dshx/src/compat/index.js'
 import { defaultFileSystem } from '../src/fs.js'
 import { runCreate } from '../src/cli.js'
+import { CORDIS_IDENTITY_DEPENDENCIES, DSH_PACKAGES } from '../src/capabilities.js'
 
 async function temp(): Promise<string> {
   return mkdtemp(resolve(tmpdir(), 'dshx-create-'))
 }
 
+const localDshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../dshx')
+
 describe('create-dshx', () => {
   it('keeps generated DSH defaults aligned with the core compatibility registry', () => {
     expect(DEFAULT_DSH_RANGE).toBe(DEFAULT_COMPATIBILITY.dshRange)
     expect(DEFAULT_DSH_VERSION).toBe(DEFAULT_COMPATIBILITY.verified.latest)
+  })
+
+  it('declares the shared Cordis identity in every generated template', () => {
+    for (const template of ['basic', 'ui', 'tool', 'full-stack', 'starter', 'showcase'] as const) {
+      const packageFile = renderProjectTemplate(
+        {
+          packageId: '@dshfiles/example',
+          dshxVersion: packageVersion(),
+          dshVersion: DEFAULT_DSH_VERSION,
+          dshRange: DEFAULT_DSH_RANGE,
+        },
+        template,
+        'none',
+      ).find(file => file.path === 'package.json')
+      if (packageFile === undefined) throw new Error(`The ${template} template did not render package.json.`)
+      const manifest = JSON.parse(packageFile.contents)
+      expect(manifest.devDependencies).toMatchObject(CORDIS_IDENTITY_DEPENDENCIES)
+    }
+  })
+
+  it('includes the approved Host Inspect runtime plugins in every generated template', () => {
+    for (const template of ['basic', 'ui', 'tool', 'full-stack', 'starter', 'showcase'] as const) {
+      const packageFile = renderProjectTemplate(
+        {
+          packageId: '@dshfiles/example',
+          dshxVersion: packageVersion(),
+          dshVersion: DEFAULT_DSH_VERSION,
+          dshRange: DEFAULT_DSH_RANGE,
+        },
+        template,
+        'none',
+      ).find(file => file.path === 'package.json')
+      if (packageFile === undefined) throw new Error(`The ${template} template did not render package.json.`)
+      const manifest = JSON.parse(packageFile.contents)
+      expect(manifest.devDependencies).toMatchObject({
+        [DSH_PACKAGES.cordisHostRunner]: DEFAULT_DSH_VERSION,
+        [DSH_PACKAGES.toolCordis]: DEFAULT_DSH_VERSION,
+      })
+    }
+  })
+
+  it('includes the Slot contract and React toolchain only in Client templates', () => {
+    for (const template of ['ui', 'starter', 'showcase', 'full-stack'] as const) {
+      const packageFile = renderProjectTemplate(
+        {
+          packageId: '@dshfiles/example',
+          dshxVersion: packageVersion(),
+          dshVersion: DEFAULT_DSH_VERSION,
+          dshRange: DEFAULT_DSH_RANGE,
+        },
+        template,
+        'none',
+      ).find(file => file.path === 'package.json')
+      if (packageFile === undefined) throw new Error(`The ${template} template did not render package.json.`)
+      const manifest = JSON.parse(packageFile.contents)
+      expect(manifest.devDependencies).toMatchObject({
+        [DSH_PACKAGES.slotContracts]: DEFAULT_DSH_VERSION,
+        react: '^18.3.1',
+        'react-dom': '^18.3.1',
+        '@types/react': '~18.3.31',
+      })
+    }
+    for (const template of ['basic', 'tool'] as const) {
+      const packageFile = renderProjectTemplate(
+        {
+          packageId: '@dshfiles/example',
+          dshxVersion: packageVersion(),
+          dshVersion: DEFAULT_DSH_VERSION,
+          dshRange: DEFAULT_DSH_RANGE,
+        },
+        template,
+        'none',
+      ).find(file => file.path === 'package.json')
+      if (packageFile === undefined) throw new Error(`The ${template} template did not render package.json.`)
+      const manifest = JSON.parse(packageFile.contents)
+      expect(manifest.devDependencies).not.toHaveProperty(DSH_PACKAGES.slotContracts)
+    }
+  })
+
+  it('links projects to the local hard fork when this source checkout is available', async () => {
+    const root = await temp()
+    try {
+      const result = await createProject({ name: 'local-fork-plugin', cwd: root, install: false })
+      expect(result.diagnostics).toEqual([])
+      const manifest = JSON.parse(await readFile(resolve(root, 'local-fork-plugin/package.json'), 'utf8'))
+      const expectedLink = `link:${relative(resolve(root, 'local-fork-plugin'), localDshxRoot)}`
+      expect(manifest.devDependencies['@dshfiles/dshx']).toBe(expectedLink)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('keeps the scope in generated Cordis loader ids', () => {
@@ -75,7 +169,7 @@ describe('create-dshx', () => {
       scripts: Record<string, string>
       dsh: { client: { inject: string[] } }
     }
-    expect(manifest.devDependencies['@dshfiles/dshx']).toBe(packageVersion())
+    expect(manifest.devDependencies['@dshfiles/dshx']).toBe(`link:${relative(result.root, localDshxRoot)}`)
     expect(manifest.devDependencies.typescript).toBe('^7.0.2')
     expect(manifest.devDependencies.oxlint).toBe('1.86.0')
     expect(manifest.devDependencies.oxfmt).toBe('0.71.0')

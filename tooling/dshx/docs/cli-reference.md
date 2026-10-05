@@ -53,13 +53,18 @@ Successful Host rebuilds restart the Host automatically by default. Set `dev.hos
 ## `dshx inspect`
 
 ```bash
-dshx inspect slots [--root <slot>] [--json]
+dshx inspect slots [--root <slot>] [--explain] [--json]
 dshx inspect tools [--json]
 dshx inspect services [--json]
 dshx inspect events [--json]
+dshx inspect capabilities [--json]
 ```
 
 Inspect is read-only and runtime-only. It queries only adapter-supported official providers in the active Composition. An unsupported or unavailable provider returns a diagnostic rather than an offline/fabricated catalog.
+
+`inspect capabilities` is the offline exception: it prints the verified protocol-2 service owners, typed SDK requirements, provider packages, native slot contracts, and known unavailable seams from the same catalog used by injection, checks, repair, templates, and slot occupancy diagnostics. JSON output uses `schemaVersion: 1`. A dynamic `uses` expression receives a warning because its dependencies cannot be proven statically.
+
+`inspect slots --explain --root <slot>` prints the installed native declaration's mode, scope, registration identity and options, owner props, known shipped IDs, and replacement child obligations. `inspect slots --root <slot>` queries active metadata; only runtime inspection can prove current occupants and children. Both JSON reports are versioned and retain declaration metadata.
 
 ## `dshx add`
 

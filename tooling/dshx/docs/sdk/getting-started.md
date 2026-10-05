@@ -21,6 +21,8 @@ Templates include native provider metadata. When adding a Client capability in `
 
 `pnpm dev` uses DSHX's existing project profile and native Host/Client tooling: Client HMR and Host restart remain native DSH operations. Use `dshx dev --port 0` for an isolated port while another DSH instance is running.
 
+For complete paths based on the owned DSH plugins—including schema-backed panels, session-bound UI and tool calls, settings, state, subprocesses, and raw Cordis extensions—see [authoring recipes](../recipes.md).
+
 ## Add a command
 
 `src/host.ts`:
@@ -140,6 +142,29 @@ export default definePlugin({
 ```
 
 Native tools retain execution policy, schema inference, rendering, concurrency and cancellation. Events preserve Cordis signatures and dispatch modes. Import the native event package's types when augmenting events not already included by your capabilities. Native listeners and registration methods already own their cleanup; do not wrap every registration in another effect. Use `lifecycle.onDispose` for resources you acquire yourself, or return cleanup from `setup`.
+
+## Typed native configuration
+
+`definePlugin` accepts a Standard Schema as `Config`. Its output type becomes `api.config`, and Cordis validates and transforms the row once before each activation. DSHX does not parse it again:
+
+```ts
+import { z } from 'zod'
+import { definePlugin } from '@dshfiles/dshx/host'
+
+export default definePlugin({
+  id: 'hello',
+  Config: z.object({
+    enabled: z.boolean().default(true),
+    endpoint: z.string().url(),
+  }),
+  setup(api) {
+    api.config.enabled // boolean
+    api.config.endpoint // string
+  },
+})
+```
+
+Validation issue messages and thrown validator errors are redacted before Cordis reports them; safe field paths remain visible. Use synchronous Standard Schema validators because the installed Cordis Config contract does not support asynchronous validation. Definitions without `Config` keep the existing untyped native config behavior. `Config` and DSHX `settings` are separate Host contracts and cannot be declared together on one entry.
 
 ## Typed Host ↔ Client communication
 

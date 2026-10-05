@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
+import { access, chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { checkClientBoot } from '../src/project/client-boot-check.js'
+import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
 import { slotRenderFailures } from '../src/project/browser-boot.js'
 
 /**
@@ -57,6 +61,24 @@ describe('client boot card parsing', () => {
   })
 })
 
+describe('pending Client entries', () => {
+  it('allows only explicit service waits outside the expected plugin entry', () => {
+    const entries = parseBootText(
+      [
+        '@dshfiles/demo: pending (waiting for service: uiConversation)',
+        '@deepseek-ai/dsh-client-ui-chat: pending (waiting for service: uiConversation)',
+        '@deepseek-ai/dsh-client-ui-models: pending',
+        '@deepseek-ai/dsh-client-ui-settings: failed: apply threw',
+      ].join('\n'),
+    )
+    expect(clientEntryFailures(entries, ['@dshfiles/demo'])).toEqual([
+      { id: '@dshfiles/demo', state: 'pending', detail: '(waiting for service: uiConversation)' },
+      { id: '@deepseek-ai/dsh-client-ui-models', state: 'pending' },
+      { id: '@deepseek-ai/dsh-client-ui-settings', state: 'failed', detail: 'apply threw' },
+    ])
+  })
+})
+
 /**
  * A Slot that throws while rendering is invisible to the boot audit: its fiber
  * already reached active, so only the renderer's error boundary records it. That
@@ -86,5 +108,61 @@ describe('offline composition gate', () => {
     const dump = ['# == @deepseek-ai/dsh-base', '- id: dshfiles-shortcuts', '  name: "@dshfiles/shortcuts"', '# == @deepseek-ai/dsh-web-app'].join('\n')
     expect(compositionFailures(dump, ['@dshfiles/shortcuts'])).toEqual([])
     expect(compositionFailures(dump, ['@dshfiles/shortcuts', '@dshfiles/ai-accounts'])).toEqual(['@dshfiles/ai-accounts'])
+    expect(compositionFailures('- name: "@dshfiles/plugin-tools"', ['@dshfiles/plugin'])).toEqual(['@dshfiles/plugin'])
+  })
+
+  it('reports a failed composition process and preserves caller-owned profiles', async () => {
+    const profileRoot = await mkdtemp(join(tmpdir(), 'dshx-caller-profile-'))
+    try {
+      const result = await checkClientBoot({
+        projectRoot: process.cwd(),
+        profile: 'fixture',
+        port: 0,
+        dshHome: profileRoot,
+        profileRoot,
+        expectedBundles: ['@test/plugin'],
+        expectedClientEntries: ['@test/plugin'],
+        executable: join(tmpdir(), 'missing-dshx-executable'),
+      })
+      expect(result.ok).toBe(false)
+      expect(result.processError).toContain('dsh --dump-config could not start')
+      await expect(stat(profileRoot)).resolves.toBeDefined()
+    } finally {
+      await rm(profileRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('does not launch a Host when the expected bundle is absent', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dshx-client-profile-fixture-'))
+    const profileRoot = join(root, 'profiles', 'fixture')
+    const marker = join(root, 'host-started')
+    const executable = join(root, 'dsh-fixture')
+    await mkdir(profileRoot, { recursive: true })
+    await writeFile(
+      executable,
+      `#!${process.execPath}\nif (process.argv.includes('--dump-config')) process.stdout.write('@deepseek-ai/dsh-base\\n'); else require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')\n`,
+    )
+    await chmod(executable, 0o755)
+    try {
+      const result = await checkClientBoot({
+        projectRoot: process.cwd(),
+        profile: 'fixture',
+        port: 0,
+        dshHome: root,
+        profileRoot,
+        expectedBundles: ['@test/plugin'],
+        expectedClientEntries: ['@test/plugin'],
+        executable,
+      })
+      const hostStarted = await access(marker).then(
+        () => true,
+        () => false,
+      )
+      expect(result.ok).toBe(false)
+      expect(result.compositionFailures).toEqual(['@test/plugin'])
+      expect(hostStarted).toBe(false)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

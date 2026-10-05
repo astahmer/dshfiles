@@ -38,6 +38,49 @@ describe('deterministic manifest repair plan', () => {
     expect(manifest.dsh).toMatchObject({ bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web', inject: [], external: [], immediately: false } })
   })
 
+  it('repairs an optional native service edge from a literal setup and leaves immediate services alone', async () => {
+    const root = await project()
+    await writeFile(
+      resolve(root, 'src-client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        "export default defineClient({ inject: ['layout'], setup(ctx) { void ctx.layout.panelInfo; void ctx.slots } })",
+        '',
+      ].join('\n'),
+    )
+    const resolved = await resolveDshxConfig({ cwd: root })
+    const plan = await createManifestRepairPlan(resolved)
+    const manifest = JSON.parse(plan.files[0]!.after) as {
+      dsh: { client: { inject: string[] } }
+      peerDependencies: Record<string, string>
+    }
+    expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-layout')
+    expect(manifest.dsh.client.inject).not.toContain('@deepseek-ai/dsh-client-ui-conversation')
+    expect(manifest.dsh.client.inject).not.toContain('@deepseek-ai/dsh-client-ui-renderer')
+    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-layout']).toBe('>=0.2.0-rc.1 <0.3.0-0')
+  })
+
+  it('declares typed SDK providers as peers and preserves existing peer ranges', async () => {
+    const root = await project()
+    await writeFile(
+      resolve(root, 'package.json'),
+      JSON.stringify({ name: 'repair-demo', type: 'module', peerDependencies: { '@deepseek-ai/dsh': '>=0.2.0-rc.1 <0.3.0-0' } }, null, 2),
+    )
+    await writeFile(
+      resolve(root, 'src-client.tsx'),
+      ["import { defineClientPlugin } from '@dshfiles/dshx/client'", "export default defineClientPlugin({ id: 'repair-demo', uses: ['ui'] })", ''].join('\n'),
+    )
+    const resolved = await resolveDshxConfig({ cwd: root })
+    const plan = await createManifestRepairPlan(resolved)
+    const manifest = JSON.parse(plan.files[0]!.after) as {
+      dsh: { client: { inject: string[] } }
+      peerDependencies: Record<string, string>
+    }
+    expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-renderer')
+    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-renderer']).toBe('>=0.2.0-rc.1 <0.3.0-0')
+    expect(manifest.peerDependencies['@deepseek-ai/dsh']).toBe('>=0.2.0-rc.1 <0.3.0-0')
+  })
+
   it('does not overwrite conflicting fields and leaves correct projects unchanged', async () => {
     const root = await project()
     await writeFile(

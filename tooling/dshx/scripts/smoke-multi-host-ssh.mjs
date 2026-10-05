@@ -6,7 +6,7 @@ import { createConnection } from 'node:net'
 import { tmpdir, homedir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import WebSocket from '../packages/dshx/node_modules/ws/index.js'
+import WebSocket from 'ws'
 import { connectDshPlatformClient } from '../packages/dshx/src/platform/client.ts'
 
 const sshTarget = process.env.MH_SSH_TARGET ?? 'deploy@100.90.142.88'

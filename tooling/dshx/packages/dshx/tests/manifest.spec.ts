@@ -248,7 +248,7 @@ describe('checkProjectManifest', () => {
     expect(await checkProjectManifest(await resolveDshxConfig({ cwd: root }))).not.toContainEqual(expect.objectContaining({ code: 'DSHX4224' }))
   })
 
-  it('checks both defineClient service injection and the locale provider package edge', async () => {
+  it('checks Cordis service injection while accepting the immediate native Locale provider', async () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/client.tsx'),
@@ -263,9 +263,7 @@ describe('checkProjectManifest', () => {
     expect(missingBoth).toContainEqual(
       expect.objectContaining({ code: 'DSHX4219', severity: 'error', file: resolve(root, 'src/client.tsx'), hint: expect.stringContaining('defineClient') }),
     )
-    expect(missingBoth).toContainEqual(
-      expect.objectContaining({ code: 'DSHX4220', severity: 'error', file: resolve(root, 'package.json'), hint: expect.stringContaining('dsh.client.inject') }),
-    )
+    expect(missingBoth).not.toContainEqual(expect.objectContaining({ code: 'DSHX4220' }))
 
     await writeFile(
       resolve(root, 'src/client.tsx'),
@@ -282,6 +280,41 @@ describe('checkProjectManifest', () => {
     const complete = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4219' }))
     expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4220' }))
+  })
+
+  it('requires an optional native service package edge and reports its actual owner', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient } from '@dshfiles/dshx/client'",
+        "export default defineClient({ inject: ['layout'], setup(ctx) { return ctx.layout.panelInfo } })",
+        '',
+      ].join('\n'),
+    )
+    const config = await resolveDshxConfig({ cwd: root })
+    const missing = await checkProjectManifest(config)
+    expect(missing).toContainEqual(expect.objectContaining({ code: 'DSHX4220', message: expect.stringContaining('@deepseek-ai/dsh-client-ui-layout') }))
+    const manifest = fullManifest()
+    ;(manifest.dsh as { client: { inject: string[] } }).client.inject.push('@deepseek-ai/dsh-client-ui-layout')
+    await writeManifest(root, manifest)
+    const complete = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))
+    expect(complete).not.toContainEqual(expect.objectContaining({ code: 'DSHX4220' }))
+  })
+
+  it('reports dynamic SDK capability lists as unknown instead of claiming a clean static check', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClientPlugin } from '@dshfiles/dshx/client'",
+        "const resolveUses = () => ['panels'] as const",
+        'export default defineClientPlugin({ id: "dynamic-plugin", uses: resolveUses() })',
+        '',
+      ].join('\n'),
+    )
+    const diagnostics = await checkProjectManifest(await resolveDshxConfig({ cwd: root }))
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: 'DSHX4227', severity: 'warning', message: expect.stringContaining('dynamic') }))
   })
 
   it('treats non-empty declarative locales as the locale service injection while still requiring the provider edge', async () => {

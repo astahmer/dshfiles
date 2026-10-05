@@ -3,6 +3,7 @@ import type { Readable, Writable } from 'node:stream'
 import { createRequire } from 'node:module'
 import { relative, resolve as resolvePath } from 'node:path'
 import { styleText } from 'node:util'
+import { capabilityReport } from 'create-dshx/catalog'
 import { isCancel, select, text } from '@clack/prompts'
 import { buildClient, buildHost } from '../compiler/index.js'
 import { resolveDshxConfig } from '../config/resolve.js'
@@ -53,6 +54,7 @@ import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
 import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
+import { CLIENT_SLOT_REFERENCES, findClientSlot } from '../client/slot-reference.js'
 
 export interface CliIO {
   readonly stdin: Readable & {
@@ -545,7 +547,7 @@ function fixSummary(value: CheckFixResult): Record<string, unknown> {
 async function runCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
   const io = options.io ?? defaultIO()
   const runtime = options.runtime ?? {}
-  let result = await collectCheck(options, project, args.runtime)
+  let result = await collectCheck(options, project, args.runtime && !args.boot)
   let fix: CheckFixResult = {
     requested: args.fix,
     dryRun: args.dryRun,
@@ -655,6 +657,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
 
 function inspectSummary(project: ResolvedDshxConfig, result: InspectResult): Record<string, unknown> {
   return {
+    schemaVersion: 1,
     project: {
       root: project.root,
       packageId: project.packageId,
@@ -673,7 +676,7 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
   const target = args.inspectTarget as InspectTarget | undefined
   // The parser guarantees this in normal CLI use; retaining the guard keeps the
   // injected runtime API safe for callers that construct CliArgs themselves.
-  if (target === undefined) throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
+  if (target === undefined) throw new CliUsageError('Inspect requires a target: slots, tools, services, events, or capabilities.')
   const result = await (runtime.inspectComposition ?? inspectProjectComposition)(project, target, args.root === undefined ? {} : { slotRoot: args.root })
   if (args.json) {
     write(io.stdout, `${JSON.stringify(inspectSummary(project, result), null, 2)}\n`)
@@ -692,6 +695,12 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
         const details = [slot.provider, slot.kind, slot.scope].filter((value): value is string => value !== undefined).join(' / ')
         const purpose = args.root !== undefined && typeof slot.metadata?.purpose === 'string' ? slot.metadata.purpose : undefined
         write(io.stdout, `  ${slot.name}${details === '' ? '' : ` (${details})`}${purpose === undefined ? '' : `: ${purpose}`}\n`)
+        if (args.root !== undefined && slot.metadata !== undefined) {
+          for (const key of ['declaredBy', 'catalog', 'occupants', 'children']) {
+            const value = slot.metadata[key]
+            if (value !== undefined) write(io.stdout, `    ${key}: ${JSON.stringify(value)}\n`)
+          }
+        }
       } else if (target === 'tools') {
         const tool = item as {
           readonly name: string
@@ -735,9 +744,13 @@ async function selectSlotInteractively(io: CliIO, items: readonly { readonly nam
 }
 
 function addSummary(project: ResolvedDshxConfig, result: AddUiResult): Record<string, unknown> {
+  const reference = findClientSlot(result.slot.name)
   return {
+    schemaVersion: 1,
     project: projectSummary(project),
     slot: result.slot,
+    capabilityStatus: reference === undefined ? 'unknown' : 'known',
+    ...(reference === undefined ? {} : { slotContract: reference, sourceLocations: { declaration: reference.declaration } }),
     provider: result.provider,
     changedFiles: result.changedFiles,
     generatedFiles: result.generatedFiles,
@@ -758,7 +771,7 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
       file: project.packageFile,
       hint: 'Pass --slot <slot-name>, or run in a TTY to choose a Slot interactively.',
     }
-    if (args.json) write(io.stdout, `${JSON.stringify({ project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
+    if (args.json) write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
     else printDiagnostic(io, item)
     return 2
   }
@@ -788,7 +801,7 @@ async function runAddUi(args: CliArgs, options: CliRunOptions, project: Resolved
     result = await add(addOptions)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
-    if (args.json) write(io.stdout, `${JSON.stringify({ project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
+    if (args.json) write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
     else {
       printDiagnostic(io, item)
     }
@@ -960,16 +973,24 @@ function hookSummary(project: ResolvedDshxConfig, result: AddHookResult): Record
  * module that resolves against the wrong tree, an entry that throws at import, a
  * registration the Host rejects at activation.
  */
-async function runBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
+async function runBootCheck(
+  args: CliArgs,
+  options: CliRunOptions,
+  project: ResolvedDshxConfig,
+  bootProfile: import('../project/boot-profile.js').PreparedBootProfile,
+): Promise<number> {
   const io = options.io ?? defaultIO()
   const check = options.runtime?.checkPluginBoot ?? (await import('../project/boot-check.js')).checkPluginBoot
   const result = await check({
     projectRoot: project.root,
-    profile: 'dshx-boot',
+    profile: bootProfile.profile,
     port: args.port ?? 0,
+    dshHome: bootProfile.homeRoot,
+    profileRoot: bootProfile.profileRoot,
+    expectedBundles: bootProfile.expectedBundles,
   })
   if (args.json) {
-    write(io.stdout, `${JSON.stringify({ project: projectSummary(project), boot: result }, null, 2)}\n`)
+    write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), boot: result }, null, 2)}\n`)
     return result.ok ? 0 : 1
   }
   if (result.ok) {
@@ -987,34 +1008,67 @@ async function runBootCheck(args: CliArgs, options: CliRunOptions, project: Reso
     return 1
   }
   const item = {
-    code: 'DSHX4109',
+    code: result.processError === undefined ? 'DSHX4109' : 'DSHX4113',
     severity: 'error' as const,
-    message: result.timedOut
-      ? 'The Host did not start within the boot window.'
-      : `The Host started but the plugin did not load cleanly (${String(result.failures.length)} failing line(s)).`,
+    message:
+      result.processError ??
+      (result.compositionFailures.length > 0
+        ? `The scratch profile is missing expected bundle(s): ${result.compositionFailures.join(', ')}.`
+        : result.timedOut
+          ? 'The Host did not start within the boot window.'
+          : `The Host started but the plugin did not load cleanly (${String(result.failures.length)} failing line(s)).`),
     file: project.packageFile,
-    hint: 'The lines above come from the Host itself; the usual cause is a Host-provided package resolved from the wrong tree.',
+    hint: 'The gate prepares a scratch DSH home, checks offline composition, and then boots only the process it started.',
   }
   printDiagnostic(io, item)
   for (const line of result.failures) write(io.stdout, `  ${line}\n`)
   return 1
 }
 
-async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project: ResolvedDshxConfig): Promise<number> {
+async function runClientBootCheck(
+  args: CliArgs,
+  options: CliRunOptions,
+  project: ResolvedDshxConfig,
+  bootProfile: import('../project/boot-profile.js').PreparedBootProfile,
+): Promise<number> {
   const io = options.io ?? defaultIO()
   const check = options.runtime?.checkClientBoot ?? (await import('../project/client-boot-check.js')).checkClientBoot
   const result = await check({
     projectRoot: project.root,
-    profile: 'dshx-boot',
+    profile: bootProfile.profile,
     port: args.port ?? 0,
+    dshHome: bootProfile.homeRoot,
+    profileRoot: bootProfile.profileRoot,
+    expectedBundles: bootProfile.expectedBundles,
+    expectedClientEntries: project.clientEntry === undefined ? [] : [project.packageId],
   })
   if (args.json) {
-    write(io.stdout, `${JSON.stringify({ project: projectSummary(project), clientBoot: result }, null, 2)}\n`)
+    write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), clientBoot: result }, null, 2)}\n`)
     return result.ok ? 0 : 1
   }
   if (result.ok) {
     write(io.stdout, `Client plugins activated cleanly in a browser at ${result.url ?? 'an announced URL'}.\n`)
     return 0
+  }
+  if (result.processError !== undefined) {
+    printDiagnostic(io, {
+      code: 'DSHX4113',
+      severity: 'error',
+      message: `The Host process or offline composition check failed: ${result.processError}`,
+      file: project.packageFile,
+      hint: 'Check the installed DSH executable, profile composition, and its startup logs before interpreting the browser result.',
+    })
+    return 1
+  }
+  if (result.compositionFailures.length > 0) {
+    printDiagnostic(io, {
+      code: 'DSHX4114',
+      severity: 'error',
+      message: `The scratch profile is missing expected bundle(s): ${result.compositionFailures.join(', ')}.`,
+      file: project.packageFile,
+      hint: 'The check stops before launching a browser when offline profile composition omits the target bundle.',
+    })
+    return 1
   }
   if (result.browserError !== undefined) {
     printDiagnostic(io, {
@@ -1037,12 +1091,42 @@ async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project
     for (const failure of result.slotFailures) write(io.stdout, `  ${failure.slot}\n`)
     return 1
   }
+  if (result.missingClientEntries.length > 0) {
+    printDiagnostic(io, {
+      code: 'DSHX4116',
+      severity: 'error',
+      message: `The native DSH Client boot manifest is missing expected entry/entries: ${result.missingClientEntries.join(', ')}.`,
+      file: project.packageFile,
+      hint: 'The scratch profile must compose the built Client artifact for this project before a browser result can pass.',
+    })
+    return 1
+  }
+  if (result.readinessError !== undefined || !result.browserReady) {
+    printDiagnostic(io, {
+      code: 'DSHX4117',
+      severity: 'error',
+      message: result.readinessError ?? 'The Web UI did not reach native DSH readiness.',
+      file: project.packageFile,
+      hint: 'A missing boot card is not success. The browser gate requires DSH readiness and a mounted #root application.',
+    })
+    return 1
+  }
+  if (result.failureCardVisible && result.failures.length === 0) {
+    printDiagnostic(io, {
+      code: 'DSHX4118',
+      severity: 'error',
+      message: 'The Web UI kept its failure card mounted without a classifiable entry result.',
+      file: project.packageFile,
+      hint: 'Inspect the DSH boot-card report; an unexplained failure card cannot pass runtime verification.',
+    })
+    return 1
+  }
   printDiagnostic(io, {
     code: 'DSHX4111',
     severity: 'error',
-    message: `The Web UI booted with ${String(result.failures.length)} client entry/entries that failed to activate.`,
+    message: `The Web UI booted with ${String(result.failures.length)} Client entry/entries that failed to activate or remain unexpectedly pending.`,
     file: project.packageFile,
-    hint: 'A client entry reaches "failed" when its apply throws, commonly a missing Cordis service or a locale namespace another package already owns. Entries left "pending" on a live-host service are expected here and are not listed.',
+    hint: 'An expected entry may not remain pending. Other entries are ignored only when the DSH boot card names the native service they await.',
   })
   for (const entry of result.failures) write(io.stdout, `  ${entry.id}: ${entry.state}${entry.detail === undefined ? '' : ` \u2014 ${entry.detail}`}\n`)
   return 1
@@ -1280,10 +1364,9 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
  * import to see it" does not require a running Host.
  */
 const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => {
-  const { CLIENT_SLOT_REFERENCES, findClientSlot } = await import('../client/slot-reference.js')
   if (args.json) {
     const slots = args.root === undefined ? CLIENT_SLOT_REFERENCES : CLIENT_SLOT_REFERENCES.filter(slot => slot.name === args.root)
-    write(io.stdout, `${JSON.stringify({ slots }, null, 2)}\n`)
+    write(io.stdout, `${JSON.stringify({ schemaVersion: 1, source: 'protocol-2-native-declarations', slots }, null, 2)}\n`)
     return slots.length === 0 ? 1 : 0
   }
   const requested = args.root
@@ -1300,8 +1383,16 @@ const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => 
     return 1
   }
   write(io.stdout, `${slot.name}\n`)
+  write(io.stdout, `  mode       ${slot.kind} / ${slot.scope}${slot.identity === undefined ? '' : ` / keyed by ${slot.identity}`}\n`)
   write(io.stdout, `  purpose    ${slot.purpose}\n`)
-  if (slot.ownerProps !== undefined) write(io.stdout, `  ownerProps ${slot.ownerProps}\n`)
+  if (slot.registration.length > 0) write(io.stdout, `  registration ${slot.registration.join(', ')}\n`)
+  if (slot.ownerProps !== undefined) write(io.stdout, `  ownerProps ${slot.ownerProps.join(', ')}\n`)
+  if (slot.shippedOccupants.length > 0) write(io.stdout, `  shipped IDs ${slot.shippedOccupants.join(', ')} (live occupants require runtime inspect)\n`)
+  if (slot.childObligations.length > 0) {
+    write(io.stdout, '  replacement obligations\n')
+    for (const obligation of slot.childObligations) write(io.stdout, `    ${obligation}\n`)
+  }
+  write(io.stdout, `  declaration ${slot.declaration}\n`)
   if (slot.declaredBy.length > 0) {
     write(io.stdout, '  declaredBy\n')
     for (const owner of slot.declaredBy) write(io.stdout, `    ${owner}\n`)
@@ -1309,7 +1400,7 @@ const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => 
     for (const owner of slot.declaredBy) write(io.stdout, `    import type {} from '${owner}'\n`)
   }
   if (slot.replaces.length > 0) {
-    write(io.stdout, `  reusing id "${slot.replaces[0]}" replaces the shipped occupant instead of adding a second one.\n`)
+    write(io.stdout, `  reusing an occupied ${slot.identity ?? 'registration'} identity (${slot.replaces.join(', ')}) replaces the shipped contribution.\n`)
   }
   return 0
 }
@@ -1412,12 +1503,28 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events, capabilities\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
   if (args.version) {
     write(io.stdout, `${options.version ?? VERSION}\n`)
+    return 0
+  }
+  if (args.command === 'inspect' && args.inspectTarget === 'capabilities') {
+    const report = capabilityReport()
+    if (args.json) {
+      write(io.stdout, `${JSON.stringify(report, null, 2)}\n`)
+      return 0
+    }
+    const sections = [
+      `DSH ${report.generation} (verified ${report.verifiedDsh})`,
+      `Client services\n${report.clientServices.map(service => `  ${service.name}: ${service.package} (${service.availability})`).join('\n')}`,
+      `Client authoring capabilities\n${report.client.map(capability => `  ${capability.name}: ${capability.services.join(', ')}; packages ${capability.providers.join(', ')}`).join('\n')}`,
+      `Host authoring capabilities\n${report.host.map(capability => `  ${capability.name}: ${capability.services.join(', ')}; packages ${capability.providers.join(', ')}`).join('\n')}`,
+      `Unavailable in this protocol generation\n${report.unavailable.map(capability => `  ${capability.name}: ${capability.reason}`).join('\n')}`,
+    ]
+    write(io.stdout, `${sections.join('\n\n')}\n`)
     return 0
   }
   if (args.command === 'inspect' && args.inspectTarget === 'slots' && args.explain) return runSlotExplanation(args, io)
@@ -1476,11 +1583,45 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       // Boot last: it is the only stage that can see a load-time failure, and it
       // costs a process, so it runs once everything cheaper has already passed.
       if (code === 0 && args.boot) {
-        const hostCode = await runBootCheck(args, options, project)
-        if (hostCode !== 0) return hostCode
-        // The browser pass costs a browser launch on top of the boot, so it rides
-        // on --runtime, which is already the opt-in for the expensive checks.
-        return args.runtime ? await runClientBootCheck(args, options, project) : 0
+        if (args.port === 3080) {
+          const item = {
+            code: 'DSHX4115',
+            severity: 'error' as const,
+            message: 'Boot checks cannot use the live web profile port 3080.',
+            file: project.packageFile,
+            hint: 'Omit --port to let DSH select an available scratch port, or choose another free port.',
+          }
+          if (args.json) write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
+          else printDiagnostic(io, item)
+          return 1
+        }
+        const buildCode = await runBuild(args, options, project)
+        if (buildCode !== 0) return buildCode
+        const { prepareBootProfile } = await import('../project/boot-profile.js')
+        let bootProfile: Awaited<ReturnType<typeof prepareBootProfile>>
+        try {
+          bootProfile = await prepareBootProfile(project.root, project.packageId)
+        } catch (error) {
+          const item = {
+            code: 'DSHX4113',
+            severity: 'error' as const,
+            message: `The scratch boot profile could not be prepared: ${error instanceof Error ? error.message : String(error)}`,
+            file: project.packageFile,
+            hint: 'Check the repository-pinned Node and pnpm versions and the read-only web profile used as the package template.',
+          }
+          if (args.json) write(io.stdout, `${JSON.stringify({ schemaVersion: 1, project: projectSummary(project), diagnostics: [item] }, null, 2)}\n`)
+          else printDiagnostic(io, item)
+          return 1
+        }
+        try {
+          const hostCode = await runBootCheck(args, options, project, bootProfile)
+          if (hostCode !== 0) return hostCode
+          // The browser pass costs a browser launch on top of the boot, so it rides
+          // on --runtime, which is already the opt-in for the expensive checks.
+          return args.runtime ? await runClientBootCheck(args, options, project, bootProfile) : 0
+        } finally {
+          await bootProfile.dispose()
+        }
       }
       return code
     }

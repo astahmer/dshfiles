@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import {
+  CLIENT_SETUP_SERVICE_CAPABILITIES,
   CLIENT_SDK_PROVIDERS,
   clientLocaleNamespaces,
   clientSetupServices,
@@ -222,6 +223,10 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
     const providers = new Set(
       (analysis.sdk?.uses ?? []).flatMap(capability => (Object.hasOwn(CLIENT_SDK_PROVIDERS, capability) ? CLIENT_SDK_PROVIDERS[capability]! : [])),
     )
+    for (const service of analysis.services) {
+      const descriptor = CLIENT_SETUP_SERVICE_CAPABILITIES[service]
+      if (descriptor.availability === 'optional' && !analysis.autoInject.includes(service)) providers.add(descriptor.packageName)
+    }
     if (await clientUsesApi(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-connection')
     if (await clientUsesSettings(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-ui-settings')
     if (await clientUsesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
@@ -240,6 +245,29 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
           inject.push(provider)
           changed = true
         }
+      if (inject.length > 0) {
+        let peerDependencies: Record<string, unknown> | undefined
+        if (manifest.peerDependencies === undefined) {
+          peerDependencies = {}
+          manifest.peerDependencies = peerDependencies
+          changed = true
+        } else if (isObject(manifest.peerDependencies)) {
+          peerDependencies = manifest.peerDependencies
+        } else {
+          diagnostics.push(
+            issue(
+              'DSHX4141',
+              'warning',
+              'package.json peerDependencies is not a plain object; DSHX will not rewrite it automatically.',
+              config.packageFile,
+              'Convert peerDependencies to an object and declare the required native provider packages manually.',
+            ),
+          )
+        }
+        if (peerDependencies !== undefined) {
+          for (const provider of inject) changed = addMissing(peerDependencies, provider, compatibility.dshRange) || changed
+        }
+      }
     }
   }
 

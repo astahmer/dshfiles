@@ -129,13 +129,15 @@ export const ${component} = (): JSX.Element => (
       path: `tests/${stem}.spec.ts`,
       content: `import { describe, expect, it } from 'vitest'
 import { createTestClient } from '@dshfiles/dshx/testing'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import clientPlugin from '../src/client.js'
 
 describe('the ${options.id} panel', () => {
   it('registers the row and the view under one id and removes both on unload', async () => {
     const client = await createTestClient()
-    client.slots.register(
+    const disposeRoot = client.slots.register(
       {
         name: 'root',
         children: {
@@ -148,14 +150,20 @@ describe('the ${options.id} panel', () => {
         return null
       },
     )
+    const disposeLayout = client.ctx.provide('layout', { selectPanel: () => undefined })
     try {
       const mounted = await client.mount(clientPlugin)
+      expect(client.slots.entries('main')).toHaveLength(1)
+      expect(client.slots.entries('sidebar.panellist')).toHaveLength(1)
+      await mounted.reload()
       expect(client.slots.entries('main')).toHaveLength(1)
       expect(client.slots.entries('sidebar.panellist')).toHaveLength(1)
       await mounted.dispose()
       expect(client.slots.entries('main')).toHaveLength(0)
       expect(client.slots.entries('sidebar.panellist')).toHaveLength(0)
     } finally {
+      disposeRoot()
+      disposeLayout()
       await client.dispose()
     }
   })
@@ -195,11 +203,8 @@ const apiFiles = (options: PresetOptions): readonly PresetFile[] => {
   return [
     {
       path: `src/api/${apiId}.ts`,
-      content: `import { defineApi, method } from '@dshfiles/dshx/api'
-
-export interface ${apiSymbol}State {
-  readonly readyAt: string
-}
+      content: `import { z } from 'zod'
+import { defineApi, method } from '@dshfiles/dshx/api'
 
 /**
  * Wire contract for ${apiId}.
@@ -213,7 +218,10 @@ export const ${apiSymbol} = defineApi({
   id: '${apiId}',
   version: 1,
   methods: {
-    read: method<void, ${apiSymbol}State>(),
+    read: method({
+      input: z.object({ name: z.string().trim().min(1) }),
+      output: z.object({ greeting: z.string(), readyAt: z.string() }),
+    }),
   },
 })
 `,
@@ -229,8 +237,8 @@ export const ${apiSymbol} = defineApi({
  * the schema fails the build instead of the client. The scaffolder wires this
  * symbol into the plugin's \`apis\` list.
  */
-export const ${hostSymbol} = ${apiSymbol}Api.host({
-  read: async () => ({ readyAt: new Date().toISOString() }),
+export const ${hostSymbol} = ${apiSymbol}.host({
+  read: async ({ input }) => ({ greeting: \`Hello \${input.name}\`, readyAt: new Date().toISOString() }),
 })
 `,
     },
@@ -242,19 +250,18 @@ import { ${apiSymbol} } from './api/${apiId}.js'
 /**
  * Client usage example for the ${apiId} API.
  *
- * The Host half is wired; the browser half needs a place to live. Register this
- * component into an existing Slot (\`dshx add ui --file src/${stem}-usage.tsx\`
- * is one way) and swap the rendered inline text for whatever the API should show.
+ * The Host half is wired. Register this component into a panel or existing Slot
+ * with \`dshx add ui --file src/${stem}-usage.tsx\`, then replace the example input.
  */
 export const ${pascal(apiId)}Usage = (): JSX.Element => {
-  const read = useApiQuery(${apiSymbol}, 'read', { enabled: true })
+  const read = useApiQuery(${apiSymbol}, 'read', { input: { name: 'World' }, enabled: true })
   return (
     <section>
       <h2>${options.id}</h2>
       {read.data === undefined ? (
-        <p role="status">{read.error === undefined ? 'Waiting for the Host…' : read.error.message}</p>
+        <p role="status">{read.error === undefined || read.error === null ? 'Waiting for the Host…' : read.error.message}</p>
       ) : (
-        <p>ready at {read.data.readyAt}</p>
+        <p>{read.data.greeting} · ready at {read.data.readyAt}</p>
       )}
     </section>
   )
@@ -264,21 +271,48 @@ export const ${pascal(apiId)}Usage = (): JSX.Element => {
     {
       path: `tests/${apiId}.spec.ts`,
       content: `import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { ${apiSymbol} } from '../src/api/${apiId}.js'
 import { ${hostSymbol} } from '../src/${apiId}-host.js'
 
+const responseSchema = z.object({
+  type: z.literal('server-response'),
+  rpcId: z.string(),
+  result: z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value: z.object({
+      version: z.number(),
+      output: z.object({ greeting: z.string(), readyAt: z.string() }),
+    }) }),
+    z.object({ ok: z.literal(false), error: z.object({ code: z.string() }) }),
+  ]),
+})
+
 describe('the ${apiId} API', () => {
-  it('serves the wired handler and removes its channel on unload', async () => {
+  it('validates input, serves the wired handler, and removes its route on unload', async () => {
     const host = await createTestHost()
+    const connection = host.connection
     try {
-      const mounted = await host.mount(definePlugin({ id: '${packageEntryId(options.packageId)}.api-test', apis: [${hostSymbol}] }))
-      mounted.dispose()
+      const mounted = await host.mount(
+        definePlugin({ id: '${packageEntryId(options.packageId)}-api-test', apis: [${hostSymbol}] }),
+        { packageId: '${options.packageId}' },
+      )
+      const response = await connection.requestApi({ packageId: '${options.packageId}', apiId: '${apiId}', method: 'read', version: 1, input: { name: '  Author  ' } })
+      const body = responseSchema.parse(await response.json())
+      expect(body.result).toMatchObject({ ok: true, value: { output: { greeting: 'Hello Author' } } })
+
+      const invalidResponse = await connection.requestApi({ packageId: '${options.packageId}', apiId: '${apiId}', method: 'read', version: 1, input: { name: 42 } })
+      const invalidBody = responseSchema.parse(await invalidResponse.json())
+      expect(invalidBody.result).toMatchObject({ ok: false, error: { code: 'contract' } })
+
+      await mounted.reload()
+      expect(connection.routeCount).toBe(1)
+      await mounted.dispose()
+      expect(connection.routeCount).toBe(0)
     } finally {
       await host.dispose()
     }
-    expect(${apiSymbol}).toBeDefined()
   })
 })
 `,

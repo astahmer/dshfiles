@@ -6,6 +6,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 
 describe('native SDK testing utilities', () => {
+  it('derives Cordis service injection from declared Client capabilities', () => {
+    const definition = defineClientPlugin({ id: 'capability-injection', uses: ['ui', 'panels', 'rpc'] })
+    expect(definition.inject).toEqual(['slots', 'layout', 'connection'])
+  })
+
   it('registers composer React actions into native session-scoped toolbar seats', async () => {
     const client = await createTestClient()
     try {

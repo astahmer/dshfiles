@@ -1,4 +1,5 @@
 import type { ProjectStyle, RenderedTemplateFile, TemplateContext, TemplateName } from './types.js'
+import { CLIENT_AUTHORING_TOOLCHAIN, CLIENT_CAPABILITIES, CLIENT_SERVICES, CORDIS_IDENTITY_DEPENDENCIES, DSH_PACKAGES } from './capabilities.js'
 
 type DependencyMap = Readonly<Record<string, string>>
 
@@ -19,10 +20,10 @@ interface StyleDefinition {
   readonly files: () => readonly RenderedTemplateFile[]
 }
 
-const sidebarProvider = '@deepseek-ai/dsh-client-ui-sidebar'
-const connectionProvider = '@deepseek-ai/dsh-client-connection'
-const localeProvider = '@deepseek-ai/dsh-client-locale'
-const settingsProvider = '@deepseek-ai/dsh-client-ui-settings'
+const sidebarProvider = DSH_PACKAGES.sidebar
+const connectionProvider = CLIENT_SERVICES.connection.packageName
+const localeProvider = CLIENT_SERVICES.locale.packageName
+const settingsProvider = CLIENT_SERVICES.configForms.packageName
 
 function packageSlug(packageId: string): string {
   const candidate = (packageId.split('/').at(-1) ?? 'plugin')
@@ -346,17 +347,18 @@ const LEGACY_TEMPLATE_REGISTRY = {
     devDependencies: context => ({
       '@dshfiles/dshx': context.dshxVersion,
       '@deepseek-ai/dsh': context.dshVersion,
+      ...CORDIS_IDENTITY_DEPENDENCIES,
       '@deepseek-ai/dsh-cordis-host-runner': context.dshVersion,
       '@deepseek-ai/dsh-settings': context.dshVersion,
       '@deepseek-ai/dsh-tool-cordis': context.dshVersion,
       '@deepseek-ai/dsh-tools': context.dshVersion,
+      [DSH_PACKAGES.slotContracts]: context.dshVersion,
       [localeProvider]: context.dshVersion,
       [sidebarProvider]: context.dshVersion,
       '@types/node': '^22.19.0',
-      '@types/react': '~18.3.31',
-      react: '^18.3.1',
-      'react-dom': '^18.3.1',
-      '@deepseek-ai/cordis': '~4.0.4',
+      '@types/react': CLIENT_AUTHORING_TOOLCHAIN.reactTypes,
+      react: CLIENT_AUTHORING_TOOLCHAIN.react,
+      'react-dom': CLIENT_AUTHORING_TOOLCHAIN.reactDom,
       typescript: '^7.0.2',
     }),
     peerDependencies: context => ({
@@ -378,20 +380,21 @@ const LEGACY_TEMPLATE_REGISTRY = {
     devDependencies: context => ({
       '@dshfiles/dshx': context.dshxVersion,
       '@deepseek-ai/dsh': context.dshVersion,
+      ...CORDIS_IDENTITY_DEPENDENCIES,
       '@deepseek-ai/dsh-cordis-host-runner': context.dshVersion,
       '@deepseek-ai/dsh-tool-cordis': context.dshVersion,
       '@deepseek-ai/dsh-tools': context.dshVersion,
       '@deepseek-ai/dsh-system-prompt': context.dshVersion,
       '@deepseek-ai/dsh-settings': context.dshVersion,
       '@deepseek-ai/schemastery': '~3.18.4',
+      [DSH_PACKAGES.slotContracts]: context.dshVersion,
       [connectionProvider]: context.dshVersion,
       [sidebarProvider]: context.dshVersion,
       [settingsProvider]: context.dshVersion,
       '@types/node': '^22.19.0',
-      '@types/react': '~18.3.31',
-      react: '^18.3.1',
-      'react-dom': '^18.3.1',
-      '@deepseek-ai/cordis': '~4.0.4',
+      '@types/react': CLIENT_AUTHORING_TOOLCHAIN.reactTypes,
+      react: CLIENT_AUTHORING_TOOLCHAIN.react,
+      'react-dom': CLIENT_AUTHORING_TOOLCHAIN.reactDom,
       typescript: '^7.0.2',
     }),
     peerDependencies: context => ({
@@ -417,7 +420,9 @@ function sdkDependencies(context: TemplateContext): DependencyMap {
   return {
     '@dshfiles/dshx': context.dshxVersion,
     '@deepseek-ai/dsh': context.dshVersion,
-    '@deepseek-ai/cordis': '~4.0.4',
+    ...CORDIS_IDENTITY_DEPENDENCIES,
+    [DSH_PACKAGES.cordisHostRunner]: context.dshVersion,
+    [DSH_PACKAGES.toolCordis]: context.dshVersion,
     '@types/node': '^22.19.0',
     typescript: '^7.0.2',
   }
@@ -480,16 +485,17 @@ export const TEMPLATE_REGISTRY = {
   ui: {
     label: 'UI plugin',
     description: 'An ordinary React panel with native sidebar navigation.',
-    clientProviders: ['@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-layout', sidebarProvider],
+    clientProviders: CLIENT_CAPABILITIES.panels.providers,
     devDependencies: context => ({
       ...sdkDependencies(context),
       '@deepseek-ai/dsh-commands': context.dshVersion,
       '@deepseek-ai/dsh-client-ui-renderer': context.dshVersion,
       '@deepseek-ai/dsh-client-ui-layout': context.dshVersion,
+      [DSH_PACKAGES.slotContracts]: context.dshVersion,
       [sidebarProvider]: context.dshVersion,
-      react: '^18.3.1',
-      'react-dom': '^18.3.1',
-      '@types/react': '~18.3.31',
+      react: CLIENT_AUTHORING_TOOLCHAIN.react,
+      'react-dom': CLIENT_AUTHORING_TOOLCHAIN.reactDom,
+      '@types/react': CLIENT_AUTHORING_TOOLCHAIN.reactTypes,
     }),
     peerDependencies: context => ({
       '@deepseek-ai/dsh': context.dshRange,

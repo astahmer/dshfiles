@@ -7,6 +7,7 @@ import { containsPrivateDshxImport } from '../private-imports.js'
 export function isHostExternal(source: string): boolean {
   if (source.startsWith('\0') || source.startsWith('.') || isAbsolute(source)) return false
   if (/^[A-Za-z]:[/\\]/.test(source)) return false
+  if (source === 'create-dshx/capabilities' || source === 'create-dshx/runtime-capabilities') return false
   return true
 }
 

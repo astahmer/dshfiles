@@ -1,4 +1,5 @@
 import { adaptClientSetup } from './setup.js'
+import { CLIENT_CAPABILITY_INJECTIONS } from 'create-dshx/runtime-capabilities'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { createElement } from 'react'
 import type { ComposedProps, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
@@ -74,14 +75,6 @@ export interface ClientPluginDefinition<Uses extends readonly ClientCapability[]
   readonly name?: string
   readonly uses?: Uses
   readonly setup?: (api: ClientPluginApi<Uses>) => void | Effect<void>
-}
-
-const services: Record<ClientCapability, readonly string[]> = {
-  ui: ['slots'],
-  panels: ['slots', 'layout'],
-  sidebar: ['slots', 'layout'],
-  composer: ['slots'],
-  rpc: ['connection'],
 }
 
 /** @internal Only this adapter erases the native slot overload implementation. */
@@ -167,11 +160,12 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
 export function defineClientPlugin<const Uses extends readonly ClientCapability[] = readonly []>(definition: ClientPluginDefinition<Uses>): ClientDefinition {
   assertPluginId(definition.id)
   const { id, name, uses = [] as unknown as Uses, setup, ...contributions } = definition
-  for (const capability of uses) if (!Object.hasOwn(services, capability)) throw new TypeError(`Unknown Client capability ${JSON.stringify(capability)}.`)
+  for (const capability of uses)
+    if (!Object.hasOwn(CLIENT_CAPABILITY_INJECTIONS, capability)) throw new TypeError(`Unknown Client capability ${JSON.stringify(capability)}.`)
   return {
     ...contributions,
     name: name ?? id,
-    inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => services[capability])])],
+    inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => CLIENT_CAPABILITY_INJECTIONS[capability])])],
     setup: adaptClientSetup(
       ctx => setup?.(createClientPluginApi(ctx, uses, id)),
       (ctx, decorate, metadata) => setup?.(createClientPluginApi(ctx, uses, metadata.packageId, decorate)),

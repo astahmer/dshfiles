@@ -2,6 +2,8 @@ import { expect, type Page } from '@playwright/test'
 import { After, Given, Then, When, readBootOutcome } from './bdd.js'
 import { defineParameterType } from 'playwright-bdd'
 import { bootProfile, type BootedProfile } from './boot.js'
+import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
+import type { PluginBoot } from './plugin-boot.js'
 
 /**
  * Step definitions for the client boot scenarios.
@@ -11,7 +13,8 @@ import { bootProfile, type BootedProfile } from './boot.js'
  * rather than in every feature that depends on it.
  */
 
-const OUTCOME_TIMEOUT_MS = 60_000
+const OUTCOME_TIMEOUT_MS = 20_000
+const PRIVATE_URL = /http:\/\/127\.0\.0\.1:\d+\/\S*/g
 
 /** Per-scenario state, keyed by the page playwright-bdd hands each scenario. */
 const profiles = new WeakMap<Page, BootedProfile>()
@@ -22,11 +25,36 @@ const profileFor = (page: Page): BootedProfile => {
   return profile
 }
 
+const assertClientBootReady = (outcome: Awaited<ReturnType<typeof readBootOutcome>>, profile: BootedProfile, label: string): void => {
+  const failures = clientEntryFailures(parseBootText(outcome.text), profile.expectedClientEntries)
+  const details = `${label}\n${outcome.text}\n\nHost output:\n${profile.output()}`
+  expect(outcome.ready, `${details}\n\nReadiness: ${outcome.readinessError ?? 'not reported'}`).toBe(true)
+  expect(outcome.missingClientEntries, details).toEqual([])
+  expect(outcome.failureCardVisible, details).toBe(false)
+  expect(failures, details).toEqual([])
+}
+
+const readProfileOutcome = (page: Page, profile: BootedProfile) =>
+  readBootOutcome(page, {
+    expectedClientEntries: profile.expectedClientEntries,
+    timeoutMs: OUTCOME_TIMEOUT_MS,
+    inspectSlotFailures: profile.expectedClientEntries.length > 0,
+  })
+
+const visitScratchProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
+  try {
+    await page.goto(profile.url, { waitUntil: 'domcontentloaded' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Could not open the ${profile.profile} scratch profile: ${message.replaceAll(PRIVATE_URL, '<private-url>')}`)
+  }
+}
+
 Given('the web profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootProfile('web')
   profiles.set(page, profile)
   try {
-    await page.goto(profile.url, { waitUntil: 'domcontentloaded' })
+    await visitScratchProfile(page, profile)
   } catch (error) {
     await profile.close()
     profiles.delete(page)
@@ -36,38 +64,16 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
 
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
-  const text = await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
-  // An entry left pending on a live-host service is expected: this scenario runs
-  // no Host conversation, so nothing can unblock those. Only "failed" is a defect.
-  const failed = [...text.matchAll(/^(?<id>@[^:\n]+): failed\b/gm)].map(match => match.groups?.id)
-  expect(
-    failed,
-    `the Web UI reported ${String(failed.length)} client entry/entries that failed to activate:\n${text}\n\nHost output:\n${profile.output()}`,
-  ).toEqual([])
+  const outcome = await readProfileOutcome(page, profile)
+  assertClientBootReady(outcome, profile, 'The composed scratch profile did not reach a clean Client boot.')
 })
 
 Then('the Web UI mounts without a failure card', async ({ page }: { page: Page }) => {
   const boots = isolatedBoots.get(page)
-  const pluginId = [...(boots?.keys() ?? [])][0] ?? 'the isolated plugin'
-  const text = await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
-  // An entry left pending on a live-host service is expected: this scenario runs
-  // no Host conversation, so nothing can unblock those. Only "failed" is a defect.
-  const failed = [...text.matchAll(/^(?<id>@[^:\n]+): failed\b/gm)].map(match => match.groups?.id)
-  expect(
-    failed,
-    `${pluginId} left ${String(failed.length)} client entry/entries that failed to activate:\n${text}`,
-  ).toEqual([])
-})
-
-Then('every client entry that failed to activate is reported by id', async ({ page }: { page: Page }) => {
-  const profile = profileFor(page)
-  const text = await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
-  if (text === '') return
-  // A failure card must name the entry that failed, not only the entries waiting on it.
-  const failed = [...text.matchAll(/^(?<id>@[^:\n]+): failed\b/gm)].map(match => match.groups?.id)
-  for (const id of failed) expect(text).toContain(String(id))
-  expect(failed.length > 0 || /web boot: \d+ entr/.test(text)).toBe(true)
-  expect(profile.output()).not.toContain('EADDRINUSE')
+  const pluginBoot = [...(boots?.values() ?? [])][0]
+  if (pluginBoot === undefined) throw new Error('No isolated plugin profile is running for this scenario.')
+  const outcome = await readProfileOutcome(page, pluginBoot)
+  assertClientBootReady(outcome, pluginBoot, `${pluginBoot.pluginId} did not reach a clean Client boot.`)
 })
 
 Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
@@ -85,7 +91,7 @@ Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
  */
 
 /** Plugin boots still running for this page, so a scenario can close them all. */
-const isolatedBoots = new WeakMap<Page, Map<string, { close(): Promise<void>; output(): string }>>()
+const isolatedBoots = new WeakMap<Page, Map<string, PluginBoot>>()
 
 Given('each plugin is booted on its own', async ({ page }: { page: Page }) => {
   isolatedBoots.set(page, new Map())
@@ -95,19 +101,14 @@ When('the plugin "{pluginId}" is opened', async ({ page }: { page: Page }, plugi
   const { bootPluginAlone } = await import('./plugin-boot.js')
   const boot = await bootPluginAlone(pluginId)
   isolatedBoots.get(page)?.set(pluginId, boot)
-  await page.goto(boot.url, { waitUntil: 'domcontentloaded' })
-  await readBootOutcome(page, OUTCOME_TIMEOUT_MS)
+  await visitScratchProfile(page, boot)
 })
 
 Then('no Slot fell back to its error boundary', async ({ page }: { page: Page }) => {
-  const slots = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-slot-error]')].map(element => element.getAttribute('data-slot-error') ?? ''),
-  )
-  const failures = slots.filter((slot): slot is string => slot !== '')
-  expect(
-    failures,
-    'these Slots mounted an error boundary instead of their entry, so their panel is blank even though every client entry activated:',
-  ).toEqual([])
+  const profile = profiles.get(page) ?? [...(isolatedBoots.get(page)?.values() ?? [])][0]
+  if (profile === undefined) throw new Error('No DSH profile is running for this scenario.')
+  const outcome = await readProfileOutcome(page, profile)
+  expect(outcome.slotFailures, `these Slots mounted an error boundary instead of their entry:\n${profile.output()}`).toEqual([])
 })
 
 Then('the plugin shuts down', async ({ page }: { page: Page }) => {

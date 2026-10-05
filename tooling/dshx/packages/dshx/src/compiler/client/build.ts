@@ -254,8 +254,9 @@ async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolv
         hint: `Add inject: [${JSON.stringify(service)}] to defineClient({...}). dsh.client.inject loads provider packages; it does not inject runtime Cordis services.`,
       })
     }
-    const provider = CLIENT_SETUP_SERVICE_CAPABILITIES[service].provider
-    if (provider !== undefined && !(options.inject ?? []).includes(provider) && !analysis.autoInject.includes(service)) {
+    const descriptor = CLIENT_SETUP_SERVICE_CAPABILITIES[service]
+    const provider = descriptor.packageName
+    if (descriptor.availability === 'optional' && !(options.inject ?? []).includes(provider) && !analysis.autoInject.includes(service)) {
       throw new DshxError('DSHX1203', `ctx.${service} requires the official ${service} provider package edge.`, {
         file: analysis.sourceFile ?? paths.entry,
         hint: `Add ${JSON.stringify(provider)} to package.json dsh.client.inject, then rebuild.`,

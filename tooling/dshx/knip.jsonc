@@ -13,7 +13,12 @@
   "ignore": ["scripts/smoke-multi-host*.mjs"],
   "workspaces": {
     ".": {
-      "entry": ["e2e/support/steps.ts", "scripts/smoke-client-slot.mjs"],
+      "entry": [
+        "e2e/support/steps.ts",
+        "scripts/smoke-client-slot.mjs",
+        "scripts/smoke-multi-host.mjs",
+        "scripts/smoke-multi-host-ssh.mjs"
+      ],
     },
     "packages/dshx": {
       "entry": [

@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import type { Program, Expression, ObjectProperty, Function, ArrowFunctionExpression, ParamPattern } from 'oxc-parser'
+import { CLIENT_CAPABILITIES, CLIENT_SERVICES } from 'create-dshx/capabilities'
+import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
 
 const CLIENT_PUBLIC = '@dshfiles/dshx/client'
@@ -17,41 +19,22 @@ interface ConversationDefinitionAnalysis {
   readonly reexports: readonly string[]
 }
 
-type ClientSetupService = 'locale' | 'slots' | 'sessions'
+/** Native Cordis services and their owning DSH package come from the authoring catalog. */
+export const CLIENT_SETUP_SERVICE_CAPABILITIES = CLIENT_SERVICES
 
-/**
- * Optional Cordis services that Client setup code may consume directly.
- *
- * `fullRuntime` marks what the runtime injects into a setup that declares no
- * inject of its own (see `usesFullRuntime` in `client/runtime.ts`). `slots` has no
- * provider edge: the renderer owns it and DSH loads the renderer immediately.
- */
-export const CLIENT_SETUP_SERVICE_CAPABILITIES: Readonly<Record<ClientSetupService, { readonly provider: string | undefined; readonly fullRuntime: boolean }>> =
-  {
-    locale: { provider: '@deepseek-ai/dsh-client-locale', fullRuntime: true },
-    slots: { provider: undefined, fullRuntime: true },
-    sessions: { provider: '@deepseek-ai/dsh-api-session-controller', fullRuntime: false },
-  }
-
-const CLIENT_SETUP_SERVICES: readonly ClientSetupService[] = ['locale', 'slots', 'sessions']
-
-/** Native package load edges; this is compiler metadata, not a second service registry. */
-export const CLIENT_SDK_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
-  ui: ['@deepseek-ai/dsh-client-ui-renderer'],
-  panels: ['@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar'],
-  sidebar: ['@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar'],
-  composer: ['@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-conversation'],
-  rpc: ['@deepseek-ai/dsh-client-connection'],
-}
+/** Package edges required by each typed SDK capability come from the same catalog. */
+export const CLIENT_SDK_PROVIDERS: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  Object.entries(CLIENT_CAPABILITIES).map(([capability, descriptor]) => [capability, descriptor.providers]),
+)
 
 export interface ClientSetupServiceAnalysis {
-  readonly services: readonly ClientSetupService[]
+  readonly services: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
   /** Undefined means a dynamic definition prevented a safe static conclusion. */
   readonly inject: readonly string[] | undefined
   /** Services supplied by declarative Client fields such as non-empty locales. */
-  readonly autoInject: readonly ClientSetupService[]
-  /** Services the runtime injects because setup declares no inject of its own. */
-  readonly runtimeInject: readonly ClientSetupService[]
+  readonly autoInject: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
+  /** Services implicitly injected by the DSHX runtime when setup has no inject list. */
+  readonly runtimeInject: readonly (keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES)[]
   readonly sourceFile: string | undefined
   readonly localeNamespaces: readonly string[] | undefined
   /** Present only for a statically recognized SDK definition; undefined means dynamic uses. */
@@ -230,7 +213,7 @@ const functionUsesSetupService = ({
 }: {
   program: Program
   declaration: SetupFunction
-  service: ClientSetupService
+  service: keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES
 }): boolean => {
   const parameter = declaration.params[0]
   if (parameter === undefined) return false
@@ -321,7 +304,7 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   const inject = arrayField('inject')
   const localeProperty = propertyAt('locales')
   const locales = localeProperty === undefined ? undefined : bindings.resolveExpression(localeProperty.value)
-  const autoInject: ClientSetupService[] = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
+  const autoInject: Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES> = locales?.type === 'ArrayExpression' && locales.elements.length > 0 ? ['locale'] : []
   const localeNamespaces: string[] = []
   let knownLocaleNamespaces = localeProperty === undefined && spreadIndex < 0
   if (locales?.type === 'ArrayExpression') {
@@ -341,11 +324,10 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   }
   const setupProperty = propertyAt('setup')
   const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
-  const services = CLIENT_SETUP_SERVICES.filter(
+  const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
     service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
   )
-  const runtimeInject =
-    setup !== undefined && inject?.length === 0 ? CLIENT_SETUP_SERVICES.filter(service => CLIENT_SETUP_SERVICE_CAPABILITIES[service].fullRuntime) : []
+  const runtimeInject = setup !== undefined && inject?.length === 0 ? CLIENT_DEFAULT_SERVICES : []
   const result: ClientDefinitionSourceAnalysis = {
     services,
     inject,

@@ -350,6 +350,17 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const packageInject = Array.isArray(client?.inject) ? client.inject : []
+  if (analysis.sdk !== undefined && analysis.sdk.uses === undefined) {
+    diagnostics.push(
+      issue(
+        'DSHX4227',
+        'warning',
+        'The Client SDK uses list is dynamic, so DSHX cannot verify its service or provider requirements statically.',
+        analysis.sourceFile ?? resolve(config.root, config.clientEntry),
+        'Use a literal uses array for automatic checks, or run dshx check --boot --runtime to prove the composed plugin.',
+      ),
+    )
+  }
   for (const capability of analysis.sdk?.uses ?? []) {
     if (!Object.hasOwn(CLIENT_SDK_PROVIDERS, capability)) {
       diagnostics.push(
@@ -392,13 +403,14 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
         ),
       )
     }
-    const provider = CLIENT_SETUP_SERVICE_CAPABILITIES[service].provider
-    if (provider !== undefined && !packageInject.includes(provider) && !analysis.autoInject.includes(service)) {
+    const descriptor = CLIENT_SETUP_SERVICE_CAPABILITIES[service]
+    const provider = descriptor.packageName
+    if (descriptor.availability === 'optional' && !packageInject.includes(provider) && !analysis.autoInject.includes(service)) {
       diagnostics.push(
         issue(
           'DSHX4220',
           'error',
-          `ctx.${service} requires ${provider} in dsh.client.inject.`,
+          `ctx.${service} requires optional provider ${provider} in dsh.client.inject.`,
           config.packageFile,
           `Add ${JSON.stringify(provider)} to dsh.client.inject so DSH loads the provider before this Client.`,
         ),

@@ -28,6 +28,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./capabilities": {
+      "types": "./dist/capabilities.d.ts",
+      "default": "./dist/capabilities.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "default": "./dist/catalog.js"
+    },
+    "./runtime-capabilities": {
+      "types": "./dist/runtime-capabilities.d.ts",
+      "default": "./dist/runtime-capabilities.js"
+    },
+    "./slot-capabilities": {
+      "types": "./dist/slot-capabilities.d.ts",
+      "default": "./dist/slot-capabilities.js"
     }
   },
   "scripts": {

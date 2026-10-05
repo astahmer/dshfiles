@@ -1,5 +1,6 @@
 import { test as bddTest, type Page } from 'playwright-bdd'
 import { createBdd } from 'playwright-bdd'
+import { readClientBootOutcome, type BrowserBootOptions, type BrowserBootOutcome } from '../../packages/dshx/src/project/browser-boot.js'
 
 /**
  * createBdd() returns the Given/When/Then constructors this suite defines steps
@@ -12,16 +13,5 @@ import { createBdd } from 'playwright-bdd'
  */
 export const { Given, When, Then, After } = createBdd(bddTest)
 
-/** Read the boot card, waiting for either the failure card or a mounted application. */
-export const readBootOutcome = async (page: Page, timeoutMs: number): Promise<string> => {
-  const card = page.locator('[data-dsh-boot]')
-  const failure = page.getByText('Failed to load plugins')
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    if ((await failure.count()) > 0) return card.innerText()
-    // A clean boot replaces the card with the application, so its absence is the pass.
-    if ((await card.count()) === 0) return ''
-    await page.waitForTimeout(250)
-  }
-  return card.innerText().catch(() => '')
-}
+/** Read DSH's native readiness, expected manifest entries, audit, and Slot errors. */
+export const readBootOutcome = (page: Page, options: BrowserBootOptions): Promise<BrowserBootOutcome> => readClientBootOutcome(page, options)

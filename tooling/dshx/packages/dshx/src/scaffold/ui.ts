@@ -10,6 +10,7 @@ import type { DshxDiagnostic } from '../diagnostics.js'
 import { inspectProjectComposition } from '../inspect/index.js'
 import type { InspectOptions, InspectResult, SlotSummary } from '../inspect/index.js'
 import { checkProjectManifest } from '../project/index.js'
+import { CLIENT_AUTHORING_TOOLCHAIN, CLIENT_CAPABILITIES, CLIENT_SERVICES, DSH_PACKAGES } from 'create-dshx/capabilities'
 import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
 
 import { slotOwnerImports } from '../client/slot-reference.js'
@@ -103,6 +104,25 @@ function contributionIdentifier(slot: string): string {
 
 function providerClient(provider: string): string {
   return `${provider}/client`
+}
+
+const nativeClientPackages: Set<string> = new Set([
+  ...Object.values(CLIENT_SERVICES).map(service => service.packageName),
+  ...Object.values(CLIENT_CAPABILITIES).flatMap(capability => capability.providers),
+])
+
+function clientPackageFromImport(value: string): string {
+  return value.endsWith('/client') ? value.slice(0, -'/client'.length) : value
+}
+
+function slotClientPackages(slotName: string, provider: string): readonly string[] {
+  const owners = slotOwnerImports(slotName).map(clientPackageFromImport)
+  const ownerProviders = owners.flatMap(owner => {
+    if (owner === DSH_PACKAGES.sidebar) return CLIENT_CAPABILITIES.sidebar.providers
+    if (owner === DSH_PACKAGES.conversation) return CLIENT_CAPABILITIES.composer.providers
+    return [owner]
+  })
+  return [...new Set([CLIENT_SERVICES.slots.packageName, ...ownerProviders, provider])]
 }
 
 interface SlotScaffoldContract {
@@ -302,7 +322,12 @@ function newClientSource(clientFile: string, contributionFile: string, slotName:
   ].join('\n')
 }
 
-function updateManifest(source: string, provider: string, compatibility: DshCompatibility): { source: string; manifest: Record<string, unknown> } {
+function updateManifest(
+  source: string,
+  provider: string,
+  slotName: string,
+  compatibility: DshCompatibility,
+): { source: string; manifest: Record<string, unknown> } {
   const value = JSON.parse(source) as Record<string, unknown>
   const exports = value.exports
   if (exports !== undefined && (typeof exports !== 'object' || exports === null || Array.isArray(exports)))
@@ -324,8 +349,11 @@ function updateManifest(source: string, provider: string, compatibility: DshComp
   value.exports = nextExports
   const dsh = typeof value.dsh === 'object' && value.dsh !== null && !Array.isArray(value.dsh) ? (value.dsh as Record<string, unknown>) : {}
   const client = typeof dsh.client === 'object' && dsh.client !== null && !Array.isArray(dsh.client) ? (dsh.client as Record<string, unknown>) : {}
-  const inject = Array.isArray(client.inject) && client.inject.every(item => typeof item === 'string') ? [...(client.inject as string[])] : []
-  if (!inject.includes(provider)) inject.push(provider)
+  if (client.inject !== undefined && (!Array.isArray(client.inject) || !client.inject.every(item => typeof item === 'string'))) {
+    throw new Error('dsh.client.inject must be an array of package names when adding a Client Slot.')
+  }
+  const requiredPackages = slotClientPackages(slotName, provider)
+  const inject = [...new Set([...(Array.isArray(client.inject) ? client.inject : []), ...requiredPackages])]
   dsh.client = {
     ...client,
     platform: compatibility.client.manifest.platform,
@@ -334,6 +362,30 @@ function updateManifest(source: string, provider: string, compatibility: DshComp
     immediately: typeof client.immediately === 'boolean' ? client.immediately : false,
   }
   value.dsh = { ...dsh, client: dsh.client }
+
+  const devDependencies = value.devDependencies === undefined ? {} : value.devDependencies
+  const peerDependencies = value.peerDependencies === undefined ? {} : value.peerDependencies
+  if (!isRecord(devDependencies) || !isRecord(peerDependencies)) throw new Error('package.json dependency fields must be objects when adding a Client Slot.')
+  const nextDevDependencies = { ...devDependencies }
+  const nextPeerDependencies = { ...peerDependencies }
+  const addDependency = (dependencies: Record<string, unknown>, name: string, specifier: string): void => {
+    const existing = dependencies[name]
+    if (existing === undefined) dependencies[name] = specifier
+    else if (typeof existing !== 'string' || existing.trim() === '')
+      throw new Error(`package.json dependency ${JSON.stringify(name)} must be a non-empty version string.`)
+  }
+  const packageVersion = compatibility.verified.latest
+  addDependency(nextDevDependencies, DSH_PACKAGES.slotContracts, packageVersion)
+  addDependency(nextDevDependencies, 'react', CLIENT_AUTHORING_TOOLCHAIN.react)
+  addDependency(nextDevDependencies, 'react-dom', CLIENT_AUTHORING_TOOLCHAIN.reactDom)
+  addDependency(nextDevDependencies, '@types/react', CLIENT_AUTHORING_TOOLCHAIN.reactTypes)
+  for (const name of requiredPackages) {
+    if (!nativeClientPackages.has(name)) continue
+    addDependency(nextDevDependencies, name, packageVersion)
+    addDependency(nextPeerDependencies, name, compatibility.dshRange)
+  }
+  value.devDependencies = nextDevDependencies
+  value.peerDependencies = nextPeerDependencies
   return { source: `${JSON.stringify(value, null, 2)}\n`, manifest: value }
 }
 
@@ -487,7 +539,8 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
     const item = diagnostic('DSHX6101', 'The Slot order must be an integer.', packageFile, 'Pass an integer value to --order or omit it to use 0.')
     return result(project, slot, provider, [item], [], false)
   }
-  const providerExists = await (dependencies.resolveProvider ?? defaultResolveProvider)(project.root, provider)
+  const nativeProvider = nativeClientPackages.has(provider)
+  const providerExists = nativeProvider || (await (dependencies.resolveProvider ?? defaultResolveProvider)(project.root, provider))
   if (!providerExists) {
     const item = diagnostic(
       'DSHX6104',
@@ -559,20 +612,6 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   let manifestChanged = false
   if (clientBefore === undefined) {
     clientAfter = newClientSource(clientFile, targetFile, slot.name)
-    try {
-      const updated = updateManifest(packageBefore, provider, dependencies.compatibility ?? DEFAULT_COMPATIBILITY)
-      manifestAfter = updated.source
-      manifest = updated.manifest
-      manifestChanged = true
-    } catch (cause) {
-      const item = diagnostic(
-        'DSHX6107',
-        `Cannot update project manifest: ${cause instanceof Error ? cause.message : String(cause)}`,
-        packageFile,
-        'Fix package.json exports and DSH metadata before generating a Client.',
-      )
-      return result(project, slot, provider, [item], [], false)
-    }
   } else {
     const modified = modifyClientSource(clientBefore, clientFile, targetFile, slot.name)
     if (modified.duplicate) {
@@ -596,10 +635,24 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
     }
     clientAfter = modified.source
   }
+  try {
+    const updated = updateManifest(packageBefore, provider, slot.name, dependencies.compatibility ?? DEFAULT_COMPATIBILITY)
+    manifestAfter = updated.source
+    manifest = updated.manifest
+    manifestChanged = manifestAfter !== packageBefore
+  } catch (cause) {
+    const item = diagnostic(
+      'DSHX6107',
+      `Cannot update project manifest: ${cause instanceof Error ? cause.message : String(cause)}`,
+      packageFile,
+      'Fix package.json exports, dependency fields, and DSH metadata before generating a Client.',
+    )
+    return result(project, slot, provider, [item], [], false)
+  }
   const plan: PlannedFile[] = [
     { file: targetFile, after: generatedSource(slot, provider, options.id ?? defaultId(project, slot.name), options.order ?? 0, contract.registration) },
     ...(clientBefore === undefined ? [{ file: clientFile, after: clientAfter }] : [{ file: clientFile, before: clientBefore, after: clientAfter }]),
-    ...(manifestAfter === undefined ? [] : [{ file: packageFile, before: packageBefore, after: manifestAfter }]),
+    ...(manifestAfter === undefined || manifestAfter === packageBefore ? [] : [{ file: packageFile, before: packageBefore, after: manifestAfter }]),
   ]
   if (options.dryRun) return result(project, slot, provider, [], plan, manifestChanged, renderFileDiff(plan))
   try {

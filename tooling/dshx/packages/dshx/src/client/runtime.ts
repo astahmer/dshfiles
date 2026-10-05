@@ -15,6 +15,7 @@ import { isConversationContribution } from '../conversation/define.js'
 import { createApiClientRuntime, provideApiContext } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
+import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
 
 const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup'])
@@ -321,8 +322,8 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
   const inject = [
     ...new Set([
       ...(definition.inject ?? []),
-      ...(hasLocales || usesFullRuntime ? ['locale'] : []),
-      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime ? ['slots'] : []),
+      ...(hasLocales || usesFullRuntime ? CLIENT_DEFAULT_SERVICES.filter(service => service === 'locale') : []),
+      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime ? CLIENT_DEFAULT_SERVICES.filter(service => service === 'slots') : []),
       ...(hasApiCapability ? ['connection'] : []),
     ]),
   ]

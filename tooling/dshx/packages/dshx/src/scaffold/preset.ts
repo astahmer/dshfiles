@@ -2,13 +2,14 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import type { ArrayExpression, Expression, ObjectExpression, Program } from 'oxc-parser'
 import { parseSource, defaultCall, objectProperty, stringValue, lastImportEnd, unwrapExpression } from '../project/syntax.js'
+import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES, SDK_RUNTIME_DEPENDENCIES } from 'create-dshx/capabilities'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import { checkProjectManifest } from '../project/index.js'
 import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
-import { presetFiles, presetSymbols } from './presets.js'
+import { panelClientEntry, presetFiles, presetSymbols } from './presets.js'
 
 export type AddPresetName = 'panel' | 'api'
 
@@ -71,6 +72,82 @@ const diagnostic = (code: string, message: string, file: string, hint: string, s
   file,
   hint,
 })
+
+const record = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
+
+const parseManifest = (source: string): Record<string, unknown> | undefined => {
+  try {
+    return record(JSON.parse(source))
+  } catch {
+    return undefined
+  }
+}
+
+const copyRecord = (value: unknown): Record<string, unknown> => ({ ...(record(value) ?? {}) })
+
+const updateManifestForPreset = (manifest: Record<string, unknown>, preset: AddPresetName, clientRpc: boolean): Record<string, unknown> | undefined => {
+  const updated = { ...manifest }
+  if (
+    (updated.exports !== undefined && record(updated.exports) === undefined) ||
+    (updated.devDependencies !== undefined && record(updated.devDependencies) === undefined) ||
+    (updated.peerDependencies !== undefined && record(updated.peerDependencies) === undefined) ||
+    (updated.dsh !== undefined && record(updated.dsh) === undefined)
+  )
+    return undefined
+  const developmentDependencies = copyRecord(updated.devDependencies)
+  const peerDependencies = copyRecord(updated.peerDependencies)
+  const dshVersion = developmentDependencies['@deepseek-ai/dsh'] ?? DSH_PROTOCOL_2.version
+  const dshRange = peerDependencies['@deepseek-ai/dsh'] ?? DSH_PROTOCOL_2.range
+  peerDependencies['@deepseek-ai/dsh'] ??= DSH_PROTOCOL_2.range
+  const providers =
+    preset === 'api' ? HOST_CAPABILITIES.rpc.providers : [...CLIENT_CAPABILITIES.panels.providers, ...(clientRpc ? CLIENT_CAPABILITIES.rpc.providers : [])]
+  for (const provider of providers) {
+    developmentDependencies[provider] ??= dshVersion
+    peerDependencies[provider] ??= dshRange
+  }
+
+  if (preset === 'api') {
+    if (updated.dependencies !== undefined && record(updated.dependencies) === undefined) return undefined
+    const dependencies = copyRecord(updated.dependencies)
+    dependencies.zod ??= SDK_RUNTIME_DEPENDENCIES.zod
+    updated.dependencies = dependencies
+  }
+
+  if (preset === 'panel' || clientRpc) {
+    const exports = copyRecord(updated.exports)
+    if (!Object.hasOwn(exports, './client')) {
+      const rootExport = exports['.']
+      exports['./client'] = record(rootExport) === undefined ? './dist/client.js' : { types: './dist/client.d.ts', default: './dist/client.js' }
+    }
+    const dsh = copyRecord(updated.dsh)
+    const existingClient = dsh.client
+    if (existingClient !== undefined && record(existingClient) === undefined) return undefined
+    const client = copyRecord(existingClient)
+    const existingInject = client.inject
+    if (existingInject !== undefined && (!Array.isArray(existingInject) || existingInject.some(item => typeof item !== 'string'))) return undefined
+    const inject = Array.isArray(existingInject) ? [...existingInject] : []
+    const clientProviders = [...(preset === 'panel' ? CLIENT_CAPABILITIES.panels.providers : []), ...(clientRpc ? CLIENT_CAPABILITIES.rpc.providers : [])]
+    for (const provider of clientProviders) if (!inject.includes(provider)) inject.push(provider)
+    client.platform ??= 'web'
+    client.inject = inject
+    client.external ??= []
+    client.immediately ??= false
+    dsh.client = client
+    updated.dsh = dsh
+    updated.exports = exports
+  }
+
+  if (preset === 'panel') {
+    developmentDependencies.react ??= '^18.3.1'
+    developmentDependencies['react-dom'] ??= '^18.3.1'
+    developmentDependencies['@types/react'] ??= '~18.3.31'
+    developmentDependencies['@deepseek-ai/dsh-client-ui-slots'] ??= dshVersion
+  }
+  updated.devDependencies = developmentDependencies
+  updated.peerDependencies = peerDependencies
+  return updated
+}
 
 const readExisting = async (fs: ScaffoldFileSystem, file: string): Promise<string | undefined> => {
   try {
@@ -171,6 +248,41 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     }
   }
 
+  const packageBefore = await readExisting(fs, project.packageFile)
+  const packageManifest = packageBefore === undefined ? undefined : parseManifest(packageBefore)
+  if (packageBefore === undefined || packageManifest === undefined) {
+    return refuse(
+      diagnostic(
+        'DSHX6307',
+        `The package manifest ${project.packageFile} is missing or invalid JSON.`,
+        project.packageFile,
+        'Fix package.json before adding a preset.',
+      ),
+    )
+  }
+  let clientRpc = preset === 'api' && project.clientEntry !== undefined
+  if (preset === 'panel' && project.hostEntry !== undefined) {
+    const hostSource = await readExisting(fs, project.hostEntry)
+    const hostProgram = hostSource === undefined ? undefined : parse(hostSource, project.hostEntry)
+    const hostObject = hostProgram === undefined ? undefined : defaultDefinition(hostProgram, 'definePlugin')
+    clientRpc = hostObject !== undefined && objectProperty({ expression: hostObject, name: 'apis' }) !== undefined
+  }
+  const updatedManifest = updateManifestForPreset(packageManifest, preset, clientRpc)
+  if (updatedManifest === undefined) {
+    return refuse(
+      diagnostic(
+        'DSHX6306',
+        `The package manifest ${project.packageFile} has an unsupported field shape for the ${preset} preset.`,
+        project.packageFile,
+        'Keep exports, dependencies, peerDependencies, and DSH Client injection as literal objects and arrays.',
+      ),
+    )
+  }
+  const packageAfter = `${JSON.stringify(updatedManifest, null, 2)}\n`
+  const packageChanged = JSON.stringify(packageManifest) !== JSON.stringify(updatedManifest)
+  const projectManifest = updatedManifest
+  let clientEntryForCheck = project.clientEntry
+
   /**
    * The wiring target is checked before anything is staged: a refused preset
    * leaves zero writes, whether the refusal came from a missing entry, a file
@@ -178,108 +290,161 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
    */
   if (preset === 'panel') {
     if (project.clientEntry === undefined || !inside(project.root, project.clientEntry)) {
-      return refuse(
-        diagnostic(
-          'DSHX6301',
-          'A Client entry is required to wire a panel.',
-          project.packageFile,
-          'Add client: { entry: "src/client.tsx" } to dshx.config.ts, export defineClientPlugin, and run dshx add panel again.',
-        ),
-      )
-    }
-    const clientBefore = await readExisting(fs, project.clientEntry)
-    if (clientBefore === undefined) {
-      return refuse(
-        diagnostic(
-          'DSHX6301',
-          `The Client entry ${project.clientEntry} does not exist.`,
-          project.packageFile,
-          'Create src/client.tsx exporting default defineClientPlugin, then run dshx add panel again.',
-        ),
-      )
-    }
-    const program = parse(clientBefore, project.clientEntry)
-    if (program === undefined) {
-      return refuse(
-        diagnostic('DSHX6307', `The Client entry ${project.clientEntry} does not parse.`, project.clientEntry, 'Fix the entry source before adding a panel.'),
-      )
-    }
-    const object = defaultDefinition(program, 'defineClientPlugin')
-    if (object === undefined) {
-      return refuse(
-        diagnostic(
-          'DSHX6305',
-          `${project.clientEntry} is not a DSHX defineClientPlugin default export.`,
-          project.clientEntry,
-          'Export default defineClientPlugin({ ... }), or register the panel with api.panels.register by hand.',
-        ),
-      )
-    }
-    const setup = objectProperty({ expression: object, name: 'setup' })
-    if (setup === undefined) {
-      return refuse(
-        diagnostic(
-          'DSHX6306',
-          `The defineClientPlugin call in ${project.clientEntry} has no setup to wire into.`,
-          project.clientEntry,
-          'Add a setup(api) body to the client entry.',
-        ),
-      )
-    }
-    const span = setupBodyOpenBrace(setup.value)
-    if (span === undefined) {
-      return refuse(
-        diagnostic(
-          'DSHX6306',
-          `The setup body in ${project.clientEntry} is not a block function.`,
-          project.clientEntry,
-          'Write setup as a block function body so the panel registration can be inserted.',
-        ),
-      )
-    }
-    const bodyText = clientBefore.slice(span.open, span.close)
-    const alreadyRegistered = bodyText.includes('panels.register') || bodyText.includes('sidebar.register')
-    if (alreadyRegistered)
-      return refuse(
-        diagnostic(
-          'DSHX6309',
-          'The client entry already registers a panel.',
-          project.clientEntry,
-          'Keep the existing contribution; no wiring edits were made.',
-          'warning',
-        ),
-      )
-    const usesProperty = objectProperty({ expression: object, name: 'uses' })
-    const injectProperty = objectProperty({ expression: object, name: 'inject' })
-    const hasPanelsCapability = usesProperty !== undefined && usesLiteralIncludes(usesProperty.value, 'panels')
-    if (usesProperty !== undefined && !hasPanelsCapability) {
-      const array = usesArray(usesProperty.value)
-      if (array === undefined) {
+      const clientEntry = resolve(project.root, 'src/client.tsx')
+      const clientBefore = await readExisting(fs, clientEntry)
+      if (clientBefore !== undefined) {
         return refuse(
           diagnostic(
-            'DSHX6306',
-            `The uses list in ${project.clientEntry} is not a literal array.`,
-            project.clientEntry,
-            'Declare uses: ["panels"] literally, or wire the panel registration by hand.',
+            'DSHX6302',
+            `${clientEntry} already exists but is not configured as the Client entry.`,
+            clientEntry,
+            'Wire the existing entry in dshx.config.ts before adding a panel.',
           ),
         )
       }
+      const configFile = project.configFile
+      const configBefore = configFile === undefined || !inside(project.root, configFile) ? undefined : await readExisting(fs, configFile)
+      if (configFile === undefined || configBefore === undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6301',
+            'A literal dshx.config.ts is required to create a Client entry.',
+            project.packageFile,
+            'Add a static defineConfig({ host, ... }) export and retry.',
+          ),
+        )
+      }
+      const configProgram = parse(configBefore, configFile)
+      const configCall = configProgram === undefined ? undefined : defaultCall({ program: configProgram, name: 'defineConfig' })
+      const configArgument = configCall?.arguments[0]
+      if (
+        configCall === undefined ||
+        configCall.arguments.length !== 1 ||
+        configArgument === undefined ||
+        configArgument.type !== 'ObjectExpression' ||
+        configArgument.properties.some(property => property.type === 'SpreadElement')
+      ) {
+        return refuse(
+          diagnostic(
+            'DSHX6305',
+            `The config in ${configFile} is not a static defineConfig object.`,
+            configFile,
+            'Export defineConfig({ host: { entry: ... } }) without spreads or dynamic values.',
+          ),
+        )
+      }
+      if (objectProperty({ expression: configArgument, name: 'client' }) !== undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6301',
+            'The Client entry is explicitly disabled or could not be resolved.',
+            configFile,
+            'Set client: { entry: "src/client.tsx" } and retry.',
+          ),
+        )
+      }
+      const configEdits: { start: number; end: number; text: string }[] = []
+      insertObjectProperty(configEdits, configBefore, configArgument, "  client: { entry: 'src/client.tsx' },")
+      plan.push({ file: configFile, before: configBefore, after: applyEdits(configBefore, configEdits) })
+      plan.push({
+        file: clientEntry,
+        after: panelClientEntry({ preset, id, packageId: project.packageId, ...(options.title === undefined ? {} : { title: options.title }) }),
+      })
+      clientEntryForCheck = clientEntry
+    } else {
+      const clientBefore = await readExisting(fs, project.clientEntry)
+      if (clientBefore === undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6301',
+            `The Client entry ${project.clientEntry} does not exist.`,
+            project.packageFile,
+            'Create the configured Client entry and run dshx add panel again.',
+          ),
+        )
+      }
+      const program = parse(clientBefore, project.clientEntry)
+      if (program === undefined) {
+        return refuse(
+          diagnostic('DSHX6307', `The Client entry ${project.clientEntry} does not parse.`, project.clientEntry, 'Fix the entry source before adding a panel.'),
+        )
+      }
+      const object = defaultDefinition(program, 'defineClientPlugin')
+      if (object === undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6305',
+            `${project.clientEntry} is not a DSHX defineClientPlugin default export.`,
+            project.clientEntry,
+            'Export default defineClientPlugin({ ... }), or wire the panel with api.panels.register by hand.',
+          ),
+        )
+      }
+      const setup = objectProperty({ expression: object, name: 'setup' })
+      if (setup === undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6306',
+            `The defineClientPlugin call in ${project.clientEntry} has no setup to wire into.`,
+            project.clientEntry,
+            'Add a setup(api) body to the Client entry.',
+          ),
+        )
+      }
+      const span = setupBodyOpenBrace(setup.value)
+      if (span === undefined) {
+        return refuse(
+          diagnostic(
+            'DSHX6306',
+            `The setup body in ${project.clientEntry} is not a block function.`,
+            project.clientEntry,
+            'Write setup as a block function body so the panel registration can be inserted.',
+          ),
+        )
+      }
+      const bodyText = clientBefore.slice(span.open, span.close)
+      const alreadyRegistered = bodyText.includes(`api.panels.register({ id: '${id}',`)
+      if (alreadyRegistered)
+        return refuse(
+          diagnostic(
+            'DSHX6309',
+            `The Client entry already registers panel ${JSON.stringify(id)}.`,
+            project.clientEntry,
+            'Choose another panel id; no wiring edits were made.',
+            'warning',
+          ),
+        )
+      const usesProperty = objectProperty({ expression: object, name: 'uses' })
+      const hasPanelsCapability = usesProperty !== undefined && usesLiteralIncludes(usesProperty.value, 'panels')
+      const edits: { start: number; end: number; text: string }[] = []
+      if (usesProperty !== undefined && !hasPanelsCapability) {
+        const array = usesArray(usesProperty.value)
+        if (array === undefined) {
+          return refuse(
+            diagnostic(
+              'DSHX6306',
+              `The uses list in ${project.clientEntry} is not a literal array.`,
+              project.clientEntry,
+              'Declare uses: ["panels"] literally, or wire the panel registration by hand.',
+            ),
+          )
+        }
+        addArrayElement(edits, array, `'panels'`)
+      } else if (usesProperty === undefined) {
+        insertObjectProperty(edits, clientBefore, object, "  uses: ['panels'],")
+      }
+      const importEnd = lastImportEnd(program)
+      const hasLayoutTypeImport = clientBefore.includes('@deepseek-ai/dsh-client-ui-layout/client')
+      const importPath = relativeImport(project.clientEntry, resolve(project.root, `src/${symbols.stem}-panel.tsx`))
+      edits.push({
+        start: importEnd,
+        end: importEnd,
+        text: `\n${hasLayoutTypeImport ? '' : "import type {} from '@deepseek-ai/dsh-client-ui-layout/client'\n"}import { ${symbols.component} } from '${importPath}'${clientBefore[importEnd] === '\n' ? '' : '\n'}`,
+      })
+      const registration = `${bodyText.trimStart() === '' ? ' ' : '\n'}api.panels.register({ id: '${id}', title: '${options.title ?? id}', component: ${symbols.component} })\n`
+      edits.push({ start: span.open, end: span.open, text: registration })
+      plan.push({ file: project.clientEntry, before: clientBefore, after: applyEdits(clientBefore, edits) })
     }
-    const needsInject = !hasPanelsCapability && usesProperty === undefined && injectProperty === undefined
-    const edits: { start: number; end: number; text: string }[] = []
-    if (usesProperty !== undefined && !hasPanelsCapability) addArrayElement(edits, usesArray(usesProperty.value)!, `'panels'`)
-    if (needsInject) insertObjectProperty(edits, clientBefore, object, "  inject: ['slots', 'layout'],")
-    const importEnd = lastImportEnd(program)
-    const hasLayoutTypeImport = clientBefore.includes('@deepseek-ai/dsh-client-ui-layout/client')
-    const importPath = relativeImport(project.clientEntry, resolve(project.root, `src/${symbols.stem}-panel.tsx`))
-    edits.push({
-      start: importEnd,
-      end: importEnd,
-      text: `\n${hasLayoutTypeImport ? '' : "import type {} from '@deepseek-ai/dsh-client-ui-layout/client'\n"}import { ${symbols.component} } from '${importPath}'${clientBefore[importEnd] === '\n' ? '' : '\n'}`,
-    })
-    const registration = `${bodyText.trimStart() === '' ? ' ' : '\n'}api.panels.register({ id: '${id}', title: '${options.title ?? id}', component: ${symbols.component} })\n`
-    edits.push({ start: span.open, end: span.open, text: registration })
-    plan.push({ file: project.clientEntry, before: clientBefore, after: applyEdits(clientBefore, edits) })
   }
 
   if (preset === 'api') {
@@ -362,6 +527,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
    * New files stage after every precondition has passed: a dry-run previews the
    * exact plan, and an applied plan either fully lands or fully rolls back.
    */
+  if (packageChanged) plan.push({ file: project.packageFile, before: packageBefore, after: packageAfter })
   for (const file of presetFiles({ preset, id, packageId: project.packageId })) {
     plan.push({ file: resolve(project.root, file.path), after: file.content })
   }
@@ -384,7 +550,10 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
-    postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)({ ...project }, { compatibility })
+    postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(
+      { ...project, ...(clientEntryForCheck === undefined ? {} : { clientEntry: clientEntryForCheck }), manifest: projectManifest },
+      { compatibility },
+    )
   } catch (cause) {
     await rollbackFilePlanWithFileSystem(filePlan, fs)
     return refuse(

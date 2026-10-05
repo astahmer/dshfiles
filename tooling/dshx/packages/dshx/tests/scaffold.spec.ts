@@ -43,7 +43,7 @@ function project(root: string, clientEntry: string | undefined, manifest: Record
   }
 }
 
-function inspectResult(): InspectResult {
+function inspectResult(provider = '@deepseek-ai/dsh-client-ui-sidebar'): InspectResult {
   return {
     profile: 'web',
     target: 'slots',
@@ -51,7 +51,7 @@ function inspectResult(): InspectResult {
     items: [
       {
         name: 'sidebar.footer.action',
-        provider: '@demo/sidebar',
+        provider,
         kind: 'list',
         scope: 'global',
         metadata: {
@@ -103,7 +103,7 @@ async function setup(full: boolean): Promise<{ root: string; project: ResolvedDs
 }
 
 describe('add ui scaffold', () => {
-  it('adds a contribution to an existing DSHX Client without modifying package metadata', async () => {
+  it('adds a first-party Slot contribution and provider metadata to an existing DSHX Client', async () => {
     const value = await setup(true)
     try {
       const result = await createUiScaffold(
@@ -121,7 +121,26 @@ describe('add ui scaffold', () => {
       const client = await readFile(resolve(value.root, 'src/client.tsx'), 'utf8')
       expect(client).toContain('from "./slots/sidebar.footer.action.js"')
       expect(client).toContain('slots: [sidebar_footer_actionContribution]')
-      expect(JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8'))).toEqual(value.project.manifest)
+      const manifest = JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8'))
+      expect(manifest.dsh.client.inject).toEqual([
+        '@deepseek-ai/dsh-client-ui-renderer',
+        '@deepseek-ai/dsh-client-ui-layout',
+        '@deepseek-ai/dsh-client-ui-sidebar',
+      ])
+      expect(manifest.devDependencies).toMatchObject({
+        '@deepseek-ai/dsh-client-ui-slots': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-renderer': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-layout': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-sidebar': '0.2.0-rc.2',
+        react: '^18.3.1',
+        'react-dom': '^18.3.1',
+        '@types/react': '~18.3.31',
+      })
+      expect(manifest.peerDependencies).toMatchObject({
+        '@deepseek-ai/dsh-client-ui-renderer': '>=0.2.0-rc.1 <0.3.0-0',
+        '@deepseek-ai/dsh-client-ui-layout': '>=0.2.0-rc.1 <0.3.0-0',
+        '@deepseek-ai/dsh-client-ui-sidebar': '>=0.2.0-rc.1 <0.3.0-0',
+      })
     } finally {
       await value.cleanup()
     }
@@ -142,7 +161,26 @@ describe('add ui scaffold', () => {
       expect(result.manifestChanged).toBe(true)
       const manifest = JSON.parse(await readFile(resolve(value.root, 'package.json'), 'utf8')) as Record<string, unknown>
       expect(manifest.exports).toMatchObject({ './client': './dist/client.js' })
-      expect(manifest.dsh).toMatchObject({ client: { platform: 'web', inject: ['@demo/sidebar'], external: [], immediately: false } })
+      expect(manifest.dsh).toMatchObject({
+        client: {
+          platform: 'web',
+          inject: ['@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar'],
+          external: [],
+          immediately: false,
+        },
+      })
+      expect(manifest.devDependencies).toMatchObject({
+        '@deepseek-ai/dsh-client-ui-renderer': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-layout': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-sidebar': '0.2.0-rc.2',
+        '@deepseek-ai/dsh-client-ui-slots': '0.2.0-rc.2',
+        react: '^18.3.1',
+      })
+      expect(manifest.peerDependencies).toMatchObject({
+        '@deepseek-ai/dsh-client-ui-renderer': '>=0.2.0-rc.1 <0.3.0-0',
+        '@deepseek-ai/dsh-client-ui-layout': '>=0.2.0-rc.1 <0.3.0-0',
+        '@deepseek-ai/dsh-client-ui-sidebar': '>=0.2.0-rc.1 <0.3.0-0',
+      })
       expect(await readFile(resolve(value.root, 'src/client.tsx'), 'utf8')).toContain('defineClient')
     } finally {
       await value.cleanup()
@@ -162,7 +200,7 @@ describe('add ui scaffold', () => {
       await expect(readFile(resolve(value.root, 'src/slots/sidebar.footer.action.tsx'), 'utf8')).rejects.toThrow()
       const failed = await createUiScaffold(
         { project: value.project, slot: 'sidebar.footer.action' },
-        { inspectComposition: async () => inspectResult(), resolveProvider: async () => false },
+        { inspectComposition: async () => inspectResult('@demo/sidebar'), resolveProvider: async () => false },
       )
       expect(failed.diagnostics[0]?.code).toBe('DSHX6104')
       const created = await createUiScaffold(
@@ -315,6 +353,42 @@ describe('add ui scaffold', () => {
       )
       expect(keyed.diagnostics[0]?.code).toBe('DSHX6110')
       await expect(readFile(resolve(value.root, 'src/slots/sidebar.footer.action.tsx'), 'utf8')).rejects.toThrow()
+    } finally {
+      await value.cleanup()
+    }
+  })
+
+  it('turns a missing runtime Slot Inspect provider into an actionable no-write error', async () => {
+    const value = await setup(true)
+    const packageBefore = await readFile(value.project.packageFile, 'utf8')
+    const clientFile = resolve(value.root, 'src/client.tsx')
+    const clientBefore = await readFile(clientFile, 'utf8')
+    try {
+      const result = await createUiScaffold(
+        { project: value.project, slot: 'conversation.input.dock' },
+        {
+          compatibility,
+          inspectComposition: async () => ({
+            ...inspectResult(),
+            items: [],
+            diagnostics: [
+              {
+                code: 'DSHX3201',
+                severity: 'error',
+                message: 'The official Slots Inspect provider is not registered.',
+                file: value.project.packageFile,
+                hint: 'Load a Host and Client Slots Inspect provider before scaffolding.',
+              },
+            ],
+          }),
+        },
+      )
+
+      expect(result.diagnostics[0]).toMatchObject({ code: 'DSHX6102', severity: 'error' })
+      expect(result.changedFiles).toEqual([])
+      expect(await readFile(value.project.packageFile, 'utf8')).toBe(packageBefore)
+      expect(await readFile(clientFile, 'utf8')).toBe(clientBefore)
+      await expect(readFile(resolve(value.root, 'src/slots/conversation.input.dock.tsx'), 'utf8')).rejects.toThrow()
     } finally {
       await value.cleanup()
     }

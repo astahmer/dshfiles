@@ -143,6 +143,10 @@ describe('CLI argument parser', () => {
     expect(parseCliArgs(['inspect', 'events'])).toMatchObject({ command: 'inspect', inspectTarget: 'events' })
   })
 
+  it('parses capability inspection as an offline inspect target', () => {
+    expect(parseCliArgs(['inspect', 'capabilities', '--json'])).toMatchObject({ command: 'inspect', inspectTarget: 'capabilities', json: true })
+  })
+
   it('parses add ui options and rejects non-ui add targets', () => {
     expect(
       parseCliArgs(['add', 'ui', '--slot', 'sidebar.footer.action', '--provider', '@provider/sidebar', '--order', '2', '--dry-run', '--json']),
@@ -175,6 +179,89 @@ describe('CLI argument parser', () => {
   })
 })
 describe('CLI commands', () => {
+  it('explains native slot mode, ownership, registration identity, and replacement obligations as versioned JSON', async () => {
+    const streams = io()
+    const code = await runCli(['inspect', 'slots', '--explain', '--root', 'sidebar', '--json'], { io: streams })
+    streams.out.end()
+    streams.err.end()
+    const report = JSON.parse(await text(streams.out)) as {
+      schemaVersion: number
+      source: string
+      slots: readonly { name: string; kind: string; scope: string; childObligations: readonly string[]; declaration: string }[]
+    }
+    expect(code).toBe(0)
+    expect(report).toMatchObject({ schemaVersion: 1, source: 'protocol-2-native-declarations' })
+    expect(report.slots).toHaveLength(1)
+    expect(report.slots[0]).toMatchObject({
+      name: 'sidebar',
+      kind: 'single',
+      scope: 'root',
+      childObligations: expect.arrayContaining(['Render the compact control rail while collapsed.']),
+      declaration: '@deepseek-ai/dsh-client-ui-layout/client#SlotMap.sidebar',
+    })
+  })
+
+  it('prints live slot catalog and occupancy facts in human Inspect output', async () => {
+    const streams = io()
+    const value = project()
+    const code = await runCli(['inspect', 'slots', '--root', 'sidebar.footer.action'], {
+      io: streams,
+      runtime: {
+        resolveConfig: async () => value,
+        inspectComposition: async (_project, target) => ({
+          profile: 'web',
+          target,
+          source: 'runtime',
+          items: [
+            {
+              name: 'sidebar.footer.action',
+              kind: 'list',
+              scope: 'root',
+              metadata: {
+                catalog: { registration: [{ name: 'id', required: true, type: 'string' }], replaceRisk: 'none', ownerProps: ['wide:boolean'] },
+                occupants: [{ registrant: '@test/footer', id: 'test.footer' }],
+                children: [{ name: 'sidebar.footer.action.icon', kind: 'single', scope: 'root' }],
+              },
+            },
+          ],
+          diagnostics: [],
+        }),
+      },
+    })
+    streams.out.end()
+    streams.err.end()
+    expect(code).toBe(0)
+    const output = await text(streams.out)
+    expect(output).toContain('catalog:')
+    expect(output).toContain('occupants:')
+    expect(output).toContain('children:')
+  })
+
+  it('prints the verified capability catalog without resolving a project', async () => {
+    const streams = io()
+    const resolveConfig = vi.fn(async () => project())
+    const code = await runCli(['inspect', 'capabilities', '--json'], { io: streams, runtime: { resolveConfig } })
+    streams.out.end()
+    streams.err.end()
+    const report = JSON.parse(await text(streams.out)) as {
+      schemaVersion: number
+      clientServices: readonly { name: string; package: string; availability: string }[]
+      client: readonly { name: string; services: readonly string[]; providers: readonly string[] }[]
+      slots: readonly { name: string; kind: string; declaration: string }[]
+      unavailable: readonly { name: string; reason: string }[]
+    }
+    expect(code).toBe(0)
+    expect(resolveConfig).not.toHaveBeenCalled()
+    expect(report.schemaVersion).toBe(1)
+    expect(report.clientServices).toContainEqual({ name: 'slots', package: '@deepseek-ai/dsh-client-ui-renderer', availability: 'provided' })
+    expect(report.client.find(capability => capability.name === 'panels')?.services).toEqual(['slots', 'layout'])
+    expect(report.slots.find(slot => slot.name === 'sidebar.panellist')).toMatchObject({
+      kind: 'list',
+      declaration: '@deepseek-ai/dsh-client-ui-sidebar/client#SlotMap.sidebar.panellist',
+    })
+    expect(report.unavailable.some(capability => capability.name === 'conversationEvents')).toBe(true)
+  })
+
   it('builds enabled faces in parallel and does not touch Profile APIs', async () => {
     const streams = io()
     const value = project()
@@ -601,9 +688,44 @@ describe('CLI commands', () => {
     streams.out.end()
     streams.err.end()
     const output = JSON.parse(await text(streams.out)) as Record<string, unknown>
-    expect(output).toMatchObject({ target: 'slots', source: 'runtime', project: { packageId: value.packageId } })
+    expect(output).toMatchObject({ schemaVersion: 1, target: 'slots', source: 'runtime', project: { packageId: value.packageId } })
     expect(output.items).toEqual([{ name: 'sidebar.footer.action', provider: '@provider/sidebar', kind: 'action', scope: 'global', metadata: { order: 10 } }])
     expect(await text(streams.err)).toBe('')
+  })
+
+  it('returns a versioned add-ui report with its verified static slot contract', async () => {
+    const streams = io()
+    const value = project()
+    const code = await runCli(['add', 'ui', '--slot', 'sidebar.footer.action', '--json'], {
+      io: streams,
+      runtime: {
+        resolveConfig: async () => value,
+        addUi: async () => ({
+          root: value.root,
+          slot: { name: 'sidebar.footer.action', provider: '@deepseek-ai/dsh-client-ui-sidebar', kind: 'list', scope: 'root' },
+          provider: '@deepseek-ai/dsh-client-ui-sidebar',
+          changedFiles: [],
+          generatedFiles: [],
+          manifestChanged: false,
+          diagnostics: [],
+        }),
+      },
+    })
+    streams.out.end()
+    streams.err.end()
+    const report = JSON.parse(await text(streams.out)) as {
+      schemaVersion: number
+      capabilityStatus: string
+      sourceLocations: { declaration: string }
+      slotContract: { identity: string; ownerProps: readonly string[] }
+    }
+    expect(code).toBe(0)
+    expect(report).toMatchObject({
+      schemaVersion: 1,
+      capabilityStatus: 'known',
+      sourceLocations: { declaration: '@deepseek-ai/dsh-client-ui-sidebar/client#SlotMap.sidebar.footer.action' },
+      slotContract: { identity: 'id', ownerProps: ['wide: boolean'] },
+    })
   })
 
   it('forwards an exact Slot root to the Inspect runtime', async () => {

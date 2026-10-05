@@ -4,6 +4,8 @@ import { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
+import { apiChannel } from '../api/common.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
 import { createClientModuleLoader } from './client-module.js'
@@ -17,12 +19,81 @@ export interface MountedPlugin {
 
 export interface TestHost {
   readonly ctx: Context
+  readonly connection: TestConnection
   readonly commands: Pick<CommandRuntime, 'find'> & {
     get(name: string): ReturnType<CommandRuntime['find']>
   }
   readonly tools: ToolRuntime
-  mount(definition: unknown, options?: { readonly packageId?: string; readonly native?: boolean }): Promise<MountedPlugin>
+  mount(definition: unknown, options?: { readonly packageId?: string; readonly native?: boolean; readonly config?: unknown }): Promise<MountedPlugin>
   dispose(): Promise<void>
+}
+
+export interface TestConnection {
+  readonly routeCount: number
+  requestApi(request: {
+    readonly packageId: string
+    readonly apiId: string
+    readonly method: string
+    readonly version: number
+    readonly input: unknown
+  }): Promise<Response>
+  dispose(): void
+}
+
+/** Provide the native Host Connection contract with an in-memory Fetch route carrier. */
+export function provideTestConnection(ctx: Context): TestConnection {
+  const routes = new Map<string, ConnectionFetchRoute>()
+  const operator: HostConnectionHandle['operator'] = {
+    id: 'dshx-test' as HostConnectionHandle['operator']['id'],
+    ctx,
+    dispose: async () => undefined,
+  }
+  const notFound = (): Response => new Response('not found', { status: 404 })
+  const handler: ConnectionFetchHandler = {
+    requestBodyMode: request => routes.get(request.url.pathname)?.requestBody ?? 'buffered',
+    fetch: async request => (await routes.get(new URL(request.url).pathname)?.fetch(request)) ?? notFound(),
+  }
+  const connection: HostConnectionHandle = {
+    operator,
+    fetch: {
+      register(route) {
+        if (routes.has(route.path)) throw new Error(`Connection route already registered: ${route.path}`)
+        routes.set(route.path, route)
+        return async () => {
+          routes.delete(route.path)
+        }
+      },
+    },
+    rpc: {
+      handle: () => {
+        throw new Error('The test Connection only supports exact Fetch routes.')
+      },
+      intercept: () => {
+        throw new Error('The test Connection only supports exact Fetch routes.')
+      },
+    },
+    createSharedFetchHandler: () => handler,
+    requestRejection: () => undefined,
+    admit: () => ({ peer: operator }),
+    authorizeIndex: () => true,
+    authenticatedUrl: baseUrl => baseUrl,
+  }
+  const dispose = ctx.provide('connection', connection)
+  return {
+    get routeCount() {
+      return routes.size
+    },
+    requestApi: ({ packageId, apiId, method, version, input }) => {
+      const endpoint = `${apiChannel(packageId, apiId).slice(1)}/${method}`
+      const request = new Request(`http://dshx.test/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'dshx-test', method: endpoint, payload: { version, input } }),
+      })
+      return handler.fetch(request)
+    },
+    dispose,
+  }
 }
 
 function mounted(fiber: Fiber): MountedPlugin {
@@ -38,12 +109,14 @@ function mounted(fiber: Fiber): MountedPlugin {
 /** Native commands, tools and prompts without model calls, a profile, or a DSH process. */
 export async function createTestHost(): Promise<TestHost> {
   const ctx = new Context()
+  const connection = provideTestConnection(ctx)
   const providers = [ctx.plugin(CommandRuntime), ctx.plugin(SystemPrompt), ctx.plugin(ToolRuntime)]
   await Promise.all(providers)
   const commands = ctx.commands
   const agent = { ctx } as Parameters<CommandRuntime['find']>[0]
   return {
     ctx,
+    connection,
     tools: ctx.tools,
     commands: {
       find: (agent, name) => commands.find(agent, name),
@@ -52,11 +125,14 @@ export async function createTestHost(): Promise<TestHost> {
     async mount(definition, options = {}) {
       const metadata = { packageId: options.packageId ?? '@test/plugin' }
       const plugin = options.native ? createHostModule(definition as Record<string, unknown>, metadata) : createHostPlugin(definition, metadata)
-      const fiber = ctx.plugin(plugin)
+      const fiber = ctx.plugin(plugin, options.config)
       await fiber
       return mounted(fiber)
     },
-    dispose: () => ctx.fiber.dispose(),
+    dispose: async () => {
+      connection.dispose()
+      await ctx.fiber.dispose()
+    },
   }
 }
 

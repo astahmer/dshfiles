@@ -20,7 +20,7 @@ export type CliCommand =
   | 'commands'
   | 'config'
   | 'comm'
-export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events'
+export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events' | 'capabilities'
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
 
 export interface CliArgs {
@@ -571,12 +571,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       command = token
       continue
     }
-    if (command === 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events')) {
+    if (command === 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events' || token === 'capabilities')) {
       if (inspectTarget !== undefined) throw new CliUsageError('Only one inspect target may be specified.')
       inspectTarget = token
       continue
     }
-    if (command !== 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events')) {
+    if (command !== 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events' || token === 'capabilities')) {
       throw new CliUsageError('Inspect targets are only valid with the inspect command.')
     }
     if (command === 'add' && (token === 'ui' || token === 'panel' || token === 'api' || token === 'tool' || token === 'command' || token === 'hook')) {
@@ -781,7 +781,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
-    throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
+    throw new CliUsageError('Inspect requires a target: slots, tools, services, events, or capabilities.')
   if (command === 'add' && addTarget === undefined && !help && !version)
     throw new CliUsageError('Add requires a target: ui, panel, api, tool, command, or hook.')
   if (

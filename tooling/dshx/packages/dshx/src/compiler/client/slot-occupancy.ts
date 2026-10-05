@@ -2,26 +2,13 @@ import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import type { Expression } from 'oxc-parser'
 import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
+import { CLIENT_SLOT_REFERENCES } from '../../client/slot-reference.js'
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
 
-/**
- * Slot entries a shipped DSH Client already occupies.
- *
- * A `list` slot addresses entries by `id`, and two occupants of one id resolve to
- * a single cell that keeps one head and drops the other without an error. A
- * plugin that wants to sit beside a shipped dock needs its own id; one that wants
- * to *replace* it declares an explicit `priority`, which DSH documents as the
- * cell shadowing rank where the lowest entry renders. Either way an accidental
- * collision is worth failing the build over, because the symptom is an affordance
- * that is simply absent.
- */
-export const SHIPPED_SLOT_OCCUPANTS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ['conversation.input.dock', new Set(['todo', 'queue'])],
-  ['sidebar.footer.action', new Set()],
-  ['sidebar.panellist', new Set(['plugins'])],
-  ['main', new Set()],
-])
+export const SHIPPED_SLOT_OCCUPANTS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
+  CLIENT_SLOT_REFERENCES.filter(slot => slot.shippedOccupants.length > 0).map(slot => [slot.name, new Set(slot.shippedOccupants)]),
+)
 
 async function sourceFile(specifier: string, importer: string): Promise<string | undefined> {
   const target = resolve(importer, '..', specifier)
@@ -42,23 +29,18 @@ async function sourceFile(specifier: string, importer: string): Promise<string |
   return undefined
 }
 
-/** One `ctx.slots.register({ name, id }, …)` call, with both keys read from literals. */
 export interface SlotRegistration {
   readonly slot: string
-  readonly id: string
+  readonly id?: string
+  readonly key?: string
   readonly file: string
-  /**
-   * The declared `priority`, DSH's cell shadowing rank. A registration that sets
-   * one is deliberately taking over a cell another entry already holds.
-   */
+  readonly line: number
+  readonly column: number
+  readonly order?: number
   readonly priority?: number
+  readonly via: 'native-register' | 'sdk-ui' | 'sdk-panel' | 'sdk-composer' | 'sdk-define-slot'
 }
 
-/**
- * A numeric literal, including the negated form: a parser reads `-1` as a unary
- * expression over `1`, so a bare `Literal` check misses every negative rank — and
- * shadowing is exactly where a plugin picks a negative rank.
- */
 function numericValue(expression: Expression): number | undefined {
   if (expression.type === 'Literal') return typeof expression.value === 'number' ? expression.value : undefined
   if (expression.type !== 'UnaryExpression') return undefined
@@ -69,45 +51,156 @@ function numericValue(expression: Expression): number | undefined {
   return undefined
 }
 
+const memberPath = (expression: Expression): string | undefined => {
+  const value = unwrapExpression(expression)
+  if (value.type === 'Identifier') return value.name
+  if (value.type !== 'MemberExpression') return undefined
+  const object = memberPath(value.object)
+  const property = propertyName(value.property)
+  return object === undefined || property === undefined ? undefined : `${object}.${property}`
+}
+
+const objectValue = (expression: Expression | undefined, name: string): Expression | undefined => {
+  if (expression === undefined) return undefined
+  const value = unwrapExpression(expression)
+  if (value.type !== 'ObjectExpression') return undefined
+  for (const property of value.properties) {
+    if (property.type === 'Property' && propertyName(property.key) === name) return unwrapExpression(property.value)
+  }
+  return undefined
+}
+
+const objectString = (expression: Expression | undefined, name: string, strings: ReadonlyMap<string, string>): string | undefined => {
+  const value = objectValue(expression, name)
+  if (value === undefined) return undefined
+  const unwrapped = unwrapExpression(value)
+  if (unwrapped.type === 'Identifier') return strings.get(unwrapped.name)
+  return stringValue(unwrapped)
+}
+
+const objectPriority = (expression: Expression | undefined): number | undefined => {
+  const value = objectValue(expression, 'priority')
+  return value === undefined ? undefined : numericValue(value)
+}
+
+const objectOrder = (expression: Expression | undefined): number | undefined => {
+  const value = objectValue(expression, 'order')
+  return value === undefined ? undefined : numericValue(value)
+}
+
+const sourceLocation = (source: string, offset: number): { readonly line: number; readonly column: number } => {
+  const before = source.slice(0, offset)
+  const lastNewline = before.lastIndexOf('\n')
+  return { line: before.split('\n').length, column: offset - lastNewline }
+}
+
 const registrationsIn = (source: string, file: string): SlotRegistration[] => {
   const program = parseSource({ source, file })
+  const defineSlotNames = new Set(['defineSlot'])
+  const strings = new Map<string, string>()
+  for (const statement of program.body) {
+    if (statement.type === 'ImportDeclaration') {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier' && specifier.imported.name === 'defineSlot') {
+          defineSlotNames.add(specifier.local.name)
+        }
+      }
+    }
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue
+    for (const variable of declaration.declarations) {
+      if (variable.id.type !== 'Identifier' || variable.init === null) continue
+      const value = stringValue(unwrapExpression(variable.init))
+      if (value !== undefined) strings.set(variable.id.name, value)
+    }
+  }
   const found: SlotRegistration[] = []
+  const record = ({
+    slot,
+    id,
+    key,
+    order,
+    priority,
+    offset,
+    via,
+  }: {
+    readonly slot: string | undefined
+    readonly id?: string | undefined
+    readonly key?: string | undefined
+    readonly order?: number | undefined
+    readonly priority?: number | undefined
+    readonly offset: number
+    readonly via: SlotRegistration['via']
+  }): void => {
+    if (slot === undefined) return
+    const location = sourceLocation(source, offset)
+    found.push({
+      slot,
+      ...(id === undefined ? {} : { id }),
+      ...(key === undefined ? {} : { key }),
+      file,
+      ...location,
+      ...(order === undefined ? {} : { order }),
+      ...(priority === undefined ? {} : { priority }),
+      via,
+    })
+  }
+
   visitSource({
     program,
     visitor: {
       CallExpression(current) {
-        if (current.callee.type !== 'MemberExpression' || propertyName(current.callee.property) !== 'register') return
-        const argument = current.arguments[0]
-        if (argument === undefined || argument.type === 'SpreadElement') return
-        const options = unwrapExpression(argument)
-        if (options.type !== 'ObjectExpression') return
-        let slot: string | undefined
-        let id: string | undefined
-        let priority: number | undefined
-        for (const property of options.properties) {
-          if (property.type !== 'Property') continue
-          const name = propertyName(property.key)
-          const value = stringValue(unwrapExpression(property.value))
-          if (name === 'name') slot = value
-          if (name === 'id') id = value
-          if (name === 'priority') {
-            priority = numericValue(unwrapExpression(property.value))
+        const name = memberPath(current.callee)
+        if (name === undefined) return
+        const first = current.arguments[0]
+        const firstValue = first === undefined || first.type === 'SpreadElement' ? undefined : unwrapExpression(first)
+        const knownRegister =
+          name.endsWith('.slots.register') || name.endsWith('.ui.register') || name.endsWith('.panels.register') || name.endsWith('.sidebar.register')
+        if (knownRegister && firstValue !== undefined) {
+          const slot = objectString(firstValue, 'name', strings)
+          const id = objectString(firstValue, 'id', strings)
+          const key = objectString(firstValue, 'key', strings)
+          const via = name.endsWith('.ui.register') ? 'sdk-ui' : 'native-register'
+          record({ slot, id, key, order: objectOrder(firstValue), priority: objectPriority(firstValue), offset: current.start, via })
+          if (name.endsWith('.panels.register') || name.endsWith('.sidebar.register')) {
+            const panelId = objectString(firstValue, 'id', strings)
+            record({ slot: 'main', key: panelId, order: objectOrder(firstValue), offset: current.start, via: 'sdk-panel' })
+            record({ slot: 'sidebar.panellist', id: panelId, order: objectOrder(firstValue), offset: current.start, via: 'sdk-panel' })
           }
+          return
         }
-        if (slot !== undefined && id !== undefined) {
-          found.push(priority === undefined ? { slot, id, file } : { slot, id, file, priority })
+        if (name.endsWith('.registerAction') && name.includes('.composer.')) {
+          const actionId = objectString(firstValue, 'id', strings)
+          const placement = objectString(firstValue, 'placement', strings)
+          record({
+            slot: placement === 'right' ? 'conversation.input.right' : 'conversation.input.left',
+            id: actionId,
+            order: objectOrder(firstValue),
+            offset: current.start,
+            via: 'sdk-composer',
+          })
+          return
         }
+        const callee = unwrapExpression(current.callee)
+        if (callee.type !== 'Identifier' || !defineSlotNames.has(callee.name)) return
+        const slot = stringValue(firstValue)
+        const options = current.arguments[1]
+        const optionsValue = options === undefined || options.type === 'SpreadElement' ? undefined : unwrapExpression(options)
+        record({
+          slot,
+          id: objectString(optionsValue, 'id', strings),
+          key: objectString(optionsValue, 'key', strings),
+          order: objectOrder(optionsValue),
+          priority: objectPriority(optionsValue),
+          offset: current.start,
+          via: 'sdk-define-slot',
+        })
       },
     },
   })
   return found
 }
 
-/**
- * Every Slot registration reachable from a Client entry, following its relative
- * imports. Returns an empty list when the entry cannot be read, so an unreadable
- * project stays the build's existing error rather than a new one here.
- */
 export async function clientSlotRegistrations(entry: string, root: string): Promise<readonly SlotRegistration[]> {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
@@ -133,14 +226,16 @@ export async function clientSlotRegistrations(entry: string, root: string): Prom
   return found
 }
 
-/** Registrations that claim a cell a shipped package already occupies. */
 export function slotOccupancyConflicts(
   registrations: readonly SlotRegistration[],
   occupants: ReadonlyMap<string, ReadonlySet<string>> = SHIPPED_SLOT_OCCUPANTS,
 ): readonly (SlotRegistration & { readonly occupant: string })[] {
   return registrations.flatMap(registration => {
     if (registration.priority !== undefined) return []
+    const identity = registration.id ?? registration.key
     const claimed = occupants.get(registration.slot)
-    return claimed?.has(registration.id) === true ? [{ ...registration, occupant: registration.id }] : []
+    if (claimed === undefined) return []
+    if (identity === undefined) return [...claimed].map(occupant => ({ ...registration, occupant }))
+    return claimed?.has(identity) === true ? [{ ...registration, occupant: identity }] : []
   })
 }

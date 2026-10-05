@@ -1,5 +1,8 @@
-import { join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { createRequire } from 'node:module'
+import { access } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { DSH_PROTOCOL_2 } from './capabilities.js'
 import { detect } from 'package-manager-detector'
 import { defaultFileSystem } from './fs.js'
 import { commandAvailable, defaultCommandRunner, installCommand } from './command.js'
@@ -18,11 +21,21 @@ export interface CreateDependencies {
 const NAME_RE = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?$/
 const require = createRequire(import.meta.url)
 
+const localDshxSpecifier = async (projectRoot: string): Promise<string | undefined> => {
+  const dshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../dshx')
+  try {
+    await access(join(dshxRoot, 'package.json'))
+    return `link:${relative(projectRoot, dshxRoot)}`
+  } catch {
+    return undefined
+  }
+}
+
 /** Concrete real-smoke boundary used by newly generated repositories. */
-export const DEFAULT_DSH_VERSION = '0.2.0-rc.2'
+export const DEFAULT_DSH_VERSION = DSH_PROTOCOL_2.version
 
 /** Public DSH range owned by the current protocol generation. */
-export const DEFAULT_DSH_RANGE = '>=0.2.0-rc.1 <0.3.0-0'
+export const DEFAULT_DSH_RANGE = DSH_PROTOCOL_2.range
 export const DEFAULT_TEMPLATE = 'starter' as const
 export const DEFAULT_STYLE = 'css-modules' as const
 
@@ -129,7 +142,7 @@ export async function createProject(options: CreateProjectOptions, dependencies:
 
   const context = {
     packageId: options.name,
-    dshxVersion: dependencies.dshxVersion ?? options.dshxVersion ?? packageVersion(),
+    dshxVersion: dependencies.dshxVersion ?? options.dshxVersion ?? (await localDshxSpecifier(root)) ?? packageVersion(),
     dshVersion: dependencies.dshVersion ?? options.dshVersion ?? DEFAULT_DSH_VERSION,
     dshRange: dependencies.dshRange ?? options.dshRange ?? DEFAULT_DSH_RANGE,
   }
