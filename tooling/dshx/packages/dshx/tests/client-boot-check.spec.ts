@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkClientBoot } from '../src/project/client-boot-check.js'
 import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
-import { slotRenderFailures } from '../src/project/browser-boot.js'
+import { readClientBootOutcome, slotRenderFailures, type BrowserBootEvidence, type BrowserBootOutcome } from '../src/project/browser-boot.js'
+import type { Page } from '@playwright/test'
 
 /**
  * The boot card is the only surface that records why a client entry did not
@@ -164,5 +165,74 @@ describe('offline composition gate', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+/**
+ * The boot reader decides pass and fail from native DOM surfaces. A stubbed page
+ * reproduces the states a real browser shows — including the blank page that a
+ * naive "card absent means mounted" reader passes.
+ */
+describe('client boot outcome reader', () => {
+  type NativeOutcome = Omit<BrowserBootOutcome, 'ok' | 'slotFailures'>
+
+  interface StubPage {
+    evaluate: () => Promise<unknown>
+  }
+
+  const asPage = (stub: StubPage): Page => stub as unknown as Page
+
+  const nativeOutcome = (evidence: BrowserBootEvidence, ready: boolean, text = ''): NativeOutcome => ({
+    ready,
+    missingClientEntries: [],
+    failureCardVisible: evidence === 'failure-card',
+    text,
+    timedOut: !ready,
+    ...(ready ? {} : { readinessError: 'Native readiness was not established.' }),
+    evidence,
+  })
+
+  const page = (outcome: NativeOutcome, slotErrors: string[] = []): StubPage => {
+    let evaluation = 0
+    return {
+      evaluate: async () => {
+        evaluation += 1
+        return evaluation === 1 ? outcome : JSON.stringify(slotErrors)
+      },
+    }
+  }
+
+  const options = { timeoutMs: 400, expectedClientEntries: [] }
+
+  it('passes when the native readiness signal and application outlet are ready', async () => {
+    const outcome = await readClientBootOutcome(asPage(page(nativeOutcome('app-outlet', true))), options)
+    expect(outcome).toMatchObject({ ok: true, ready: true, evidence: 'app-outlet', text: '' })
+  })
+
+  it('keeps the boot-card handoff evidence while requiring native readiness', async () => {
+    const outcome = await readClientBootOutcome(asPage(page(nativeOutcome('boot-card-cleared', false))), options)
+    expect(outcome).toMatchObject({ ok: true, ready: false, evidence: 'boot-card-cleared' })
+  })
+
+  it('reports a blank page as a failed outcome', async () => {
+    const outcome = await readClientBootOutcome(asPage(page(nativeOutcome('blank', false))), options)
+    expect(outcome).toMatchObject({ ok: false, ready: false, evidence: 'blank', text: '' })
+  })
+
+  it('reports a stalled boot card with its text', async () => {
+    const outcome = await readClientBootOutcome(asPage(page(nativeOutcome('stalled', false, 'Loading plugins…'))), options)
+    expect(outcome).toMatchObject({ ok: false, ready: false, evidence: 'stalled', text: 'Loading plugins…' })
+  })
+
+  it('reports a failure card and the Slot error markers', async () => {
+    const text = 'Failed to load plugins\n@dshfiles/demo: failed'
+    const outcome = await readClientBootOutcome(asPage(page(nativeOutcome('failure-card', false, text), ['settings'])), options)
+    expect(outcome).toMatchObject({
+      ok: false,
+      ready: false,
+      evidence: 'failure-card',
+      text,
+      slotFailures: [{ slot: 'settings' }],
+    })
   })
 })

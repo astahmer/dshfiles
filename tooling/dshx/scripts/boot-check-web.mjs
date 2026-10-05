@@ -80,6 +80,7 @@ const bootAlone = async plugin => {
 }
 
 const describe = result => {
+  if (result.spawnError !== undefined) return result.spawnError.split('\n')[0]
   if (result.processError !== undefined) return result.processError.split('\n')[0]
   if (result.browserError !== undefined) return result.browserError.split('\n')[0]
   if (result.compositionFailures.length > 0) {

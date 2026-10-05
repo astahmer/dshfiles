@@ -1010,6 +1010,16 @@ async function runBootCheck(
     })
     return 1
   }
+  if (result.spawnError !== undefined) {
+    printDiagnostic(io, {
+      code: 'DSHX4108',
+      severity: 'error',
+      message: 'The Host process could not be spawned: ' + result.spawnError,
+      file: project.packageFile,
+      hint: 'Check that the configured DSH executable exists and can be started from this environment.',
+    })
+    return 1
+  }
   const item = {
     code: result.processError === undefined ? 'DSHX4109' : 'DSHX4113',
     severity: 'error' as const,
@@ -1052,6 +1062,16 @@ async function runClientBootCheck(
   if (result.ok) {
     write(io.stdout, `Client plugins activated cleanly in a browser at ${result.url ?? 'an announced URL'}.\n`)
     return 0
+  }
+  if (result.spawnError !== undefined) {
+    printDiagnostic(io, {
+      code: 'DSHX4108',
+      severity: 'error',
+      message: 'The Host process could not be spawned: ' + result.spawnError,
+      file: project.packageFile,
+      hint: 'Check that the configured DSH executable exists and can be started from this environment.',
+    })
+    return 1
   }
   if (result.processError !== undefined) {
     printDiagnostic(io, {
@@ -1104,13 +1124,23 @@ async function runClientBootCheck(
     })
     return 1
   }
-  if (result.readinessError !== undefined || !result.browserReady) {
+  if (result.evidence === 'blank') {
     printDiagnostic(io, {
       code: 'DSHX4117',
       severity: 'error',
-      message: result.readinessError ?? 'The Web UI did not reach native DSH readiness.',
+      message: 'The Web UI never reached its boot handoff: the kernel-owned boot element never appeared, so the page was blank.',
       file: project.packageFile,
-      hint: 'A missing boot card is not success. The browser gate requires DSH readiness and a mounted #root application.',
+      hint: 'A blank page is not a clean boot. Check that the Client bundle and its inject providers load.',
+    })
+    return 1
+  }
+  if (result.evidence === 'stalled') {
+    printDiagnostic(io, {
+      code: 'DSHX4117',
+      severity: 'error',
+      message: 'The Web UI kept its boot element for the whole window without reporting a failure.',
+      file: project.packageFile,
+      hint: 'Inspect the boot card and native readiness signal to find which startup step stalled.',
     })
     return 1
   }
@@ -1124,14 +1154,34 @@ async function runClientBootCheck(
     })
     return 1
   }
+  if (result.failures.length > 0) {
+    printDiagnostic(io, {
+      code: 'DSHX4111',
+      severity: 'error',
+      message: 'The Web UI booted with ' + String(result.failures.length) + ' Client entry/entries that failed to activate or remain unexpectedly pending.',
+      file: project.packageFile,
+      hint: 'An expected entry may not remain pending. Other entries are ignored only when the DSH boot card names the native service they await.',
+    })
+    for (const entry of result.failures) write(io.stdout, '  ' + entry.id + ': ' + entry.state + (entry.detail === undefined ? '' : ' — ' + entry.detail) + '\n')
+    return 1
+  }
+  if (result.readinessError !== undefined || !result.browserReady) {
+    printDiagnostic(io, {
+      code: 'DSHX4117',
+      severity: 'error',
+      message: result.readinessError ?? 'The Web UI did not reach native DSH readiness.',
+      file: project.packageFile,
+      hint: 'A missing boot card is not success. The browser gate requires DSH readiness and a mounted #root application.',
+    })
+    return 1
+  }
   printDiagnostic(io, {
-    code: 'DSHX4111',
+    code: 'DSHX4117',
     severity: 'error',
-    message: `The Web UI booted with ${String(result.failures.length)} Client entry/entries that failed to activate or remain unexpectedly pending.`,
+    message: 'The Web UI boot verification did not establish a clean result.',
     file: project.packageFile,
-    hint: 'An expected entry may not remain pending. Other entries are ignored only when the DSH boot card names the native service they await.',
+    hint: 'Inspect the structured client boot result for the missing readiness evidence.',
   })
-  for (const entry of result.failures) write(io.stdout, `  ${entry.id}: ${entry.state}${entry.detail === undefined ? '' : ` \u2014 ${entry.detail}`}\n`)
   return 1
 }
 

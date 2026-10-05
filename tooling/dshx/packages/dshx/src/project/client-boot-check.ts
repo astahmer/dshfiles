@@ -1,6 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
+import type { BrowserBootEvidence } from './browser-boot.js'
 export { compositionFailures }
 
 /**
@@ -57,6 +58,8 @@ export interface ClientBootCheckResult {
   readonly compositionFailures: readonly string[]
   /** Expected Client entries absent from DSH's boot manifest. */
   readonly missingClientEntries: readonly string[]
+  /** Which native surface decided the browser outcome. */
+  readonly evidence?: BrowserBootEvidence
   /** The unavailability card remained mounted after the native readiness signal. */
   readonly failureCardVisible: boolean
   /** True only after DSH readiness resolved and the application root mounted. */
@@ -65,6 +68,8 @@ export interface ClientBootCheckResult {
   readonly timedOut: boolean
   /** Host process or offline composition check could not complete. */
   readonly processError?: string
+  /** Set when the Host process could not be spawned at all. */
+  readonly spawnError?: string
   /** Set when the browser could not be driven at all. */
   readonly browserError?: string
   /** A safe description of why native application readiness could not be proved. */
@@ -121,10 +126,10 @@ const findFreePort = async (): Promise<number> => {
   })
 }
 
-const waitForHostUrl = (child: ChildProcess, output: () => string, timeoutMs: number): Promise<{ readonly url?: string; readonly processError?: string }> =>
+const waitForHostUrl = (child: ChildProcess, output: () => string, timeoutMs: number): Promise<{ readonly url?: string; readonly processError?: string; readonly spawnError?: string }> =>
   new Promise(resolve => {
     let settled = false
-    const finish = (value: { readonly url?: string; readonly processError?: string }): void => {
+    const finish = (value: { readonly url?: string; readonly processError?: string; readonly spawnError?: string }): void => {
       if (settled) return
       settled = true
       clearInterval(timer)
@@ -132,7 +137,7 @@ const waitForHostUrl = (child: ChildProcess, output: () => string, timeoutMs: nu
       child.off('close', handleClose)
       resolve(value)
     }
-    const handleError = (error: Error): void => finish({ processError: `The Host could not start: ${error.message}` })
+    const handleError = (error: Error): void => finish({ spawnError: 'The Host process could not be spawned: ' + error.message })
     const handleClose = (code: number | null): void => finish({ processError: `The Host exited with code ${String(code)} before announcing its URL.` })
     const timer = setInterval(() => {
       const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output())
@@ -161,6 +166,8 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   let readinessError: string | undefined
   let browserError: string | undefined
   let processError: string | undefined
+  let spawnError: string | undefined
+  let evidence: string | undefined
   let timedOut = false
   let host: ChildProcess | undefined
   let launchUrl: string | undefined
@@ -183,7 +190,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
           stdio: ['ignore', 'pipe', 'pipe'],
         })
       } catch (error) {
-        processError = error instanceof Error ? error.message : String(error)
+        spawnError = error instanceof Error ? error.message : String(error)
       }
       if (host !== undefined) {
         const collect = (chunk: Buffer): void => {
@@ -194,8 +201,9 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
         const readiness = await waitForHostUrl(host, () => output, timeoutMs)
         launchUrl = readiness.url
         processError = readiness.processError
+        spawnError = readiness.spawnError
 
-        if (launchUrl === undefined && processError === undefined) timedOut = true
+        if (launchUrl === undefined && processError === undefined && spawnError === undefined) timedOut = true
         if (launchUrl !== undefined) {
           await new Promise(resolve => setTimeout(resolve, 2_000))
           try {
@@ -212,6 +220,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
               })
               browserReady = outcome.ready
+              evidence = outcome.evidence
               missingClientEntries = outcome.missingClientEntries
               failureCardVisible = outcome.failureCardVisible
               readinessError = outcome.readinessError
@@ -248,6 +257,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
       !unexplainedFailureCard &&
       !timedOut &&
       processError === undefined &&
+      spawnError === undefined &&
       browserError === undefined &&
       readinessError === undefined &&
       failures.length === 0 &&
@@ -261,6 +271,8 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     failureCardVisible,
     timedOut,
     ...(processError === undefined ? {} : { processError }),
+    ...(spawnError === undefined ? {} : { spawnError }),
+    ...(evidence === undefined ? {} : { evidence }),
     ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
     ...(browserError === undefined ? {} : { browserError }),
     ...(readinessError === undefined ? {} : { readinessError }),

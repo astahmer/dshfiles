@@ -16,6 +16,8 @@ export interface BootCheckOptions {
 export interface BootCheckResult {
   readonly ok: boolean
   readonly failures: readonly string[]
+  /** Set when the Host process could not be spawned at all. */
+  readonly spawnError?: string
   /** Public origin only; the tokenized route is never returned. */
   readonly url?: string
   readonly timedOut: boolean
@@ -29,9 +31,9 @@ const UNSUPPORTED_NODE_MARKER = 'node-addon-require-builtin unsupported'
 const FAILURE_MARKERS = ['failed to import', 'Failed plugins', 'Cannot find module', 'ERR_MODULE_NOT_FOUND', 'is not a function', 'Cannot read properties of']
 
 const waitForHostUrl = (child: ChildProcess, output: () => string, startedAt: number, timeoutMs: number) =>
-  new Promise<{ readonly url?: string; readonly processError?: string }>(resolve => {
+  new Promise<{ readonly url?: string; readonly processError?: string; readonly spawnError?: string }>(resolve => {
     let settled = false
-    const finish = (value: { readonly url?: string; readonly processError?: string }): void => {
+    const finish = (value: { readonly url?: string; readonly processError?: string; readonly spawnError?: string }): void => {
       if (settled) return
       settled = true
       clearInterval(timer)
@@ -39,7 +41,7 @@ const waitForHostUrl = (child: ChildProcess, output: () => string, startedAt: nu
       child.off('close', handleClose)
       resolve(value)
     }
-    const handleError = (error: Error): void => finish({ processError: `The Host process failed: ${error.message}` })
+    const handleError = (error: Error): void => finish({ spawnError: 'The Host process could not be spawned: ' + error.message })
     const handleClose = (code: number | null): void => finish({ processError: `The Host exited with code ${String(code)} before announcing readiness.` })
     const timer = setInterval(() => {
       const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output())
@@ -59,6 +61,7 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
   let output = ''
   let launchUrl: string | undefined
   let processError: string | undefined
+  let spawnError: string | undefined
   let expectedBundleFailures: readonly string[] = []
   let child: ChildProcess | undefined
 
@@ -87,6 +90,7 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
       const readiness = await waitForHostUrl(child, () => output, startedAt, timeoutMs)
       launchUrl = readiness.url
       processError = readiness.processError
+      spawnError = readiness.spawnError
       if (launchUrl !== undefined) await new Promise(resolve => setTimeout(resolve, Math.max(0, 2_000 - (Date.now() - startedAt))))
     }
   } catch (error) {
@@ -103,15 +107,16 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
     .split('\n')
     .map(line => line.trim())
     .filter(line => FAILURE_MARKERS.some(marker => line.includes(marker)))
-  const timedOut = launchUrl === undefined && processError === undefined && expectedBundleFailures.length === 0
+  const timedOut = launchUrl === undefined && processError === undefined && spawnError === undefined && expectedBundleFailures.length === 0
   const unsupportedNode = output.includes(UNSUPPORTED_NODE_MARKER) || (processError?.includes(UNSUPPORTED_NODE_MARKER) ?? false)
   return {
-    ok: !timedOut && !unsupportedNode && processError === undefined && expectedBundleFailures.length === 0 && failures.length === 0,
+    ok: !timedOut && !unsupportedNode && processError === undefined && spawnError === undefined && expectedBundleFailures.length === 0 && failures.length === 0,
     failures,
     timedOut,
     unsupportedNode,
     compositionFailures: expectedBundleFailures,
     ...(processError === undefined ? {} : { processError }),
+    ...(spawnError === undefined ? {} : { spawnError }),
     ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
   }
 }
