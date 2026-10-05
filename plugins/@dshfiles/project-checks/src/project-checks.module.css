@@ -1,0 +1,185 @@
+.panel {
+  position: absolute;
+  z-index: 40;
+  inset: auto 0 calc(100% + 8px);
+  width: min(620px, calc(100vw - 24px));
+  max-height: min(72vh, 680px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: inherit;
+}
+
+.header,
+.headerActions,
+.action,
+.actionCopy,
+.receiptHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.header {
+  align-items: flex-start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.header h2,
+.section h3,
+.header p {
+  margin: 0;
+}
+
+.header h2 {
+  font-size: 1rem;
+}
+
+.header p,
+.actionCopy span,
+.receipt > span,
+.hook > span,
+.hook time,
+.note,
+.empty {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.header p {
+  margin-top: 4px;
+}
+
+.headerActions button,
+.action button {
+  color: inherit;
+  font: inherit;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.headerActions button:focus-visible,
+.action button:focus-visible {
+  outline: 2px solid var(--dsw-alias-color-primary);
+  outline-offset: 2px;
+}
+
+.action button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.section h3 {
+  font-size: 0.9rem;
+}
+
+.actionList,
+.receiptList,
+.hookList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action,
+.receipt,
+.hook {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 11%, transparent);
+  border-radius: 9px;
+}
+
+.actionCopy {
+  min-width: 0;
+  align-items: flex-start;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actionCopy strong,
+.receiptHeading strong,
+.hook strong {
+  overflow-wrap: anywhere;
+}
+
+.receipt,
+.hook {
+  display: grid;
+  gap: 4px;
+}
+
+.receiptHeading span {
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.receiptHeading span[data-status='passed'] {
+  background: color-mix(in srgb, #28a56a 20%, transparent);
+}
+
+.receiptHeading span[data-status='failed'],
+.receiptHeading span[data-status='timed-out'] {
+  background: color-mix(in srgb, #d94a4a 20%, transparent);
+}
+
+.receiptHeading span[data-status='cancelled'] {
+  background: color-mix(in srgb, #d49b3c 20%, transparent);
+}
+
+.notice {
+  color: var(--dsw-alias-color-danger);
+  font-size: 12px;
+}
+
+.note,
+.empty {
+  margin: 0;
+}
+
+.hook time {
+  justify-self: end;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    width: calc(100vw - 16px);
+    max-height: 72vh;
+    padding: 10px;
+  }
+
+  .header,
+  .action {
+    align-items: flex-start;
+  }
+
+  .headerActions {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    scroll-behavior: auto;
+  }
+}

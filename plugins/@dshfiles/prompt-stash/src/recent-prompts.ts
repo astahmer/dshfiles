@@ -50,19 +50,11 @@ export const projectRecentPrompts = (newestFirstNodes: Iterable<unknown>): reado
     const messageResult = userMessageSchema.safeParse(nodeResult.data.data)
     if (!messageResult.success || messageResult.data.seq !== nodeResult.data.anchorSeq) continue
 
-    let text = ''
-    let oversized = false
-    for (const block of messageResult.data.content) {
-      const textResult = textBlockSchema.safeParse(block)
-      if (!textResult.success) continue
-      if (text.length + textResult.data.text.length > MAX_RECENT_PROMPT_TEXT_LENGTH) {
-        oversized = true
-        break
-      }
-      text += textResult.data.text
-    }
+    const textBlocks = messageResult.data.content.map(block => textBlockSchema.safeParse(block))
+    if (textBlocks.length === 0 || textBlocks.some(result => !result.success)) continue
 
-    if (oversized || text.trim().length === 0) continue
+    const text = textBlocks.flatMap(result => result.success ? [result.data.text] : []).join('')
+    if (text.length > MAX_RECENT_PROMPT_TEXT_LENGTH || text.trim().length === 0) continue
 
     const id = nodeResult.data.id + ':' + messageResult.data.seq
     if (seen.has(id)) continue

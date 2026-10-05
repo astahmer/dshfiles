@@ -1,9 +1,17 @@
-# Prompt stash
+# Prompt Stash
 
-Prompt stash keeps reusable text prompts in this browser's local storage. It adds a Prompts control to the native composer.
+Prompt Stash provides two composer actions. Both keep prompt text in this browser and use DSH's revision-guarded insertion API; neither submits a message.
 
-Create or edit a saved prompt, then choose Insert. The plugin uses the native revision-guarded insertion API at the cursor captured when the stash opened. It never submits a message and does not replace the current draft. If the draft changes while the stash is open, the insertion is rejected and the user can reopen the stash to choose a fresh position.
+## Prompts
 
-The library is versioned, validated, and bounded to 50 prompts, 20,000 characters per prompt, and 450,000 total prompt characters. Concurrent edits from another browser tab are detected by per-prompt revision ids; the local editor remains available and can be saved as a separate copy.
+The Prompts action manages up to 50 reusable text prompts, with up to 20,000 characters per prompt and 450,000 total prompt characters. Edits are versioned and validated. Per-prompt revision ids detect concurrent edits from another browser tab; the local editor remains available and can be saved as a separate copy.
 
-This first increment stores plain text only. It does not save sent-prompt history, references, files, or attachments, and it does not synchronize across browsers or devices.
+Its Recent tab reads up to 20 direct user-text messages from the loaded Chat snapshot, scanning no more than 1,000 nodes. Recent messages are not persisted. Unsupported content, references, and attachments are excluded.
+
+## Drafts
+
+The Drafts action can save up to 20 snapshots of the current plain-text composer draft. Saving is disabled while the composer is busy, for empty text, when it has attachment ids or reference chips, or when the text exceeds 24,000 characters. The store is limited to 512 KiB. These snapshots remain in this browser's local storage.
+
+Drafts also shows up to 50 text-only sent prompts from the loaded conversation; this history is not copied into local storage. Both actions capture the insertion position and reject insertion if the composer changed while the panel was open, preserving the current text and supported assets.
+
+Neither action syncs prompt data between browsers or devices.
