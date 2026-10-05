@@ -281,6 +281,12 @@ Initial framework validation on 2026-10-05:
 - `fnm exec --using 22.23.3 pnpm --dir tooling/dshx run test:e2e` passed **13/13**: three composed browser boot-integrity scenarios and ten isolated plugin boots. The suite cleaned up its scratch Host.
 - The additional clean Basic-to-Slot fixture passed install, typecheck, build, its generated test, and static `dshx check`.
 
+Final Slots Inspect completion validation on 2026-10-05:
+
+- `fnm exec --using 22.23.3 pnpm check` passed after the bridge change: 508 DSHX tests, 25 scaffolder tests, owned-plugin checks, isolated plugin boots, lint, and formatting. Oxlint reported existing warnings but no errors.
+- The focused Inspect, bridge, CLI, and UI scaffold suite passed **61/61**; `fnm exec --using 22.23.3 pnpm --dir tooling/dshx run test:e2e` passed **13/13** browser boot scenarios.
+- On isolated profile `dshx-verify` at port `3201`, live Inspect returned 91 nodes including the `conversation.content` Factory. The exact `sidebar.brand.mark` query returned one active occupant and `shadows-shipped-ui` replacement risk. The scratch DSHX process was stopped after verification; the live `web` profile was untouched.
+
 ## Resolved questions and runtime Slot discovery
 
 1. **Isolated profiles:** The boot gate builds an owned scratch home and profile, verifies the composed bundle list before launch, and cleans up its own process. Runtime evidence comes from a second scratch instance, never the user's `web` instance.
