@@ -81,13 +81,9 @@
           hash = "sha256-15NhC5oiICDOq4bTcqFNC1AgFBPlbfKD2LB6bpjZNl4=";
         };
         nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm pkgs.pnpmConfigHook pkgs.electron ];
+        ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
         # Electron comes from the binary cache and is never built from source.
         dontFixup = true;
-
-        configurePhase = ''
-          export ELECTRON_SKIP_BINARY_DOWNLOAD=1
-          pnpm install --offline --frozen-lockfile --ignore-scripts
-        '';
 
         buildPhase = ''
           runHook preBuild
