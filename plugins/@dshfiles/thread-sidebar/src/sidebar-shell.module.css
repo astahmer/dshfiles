@@ -58,12 +58,17 @@
   white-space: nowrap;
 }
 
+/*
+ * Reference 02 measures the compact row's selected item as a 68x68 rounded
+ * square inset 16px from the panel edge. Ours was a 44x40 button inset 12px,
+ * which reads as a toolbar rather than the reference's generous tap targets.
+ */
 .headerCompact {
   display: flex;
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 4px 12px 10px;
+  padding: 8px 16px 12px;
   scrollbar-width: thin;
 }
 
@@ -73,29 +78,55 @@
   padding: 4px 0 10px;
 }
 
+/*
+ * Reference 03 sets expanded rows 64px apart with the label inset to 73px, so
+ * a row carries real vertical presence and the label clears the icon. Ours was
+ * 43px apart with the label at 22px, which packed eight entries into a strip.
+ */
 .headerExpanded {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   overflow-y: auto;
-  padding: 4px 12px 10px;
+  padding: 8px 16px 12px;
 }
 
 .headerLink,
 .selectedLink {
   flex: 0 0 auto;
-  gap: 12px;
+  min-height: 60px;
+  gap: 9px;
   justify-content: flex-start;
-  padding: 0 10px;
+  padding: 0 16px;
   color: var(--dsw-alias-label-secondary);
+  font-size: 0.95rem;
   text-align: left;
 }
 
 .headerCompact .headerLink,
 .headerCompact .selectedLink {
-  width: 44px;
+  width: 68px;
+  height: 68px;
   padding: 0;
+  border-radius: var(--dsw-radius-lg);
+}
+
+/*
+ * A fixed-height button centres its content, and an SVG with no intrinsic size
+ * stretches to fill, so the glyphs rendered tall and thin. Pinning the icon box
+ * keeps the reference's square target without distorting the art.
+ */
+.headerCompact .headerLink > :first-child,
+.headerCompact .selectedLink > :first-child {
+  width: 24px;
+  height: 24px;
+}
+
+.headerCompact .headerLink > :first-child > svg,
+.headerCompact .selectedLink > :first-child > svg {
+  width: 24px;
+  height: 24px;
 }
 
 .headerExpanded .headerLink,
@@ -113,10 +144,15 @@
   background: var(--dsw-specific-sidebar-nav-item-active);
 }
 
+/*
+ * Reference 03 puts the icon glyph at x31 and the label at x73, so the icon
+ * column is 24px wide with a 16px gap and the row's own 16px inset. Sizing the
+ * icon slot at 32px with an 18px gap lands the label on the reference position.
+ */
 .headerLink > :first-child,
 .selectedLink > :first-child {
   display: inline-flex;
-  flex: 0 0 24px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
 }
