@@ -93,7 +93,7 @@
   width: 100%;
   align-items: center;
   gap: 12px;
-  padding: 10px !important;
+  padding: 4px 10px !important;
   border-color: transparent !important;
   background: transparent !important;
   text-align: left;
@@ -108,17 +108,19 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 
 .itemText strong {
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
 .itemText small {
   overflow: hidden;
   color: var(--dsw-alias-label-secondary);
+  font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -128,8 +130,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-state-business-tertiary);
   color: var(--dsw-alias-state-business-primary);
