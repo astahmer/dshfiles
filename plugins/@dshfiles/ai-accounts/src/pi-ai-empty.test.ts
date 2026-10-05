@@ -97,22 +97,28 @@ describe('pi-ai openai-completions: a reasoning-only completion', () => {
     expect(result.blockTypes).toContain('text_delta')
   })
 
-  // This currently FAILS, and that is the finding. pi-ai ends a reasoning-only
-  // response with `stopReason: 'stop'` and no content, exactly as
-  // @mars-sea/dsh-commandcode-provider does, so our own provider inherits the
-  // defect. Swap `createCommandCodeProvider` for pi-ai's transport with no other
-  // change and the goal livelock survives the swap.
+  // This FAILS, permanently, and that is the point.
   //
-  // The assertion states the contract we want: a response with reasoning and no
-  // answer must fail so the retry policy can see it. When pi-ai fixes this, or
-  // our provider stops using this transport, this test goes green.
-  it('raises instead of reporting an empty successful turn', async () => {
+  // It drives pi-ai's transport *directly*, bypassing our provider boundary, so
+  // it pins the upstream defect: a reasoning-only response settles as
+  // `stopReason: 'stop'` with no answer, exactly as
+  // `@mars-sea/dsh-commandcode-provider` does.
+  //
+  // It must not be made to pass. Deleting the assertion would erase the evidence
+  // that the defect is upstream and that our guard, not pi-ai, is what stops the
+  // goal livelock. `src/empty-response.test.ts` proves the same response raises
+  // `EMPTY_RESPONSE` once it passes through `createCommandCodeProvider`, so the
+  // two files together say where the fix lives: at our boundary, not in a
+  // dependency we do not control.
+  it('reports a reasoning-only response as a successful empty turn (upstream defect)', async () => {
     const result = await complete(reasoningOnlyBody())
     expect({
       threw: result.threw,
-      message: result.message,
       blockTypes: result.blockTypes,
       stopReason: result.stopReason,
-    }).toMatchObject({ threw: true })
+    }).toMatchObject({
+      threw: false,
+      stopReason: 'stop',
+    })
   })
 })

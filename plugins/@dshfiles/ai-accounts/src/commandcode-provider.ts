@@ -1,8 +1,10 @@
 import { createProvider, type Model } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
+import { LlmError } from '@deepseek-ai/dsh-llm'
 import { isAllowedCommandCodeBase, isKeyEnvName } from './api.js'
 import { readKeyFromEnv } from './credentials.js'
+import { describeEmptyResponse, EMPTY_RESPONSE_CODE, isEmptyCompletion } from './empty-response.js'
 
 /**
  * Command Code as a provider.
@@ -110,6 +112,56 @@ const modelsFor = (entries: readonly CatalogEntry[], baseUrl: string): readonly 
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   }))
 
+/**
+ * Turn a content-free settlement into a failure the retry policy can act on.
+ *
+ * pi-ai settles a reasoning-only response as `stopReason: 'stop'` with no
+ * model-visible content. DSH reads that as a finished turn, the goal-round
+ * driver reads a finished turn as "start the next round", and a degraded
+ * provider then spends the entire round budget producing nothing. The transport
+ * has no vocabulary for "this attempt failed", so the boundary raises one.
+ *
+ * Both stream shapes are wrapped, not just completions: the Responses API can
+ * produce the same reasoning-only settlement on a different route.
+ */
+const rejectEmptyCompletion = <Streams extends { stream: (...args: never[]) => AsyncIterable<unknown> }>(
+  api: Streams,
+): Streams => {
+  const original = api.stream.bind(api)
+  return {
+    ...api,
+    stream: (...args: never[]) => {
+      const source = original(...args)
+      return {
+        async *[Symbol.asyncIterator]() {
+          for await (const raw of source) {
+            const event = raw as { type?: string; message?: unknown }
+            if (event.type === 'done') {
+              // The settled message is the only authority here. Tracking deltas
+              // instead would count a whitespace-only text_delta as an answer and
+              // short-circuit the check that exists to catch exactly that.
+              const settled = event.message as
+                | { content?: readonly { type?: string; text?: string }[]; stopReason?: string; model?: string; rawStopReason?: string }
+                | undefined
+              if (isEmptyCompletion(settled)) {
+                throw new LlmError(
+                  describeEmptyResponse({
+                    model: settled?.model,
+                    stopReason: settled?.stopReason,
+                    rawStopReason: settled?.rawStopReason,
+                  }),
+                  EMPTY_RESPONSE_CODE,
+                )
+              }
+            }
+            yield raw
+          }
+        },
+      }
+    },
+  } as Streams
+}
+
 export const createCommandCodeProvider = (options: CommandCodeProviderOptions = {}) => {
   const base = providerBase(options.baseUrl)
   const keyEnv = resolveKeyEnv(options.keyEnv)
@@ -145,8 +197,8 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
     // result, so it only has to answer with the models it advertises now.
     fetchModels: async () => modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey: readKeyFromEnv(keyEnv) }), base),
     api: {
-      'openai-completions': openAICompletionsApi(),
-      'openai-responses': openAIResponsesApi(),
+      'openai-completions': rejectEmptyCompletion(openAICompletionsApi()),
+      'openai-responses': rejectEmptyCompletion(openAIResponsesApi()),
     },
   })
 }
