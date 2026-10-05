@@ -1,8 +1,9 @@
 # Own the Command Code provider route
 
-> **Status:** plan only, nothing implemented. The route our plugin already
-> registers is unconfigured, so `@mars-sea/dsh-commandcode-provider` serves every
-> Command Code request today. Removing it is the last step, not the first.
+> **Status:** Phase 1 complete, and its answer changes this plan. Our route would
+> inherit the same defect, so this is a *fix*, not a move.
+> `@mars-sea/dsh-commandcode-provider` serves every Command Code request today
+> and its removal stays the last step.
 
 ## Context
 
@@ -71,24 +72,49 @@ does not. `@dshfiles/goal-stall-guard` is the safety net, not the fix.
 
 ## How
 
-### Phase 1 — prove the wire before porting anything
+### Phase 1 — DONE. The answer is the opposite of the hopeful one
 
-Do not start by porting. Two cheap checks decide whether the whole plan is worth
-its cost, and both are read-only.
+Both checks ran. The result is recorded here so Phase 2 starts from evidence
+rather than from the assumption the phase was written under.
 
-1. **Does pi-ai already classify an empty completion?** Write a scratch test
-   that feeds `createCommandCodeProvider`'s stream a response carrying only a
-   `reasoning` delta and a terminal marker. Assert it raises a classified
-   failure rather than yielding an empty assistant message. If pi-ai already
-   does this, the defect is `@mars-sea`-specific and this repository inherits
-   nothing.
-2. **Does pi-ai's transport already expose `providerRetryPolicy` and image
-   pricing?** If the seams exist, Phase 2 is configuration, not a transport
-   rewrite.
+**Check 1: does pi-ai classify a reasoning-only completion? No.**
 
-Write the findings into this file before Phase 2. A plan whose first phase can
-return "the third-party plugin is the entire problem, ours is already correct"
-is worth running.
+`plugins/@dshfiles/ai-accounts/src/pi-ai-empty.test.ts` drives pi-ai's real
+`openai-completions` transport with a synthetic SSE body — no network. A response
+carrying `reasoning_content` and a clean `finish_reason: "stop"`, with no answer
+text and no tool call, ends the stream as:
+
+```
+{ threw: false, blockTypes: ['thinking_delta'], stopReason: 'stop' }
+```
+
+The transport reports success with no model-visible content. `pi-ai` is not the
+innocent bystander the plan hoped for: `createCommandCodeProvider` wraps exactly
+this transport, so **our route inherits the defect unchanged**. Swapping the
+provider without fixing this carries the goal livelock across.
+
+The test asserts the contract we want (a reasoning-only response must raise) and
+therefore fails today on purpose. Its control passes: the same body with answer
+text yields a `text_delta`, so the harness can see content when it exists.
+
+> The control caught a real error first. The event union is `text_delta` /
+> `thinking_delta` / `toolcall_delta`, not the block names. The first version
+> matched on `text`, reported an empty stream for *every* response, and would
+> have "confirmed" the defect for the wrong reason. A harness that cannot see a
+> passing case cannot be trusted to see a failing one.
+
+**Check 2: do the seams exist?** Partially.
+
+| Seam | pi-ai | Consequence |
+|---|---|---|
+| `maxRetries` | present (`dist/types.d.ts:101`) | retry is configuration, not a rewrite |
+| `retryableCodes` | **absent** | the *classification* is ours to own — and that is the bug |
+| `imageRequestPricing` | **absent** | Phase 3 must add it |
+| reasoning effort tiers | present, `reasoning_effort` + `thinkingFormat` | portable |
+
+**Consequence: the fix belongs at our provider boundary, not in pi-ai.** pi-ai
+exposes the retry budget but nothing classifies a failure for it, so a wrapper
+that raises `LlmError` with a code is the whole remedy.
 
 ### Phase 2 — configure the route, keeping `@mars-sea` installed
 
@@ -101,6 +127,29 @@ Verify on a second instance (`dsh --profile probe --port <free>`), never `3080`:
 `dsh --profile probe --dump-config` shows the row, the boot log reports no entry
 that failed to activate, and a real request is answered by our route.
 
+**The live check already works and is worth reusing.** Against a booted probe
+instance, the Command Code catalog answers on the gateway:
+
+```bash
+# inside the page, cookie minted with .local/mint-dsh-cookie.mjs <port>
+fetch('/api/commandcode/models', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    type: 'client-request',
+    rpcId: crypto.randomUUID(),
+    method: 'commandcode/models',
+    payload: { args: {} },
+  }),
+})
+```
+
+The envelope is not guessable: `method` must equal the endpoint path minus
+`/api/`, and `payload` must be exactly one plain-object `args` field. Getting
+either wrong returns a gateway error that looks like an empty catalog. Confirmed
+live on `probe` — 85 models, including `stealth/space-bunny-alpha`, tier `go`,
+and it is the default for `commandcode` in `/api/session/modelCatalog`.
+
 ### Phase 3 — port the four capabilities
 
 Port each behind a test that fails before the port. Follow
@@ -109,8 +158,12 @@ Port each behind a test that fails before the port. Follow
 https on `commandcode.ai` or a loopback address, and model discovery passes the
 key value rather than an env name.
 
-The empty-response classification is the one that earns its own regression test
-and its own review, because it is the defect this plan exists to remove.
+**The empty-response classification comes first, not last.** Phase 1 showed
+`retryableCodes` does not exist in pi-ai, so nothing upstream will ever raise it
+for us. `createCommandCodeProvider` must wrap the transport and turn a stream
+that settles with no answer text and no tool call into an `LlmError` carrying a
+code the retry policy already retries. `src/pi-ai-empty.test.ts` turns green
+when that lands, and it is the one test in this plan that fails on arrival.
 
 ### Phase 4 — remove the third-party route
 
