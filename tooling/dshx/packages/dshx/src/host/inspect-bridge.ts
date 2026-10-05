@@ -1,10 +1,11 @@
 import { randomUUID, createHash } from 'node:crypto'
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { createServer, type Server, type Socket } from 'node:net'
+import { createServer, type Server } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import process from 'node:process'
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import { acceptJsonLine, writeJsonLine } from '../bridge/json-line.js'
 import type { RuntimePluginStatus } from './runtime-plugins.js'
 
 const PROTOCOL_VERSION = 1
@@ -272,15 +273,6 @@ async function queryComposition(
   return items ?? []
 }
 
-function writeResponse(socket: Socket, response: BridgeResponse): void {
-  const text = JSON.stringify(response)
-  if (Buffer.byteLength(text) > MAX_MESSAGE_BYTES) {
-    socket.end(`${JSON.stringify(responseError(response.requestId, response.target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'))}\n`)
-    return
-  }
-  socket.end(`${text}\n`)
-}
-
 /** Start the dshx-owned bridge inside the current Host Composition. */
 export async function startHostInspectBridge(ctx: Context, metadata: HostInspectBridgeMetadata): Promise<HostInspectBridgeHandle> {
   const location = paths(metadata.packageId)
@@ -290,34 +282,39 @@ export async function startHostInspectBridge(ctx: Context, metadata: HostInspect
   await removeStaleEndpoint(location)
 
   const server: Server = createServer(socket => {
-    let buffer = ''
-    let handled = false
-    socket.on('data', chunk => {
-      if (handled) return
-      buffer += chunk.toString()
-      if (Buffer.byteLength(buffer) > MAX_MESSAGE_BYTES) {
-        handled = true
-        writeResponse(socket, responseError('unknown', 'services', 'DSHX3203', 'Inspect bridge request exceeds the size limit.'))
-        return
-      }
-      const newline = buffer.indexOf('\n')
-      if (newline < 0) return
-      handled = true
-      const text = buffer.slice(0, newline)
-      let requestId = 'unknown'
-      let target: HostInspectTarget = 'services'
-      try {
-        const request = parseRequest(text, token)
-        requestId = request.requestId
-        target = request.target
-        void queryComposition(ctx, metadata, target, request.input)
-          .then(items => writeResponse(socket, { version: PROTOCOL_VERSION, requestId, ok: true, target, items }))
-          .catch(error =>
-            writeResponse(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3202', errorMessage(error))),
-          )
-      } catch (error) {
-        writeResponse(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3203', errorMessage(error)))
-      }
+    acceptJsonLine(socket, MAX_MESSAGE_BYTES, {
+      onTooLarge: () => writeJsonLine(socket, responseError('unknown', 'services', 'DSHX3203', 'Inspect bridge request exceeds the size limit.')),
+      onLine: text => {
+        let requestId = 'unknown'
+        let target: HostInspectTarget = 'services'
+        try {
+          const request = parseRequest(text, token)
+          requestId = request.requestId
+          target = request.target
+          void queryComposition(ctx, metadata, target, request.input)
+            .then(items =>
+              writeJsonLine(
+                socket,
+                { version: PROTOCOL_VERSION, requestId, ok: true, target, items },
+                {
+                  maxBytes: MAX_MESSAGE_BYTES,
+                  onTooLarge: () => responseError(requestId, target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
+                },
+              ),
+            )
+            .catch(error =>
+              writeJsonLine(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3202', errorMessage(error)), {
+                maxBytes: MAX_MESSAGE_BYTES,
+                onTooLarge: () => responseError(requestId, target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
+              }),
+            )
+        } catch (error) {
+          writeJsonLine(socket, responseError(requestId, target, error instanceof BridgeFailure ? error.code : 'DSHX3203', errorMessage(error)), {
+            maxBytes: MAX_MESSAGE_BYTES,
+            onTooLarge: () => responseError(requestId, target, 'DSHX3203', 'Inspect bridge response exceeds the size limit.'),
+          })
+        }
+      },
     })
   })
 

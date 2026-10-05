@@ -2,8 +2,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { createConnection, createServer, type Server, type Socket } from 'node:net'
+import { createServer, type Server, type Socket } from 'node:net'
 import { z } from 'zod'
+import { acceptJsonLine, JsonLineTransportError, requestJsonLine, writeJsonLine } from '../bridge/json-line.js'
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
@@ -87,6 +88,14 @@ const bridgePaths = (stateHome?: string): { readonly directory: string; readonly
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const communicationTransportError = (error: JsonLineTransportError): CommunicationError => {
+  if (error.code === 'request-too-large') return new CommunicationError('request-too-large', 'Communication request exceeds the size limit.')
+  if (error.code === 'response-too-large') return new CommunicationError('response-too-large', 'Communication bridge response exceeds the size limit.')
+  if (error.code === 'timeout') return new CommunicationError('timeout', 'Communication bridge request timed out.')
+  if (error.code === 'connection') return new CommunicationError('host-unavailable', error.message)
+  return new CommunicationError('invalid-response', 'Communication bridge returned invalid JSON.')
+}
 
 const responseError = (requestId: string, code: string, message: string): Record<string, unknown> => ({
   version: PROTOCOL_VERSION,
@@ -193,12 +202,14 @@ const dispatch = async (
 }
 
 const writeResponse = (socket: Socket, requestId: string, value: unknown): void => {
-  const response = JSON.stringify({ version: PROTOCOL_VERSION, requestId, ok: true, result: value })
-  if (Buffer.byteLength(response) > MAX_RESPONSE_BYTES) {
-    socket.end(`${JSON.stringify(responseError(requestId, 'response-too-large', 'Communication response exceeds the size limit.'))}\n`)
-    return
-  }
-  socket.end(`${response}\n`)
+  writeJsonLine(
+    socket,
+    { version: PROTOCOL_VERSION, requestId, ok: true, result: value },
+    {
+      maxBytes: MAX_RESPONSE_BYTES,
+      onTooLarge: () => responseError(requestId, 'response-too-large', 'Communication response exceeds the size limit.'),
+    },
+  )
 }
 
 const removeStaleEndpoint = async (location: ReturnType<typeof bridgePaths>): Promise<void> => {
@@ -244,39 +255,34 @@ export const startHostCommunicationBridge = async (
     socket.setTimeout(REQUEST_TIMEOUT_MS)
     sockets.add(socket)
     socket.once('close', () => sockets.delete(socket))
-    socket.once('timeout', () => socket.end(`${JSON.stringify(responseError('unknown', 'timeout', 'Communication bridge request timed out.'))}\n`))
-    let buffer = ''
-    let handled = false
-    socket.on('data', chunk => {
-      if (handled) return
-      buffer += chunk.toString()
-      if (Buffer.byteLength(buffer) > MAX_REQUEST_BYTES) {
-        handled = true
-        socket.end(`${JSON.stringify(responseError('unknown', 'request-too-large', 'Communication request exceeds the size limit.'))}\n`)
-        return
-      }
-      const newline = buffer.indexOf('\n')
-      if (newline < 0) return
-      handled = true
-      const text = buffer.slice(0, newline)
-      let requestId = 'unknown'
-      try {
-        const parsedValue: unknown = JSON.parse(text)
-        if (isRecord(parsedValue) && typeof parsedValue.requestId === 'string') requestId = parsedValue.requestId
-        const request = bridgeRequestSchema.parse(parsedValue)
-        if (request.token !== token) throw new CommunicationError('unauthorized', 'Communication bridge authentication failed.')
-        void dispatch(service, options.listAgents, request)
-          .then(result => writeResponse(socket, requestId, result))
-          .catch(error =>
-            socket.end(
-              `${JSON.stringify(responseError(requestId, error instanceof CommunicationError ? error.code : 'operation-failed', error instanceof Error ? error.message : 'Communication operation failed.'))}\n`,
-            ),
-          )
-      } catch (error) {
-        const code = error instanceof CommunicationError ? error.code : 'invalid-request'
-        const message = error instanceof Error ? error.message : 'Communication bridge received an invalid request.'
-        socket.end(`${JSON.stringify(responseError(requestId, code, message))}\n`)
-      }
+    socket.once('timeout', () => writeJsonLine(socket, responseError('unknown', 'timeout', 'Communication bridge request timed out.')))
+    acceptJsonLine(socket, MAX_REQUEST_BYTES, {
+      onTooLarge: () => writeJsonLine(socket, responseError('unknown', 'request-too-large', 'Communication request exceeds the size limit.')),
+      onLine: text => {
+        let requestId = 'unknown'
+        try {
+          const parsedValue: unknown = JSON.parse(text)
+          if (isRecord(parsedValue) && typeof parsedValue.requestId === 'string') requestId = parsedValue.requestId
+          const request = bridgeRequestSchema.parse(parsedValue)
+          if (request.token !== token) throw new CommunicationError('unauthorized', 'Communication bridge authentication failed.')
+          void dispatch(service, options.listAgents, request)
+            .then(result => writeResponse(socket, requestId, result))
+            .catch(error =>
+              writeJsonLine(
+                socket,
+                responseError(
+                  requestId,
+                  error instanceof CommunicationError ? error.code : 'operation-failed',
+                  error instanceof Error ? error.message : 'Communication operation failed.',
+                ),
+              ),
+            )
+        } catch (error) {
+          const code = error instanceof CommunicationError ? error.code : 'invalid-request'
+          const message = error instanceof Error ? error.message : 'Communication bridge received an invalid request.'
+          writeJsonLine(socket, responseError(requestId, code, message))
+        }
+      },
     })
   })
   try {
@@ -328,48 +334,25 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
   const request = async (operation: z.infer<typeof operationSchema>, input?: unknown): Promise<unknown> => {
     const requestId = randomUUID()
     const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input === undefined ? {} : { input }) })}\n`
-    if (Buffer.byteLength(body) > MAX_REQUEST_BYTES) throw new CommunicationError('request-too-large', 'Communication request exceeds the size limit.')
-    return new Promise((resolve, reject) => {
-      const socket = createConnection(metadata.socketPath)
-      let buffer = ''
-      let settled = false
-      const timer = setTimeout(() => finish(new CommunicationError('timeout', 'Communication bridge request timed out.')), REQUEST_TIMEOUT_MS)
-      const finish = (error?: Error, value?: unknown): void => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        socket.destroy()
-        if (error) reject(error)
-        else resolve(value)
-      }
-      socket.once('error', error => finish(new CommunicationError('host-unavailable', error.message)))
-      socket.on('data', chunk => {
-        buffer += chunk.toString()
-        if (Buffer.byteLength(buffer) > MAX_RESPONSE_BYTES) {
-          finish(new CommunicationError('response-too-large', 'Communication bridge response exceeds the size limit.'))
-          return
-        }
-        const newline = buffer.indexOf('\n')
-        if (newline < 0) return
-        try {
-          const value: unknown = JSON.parse(buffer.slice(0, newline))
-          if (!isRecord(value) || value.version !== PROTOCOL_VERSION || value.requestId !== requestId || typeof value.ok !== 'boolean') {
-            throw new CommunicationError('invalid-response', 'Communication bridge returned an invalid response envelope.')
-          }
-          if (!value.ok) {
-            const failure = isRecord(value.error) ? value.error : {}
-            throw new CommunicationError(
-              typeof failure.code === 'string' ? failure.code : 'operation-failed',
-              typeof failure.message === 'string' ? failure.message : 'Communication operation failed.',
-            )
-          }
-          finish(undefined, value.result)
-        } catch (error) {
-          finish(error instanceof Error ? error : new CommunicationError('invalid-response', 'Communication bridge returned invalid JSON.'))
-        }
-      })
-      socket.once('connect', () => socket.write(body))
+    const value = await requestJsonLine(metadata.socketPath, body, {
+      maxRequestBytes: MAX_REQUEST_BYTES,
+      maxResponseBytes: MAX_RESPONSE_BYTES,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    }).catch(error => {
+      if (error instanceof JsonLineTransportError) throw communicationTransportError(error)
+      throw error
     })
+    if (!isRecord(value) || value.version !== PROTOCOL_VERSION || value.requestId !== requestId || typeof value.ok !== 'boolean') {
+      throw new CommunicationError('invalid-response', 'Communication bridge returned an invalid response envelope.')
+    }
+    if (!value.ok) {
+      const failure = isRecord(value.error) ? value.error : {}
+      throw new CommunicationError(
+        typeof failure.code === 'string' ? failure.code : 'operation-failed',
+        typeof failure.message === 'string' ? failure.message : 'Communication operation failed.',
+      )
+    }
+    return value.result
   }
 
   return {

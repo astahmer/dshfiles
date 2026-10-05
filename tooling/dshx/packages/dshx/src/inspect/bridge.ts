@@ -1,9 +1,9 @@
 import { randomUUID, createHash } from 'node:crypto'
 import { access, readFile } from 'node:fs/promises'
-import { createConnection } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
+import { JsonLineTransportError, requestJsonLine } from '../bridge/json-line.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -70,22 +70,16 @@ type BridgeCredentials = z.infer<typeof bridgeCredentialsSchema>
 const bridgeRetryHint = 'Restart the Composition and retry the Inspect command.'
 
 const decodeBridgeResponse = <Item>({
-  line,
+  value,
   requestId,
   target,
   itemsSchema,
 }: {
-  readonly line: string
+  readonly value: unknown
   readonly requestId: string
   readonly target: string
   readonly itemsSchema: z.ZodType<readonly Item[]>
 }): readonly Item[] => {
-  let value: unknown
-  try {
-    value = JSON.parse(line)
-  } catch (cause) {
-    throw fail('DSHX3203', `Host Inspect bridge returned invalid JSON: ${String(cause)}`, bridgeRetryHint)
-  }
   const header = bridgeResponseHeaderSchema.safeParse(value)
   if (!header.success || header.data.requestId !== requestId || header.data.target !== target) {
     throw fail('DSHX3203', 'Host Inspect bridge response has an invalid protocol header.', bridgeRetryHint)
@@ -327,6 +321,26 @@ async function readMetadata(path: string, project: ResolvedDshxConfig, expectedS
   return credentials
 }
 
+const inspectTransportError = (error: JsonLineTransportError): DshxError => {
+  if (error.code === 'timeout') {
+    return fail('DSHX3202', 'Timed out while querying the Host Inspect bridge.', 'Check the running Composition and retry the Inspect command.')
+  }
+  if (error.code === 'connection') {
+    return fail(
+      'DSHX3202',
+      `Unable to connect to the Host Inspect bridge: ${error.message}`,
+      'Ensure the Composition is still running and that DSHX_INSPECT_BRIDGE=1 was enabled.',
+    )
+  }
+  if (error.code === 'request-too-large') {
+    return fail('DSHX3203', 'Host Inspect bridge request exceeds the size limit.', 'Use the official bridge protocol and retry.')
+  }
+  if (error.code === 'response-too-large') {
+    return fail('DSHX3203', 'Host Inspect bridge response exceeds the size limit.', 'Use the official bridge protocol and retry.')
+  }
+  return fail('DSHX3203', `Host Inspect bridge returned invalid JSON: ${error.message}`, 'Restart the Composition and retry the Inspect command.')
+}
+
 const request = async <Item>({
   project,
   target,
@@ -342,54 +356,19 @@ const request = async <Item>({
 }): Promise<readonly Item[]> => {
   const env = { ...process.env, ...options.env }
   const paths = endpointPaths(project.packageId, env)
-  const metadata = await readMetadata(paths.metadataPath, project, paths.socketPath)
-  const socketPath = metadata.socketPath
+  const { metadata } = await readMetadata(paths.metadataPath, project, paths.socketPath)
   const requestId = `inspect-${randomUUID()}`
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const payload =
     JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
-  return await new Promise<readonly Item[]>((resolveRequest, rejectRequest) => {
-    const socket = createConnection(socketPath)
-    let buffer = ''
-    let settled = false
-    const timer = setTimeout(() => {
-      socket.destroy()
-      rejectRequest(fail('DSHX3202', 'Timed out while querying the Host Inspect bridge.', 'Check the running Composition and retry the Inspect command.'))
-      settled = true
-    }, timeoutMs)
-    const finish = (error?: unknown, items?: readonly Item[]) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      socket.destroy()
-      if (error !== undefined) rejectRequest(error)
-      else resolveRequest(items ?? [])
-    }
-    socket.on('error', error =>
-      finish(
-        fail(
-          'DSHX3202',
-          `Unable to connect to the Host Inspect bridge: ${error instanceof Error ? error.message : String(error)}`,
-          'Ensure the Composition is still running and that DSHX_INSPECT_BRIDGE=1 was enabled.',
-        ),
-      ),
-    )
-    socket.on('data', chunk => {
-      buffer += chunk.toString()
-      if (Buffer.byteLength(buffer) > MAX_MESSAGE_BYTES) {
-        finish(fail('DSHX3203', 'Host Inspect bridge response exceeds the size limit.', 'Use the official bridge protocol and retry.'))
-        return
-      }
-      const newline = buffer.indexOf('\n')
-      if (newline < 0) return
-      try {
-        finish(undefined, decodeBridgeResponse({ line: buffer.slice(0, newline), requestId, target, itemsSchema }))
-      } catch (error) {
-        finish(error)
-      }
-    })
-    socket.on('connect', () => socket.write(payload))
+  const value = await requestJsonLine(paths.socketPath, payload, {
+    maxRequestBytes: MAX_MESSAGE_BYTES,
+    maxResponseBytes: MAX_MESSAGE_BYTES,
+    timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  }).catch(error => {
+    if (error instanceof JsonLineTransportError) throw inspectTransportError(error)
+    throw error
   })
+  return decodeBridgeResponse({ value, requestId, target, itemsSchema })
 }
 
 /** Read-only client for the DSHX Host-owned Runtime Inspect bridge. */
