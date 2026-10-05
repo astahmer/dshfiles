@@ -1,27 +1,8 @@
-import { defineCommand, parseArgs as parseCittyArgs, type ArgsDef } from 'citty'
+import { parseArgs as parseCittyArgs } from 'citty'
+import type { ArgsDef } from 'citty'
 
-const platformCommandNames = [
-  'status',
-  'info',
-  'doctor',
-  'sessions',
-  'plugins',
-  'bundles',
-  'presets',
-  'models',
-  'skills',
-  'commands',
-  'config',
-  'host',
-  'runtime',
-  'workspace',
-  'comm',
-] as const
-
-const cliInspectTargets = ['slots', 'tools', 'services', 'events', 'capabilities'] as const
-
-export type CliCommand = keyof typeof cliSubCommands
-export type CliInspectTarget = (typeof cliInspectTargets)[number]
+export type CliCommand = keyof typeof cliCommandMetadata
+export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events'
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
 
 export interface CliArgs {
@@ -114,7 +95,7 @@ const sharedArgs = {
   open: { type: 'boolean', description: 'Open the development URL.' },
   port: {
     type: 'string',
-    description: 'Set the DSH Web development port; use 0 to let the OS choose.',
+    description: 'Set the DSH Web development port; with check --boot, use 0 to let the OS choose.',
     valueHint: 'port',
   },
   slot: {
@@ -159,7 +140,7 @@ const sharedArgs = {
   },
   dryRun: {
     type: 'boolean',
-    description: 'Plan changes without writing files.',
+    description: 'Plan add or check --fix changes without writing files.',
   },
   fix: { type: 'boolean', description: 'Repair safe manifest issues.' },
   quiet: {
@@ -282,162 +263,59 @@ for (const [name, definition] of Object.entries(sharedArgs)) {
 }
 
 /** Citty command metadata is the single declaration of DSHX commands and options. */
-const cliSubCommands = {
-  create: defineCommand({ meta: { name: 'create', description: 'Create a DSHX plugin project.' }, args: sharedArgs }),
-  test: defineCommand({
-    meta: { name: 'test', description: 'Run project-local Vitest tests.' },
-    args: sharedArgs,
-  }),
-  package: defineCommand({
-    meta: {
-      name: 'package',
-      description: 'Build, validate, and pack a native plugin bundle.',
-    },
-    args: sharedArgs,
-  }),
-  build: defineCommand({
-    meta: {
-      name: 'build',
-      description: 'Build Host and Client plugin artifacts.',
-    },
-    args: sharedArgs,
-  }),
-  check: defineCommand({
-    meta: {
-      name: 'check',
-      description: 'Validate compatibility and project wiring.',
-    },
-    args: sharedArgs,
-  }),
-  dev: defineCommand({
-    meta: {
-      name: 'dev',
-      description: 'Run a compatibility-aware DSH development session.',
-    },
-    args: sharedArgs,
-  }),
-  inspect: defineCommand({
-    meta: {
-      name: 'inspect',
-      description: 'Inspect Slots, Tools, Services, Events, or capabilities.',
-    },
-    args: sharedArgs,
-  }),
-  add: defineCommand({
-    meta: {
-      name: 'add',
-      description: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
-    },
-    args: sharedArgs,
-  }),
-  status: defineCommand({
-    meta: {
-      name: 'status',
-      description: 'Check the authenticated local DSH Host connection.',
-    },
-    args: sharedArgs,
-  }),
-  info: defineCommand({
-    meta: {
-      name: 'info',
-      description: 'Show local DSHX and Node runtime information.',
-    },
-    args: sharedArgs,
-  }),
-  doctor: defineCommand({
-    meta: {
-      name: 'doctor',
-      description: 'Diagnose local DSHX and reachable DSH APIs.',
-    },
-    args: sharedArgs,
-  }),
-  presets: defineCommand({ meta: { name: 'presets', description: 'List or inspect DSH Agent presets.' }, args: sharedArgs }),
-  models: defineCommand({ meta: { name: 'models', description: 'List or select DSH models.' }, args: sharedArgs }),
-  skills: defineCommand({ meta: { name: 'skills', description: 'List Session skills.' }, args: sharedArgs }),
-  sessions: defineCommand({
-    meta: {
-      name: 'sessions',
-      description: 'List, inspect, create, fork, cancel, and export DSH Sessions.',
-    },
-    args: sharedArgs,
-  }),
-  plugins: defineCommand({
-    meta: {
-      name: 'plugins',
-      description: 'List, inspect, enable, and disable DSH plugins.',
-    },
-    args: sharedArgs,
-  }),
-  bundles: defineCommand({
-    meta: {
-      name: 'bundles',
-      description: 'List, inspect, enable, and disable DSH bundles.',
-    },
-    args: sharedArgs,
-  }),
-  commands: defineCommand({
-    meta: {
-      name: 'commands',
-      description: 'Inspect and run Session-scoped DSH commands.',
-    },
-    args: sharedArgs,
-  }),
-  config: defineCommand({
-    meta: {
-      name: 'config',
-      description: 'Read and update one DSH settings namespace.',
-    },
-    args: sharedArgs,
-  }),
-  host: defineCommand({
-    meta: { name: 'host', description: 'Record, verify, and select execution machines and DSH runtimes.' },
-    args: sharedArgs,
-  }),
-  runtime: defineCommand({
-    meta: { name: 'runtime', description: 'Register, verify, select, and remove remote DSH runtimes.' },
-    args: sharedArgs,
-  }),
-  workspace: defineCommand({
-    meta: { name: 'workspace', description: 'Create or open remote Workspaces on a recorded host.' },
-    args: sharedArgs,
-  }),
-  comm: defineCommand({
-    meta: {
-      name: 'comm',
-      description: 'Exchange durable messages between DSH Agents and external MCP clients.',
-    },
-    args: sharedArgs,
-  }),
-}
+export const cliCommandMetadata = {
+  create: 'Create a DSHX plugin project.',
+  test: 'Run project-local Vitest tests.',
+  package: 'Build, validate, and pack a native plugin bundle.',
+  build: 'Build Host and Client plugin artifacts.',
+  check: 'Validate compatibility and project wiring.',
+  dev: 'Run a compatibility-aware DSH development session.',
+  inspect: 'Inspect Slots, Tools, Services, or Events.',
+  add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
+  status: 'Check the authenticated local DSH Host connection.',
+  info: 'Show local DSHX and Node runtime information.',
+  doctor: 'Diagnose local DSHX and reachable DSH APIs.',
+  presets: 'List or inspect DSH Agent presets.',
+  models: 'List or select DSH models.',
+  skills: 'List Session skills.',
+  sessions: 'List, inspect, create, fork, cancel, and export DSH Sessions.',
+  plugins: 'List, inspect, enable, and disable DSH plugins.',
+  bundles: 'List, inspect, enable, and disable DSH bundles.',
+  commands: 'Inspect and run Session-scoped DSH commands.',
+  config: 'Read and update one DSH settings namespace.',
+  host: 'Record, verify, and select execution machines and DSH runtimes.',
+  runtime: 'Register, verify, select, and remove remote DSH runtimes.',
+  workspace: 'Create or open remote Workspaces on a recorded host.',
+  comm: 'Exchange durable messages between DSH Agents and external MCP clients.',
+} satisfies Readonly<Record<string, string>>
 
-export const dshxCommand = defineCommand({
-  meta: {
-    name: 'dshx',
-    description: 'Build DSH plugins and inspect or control a running DSH installation.',
-  },
-  args: sharedArgs,
-  subCommands: cliSubCommands,
-})
-
-export const cliCommandDescription = (command: CliCommand): string => {
-  const meta = cliSubCommands[command]?.meta
-  if (meta === undefined || typeof meta === 'function' || meta instanceof Promise) return ''
-  return typeof meta.description === 'string' ? meta.description : ''
-}
-
-const isCliCommand = (value: string | undefined): value is CliCommand => value !== undefined && Object.hasOwn(cliSubCommands, value)
-
-const platformCommands: ReadonlySet<CliCommand> = new Set(platformCommandNames)
-
-const isCliInspectTarget = (value: string): value is CliInspectTarget => cliInspectTargets.some(target => target === value)
-
+const isCliCommand = (value: string | undefined): value is CliCommand => value !== undefined && Object.hasOwn(cliCommandMetadata, value)
+const cliInspectTargets: ReadonlySet<string> = new Set(['slots', 'tools', 'services', 'events'])
 const cliAddTargets: ReadonlySet<string> = new Set(['ui', 'panel', 'api', 'tool', 'command', 'hook'])
-
+const isCliInspectTarget = (value: string): value is CliInspectTarget => cliInspectTargets.has(value)
 const isCliAddTarget = (value: string): value is CliAddTarget => cliAddTargets.has(value)
+
+const platformCommands: ReadonlySet<CliCommand> = new Set([
+  'status',
+  'info',
+  'doctor',
+  'sessions',
+  'plugins',
+  'bundles',
+  'presets',
+  'models',
+  'skills',
+  'commands',
+  'config',
+  'host',
+  'runtime',
+  'workspace',
+  'comm',
+])
 
 const isPlatformCommand = (command: CliCommand | undefined): boolean => command !== undefined && platformCommands.has(command)
 
-interface OptionContext {
+export interface CliOptionContext {
   readonly command: CliCommand | undefined
   readonly action: string | undefined
   readonly inspectTarget: CliInspectTarget | undefined
@@ -446,29 +324,28 @@ interface OptionContext {
   readonly fix: boolean
 }
 
-export type CliOptionContext = OptionContext
-
 interface OptionScope {
-  readonly allows: (context: OptionContext) => boolean
+  readonly allows: (context: CliOptionContext) => boolean
   readonly usage: string
 }
 
 const platformAction =
   (command: CliCommand, ...actions: string[]) =>
-  (context: OptionContext) =>
+  (context: CliOptionContext) =>
     context.command === command && actions.includes(context.action ?? '')
 
 const addTargets =
   (...targets: CliAddTarget[]) =>
-  (context: OptionContext) =>
+  (context: CliOptionContext) =>
     context.command === 'add' && targets.includes(context.addTarget ?? 'ui')
 
-const inspectSlots = (context: OptionContext) => context.command === 'inspect' && context.inspectTarget === 'slots'
+const inspectSlots = (context: CliOptionContext) => context.command === 'inspect' && context.inspectTarget === 'slots'
 
 /** Where each option is accepted: the one place a command gains or loses an option. */
 const optionScopes: Readonly<Record<string, OptionScope>> = {
   json: {
-    allows: ({ command }) => command === 'check' || command === 'inspect' || command === 'add' || isPlatformCommand(command),
+    allows: ({ command, action }) =>
+      command === 'check' || command === 'inspect' || command === 'add' || (isPlatformCommand(command) && !(command === 'comm' && action === 'mcp')),
     usage: '--json is only valid with check, inspect, add, or DSH platform commands.',
   },
   open: { allows: ({ command }) => command === 'dev', usage: '--open is only valid with dev.' },
@@ -505,7 +382,11 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   unit: { allows: platformAction('runtime', 'add'), usage: '--unit is only valid with runtime add.' },
   remoteHome: { allows: platformAction('runtime', 'add'), usage: '--remote-home is only valid with runtime add.' },
   directoryOnly: { allows: platformAction('host', 'remove'), usage: '--directory-only is only valid with host remove.' },
-  line: { allows: ({ command }) => command === 'commands', usage: '--line is only valid with commands run.' },
+  line: { allows: platformAction('commands', 'run'), usage: '--line is only valid with commands run.' },
+  file: {
+    allows: addTargets('ui', 'tool', 'command', 'hook'),
+    usage: '--file is only valid with add ui, tool, command, or hook.',
+  },
   output: { allows: platformAction('sessions', 'export'), usage: '--output is only valid with sessions export.' },
   agentPreset: { allows: platformAction('sessions', 'create'), usage: '--agent-preset is only valid with sessions create.' },
   mode: { allows: platformAction('sessions', 'prompt'), usage: '--mode is only valid with sessions prompt.' },
@@ -528,6 +409,14 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   explain: { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' },
 }
 
+const isSet = (value: unknown): boolean => value !== undefined && value !== false
+
+const validateOptionScopes = (options: Readonly<Record<string, unknown>>, context: CliOptionContext): void => {
+  for (const [option, value] of Object.entries(options)) {
+    const scope = optionScopes[option]
+    if (scope !== undefined && isSet(value) && !scope.allows(context)) throw new CliUsageError(scope.usage)
+  }
+}
 
 export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
   const args: ArgsDef = {}
@@ -535,8 +424,7 @@ export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
     const scope = optionScopes[name]
     if (scope !== undefined && !scope.allows(context)) continue
     const required =
-      name === 'session' &&
-      (context.command === 'commands' || context.command === 'skills' || (context.command === 'models' && context.action === 'select'))
+      name === 'session' && (context.command === 'commands' || context.command === 'skills' || (context.command === 'models' && context.action === 'select'))
     args[toKebabCase(name)] = required ? { ...definition, required: true } : definition
   }
   return args
@@ -551,15 +439,6 @@ export const cliArgsCommonToContexts = (contexts: readonly CliOptionContext[]): 
     if (remainingContexts.every(context => Object.hasOwn(cliArgsForContext(context), name))) args[name] = definition
   }
   return args
-}
-
-const isSet = (value: unknown): boolean => value !== undefined && value !== false
-
-const validateOptionScopes = (options: Readonly<Record<string, unknown>>, context: OptionContext): void => {
-  for (const [option, value] of Object.entries(options)) {
-    const scope = optionScopes[option]
-    if (scope !== undefined && isSet(value) && !scope.allows(context)) throw new CliUsageError(scope.usage)
-  }
 }
 
 function validateOptionTokens(argv: readonly string[]): void {
@@ -614,7 +493,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       inspectTarget = token
       continue
     }
-    if (command !== 'inspect' && isCliInspectTarget(token)) {
+    if (command !== 'inspect' && cliInspectTargets.has(token)) {
       throw new CliUsageError('Inspect targets are only valid with the inspect command.')
     }
     if (command === 'add' && isCliAddTarget(token)) {
@@ -738,6 +617,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       name,
       description,
       event,
+      file,
       root,
       explain,
       boot,
@@ -868,7 +748,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
   if (command === 'inspect' && inspectTarget === undefined && !help && !version)
-    throw new CliUsageError('Inspect requires a target: slots, tools, services, events, or capabilities.')
+    throw new CliUsageError('Inspect requires a target: slots, tools, services, or events.')
   if (command === 'add' && addTarget === undefined && !help && !version)
     throw new CliUsageError('Add requires a target: ui, panel, api, tool, command, or hook.')
   if (help || version)
@@ -916,7 +796,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(limit === undefined ? {} : { limit }),
     }
   if (command === undefined && !help && !version) {
-    throw new CliUsageError(`A command is required: ${Object.keys(cliSubCommands).join(', ')}.`)
+    throw new CliUsageError(`A command is required: ${Object.keys(cliCommandMetadata).join(', ')}.`)
   }
   return {
     ...(command === undefined ? {} : { command }),
