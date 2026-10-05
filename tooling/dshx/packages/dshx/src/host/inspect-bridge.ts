@@ -179,24 +179,21 @@ function catalogItems(target: HostInspectTarget, value: unknown): readonly Recor
 }
 
 function slotNode(node: unknown): Record<string, unknown> {
-  if (
-    !isRecord(node) ||
-    typeof node.name !== 'string' ||
-    node.name.trim() === '' ||
-    typeof node.kind !== 'string' ||
-    node.kind.trim() === '' ||
-    typeof node.scope !== 'string' ||
-    node.scope.trim() === ''
-  ) {
-    throw new BridgeFailure('DSHX3203', 'Slot Inspect returned a tree item without valid name, kind, and scope fields.')
-  }
+  if (!isRecord(node) || typeof node.name !== 'string' || node.name.trim() === '' || typeof node.scope !== 'string' || node.scope.trim() === '')
+    throw new BridgeFailure('DSHX3203', 'Slot Inspect returned a tree item without valid name and scope fields.')
+  if (node.type !== undefined && node.type !== 'slot' && node.type !== 'factory')
+    throw new BridgeFailure('DSHX3203', 'Slot Inspect returned a tree item with an unsupported node type.')
+  if (node.type !== 'factory' && (typeof node.kind !== 'string' || node.kind.trim() === ''))
+    throw new BridgeFailure('DSHX3203', 'Slot Inspect returned a Slot node without a valid kind field.')
   if (node.children !== undefined && (!Array.isArray(node.children) || node.children.some(child => !isRecord(child)))) {
     throw new BridgeFailure('DSHX3203', 'Slot Inspect returned an invalid children tree.')
   }
-  const { name, kind, scope, ...rest } = node
+  const { name, type, kind, scope, ...rest } = node
+  delete rest.children
   return {
     name,
-    kind,
+    ...(type === undefined ? {} : { type }),
+    ...(kind === undefined ? {} : { kind }),
     scope,
     ...(Object.keys(rest).length === 0 ? {} : { metadata: rest }),
   }

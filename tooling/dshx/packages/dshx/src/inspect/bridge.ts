@@ -53,6 +53,7 @@ const itemNameSchema = z.string().trim().min(1)
 const slotItemsSchema = z.array(
   z.looseObject({
     name: itemNameSchema,
+    type: z.enum(['slot', 'factory']).exactOptional(),
     provider: optionalStringSchema,
     kind: optionalStringSchema,
     scope: optionalStringSchema,

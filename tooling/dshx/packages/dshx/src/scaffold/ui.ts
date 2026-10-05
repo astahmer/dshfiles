@@ -135,6 +135,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions): { contract?: SlotScaffoldContract; diagnostic?: DshxDiagnostic } {
+  if (slot.type === 'factory') {
+    return {
+      diagnostic: diagnostic(
+        'DSHX6110',
+        `Factory ${JSON.stringify(slot.name)} is a composition container and does not accept UI contributions.`,
+        file,
+        'Choose a child Slot reported by dshx inspect slots.',
+      ),
+    }
+  }
   if (slot.kind !== 'list' && slot.kind !== 'single') {
     return {
       diagnostic: diagnostic(
@@ -441,8 +451,9 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
     return result(project, { name: options.slot ?? '' }, options.provider ?? '', mapped, [], false)
   }
   const slots = inspect.items as readonly SlotSummary[]
+  const contributionSlots = slots.filter(item => item.type !== 'factory')
   let slotName = options.slot
-  if (slotName === undefined) slotName = await dependencies.selectSlot?.(slots)
+  if (slotName === undefined) slotName = await dependencies.selectSlot?.(contributionSlots)
   if (slotName === undefined || slotName.trim() === '') {
     const item = diagnostic(
       'DSHX6101',
@@ -461,6 +472,15 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
       'Run dshx inspect slots and choose an available Slot name.',
     )
     return result(project, { name: slotName }, options.provider ?? '', [item], [], false)
+  }
+  if (treeSlot.type === 'factory') {
+    const item = diagnostic(
+      'DSHX6110',
+      `Factory ${JSON.stringify(treeSlot.name)} is a composition container and does not accept UI contributions.`,
+      packageFile,
+      'Choose a child Slot reported by dshx inspect slots.',
+    )
+    return result(project, treeSlot, options.provider ?? treeSlot.provider ?? '', [item], [], false)
   }
   let exact: InspectResult
   try {

@@ -90,13 +90,17 @@ export function normalizeSlots(value: unknown): readonly SlotSummary[] {
   return value.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.name !== 'string' || entry.name.trim() === '')
       throw new Error(`Slot Inspect item ${index} must contain a non-empty string name.`)
-    const known = ['name', 'provider', 'kind', 'scope', 'metadata'] as const
+    const type = entry.type
+    if (type !== undefined && type !== 'slot' && type !== 'factory')
+      throw new Error(`Slot Inspect item ${index} field "type" must be "slot" or "factory" when present.`)
+    const known = ['name', 'type', 'provider', 'kind', 'scope', 'metadata'] as const
     const provider = optionalString(entry, 'provider')
     const kind = optionalString(entry, 'kind')
     const scope = optionalString(entry, 'scope')
     const extra = metadata(entry, known)
     return {
       name: entry.name,
+      ...(type === undefined ? {} : { type }),
       ...(provider === undefined ? {} : { provider }),
       ...(kind === undefined ? {} : { kind }),
       ...(scope === undefined ? {} : { scope }),

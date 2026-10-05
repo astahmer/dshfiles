@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createUiScaffold } from '../src/scaffold/ui.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import type { InspectResult } from '../src/inspect/types.js'
+import type { InspectResult, SlotSummary } from '../src/inspect/types.js'
 import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
 
 const compatibility = {
@@ -353,6 +353,61 @@ describe('add ui scaffold', () => {
       )
       expect(keyed.diagnostics[0]?.code).toBe('DSHX6110')
       await expect(readFile(resolve(value.root, 'src/slots/sidebar.footer.action.tsx'), 'utf8')).rejects.toThrow()
+    } finally {
+      await value.cleanup()
+    }
+  })
+
+  it('offers Slot nodes but refuses Factory nodes as UI contribution targets', async () => {
+    const value = await setup(true)
+    try {
+      const visibleSlot: SlotSummary = {
+        name: 'sidebar.footer.action',
+        type: 'slot',
+        provider: '@deepseek-ai/dsh-client-ui-sidebar',
+        kind: 'list',
+        scope: 'root',
+        metadata: {
+          catalog: { registration: [{ name: 'id', required: true, type: 'string' }], replaceRisk: 'none' },
+          occupants: [],
+        },
+      }
+      let offeredSlots: readonly SlotSummary[] = []
+      const listed = await createUiScaffold(
+        { project: value.project },
+        {
+          inspectComposition: async (_project, _target, options) => ({
+            profile: 'web',
+            target: 'slots',
+            source: 'runtime',
+            diagnostics: [],
+            items: options?.slotRoot === undefined ? [{ name: 'ui.root', type: 'factory', scope: 'root' }, visibleSlot] : [visibleSlot],
+          }),
+          selectSlot: async slots => {
+            offeredSlots = slots
+            return visibleSlot.name
+          },
+          resolveProvider: async () => true,
+          checkManifest: async () => [],
+        },
+      )
+      expect(offeredSlots).toEqual([visibleSlot])
+      expect(listed.diagnostics).toEqual([])
+
+      const factory = await createUiScaffold(
+        { project: value.project, slot: 'ui.root' },
+        {
+          inspectComposition: async () => ({
+            profile: 'web',
+            target: 'slots',
+            source: 'runtime',
+            diagnostics: [],
+            items: [{ name: 'ui.root', type: 'factory', scope: 'root' }],
+          }),
+        },
+      )
+      expect(factory.diagnostics[0]).toMatchObject({ code: 'DSHX6110', message: expect.stringContaining('Factory') })
+      await expect(readFile(resolve(value.root, 'src/slots/ui.root.tsx'), 'utf8')).rejects.toThrow()
     } finally {
       await value.cleanup()
     }

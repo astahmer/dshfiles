@@ -39,6 +39,9 @@ describe('runtime inspect normalization', () => {
     expect(normalizeSlots([{ name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', order: 10 }])).toEqual([
       { name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', metadata: { order: 10 } },
     ])
+    expect(normalizeSlots([{ name: 'ui.root', type: 'factory', scope: 'root', children: [] }])).toEqual([
+      { name: 'ui.root', type: 'factory', scope: 'root', metadata: { children: [] } },
+    ])
     expect(normalizeTools([{ name: 'status', provider: 'fixture', description: 'Show status', input: { type: 'object' } }])).toEqual([
       { name: 'status', provider: 'fixture', description: 'Show status', metadata: { input: { type: 'object' } } },
     ])
@@ -47,6 +50,7 @@ describe('runtime inspect normalization', () => {
   it('rejects malformed provider DTOs', () => {
     expect(() => normalizeSlots([{ name: '' }])).toThrow('non-empty string name')
     expect(() => normalizeSlots([{ name: 'slot', scope: 42 }])).toThrow('must be a string')
+    expect(() => normalizeSlots([{ name: 'slot', type: 'unknown' }])).toThrow('must be "slot" or "factory"')
     expect(() => normalizeTools('not-an-array')).toThrow('must be an array')
   })
 })

@@ -10,6 +10,7 @@ export interface InspectSlotOptions {
 
 export interface SlotSummary {
   readonly name: string
+  readonly type?: 'slot' | 'factory'
   readonly provider?: string
   readonly kind?: string
   readonly scope?: string

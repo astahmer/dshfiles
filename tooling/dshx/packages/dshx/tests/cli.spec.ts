@@ -213,6 +213,7 @@ describe('CLI commands', () => {
           target,
           source: 'runtime',
           items: [
+            { name: 'ui.root', type: 'factory', scope: 'root' },
             {
               name: 'sidebar.footer.action',
               kind: 'list',
@@ -235,6 +236,7 @@ describe('CLI commands', () => {
     expect(output).toContain('catalog:')
     expect(output).toContain('occupants:')
     expect(output).toContain('children:')
+    expect(output).toContain('ui.root (factory / root)')
   })
 
   it('prints the verified capability catalog without resolving a project', async () => {

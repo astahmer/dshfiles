@@ -2,8 +2,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { startHostInspectBridge } from '../src/host/inspect-bridge.js'
 import { DshInspectBridgeProvider, inspectBridgeStatus } from '../src/inspect/bridge.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 
@@ -72,6 +74,7 @@ const replyingEndpoint = async ({
 
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+  vi.unstubAllEnvs()
 })
 
 describe('DshInspectBridgeProvider', () => {
@@ -175,12 +178,19 @@ describe('DshInspectBridgeProvider', () => {
             ]
           : [
               {
+                name: 'ui.root',
+                type: 'factory',
+                scope: 'root',
+                metadata: { children: [{ name: 'sidebar.footer.action', type: 'slot', kind: 'list', scope: 'root' }] },
+              },
+              {
                 name: 'sidebar',
+                type: 'slot',
                 kind: 'single',
                 scope: 'root',
                 metadata: { purpose: 'Sidebar', children: [{ name: 'sidebar.footer.action', kind: 'list', scope: 'root', purpose: 'Footer action' }] },
               },
-              { name: 'sidebar.footer.action', kind: 'list', scope: 'root', metadata: { purpose: 'Footer action', children: [] } },
+              { name: 'sidebar.footer.action', type: 'slot', kind: 'list', scope: 'root', metadata: { purpose: 'Footer action', children: [] } },
             ]
         socket.end(JSON.stringify({ version: 1, requestId: request.requestId, ok: true, target: request.target, items: value }) + '\n')
       })
@@ -196,12 +206,19 @@ describe('DshInspectBridgeProvider', () => {
     const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
     await expect(provider.listSlots()).resolves.toEqual([
       {
+        name: 'ui.root',
+        type: 'factory',
+        scope: 'root',
+        metadata: { children: [{ name: 'sidebar.footer.action', type: 'slot', kind: 'list', scope: 'root' }] },
+      },
+      {
         name: 'sidebar',
+        type: 'slot',
         kind: 'single',
         scope: 'root',
         metadata: { purpose: 'Sidebar', children: [{ name: 'sidebar.footer.action', kind: 'list', scope: 'root', purpose: 'Footer action' }] },
       },
-      { name: 'sidebar.footer.action', kind: 'list', scope: 'root', metadata: { purpose: 'Footer action', children: [] } },
+      { name: 'sidebar.footer.action', type: 'slot', kind: 'list', scope: 'root', metadata: { purpose: 'Footer action', children: [] } },
     ])
     await expect(provider.listSlots({ root: 'sidebar.footer.action' })).resolves.toMatchObject([
       {
@@ -213,6 +230,70 @@ describe('DshInspectBridgeProvider', () => {
     ])
     await expect(provider.listTools()).rejects.toMatchObject({ code: 'DSHX3204' })
     await new Promise<void>(resolve => server.close(() => resolve()))
+  })
+
+  it('bridges native Client Slot and Factory nodes from the Host Inspect registry', async () => {
+    const root = await mkdtemp(join('/tmp', 'dx-slot-tree-'))
+    tempRoots.push(root)
+    vi.stubEnv('DSH_HOME', root)
+    const context = new Context()
+    await context.provide('cordisInspect', {
+      list: () => [{ id: 'Slots' }],
+      query: async (_platform: string, _provider: string, _method: string, input: unknown) => {
+        const slotRoot = typeof input === 'object' && input !== null && 'root' in input ? input.root : undefined
+        if (typeof slotRoot === 'string') {
+          return {
+            requestedRoot: { name: slotRoot, available: true },
+            trees: [],
+            selected: {
+              type: 'slot',
+              name: slotRoot,
+              kind: 'list',
+              scope: 'root',
+              declaredBy: '@deepseek-ai/dsh-client-ui-sidebar',
+              catalog: { registration: [{ name: 'id', required: true, type: 'string' }], replaceRisk: 'none' },
+              occupants: [{ registrant: '@test/footer', id: 'test.footer' }],
+            },
+            referencedTypes: [],
+          }
+        }
+        return {
+          trees: [
+            {
+              type: 'factory',
+              name: 'ui.root',
+              scope: 'root',
+              children: [{ type: 'slot', name: 'sidebar.footer.action', kind: 'list', scope: 'root', children: [] }],
+            },
+          ],
+          referencedTypes: [],
+        }
+      },
+    })
+    await context.provide('agents', { create: async () => ({ agent: {}, dispose: async () => undefined }) })
+    const bridge = await startHostInspectBridge(context, { packageId: project.packageId, root: project.root })
+    try {
+      const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
+      await expect(provider.listSlots()).resolves.toEqual([
+        {
+          name: 'ui.root',
+          type: 'factory',
+          scope: 'root',
+        },
+        { name: 'sidebar.footer.action', type: 'slot', kind: 'list', scope: 'root' },
+      ])
+      await expect(provider.listSlots({ root: 'sidebar.footer.action' })).resolves.toMatchObject([
+        {
+          name: 'sidebar.footer.action',
+          type: 'slot',
+          kind: 'list',
+          scope: 'root',
+          metadata: { occupants: [{ registrant: '@test/footer', id: 'test.footer' }] },
+        },
+      ])
+    } finally {
+      await bridge.close()
+    }
   })
   it.each([
     ['an item without a name', { items: [{ provider: 'Service' }] }],

@@ -687,12 +687,15 @@ async function runInspect(args: CliArgs, options: CliRunOptions, project: Resolv
       if (target === 'slots') {
         const slot = item as {
           readonly name: string
+          readonly type?: 'slot' | 'factory'
           readonly provider?: string
           readonly kind?: string
           readonly scope?: string
           readonly metadata?: Readonly<Record<string, unknown>>
         }
-        const details = [slot.provider, slot.kind, slot.scope].filter((value): value is string => value !== undefined).join(' / ')
+        const details = [slot.provider, slot.type === 'factory' ? 'factory' : slot.kind, slot.scope]
+          .filter((value): value is string => value !== undefined)
+          .join(' / ')
         const purpose = args.root !== undefined && typeof slot.metadata?.purpose === 'string' ? slot.metadata.purpose : undefined
         write(io.stdout, `  ${slot.name}${details === '' ? '' : ` (${details})`}${purpose === undefined ? '' : `: ${purpose}`}\n`)
         if (args.root !== undefined && slot.metadata !== undefined) {
