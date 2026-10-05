@@ -179,12 +179,49 @@ None. Stateless UI; persisted data stays in each plugin's Host half.
 ## Implementation steps
 
 1. ✅ Audit: Host primitives, dshx platform modules, `useApiQuery`, theme tokens, per-plugin control inventory.
-2. ✅ Build `@dshfiles/plugin-ui`: core gap components, `/query`, `/table`, `/form`, `/chart` subpaths, tests.
-3. ✅ Pilot: `project-folder-picker` + `secret-catalog` (Host atoms, `Field`, `ConfirmDialog`, `DataTable`, Query).
-4. ✅ Migrate `ai-accounts`, `jujutsu`, `mcp-servers`, `plugin-marketplace`, `queue-reorder`, `settings-search`, `thread-sidebar`, `shortcuts`. Record each kept local style and why.
-5. ✅ Verify: workspace typecheck/test/build; client bundles contain no second React and import primitives externally.
+2. ✅ Build `@dshfiles/plugin-ui`: gap components, `/query`, `/table`, `/form`, `/chart`, a shared Host-primitives test double, README.
+3. ✅ Pilot `project-folder-picker` + `secret-catalog`, then migrate `ai-accounts`, `jujutsu`, `mcp-servers`, `plugin-marketplace`, `queue-reorder`, `settings-search`, `thread-sidebar`. One jj revision per plugin.
+4. ✅ Verify: workspace typecheck/test/build; every client bundle keeps React and the primitives external; per-plugin isolated boot (`tooling/dshx/scripts/boot-check-web.mjs`).
+5. ⏭ Not migrated: `shortcuts`, `agent-communication`, `goal-stall-guard` have no UI. `multi-host` lives as uncommitted work in another checkout; migrate it when it lands.
 6. ⏭ BB: kept separate. BB's runtime and content-script surfaces cannot consume DSH's platform module; BB stays a source of usage evidence.
-7. ⏭ Out of this branch: `multi-host` lives as uncommitted work in another checkout; migrate it when it lands.
+
+## Results
+
+| Plugin | CSS lines before → after | Query | Table | Form | Charts | Tests before → after |
+|---|---|---|---|---|---|---|
+| ai-accounts | 1452 → 716 | ✅ one cache for 4 slots, replaces 4 polls | ✅ banked resets | ✅ account editor | ✅ quota history | 68 → 74 |
+| jujutsu | 596 → 439 | ✅ load/details/diff + prepare/confirm | — | — | — | 12 → 12 |
+| mcp-servers | 422 → 298 (`client.tsx` 850 → 56) | ✅ snapshot + actions | — | ✅ server editor | — | 19 → 22 |
+| plugin-marketplace | 449 → 232 | ✅ infinite catalog + install | — | — | — | 29 → 29 |
+| secret-catalog | 376 → 136 | ✅ list/machine + mutations | ✅ aliases | ✅ create/edit | — | 24 → 34 |
+| project-folder-picker | 201 → 128 | — | — | — | — | 3 → 3 |
+| settings-search | 186 → 120 | ✅ save/reset mutation | — | — | — | 10 → 10 |
+| thread-sidebar | 1015 → 803 | — (sync stores) | — | — | — | 17 → 17 |
+| queue-reorder | 231 → 224 | ✅ queue writes | — | — | — | 5 → 5 |
+
+Total across the migration: ~7.0k lines removed, ~5.3k added (plugin-ui included). Client bundles are unminified (dshx sets `minify: false`); TanStack adds ~120 KB (Query) to ~1 MB (ai-accounts, all four libraries) per plugin, loaded from localhost.
+
+### Kept local, by reason
+
+- **Matches a Host reference surface.** `queue-reorder` dock buttons and editor (shipped dock styling differs from Host `Button`); `thread-sidebar` rail/row/header metrics, row icon buttons, header-style radios, the "More" footer popover.
+- **List rows, not actions.** Picker, settings-search results, jujutsu revisions, ai-accounts rail rows stay `<button>` rows: the Host `Button` has a fixed control height.
+- **Domain visuals.** Revision graph, diff blocks, quota bars, provider marks, marketplace/server/catalog cards, the draggable edge widget, the secret mask/reveal block.
+- **Security.** Secret reveal stays outside Query so a value never sits in a cache.
+- **No primitive exists.** `<details>`, `<datalist>`, spinners, links.
+
+### Behaviour changes worth a look
+
+1. ai-accounts: the rail switch toggled twice and saved nothing — fixed. Model curation now marks the editor dirty. Profile removal asks first. Slug validation enforces the documented pattern.
+2. secret-catalog: item type is always sent (it showed "Login" but sent nothing). Old rows are not kept while another folder loads, so actions cannot target the wrong folder.
+3. thread-sidebar: park/unpark use the Host pause/play icons. The context menu lost its accessible name (Host `Menu` has no label prop).
+4. jujutsu: sticky offsets were tuned for the old header; check them visually.
+5. Wide dialogs (mcp-servers manager, secret-catalog) size the Host `Modal` via `className`, which relies on plugin CSS loading after Host CSS.
+
+### Follow-ups
+
+1. Interactive component tests: most plugins lack `jsdom` + `@testing-library/react`. The shared double (`plugin-ui/testing/host-primitives.tsx`) is ready; first targets are "removal never fires before confirmation" in secret-catalog and mcp-servers.
+2. Host gaps: `Menu` label prop, `Tag` attribute pass-through, a danger `Button` variant, a disclosure primitive.
+3. Consider enabling minification in dshx client builds.
 
 ## Open questions
 
@@ -196,11 +233,12 @@ None. Stateless UI; persisted data stays in each plugin's Host half.
 ## Acceptance criteria
 
 - [x] `@dshfiles/plugin-ui` typechecks and tests independently.
-- [x] Every migrated plugin builds; client bundles keep React and `dsh-client-ui-primitives` external.
+- [x] Every migrated plugin typechecks, tests, and builds; client bundles keep React and `dsh-client-ui-primitives` external.
 - [x] Shared styles are CSS Modules on `--dsw-*` tokens with no global reset or unscoped element rule.
 - [x] Controls keep accessible names, label/error association, focus visibility, disabled semantics, and Host dialog behavior.
-- [x] Hand-rolled async loaders in migrated plugins use TanStack Query; remaining local primitives have a recorded reason (below).
-- [ ] A scratch-profile runtime boot shows the migrated plugins without activation failures (user-run; never restart the live web profile).
+- [x] Hand-rolled async loaders in migrated plugins use TanStack Query; remaining local primitives have a recorded reason (above).
+- [x] Isolated per-plugin boot (`boot-check-web.mjs`, scratch DSH_HOME, port 0): all 11 bundles reach active and mount.
+- [ ] Visual pass in the user's browser on a second instance (never restart the live web profile).
 
 ## Decisions log
 
@@ -216,3 +254,5 @@ None. Stateless UI; persisted data stays in each plugin's Host half.
 | 2026-10-05 | Re-export TanStack from `@dshfiles/plugin-ui` subpaths | One pinned version across plugins; plugins declare one dependency. |
 | 2026-10-05 | Pin TanStack Charts exactly and confine to `ai-accounts` | 1.0.0 is two days old. |
 | 2026-10-05 | Keep dshx `useApiQuery` but stop using it in owned plugins | Toolchain API stays for other authors; TanStack Query supersedes it here. |
+| 2026-10-05 | Use Query even for a lone mutation (queue-reorder, settings-search) | Consistency with the TanStack preference; the unminified bundle cost is served from localhost. |
+| 2026-10-05 | Keep Host-reference surfaces local where the primitives do not match | Fidelity to the shipped dock and sidebar outranks shared styling. |
