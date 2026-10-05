@@ -75,6 +75,14 @@ const EXPECTED = {
   '01 title above context': true,
   '01 actions hidden at rest': true,
   '02 compact target': 68,
+  '03 expanded label inset': 73,
+  '03 expanded pitch': 64,
+  '09 picker row height': 43,
+  '09 picker title font': '15.2px',
+  '10 header row pitch': 60,
+  '11 footer row pitch': 90,
+  '14 jujutsu row pitch': 57,
+  '14 jujutsu title font': '15px',
 }
 
 const measure = async () => {
@@ -102,6 +110,50 @@ const measure = async () => {
       slotErrors: document.querySelectorAll('[data-slot-error]').length,
     }
   })
+
+  // References 03, 10 and 11 all live in the customize panel, so one open of it
+  // covers them: the expanded header geometry, and the two row densities, which
+  // differ because the references measure two different panels.
+  await page.getByRole('button', { name: 'Customize sidebar' }).first().click()
+  await page.waitForTimeout(2000)
+  Object.assign(
+    values,
+    await page.evaluate(() => {
+      const headerRows = [...document.querySelectorAll('[class*="_customizeRow_"][class*="_headerRows"]')]
+      const footerRows = [...document.querySelectorAll('[class*="_customizeRow_"][class*="_footerRows"]')]
+      const pitch = rows =>
+        rows.length > 1 ? Math.round(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top) : null
+      return {
+        '10 header row pitch': pitch(headerRows),
+        '11 footer row pitch': pitch(footerRows),
+      }
+    }),
+  )
+
+  // Reference 03: expanded header rows carry the label at x73 on a 64px pitch.
+  await page.evaluate(() => {
+    ;[...document.querySelectorAll('[class*="_modeField_"] input')].find(input => input.value === 'expanded')?.click()
+  })
+  await page.waitForTimeout(1500)
+  Object.assign(
+    values,
+    await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label]')
+      const rows = [...(nav?.querySelectorAll('button') ?? [])]
+      const labelLeft = rows[0] === undefined ? null : Math.round([...rows[0].children].map(c => c.getBoundingClientRect().left).sort((a, b) => b - a)[0])
+      const rowPitch = rows[1] === undefined ? null : Math.round(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top)
+      return { '03 expanded label inset': labelLeft, '03 expanded pitch': rowPitch }
+    }),
+  )
+
+  // Put the header back to compact so the run leaves no saved change behind.
+  await page.evaluate(() => {
+    ;[...document.querySelectorAll('[class*="_modeField_"] input')].find(input => input.value === 'compact')?.click()
+  })
+  await page.waitForTimeout(1000)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(800)
+
   await context.close()
   return values
 }
@@ -179,6 +231,64 @@ const measurePanels = async () => {
       }),
     )
     await context.close()
+  }
+
+  // Reference 09: the picker, opened from Secret Catalog. Its scale is ~1.662, so
+  // its measured values are halved before comparing -- reading a font straight
+  // off that image doubles it.
+  {
+    const { context, page } = await openPage()
+    await page.locator('button[aria-label="Secret Catalog"]').first().click()
+    await page.waitForTimeout(3000)
+    await page.getByRole('button', { name: /choose a project folder/i }).first().click()
+    await page.waitForTimeout(2500)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const dialog = document.querySelector('[class*="_dialog_"]')
+        const item = dialog?.querySelector('[class*="_item"]')
+        const title = dialog?.querySelector('[class*="_itemText"] strong')
+        return {
+          '09 picker row height': item === null ? null : Math.round(item.getBoundingClientRect().height),
+          '09 picker title font': title === null ? null : getComputedStyle(title).fontSize,
+          '09 picker shortcuts': dialog === null ? 0 : dialog.querySelectorAll('kbd').length,
+        }
+      }),
+    )
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(800)
+    await context.close()
+  }
+
+  // Reference 14: the Jujutsu graph, which needs a repository open before its
+  // rows exist. The path is read from the environment so the gate does not hard
+  // code one developer's checkout.
+  if (process.env.DSH_JUJUTSU_REPO !== undefined) {
+    const { context, page } = await openPage()
+    await page.locator('button[aria-label="Jujutsu"]').first().click()
+    await page.waitForTimeout(2500)
+    const field = page.locator('input').filter({ hasNot: page.locator('[type="checkbox"]') }).first()
+    await field.click()
+    await field.fill(process.env.DSH_JUJUTSU_REPO)
+    await page.waitForTimeout(500)
+    await page.getByRole('button', { name: /open repository/i }).first().click().catch(() => {})
+    await page.waitForTimeout(5000)
+    Object.assign(
+      values,
+      await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('[class*="_revision_"]')]
+        const title = rows[0]?.querySelector('[class*="_revisionTitle"]')
+        return {
+          '14 jujutsu row pitch':
+            rows.length > 1 ? Math.round(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top) : null,
+          '14 jujutsu title font': title === null ? null : getComputedStyle(title).fontSize,
+        }
+      }),
+    )
+    await context.close()
+  } else {
+    values['14 jujutsu row pitch'] = 'skipped: set DSH_JUJUTSU_REPO to a repository path'
+    values['14 jujutsu title font'] = 'skipped: set DSH_JUJUTSU_REPO to a repository path'
   }
 
   return values
