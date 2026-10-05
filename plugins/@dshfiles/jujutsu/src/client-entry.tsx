@@ -1,26 +1,27 @@
-import type {} from '@deepseek-ai/dsh-client-locale'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
-import { defineClientPlugin } from '@dshfiles/dshx/client'
+import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { defineClient } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { JujutsuPanel } from './client.js'
-import { JUJUTSU_LOCALE_NAMESPACE, jujutsuLocale } from './locales.js'
 
 const PANEL_ID = 'dshfiles-jujutsu'
 const RIGHT_PANE_ID = '@dshfiles/jujutsu/revision-graph'
 const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 
-export default defineClientPlugin({
-  id: PANEL_ID,
+export default defineClient({
   name: '@dshfiles/jujutsu',
-  locales: [jujutsuLocale],
-  inject: ['sidebarRightTabs'],
-  uses: ['ui'],
-  setup(api) {
-    const translate = api.raw.ctx.locale.bind(JUJUTSU_LOCALE_NAMESPACE)
-    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: JUJUTSU_LOCALE_NAMESPACE }, PanelGlyph)
-    api.ui.register({ name: 'main', key: PANEL_ID, locale: JUJUTSU_LOCALE_NAMESPACE }, JujutsuPanel)
-    api.raw.ctx.effect(
+  // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
+  inject: ['slots', 'sidebarRightTabs'],
+  // The panel calls useApi, so the entry must be decorated: a raw component
+  // renders outside the API context and its useApi throws while rendering.
+  setup(ctx, decorate) {
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(MainJujutsuSlot)))
+    ctx.effect(
       () =>
-        api.raw.ctx.sidebarRightTabs.register({
+        ctx.sidebarRightTabs.register({
           id: RIGHT_PANE_ID,
           kind: RIGHT_PANE_KIND,
           title: () => 'Jujutsu',
@@ -36,11 +37,23 @@ export default defineClientPlugin({
         }),
       'dshfiles-jujutsu: right pane tab type',
     )
-    api.ui.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, inject: () => ({ t: translate }) }, JujutsuRightPane)
+    ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, decorate(JujutsuRightPane)),
+    )
   },
 })
 
-const JujutsuRightPane = (props: Parameters<typeof JujutsuPanel>[0]): JSX.Element => <JujutsuPanel {...props} surface="side-panel" />
+const MainJujutsuSlot = (): JSX.Element => (
+  <PluginQueryProvider>
+    <JujutsuPanel surface="main" />
+  </PluginQueryProvider>
+)
+
+const JujutsuRightPane = (): JSX.Element => (
+  <PluginQueryProvider>
+    <JujutsuPanel surface="side-panel" />
+  </PluginQueryProvider>
+)
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg
