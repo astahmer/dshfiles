@@ -301,8 +301,11 @@
  * accent colour, and `role="switch"` keeps the state announced.
  */
 /*
- * The reference's switch is a 32x32 rounded square, not a wide pill, so the
- * thumb is a circle that fills it rather than a track with a sliding knob.
+ * The reference's switch is a 32x32 square on rows 60px apart, and the two
+ * measurements have to agree: a control taller than its row cannot sit in it.
+ * Reference 11 renders the same affordance as a 64x40 bar, so the exact shape
+ * belongs to the Host; what this reproduces is the square that fits reference
+ * 10's row.
  */
 .visibilityToggle {
   position: relative;
