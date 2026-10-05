@@ -5,6 +5,7 @@ import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { AccountsPanel } from './accounts-panel.js'
 import { QuotaFooter } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
+import { EdgeUsageWidget } from './edge-usage.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 
 /**
@@ -31,6 +32,7 @@ export default defineClientPlugin({
     const AccountsPanelView = (): JSX.Element => <AccountsPanel onOpenUsageHistory={openUsageHistory} />
     const UsageHistoryPanelView = (): JSX.Element => <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
     const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element | null => <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
+    const EdgeUsageHostView = (): JSX.Element | null => <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} />
     // The footer owns its whole surface, so quota lives there as a compact
     // disclosure: the number you want without opening the panel.
     api.ui.register(
@@ -41,6 +43,17 @@ export default defineClientPlugin({
         locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
       },
       QuotaFooterView,
+    )
+    // The edge overlay mounts with the shell, so it survives panel switches; a
+    // settings toggle decides whether it draws.
+    api.ui.register(
+      {
+        name: 'sidebar.footer.action',
+        id: 'ai-accounts-edge',
+        order: 3,
+        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
+      },
+      EdgeUsageHostView,
     )
 
     api.ui.register(

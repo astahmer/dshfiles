@@ -1353,3 +1353,100 @@
 .footerWide .footerHistoryLink {
   flex: 0 0 auto;
 }
+
+.edgeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.edgeOverlay:has(.edgePopover) {
+  pointer-events: none;
+}
+
+.edgeTrigger {
+  position: fixed;
+  width: 36px;
+  height: 36px;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14));
+  border-radius: 50%;
+  background: var(--dsw-specific-menu, rgba(28, 28, 30, 0.92));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  color: var(--dsw-alias-label-primary, #f5f5f7);
+  cursor: pointer;
+  z-index: 2001;
+  pointer-events: auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  font: var(--dsw-font-xs-13, 13px Inter);
+}
+
+.edgeTriggerMark {
+  font-size: 9px;
+  line-height: 10px;
+  letter-spacing: 0.02em;
+}
+
+.edgePopover {
+  position: fixed;
+  width: min(420px, 100vw - 32px);
+  max-height: 60vh;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  background: var(--dsw-specific-menu, rgba(28, 28, 30, 0.95));
+  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(12px));
+  box-shadow: var(--dsw-elevation-prominent, 0 12px 40px rgba(0, 0, 0, 0.5));
+  color: var(--dsw-alias-label-primary, #f5f5f7);
+  z-index: 2002;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  pointer-events: auto;
+}
+
+.edgePopoverHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 8px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l4, rgba(255, 255, 255, 0.08));
+}
+
+.edgeRows {
+  margin: 4px 0 0;
+  padding: 0 6px 2px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.edgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.edgeRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.edgeReset {
+  flex: 1 0 auto;
+  text-align: right;
+  color: var(--dsw-alias-label-caption, rgba(245, 245, 247, 0.5));
+  font: var(--dsw-font-xs-13, 13px Inter);
+}
+
+.edgeEmpty {
+  padding: 8px 12px;
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, rgba(245, 245, 247, 0.4));
+  font: var(--dsw-font-xs-13, 13px Inter);
+}

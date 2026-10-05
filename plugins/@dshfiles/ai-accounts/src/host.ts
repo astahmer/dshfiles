@@ -24,11 +24,11 @@ import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV, createCommandCodeProvider } from './commandcode-provider.js'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import { LlmError, ReasoningEffortId, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, isRateLimitFailure } from './account-pool.js'
@@ -284,6 +284,12 @@ const accountsHostApi = aiAccountsApi.host({
   }),
   historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
   saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
+  overlaySettings: async ({ ctx }) => (await readUsageHistorySettings(ctx)).overlays,
+  saveOverlaySettings: async ({ input, ctx }) => {
+    const meta = await readUsageHistorySettings(ctx)
+    const next = await saveUsageHistorySettings(ctx, { overlays: { ...meta.overlays, ...input.patch } })
+    return next.overlays
+  },
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
 })
 
@@ -353,6 +359,45 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
   const config = configFromAccountsFile(file)
   activeAccounts.config = config
   activeAccounts.pool.setDistribution(file.distribution)
+}
+
+/** Apply the account's pin to one request whose caller did not choose an effort. */
+const pinnedCall = (options: GenerateOptions, pins: ReadonlyMap<string, Readonly<Record<string, string>>>): GenerateOptions => {
+  if (options.reasoningEffort !== undefined) return options
+  const effort = pins.get(options.provider)?.[options.model]
+  if (effort === undefined) return options
+  return { ...options, reasoningEffort: ReasoningEffortId(effort) }
+}
+
+/**
+ * One default per model, not one per route.
+ *
+ * pi-ai materializes a default effort through the route-wide `profile.reasoning`
+ * field, so a per-model pin cannot be expressed there without reshuffling every
+ * other model the account serves. The adapter's `stream` entry point sees the
+ * fully-assembled request after the loop built it, so overriding there applies
+ * exactly one pin — the caller's explicit choice still wins, a different model
+ * on the same route keeps the provider default, and an effort-only switch
+ * (no provider or model change) stays silent the way `sameRoute` wants.
+ */
+class EffortPinnedAdapter extends PiAiAdapter {
+  private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+
+  constructor(config: ConstructorParameters<typeof PiAiAdapter>[0], deps: { reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>> }) {
+    super(config)
+    this.reasoningDefaults = deps.reasoningDefaults
+  }
+
+  override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    return super.stream(pinnedCall(options, this.reasoningDefaults))
+  }
+
+  override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
+    return super.prepareCall(provider, model, signal).then(call => ({
+      ...call,
+      stream: (options: GenerateOptions) => call.stream(pinnedCall(options, this.reasoningDefaults)),
+    }))
+  }
 }
 
 export default definePlugin({
@@ -446,57 +491,60 @@ export default definePlugin({
     const llm = ctx.get('llm')
     if (llm === undefined) return
 
-    const adapter = new PiAiAdapter({
-      profiles: () => profiles,
-      resolveApiKey: async provider => {
-        const route = routes.get(provider)
-        if (route === undefined) return undefined
-        if (route.kind === CODEX_KIND) {
-          await materializeCodexShadowHome(route.layout)
-          return readCodexAccessToken(route.layout.effectiveHomePath)
-        }
-        // Keyed providers read the variable their own account names, so several
-        // subscriptions live in the vault without any value in the accounts file.
-        const named = keyEnvFor(route)
-        const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
-        const key = readKeyFromEnv(named) || sharedKey
-        if (key.length === 0) {
-          throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
-        }
-        return key
-      },
-      resolveAttachments: () => ctx.get('attachments'),
-      resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref),
-      auth: {
-        credentials: {
-          read: async provider => {
-            const route = routes.get(provider)
-            if (route === undefined || route.kind !== CODEX_KIND) return undefined
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => profiles,
+        resolveApiKey: async provider => {
+          const route = routes.get(provider)
+          if (route === undefined) return undefined
+          if (route.kind === CODEX_KIND) {
             await materializeCodexShadowHome(route.layout)
-            return readCodexOAuthCredential(route.layout.effectiveHomePath)
-          },
-          list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
-          modify: async (provider, mutate) => {
-            const route = routes.get(provider)
-            if (route === undefined || route.kind !== CODEX_KIND) {
+            return readCodexAccessToken(route.layout.effectiveHomePath)
+          }
+          // Keyed providers read the variable their own account names, so several
+          // subscriptions live in the vault without any value in the accounts file.
+          const named = keyEnvFor(route)
+          const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
+          const key = readKeyFromEnv(named) || sharedKey
+          if (key.length === 0) {
+            throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
+          }
+          return key
+        },
+        resolveAttachments: () => ctx.get('attachments'),
+        resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath), ref),
+        auth: {
+          credentials: {
+            read: async provider => {
+              const route = routes.get(provider)
+              if (route === undefined || route.kind !== CODEX_KIND) return undefined
+              await materializeCodexShadowHome(route.layout)
+              return readCodexOAuthCredential(route.layout.effectiveHomePath)
+            },
+            list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
+            modify: async (provider, mutate) => {
+              const route = routes.get(provider)
+              if (route === undefined || route.kind !== CODEX_KIND) {
+                throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+              }
+              await materializeCodexShadowHome(route.layout)
+              const codexHome = route.layout.effectiveHomePath
+              const next = await mutate(await readCodexOAuthCredential(codexHome))
+              if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
+              return next
+            },
+            delete: async () => {
               throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
-            }
-            await materializeCodexShadowHome(route.layout)
-            const codexHome = route.layout.effectiveHomePath
-            const next = await mutate(await readCodexOAuthCredential(codexHome))
-            if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
-            return next
+            },
           },
-          delete: async () => {
-            throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+          authContext: {
+            env: async () => undefined,
+            fileExists: async () => false,
           },
-        },
-        authContext: {
-          env: async () => undefined,
-          fileExists: async () => false,
         },
       },
-    })
+      { reasoningDefaults: new Map(reasoningPins) },
+    )
 
     const disposers: Array<() => void> = []
 

@@ -10,6 +10,7 @@ import {
   type AccountProfile,
   type AccountsFile,
   type AccountsCatalog,
+  type OverlaySettings,
 } from './api.js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import styles from './accounts.module.css'
@@ -33,6 +34,12 @@ const KIND_LABEL: Record<AccountProfile['kind'], string> = {
 
 /** Rail group headings, in the order the groups are listed. */
 const KIND_GROUPS: readonly AccountProfile['kind'][] = ['codex', 'opencode-go', 'commandcode']
+
+/** What connects a keyed account, for the notice the rail shows after creating one. */
+const keyHintFor = (kind: AccountProfile['kind']): string =>
+  kind === 'commandcode'
+    ? 'Set COMMANDCODE_API_KEY in the environment and the picker publishes the route.'
+    : 'Set OPENCODE_API_KEY (or a shared key on the ai-accounts entry) and the route serves.'
 
 const STATE_LABEL: Record<AccountProfile['state'], string> = {
   healthy: 'Authenticated',
@@ -454,10 +461,10 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
-  const [addingKind, setAddingKind] = useState<AccountProfile['kind'] | null>(null)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [overlays, setOverlays] = useState<OverlaySettings>(() => ({ edgeWidget: true, footerQuota: true }))
 
   const load = useCallback(async () => {
     const next = await accounts.read()
@@ -468,6 +475,18 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   useEffect(() => {
     void load().catch(() => setNotice('The account host did not answer.'))
   }, [load])
+
+  // Surfaces are independent of the file, so read them once on open.
+  useEffect(() => {
+    void accounts
+      .overlaySettings()
+      .then(setOverlays)
+      .catch(() => setOverlays({ edgeWidget: true, footerQuota: true }))
+  }, [accounts])
+
+  const persistOverlay = async (patch: Partial<OverlaySettings>) => {
+    setOverlays(await accounts.saveOverlaySettings({ patch }))
+  }
 
   // The catalog is per account and only changes when the account does.
   const refreshCatalog = useCallback(
@@ -574,6 +593,43 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
     setNotice(`Removed ${profile.displayName}. Credentials were left on disk.`)
   }
 
+  /**
+   * One click, one account. The kind decides every default: a unique route slug,
+   * a display name, a two-character tag, a color and a spare icon — all editable
+   * after the fact in the numbered sections. The user signs in afterwards; the
+   * panel polls the identity and the card lights up when Codex writes the file.
+   */
+  const createAccount = async (kind: AccountProfile['kind']) => {
+    setAddMenuOpen(false)
+    setSaving(true)
+    setNotice(null)
+    try {
+      const existing = file?.accounts ?? []
+      const taken = new Set(existing.map(account => account.instanceId))
+      const base = blankAccount(kind)
+      let derived = `${kind}_work`
+      for (let suffix = 2; taken.has(derived); suffix += 1) derived = `${kind}_work_${suffix}`
+      const ordinalLabel = `${KIND_LABEL[kind]} ${existing.filter(account => account.kind === kind).length + 1}`
+      const freeIcon = PROVIDER_ICONS.find(icon => !existing.some(account => account.providerIcon === icon)) ?? PROVIDER_ICONS[0]
+      const draft: AccountDraft = {
+        ...base,
+        instanceId: derived,
+        displayName: ordinalLabel,
+        badge: badgeFromName(ordinalLabel),
+        accentColor: kind === 'codex' ? '#2563EB' : kind === 'opencode-go' ? '#7C3AED' : '#0E7490',
+        providerIcon: freeIcon,
+      }
+      setFile(await accounts.save({ draft }))
+      setSelectedId(derived)
+      const label = kind === 'codex' ? 'Sign in with the copied command (Session section) and the identity fills itself in.' : keyHintFor(kind)
+      setNotice(`Added ${ordinalLabel}. ${label}`)
+    } catch (error) {
+      setNotice(`Could not add the account: ${String(error)}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const copy = async (text: string, message: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -622,6 +678,14 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
           <span>on</span>
           <span className={styles.scopeValue}>this host</span>
         </span>
+        <label className={styles.overlaySwitch}>
+          <input type="checkbox" checked={overlays.edgeWidget} onChange={event => void persistOverlay({ edgeWidget: event.target.checked })} />
+          <span>Edge overlay</span>
+        </label>
+        <label className={styles.overlaySwitch}>
+          <input type="checkbox" checked={overlays.footerQuota} onChange={event => void persistOverlay({ footerQuota: event.target.checked })} />
+          <span>Sidebar foot</span>
+        </label>
         <span className={styles.scopeBar}>
           <span>Spreading requests</span>
           <select
@@ -664,16 +728,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
               {addMenuOpen ? (
                 <span className={styles.addMenu} role="menu">
                   {KIND_GROUPS.map(kind => (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      key={kind}
-                      disabled={saving}
-                      onClick={() => {
-                        setAddMenuOpen(false)
-                        setAddingKind(kind)
-                      }}
-                    >
+                    <button type="button" role="menuitem" key={kind} disabled={saving} onClick={() => void createAccount(kind)}>
                       <span
                         className={styles.addMenuMark}
                         style={{ background: kind === 'codex' ? '#2563EB' : kind === 'opencode-go' ? '#7C3AED' : '#0E7490' }}
@@ -997,76 +1052,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
             <p>Create a Codex, OpenCode Go, or Command Code profile. Each one becomes its own route in the model picker.</p>
           </section>
         )}
-
-        {addingKind !== null ? (
-          <div className={styles.addOverlay} role="dialog" aria-modal="true" aria-label={`New ${KIND_LABEL[addingKind]} account`}>
-            <div className={styles.addCard}>
-              <h2 className={styles.detailTitle}>New {KIND_LABEL[addingKind]} account</h2>
-              <p className={styles.detailSub}>Give it a route slug; each account becomes its own provider in the picker.</p>
-              <NewAccountForm
-                kind={addingKind}
-                onCancel={() => setAddingKind(null)}
-                onCreate={async next => {
-                  setAddingKind(null)
-                  setSelectedId(next.instanceId)
-                  await save(next)
-                }}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
-  )
-}
-
-const NewAccountForm = (props: {
-  readonly kind: AccountProfile['kind']
-  readonly onCancel: () => void
-  readonly onCreate: (draft: AccountDraft) => Promise<void>
-}): JSX.Element => {
-  const [draft, setDraft] = useState<AccountDraft>(() => blankAccount(props.kind))
-  const invalid = draft.instanceId.trim().length === 0
-  return (
-    <>
-      <Field label="Route slug" hint="For example codex_work.">
-        <input
-          className={styles.input}
-          value={draft.instanceId}
-          placeholder={props.kind === 'codex' ? 'codex_work' : `${props.kind}_work`}
-          onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
-        />
-      </Field>
-      <Field label="Display name">
-        <input
-          className={styles.input}
-          value={draft.displayName}
-          placeholder={KIND_LABEL[props.kind]}
-          onChange={event => setDraft({ ...draft, displayName: event.target.value })}
-        />
-      </Field>
-      {props.kind === 'codex' ? (
-        <Field label="CODEX_HOME path" hint="Where shared sessions and skills live.">
-          <input className={styles.input} value={draft.homePath} onChange={event => setDraft({ ...draft, homePath: event.target.value })} />
-        </Field>
-      ) : (
-        <Field label="API key environment variable">
-          <input
-            className={styles.input}
-            value={draft.apiKeyEnv}
-            placeholder={props.kind === 'commandcode' ? 'COMMANDCODE_API_KEY' : 'OPENCODE_API_KEY'}
-            onChange={event => setDraft({ ...draft, apiKeyEnv: event.target.value })}
-          />
-        </Field>
-      )}
-      <div className={styles.detailActions}>
-        <button type="button" className={styles.primary} disabled={invalid} onClick={() => void props.onCreate(draft)}>
-          Create
-        </button>
-        <button type="button" className={styles.quiet} onClick={props.onCancel}>
-          Cancel
-        </button>
-      </div>
-    </>
   )
 }

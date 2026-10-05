@@ -88,7 +88,7 @@ export const accountProfileSchema = z.object({
   /** The exact command that signs this account in. Never a credential. */
   loginHint: z.string().max(2048),
   detail: z.string().max(400).nullable(),
-  additionalModelIds: z.array(z.string().max(120)).max(32),
+  additionalModelIds: z.array(z.string().max(120)).max(32).default([]),
   /**
    * Default reasoning effort per model id. Absent means the provider's own
    * default, so an account only lists the models it wants to pin.
@@ -177,6 +177,7 @@ export const accountsCatalogSchema = z.object({
 export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
+export type OverlaySettings = { readonly edgeWidget: boolean; readonly footerQuota: boolean }
 
 export const identityResultSchema = z.object({
   instanceId: z.string().min(1).max(64),
@@ -265,6 +266,17 @@ export const aiAccountsApi = defineApi({
         retentionDays: z.number().int().min(1).max(365),
       }),
       output: usageMetaSchema,
+    }),
+
+    /**
+     * Which surfaces quota lives on. The foot disclosure renders when footerQuota
+     * is on, the draggable edge overlay when edgeWidget is on; the two are
+     * independent so either surface can exist without the other.
+     */
+    overlaySettings: method({ input: z.void(), output: usageMetaSchema.shape.overlays.unwrap() }),
+    saveOverlaySettings: method({
+      input: z.object({ patch: z.object({ edgeWidget: z.boolean().optional(), footerQuota: z.boolean().optional() }) }),
+      output: usageMetaSchema.shape.overlays.unwrap(),
     }),
 
     /**

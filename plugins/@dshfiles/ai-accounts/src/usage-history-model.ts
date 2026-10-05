@@ -17,6 +17,15 @@ export const usageMetaSchema = z.object({
   lastAttemptAt: z.number().nullable().default(null),
   intervalMinutes: z.number().int().min(1).max(60).default(5),
   retentionDays: z.number().int().min(1).max(365).default(90),
+  /** Surfaces quota can live on. A stored row written before overlays existed reads the default. */
+  overlays: z
+    .object({
+      /** The draggable edge overlay. */
+      edgeWidget: z.boolean().default(true),
+      /** The sidebar foot disclosure. */
+      footerQuota: z.boolean().default(true),
+    })
+    .prefault({}),
 })
 
 export const usageHistoryPointSchema = quotaSnapshotSchema.omit({ instanceId: true })
@@ -24,4 +33,4 @@ export const usageHistoryPointSchema = quotaSnapshotSchema.omit({ instanceId: tr
 export type QuotaSnapshot = z.infer<typeof quotaSnapshotSchema>
 export type UsageMeta = z.infer<typeof usageMetaSchema>
 export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>
-export type UsageHistorySettings = Pick<UsageMeta, 'intervalMinutes' | 'retentionDays'>
+export type UsageHistorySettings = Partial<Pick<UsageMeta, 'intervalMinutes' | 'retentionDays' | 'overlays'>>
