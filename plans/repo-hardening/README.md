@@ -231,11 +231,12 @@ antislop outside the files touched here.
       Reproduced in an isolated DSH home: four actions painted down to y=1020
       in an 876px viewport; after the CSS fix, wheel scrolling kept the last of
       five actions inside the footer at y=872, before its y=876 boundary
-- [ ] (owned by the `dshx-complete` workspace) Toolchain gap behind two of those crashes, earned by three plugins:
-      dshx should either check every `ctx.<service>` against `inject` (it
-      knows only locale, slots and sessions) or decorate imperative
-      `ctx.slots.register` components itself. `profile:boot` covers the Host
-      only; a client pass (dshx's browser boot check) belongs in the smoke
+- [x] DSHX checks catalogued Client service injections and their provider
+      package edges during build and manifest validation. The web boot gate
+      gives each owned bundle a scratch profile, then uses headless Chromium to
+      verify composition, expected Client entries, native readiness, and Slot
+      render boundaries. All 13 per-plugin browser boot checks passed in the
+      2026-10-05 `pnpm check`
 - [x] Integration review install steps corrected (bundles list package names,
       not row ids); Installed column added
 
