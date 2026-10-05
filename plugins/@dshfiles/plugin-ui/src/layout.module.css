@@ -1,0 +1,153 @@
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsw-font-xs-13, 13px);
+  line-height: 1.45;
+}
+
+.noticeBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noticeTitle {
+  font-weight: 600;
+}
+
+.noticeActions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.info {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
+}
+
+.success {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 45%, transparent);
+}
+
+.warning {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 50%, transparent);
+  background: var(--dsw-alias-state-warn-tertiary, var(--dsw-alias-bg-layer-1));
+}
+
+.danger {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 50%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 16px;
+  color: var(--dsw-alias-label-secondary);
+  text-align: center;
+}
+
+.emptyStateCompact {
+  align-items: flex-start;
+  padding: 10px 2px;
+  text-align: left;
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.emptyDescription {
+  margin: 0;
+  font-size: var(--dsw-font-xs-13, 13px);
+  line-height: 1.45;
+}
+
+.emptyAction {
+  margin-top: 6px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.sectionHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sectionDescription {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsw-font-xs-13, 13px);
+  line-height: 1.45;
+}
+
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dangerButton {
+  background: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-static-neutral-00, #fff);
+}

@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "zod": "^4.4.3"
   },
   "devDependencies": {

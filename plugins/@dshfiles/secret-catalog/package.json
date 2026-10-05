@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "@dshfiles/project-folder-picker": "link:../project-folder-picker",
     "zod": "^4.4.3"
   },

@@ -24,5 +24,8 @@
   },
   "peerDependencies": {
     "react": ">=18.2.0 <19"
+  },
+  "dependencies": {
+    "@dshfiles/plugin-ui": "link:../plugin-ui"
   }
 }
