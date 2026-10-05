@@ -125,11 +125,18 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   that path. Record the T3 thread ID, workspace name, and absolute path in the
   task handoff. Do not use an ad-hoc copy or a T3-generated project directory
   as a code checkout.
-- T3's null `worktreePath` means the thread is bound to the project's main
-  checkout; it does not discover a manually created JJ workspace. Enter the
-  named workspace explicitly before editing, and confirm its workspace name
-  still appears in `jj workspace list`. A T3 Git worktree is not a JJ
-  workspace unless JJ confirms that it shares this repository.
+- Create the JJ workspace before launching an independent top-level T3 thread,
+  then pass it with `workspaceStrategy: { type: "existing_worktree",
+  worktreePath: "<absolute-path>", branch: "<bookmark>" }`. An omitted
+  strategy binds the thread to the project root, even when its caller is in a
+  sibling workspace. Running `cd` or `jj workspace add` after launch does not
+  update T3's binding.
+- After launch, verify `t3_thread_read` reports the requested `worktreePath`
+  and `t3_worktree_status` reports the same attached path. Then confirm
+  `jj workspace list` from that path contains the named workspace. If T3 cannot
+  bind the JJ workspace, do not let the thread edit until its checkout is
+  prepared as a JJ workspace and the T3 binding is verified. A T3 Git worktree
+  is not a JJ workspace unless JJ confirms that it shares this repository.
 - Keep active source workspaces untouched during consolidation. Duplicate a
   fixed revision snapshot into an integration workspace, rebase that copy onto
   `main`, and retain the source workspace until tree equality and status prove
