@@ -419,11 +419,7 @@ describe('client compiler', () => {
     const root = await temporaryProject()
     await writeFile(
       resolve(root, 'src/client.tsx'),
-      [
-        "import { defineClient } from '@dshfiles/dshx/client'",
-        'export default defineClient({ setup(ctx) { ctx.sessions.scope("s") } })',
-        '',
-      ].join('\n'),
+      ["import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({ setup(ctx) { ctx.sessions.scope("s") } })', ''].join('\n'),
     )
 
     await expect(

@@ -73,10 +73,7 @@ describe('slot render failures', () => {
   })
 
   it('reports every failing Slot, not just the first', () => {
-    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([
-      { slot: 'sidebar' },
-      { slot: 'conversation.input.overlay' },
-    ])
+    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([{ slot: 'sidebar' }, { slot: 'conversation.input.overlay' }])
   })
 
   it('ignores a marker with no Slot name', () => {
