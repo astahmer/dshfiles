@@ -165,6 +165,7 @@ settings:
 overrides:
   '@deepseek-ai/dsh-agent': link:../agent
   '@deepseek-ai/dsh-session': link:../session
+  '@deepseek-ai/dsh-session-persistence-jsonl': link:../session-persistence-jsonl
 
 importers:
 
@@ -179,6 +180,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: link:../session
         version: link:../session
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: link:../session-persistence-jsonl
+        version: link:../session-persistence-jsonl
       '@deepseek-ai/dsh-util-values':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
