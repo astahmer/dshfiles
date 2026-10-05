@@ -1553,6 +1553,15 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   // before a Host is contacted.
   if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
   if (args.help) {
+    const runtime = options.runtime ?? {}
+    if (args.command !== undefined && platformGroupsForRun().has(args.command)) {
+      return runPlatformCli(args, {
+        io,
+        dshxVersion: options.version ?? VERSION,
+        ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
+        ...(runtime.connectCommunication === undefined ? {} : { connectCommunication: runtime.connectCommunication }),
+      })
+    }
     write(io.stdout, await renderCliUsage(args))
     return 0
   }
