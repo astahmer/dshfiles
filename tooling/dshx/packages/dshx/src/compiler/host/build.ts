@@ -190,6 +190,11 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       singleHostChunkPlugin(),
     ],
     build: {
+      // A Host artifact runs inside the DSH Node process, so the build must
+      // run the server environment: without a server consumer Vite treats
+      // `node:*` imports as browser externals and rewrote every bare
+      // `process.env.X` read in plugin source to an empty-object lookup.
+      ssr: true,
       target: 'es2024',
       outDir: paths.outDir,
       emptyOutDir: false,
