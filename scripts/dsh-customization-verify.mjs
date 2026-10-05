@@ -77,16 +77,22 @@ const runControl = async () => {
  * Reference 01 and 02, measured against the running profile.
  *
  * The expected values are read off plans/dsh-customization/screenshots/01 and 02
- * by measuring the images: a 29px filter inset at ~21px, a 12px group caption, a
- * 70px row with the title inset to 33px and leading its context line, and a 68px
- * compact header target.
+ * by decoding the PNG and reading pixels, not by eyeballing it.
+ *
+ * The capture scale is established rather than assumed. 01 is 1332x1622 for this
+ * gate's own 1332x1622 viewport, and its project filter's inset measures 29px in
+ * the image against 29px live -- two independent anchors agreeing is what makes
+ * the image 1:1 and rules out the halving an earlier pass applied on the
+ * strength of a nominal 144dpi. That halving moved every row measurement to half
+ * its true value, which is why three of the numbers below matched nothing at all:
+ * not the image, and not what the app renders.
  */
 const EXPECTED = {
   '01 filter inset': 29,
   '01 group caption': '12px',
-  '01 row height': 70,
-  '01 title inset': 31,
-  '01 title font': '16px',
+  '01 row height': 151,
+  '01 title inset': 34,
+  '01 title font': '20px',
   '01 title above context': true,
   '01 actions hidden at rest': true,
   '02 compact target': 68,
