@@ -442,8 +442,12 @@
 }
 
 .rail .footer {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 50%;
   flex-direction: column;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 4px 0;
 }
 
