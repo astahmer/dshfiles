@@ -53,12 +53,20 @@ same-workspace sessions ranked first. The menu also contains file and folder
 references; session discovery searches metadata, not message bodies.
 
 The full shell uses the public `sidebar` root slot and Host `ctx.layout` state
-and actions for width, collapse, and panel selection. Its root declaration
-owns the same seven child slots declared by the native shell. The package patch
-disables `ui-sidebar` first: SlotCore refuses to redeclare an existing child
+and actions for width, collapse, and panel selection.
+
+Its root declaration owns the same seven child slots declared by the native
+shell. The package patch disables `ui-sidebar` first: SlotCore refuses to redeclare an existing child
 slot, and retained native declarations do not transfer render authorization.
 The custom root and workspace browser both register at priority `-1000`, below
 the Host's default priority `0`; lower priority wins the live single slot.
+
+Sidebar width is user-draggable, not fixed. The frame renders a `col-resize`
+handle at the sidebar's edge whenever the sidebar is open, and dragging it calls
+the frame's own `setSidebar`, which clamps to 264-420px. Measured live: 279px
+before, 419px after dragging right, 263px after dragging back left. The width is
+not persisted and the plugin does not control it; an earlier claim in this work
+that no width control existed was wrong on both counts.
 
 ## Installed DSH 0.2.0-rc.2 sidebar contract
 
