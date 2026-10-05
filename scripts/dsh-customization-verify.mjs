@@ -7,19 +7,27 @@
 // being unable to see anything. Every run now shows the page a known fault and
 // refuses to trust its own result unless it is caught.
 //
-//   node scripts/dsh-customization-verify.mjs
+//   DSH_ORIGIN=http://127.0.0.1:3210 DSH_COOKIE=… node scripts/dsh-customization-verify.mjs
 //
-// Needs DSH_COOKIE (name=value for http://127.0.0.1:3080) and a running
-// profile. Read-only apart from toggling the appearance, which is restored
-// before exit. Only reports; it changes nothing in the repository.
+// Needs DSH_COOKIE (name=value for the origin) and a running profile. Read-only
+// apart from toggling the appearance, which is restored before exit. Only
+// reports; it changes nothing in the repository.
+//
+// DSH_ORIGIN exists because this gate used to name port 3080 literally, which
+// meant it could only ever be run against the one instance the user is already
+// using -- the instance AGENTS.md forbids restarting and the one where a run
+// would toggle the user's own appearance setting. Every navigation is built from
+// the origin now, so a second instance can be verified without touching the first.
 import { chromium } from '/Users/astahmer/dev/dshfiles/tooling/dshx/node_modules/.pnpm/playwright@1.56.1/node_modules/playwright/index.mjs'
 
 const cookie = process.env.DSH_COOKIE
 if (cookie === undefined) {
-  process.stderr.write('DSH_COOKIE is required (name=value for http://127.0.0.1:3080)\n')
+  process.stderr.write('DSH_COOKIE is required (name=value for the origin)\n')
   process.exit(2)
 }
 
+const origin = (process.env.DSH_ORIGIN ?? 'http://127.0.0.1:3080').replace(/\/$/, '')
+const openUrl = path => `${origin}${path}`
 const [name, value] = cookie.split('=')
 const browser = await chromium.launch()
 
@@ -35,16 +43,23 @@ const openPage = async (viewport = { width: 1332, height: 1622 }) => {
   const context = await browser.newContext({ viewport })
   await context.addCookies([{ name, value, domain: '127.0.0.1', path: '/', httpOnly: true, sameSite: 'Strict' }])
   const page = await context.newPage()
-  await page.goto('http://127.0.0.1:3080/', { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await page.goto(openUrl('/'), { waitUntil: 'domcontentloaded', timeout: 60000 })
   await settle(page)
   return { context, page }
 }
 
+/**
+ * The control needs a real row's actions to force opacity on. When the profile
+ * has no threads at all there is nothing to touch, and returning `detected: false`
+ * for that made the gate print UNTRUSTED -- the same verdict it gives a probe that
+ * was shown a fault and missed it. The two are not the same thing, and collapsing
+ * them hid the reason behind a scary one: an empty profile, not a blind gate.
+ */
 const runControl = async () => {
   const { context, page } = await openPage()
   const result = await page.evaluate(async () => {
     const target = document.querySelector('[class*="_row"] [class*="_actions"]')
-    if (target === null) return { ran: false, detected: false }
+    if (target === null) return { ran: false, detected: false, reason: 'no thread row with an actions area exists on this profile' }
     const resting = getComputedStyle(target).opacity
     target.style.setProperty('opacity', '1', 'important')
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -105,11 +120,11 @@ const measure = async () => {
       '01 filter font': filter === null ? null : getComputedStyle(filter).fontSize,
       '01 group caption': group === null ? null : getComputedStyle(group).fontSize,
       '01 row height': row === null ? null : Math.round(row.getBoundingClientRect().height),
-      '01 title inset': title === null ? null : Math.round(title.getBoundingClientRect().left),
-      '01 title font': title === null ? null : getComputedStyle(title).fontSize,
+      '01 title inset': title == null ? null : Math.round(title.getBoundingClientRect().left),
+      '01 title font': title == null ? null : getComputedStyle(title).fontSize,
       '01 title above context':
-        title === null || project === null ? null : title.getBoundingClientRect().top < project.getBoundingClientRect().top,
-      '01 actions hidden at rest': actions === null ? null : getComputedStyle(actions).opacity === '0',
+        title == null || project == null ? null : title.getBoundingClientRect().top < project.getBoundingClientRect().top,
+      '01 actions hidden at rest': actions == null ? null : getComputedStyle(actions).opacity === '0',
       '02 compact target': compact === null ? null : Math.round(compact.getBoundingClientRect().width),
       slotErrors: document.querySelectorAll('[data-slot-error]').length,
     }
@@ -226,7 +241,11 @@ const measurePanels = async () => {
         const heading = panel?.querySelector('strong')
         return {
           '06 quick panel open': panel !== null,
-          '06 quick panel heading': heading === null ? null : getComputedStyle(heading).fontSize,
+          // `panel?.querySelector` yields undefined when the panel is absent, not
+          // null, so a `=== null` guard let undefined reach getComputedStyle and
+          // took the whole run down with a TypeError instead of a report. A gate
+          // that dies on the defect it is meant to report reports nothing at all.
+          '06 quick panel heading': heading == null ? null : getComputedStyle(heading).fontSize,
           '06 quick panel actions': panel === null ? 0 : panel.querySelectorAll('button').length,
         }
       }),
@@ -294,8 +313,8 @@ const measurePanels = async () => {
         const item = dialog?.querySelector('[class*="_item"]')
         const title = dialog?.querySelector('[class*="_itemText"] strong')
         return {
-          '09 picker row height': item === null ? null : Math.round(item.getBoundingClientRect().height),
-          '09 picker title font': title === null ? null : getComputedStyle(title).fontSize,
+          '09 picker row height': item == null ? null : Math.round(item.getBoundingClientRect().height),
+          '09 picker title font': title == null ? null : getComputedStyle(title).fontSize,
           '09 picker shortcuts': dialog === null ? 0 : dialog.querySelectorAll('kbd').length,
         }
       }),
@@ -348,19 +367,26 @@ const mismatches =
         .filter(([key, want]) => allMeasured[key] !== want)
         .map(([key, want]) => `${key}: expected ${want}, measured ${allMeasured[key]}`)
 
+// "Could not look" and "looked and found nothing" must not print the same thing.
+// An unrunnable control is a setup problem with a fixable cause; a control that
+// ran and missed its injected fault is a broken gate. Only the second is UNTRUSTED.
+const verdict = !control.ran
+  ? `NOT RUN: the control had nothing to test (${control.reason})`
+  : !control.detected
+    ? 'UNTRUSTED: the probe was shown a fault and missed it'
+    : mismatches.length === 0
+      ? 'matches the reference on every measured value'
+      : `${mismatches.length} value(s) drift from the reference`
+
 process.stdout.write(
   `${JSON.stringify(
     {
       controlPassed: control.detected,
       control,
-      trusted: control.detected,
+      trusted: control.ran && control.detected,
       measured: allMeasured,
       mismatches,
-      verdict: !control.detected
-        ? 'UNTRUSTED: the probe was shown a fault and missed it'
-        : mismatches.length === 0
-          ? 'matches the reference on every measured value'
-          : `${mismatches.length} value(s) drift from the reference`,
+      verdict,
     },
     null,
     2,
@@ -368,4 +394,4 @@ process.stdout.write(
 )
 
 await browser.close()
-process.exit(control.detected && mismatches.length === 0 ? 0 : 1)
+process.exit(control.ran && control.detected && mismatches.length === 0 ? 0 : 1)

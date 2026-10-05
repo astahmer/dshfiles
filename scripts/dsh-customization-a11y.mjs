@@ -16,18 +16,24 @@
 // Like the reference gate, this one shows the page a known fault and refuses to
 // trust itself if that fault is missed.
 //
-//   DSH_COOKIE=… node scripts/dsh-customization-a11y.mjs
+//   DSH_ORIGIN=http://127.0.0.1:3210 DSH_COOKIE=… node scripts/dsh-customization-a11y.mjs
 //
-// Needs DSH_COOKIE and a running profile. Changes nothing in the repository. The
-// appearance is toggled to test dark and is restored before exit.
+// Needs DSH_COOKIE (name=value for the origin) and a running profile. Changes nothing
+// in the repository. The appearance is toggled to test dark and is restored before exit.
+//
+// DSH_ORIGIN exists because this gate used to name port 3080 literally, so it could
+// only be run against the instance the user is already using -- the one this repo
+// forbids restarting, and the one whose appearance setting a run would toggle.
 import { chromium } from '/Users/astahmer/dev/dshfiles/tooling/dshx/node_modules/.pnpm/playwright@1.56.1/node_modules/playwright/index.mjs'
 
 const cookie = process.env.DSH_COOKIE
 if (cookie === undefined) {
-  process.stderr.write('DSH_COOKIE is required (name=value for http://127.0.0.1:3080)\n')
+  process.stderr.write('DSH_COOKIE is required (name=value for the origin)\n')
   process.exit(2)
 }
 
+const origin = (process.env.DSH_ORIGIN ?? 'http://127.0.0.1:3080').replace(/\/$/, '')
+const openUrl = path => `${origin}${path}`
 const [name, value] = cookie.split('=')
 const browser = await chromium.launch()
 
@@ -45,17 +51,21 @@ const openPage = async (options = {}) => {
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', error => errors.push(String(error).slice(0, 140)))
-  await page.goto('http://127.0.0.1:3080/', { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await page.goto(openUrl('/'), { waitUntil: 'domcontentloaded', timeout: 60000 })
   await settle(page)
   return { context, page, errors }
 }
 
-/** The control: this probe must catch a fault it is shown, or trust nothing. */
+/**
+ * The control: this probe must catch a fault it is shown, or trust nothing.
+ * When it has no target to fault there is nothing to catch, which is a setup
+ * problem rather than a broken probe -- see the verdict split below.
+ */
 const runControl = async () => {
   const { context, page } = await openPage()
   const result = await page.evaluate(async () => {
     const target = document.querySelector('[class*="_row"] [class*="_actions"]')
-    if (target === null) return { ran: false, detected: false }
+    if (target === null) return { ran: false, detected: false, reason: 'no thread row with an actions area exists on this profile' }
     target.style.setProperty('opacity', '1', 'important')
     await new Promise(resolve => setTimeout(resolve, 300))
     const forced = getComputedStyle(target).opacity
@@ -254,7 +264,7 @@ const checkRailAtZoom = async () => {
     })
     await context.addCookies([{ name, value, domain: '127.0.0.1', path: '/', httpOnly: true, sameSite: 'Strict' }])
     const page = await context.newPage()
-    await page.goto('http://127.0.0.1:3080/', { waitUntil: 'domcontentloaded', timeout: 60000 })
+    await page.goto(openUrl('/'), { waitUntil: 'domcontentloaded', timeout: 60000 })
     await settle(page)
     results.push({
       label,
@@ -282,7 +292,7 @@ const checkReducedMotion = async () => {
     const context = await browser.newContext({ viewport: { width: 1332, height: 1622 }, reducedMotion })
     await context.addCookies([{ name, value, domain: '127.0.0.1', path: '/', httpOnly: true, sameSite: 'Strict' }])
     const page = await context.newPage()
-    await page.goto('http://127.0.0.1:3080/', { waitUntil: 'domcontentloaded', timeout: 60000 })
+    await page.goto(openUrl('/'), { waitUntil: 'domcontentloaded', timeout: 60000 })
     await settle(page)
     const durations = await page.evaluate(() =>
       [...document.querySelectorAll('[class*="_visibilityToggle"], [class*="_actions"]')]
@@ -317,7 +327,8 @@ if (control.detected) {
 }
 
 const problems = []
-if (!control.detected) problems.push('the probe was shown a fault and missed it')
+if (!control.ran) problems.push(`the control had nothing to test: ${control.reason}`)
+else if (!control.detected) problems.push('the probe was shown a fault and missed it')
 if (report.themes !== undefined) {
   if (!report.themes.appearanceRestored) problems.push('the appearance was not restored')
   if (report.themes.slotErrors > 0) problems.push(`${report.themes.slotErrors} slot error(s) in dark mode`)
