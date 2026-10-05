@@ -198,6 +198,44 @@ describe('CLI commands', () => {
     expect(targetOutput).not.toContain('--slot=')
   })
 
+  it('prints live slot catalog and occupancy facts in human Inspect output', async () => {
+    const streams = io()
+    const value = project()
+    const code = await runCli(['inspect', 'slots', '--root', 'sidebar.footer.action'], {
+      io: streams,
+      runtime: {
+        resolveConfig: async () => value,
+        inspectComposition: async (_project, target) => ({
+          profile: 'web',
+          target,
+          source: 'runtime',
+          items: [
+            { name: 'ui.root', type: 'factory', scope: 'root' },
+            {
+              name: 'sidebar.footer.action',
+              kind: 'list',
+              scope: 'root',
+              metadata: {
+                catalog: { registration: [{ name: 'id', required: true, type: 'string' }], replaceRisk: 'none', ownerProps: ['wide:boolean'] },
+                occupants: [{ registrant: '@test/footer', id: 'test.footer' }],
+                children: [{ name: 'sidebar.footer.action.icon', kind: 'single', scope: 'root' }],
+              },
+            },
+          ],
+          diagnostics: [],
+        }),
+      },
+    })
+    streams.out.end()
+    streams.err.end()
+    expect(code).toBe(0)
+    const output = await text(streams.out)
+    expect(output).toContain('catalog:')
+    expect(output).toContain('occupants:')
+    expect(output).toContain('children:')
+    expect(output).toContain('ui.root (factory / root)')
+  })
+
   it('builds enabled faces in parallel and does not touch Profile APIs', async () => {
     const streams = io()
     const value = project()
