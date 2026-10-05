@@ -39,7 +39,7 @@ export const AccountGroup = (props: {
               type="checkbox"
               aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
               checked={profile.enabled}
-              onChange={event => props.onToggle({ ...profile, enabled: event.target.checked })}
+              onChange={() => props.onToggle(profile)}
             />
             <span className={styles.switchTrack}>
               <span className={profile.enabled ? styles.knobOn : styles.knobOff} />
