@@ -348,20 +348,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             <button type="button" aria-pressed={projectFilterValue === '__all__'} onClick={() => selectProject('__all__')}>
               {props.tSidebar('threadSidebarAllProjects')}
             </button>
-            <button
-              type="button"
-              aria-pressed={projectFilterValue === '__unassigned__'}
-              onClick={() => selectProject('__unassigned__')}
-            >
+            <button type="button" aria-pressed={projectFilterValue === '__unassigned__'} onClick={() => selectProject('__unassigned__')}>
               {props.tSidebar('threadSidebarUnassigned')}
             </button>
             {displayWorkspaces.map(workspace => (
-              <button
-                key={workspace.id}
-                type="button"
-                aria-pressed={projectFilterValue === workspace.id}
-                onClick={() => selectProject(workspace.id)}
-              >
+              <button key={workspace.id} type="button" aria-pressed={projectFilterValue === workspace.id} onClick={() => selectProject(workspace.id)}>
                 {workspace.title}
               </button>
             ))}

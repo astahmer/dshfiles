@@ -39,9 +39,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const workspaceSource = props.workspaces?.list
   const subscribe = workspaceSource === undefined ? noopSubscribe : workspaceSource.subscribe.bind(workspaceSource)
   const getSnapshot =
-    workspaceSource === undefined
-      ? emptyWorkspaceSnapshot
-      : (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> => workspaceSource.getSnapshot()
+    workspaceSource === undefined ? emptyWorkspaceSnapshot : (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> => workspaceSource.getSnapshot()
   const workspaceSnapshot = useSyncExternalStore(subscribe, getSnapshot, emptyWorkspaceSnapshot)
   const [selection, setSelection] = useState<ProjectFolderSelection | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)

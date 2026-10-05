@@ -142,7 +142,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
    * cannot express the same affordance, so reordering is by pointer drag and
    * visibility is by the toggle.
    */
-  const renderCustomizeRow = (entry: { id: string; label: string }, index: number, icon: ReactNode, hidden: boolean, onReorder: (from: number, to: number) => void, onToggle: () => void): JSX.Element => (
+  const renderCustomizeRow = (
+    entry: { id: string; label: string },
+    index: number,
+    icon: ReactNode,
+    hidden: boolean,
+    onReorder: (from: number, to: number) => void,
+    onToggle: () => void,
+  ): JSX.Element => (
     <div
       className={styles.customizeRow}
       key={entry.id}
@@ -194,7 +201,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         preferences.hiddenHeaderIds.includes(entry.id),
         (from, to) =>
           updatePreferences({
-            headerOrder: reorderSidebarEntry(orderSidebarEntries(headerEntries, preferences.headerOrder).map(item => item.id), from, to),
+            headerOrder: reorderSidebarEntry(
+              orderSidebarEntries(headerEntries, preferences.headerOrder).map(item => item.id),
+              from,
+              to,
+            ),
           }),
         () => updatePreferences({ hiddenHeaderIds: toggleHidden(preferences.hiddenHeaderIds, entry.id) }),
       ),
@@ -213,7 +224,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         preferences.hiddenFooterIds.includes(entry.id),
         (from, to) =>
           updatePreferences({
-            footerOrder: reorderSidebarEntry(orderSidebarEntries(footerEntries, preferences.footerOrder).map(item => item.id), from, to),
+            footerOrder: reorderSidebarEntry(
+              orderSidebarEntries(footerEntries, preferences.footerOrder).map(item => item.id),
+              from,
+              to,
+            ),
           }),
         () => updatePreferences({ hiddenFooterIds: toggleHidden(preferences.hiddenFooterIds, entry.id) }),
       ),

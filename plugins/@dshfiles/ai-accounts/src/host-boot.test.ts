@@ -12,10 +12,7 @@ describe('host boot against the real account store', () => {
     primeAccountFile()
     const config = configFromAccountsFile(readAccountFileSync())
 
-    const routes = [
-      ...config.codexAccounts.map(account => account.instanceId),
-      ...config.opencodeAccounts.map(account => account.instanceId),
-    ]
+    const routes = [...config.codexAccounts.map(account => account.instanceId), ...config.opencodeAccounts.map(account => account.instanceId)]
 
     expect(routes.length).toBeGreaterThan(0)
     expect(routes).toContain('codex')
@@ -28,9 +25,7 @@ describe('host boot against the real account store', () => {
     // the derived config: the derived config does not carry pins at all.
     primeAccountFile()
 
-    const codexAccounts = readAccountFileSync().accounts.filter(
-      account => account.kind === 'codex',
-    )
+    const codexAccounts = readAccountFileSync().accounts.filter(account => account.kind === 'codex')
 
     expect(codexAccounts.length).toBeGreaterThan(0)
     for (const account of codexAccounts) {

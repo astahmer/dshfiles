@@ -122,9 +122,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const rowCount = rows.length
 
   const running = props.useSession((state: SessionState) => state.running)
-  const queueMutable = props.useSession(
-    (state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable',
-  )
+  const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -230,13 +228,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                 const isBusy = busy === row.id
                 return (
                   <li
-                    className={
-                      dragId === row.id
-                        ? `${styles.row} ${styles.rowDragging}`
-                        : dropIndex === index
-                          ? `${styles.row} ${styles.rowDrop}`
-                          : styles.row
-                    }
+                    className={dragId === row.id ? `${styles.row} ${styles.rowDragging}` : dropIndex === index ? `${styles.row} ${styles.rowDrop}` : styles.row}
                     key={row.id}
                     onDragOver={event => {
                       if (dragId === null || dragId === row.id) return

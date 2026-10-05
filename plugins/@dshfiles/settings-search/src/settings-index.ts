@@ -176,8 +176,7 @@ const schemaNode = (schema: SerializedSchema, reference: unknown): Record<string
 }
 
 /** An object node's field name → uid map, or null when the node is not an object. */
-const dictFields = (node: Record<string, unknown>): Record<string, unknown> | null =>
-  objectRecord(node.dict)
+const dictFields = (node: Record<string, unknown>): Record<string, unknown> | null => objectRecord(node.dict)
 
 /** A union node's branch uids, or null when the node is not a union. */
 const unionBranches = (node: Record<string, unknown>): readonly unknown[] | null => (Array.isArray(node.list) ? node.list : null)

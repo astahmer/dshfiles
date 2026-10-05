@@ -8,6 +8,7 @@ import {
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
   moveSidebarEntry,
+  reorderSidebarEntry,
   orderSidebarEntries,
   parseSessionIds,
   sessionLineage,
@@ -67,9 +68,7 @@ test('archived starts folded and the working sections start open', () => {
   // Archived is storage rather than a place to work, so it opens folded; every
   // other section holds threads a user comes here to act on.
   assert.deepEqual(DEFAULT_PREFERENCES.collapsedSections, ['archived'])
-  const workingSections = (['pinned', 'active', 'parked', 'inactive'] as const).filter(section =>
-    DEFAULT_PREFERENCES.collapsedSections.includes(section),
-  )
+  const workingSections = (['pinned', 'active', 'parked', 'inactive'] as const).filter(section => DEFAULT_PREFERENCES.collapsedSections.includes(section))
   assert.deepEqual(workingSections, [])
 })
 

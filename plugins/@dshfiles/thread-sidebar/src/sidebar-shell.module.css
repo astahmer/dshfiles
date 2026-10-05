@@ -285,7 +285,9 @@
   height: 18px;
   border-radius: 50%;
   background: var(--dsw-alias-label-tertiary);
-  transition: transform 120ms ease, background 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
 }
 
 .visibilityToggle[aria-checked='true'] .visibilityThumb {

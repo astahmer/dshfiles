@@ -5,7 +5,16 @@ import type { Context } from '@deepseek-ai/cordis'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { aiAccountsApi, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
-import { buildAccountsFile, primeAccountFile, readAccountFile, readAccountFileSync, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
+import {
+  buildAccountsFile,
+  primeAccountFile,
+  readAccountFile,
+  readAccountFileSync,
+  readAccountIdentity,
+  removeAccount,
+  setDistribution,
+  upsertAccount,
+} from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { createUsageHistoryScheduler, readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'

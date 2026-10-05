@@ -107,9 +107,7 @@ const requireLayout = (resolve: () => Layout | undefined): Layout => {
  * nothing and the chord appears to do nothing.
  */
 const focusComposer = (): void => {
-  const composer = document.querySelector<HTMLElement>(
-    '[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])',
-  )
+  const composer = document.querySelector<HTMLElement>('[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])')
   if (composer === null) return
   composer.focus()
   // A text field has a caret to place; a contenteditable div has a selection.
