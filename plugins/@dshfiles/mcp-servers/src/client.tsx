@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { defineClientPlugin, useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { mcpServersApi, type ManagerSnapshot, type RegistryEntry, type ServerDraft, type ServerView } from './api.js'
 import { filterProviders } from './catalog.js'
@@ -72,32 +72,30 @@ const referencesFor = (server: ServerView, prefix: string): Record<string, strin
   )
 }
 
-export default defineClient({
+export default defineClientPlugin({
+  id: 'dshfiles-mcp-servers',
   name: '@dshfiles/mcp-servers',
-  // setup(ctx) reads ctx.slots and ctx.commandUi; locales already inject locale.
-  inject: ['slots', 'commandUi'],
+  uses: ['ui'],
+  inject: ['commandUi'],
   locales: [mcpServersLocale],
-  setup(ctx, decorate) {
+  setup(api) {
+    const ctx = api.raw.ctx
     const translate = ctx.locale.bind(MCP_LOCALE_NAMESPACE) as T
     const RootQuickPanel = ({ panel }: { panel: QuickPanelState }): JSX.Element => <McpQuickPanel t={translate} panel={panel} />
     const RootPanel = (): JSX.Element => <ManagerPage t={translate} />
     const panels = new SessionQuickPanels()
 
-    ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: MCP_LOCALE_NAMESPACE }, () => icon()),
-    )
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: MCP_LOCALE_NAMESPACE }, decorate(RootPanel)))
-    ctx.slots.inject('conversation.input.overlay', () =>
-      ctx.slots.register(
-        {
-          name: 'conversation.input.overlay',
-          id: 'mcp-servers-quick-panel',
-          order: 3,
-          locale: MCP_LOCALE_NAMESPACE,
-          inject: sessionId => ({ panel: panels.forSession(sessionId) }),
-        },
-        decorate(RootQuickPanel),
-      ),
+    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: MCP_LOCALE_NAMESPACE }, () => icon())
+    api.ui.register({ name: 'main', key: PANEL_ID, locale: MCP_LOCALE_NAMESPACE }, RootPanel)
+    api.ui.register(
+      {
+        name: 'conversation.input.overlay',
+        id: 'mcp-servers-quick-panel',
+        order: 3,
+        locale: MCP_LOCALE_NAMESPACE,
+        inject: sessionId => ({ panel: panels.forSession(sessionId) }),
+      },
+      RootQuickPanel,
     )
 
     ctx.effect(() => ctx.commandUi.register(createQuickPanelContribution(panels, translate)), 'MCP quick panel command')

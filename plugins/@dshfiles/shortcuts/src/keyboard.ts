@@ -44,6 +44,8 @@ export interface Shortcut {
   readonly run: (event: KeyboardEvent) => void
 }
 
+type ShortcutChord = Pick<KeyboardEvent, 'code' | 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>
+
 export const isMacPlatform = (platform: string): boolean => platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
 
 const EDITABLE_SELECTOR =
@@ -56,7 +58,7 @@ export const isEditableTarget = (target: EventTarget | null): boolean => {
 }
 
 /** Resolve the Host's logical `primary` to the physical modifier for this platform. */
-const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? event.metaKey : event.ctrlKey)
+const isPrimaryHeld = (event: ShortcutChord, mac: boolean): boolean => (mac ? event.metaKey : event.ctrlKey)
 
 /**
  * Count how many modifiers the event carries, ignoring the one the chord claims.
@@ -66,7 +68,7 @@ const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? ev
  * might own. Requiring the set to match exactly is what makes the chords
  * predictable enough to document.
  */
-const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
+const extraModifiers = (event: ShortcutChord, mac: boolean): number =>
   (event.ctrlKey ? 1 : 0) + (event.metaKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0) - (isPrimaryHeld(event, mac) ? 1 : 0)
 
 /**
@@ -75,7 +77,7 @@ const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
  * "Exactly" matters: a chord that also matched `primary+shift+p` would fire both,
  * because a keydown carries every modifier that is down.
  */
-export const matchesShortcut = (event: KeyboardEvent, shortcut: Shortcut, mac: boolean): boolean => {
+export const matchesShortcut = (event: ShortcutChord, shortcut: Shortcut, mac: boolean): boolean => {
   if (event.code !== shortcut.key && event.key !== shortcut.key) return false
   if (!isPrimaryHeld(event, mac)) return false
   // Exactly one extra modifier is allowed, and only when the chord asks for it.

@@ -1,4 +1,5 @@
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import {
   IconCheckOutlineRegular,
   IconChevronDownOutlineRegular,
@@ -42,7 +43,7 @@ interface TextBlock {
 }
 
 interface QueuedMessage {
-  readonly id: string
+  readonly id: MessageId
   readonly content: readonly TextBlock[]
 }
 
@@ -57,16 +58,16 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 /** Decode one projection row, or `null` when it is not a queued message. */
 const asQueuedMessage = (value: unknown): QueuedMessage | null => {
   const record = asRecord(value)
-  if (record === null || typeof record.id !== 'string') return null
+  if (record === null || typeof record.id !== 'string' || record.id.length === 0) return null
   const content = Array.isArray(record.content)
     ? record.content.filter((block): block is TextBlock => asRecord(block) !== null && typeof (block as TextBlock).type === 'string')
     : []
-  return { id: record.id, content }
+  return { id: MessageId(record.id), content }
 }
 
 type Direction = 'up' | 'down'
 
-export type QueueAction = { readonly kind: 'edit'; readonly content: readonly TextBlock[] } | { readonly kind: 'remove' } | { readonly kind: 'steer' }
+export type QueueAction = Parameters<IConversation['updateQueue']>[1]
 
 const textOf = (content: readonly TextBlock[]): string | null => {
   const text = content
@@ -98,7 +99,7 @@ const PREVIEW_CHARS = 200
 
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
-  readonly updateQueue: (itemId: string, action: QueueAction) => Promise<unknown>
+  readonly updateQueue: IConversation['updateQueue']
 }
 
 /**
@@ -124,9 +125,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const running = props.useSession((state: SessionState) => state.running)
   const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
-  const [editing, setEditing] = useState<string | null>(null)
+  const [editing, setEditing] = useState<MessageId | null>(null)
   const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState<string | null>(null)
+  const [busy, setBusy] = useState<MessageId | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default: the list is the point of the dock, and a collapsed dock
@@ -155,7 +156,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     node?.setSelectionRange(node.value.length, node.value.length)
   }, [editing, rows])
 
-  const applyAction = async (itemId: string, action: QueueAction): Promise<boolean> => {
+  const applyAction = async (itemId: MessageId, action: QueueAction): Promise<boolean> => {
     setBusy(itemId)
     try {
       await props.updateQueue(itemId, action)
