@@ -69,17 +69,24 @@
       # an app that breaks the moment the global store moves. The wrapper passes the
       # caller's PATH through, and the shell reports a dialog naming the fix when
       # the executable is absent, which is the failure a GUI launch actually hits.
-      desktop = pkgs.stdenvNoCC.mkDerivation {
+      desktop = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
         pname = "dsh-desktop";
         version = "0.1.0";
         src = ./apps/desktop;
-        nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm pkgs.electron ];
+        pnpmDeps = pkgs.fetchPnpmDeps {
+          inherit (finalAttrs) pname version src;
+          pnpm = pkgs.pnpm;
+          fetcherVersion = 4;
+          preFixup = "rm -rf $storePath/v11/links";
+          hash = "sha256-15NhC5oiICDOq4bTcqFNC1AgFBPlbfKD2LB6bpjZNl4=";
+        };
+        nativeBuildInputs = [ pkgs.nodejs_22 pkgs.pnpm pkgs.pnpmConfigHook pkgs.electron ];
         # Electron comes from the binary cache and is never built from source.
         dontFixup = true;
 
         configurePhase = ''
           export ELECTRON_SKIP_BINARY_DOWNLOAD=1
-          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm install --offline --frozen-lockfile --ignore-scripts
         '';
 
         buildPhase = ''
@@ -102,7 +109,7 @@
           chmod +x "$out/bin/dsh-desktop"
           runHook postInstall
         '';
-      };
+      });
 
     in
     {
