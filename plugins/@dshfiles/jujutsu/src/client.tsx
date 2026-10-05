@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { useApi } from '@dshfiles/dshx/client'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import type { JujutsuState, Mutation, Revision } from './api.js'
 import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.js'
 import { jujutsuApi } from './api.js'
@@ -71,7 +71,8 @@ const groupRows = (input: {
   return [...groups].map(([day, rows]) => ({ day, rows }))
 }
 
-export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Element => {
+export const JujutsuPanel = (props: { readonly t: JujutsuTranslate; readonly surface?: 'main' | 'side-panel' }): JSX.Element => {
+  const sidePanel = props.surface === 'side-panel'
   const api = useApi(jujutsuApi)
   const t = props.t
   const [path, setPath] = useState('')
@@ -103,6 +104,7 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Eleme
   const [workingPatch, setWorkingPatch] = useState<string | null>(null)
   const previewRequestId = useRef(0)
   const selectedRevisionRef = useRef<Revision | null>(null)
+  const autoRegisterPath = useRef<string | null>(null)
 
   useEffect(() => {
     try {
@@ -214,13 +216,13 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Eleme
     return result
   }, [state, workingCopy, ancestorLimit])
 
-  const register = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-    if (path.trim().length === 0) return
+  const registerPath = useCallback(async (repositoryPath: string): Promise<void> => {
+    const selectedPath = repositoryPath.trim()
+    if (selectedPath.length === 0) return
     setBusy(true)
     setError(null)
     try {
-      const registered = await api.registerRepository({ path: path.trim() })
+      const registered = await api.registerRepository({ path: selectedPath })
       previewRequestId.current += 1
       setPreview(null)
       setRepoId(registered.repoId)
@@ -238,6 +240,18 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Eleme
     } finally {
       setBusy(false)
     }
+  }, [api, repoHistory, t])
+
+  useEffect(() => {
+    const selectedPath = path.trim()
+    if (!sidePanel || repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
+    autoRegisterPath.current = selectedPath
+    void registerPath(selectedPath)
+  }, [registerPath, sidePanel, path, repoId])
+
+  const register = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault()
+    await registerPath(path)
   }
 
   const askForConfirmation = async (action: Mutation): Promise<void> => {
@@ -299,7 +313,7 @@ export const JujutsuPanel = (props: { readonly t: JujutsuTranslate }): JSX.Eleme
   }
 
   return (
-    <main className={styles.panel}>
+    <main className={sidePanel ? `${styles.panel} ${styles.sidePanel}` : styles.panel}>
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <div>
