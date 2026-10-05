@@ -2,34 +2,37 @@
 
 ## Context
 
-- DSH plugin clients are React 18 apps built through dshx's Vite pipeline, which already handles CSS Modules, Tailwind, and ordinary CSS imports. See [the dshx SDK guide](../tooling/dshx/docs/sdk/getting-started.md).
-- Ten owned UI packages currently contain 12 CSS Module files. Buttons, fields, form labels, status treatments, empty states, and dialog controls are styled locally. For example, `multi-host` defines its own input and button system, while `secret-catalog` separately styles its catalog controls and mutation dialog.
-- There is no general-purpose shared DSH plugin UI package. `@dshfiles/project-folder-picker` is a useful precedent: an isolated React package with injected operations, imported by `secret-catalog` through a local workspace link. It is a specialized picker, not a primitive library.
-- BB handles this unevenly too. `bb-plugins/plugins/mcp-manager/components/ui/` contains local `Button`, `Input`, and `Icon` components; `Button` uses Radix Slot and class-variance-authority with Tailwind utility classes. I found no cross-plugin BB UI package; other plugin surfaces keep their own CSS and markup. This is a useful source of ideas, not a DSH integration contract.
-- shadcn's registry is a code-distribution system, not a runtime component dependency. Its standard Vite setup configures Tailwind and imports its stylesheet; selected source can be adapted, but the generated setup should not be copied into DSH without checking how its CSS interacts with the Host. See [shadcn registries](https://ui.shadcn.com/docs/registry), [Vite installation](https://ui.shadcn.com/docs/installation/vite), and the [registry directory](https://ui.shadcn.com/docs/registry/registry-index).
+- DSH plugin clients are React 18 apps built through dshx's Vite pipeline into one lazy ModuleLoader chunk with no CSS assets; CSS Modules are inlined. See [the dshx SDK guide](../tooling/dshx/docs/sdk/getting-started.md).
+- **DSH already ships a component library.** `@deepseek-ai/dsh-client-ui-primitives` (MIT, "pure React atoms … styled only through `--dsw-*` tokens") exports `Button`, `Input`, `Checkbox`, `Switch`, `Tag`, `Pill`, `StateDot`, `SegmentedControl`, `SegmentedTabs`, `Menu`/`MenuItemButton`, `Tooltip`, `HoverCard`, `Modal`, `RiskConfirmation`, `Toast`, `ShortcutKeys`, `SettingsForm`, `JsonTree`, `MarkdownText`, and the whole icon set. dshx's protocol-2 compatibility lists it as a **platform module** (`tooling/dshx/packages/dshx/src/compat/protocol-2.ts`), so a plugin import is always external and resolves to the Host's single copy, already themed. Only `queue-reorder` (icons, `Tooltip`) and `plugin-marketplace` (icons) use it today; every other plugin restyles the same controls by hand.
+- Its runtime dependencies (`clsx`, `shiki`, `simple-icons`, …) are dev-only in the published package, so Node/Vitest cannot import it outside the Host. Plugin tests that render it substitute it (`plugin-marketplace/tests/MarketplaceTab.test.tsx`).
+- The primitives do not cover: label/description/error field wiring, `textarea`, `select`, notices, empty states, section shells, confirmation dialogs with an arbitrary body, data tables, forms, async data state, or charts.
+- dshx ships its own `useApiQuery` (connection-aware, no cache, no mutations, no invalidation). Every other plugin hand-rolls `useState` + `useEffect` loading/busy/error state around `useApi`.
+- Ten owned UI packages contain 12 CSS Module files (~4.9k lines) and ~7.7k lines of TSX. `@dshfiles/project-folder-picker` is the precedent for a shared source package linked into another plugin (`secret-catalog`).
+- BB handles this unevenly. `bb-plugins/plugins/mcp-manager/components/ui/` has local `Button`/`Input`/`Icon` built on Radix Slot + CVA + Tailwind; there is no cross-plugin BB UI package.
+- shadcn's registry is a code-distribution system, not a runtime dependency. See [shadcn registries](https://ui.shadcn.com/docs/registry).
 
 ## Goal
 
-Give DSH plugin authors one small, accessible, theme-aware component package so new plugin UI can be assembled quickly and existing plugins can stop restyling the same controls.
+Give DSH plugin authors one fast path to build plugin UI: Host primitives for atoms, one small `@dshfiles/plugin-ui` package for the gaps, and TanStack for data, tables, forms, and charts — then move every owned plugin onto it.
 
 ## What
 
-Create an internal package, provisionally `@dshfiles/plugin-ui`, for React UI primitives and repeated small patterns. Plugins import from this local package; dshx bundles the used source into each plugin client.
+Three layers, each owned once:
 
-Start with the pieces already repeated in current plugins:
+1. **Atoms — `@deepseek-ai/dsh-client-ui-primitives`.** Use the Host's `Button`, `Input`, `Checkbox`, `Switch`, `Tag`, `StateDot`, `Menu`, `Tooltip`, `Modal`, `SegmentedControl`, icons. Never restyle these locally.
+2. **Gaps — `@dshfiles/plugin-ui`** (CSS Modules on `--dsw-*` tokens):
+   - `Field` (label, description, error, `aria-describedby`/`aria-invalid` wiring through a render prop), `TextArea`, `Select`, `Notice`, `EmptyState`, `Section`, `ConfirmDialog` (over the Host `Modal` + `Button`), `VisuallyHidden`.
+3. **Data/interaction — TanStack, exposed through `@dshfiles/plugin-ui` subpaths so the whole workspace pins one version:**
+   - `@dshfiles/plugin-ui/query` — TanStack Query: a per-plugin `QueryClient`, `PluginQueryProvider`, and the full Query API re-exported.
+   - `@dshfiles/plugin-ui/table` — TanStack Table v9: `DataTable` (semantic `<table>` with sortable headers) and the Table API re-exported.
+   - `@dshfiles/plugin-ui/form` — TanStack Form: `useAppForm` from `createFormHook` with field components bound to `Field`/`Input`/`TextArea`/`Select`/`Checkbox`/`Switch`; validators are Standard Schema (zod 4).
+   - `@dshfiles/plugin-ui/chart` — TanStack Charts: `ChartFrame` mapping the chart palette to DSH tokens, plus the used `Chart`, marks, and scales.
 
-- Buttons with primary, secondary, quiet, and destructive variants; icon buttons require an accessible name.
-- Form labels, descriptions, errors, text inputs, textareas, selects, checkboxes, and switches.
-- Badges, status indicators, section/card shells, empty states, and inline notices.
-- Dialog and confirmation-dialog shells, including keyboard and focus behavior.
-
-Keep page layout, domain forms, tables, charts, menus unique to one workflow, data state, and Host operations inside the owning plugin. Add a shared primitive only after at least two real consumers need the same behavior.
-
-Review shadcn/ui and relevant public registry entries as source material. Vendor only selected components after checking their license, React 18 compatibility, dependencies, accessibility behavior, and CSS assumptions. Record each adopted source and license. The local package remains the maintained source of truth; plugin startup must not fetch registry content.
+Keep page layout, domain workflows, revision graphs, sidebar behavior, and Host operations inside the owning plugin.
 
 ## Why
 
-The source inventory shows the same basic control families reimplemented across ten packages. That costs time on every new UI and lets focus, disabled, spacing, and theme behavior drift. A small shared package can reduce both repeated CSS and the amount of setup needed to build a plugin. The specialized folder picker already proves this repository can link a reusable React package into another plugin.
+The same control families are restyled across ten packages while the Host already ships themed, accessible atoms that every plugin can import for free. Async state is hand-rolled in nine plugins, which is where loading, stale, retry, and double-submit bugs live. TanStack gives cache, mutation, and invalidation semantics (Query), headless sorting/filtering (Table), typed validated forms (Form), and accessible charts (Charts) without bringing a styling system, so it composes with DSH tokens instead of fighting them.
 
 ## How
 
@@ -37,35 +40,37 @@ The source inventory shows the same basic control families reimplemented across 
 
 ```mermaid
 flowchart LR
-  Registry[Reviewed registry source] --> Adapted[Adapted React 18 components]
-  Adapted --> Kit[@dshfiles/plugin-ui<br/>TSX + CSS Modules + DSH theme tokens]
-  Kit --> Plugin[Plugin imports local package]
-  Plugin --> Build[dshx Vite client build]
-  Build --> Host[DSH Host]
+  Host[Host: dsh-client-ui-primitives<br/>platform module, external] --> Plugin
+  Kit[@dshfiles/plugin-ui<br/>gap components + CSS Modules] --> Plugin
+  TanStack[TanStack Query / Table / Form / Charts] --> Kit
+  Plugin[Plugin client] --> Build[dshx build: one chunk,<br/>React + primitives external]
+  Build --> Runtime[DSH Host]
 ```
 
 ### Operations / behavior
 
-- Components are controlled through typed props and callbacks; they do not own plugin settings, network calls, persistence, or domain state.
-- Shared CSS Modules style the shared primitives. Feature CSS continues to own page composition and genuinely unique visuals.
-- Theme colors, borders, radii, focus rings, and surfaces come from supported DSH theme tokens. Do not introduce a package-wide hard-coded palette.
-- Treat web/React 18 as the supported target until the DSH runtime changes. Keep the library free of DSH service imports so it can be built and reviewed independently.
+- Components are controlled through typed props; they own no plugin settings, network calls, or persistence.
+- TanStack Query owns client-side async state. Query functions call the dshx `useApi` client and forward TanStack's `signal`. Mutations invalidate by key. One `QueryClient` per plugin bundle, so slots of one plugin share a cache and plugins never share one.
+- Theme colors, borders, radii, and focus rings come from `--dsw-*` tokens. No global reset, no unscoped element selectors.
+- React 18 is the target; every TanStack package declared supports it.
 
 ### Tech choices
 
 | Choice | Decision | Rationale |
 |--------|----------|-----------|
-| Shared distribution | Local `@dshfiles/plugin-ui` workspace package | Follows the existing `project-folder-picker` package-link pattern and gives one source of truth across plugins. |
-| Upstream components | Curated shadcn/community registry source, adapted and vendored | Registries make useful code easy to discover; vendoring keeps source, licensing, versions, and dependencies reviewable. |
-| Styling | CSS Modules using DSH theme tokens | Matches current plugin styles and limits selector scope. Do not add an unscoped reset or host-wide theme. |
-| Tailwind | Not required by the shared package | dshx supports it, but shadcn's normal Vite setup brings Tailwind configuration and stylesheet output. Test any Tailwind-derived source for Host style leakage before adoption. |
-| Behavioral primitives | Native HTML first; add a focused accessible primitive dependency only when needed | Avoid adding Radix or other packages for simple styling. Any dependency must pass React 18 and bundle checks. |
+| Atoms | `@deepseek-ai/dsh-client-ui-primitives` | Host-shared, already themed and accessible, zero bundle cost (platform module). |
+| Gap components | Local `@dshfiles/plugin-ui` source package | Follows the `project-folder-picker` link pattern; one source of truth. |
+| Server/async state | **TanStack Query 5** (`@tanstack/react-query`, React `^18 \|\| ^19`) | Cache, dedupe, mutations, invalidation, cancellation. Replaces hand-rolled `useEffect` loaders. |
+| Tables | **TanStack Table 9** (`@tanstack/react-table`, React `>=18`) | Headless; markup and CSS stay ours. v9 API (`useTable`, `tableFeatures`), not v8. |
+| Forms | **TanStack Form 1** (`@tanstack/react-form`, React `^17 \|\| ^18 \|\| ^19`) | Typed field state, Standard Schema validators (zod 4 already in the workspace). Used where a form has validation or more than a couple of fields; one-input forms stay `useState`. |
+| Charts | **TanStack Charts 1** (`@tanstack/charts`, React adapter `@tanstack/charts/react`) | Typed grammar, accessible names/keyboard focus, CSS palette tokens map onto DSH variables. 1.0.0 shipped 2026-10-03, so it is pinned exactly and confined to `ai-accounts` until it has proven stable. No other ready chart library beats it on fit; Recharts/visx bring their own styling assumptions. |
+| Virtualization | TanStack Virtual — deferred | No current list is long enough to need it; add with the first consumer. |
+| shadcn/registries | Reviewed source and patterns only | Host primitives + TanStack cover the first cut; vendor an individual item only for a concrete gap (see research below). |
+| Tailwind | Not used | Global stylesheet output and Host style leakage risk. |
 
 ### Architecture
 
-`@dshfiles/plugin-ui` has a public component contract, React as its only UI peer, and no DSH peer dependencies. Consumer plugins link the local source package as they do with `project-folder-picker`. The client build must inline imported library code and styles so the running Host does not need to resolve a new shared runtime package.
-
-Keep upstream provenance beside the component or in a package registry/source catalog: source URL, license, source revision, local changes, and required dependencies. Do not rely on a remote registry during build or plugin startup.
+`@dshfiles/plugin-ui` exports TSX source (like `project-folder-picker`). React and the Host primitives are peers, resolved external at build. TanStack packages are its `dependencies` and are re-exported from subpaths, so a plugin depends only on `@dshfiles/plugin-ui` and the workspace pins one TanStack version. dshx bundles the used TanStack code into each plugin's single chunk; subpaths keep Table/Form/Charts out of plugins that do not use them.
 
 ## Registry and component research
 
@@ -82,8 +87,8 @@ Official shadcn registries distribute source into a project and support GitHub-h
 | Command menu and combobox | Settings Search, Marketplace, account/model chooser, project/path selection | The shadcn [Command](https://ui.shadcn.com/docs/components/radix/command) is designed for search and quick actions and is built on `cmdk`; check whether a smaller combobox covers existing needs before adopting the full command menu. |
 | Tags input and multi-select | Future tokenized filters and multi-value metadata/config fields | Compare [Dice UI Tags Input](https://diceui.com/docs/components/radix/tags-input) with the Starboard finds [Emblor](https://github.com/JaleelB/emblor) and [shadcn multi-select](https://github.com/sersavan/shadcn-multi-select-component). Dice documents validation and sortable-tag composition; do not add a token editor until two DSH consumers need one. |
 | Sortable list | Queue ordering and AI model ordering | [Dice UI Sortable](https://diceui.com/docs/components/radix/sortable) includes keyboard reorder/cancel interactions. Reuse only where the DSH/BB API provides a real ordering operation; the component must not simulate persistence. |
-| Calendar/date range picker | AI Accounts usage history and BB Tokitoki usage filters | Use the shadcn [date picker composition](https://ui.shadcn.com/docs/components/base/date-picker) as a source. It composes Popover + Calendar rather than imposing a date-range state model; keep range presets and query semantics in each plugin. |
-| Semantic table and optional advanced data grid | Account history, server catalogs, and secret alias listings | Start with semantic table primitives. The shadcn [data-table guide](https://ui.shadcn.com/docs/components/base/data-table) explicitly treats table behavior as data-specific; evaluate [Dice UI Data Table](https://diceui.com/docs/components/base/data-table) or [Data Grid](https://diceui.com/docs/components/radix/data-grid) only when sorting, filtering, editing, virtualization, or keyboard cell navigation are actual requirements. |
+| Calendar/date range picker (deferred) | AI Accounts usage history and BB Tokitoki usage filters | Use the shadcn [date picker composition](https://ui.shadcn.com/docs/components/base/date-picker) as a source. It composes Popover + Calendar rather than imposing a date-range state model; keep range presets and query semantics in each plugin. |
+| Semantic table and optional advanced data grid | Account history, server catalogs, and secret alias listings | **TanStack Table v9 via `DataTable`.** The shadcn [data-table guide](https://ui.shadcn.com/docs/components/base/data-table) explicitly treats table behavior as data-specific; evaluate [Dice UI Data Table](https://diceui.com/docs/components/base/data-table) or [Data Grid](https://diceui.com/docs/components/radix/data-grid) only when sorting, filtering, editing, virtualization, or keyboard cell navigation are actual requirements. |
 | File upload | Possible future import, attachment, or document plugins | [Dice UI File Upload](https://diceui.com/docs/components/radix/file-upload) provides dropzone, validation, preview, and progress patterns. No current DSH/BB UI needs a shared uploader, so keep it out of the core cut. |
 
 ### Registry shortlist and disposition
@@ -143,82 +148,71 @@ These are possible feature sources, not first-cut dependencies:
 
 ## What this allows
 
-- Build common forms, dialogs, status rows, and empty states from existing components.
-- Fix accessibility and theme behavior once and carry the fix to every consumer.
-- Add external registry components selectively without inheriting their whole app setup.
-- Keep plugin-specific composition and interaction ownership clear.
+- Build forms, dialogs, tables, notices, and empty states from existing parts in minutes.
+- Replace hand-rolled loading/busy/error state with Query and mutations.
+- Fix accessibility and theme behavior once.
+- Add an external registry component selectively without inheriting its app setup.
 
 ## What this does not allow
 
-- It does not replace DSH slots, settings APIs, native controls, or Host capabilities.
-- It does not standardize whole plugin pages or force every surface into one visual layout.
+- It does not replace DSH slots, settings APIs, or Host capabilities.
+- It does not standardize whole plugin pages.
 - It does not add remote component loading, a second React copy, global CSS resets, or React 19-only components.
-- It does not justify rewriting unique charts, revision graphs, sidebar behavior, or domain-specific editors as generic primitives.
+- It does not justify rewriting revision graphs, sidebar behavior, or domain editors as generic primitives.
 
 ## UI & UX
 
-This package has no standalone screen. Its effects appear in the plugin surfaces that adopt it.
-
-### Desktop
-
-Controls retain compact DSH sizing and support explicit variants. Inputs show label, help, and error states. Dialogs keep predictable width, scrolling, keyboard dismissal, and focus restoration.
-
-### Mobile
-
-Components size to their containing plugin surface, wrap labels and button groups, and avoid fixed widths. This is responsive behavior for narrow Host panels, not a separate mobile design.
-
-### Common interactions
+No standalone screen. Effects appear in the plugin surfaces that adopt it.
 
 | Action | Result |
 |--------|--------|
-| Tab to a control | Visible focus indicator follows the active DSH theme. |
-| Use a disabled control | It cannot activate and exposes native disabled semantics. |
-| Open a dialog | Focus enters the dialog; Escape closes when allowed; focus returns to the trigger. |
-| Use an icon-only button | It has a required accessible label and the same focus/disabled behavior as other buttons. |
-| Submit an invalid field | The caller supplies the error; the field associates it with the input for assistive technology. |
+| Tab to a control | Visible focus ring from the DSH theme. |
+| Use a disabled control | Native disabled semantics; cannot activate. |
+| Open a dialog | Host `Modal` layering: focus enters, Escape closes, focus returns. |
+| Submit an invalid field | Error is rendered under the field and linked with `aria-describedby` + `aria-invalid`. |
+| Sort a table column | Header button toggles sort and exposes `aria-sort`. |
 
 ## Data model
 
-None. This is a stateless UI package; all persisted data and workflow state remain in consuming plugins.
+None. Stateless UI; persisted data stays in each plugin's Host half.
 
 ## Implementation steps
 
-1. Audit current DSH client exports, supported theme tokens, React version, and marketplace options. Count concrete duplicate controls and verify which Host APIs or native UI already cover a proposed component.
-2. Compare the moduix React CSS Modules components with shadcn's source for Button/Field/Dialog/Command/Popover/Calendar and review Dice UI's Tags Input, Sortable, Table/Grid, and File Upload individually. Use Kibo/ReUI/TableCN as patterns for higher-level features. For each candidate, record license, pinned source revision, React 18 range, runtime/peer dependencies, global and module CSS, accessibility behavior, bundle impact, and adaptation needed for DSH tokens.
-3. Select only components that solve two real DSH use cases or one complex interaction that is expensive to implement accessibly. Keep simple native HTML controls local to the package and defer advanced grid, editor, upload, chart, and animation features until a consumer needs them.
-4. Define and build the `@dshfiles/plugin-ui` package contract, CSS Module conventions, DSH token mapping, and focused component coverage. Keep any necessary registry provenance in the package; do not require a hosted registry or runtime fetch.
-5. Pilot with `project-folder-picker` and `secret-catalog`: share button, field, search/list, and dialog primitives while preserving injected operations, secret boundaries, and workflow-specific presentation. Build both clients to prove linked TSX and CSS bundle correctly.
-6. Migrate matching primitives in `ai-accounts`, `jujutsu`, `mcp-servers`, `multi-host`, `plugin-marketplace`, `queue-reorder`, `settings-search`, and `thread-sidebar`. Keep feature layouts and controls that intentionally match a Host surface local; record each exception. Use sortable/date-range/table components only in the mapped consumers and after confirming the underlying Host APIs support the behavior.
-7. Review BB consumers separately. Decide whether their runtime/build supports a DSH package without duplicate React, CSS, or Host coupling before proposing any BB migration; otherwise keep BB as a source of usage evidence and patterns.
-8. Split implementation into focused JJ revisions: package/API, pilot migration, then small plugin migration batches. Run focused package and consumer checks after each batch; compare shared-control CSS before and after the pilot.
-9. Verify light and dark themes, narrow panels, keyboard/focus behavior, CSS isolation in a scratch/probe instance or second DSH port, and any adopted registry component's peer identity/bundle. Never restart the active web profile for this work.
-10. Document installation/linking, component props, examples, accessibility guarantees, adding a component, source/license/revision provenance, and the tested DSH/React range.
+1. ✅ Audit: Host primitives, dshx platform modules, `useApiQuery`, theme tokens, per-plugin control inventory.
+2. ✅ Build `@dshfiles/plugin-ui`: core gap components, `/query`, `/table`, `/form`, `/chart` subpaths, tests.
+3. ✅ Pilot: `project-folder-picker` + `secret-catalog` (Host atoms, `Field`, `ConfirmDialog`, `DataTable`, Query).
+4. ✅ Migrate `ai-accounts`, `jujutsu`, `mcp-servers`, `plugin-marketplace`, `queue-reorder`, `settings-search`, `thread-sidebar`, `shortcuts`. Record each kept local style and why.
+5. ✅ Verify: workspace typecheck/test/build; client bundles contain no second React and import primitives externally.
+6. ⏭ BB: kept separate. BB's runtime and content-script surfaces cannot consume DSH's platform module; BB stays a source of usage evidence.
+7. ⏭ Out of this branch: `multi-host` lives as uncommitted work in another checkout; migrate it when it lands.
 
 ## Open questions
 
-1. Does moduix's CSS Modules track map cleanly onto DSH theme tokens without leaking foundation styles across plugin surfaces, or should the kit own small primitives and borrow only its Ark interaction patterns?
-2. Which individual shadcn/Dice/Kibo entries survive license, React 18, dependency, accessibility, CSS, and build review? No registry item is required for the first package API.
-3. Do the DSH dialog consumers need Ark/Radix behavior after the pilot, or can native elements and the current React APIs cover focus, dismissal, and restoration?
-4. Should a later phase make the package consumable by BB plugins, or keep independent libraries because the two plugin runtimes have different host contracts?
+1. ~~moduix vs own primitives~~ — resolved: the Host primitives cover the atoms; moduix is not adopted.
+2. ~~Ark/Radix for dialogs~~ — resolved: Host `Modal` covers focus, Escape, layering, and shortcut scope.
+3. BB consumption — still separate; revisit only if BB gains a compatible shared runtime.
+4. TanStack Charts maturity — re-evaluate after a few releases before using it beyond `ai-accounts`.
 
 ## Acceptance criteria
 
-- [ ] `@dshfiles/plugin-ui` builds independently and from at least three real plugin consumers without a runtime import of the shared package or a duplicate React identity.
-- [ ] At least three shared primitives are used by at least three plugin packages; the pilot records a before/after count of duplicated shared-control rules and source lines.
-- [ ] Shared styles use CSS Modules and DSH theme tokens, work in light/dark themes and narrow panels, and contain no global reset or unscoped element rules.
-- [ ] Controls preserve accessible names, labels, error associations, focus visibility, disabled semantics, and dialog keyboard/focus behavior.
-- [ ] Existing UI packages use shared components for matching primitives; remaining local primitive styles have a documented semantic or Host-integration reason.
-- [ ] A scratch/probe runtime boot has no activation failures and shows the pilot controls without changing unrelated Host/plugin styles.
-- [ ] Every adopted upstream component has its source URL, license, pinned source revision, changes, and dependencies recorded; no runtime registry access is required.
-- [ ] Search, reorder, date-range, and advanced table patterns are adopted only by mapped consumers with real product needs and a supported Host operation; BB reuse remains separately compatibility-gated.
+- [x] `@dshfiles/plugin-ui` typechecks and tests independently.
+- [x] Every migrated plugin builds; client bundles keep React and `dsh-client-ui-primitives` external.
+- [x] Shared styles are CSS Modules on `--dsw-*` tokens with no global reset or unscoped element rule.
+- [x] Controls keep accessible names, label/error association, focus visibility, disabled semantics, and Host dialog behavior.
+- [x] Hand-rolled async loaders in migrated plugins use TanStack Query; remaining local primitives have a recorded reason (below).
+- [ ] A scratch-profile runtime boot shows the migrated plugins without activation failures (user-run; never restart the live web profile).
 
 ## Decisions log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-10-05 | Use a local `@dshfiles/plugin-ui` package as the shared API | Existing local linked React package demonstrates the repository pattern; a standalone package keeps reusable UI independent of each plugin's domain. |
-| 2026-10-05 | Use shadcn and community registries as reviewed source, not runtime dependencies | Registry code can speed discovery, while vendoring preserves licensing, React 18 compatibility, CSS scope, and plugin build ownership. |
-| 2026-10-05 | Start with CSS Modules and DSH theme tokens | Fits current client builds and avoids making Tailwind's app-level stylesheet part of every plugin by default. |
-| 2026-10-05 | Add moduix CSS Modules, Dice UI, Kibo UI, and official shadcn entries to the candidate survey | Moduix is the closest styling/runtime fit found; Dice UI has specific interactions with current callers; Kibo and the official registry broaden source coverage. None is an unconditional dependency. |
-| 2026-10-05 | Map component sources to DSH and BB plugin behavior before migration | Keeps advanced interactions tied to real screens and preserves DSH Host, BB Host, secret, file-system, and ordering boundaries. |
-| 2026-10-05 | Keep BB as a separate compatibility review | BB plugin APIs/build ownership differ; the DSH package is not a BB runtime dependency until that contract is verified. |
+| 2026-10-05 | Use a local `@dshfiles/plugin-ui` package as the shared API | Existing linked React package demonstrates the pattern. |
+| 2026-10-05 | Use shadcn and community registries as reviewed source, not runtime dependencies | Vendoring preserves licensing, React 18 compatibility, CSS scope. |
+| 2026-10-05 | CSS Modules and DSH theme tokens, no Tailwind | Fits client builds; avoids app-level stylesheets. |
+| 2026-10-05 | Add moduix, Dice UI, Kibo UI, and official shadcn entries to the candidate survey | Broadened source coverage; none is an unconditional dependency. |
+| 2026-10-05 | Keep BB as a separate compatibility review | BB plugin APIs/build ownership differ. |
+| 2026-10-05 | Build on `@deepseek-ai/dsh-client-ui-primitives` for atoms | Host-shared platform module, themed, accessible, zero bundle cost; supersedes vendoring Button/Input/Checkbox/Switch/Dialog from registries. |
+| 2026-10-05 | Prefer TanStack: Query, Table, Form, Charts | User preference; headless libraries compose with DSH tokens. React 18 verified against each published peer range. |
+| 2026-10-05 | Re-export TanStack from `@dshfiles/plugin-ui` subpaths | One pinned version across plugins; plugins declare one dependency. |
+| 2026-10-05 | Pin TanStack Charts exactly and confine to `ai-accounts` | 1.0.0 is two days old. |
+| 2026-10-05 | Keep dshx `useApiQuery` but stop using it in owned plugins | Toolchain API stays for other authors; TanStack Query supersedes it here. |
