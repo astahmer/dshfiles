@@ -19,6 +19,31 @@ const pinnedNode = async () => {
   }
 }
 
+/** The package manager installs the profile's link: dependencies. */
+const pnpmInstall = profileDir =>
+  new Promise((resolve, reject) => {
+    const child = spawn('pnpm', ['install', '--prefer-offline'], { cwd: profileDir, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    child.stderr.on('data', chunk => {
+      stderr += String(chunk)
+    })
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(new Error(`pnpm install in ${profileDir} timed out: ${stderr.slice(-400)}`))
+    }, 180_000)
+    // A missing pnpm emits `error`, never `exit`; without this, the gate stalls.
+    child.on('error', cause => {
+      clearTimeout(timer)
+      reject(new Error(`pnpm install in ${profileDir} could not be spawned: ${String(cause)}`))
+    })
+    child.once('exit', code => {
+      clearTimeout(timer)
+      if (code === 0) resolve()
+      else reject(new Error(`pnpm install exited ${String(code)}: ${stderr.slice(-400)}`))
+    })
+  })
+
+/** Directories that are packages: a `dsh` block is what makes one a plugin. */
 const listPlugins = async () => {
   const entries = await readdir(pluginsRoot, { withFileTypes: true })
   const plugins = []
@@ -63,6 +88,8 @@ const describe = result => {
   if (result.missingClientEntries.length > 0) {
     return `boot manifest is missing expected Client entries ${result.missingClientEntries.join(', ')}`
   }
+  if (result.evidence === 'blank') return 'booted a blank page: the kernel-owned boot element never appeared, so nothing was verified'
+  if (result.evidence === 'stalled') return 'left the boot element up for the whole window without reporting a failure'
   if (result.slotFailures.length > 0) {
     return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}`
   }

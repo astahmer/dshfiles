@@ -5,10 +5,12 @@ import { promisify } from 'node:util'
 import semver from 'semver'
 import { z } from 'zod'
 import type { CliArgs } from './args.js'
-import { DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
-import type { BundleSummary, DshPlatformClient, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
+import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
+import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
+import { connectMultiHost, nativeRpcRequestSchema, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
+
 
 const runFile = promisify(execFile)
 const engineRange = '^22.19.0 || >=24.0.0'
@@ -24,6 +26,7 @@ export interface PlatformCliRuntime {
   readonly connect?: typeof connectDshPlatformClient
   readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
   readonly readDshVersion?: () => Promise<string | undefined>
+  readonly connectMultiHost?: (options: { readonly url?: string }) => Promise<MultiHost>
 }
 
 interface DoctorCheck {
@@ -418,6 +421,50 @@ async function runStatus(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
   }
 }
 
+interface SelectedRemoteRuntime {
+  readonly hostId: string
+  readonly hostName: string
+  readonly runtimeId: string
+  readonly runtimeName: string
+}
+
+const selectRemoteRuntime = async (multiHost: MultiHost, selector: string): Promise<SelectedRemoteRuntime> => {
+  const directory = await multiHost.list()
+  const candidates = directory.runtimes.filter(item => item.id === selector || item.hostId === selector)
+  if (candidates.length === 0) throw new DshPlatformError('runtime-not-found', `No registered runtime matches ${JSON.stringify(selector)}.`)
+  if (candidates.length > 1) {
+    const runtimeIds = candidates.map(item => item.id).join(', ')
+    throw new DshPlatformError('runtime-ambiguous', `Host ${JSON.stringify(selector)} has multiple runtimes. Select one runtime id: ${runtimeIds}.`)
+  }
+  const runtime = candidates[0]
+  if (runtime === undefined) throw new DshPlatformError('runtime-not-found', `No registered runtime matches ${JSON.stringify(selector)}.`)
+  const host = directory.hosts.find(item => item.id === runtime.hostId)
+  if (host === undefined) throw new DshPlatformError('host-not-found', 'The selected runtime has no recorded host.')
+  return { hostId: host.id, hostName: host.name, runtimeId: runtime.id, runtimeName: runtime.name }
+}
+
+const remoteSessionClient = (multiHost: MultiHost, runtimeId: string): DshPlatformClient => createDshPlatformClientFromTransport({
+  rpc: async (namespace, method, args, signal) => {
+    const request = nativeRpcRequestSchema.parse({ namespace, method, args })
+    const response = await multiHost.runtimeCall(runtimeId, request, signal)
+    if (!response.ok) throw new DshPlatformError(response.code, response.message)
+    return response.value
+  },
+  sessionCursor: async sessionId => (await multiHost.sessionCursor(runtimeId, sessionId)).cursor,
+} satisfies DshPlatformTransport)
+
+const requireOnlineRuntime = (status: RuntimeStatusValue) => {
+  if (!status.ok) throw new DshPlatformError(status.code, status.message)
+  return status
+}
+
+const runtimeStatusText = (status: RuntimeStatusValue): string => {
+  if (!status.ok) return `OFFLINE ${status.runtimeId}: ${status.code} — ${status.message}`
+  const workspaces = status.workspaces.map(item => `${item.workspaceId}\t${item.path}\t${item.title}`).join('\n') || '(none)'
+  const sessions = status.sessions.map(item => `${item.sessionId}\t${item.cwd ?? ''}\t${item.running ? 'running' : item.blank ? 'blank' : 'idle'}`).join('\n') || '(none)'
+  return `ONLINE ${status.runtime.id} (${status.runtime.name}) on ${status.host.name}\nProfile: ${status.identity.profile} · DSH ${status.identity.dshVersion}\nWorkspaces:\n${workspaces}\nSessions:\n${sessions}`
+}
+
 async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Promise<number> {
   const action = args.platformArgs?.[0]
   const parameters = args.platformArgs?.slice(1) ?? []
@@ -441,6 +488,116 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   }
   if (args.command === 'doctor') return runDoctor(args, runtime)
   if (args.command === 'status') return runStatus(args, runtime)
+  if (args.command === 'host' || args.command === 'runtime' || args.command === 'workspace') {
+    const connect = connectMultiHostRuntime(runtime)
+    let multiHost: MultiHost
+    try {
+      multiHost = await connect({ ...(args.url === undefined ? {} : { url: args.url }) })
+    } catch (error) {
+      return emitError(args, runtime.io, error)
+    }
+    try {
+      if (args.command === 'host') {
+        if (action === 'list') {
+          const directory = await multiHost.list()
+          const rows = directory.hosts
+          emitResult(args, runtime.io, { items: rows }, rows.length === 0 ? 'No recorded hosts. Add one with `dshx host add`.' : rows.map(host => `${host.id}\t${host.name}\t${host.connector.kind}\t${host.runtimeCount} runtime(s)`).join('\n'))
+          return 0
+        }
+        if (action === 'status') {
+          const hostId = parameters[0] ?? ''
+          const directory = await multiHost.list()
+          const host = directory.hosts.find(item => item.id === hostId)
+          if (host === undefined) throw new DshPlatformError('host-not-found', `No recorded host ${JSON.stringify(hostId)}.`)
+          const runtimes = directory.runtimes.filter(item => item.hostId === host.id)
+          if (runtimes.length === 0) throw new DshPlatformError('host-has-no-runtimes', `Host ${host.id} has no registered runtimes.`)
+          const statuses = await Promise.all(runtimes.map(item => multiHost.runtimeStatus(item.id)))
+          const online = statuses.filter(status => status.ok).length
+          emitResult(args, runtime.io, { host, runtimes: statuses }, `Host ${host.id} (${host.name}) · ${online}/${statuses.length} runtime(s) online\n${statuses.map(runtimeStatusText).join('\n\n')}`)
+          return online === statuses.length ? 0 : 1
+        }
+        if (action === 'remove') {
+          const hostId = parameters[0] ?? ''
+          const { removed } = await multiHost.hostRemove(hostId, args.directoryOnly)
+          emitResult(args, runtime.io, { removed }, removed ? `Removed host ${hostId}. Remote data remains intact.` : `No recorded host ${hostId}.`)
+          return removed ? 0 : 4
+        }
+        if (action === 'add') {
+          const id = parameters[0] ?? ''
+          const name = parameters.slice(1).join(' ').trim()
+          const connector = args.local
+            ? { kind: 'local' as const }
+            : { kind: 'ssh' as const, sshTarget: args.sshTarget ?? '' }
+          const host = await multiHost.hostUpsert({ id, name, connector })
+          emitResult(args, runtime.io, host, `Recorded ${host.name} (${host.id}) as a ${host.connector.kind} host.`)
+          return 0
+        }
+      }
+      if (args.command === 'runtime') {
+        if (action === 'list') {
+          const rows = (await multiHost.runtimeList(parameters[0])).runtimes
+          emitResult(args, runtime.io, { items: rows }, rows.length === 0 ? 'No registered runtimes.' : rows.map(item => `${item.id}\t${item.name}\t${item.identity?.profile ?? 'identity unavailable'}\t${item.hostId}`).join('\n'))
+          return 0
+        }
+        if (action === 'status') {
+          const status = await multiHost.runtimeStatus(parameters[0] ?? '')
+          emitResult(args, runtime.io, status, runtimeStatusText(status))
+          return status.ok ? 0 : 1
+        }
+        if (action === 'add') {
+          const hostId = parameters[0] ?? ''
+          const name = parameters.slice(1).join(' ').trim()
+          const directory = await multiHost.list()
+          const host = directory.hosts.find(item => item.id === hostId)
+          if (host === undefined) throw new DshPlatformError('host-not-found', `No recorded host ${JSON.stringify(hostId)}.`)
+          const locator = host.connector.kind === 'local'
+            ? (() => {
+                const environmentName = args.launchUrlEnv
+                if (environmentName === undefined) throw new DshPlatformError('usage', 'Local runtime add requires --launch-url-env <name>.')
+                const launchUrl = process.env[environmentName]
+                if (launchUrl === undefined || launchUrl.length === 0) throw new DshPlatformError('missing-launch-url', `Environment variable ${environmentName} is not set.`)
+                return { kind: 'local' as const, launchUrl }
+              })()
+            : (() => {
+                if (args.unit === undefined || args.remoteHome === undefined) throw new DshPlatformError('usage', 'SSH runtime add requires --unit and --remote-home.')
+                return { kind: 'ssh' as const, unit: args.unit, remoteHome: args.remoteHome }
+              })()
+          const registration = await multiHost.runtimeUpsert({ hostId, name, locator })
+          if (!registration.ok) throw new DshPlatformError(registration.code, registration.message)
+          const added = registration.runtime
+          emitResult(args, runtime.io, added, `Registered runtime ${added.id} (${added.name}) on host ${added.hostId}.`)
+          return 0
+        }
+        if (action === 'remove') {
+          const runtimeId = parameters[0] ?? ''
+          const { removed } = await multiHost.runtimeRemove(runtimeId)
+          emitResult(args, runtime.io, { removed }, removed ? `Removed runtime ${runtimeId}. Remote data remains intact.` : `No recorded runtime ${runtimeId}.`)
+          return removed ? 0 : 4
+        }
+      }
+      if (args.command === 'workspace') {
+        if (action === 'list') {
+          const selection = await selectRemoteRuntime(multiHost, parameters[0] ?? '')
+          const status = requireOnlineRuntime(await multiHost.runtimeStatus(selection.runtimeId))
+          const workspaces = status.workspaces
+          emitResult(args, runtime.io, { placement: selection, items: workspaces }, workspaces.length === 0 ? `No workspaces on ${selection.runtimeName}.` : workspaces.map(item => `${item.workspaceId}\t${item.path}\t${item.title}`).join('\n'))
+          return 0
+        }
+        if (action === 'open') {
+          const [selector, ...pathParts] = parameters
+          const path = pathParts.join(' ')
+          if (selector === undefined || !path.startsWith('/')) throw new DshPlatformError('usage', 'Workspace paths must be absolute paths on the selected runtime.')
+          const selection = await selectRemoteRuntime(multiHost, selector)
+          const created = await multiHost.workspaceOpen(selection.runtimeId, path)
+          emitResult(args, runtime.io, { placement: selection, workspace: created }, `Workspace ${created.workspaceId} at ${created.path} on runtime ${selection.runtimeId}`)
+          return 0
+        }
+      }
+    } catch (error) {
+      return emitError(args, runtime.io, error)
+    }
+  }
+
   if (args.command === 'comm') {
     return runCommunicationCommand(args, {
       io: runtime.io,
@@ -448,39 +605,63 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
     })
   }
 
-  const connect = runtime.connect ?? connectDshPlatformClient
+  let selectedPlacement: SelectedRemoteRuntime | undefined
   let client: DshPlatformClient
-  try {
-    client = await connect(args.url === undefined ? {} : { url: args.url })
-  } catch (error) {
-    return emitError(args, runtime.io, error)
+  if (args.command === 'sessions' && args.hostSelector !== undefined) {
+    try {
+      const multiHost = await connectMultiHostRuntime(runtime)({ ...(args.url === undefined ? {} : { url: args.url }) })
+      selectedPlacement = await selectRemoteRuntime(multiHost, args.hostSelector)
+      client = remoteSessionClient(multiHost, selectedPlacement.runtimeId)
+    } catch (error) {
+      return emitError(args, runtime.io, error)
+    }
+  } else {
+    const connect = runtime.connect ?? connectDshPlatformClient
+    try {
+      client = await connect(args.url === undefined ? {} : { url: args.url })
+    } catch (error) {
+      return emitError(args, runtime.io, error)
+    }
+  }
+
+  const emitSessionResult = (data: JsonValue | object, message: string): void => {
+    if (selectedPlacement === undefined) {
+      emitResult(args, runtime.io, data, message)
+      return
+    }
+    emitResult(
+      args,
+      runtime.io,
+      { placement: selectedPlacement, result: data },
+      `${message} [${selectedPlacement.runtimeId} on ${selectedPlacement.hostName}]`,
+    )
   }
 
   try {
     if (args.command === 'sessions') {
       if (action === 'list') {
         const items = await client.sessions.list()
-        emitResult(args, runtime.io, { items }, sessionRows(items))
+        emitSessionResult({ items }, sessionRows(items))
         return 0
       }
       if (action === 'search') {
         const query = parameters.join(' ')
         const result = await client.sessions.search(query)
         const message = result.items.length === 0 ? 'No matching Sessions.' : result.items.map(item => `${item.sessionId}\t${item.snippet}`).join('\n')
-        emitResult(args, runtime.io, { query, ...result }, `${message}${result.hasMore ? '\nMore results are available.' : ''}`)
+        emitSessionResult({ query, ...result }, `${message}${result.hasMore ? '\nMore results are available.' : ''}`)
         return 0
       }
       if (action === 'show') {
         const sessionId = parameters[0]
         const item = (await client.sessions.list()).find(session => session.sessionId === sessionId)
         if (!item) throw new DshPlatformError('not-found', `No DSH Session named ${JSON.stringify(sessionId)} exists.`)
-        emitResult(args, runtime.io, item, JSON.stringify(item, null, 2))
+        emitSessionResult(item, JSON.stringify(item, null, 2))
         return 0
       }
       if (action === 'history') {
         const sessionId = parameters[0]
         const page = await client.sessions.history(sessionId ?? '', args.max)
-        emitResult(args, runtime.io, { sessionId, ...page }, JSON.stringify(page, null, 2))
+        emitSessionResult({ sessionId, ...page }, JSON.stringify(page, null, 2))
         return 0
       }
       if (action === 'create') {
@@ -488,33 +669,31 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
           ...(args.agentPreset === undefined ? {} : { agentPreset: args.agentPreset }),
         })
-        emitResult(args, runtime.io, result, `Created Session ${result.sessionId}`)
+        emitSessionResult(result, `Created Session ${result.sessionId}`)
         return 0
       }
       if (action === 'fork') {
         const result = await client.sessions.fork(parameters[0] ?? '', args.atSeq)
-        emitResult(args, runtime.io, result, `Forked Session ${parameters[0]} as ${result.sessionId}`)
+        emitSessionResult(result, `Forked Session ${parameters[0]} as ${result.sessionId}`)
         return 0
       }
       if (action === 'cancel') {
         const result = await client.sessions.cancel(parameters[0] ?? '')
-        emitResult(args, runtime.io, { sessionId: parameters[0], ...result }, `Cancellation accepted for ${parameters[0]}`)
+        emitSessionResult({ sessionId: parameters[0], ...result }, `Cancellation accepted for ${parameters[0]}`)
         return 0
       }
       if (action === 'rename') {
         const sessionId = parameters[0] ?? ''
         const title = parameters.slice(1).join(' ')
         const result = await client.sessions.rename(sessionId, title)
-        emitResult(args, runtime.io, { sessionId, ...result }, `Renamed Session ${sessionId} to ${result.title}`)
+        emitSessionResult({ sessionId, ...result }, `Renamed Session ${sessionId} to ${result.title}`)
         return 0
       }
       if (action === 'archive' || action === 'unarchive') {
         const sessionId = parameters[0] ?? ''
         const archived = action === 'archive'
         const result = await (archived ? client.sessions.archive(sessionId) : client.sessions.unarchive(sessionId))
-        emitResult(
-          args,
-          runtime.io,
+        emitSessionResult(
           {
             sessionId,
             archived,
@@ -528,7 +707,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         const sessionId = parameters[0] ?? ''
         const mode = args.mode ?? 'queue'
         const result = await promptSessionWithInterrupt(client, sessionId, parameters.slice(1).join(' '), mode)
-        emitResult(args, runtime.io, { sessionId, mode, ...result }, `Prompt accepted for Session ${sessionId} (${mode})`)
+        emitSessionResult({ sessionId, mode, ...result }, `Prompt accepted for Session ${sessionId} (${mode})`)
         return 0
       }
       if (action === 'export') {
@@ -537,13 +716,12 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           schemaVersion: 1,
           source: 'dshx',
           sessionId,
+          ...(selectedPlacement === undefined ? {} : { placement: selectedPlacement }),
           records: await client.sessions.export(sessionId),
         }
         if (args.output !== undefined) {
           await writeFile(args.output, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
-          emitResult(
-            args,
-            runtime.io,
+          emitSessionResult(
             {
               sessionId,
               output: args.output,
@@ -552,7 +730,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
             `Exported ${data.records.length} records to ${args.output}`,
           )
         } else {
-          emitResult(args, runtime.io, data, JSON.stringify(data, null, 2))
+          emitSessionResult(data, JSON.stringify(data, null, 2))
         }
         return 0
       }
@@ -850,6 +1028,10 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   }
 }
 
+
+const connectMultiHostRuntime = (runtime: PlatformCliRuntime): ((options: { readonly url?: string }) => Promise<MultiHost>) =>
+  runtime.connectMultiHost ?? (options => connectMultiHost(options))
+
 export function platformHelp(args: CliArgs): string | undefined {
   const group = args.command
   const nested = args.platformArgs?.[0]
@@ -859,14 +1041,14 @@ export function platformHelp(args: CliArgs): string | undefined {
   if (group === 'info') return `Usage: dshx info ${output}\nShows local DSHX and Node versions; it does not require a running DSH Host.\n`
   if (group === 'doctor') return `Usage: dshx doctor ${connection} ${output}\nChecks local runtime facts and the DSH APIs available to this launch URL.\n`
   if (group === 'sessions') {
-    if (nested === 'list') return `Usage: dshx sessions list ${connection} ${output}\nLists Sessions visible to the connected DSH Host.\n`
+    if (nested === 'list') return `Usage: dshx sessions list [--host <host-id|runtime-id>] ${connection} ${output}\nLists Sessions from the selected execution runtime. Without --host, uses the connected DSH Host.\n`
     if (nested === 'search')
       return `Usage: dshx sessions search <query...> ${connection} ${output}\nSearches visible Session content; DSH returns at most 20 snippets.\n`
     if (nested === 'show') return `Usage: dshx sessions show <session-id> ${connection} ${output}\nShows one Session summary.\n`
     if (nested === 'history')
       return `Usage: dshx sessions history <session-id> [--max <count>] ${connection} ${output}\nReads bounded Session history through DSH's paging API.\n`
     if (nested === 'create')
-      return `Usage: dshx sessions create [--cwd <path>] [--agent-preset <id>] ${connection} ${output}\nCreates a Session through the DSH Session API.\n`
+      return `Usage: dshx sessions create [--host <host-id|runtime-id>] [--cwd <path>] [--agent-preset <id>] ${connection} ${output}\nCreates a Session on the selected execution runtime.\n`
     if (nested === 'fork')
       return `Usage: dshx sessions fork <session-id> [--at-seq <n>] ${connection} ${output}\nForks a Session, optionally from a sequence number.\n`
     if (nested === 'cancel') return `Usage: dshx sessions cancel <session-id> ${connection} ${output}\nRequests cancellation of the Session's active work.\n`
@@ -878,7 +1060,7 @@ export function platformHelp(args: CliArgs): string | undefined {
       return `Usage: dshx sessions prompt <session-id> <message...> [--mode queue|steer] ${connection} ${output}\nSends text to the Session Agent; defaults to queue. Ctrl-C asks DSH to cancel prompt admission.\n`
     if (nested === 'export')
       return `Usage: dshx sessions export <session-id> [--output <path>] ${connection} ${output}\nExports Session records as versioned DSHX JSON.\n`
-    return `Usage: dshx sessions <list|search|show|history|create|fork|cancel|rename|archive|unarchive|prompt|export> [arguments] [options]\nCommon options: ${connection} ${output}\nSession creation: --cwd <path> --agent-preset <id>\nPrompt: --mode queue|steer\nHistory/fork: --max <count> --at-seq <n>\nExport: --output <path>\n`
+    return `Usage: dshx sessions <list|search|show|history|create|fork|cancel|rename|archive|unarchive|prompt|export> [arguments] [options]\nCommon options: [--host <host-id|runtime-id>] ${connection} ${output}\nSession creation: --cwd <path> --agent-preset <id>\nPrompt: --mode queue|steer\nHistory/fork: --max <count> --at-seq <n>\nExport: --output <path>\n`
   }
   if (group === 'plugins') {
     if (nested === 'list') return `Usage: dshx plugins list ${connection} ${output}\nLists runtime plugin entries and their Loader state.\n`
@@ -927,6 +1109,25 @@ export function platformHelp(args: CliArgs): string | undefined {
       return `Usage: dshx config set <namespace> <path> <json-value> ${connection} ${output}\nWrites one schema-validated setting using its current revision. Secret values must be changed in DSH Settings.\n`
     if (nested === 'unset') return `Usage: dshx config unset <namespace> <path> ${connection} ${output}\nRemoves one setting using its current revision.\n`
     return `Usage: dshx config <list|get|set|unset> [arguments] ${connection} ${output}\nValues use JSON syntax. Secret values are redacted and must be changed in DSH Settings.\n`
+  }
+  if (group === 'host') {
+    if (nested === 'list') return `Usage: dshx host list ${connection} ${output}\nLists recorded hosts and their connector targets.\n`
+    if (nested === 'status') return `Usage: dshx host status <host-id> ${connection} ${output}\nChecks every registered runtime on the host and reports its workspaces and Sessions.\n`
+    if (nested === 'remove') return `Usage: dshx host remove <host-id> [--directory-only] ${connection} ${output}\nRemoves the directory record. --directory-only also removes runtime references; remote data stays intact.\n`
+    if (nested === 'add') return `Usage: dshx host add <id> <display-name...> (--local | --ssh-target <user@host>) ${connection} ${output}\nRecords one local or trusted SSH machine.\n`
+    return `Usage: dshx host <list|status|remove|add> [arguments] ${connection} ${output}\n`
+  }
+  if (group === 'runtime') {
+    if (nested === 'list') return `Usage: dshx runtime list [host-id] ${connection} ${output}\nLists runtimes registered on one host or across all hosts.\n`
+    if (nested === 'status') return `Usage: dshx runtime status <runtime-id> ${connection} ${output}\nVerifies runtime identity before reading native workspace and Session state.\n`
+    if (nested === 'add') return `Usage: dshx runtime add <host-id> <display-name...> [--launch-url-env <name> | --unit <systemd-unit> --remote-home <path>] ${connection} ${output}\nPins the DSH runtime identity after an authenticated connection.\n`
+    if (nested === 'remove') return `Usage: dshx runtime remove <runtime-id> ${connection} ${output}\nRemoves only this local directory reference; runtime data remains intact.\n`
+    return `Usage: dshx runtime <list|status|add|remove> [arguments] ${connection} ${output}\n`
+  }
+  if (group === 'workspace') {
+    if (nested === 'list') return `Usage: dshx workspace list <host-id|runtime-id> ${connection} ${output}\nLists native Workspaces from the selected runtime. A host with multiple runtimes is ambiguous.\n`
+    if (nested === 'open') return `Usage: dshx workspace open <host-id|runtime-id> <absolute-path...> ${connection} ${output}\nCreates or resolves one Workspace on the selected runtime.\n`
+    return `Usage: dshx workspace <list|open> [arguments] ${connection} ${output}\n`
   }
   if (group === 'comm') {
     const principal = '[--principal <name>]'

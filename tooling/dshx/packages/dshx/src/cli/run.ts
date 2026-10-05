@@ -1408,6 +1408,11 @@ const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => 
   return 0
 }
 
+const platformGroupsForRun = (): ReadonlySet<string> =>
+  new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config', 'host', 'runtime', 'workspace', 'comm'])
+
+const platformCommandsForHelp = platformGroupsForRun
+
 export async function runCli(argv: readonly string[], options: CliRunOptions = {}): Promise<number> {
   const io = options.io ?? defaultIO()
   if (argv[0] === 'create') {
@@ -1423,7 +1428,23 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     args = parseCliArgs(argv)
   } catch (error) {
     const message = (error instanceof CliUsageError ? error.message : String(error)).replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]')
-    const platformGroups = new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config', 'comm'])
+    const platformGroups = new Set([
+      'status',
+      'info',
+      'doctor',
+      'sessions',
+      'plugins',
+      'bundles',
+      'presets',
+      'models',
+      'skills',
+      'commands',
+      'config',
+      'host',
+      'runtime',
+      'workspace',
+      'comm',
+    ])
     const group = argv.find(token => platformGroups.has(token))
     if (group !== undefined && argv.includes('--json')) {
       const actions = new Set([
@@ -1483,20 +1504,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
   if (args.help) {
     const runtime = options.runtime ?? {}
-    if (
-      args.command === 'status' ||
-      args.command === 'info' ||
-      args.command === 'doctor' ||
-      args.command === 'sessions' ||
-      args.command === 'plugins' ||
-      args.command === 'bundles' ||
-      args.command === 'presets' ||
-      args.command === 'models' ||
-      args.command === 'skills' ||
-      args.command === 'commands' ||
-      args.command === 'config' ||
-      args.command === 'comm'
-    ) {
+    if (args.command !== undefined && platformCommandsForHelp().has(args.command)) {
       return runPlatformCli(args, {
         io,
         dshxVersion: options.version ?? VERSION,
@@ -1506,7 +1514,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     }
     write(
       io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events, capabilities\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
+      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|host|runtime|workspace|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events, capabilities\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, host, runtime, workspace, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
     )
     return 0
   }
@@ -1532,20 +1540,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (args.command === 'inspect' && args.inspectTarget === 'slots' && args.explain) return runSlotExplanation(args, io)
   const runtime = options.runtime ?? {}
-  if (
-    args.command === 'status' ||
-    args.command === 'info' ||
-    args.command === 'doctor' ||
-    args.command === 'sessions' ||
-    args.command === 'plugins' ||
-    args.command === 'bundles' ||
-    args.command === 'presets' ||
-    args.command === 'models' ||
-    args.command === 'skills' ||
-    args.command === 'commands' ||
-    args.command === 'config' ||
-    args.command === 'comm'
-  ) {
+  if (args.command !== undefined && platformGroupsForRun().has(args.command)) {
     return runPlatformCli(args, {
       io,
       dshxVersion: options.version ?? VERSION,
@@ -1558,12 +1553,11 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       args.cwd === undefined ? (options.cwd === undefined ? {} : { cwd: options.cwd }) : { cwd: args.cwd },
     )
     if (args.command === 'build') return await runBuild(args, options, project)
-    if (args.command === 'test')
-      return await (runtime.testProject ?? testProject)(project.root, {
-        stdout: io.stdout,
-        stderr: io.stderr,
-        ...(args.file === undefined ? {} : { file: args.file }),
-      })
+    if (args.command === 'test') {
+      const testOptions: { stdout: Writable; stderr: Writable; file?: string } = { stdout: io.stdout, stderr: io.stderr }
+      if (args.file !== undefined) testOptions.file = args.file
+      return await (runtime.testProject ?? testProject)(project.root, testOptions)
+    }
     if (args.command === 'package') {
       const exitCode = await runBuild(args, options, project)
       if (exitCode !== 0) return exitCode

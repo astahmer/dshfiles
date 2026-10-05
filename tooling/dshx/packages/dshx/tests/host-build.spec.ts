@@ -190,6 +190,31 @@ describe('host compiler', () => {
     expect(await readFile(output, 'utf8')).not.toContain('@dshfiles/dshx/api')
   })
 
+  it('inlines the public Host platform API helpers into Host artifacts', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost } from '@dshfiles/dshx/host'",
+        "import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'",
+        "import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'",
+        'export default defineHost({ setup() { return { createDshxApiCaller, loopbackLaunchUrl, nativeRpcRequestSchema } } })',
+        '',
+      ].join('\n'),
+    )
+    await buildHost({
+      packageId: '@dshx/fixture-plugin',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+    })
+    const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(code).toContain('createDshxApiCaller')
+    expect(code).toContain('loopbackLaunchUrl')
+    expect(code).toContain('nativeRpcRequestSchema')
+    expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
+  })
+
   it('inlines defineCommand and registers official definitions through ctx.commands', async () => {
     const root = await temporaryProject()
     await writeFile(

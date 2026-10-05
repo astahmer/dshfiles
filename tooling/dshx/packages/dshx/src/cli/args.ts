@@ -19,6 +19,9 @@ export type CliCommand =
   | 'skills'
   | 'commands'
   | 'config'
+  | 'host'
+  | 'runtime'
+  | 'workspace'
   | 'comm'
 export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events' | 'capabilities'
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
@@ -53,6 +56,13 @@ export interface CliArgs {
   readonly noColor?: boolean
   readonly url?: string
   readonly session?: string
+  readonly hostSelector?: string
+  readonly local?: boolean
+  readonly sshTarget?: string
+  readonly launchUrlEnv?: string
+  readonly unit?: string
+  readonly remoteHome?: string
+  readonly directoryOnly?: boolean
   readonly line?: string
   readonly output?: string
   readonly agentPreset?: string
@@ -89,6 +99,11 @@ const valueOptions = new Set([
   '--port',
   '--url',
   '--session',
+  '--host',
+  '--ssh-target',
+  '--launch-url-env',
+  '--unit',
+  '--remote-home',
   '--line',
   '--output',
   '--agent-preset',
@@ -118,6 +133,8 @@ const booleanOptions = new Set([
   '--explain',
   '--quiet',
   '--no-color',
+  '--local',
+  '--directory-only',
 ])
 
 const sharedArgs = {
@@ -215,6 +232,25 @@ const sharedArgs = {
     description: 'Scope this operation to a DSH Session.',
     valueHint: 'id',
   },
+  host: {
+    type: 'string',
+    description: 'Select one registered host or runtime for Session commands.',
+    valueHint: 'id',
+  },
+  local: { type: 'boolean', description: 'Register a local execution host.' },
+  sshTarget: {
+    type: 'string',
+    description: 'Register an SSH host target that already has a trusted host key.',
+    valueHint: 'user@host',
+  },
+  launchUrlEnv: {
+    type: 'string',
+    description: 'Read a local runtime launch URL from this environment variable.',
+    valueHint: 'variable',
+  },
+  unit: { type: 'string', description: 'Remote systemd user unit for a DSH runtime.', valueHint: 'unit' },
+  remoteHome: { type: 'string', description: 'Remote DSH_HOME for a DSH runtime.', valueHint: 'path' },
+  directoryOnly: { type: 'boolean', description: 'Remove directory references while keeping remote runtime data.' },
   line: {
     type: 'string',
     description: 'Run one slash-prefixed DSH command line.',
@@ -393,6 +429,18 @@ export const dshxCommand = defineCommand({
       },
       args: sharedArgs,
     }),
+    host: defineCommand({
+      meta: { name: 'host', description: 'Record, verify, and select execution machines and DSH runtimes.' },
+      args: sharedArgs,
+    }),
+    runtime: defineCommand({
+      meta: { name: 'runtime', description: 'Register, verify, select, and remove remote DSH runtimes.' },
+      args: sharedArgs,
+    }),
+    workspace: defineCommand({
+      meta: { name: 'workspace', description: 'Create or open remote Workspaces on a recorded host.' },
+      args: sharedArgs,
+    }),
     comm: defineCommand({
       meta: {
         name: 'comm',
@@ -415,6 +463,9 @@ const platformCommands: ReadonlySet<CliCommand> = new Set([
   'skills',
   'commands',
   'config',
+  'host',
+  'runtime',
+  'workspace',
   'comm',
 ])
 
@@ -476,6 +527,16 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
     allows: context => context.command === 'commands' || context.command === 'skills' || platformAction('models', 'select')(context),
     usage: '--session is only valid with commands, models select, or skills.',
   },
+  host: {
+    allows: platformAction('sessions', 'list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export'),
+    usage: '--host is only valid with sessions commands.',
+  },
+  local: { allows: platformAction('host', 'add'), usage: '--local is only valid with host add.' },
+  sshTarget: { allows: platformAction('host', 'add'), usage: '--ssh-target is only valid with host add.' },
+  launchUrlEnv: { allows: platformAction('runtime', 'add'), usage: '--launch-url-env is only valid with runtime add.' },
+  unit: { allows: platformAction('runtime', 'add'), usage: '--unit is only valid with runtime add.' },
+  remoteHome: { allows: platformAction('runtime', 'add'), usage: '--remote-home is only valid with runtime add.' },
+  directoryOnly: { allows: platformAction('host', 'remove'), usage: '--directory-only is only valid with host remove.' },
   line: { allows: ({ command }) => command === 'commands', usage: '--line is only valid with commands run.' },
   output: { allows: platformAction('sessions', 'export'), usage: '--output is only valid with sessions export.' },
   agentPreset: { allows: platformAction('sessions', 'create'), usage: '--agent-preset is only valid with sessions create.' },
@@ -541,6 +602,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       command === 'skills' ||
       command === 'commands' ||
       command === 'config' ||
+      command === 'host' ||
+      command === 'runtime' ||
+      command === 'workspace' ||
       command === 'comm'
     ) {
       platformArgs.push(token)
@@ -565,6 +629,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       token === 'skills' ||
       token === 'commands' ||
       token === 'config' ||
+      token === 'host' ||
+      token === 'runtime' ||
+      token === 'workspace' ||
       token === 'comm'
     ) {
       if (command !== undefined) throw new CliUsageError('Only one command may be specified.')
@@ -611,6 +678,13 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const noColor = parsed.noColor ?? false
   const url = parsed.url
   const session = parsed.session
+  const hostSelector = parsed.host
+  const local = parsed.local ?? false
+  const sshTarget = parsed.sshTarget
+  const launchUrlEnv = parsed.launchUrlEnv
+  const unit = parsed.unit
+  const remoteHome = parsed.remoteHome
+  const directoryOnly = parsed.directoryOnly ?? false
   const line = parsed.line
   const output = parsed.output
   const agentPreset = parsed.agentPreset
@@ -667,6 +741,13 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       url,
       cwd,
       session,
+      host: hostSelector,
+      local,
+      sshTarget,
+      launchUrlEnv,
+      unit,
+      remoteHome,
+      directoryOnly,
       line,
       output,
       agentPreset,
@@ -777,6 +858,38 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (action === 'list' && (namespace !== undefined || path !== undefined || extra.length > 0))
       throw new CliUsageError('config list accepts no namespace or path.')
   }
+  if (command === 'host' && !help) {
+    const [action, id, ...nameParts] = platformArgs
+    if (!['list', 'status', 'add', 'remove'].includes(action ?? '')) throw new CliUsageError('host requires list, status, add, or remove.')
+    if (action === 'list' && id !== undefined) throw new CliUsageError('host list accepts no positional arguments.')
+    if (action === 'status' && (id === undefined || nameParts.length > 0)) throw new CliUsageError('host status requires exactly one host id.')
+    if (action === 'remove' && (id === undefined || nameParts.length > 0)) throw new CliUsageError('host remove requires exactly one host id.')
+    if (action === 'add') {
+      if (id === undefined || nameParts.join(' ').trim().length === 0) throw new CliUsageError('host add requires an id and display name.')
+      if (local === (sshTarget !== undefined)) throw new CliUsageError('host add requires exactly one of --local or --ssh-target <user@host>.')
+    }
+  }
+  if (command === 'runtime' && !help) {
+    const [action, id, ...nameParts] = platformArgs
+    if (!['list', 'status', 'add', 'remove'].includes(action ?? '')) throw new CliUsageError('runtime requires list, status, add, or remove.')
+    if (action === 'list' && platformArgs.length > 2) throw new CliUsageError('runtime list accepts at most one host id.')
+    if (action === 'status' && (id === undefined || nameParts.length > 0)) throw new CliUsageError('runtime status requires exactly one runtime id.')
+    if (action === 'remove' && (id === undefined || nameParts.length > 0)) throw new CliUsageError('runtime remove requires exactly one runtime id.')
+    if (action === 'add') {
+      if (id === undefined || nameParts.join(' ').trim().length === 0) throw new CliUsageError('runtime add requires a host id and display name.')
+      const localRuntime = launchUrlEnv !== undefined
+      const sshRuntime = unit !== undefined || remoteHome !== undefined
+      if (localRuntime === sshRuntime) throw new CliUsageError('runtime add requires --launch-url-env <name> for local runtimes, or both --unit and --remote-home for SSH runtimes.')
+      if (sshRuntime && (unit === undefined || remoteHome === undefined)) throw new CliUsageError('SSH runtime add requires both --unit and --remote-home.')
+      if (launchUrlEnv !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(launchUrlEnv)) throw new CliUsageError('--launch-url-env requires an environment variable name.')
+    }
+  }
+  if (command === 'workspace' && !help) {
+    const [action, id, ...pathParts] = platformArgs
+    if (!['list', 'open'].includes(action ?? '')) throw new CliUsageError('workspace requires list or open.')
+    if (action === 'list' && (id === undefined || pathParts.length > 0)) throw new CliUsageError('workspace list requires exactly one host or runtime id.')
+    if (action === 'open' && (id === undefined || pathParts.join(' ').trim().length === 0)) throw new CliUsageError('workspace open requires a host or runtime id and an absolute path.')
+  }
   if (!platformCommand && platformArgs.length > 0) throw new CliUsageError('Unexpected positional arguments.')
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')
   if (command !== 'add' && addTarget !== undefined) throw new CliUsageError('Add targets are only valid with the add command.')
@@ -864,6 +977,13 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(noColor ? { noColor } : {}),
     ...(url === undefined ? {} : { url }),
     ...(session === undefined ? {} : { session }),
+    ...(hostSelector === undefined ? {} : { hostSelector }),
+    ...(local ? { local } : {}),
+    ...(sshTarget === undefined ? {} : { sshTarget }),
+    ...(launchUrlEnv === undefined ? {} : { launchUrlEnv }),
+    ...(unit === undefined ? {} : { unit }),
+    ...(remoteHome === undefined ? {} : { remoteHome }),
+    ...(directoryOnly ? { directoryOnly } : {}),
     ...(line === undefined ? {} : { line }),
     ...(output === undefined ? {} : { output }),
     ...(agentPreset === undefined ? {} : { agentPreset }),

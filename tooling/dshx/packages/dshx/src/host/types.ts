@@ -38,5 +38,5 @@ export interface HostDefinition {
   readonly Config?: StandardSchemaV1
   readonly settings?: readonly SettingsContribution[]
   readonly apis?: readonly ApiHostRegistration<Record<string, AnyApiMethodDefinition>, any>[]
-  readonly setup?: (ctx: Context) => void | Effect<void>
+  readonly setup?: (ctx: Context, config?: unknown) => void | Effect<void>
 }
