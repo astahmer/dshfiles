@@ -6,6 +6,7 @@ import type { ComposedProps, SlotComponent } from '@deepseek-ai/dsh-client-ui-sl
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
 import { createApiClient } from '../api/runtime.js'

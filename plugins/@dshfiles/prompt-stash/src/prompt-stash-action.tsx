@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
+import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, MAX_RECENT_SCAN_NODES, projectRecentPrompts } from './recent-prompts.js'
 import {
   MAX_PROMPTS,
   MAX_PROMPT_TEXT_LENGTH,
@@ -43,6 +44,7 @@ const readLatestPrompts = (): StorageRead => {
 
 const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false)
+  const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
   const [libraryState, setLibraryState] = useState<LibraryState>('loading')
   const [prompts, setPrompts] = useState<readonly SavedPrompt[]>([])
   const [editor, setEditor] = useState<PromptEditor | null>(null)
@@ -50,6 +52,22 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const [hasInserted, setHasInserted] = useState(false)
   const [notice, setNotice] = useState('')
   const insertionSpan = useRef<ReturnType<ComposerActionProps['inputActions']['captureInsertion']> | null>(null)
+  const recentPrompts = props.useChat(chat => {
+    const newestFirstNodes = {
+      *[Symbol.iterator]() {
+        let index = chat.order.length - 1
+        let scanned = 0
+        while (index >= 0 && scanned < MAX_RECENT_SCAN_NODES) {
+          const key = chat.order[index]
+          if (key !== undefined) yield chat.nodes.get(key)
+          index -= 1
+          scanned += 1
+        }
+      },
+    }
+
+    return projectRecentPrompts(newestFirstNodes)
+  }, areRecentPromptsEqual)
   const triggerId = useId()
   const regionId = useId()
   const titleId = useId()
@@ -120,6 +138,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     }
 
     insertionSpan.current = props.inputActions.captureInsertion()
+    setActiveSource('saved')
     setHasInserted(false)
     setNotice('')
     setIsOpen(true)
@@ -244,6 +263,29 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     setNotice('Inserted at the saved cursor position. The message was not sent.')
   }
 
+  const insertRecentPrompt = (promptId: string): void => {
+    if (hasInserted) return
+    const span = insertionSpan.current
+    if (span === null) {
+      setNotice('Close and reopen the prompt stash to choose a fresh insertion point.')
+      return
+    }
+
+    const prompt = recentPrompts.find(item => item.id === promptId)
+    if (prompt === undefined) {
+      setNotice('This message is no longer in the loaded conversation.')
+      return
+    }
+
+    if (!props.inputActions.insertText(prompt.text, span)) {
+      setNotice('The composer draft changed. Close and reopen the prompt stash before inserting.')
+      return
+    }
+
+    setHasInserted(true)
+    setNotice('Inserted at the saved cursor position. The message was not sent.')
+  }
+
   const closeLibrary = (): void => {
     insertionSpan.current = null
     setIsOpen(false)
@@ -283,8 +325,12 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
         >
           <div className={styles.header}>
             <div>
-              <h2 className={styles.heading}>Saved prompts</h2>
-              <p className={styles.description}>Stored only in this browser. Text only; files and attachments are not included.</p>
+              <h2 className={styles.heading}>{activeSource === 'recent' ? 'Recent messages' : 'Saved prompts'}</h2>
+              <p className={styles.description}>
+                {activeSource === 'recent'
+                  ? 'Recent text from this conversation only. Attachments are not included.'
+                  : 'Saved text stays in this browser. Files and attachments are not included.'}
+              </p>
             </div>
             <button type="button" className={styles.quietButton} onClick={closeLibrary}>
               Done
@@ -295,102 +341,146 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
             {notice}
           </p>
 
-          {libraryState === 'loading' ? <p className={styles.empty}>Loading saved prompts…</p> : null}
-          {libraryState === 'invalid' ? <p className={styles.empty}>Saved data is unreadable and was left untouched.</p> : null}
-          {libraryState === 'unavailable' ? <p className={styles.empty}>Browser storage is unavailable. Prompts cannot be saved.</p> : null}
+          <div className={styles.listHeader} role="group" aria-label="Prompt source">
+            <button
+              type="button"
+              className={activeSource === 'saved' ? styles.primaryButton : styles.quietButton}
+              aria-pressed={activeSource === 'saved'}
+              onClick={() => setActiveSource('saved')}
+            >
+              Saved
+            </button>
+            <button
+              type="button"
+              className={activeSource === 'recent' ? styles.primaryButton : styles.quietButton}
+              aria-pressed={activeSource === 'recent'}
+              onClick={() => setActiveSource('recent')}
+            >
+              Recent here ({Math.min(recentPrompts.length, MAX_RECENT_PROMPTS)})
+            </button>
+          </div>
 
-          {libraryState === 'ready' ? (
+          {activeSource === 'recent' ? (
             <>
-              {editor === null ? (
-                <>
-                  <div className={styles.listHeader}>
-                    <span>
-                      {prompts.length} of {MAX_PROMPTS} prompts
-                    </span>
-                    <button type="button" className={styles.primaryButton} disabled={prompts.length >= MAX_PROMPTS} onClick={beginNewPrompt}>
-                      New prompt
-                    </button>
-                  </div>
-                  {prompts.length === 0 ? <p className={styles.empty}>Save a text prompt to reuse it later.</p> : null}
-                  <ul className={styles.list}>
-                    {prompts.map(prompt => {
-                      return (
-                        <li className={styles.item} key={prompt.id}>
-                          <div className={styles.copy}>
-                            <h3 className={styles.title}>{prompt.title}</h3>
-                            <p className={styles.preview}>{prompt.text.slice(0, 180)}</p>
-                          </div>
-                          <div className={styles.actions}>
-                            <button type="button" className={styles.primaryButton} disabled={hasInserted} onClick={() => insertPrompt(prompt)}>
-                              Insert
-                            </button>
-                            <button type="button" className={styles.quietButton} onClick={() => beginEdit(prompt)}>
-                              Edit
-                            </button>
-                            <button type="button" className={styles.dangerButton} onClick={() => requestDelete(prompt)}>
-                              {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? 'Confirm delete' : 'Delete'}
-                            </button>
-                            {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? (
-                              <button type="button" className={styles.quietButton} onClick={() => setDeleteConfirmation(null)}>
-                                Keep
-                              </button>
-                            ) : null}
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </>
+              {recentPrompts.length === 0 ? (
+                <p className={styles.empty}>No sent text prompts are loaded from this conversation.</p>
               ) : (
-                <form
-                  className={styles.editor}
-                  onSubmit={event => {
-                    event.preventDefault()
-                    saveEditor(false)
-                  }}
-                >
-                  <label className={styles.field}>
-                    <span>Title</span>
-                    <input
-                      id={titleId}
-                      maxLength={MAX_PROMPT_TITLE_LENGTH}
-                      required
-                      value={editor.title}
-                      onChange={event => updateEditor('title', event.currentTarget.value)}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Prompt text</span>
-                    <textarea
-                      id={textId}
-                      maxLength={MAX_PROMPT_TEXT_LENGTH}
-                      required
-                      rows={8}
-                      value={editor.text}
-                      onChange={event => updateEditor('text', event.currentTarget.value)}
-                    />
-                  </label>
-                  <p className={styles.counter}>
-                    {editor.text.length} of {MAX_PROMPT_TEXT_LENGTH} characters
-                  </p>
-                  {editor.stale ? <p className={styles.conflict}>The saved version changed elsewhere. Your edits remain here.</p> : null}
-                  <div className={styles.actions}>
-                    <button type="submit" className={styles.primaryButton} disabled={editor.stale}>
-                      Save prompt
-                    </button>
-                    {editor.stale ? (
-                      <button type="button" className={styles.primaryButton} onClick={() => saveEditor(true)}>
-                        Save as new copy
-                      </button>
-                    ) : null}
-                    <button type="button" className={styles.quietButton} onClick={() => setEditor(null)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                <ul className={styles.list}>
+                  {recentPrompts.map(prompt => (
+                    <li className={styles.item} key={prompt.id}>
+                      <div className={styles.copy}>
+                        <h3 className={styles.title}>Sent message · {new Date(prompt.time).toLocaleString()}</h3>
+                        <p className={styles.preview}>{prompt.text.slice(0, 180)}</p>
+                      </div>
+                      <div className={styles.actions}>
+                        <button type="button" className={styles.primaryButton} disabled={hasInserted} onClick={() => insertRecentPrompt(prompt.id)}>
+                          Insert
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </>
-          ) : null}
+          ) : (
+            <>
+              {libraryState === 'loading' ? <p className={styles.empty}>Loading saved prompts…</p> : null}
+              {libraryState === 'invalid' ? <p className={styles.empty}>Saved data is unreadable and was left untouched.</p> : null}
+              {libraryState === 'unavailable' ? <p className={styles.empty}>Browser storage is unavailable. Prompts cannot be saved.</p> : null}
+              {libraryState === 'ready' ? (
+                <>
+                  {editor === null ? (
+                    <>
+                      <div className={styles.listHeader}>
+                        <span>
+                          {prompts.length} of {MAX_PROMPTS} prompts
+                        </span>
+                        <button type="button" className={styles.primaryButton} disabled={prompts.length >= MAX_PROMPTS} onClick={beginNewPrompt}>
+                          New prompt
+                        </button>
+                      </div>
+                      {prompts.length === 0 ? <p className={styles.empty}>Save a text prompt to reuse it later.</p> : null}
+                      <ul className={styles.list}>
+                        {prompts.map(prompt => {
+                          return (
+                            <li className={styles.item} key={prompt.id}>
+                              <div className={styles.copy}>
+                                <h3 className={styles.title}>{prompt.title}</h3>
+                                <p className={styles.preview}>{prompt.text.slice(0, 180)}</p>
+                              </div>
+                              <div className={styles.actions}>
+                                <button type="button" className={styles.primaryButton} disabled={hasInserted} onClick={() => insertPrompt(prompt)}>
+                                  Insert
+                                </button>
+                                <button type="button" className={styles.quietButton} onClick={() => beginEdit(prompt)}>
+                                  Edit
+                                </button>
+                                <button type="button" className={styles.dangerButton} onClick={() => requestDelete(prompt)}>
+                                  {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? 'Confirm delete' : 'Delete'}
+                                </button>
+                                {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? (
+                                  <button type="button" className={styles.quietButton} onClick={() => setDeleteConfirmation(null)}>
+                                    Keep
+                                  </button>
+                                ) : null}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  ) : (
+                    <form
+                      className={styles.editor}
+                      onSubmit={event => {
+                        event.preventDefault()
+                        saveEditor(false)
+                      }}
+                    >
+                      <label className={styles.field}>
+                        <span>Title</span>
+                        <input
+                          id={titleId}
+                          maxLength={MAX_PROMPT_TITLE_LENGTH}
+                          required
+                          value={editor.title}
+                          onChange={event => updateEditor('title', event.currentTarget.value)}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Prompt text</span>
+                        <textarea
+                          id={textId}
+                          maxLength={MAX_PROMPT_TEXT_LENGTH}
+                          required
+                          rows={8}
+                          value={editor.text}
+                          onChange={event => updateEditor('text', event.currentTarget.value)}
+                        />
+                      </label>
+                      <p className={styles.counter}>
+                        {editor.text.length} of {MAX_PROMPT_TEXT_LENGTH} characters
+                      </p>
+                      {editor.stale ? <p className={styles.conflict}>The saved version changed elsewhere. Your edits remain here.</p> : null}
+                      <div className={styles.actions}>
+                        <button type="submit" className={styles.primaryButton} disabled={editor.stale}>
+                          Save prompt
+                        </button>
+                        {editor.stale ? (
+                          <button type="button" className={styles.primaryButton} onClick={() => saveEditor(true)}>
+                            Save as new copy
+                          </button>
+                        ) : null}
+                        <button type="button" className={styles.quietButton} onClick={() => setEditor(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
         </section>
       ) : null}
     </>
