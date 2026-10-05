@@ -17,7 +17,7 @@
 .editor h2 {
   margin: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 1.35rem;
+  font-size: 1.45rem;
 }
 
 .page header p,
@@ -63,7 +63,7 @@
 .namespaceList h2 {
   margin: 4px 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 .namespaceButton,

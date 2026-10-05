@@ -227,8 +227,8 @@
   display: grid;
   grid-template-columns: 28px minmax(140px, 1fr) auto auto 25px;
   align-items: center;
-  gap: 10px;
-  min-height: 70px;
+  gap: 4px;
+  min-height: 52px;
   padding: 8px 12px 8px 2px;
   border-bottom: 1px solid color-mix(in srgb, var(--jj-border), transparent 45%);
 }
@@ -265,12 +265,25 @@
   background: var(--jj-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--jj-accent), transparent 82%);
 }
+/*
+ * Reference 14 packs each revision row into a single 22px text band: the title
+ * and its meta share one line rather than stacking, which is what puts rows 52px
+ * apart. Ours stacked them, so the body needed 57px and the row landed at 84 --
+ * more than half again the reference's density.
+ */
 .revisionBody {
+  display: flex;
+  flex-wrap: wrap;
   min-width: 0;
+  min-height: 0;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
   border: 0 !important;
   padding: 0 !important;
   color: var(--jj-text) !important;
   background: transparent !important;
+  font-weight: 400;
   text-align: left;
 }
 .revisionTitle {
@@ -292,7 +305,7 @@
   overflow: hidden;
   align-items: center;
   gap: 6px;
-  margin-top: 5px;
+  margin-top: 0;
   color: var(--jj-muted);
   font-size: 11px;
   white-space: nowrap;
