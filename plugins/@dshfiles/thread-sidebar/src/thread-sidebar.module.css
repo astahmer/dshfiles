@@ -275,10 +275,20 @@
  * and so read as agreement while the rail was actually ~2.7x tighter than the
  * reference.
  */
+/*
+ * Inset and type are read off 01-thread-sidebar.png at its measured 1:1 scale:
+ * the title's ink starts 34px from the rail edge and its cap-to-descender spans
+ * 23-25px, which is a ~20px font. We sat at 31px and 17px, so the title read a
+ * size down and started closer to the edge than the reference does.
+ *
+ * The 34px is the row's own padding only because .sections already insets 7.2px
+ * and a depth-0 row adds none of its own, so this is measured against the rail
+ * edge and not re-derived from the total.
+ */
 .row {
   gap: 0.6rem;
   min-width: 0;
-  padding: 0.5rem 1.1rem;
+  padding: 0.5rem 1.3125rem;
   border-radius: var(--dsw-radius-sm);
 }
 
@@ -356,12 +366,13 @@ body[data-ds-dark-theme] .rowTime {
 }
 
 /*
- * The reference's title ink measures 12px cap-to-descender, which is a 17px
- * font; it inherited .row's 16px rem here and read a size down.
+ * The reference's title ink measures 23-25px cap-to-descender, which is a ~20px
+ * font; an earlier reading here put it at 12px and set 17px, which read a size
+ * down against the reference.
  */
 .rowTitle {
   overflow: hidden;
-  font-size: 1.0625rem;
+  font-size: 1.25rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
