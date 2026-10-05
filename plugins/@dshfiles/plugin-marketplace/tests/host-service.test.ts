@@ -101,7 +101,7 @@ async function serviceFixture(options: {
   readonly hubBaseUrl?: string
 }) {
   const profile = await profileFixture(options.bundles)
-  const fetchMock = vi.fn(async () => response(options.fetchValue ?? detail()))
+  const fetchMock = vi.fn(async (_url: string | URL | Request) => response(options.fetchValue ?? detail()))
   const runCli = options.runCli ?? vi.fn(async () => cliResult())
   const service = new MarketplaceHostService({
     ...profile.dependencies,

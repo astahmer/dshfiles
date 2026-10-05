@@ -1,5 +1,15 @@
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import {
+  Button,
+  IconEllipsisOutlineRegular,
+  IconNewChatOutlineRegular,
+  IconSearchOutlineRegular,
+  IconSettingsOutlineRegular,
+  Input,
+  Switch,
+  Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { orderSidebarEntries, reorderSidebarEntry, type OrderedSidebarEntry } from './organization.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
@@ -138,9 +148,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
   /**
    * One customizable row, shaped like the reference: a drag handle, the entry's
-   * own icon, its label, and a filled toggle. Arrow buttons and a bare checkbox
-   * cannot express the same affordance, so reordering is by pointer drag and
-   * visibility is by the toggle.
+   * own icon, its label, and a switch. Arrow buttons and a bare checkbox cannot
+   * express the same affordance, so reordering is by pointer drag and visibility
+   * is by the switch.
    */
   const renderCustomizeRow = (
     entry: { id: string; label: string },
@@ -173,24 +183,25 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         {icon}
       </span>
       <span className={styles.customizeLabel}>{entry.label}</span>
-      <button
-        type="button"
-        className={styles.visibilityToggle}
-        role="switch"
-        aria-checked={!hidden}
-        aria-label={`${text(props.t, 'threadSidebarVisibility')}: ${entry.label}`}
-        onClick={onToggle}
-      >
-        <span className={styles.visibilityThumb} />
-      </button>
+      <Switch checked={!hidden} label={`${text(props.t, 'threadSidebarVisibility')}: ${entry.label}`} onChange={onToggle} />
     </div>
   )
 
-  const headerIconFor = (entry: HeaderEntry): ReactNode => {
-    if (entry.kind === 'new-thread') return <span aria-hidden="true">＋</span>
-    if (entry.kind === 'search') return <span aria-hidden="true">⌕</span>
+  const headerIconFor = (entry: HeaderEntry, size: number): ReactNode => {
+    if (entry.kind === 'new-thread')
+      return (
+        <span aria-hidden="true">
+          <IconNewChatOutlineRegular size={size} />
+        </span>
+      )
+    if (entry.kind === 'search')
+      return (
+        <span aria-hidden="true">
+          <IconSearchOutlineRegular size={size} />
+        </span>
+      )
     if (entry.panelId === undefined) return null
-    return props.renderSlot('sidebar.panellist', { size: 18, active: activePanelId === entry.panelId }, { only: entry.panelId })
+    return props.renderSlot('sidebar.panellist', { size, active: activePanelId === entry.panelId }, { only: entry.panelId })
   }
 
   const renderHeaderCustomizeRows = (): JSX.Element[] =>
@@ -198,7 +209,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       renderCustomizeRow(
         entry,
         index,
-        headerIconFor(entry),
+        headerIconFor(entry, 18),
         preferences.hiddenHeaderIds.includes(entry.id),
         (from, to) =>
           updatePreferences({
@@ -219,7 +230,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         entry,
         index,
         entry.kind === 'settings' ? (
-          <span aria-hidden="true">⚙</span>
+          <IconSettingsOutlineRegular size={18} />
         ) : (
           props.renderSlot('sidebar.footer.action', { wide: false }, { only: entry.registrationId ?? undefined })
         ),
@@ -257,27 +268,19 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       <nav className={compactHeader ? styles.headerCompact : styles.headerExpanded} aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
         {visibleHeaderEntries.map(entry => {
           const active = entry.kind === 'panel' && activePanelId === entry.panelId
-          const icon =
-            entry.kind === 'new-thread' ? (
-              <span aria-hidden="true">＋</span>
-            ) : entry.kind === 'search' ? (
-              <span aria-hidden="true">⌕</span>
-            ) : entry.panelId === undefined ? null : (
-              props.renderSlot('sidebar.panellist', { size: 22, active }, { only: entry.panelId })
-            )
           return (
-            <button
-              key={entry.id}
-              type="button"
-              className={active ? styles.selectedLink : styles.headerLink}
-              aria-label={entry.label}
-              title={entry.label}
-              aria-current={active ? 'page' : undefined}
-              onClick={() => activateHeaderEntry(entry)}
-            >
-              {icon}
-              {!compactHeader ? <span>{entry.label}</span> : null}
-            </button>
+            <Tooltip key={entry.id} label={entry.label} side={props.collapsed ? 'right' : 'bottom'} delayMs={500} disabled={!compactHeader} portal>
+              <button
+                type="button"
+                className={active ? styles.selectedLink : styles.headerLink}
+                aria-label={entry.label}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => activateHeaderEntry(entry)}
+              >
+                {headerIconFor(entry, 22)}
+                {!compactHeader ? <span>{entry.label}</span> : null}
+              </button>
+            </Tooltip>
           )
         })}
       </nav>
@@ -285,8 +288,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       {wide ? (
         <div className={styles.headerTools}>
           {searchOpen ? (
-            <input
+            <Input
               ref={searchInput}
+              className={styles.searchInput}
+              icon={<IconSearchOutlineRegular size={16} />}
               type="search"
               aria-label={text(props.t, 'threadSidebarSearch')}
               placeholder={text(props.t, 'threadSidebarSearchPlaceholder')}
@@ -300,9 +305,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               }}
             />
           ) : null}
-          <button type="button" onClick={() => setCustomizeOpen(value => !value)}>
+          <Button variant="outline" size="sm" aria-expanded={customizeOpen} onClick={() => setCustomizeOpen(value => !value)}>
             {text(props.t, 'threadSidebarCustomize')}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -310,9 +315,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         <section className={styles.customizePanel} aria-label={text(props.t, 'threadSidebarCustomize')}>
           <div className={styles.customizeTitle}>
             <h2>{text(props.t, 'threadSidebarCustomize')}</h2>
-            <button type="button" onClick={() => setCustomizeOpen(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setCustomizeOpen(false)}>
               {text(props.t, 'threadSidebarDone')}
-            </button>
+            </Button>
           </div>
           <fieldset className={styles.modeField}>
             <legend>{text(props.t, 'threadSidebarHeaderStyle')}</legend>
@@ -362,9 +367,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
       <footer className={styles.footer}>
         {visibleFooterEntries.map(entry => (
-          <div className={styles.footerItem} key={entry.id} title={entry.label}>
-            {renderFooterEntry(entry, wide)}
-          </div>
+          <Tooltip key={entry.id} label={entry.label} side={props.collapsed ? 'right' : 'top'} delayMs={500} portal>
+            <div className={styles.footerItem}>{renderFooterEntry(entry, wide)}</div>
+          </Tooltip>
         ))}
         {hiddenFooterEntries.length > 0 ? (
           <div className={styles.moreContainer}>
@@ -375,7 +380,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen(value => !value)}
             >
-              <span aria-hidden="true">···</span>
+              <IconEllipsisOutlineRegular size={18} />
               {wide ? <span>{text(props.t, 'threadSidebarMore')}</span> : null}
             </button>
             {moreOpen ? (

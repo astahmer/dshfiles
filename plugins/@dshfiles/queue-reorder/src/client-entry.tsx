@@ -1,7 +1,9 @@
-import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
-import { DraggableQueueDock } from './client.js'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { type DockProps, DraggableQueueDock } from './client.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
 
 /**
@@ -23,6 +25,16 @@ import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js
  * through it the row's `useApi()` call throws
  * `API "…" is unavailable outside a DSHX Client Slot component` on first render.
  */
+interface ConversationService {
+  updateQueue(itemId: MessageId, action: unknown): Promise<void>
+}
+
+const QueueDockSlot = (props: DockProps): JSX.Element => (
+  <PluginQueryProvider>
+    <DraggableQueueDock {...props} />
+  </PluginQueryProvider>
+)
+
 export default defineClient({
   name: '@dshfiles/queue-reorder',
   locales: [queueReorderLocale],
@@ -46,16 +58,16 @@ export default defineClient({
             if (scoped === undefined) {
               throw new Error(`queue dock: session "${sessionId}" resolved no scope`)
             }
-            const conversation: IConversation | undefined = scoped.get('conversation')
+            const conversation = scoped.get('conversation') as ConversationService | undefined
             if (conversation === undefined) {
               throw new Error('queue dock: conversation service unavailable')
             }
             return {
-              updateQueue: conversation.updateQueue.bind(conversation),
+              updateQueue: (itemId: MessageId, action: unknown): Promise<void> => conversation.updateQueue(itemId, action),
             }
           },
         },
-        decorate(DraggableQueueDock),
+        decorate(QueueDockSlot),
       ),
     )
   },

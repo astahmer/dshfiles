@@ -1,9 +1,3 @@
-/*
- * Every value here is a DSH token, because this panel is rendered inside the
- * Host's settings dialog and its own colours cannot know whether the Host is in
- * light or dark. The hardcoded dark palette that was here made the section
- * heading and its hint nearly invisible on the light dialog.
- */
 .page {
   display: flex;
   flex-direction: column;
@@ -13,46 +7,26 @@
   color: var(--dsw-alias-label-primary);
 }
 
-.page h1,
-.editor h2 {
+.title {
   margin: 0;
-  color: var(--dsw-alias-label-primary);
   font-size: 1.45rem;
 }
 
-.page header p,
-.description,
-.formHint,
-.keyboardHint {
+.lead {
   margin: 6px 0 0;
   color: var(--dsw-alias-label-secondary);
 }
 
-.searchLabel input,
-.valueField textarea,
-.valueField select {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-specific-input-major);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
+.search {
+  display: flex;
+  flex-direction: column;
 }
 
-.searchLabel input:focus,
-.valueField textarea:focus,
-.valueField select:focus {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
+.inlineAction {
+  align-self: flex-start;
 }
 
-.searchLabel input {
-  font-size: 1rem;
-}
-
-.namespaceList,
-.results,
+.list,
 .editor {
   display: flex;
   flex-direction: column;
@@ -60,14 +34,12 @@
   overflow: auto;
 }
 
-.namespaceList h2 {
+.listTitle {
   margin: 4px 0;
-  color: var(--dsw-alias-label-primary);
   font-size: 1.2rem;
 }
 
-.namespaceButton,
-.result {
+.row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -82,36 +54,33 @@
   cursor: pointer;
 }
 
-.namespaceButton:hover:not(:disabled),
-.result:hover {
+.row:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-.namespaceButton:disabled {
+.row:disabled {
   color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
 
-.namespaceButton span,
-.result small {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.result[aria-current='true'] {
+.row[aria-current='true'] {
   border-color: var(--dsw-alias-state-business-primary);
 }
 
-.namespaceButton:focus-visible,
-.result:focus-visible {
+.row:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
 }
 
-.result p {
-  margin: 4px 0 0;
+.rowMeta,
+.rowDescription {
   color: var(--dsw-alias-label-secondary);
 }
 
-.result .optionLabels {
+.rowDescription {
+  margin: 4px 0 0;
+}
+
+.optionLabels {
   color: var(--dsw-alias-label-tertiary);
   font-size: 0.82rem;
 }
@@ -121,7 +90,6 @@
   padding: 10px 12px;
   border-left: 3px solid var(--dsw-alias-state-warn-primary);
   background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-label-primary);
 }
 
 .path {
@@ -130,57 +98,23 @@
   overflow-wrap: anywhere;
 }
 
-.valueField {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-weight: 600;
-}
-
-.valueField textarea {
-  resize: vertical;
-  font-weight: 400;
-}
-
-.formHint {
-  margin: 0;
-}
-
 .editorActions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.editorActions button,
-.backButton {
-  width: max-content;
-  padding: 8px 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  cursor: pointer;
-}
-
-.editorActions button:disabled {
-  color: var(--dsw-alias-label-tertiary);
-  cursor: default;
+.resultCount {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .keyboardHint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
   font-size: 0.85rem;
-}
-
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }

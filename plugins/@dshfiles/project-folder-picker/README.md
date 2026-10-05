@@ -23,8 +23,9 @@ port, and a workspace registration callback.
 - `{ kind: 'directory', canonicalPath, title }`
 
 The component filters registered projects by title/path, enters path browsing
-when the query starts with `/`, and supports arrows, Enter, Escape, and
-Command/Ctrl+1–9. Folder browsing, OS picking, folder creation, and project
+when the query starts with `/`, and supports arrows, Enter, and
+Command/Ctrl+1–9. Escape, mask click, focus trapping, and return focus come
+from the Host `Modal` it renders in headless mode. Folder browsing, OS picking, folder creation, and project
 registration are injected ports, so a consumer can replace them in tests or
 reuse this UI from another DSH plugin without importing Secret Catalog code.
 
@@ -37,9 +38,11 @@ was not adopted or forked. This package is a small shared component built for
 the local DSH plugin set; its Secret Catalog adapter calls the installed rc.2
 `remote.directoryPicker` and `remote.workspace.create` APIs.
 
-The component itself has no DSH peer dependency because it consumes injected
-ports. The consuming Secret Catalog package pins the rc.2 workspace-controller
-peer contract. DSH refusals are surfaced to the user; the adapter does not
+The component's only DSH import is the Host platform module
+`@deepseek-ai/dsh-client-ui-primitives` (its `Modal`, `Button`, `Input`, and
+keycaps), which the consuming bundle leaves external; every Host operation
+still arrives as an injected port. The consuming Secret Catalog package pins
+the rc.2 workspace-controller peer contract. DSH refusals are surfaced to the user; the adapter does not
 approximate an unavailable Host operation.
 
 ## Why this is not in the web profile

@@ -96,13 +96,6 @@
   flex: none;
 }
 
-.status {
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xs-13);
-  white-space: nowrap;
-  flex: none;
-}
-
 .chevron {
   width: 14px;
   height: 14px;

@@ -16,8 +16,7 @@
 .titleRow,
 .groupHeader,
 .row,
-.actions,
-.checkRow {
+.actions {
   display: flex;
   align-items: center;
 }
@@ -43,10 +42,16 @@
   font: inherit;
 }
 
+.iconButton,
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .iconButton {
   width: 2rem;
   height: 2rem;
-  font-size: 1.1rem;
 }
 
 .iconButton:hover,
@@ -63,27 +68,28 @@
  * sidebar's primary scope switch.
  */
 .projectFilter {
-  position: relative;
+  display: block;
   margin: 0.25rem 1rem;
 }
 
-.projectFilter > summary {
+.projectFilterTrigger {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+  font: inherit;
   font-size: 1.3rem;
   font-weight: 500;
-  list-style: none;
+  text-align: left;
 }
 
-.projectFilter > summary::-webkit-details-marker {
-  display: none;
-}
-
-.projectFilter > summary::after {
+.projectFilterTrigger::after {
   content: '';
   width: 0.5rem;
   height: 0.5rem;
@@ -94,56 +100,8 @@
   transition: transform 120ms ease;
 }
 
-.projectFilter[open] > summary::after {
+.projectFilterTrigger[aria-expanded='true']::after {
   transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
-}
-
-.projectMenu {
-  position: absolute;
-  z-index: 15;
-  top: calc(100% + 4px);
-  left: 0;
-  display: flex;
-  min-width: 100%;
-  flex-direction: column;
-  gap: 1px;
-  padding: 4px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-1);
-  box-shadow: var(--dsw-shadow-lv2);
-}
-
-.projectMenu button {
-  padding: 0.35rem 0.5rem;
-  border: 0;
-  border-radius: var(--dsw-radius-xs);
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.projectMenu button:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-specific-sidebar-nav-item-hover);
-}
-
-.projectMenu button[aria-pressed='true'] {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-specific-sidebar-nav-item-active);
-}
-
-.field input,
-.field textarea {
-  min-width: 0;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 0.4rem;
-  background: transparent;
-  color: inherit;
-  font: inherit;
 }
 
 .settings {
@@ -152,34 +110,6 @@
   padding: 0.8rem;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-border-l1);
-}
-
-.checkRow {
-  gap: 0.55rem;
-  font-size: 0.87rem;
-}
-
-.checkRow input {
-  accent-color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
-}
-
-.field {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-}
-
-.field input,
-.field textarea {
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-}
-
-.field small,
-.note {
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 0.75rem;
-  line-height: 1.4;
 }
 
 .exclusions {
@@ -199,14 +129,13 @@
 
 .note {
   margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
-.notice,
-.empty {
-  margin: 0;
-  padding: var(--dsw-radius-sm) 0.8rem;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 0.82rem;
+.notice {
+  margin: 0.5rem 0.8rem 0;
 }
 
 /*
@@ -383,21 +312,9 @@ body[data-ds-dark-theme] .rowTime {
  * reference shows and what keeps the row at its reference height.
  */
 .runningDot {
+  display: inline-flex;
   margin-right: 0.35em;
-  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
-  font-size: 0.7em;
-  vertical-align: 0.15em;
-}
-
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  vertical-align: middle;
 }
 
 /* The reference keeps every row clean and reveals its verbs on hover, so the
@@ -426,7 +343,6 @@ body[data-ds-dark-theme] .rowTime {
 .actions button {
   width: 1.9rem;
   height: 1.9rem;
-  font-size: 0.9rem;
 }
 
 .actions button:disabled {
@@ -434,50 +350,18 @@ body[data-ds-dark-theme] .rowTime {
   opacity: 0.4;
 }
 
-.contextMenu {
-  position: fixed;
-  z-index: 1000;
-  display: grid;
-  min-width: 12rem;
-  gap: 0.15rem;
-  padding: 0.3rem;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-specific-sidebar-fill);
-  color: inherit;
-  box-shadow: var(--dsw-shadow-lv3);
-}
-
-.contextMenu button {
-  border: 0;
-  border-radius: 0.4rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  padding: 0.45rem 0.6rem;
-  text-align: left;
-}
-
-.contextMenu button:hover,
-.contextMenu button:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.toolbar button:focus-visible,
 .iconButton:focus-visible,
-.projectFilter > summary:focus-visible,
+.projectFilterTrigger:focus-visible,
 .groupHeader:focus-visible,
 .openButton:focus-visible,
-.actions button:focus-visible,
-.settings input:focus-visible,
-.settings textarea:focus-visible {
+.actions button:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color);
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .projectFilter > summary::after,
+  .projectFilterTrigger::after,
   .actions {
     transition: none;
   }

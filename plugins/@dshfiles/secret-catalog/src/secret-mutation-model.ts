@@ -1,4 +1,4 @@
-import type { SecretRemoveTarget } from './secret-mutation-dialog.js'
+import type { SecretRemoveTarget } from './secret-mutation-form.js'
 
 export type RemovalDialogState = { readonly stage: 'choose' } | { readonly stage: 'confirm'; readonly target: SecretRemoveTarget }
 

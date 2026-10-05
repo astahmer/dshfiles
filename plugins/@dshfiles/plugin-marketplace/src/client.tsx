@@ -1,16 +1,24 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { defineClient, defineSlot } from '@dshfiles/dshx/client'
-import { MarketplaceTab } from './MarketplaceTab.js'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import type { ReactNode } from 'react'
+import { MarketplaceTab, type MarketplaceTabProps } from './MarketplaceTab.js'
 import { marketplaceLocale, MARKETPLACE_LOCALE_NAMESPACE } from './locales.js'
 
 let tabLabel = (): string => 'Plugin marketplace'
+
+const MarketplaceSlot = (props: MarketplaceTabProps): ReactNode => (
+  <PluginQueryProvider>
+    <MarketplaceTab {...props} />
+  </PluginQueryProvider>
+)
 
 const marketplaceTab = defineSlot('settings.plugins.tab', {
   id: 'marketplace',
   order: 20,
   label: () => tabLabel(),
   locale: marketplaceLocale,
-  component: MarketplaceTab,
+  component: MarketplaceSlot,
 })
 
 export default defineClient({

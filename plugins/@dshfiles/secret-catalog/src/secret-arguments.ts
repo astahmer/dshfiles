@@ -2,15 +2,15 @@ import { z } from 'zod'
 
 export const aliasSchema = z
   .string()
-  .min(1)
-  .max(128)
-  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/)
+  .min(1, 'Enter an alias.')
+  .max(128, 'An alias is at most 128 characters.')
+  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/, 'Start with a letter or _, then use letters, digits, _ or -.')
 
 export const environmentSchema = z
   .string()
-  .min(1)
-  .max(256)
-  .regex(/^[A-Za-z0-9_-]+$/)
+  .min(1, 'Enter an environment.')
+  .max(256, 'An environment is at most 256 characters.')
+  .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, _ or -.')
 
 /** Free text passed after a `secret` flag; a leading dash would be read as another flag. */
 const optionValueSchema = (maxLength: number) =>

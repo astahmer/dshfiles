@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { hasInlineCredential, parseCommandLine, formatCommandLine } from './command-line.js'
 import { serverDraftSchema, type StoredServer } from './api.js'
 import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js'
-import { runAfterConfirmation } from './confirmed-action.js'
 import { ManagedLocalCommand } from './local-process.js'
 import { ClientReconciler } from './reconcile.js'
 import { redactText, redactingLogger } from './redaction.js'
@@ -159,16 +158,6 @@ describe('catalog search', () => {
     } finally {
       vi.unstubAllGlobals()
     }
-  })
-})
-
-describe('confirmed user mutations', () => {
-  it('never calls removal before confirmation', async () => {
-    const remove = vi.fn(async () => 'removed')
-    expect(await runAfterConfirmation(() => false, remove)).toBeUndefined()
-    expect(remove).not.toHaveBeenCalled()
-    expect(await runAfterConfirmation(() => true, remove)).toBe('removed')
-    expect(remove).toHaveBeenCalledTimes(1)
   })
 })
 

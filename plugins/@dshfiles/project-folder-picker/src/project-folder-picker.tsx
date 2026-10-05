@@ -1,3 +1,14 @@
+import {
+  Button,
+  IconFolderCloseRegular,
+  IconFolderOpenOutlineRegular,
+  IconSearchOutlineRegular,
+  Input,
+  Modal,
+  ShortcutKeys,
+  Tag,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import { EmptyState, Notice, joinClassNames } from '@dshfiles/plugin-ui'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import styles from './project-folder-picker.module.css'
 import { filterRegisteredProjects, folderSelection, movePickerSelection, workspaceSelection } from './project-folder-picker-model.js'
@@ -41,6 +52,8 @@ export interface ProjectFolderPickerProps {
   readonly machineName?: string
 }
 
+const optionClassName = (active: boolean): string => joinClassNames(styles.item, active && styles.active)
+
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
   const [query, setQuery] = useState('')
   const [listing, setListing] = useState<DirectoryListing | null>(null)
@@ -48,7 +61,6 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [newDirectoryName, setNewDirectoryName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement | null>(null)
   const activeRequest = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const pathMode = query.startsWith('/')
@@ -56,13 +68,13 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const folderEntries = pathMode ? (listing?.entries ?? []) : []
   const itemCount = pathMode ? folderEntries.length : matchingProjects.length
 
-  useEffect(() => {
-    inputRef.current?.focus()
-    return () => {
+  useEffect(
+    () => () => {
       generation.current += 1
       activeRequest.current?.abort()
-    }
-  }, [])
+    },
+    [],
+  )
 
   useEffect(() => setSelectedIndex(0), [query, listing?.path])
 
@@ -152,11 +164,6 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      props.onClose()
-      return
-    }
     if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key) && !pathMode) {
       const project = matchingProjects[Number(event.key) - 1]
       if (project !== undefined) {
@@ -183,128 +190,129 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   }
 
   return (
-    <div className={styles.backdrop} onMouseDown={event => event.target === event.currentTarget && props.onClose()}>
-      <section aria-label={props.title ?? 'Choose a project or folder'} aria-modal="true" className={styles.dialog} role="dialog">
-        <div className={styles.searchRow}>
-          <input
-            ref={inputRef}
-            aria-label="Search projects or enter a folder path"
-            autoComplete="off"
-            onChange={event => {
-              setQuery(event.currentTarget.value)
-              if (!event.currentTarget.value.startsWith('/')) setListing(null)
-              setError(null)
-            }}
-            onKeyDown={onKeyDown}
-            placeholder="Search projects or type / for a folder…"
-            value={query}
-          />
-          <button disabled={busy} onClick={() => void chooseWithSystemPicker()} type="button">
-            Browse…
-          </button>
-        </div>
-        {pathMode ? (
-          <>
-            {listing !== null && <p className={styles.path}>{listing.path}</p>}
-            <div className={styles.list} role="listbox" aria-label="Folders">
-              {folderEntries.map((entry, index) => (
-                <button
-                  aria-selected={index === selectedIndex}
-                  className={`${styles.item} ${index === selectedIndex ? styles.active : ''}`}
-                  key={entry.path}
-                  onClick={() => void browse(entry.path)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  role="option"
-                  type="button"
-                >
-                  <span className={styles.folderGlyph} aria-hidden>
-                    ▸
-                  </span>
-                  <span className={styles.itemText}>
-                    <strong>{entry.name}</strong>
-                    <small>{entry.path}</small>
-                  </span>
-                  {entry.hidden && <span className={styles.badge}>Hidden</span>}
-                </button>
-              ))}
-              {listing === null && <p className={styles.empty}>Enter an absolute folder path, then press Enter.</p>}
-              {listing !== null && folderEntries.length === 0 && <p className={styles.empty}>No folders here.</p>}
+    <Modal className={styles.dialog} headless onClose={props.onClose} open title={props.title ?? 'Choose a project or folder'}>
+      <div className={styles.searchRow}>
+        <Input
+          aria-label="Search projects or enter a folder path"
+          autoComplete="off"
+          className={styles.grow}
+          data-modal-autofocus
+          icon={<IconSearchOutlineRegular />}
+          onChange={event => {
+            setQuery(event.currentTarget.value)
+            if (!event.currentTarget.value.startsWith('/')) setListing(null)
+            setError(null)
+          }}
+          onKeyDown={onKeyDown}
+          placeholder="Search projects or type / for a folder…"
+          value={query}
+        />
+        <Button disabled={busy} icon={<IconFolderOpenOutlineRegular />} onClick={() => void chooseWithSystemPicker()} type="button" variant="outline">
+          Browse…
+        </Button>
+      </div>
+      {pathMode ? (
+        <>
+          {listing !== null && <p className={styles.path}>{listing.path}</p>}
+          <div className={styles.list} role="listbox" aria-label="Folders">
+            {folderEntries.map((entry, index) => (
+              <button
+                aria-selected={index === selectedIndex}
+                className={optionClassName(index === selectedIndex)}
+                key={entry.path}
+                onClick={() => void browse(entry.path)}
+                onMouseEnter={() => setSelectedIndex(index)}
+                role="option"
+                type="button"
+              >
+                <IconFolderCloseRegular className={styles.folderGlyph} />
+                <span className={styles.itemText}>
+                  <span className={styles.itemTitle}>{entry.name}</span>
+                  <span className={styles.itemDetail}>{entry.path}</span>
+                </span>
+                {entry.hidden && <Tag tone="quiet">Hidden</Tag>}
+              </button>
+            ))}
+            {listing === null && <EmptyState compact description="Enter an absolute folder path, then press Enter." />}
+            {listing !== null && folderEntries.length === 0 && <EmptyState compact description="No folders here." />}
+          </div>
+          {listing !== null && (
+            <div className={styles.folderActions}>
+              <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} type="button" variant="primary">
+                Select this folder
+              </Button>
+              <Button disabled={busy} onClick={() => void registerCurrentFolder()} type="button" variant="outline">
+                Register project
+              </Button>
+              <form
+                className={styles.createFolder}
+                onSubmit={event => {
+                  event.preventDefault()
+                  void createFolder()
+                }}
+              >
+                <Input
+                  aria-label="New folder name"
+                  className={styles.grow}
+                  onChange={event => setNewDirectoryName(event.currentTarget.value)}
+                  placeholder="New folder name"
+                  value={newDirectoryName}
+                />
+                <Button disabled={busy || newDirectoryName.trim().length === 0} type="submit" variant="outline">
+                  Create folder
+                </Button>
+              </form>
+              {listing.truncated && <Tag tone="warning">Folder list is truncated.</Tag>}
             </div>
-            {listing !== null && (
-              <div className={styles.folderActions}>
-                <button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} type="button">
-                  Select this folder
-                </button>
-                <button disabled={busy} onClick={() => void registerCurrentFolder()} type="button">
-                  Register project
-                </button>
-                <form
-                  className={styles.createFolder}
-                  onSubmit={event => {
-                    event.preventDefault()
-                    void createFolder()
-                  }}
-                >
-                  <input
-                    aria-label="New folder name"
-                    onChange={event => setNewDirectoryName(event.currentTarget.value)}
-                    placeholder="New folder name"
-                    value={newDirectoryName}
-                  />
-                  <button disabled={busy || newDirectoryName.trim().length === 0} type="submit">
-                    Create folder
-                  </button>
-                </form>
-                {listing.truncated && <small className={styles.muted}>Folder list is truncated.</small>}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className={styles.sectionLabel}>Projects</p>
-            <div className={styles.list} role="listbox" aria-label="Registered projects">
-              {matchingProjects.map((project, index) => (
-                <button
-                  aria-selected={index === selectedIndex}
-                  className={`${styles.item} ${index === selectedIndex ? styles.active : ''}`}
-                  key={project.workspaceId}
-                  onClick={() => props.onSelect(workspaceSelection(project))}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  role="option"
-                  type="button"
-                >
-                  <span className={styles.projectGlyph} aria-hidden>
-                    {project.title.slice(0, 2).toLocaleUpperCase()}
+          )}
+        </>
+      ) : (
+        <>
+          <p className={styles.sectionLabel}>Projects</p>
+          <div className={styles.list} role="listbox" aria-label="Registered projects">
+            {matchingProjects.map((project, index) => (
+              <button
+                aria-selected={index === selectedIndex}
+                className={optionClassName(index === selectedIndex)}
+                key={project.workspaceId}
+                onClick={() => props.onSelect(workspaceSelection(project))}
+                onMouseEnter={() => setSelectedIndex(index)}
+                role="option"
+                type="button"
+              >
+                <span className={styles.projectGlyph} aria-hidden>
+                  {project.title.slice(0, 2).toLocaleUpperCase()}
+                </span>
+                <span className={styles.itemText}>
+                  <span className={styles.itemTitle}>{project.title}</span>
+                  <span className={styles.itemDetail}>
+                    {props.machineName === undefined ? null : `${props.machineName} · `}
+                    {project.canonicalPath}
                   </span>
-                  <span className={styles.itemText}>
-                    <strong>{project.title}</strong>
-                    <small>
-                      {props.machineName === undefined ? null : `${props.machineName} · `}
-                      {project.canonicalPath}
-                    </small>
-                  </span>
-                  {index < 9 && <kbd>⌘ {index + 1}</kbd>}
-                </button>
-              ))}
-              {matchingProjects.length === 0 && <p className={styles.empty}>No registered projects match.</p>}
-            </div>
-          </>
-        )}
-        {error !== null && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        <footer className={styles.footer}>
-          <span>↑ ↓ Navigate</span>
-          <span>
-            <kbd>Enter</kbd> Select / open
-          </span>
-          <span>
-            <kbd>Esc</kbd> Close
-          </span>
-        </footer>
-      </section>
-    </div>
+                </span>
+                {index < 9 && <ShortcutKeys keys={['⌘', String(index + 1)]} />}
+              </button>
+            ))}
+            {matchingProjects.length === 0 && <EmptyState compact description="No registered projects match." />}
+          </div>
+        </>
+      )}
+      {error !== null && (
+        <Notice className={styles.error} tone="danger">
+          {error}
+        </Notice>
+      )}
+      <footer className={styles.footer}>
+        <span className={styles.hint}>
+          <ShortcutKeys keys={['↑', '↓']} /> Navigate
+        </span>
+        <span className={styles.hint}>
+          <ShortcutKeys keys={['Enter']} /> Select / open
+        </span>
+        <span className={styles.hint}>
+          <ShortcutKeys keys={['Esc']} /> Close
+        </span>
+      </footer>
+    </Modal>
   )
 }

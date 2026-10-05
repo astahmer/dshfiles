@@ -2,7 +2,25 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Checkbox,
+  IconArchiveOutlineRegular,
+  IconChevronDownOutlineRegular,
+  IconChevronUpOutlineRegular,
+  IconPauseOutlineRegular,
+  IconPinFillRegular,
+  IconPinOutlineRegular,
+  IconPlayOutlineRegular,
+  IconSettingsOutlineRegular,
+  IconUnarchiveOutlineRegular,
+  Input,
+  Menu,
+  MenuItemButton,
+  StateDot,
+  Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import { EmptyState, Field, Notice, TextArea, VisuallyHidden, type NoticeTone } from '@dshfiles/plugin-ui'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import {
   isAutoArchiveCandidate,
   parseSessionIds,
@@ -39,6 +57,14 @@ interface ThreadContextMenuState {
   x: number
   y: number
 }
+
+interface SidebarNotice {
+  tone: NoticeTone
+  message: string
+}
+
+const ALL_PROJECTS = '__all__'
+const UNASSIGNED_PROJECT = '__unassigned__'
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'inactive', 'archived']
 
@@ -87,13 +113,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, threadQuery } = useSidebarState()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<SidebarNotice | null>(null)
   const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null)
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
   const archiveInFlight = useRef(false)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
   const latestAutoArchive = useRef<{
@@ -103,7 +129,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     archived: ReadonlySet<string>
     pinned: ReadonlySet<string>
     archive: ThreadSidebarProps['archiveSession']
-    announce: (message: string) => void
+    announce: (notice: SidebarNotice) => void
   } | null>(null)
 
   const workspaceBySession = useMemo(() => workspaceForSessions(workspaceState.items), [workspaceState.items])
@@ -136,7 +162,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (routeRequest === null || sessionState.phase !== 'ready') return
     const target = Object.values(sessionState.byId).find(session => session.id === routeRequest)
     if (target === undefined) {
-      setNotice(props.tSidebar('threadSidebarLinkNotFound'))
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarLinkNotFound') })
       window.history.replaceState(window.history.state, '', clearThreadUrl(window.location.href))
       setRouteRequest(null)
       return
@@ -161,38 +187,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
   }, [routeRequest, selectedSession, sessionState.byId, workspaceBySession])
 
-  useEffect(() => {
-    if (contextMenu === null) return
-    contextMenuRef.current?.querySelector('button')?.focus()
-    const onPointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Node && contextMenuRef.current?.contains(event.target)) return
-      setContextMenu(null)
-    }
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        setContextMenu(null)
-        return
-      }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-      const items = [...(contextMenuRef.current?.querySelectorAll('button') ?? [])]
-      if (items.length === 0) return
-      event.preventDefault()
-      const currentIndex = items.findIndex(item => item === document.activeElement)
-      const direction = event.key === 'ArrowDown' ? 1 : -1
-      const nextIndex = (currentIndex + direction + items.length) % items.length
-      items[nextIndex]?.focus()
-    }
-    const close = (): void => setContextMenu(null)
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    window.addEventListener('blur', close)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('blur', close)
-    }
-  }, [contextMenu])
-
   const changePreferences = (patch: Partial<SidebarPreferences>): void => {
     updatePreferences(patch)
   }
@@ -202,7 +196,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       await operation(sessionId)
       setNotice(null)
     } catch {
-      setNotice(props.tSidebar('threadSidebarArchiveFailure'))
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarArchiveFailure') })
     }
   }
 
@@ -220,9 +214,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     setContextMenu(null)
     try {
       await navigator.clipboard.writeText(value)
-      setNotice(successMessage)
+      setNotice({ tone: 'success', message: successMessage })
     } catch {
-      setNotice(props.tSidebar('threadSidebarClipboardFailure'))
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarClipboardFailure') })
     }
   }
 
@@ -268,7 +262,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     } finally {
       archiveInFlight.current = false
     }
-    if (failed) latest.announce(props.tSidebar('threadSidebarArchiveFailure'))
+    if (failed) latest.announce({ tone: 'danger', message: props.tSidebar('threadSidebarArchiveFailure') })
   }
 
   latestAutoArchive.current = {
@@ -325,137 +319,154 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   ])
 
   const projectFilterValue =
-    preferences.workspaceFilter === null ? '__all__' : preferences.workspaceFilter.length === 0 ? '__unassigned__' : preferences.workspaceFilter
+    preferences.workspaceFilter === null ? ALL_PROJECTS : preferences.workspaceFilter.length === 0 ? UNASSIGNED_PROJECT : preferences.workspaceFilter
 
   const selectProject = (value: string): void => {
-    if (value === '__all__') changePreferences({ workspaceFilter: null })
-    else if (value === '__unassigned__') changePreferences({ workspaceFilter: '' })
+    setProjectMenuOpen(false)
+    if (value === ALL_PROJECTS) changePreferences({ workspaceFilter: null })
+    else if (value === UNASSIGNED_PROJECT) changePreferences({ workspaceFilter: '' })
     else changePreferences({ workspaceFilter: value })
   }
 
-  const projectFilterLabel =
-    projectFilterValue === '__all__'
-      ? props.tSidebar('threadSidebarAllProjects')
-      : projectFilterValue === '__unassigned__'
-        ? props.tSidebar('threadSidebarUnassigned')
-        : (displayWorkspaces.find(workspace => workspace.id === projectFilterValue)?.title ?? props.tSidebar('threadSidebarAllProjects'))
+  const projectMenuItems = [
+    { id: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
+    { id: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
+    ...displayWorkspaces.map(workspace => ({ id: workspace.id, label: workspace.title })),
+  ]
+
+  const projectFilterLabel = projectMenuItems.find(item => item.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
+
+  const contextMenuAnchorRect = useCallback(
+    (): DOMRect | null => (contextMenu === null ? null : new DOMRect(contextMenu.x, contextMenu.y, 0, 0)),
+    [contextMenu],
+  )
+
+  const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
+    <Tooltip label={label} side="top" delayMs={500} portal>
+      {anchor}
+    </Tooltip>
+  )
 
   return (
     <section className={styles.sidebar} aria-label={props.tSidebar('threadSidebarTitle')}>
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <h2 className={styles.title}>{props.tSidebar('threadSidebarTitle')}</h2>
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label={props.tSidebar('threadSidebarSettings')}
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen(value => !value)}
-          >
-            ⚙
-          </button>
+          {withTooltip(
+            props.tSidebar('threadSidebarSettings'),
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label={props.tSidebar('threadSidebarSettings')}
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen(value => !value)}
+            >
+              <IconSettingsOutlineRegular size={18} />
+            </button>,
+          )}
         </div>
         {/* The reference shows one plain label with a chevron, not a doubled
-            label plus a boxed <select>, so the control is a disclosure whose
-            summary carries the label and the native marker carries the arrow. */}
-        <details className={styles.projectFilter}>
-          <summary>{projectFilterLabel}</summary>
-          <div className={styles.projectMenu} role="group">
-            <button type="button" aria-pressed={projectFilterValue === '__all__'} onClick={() => selectProject('__all__')}>
-              {props.tSidebar('threadSidebarAllProjects')}
+            label plus a boxed <select>, so the trigger is the label itself. */}
+        <Menu
+          className={styles.projectFilter}
+          open={projectMenuOpen}
+          portal
+          items={projectMenuItems}
+          selectedId={projectFilterValue}
+          onSelect={selectProject}
+          onClose={() => setProjectMenuOpen(false)}
+          anchor={
+            <button
+              type="button"
+              className={styles.projectFilterTrigger}
+              aria-haspopup="menu"
+              aria-expanded={projectMenuOpen}
+              onClick={() => setProjectMenuOpen(value => !value)}
+            >
+              {projectFilterLabel}
             </button>
-            <button type="button" aria-pressed={projectFilterValue === '__unassigned__'} onClick={() => selectProject('__unassigned__')}>
-              {props.tSidebar('threadSidebarUnassigned')}
-            </button>
-            {displayWorkspaces.map(workspace => (
-              <button key={workspace.id} type="button" aria-pressed={projectFilterValue === workspace.id} onClick={() => selectProject(workspace.id)}>
-                {workspace.title}
-              </button>
-            ))}
-          </div>
-        </details>
+          }
+        />
       </header>
 
       {settingsOpen ? (
         <section className={styles.settings} aria-label={props.tSidebar('threadSidebarSettings')}>
-          <label className={styles.checkRow}>
-            <input
-              type="checkbox"
-              checked={preferences.autoArchiveEnabled}
-              onChange={event => changePreferences({ autoArchiveEnabled: event.currentTarget.checked })}
-            />
-            <span>{props.tSidebar('threadSidebarAutoArchive')}</span>
-          </label>
-          <label className={styles.field}>
-            <span>{props.tSidebar('threadSidebarIdleAfter')}</span>
-            <input
-              type="number"
-              min={15}
-              max={10080}
-              value={preferences.idleMinutes}
-              onChange={event => {
-                const value = Number(event.currentTarget.value)
-                if (Number.isInteger(value) && value >= 15 && value <= 10080) changePreferences({ idleMinutes: value })
-              }}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>{props.tSidebar('threadSidebarScanEvery')}</span>
-            <input
-              type="number"
-              min={1}
-              max={120}
-              value={preferences.scanIntervalMinutes}
-              onChange={event => {
-                const value = Number(event.currentTarget.value)
-                if (Number.isInteger(value) && value >= 1 && value <= 120) changePreferences({ scanIntervalMinutes: value })
-              }}
-            />
-          </label>
+          <Checkbox
+            checked={preferences.autoArchiveEnabled}
+            label={props.tSidebar('threadSidebarAutoArchive')}
+            onChange={checked => changePreferences({ autoArchiveEnabled: checked })}
+          />
+          <Field label={props.tSidebar('threadSidebarIdleAfter')}>
+            {control => (
+              <Input
+                {...control}
+                type="number"
+                min={15}
+                max={10080}
+                value={preferences.idleMinutes}
+                onChange={event => {
+                  const value = Number(event.currentTarget.value)
+                  if (Number.isInteger(value) && value >= 15 && value <= 10080) changePreferences({ idleMinutes: value })
+                }}
+              />
+            )}
+          </Field>
+          <Field label={props.tSidebar('threadSidebarScanEvery')}>
+            {control => (
+              <Input
+                {...control}
+                type="number"
+                min={1}
+                max={120}
+                value={preferences.scanIntervalMinutes}
+                onChange={event => {
+                  const value = Number(event.currentTarget.value)
+                  if (Number.isInteger(value) && value >= 1 && value <= 120) changePreferences({ scanIntervalMinutes: value })
+                }}
+              />
+            )}
+          </Field>
           <fieldset className={styles.exclusions}>
             <legend>{props.tSidebar('threadSidebarExcludedProjects')}</legend>
             {displayWorkspaces.map(workspace => (
-              <label className={styles.checkRow} key={workspace.id}>
-                <input
-                  type="checkbox"
-                  checked={preferences.excludedWorkspaceIds.includes(workspace.id)}
-                  onChange={event => {
-                    const next = event.currentTarget.checked
-                      ? [...preferences.excludedWorkspaceIds, workspace.id]
-                      : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
-                    changePreferences({ excludedWorkspaceIds: next })
-                  }}
-                />
-                <span>{workspace.title}</span>
-              </label>
+              <Checkbox
+                key={workspace.id}
+                checked={preferences.excludedWorkspaceIds.includes(workspace.id)}
+                label={workspace.title}
+                onChange={checked => {
+                  const next = checked ? [...preferences.excludedWorkspaceIds, workspace.id] : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
+                  changePreferences({ excludedWorkspaceIds: next })
+                }}
+              />
             ))}
           </fieldset>
-          <label className={styles.field}>
-            <span>{props.tSidebar('threadSidebarExcludedSessions')}</span>
-            <textarea
-              rows={3}
-              value={preferences.excludedSessionIds.join('\n')}
-              onChange={event => changePreferences({ excludedSessionIds: parseSessionIds(event.currentTarget.value) })}
-            />
-            <small>{props.tSidebar('threadSidebarExclusionHint')}</small>
-          </label>
+          <Field label={props.tSidebar('threadSidebarExcludedSessions')} description={props.tSidebar('threadSidebarExclusionHint')}>
+            {control => (
+              <TextArea
+                {...control}
+                rows={3}
+                value={preferences.excludedSessionIds.join('\n')}
+                onChange={event => changePreferences({ excludedSessionIds: parseSessionIds(event.currentTarget.value) })}
+              />
+            )}
+          </Field>
           <p className={styles.note}>{props.tSidebar('threadSidebarTimestampNote')}</p>
         </section>
       ) : null}
 
       {notice !== null ? (
-        <p role="status" className={styles.notice}>
-          {notice}
-        </p>
+        <Notice className={styles.notice} tone={notice.tone}>
+          {notice.message}
+        </Notice>
       ) : null}
       {storageWarning ? (
-        <p role="status" className={styles.notice}>
+        <Notice className={styles.notice} tone="warning">
           {props.tSidebar('threadSidebarStorageFailure')}
-        </p>
+        </Notice>
       ) : null}
 
       <div className={styles.sections}>
-        {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? <p className={styles.empty}>{props.tSidebar('threadSidebarLoading')}</p> : null}
+        {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? <EmptyState compact title={props.tSidebar('threadSidebarLoading')} /> : null}
         {sections.map(section => {
           const rows = rowsBySection.get(section) ?? []
           if (rows.length === 0 && section !== 'active') return null
@@ -465,7 +476,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               <button type="button" className={styles.groupHeader} aria-expanded={!collapsed} onClick={() => toggleSection(section)}>
                 <span>{props.tSidebar(sectionLabels[section])}</span>
                 <span className={styles.count}>({rows.length})</span>
-                <span aria-hidden="true">{collapsed ? '⌄' : '⌃'}</span>
+                {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
               </button>
               {!collapsed
                 ? rows.map(session => {
@@ -482,14 +493,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                         key={session.id}
                         onContextMenu={event => {
                           event.preventDefault()
-                          const width = 210
-                          const height = 88
-                          setContextMenu({
-                            sessionId: session.id,
-                            workspaceId,
-                            x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
-                            y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8)),
-                          })
+                          setContextMenu({ sessionId: session.id, workspaceId, x: event.clientX, y: event.clientY })
                         }}
                         style={{ marginInlineStart: lineage.depth * 12 }}
                       >
@@ -511,8 +515,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                           <span className={styles.rowTitle}>
                             {session.running ? (
                               <span className={styles.runningDot} title={props.tSidebar('threadSidebarWorking')}>
-                                <span aria-hidden="true">●</span>
-                                <span className={styles.srOnly}>{props.tSidebar('threadSidebarWorking')}</span>
+                                <StateDot state="ongoing" size={12} />
+                                <VisuallyHidden>{props.tSidebar('threadSidebarWorking')}</VisuallyHidden>
                               </span>
                             ) : null}
                             {session.displayTitle}
@@ -533,42 +537,50 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                         <div className={styles.actions}>
                           {!archived ? (
                             <>
-                              <button
-                                type="button"
-                                aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                                title={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                                onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
-                              >
-                                {pinned ? '◆' : '◇'}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                                title={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                                disabled={session.running}
-                                onClick={() => toggleParked(session.id)}
-                              >
-                                {parked ? '▰' : '▱'}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={props.tSidebar('threadSidebarArchive')}
-                                title={props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive')}
-                                disabled={session.running}
-                                onClick={() => void mutateSession(session.id, props.archiveSession)}
-                              >
-                                ↓
-                              </button>
+                              {withTooltip(
+                                props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+                                <button
+                                  type="button"
+                                  aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                                  onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
+                                >
+                                  {pinned ? <IconPinFillRegular size={16} /> : <IconPinOutlineRegular size={16} />}
+                                </button>,
+                              )}
+                              {withTooltip(
+                                props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+                                <button
+                                  type="button"
+                                  aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                                  disabled={session.running}
+                                  onClick={() => toggleParked(session.id)}
+                                >
+                                  {parked ? <IconPlayOutlineRegular size={16} /> : <IconPauseOutlineRegular size={16} />}
+                                </button>,
+                              )}
+                              {withTooltip(
+                                props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
+                                <button
+                                  type="button"
+                                  aria-label={props.tSidebar('threadSidebarArchive')}
+                                  disabled={session.running}
+                                  onClick={() => void mutateSession(session.id, props.archiveSession)}
+                                >
+                                  <IconArchiveOutlineRegular size={16} />
+                                </button>,
+                              )}
                             </>
                           ) : (
-                            <button
-                              type="button"
-                              aria-label={props.tSidebar('threadSidebarRestore')}
-                              title={props.tSidebar('threadSidebarRestore')}
-                              onClick={() => void mutateSession(session.id, props.unarchiveSession)}
-                            >
-                              ↩
-                            </button>
+                            withTooltip(
+                              props.tSidebar('threadSidebarRestore'),
+                              <button
+                                type="button"
+                                aria-label={props.tSidebar('threadSidebarRestore')}
+                                onClick={() => void mutateSession(session.id, props.unarchiveSession)}
+                              >
+                                <IconUnarchiveOutlineRegular size={16} />
+                              </button>,
+                            )
                           )}
                         </div>
                       </article>
@@ -579,34 +591,28 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           )
         })}
         {sessionState.phase === 'ready' && [...rowsBySection.values()].every(rows => rows.length === 0) ? (
-          <p className={styles.empty}>{props.tSidebar('threadSidebarEmpty')}</p>
+          <EmptyState compact title={props.tSidebar('threadSidebarEmpty')} />
         ) : null}
       </div>
-      {contextMenu === null ? null : (
-        <div
-          ref={contextMenuRef}
-          className={styles.contextMenu}
-          role="menu"
-          aria-label={props.tSidebar('threadSidebarContextMenu')}
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          <button type="button" role="menuitem" onClick={() => void copyContextValue(contextMenu.sessionId, props.tSidebar('threadSidebarIdCopied'))}>
-            {props.tSidebar('threadSidebarCopyId')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() =>
-              void copyContextValue(
-                buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
-                props.tSidebar('threadSidebarLinkCopied'),
-              )
-            }
-          >
-            {props.tSidebar('threadSidebarCopyLink')}
-          </button>
-        </div>
-      )}
+      <Menu open={contextMenu !== null} anchor={<span />} portal autoFocus getAnchorRect={contextMenuAnchorRect} onClose={() => setContextMenu(null)}>
+        {contextMenu === null ? null : (
+          <>
+            <MenuItemButton onSelect={() => void copyContextValue(contextMenu.sessionId, props.tSidebar('threadSidebarIdCopied'))}>
+              {props.tSidebar('threadSidebarCopyId')}
+            </MenuItemButton>
+            <MenuItemButton
+              onSelect={() =>
+                void copyContextValue(
+                  buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
+                  props.tSidebar('threadSidebarLinkCopied'),
+                )
+              }
+            >
+              {props.tSidebar('threadSidebarCopyLink')}
+            </MenuItemButton>
+          </>
+        )}
+      </Menu>
     </section>
   )
 }

@@ -1,72 +1,10 @@
-/*
- * The --jj-* layer is the single place this panel resolves a colour, so the
- * theme decision lives here once. Every fallback was a dark literal reached
- * through a `--dsh-*` custom property that DSH does not define -- the namespace
- * is `--dsw-alias-*` and `--dsw-*` -- so each one silently fell through to its
- * hardcoded dark value in light mode. The fallbacks stay as last-resort values
- * for a page served without the Host token set.
- */
 .panel {
-  --jj-bg: var(--dsw-alias-bg-layer-1, #17191d);
-  --jj-raised: var(--dsw-alias-bg-module-platform, #202329);
-  --jj-border: var(--dsw-alias-border-l2, #34383f);
-  --jj-text: var(--dsw-alias-label-primary, #f1f3f5);
-  --jj-muted: var(--dsw-alias-label-secondary, #a2a7af);
-  --jj-accent: var(--dsw-alias-state-business-primary, #38bdf8);
-  --jj-danger: var(--dsw-alias-state-error-primary, #a33c46);
-  --jj-danger-soft: var(--dsw-alias-state-error-secondary, #ffc4c9);
-  --jj-danger-bg: var(--dsw-alias-file-diff-deleted-bg, #391e24);
-  --jj-warn: var(--dsw-alias-state-warn-primary, #dfc58b);
-  --jj-warn-bg: var(--dsw-alias-state-warn-tertiary, #493e27);
-  --jj-bookmark: var(--dsw-alias-label-primary-bluish, #d5e8ff);
-  --jj-bookmark-bg: var(--dsw-alias-state-business-tertiary, #254563);
-  --jj-tag: var(--dsw-alias-label-primary-bluish, #d7c8ff);
-  --jj-tag-bg: var(--dsw-alias-bg-multi-select, #3a3150);
-  --jj-remote: var(--dsw-alias-label-secondary, #aab3bf);
-  --jj-remote-bg: var(--dsw-alias-bg-module-platform, #30343a);
-  --jj-on-accent: var(--dsw-alias-label-primary-foreground, #071018);
   box-sizing: border-box;
   min-height: 100%;
   padding: 20px 24px 36px;
-  color: var(--jj-text);
-  background: var(--jj-bg);
-  font: var(--dsw-font-s-14, 14px/1.45 system-ui, sans-serif);
-}
-
-.panel * {
-  box-sizing: border-box;
-}
-.panel button,
-.panel input,
-.panel select,
-.panel textarea {
-  font: inherit;
-}
-.panel button {
-  color: inherit;
-  cursor: pointer;
-}
-.panel button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-.panel h1,
-.panel h2,
-.panel h3,
-.panel p {
-  margin-top: 0;
-}
-.panel h1 {
-  margin-bottom: 3px;
-  font-size: 1.8rem;
-}
-.panel h2 {
-  margin-bottom: 8px;
-  font-size: 17px;
-}
-.panel h3 {
-  margin: 14px 0 8px;
-  font-size: 14px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  font: var(--dsw-font-s-14);
 }
 
 .header {
@@ -74,168 +12,137 @@
   z-index: 3;
   top: 0;
   padding-bottom: 12px;
-  background: var(--jj-bg);
+  background: var(--dsw-alias-bg-layer-1);
 }
+
 .titleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.muted,
-.detailMeta {
-  color: var(--jj-muted);
+
+.title {
+  margin: 0 0 3px;
+  font: var(--dsw-font-xl-24);
 }
+
+.heading {
+  margin: 0 0 8px;
+  font: var(--dsw-font-base-strong-16);
+}
+
+.subheading {
+  margin: 14px 0 0;
+  font: var(--dsw-font-s-strong-14);
+}
+
+.muted {
+  color: var(--dsw-alias-label-secondary);
+}
+
 .repoForm {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto minmax(90px, auto) auto minmax(90px, auto) auto;
   gap: 8px;
   margin: 16px 0 8px;
 }
-.panel input:not([type='checkbox']),
-.panel select,
-.panel textarea {
+
+.repoPath {
   min-width: 0;
-  border: 1px solid var(--jj-border);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: var(--jj-text);
-  background: var(--jj-raised);
 }
-.panel textarea {
-  width: 100%;
-  resize: vertical;
-}
-.panel button {
-  min-height: 36px;
-  border: 1px solid color-mix(in srgb, var(--jj-accent), transparent 30%);
-  border-radius: 7px;
-  padding: 7px 12px;
-  color: var(--jj-on-accent);
-  background: var(--jj-accent);
-  font-weight: 650;
-}
-.panel .secondary {
-  border-color: var(--jj-border);
-  color: var(--jj-text);
-  background: var(--jj-raised);
-}
+
 .statusLine {
   min-height: 20px;
-  color: var(--jj-muted);
-  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
 }
+
 .tabs {
-  display: flex;
-  gap: 22px;
   margin-top: 12px;
-  border-bottom: 1px solid var(--jj-border);
 }
-.tabs button {
-  position: relative;
-  border: 0;
-  border-radius: 0;
-  padding: 9px 2px 11px;
-  color: var(--jj-muted);
-  background: transparent;
-}
-.tabs .activeTab {
-  color: var(--jj-text);
-}
-.tabs .activeTab::after {
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 3px;
-  background: var(--jj-accent);
-  content: '';
-}
-.error,
-.loading,
-.output {
+
+.messages {
+  display: grid;
+  gap: 8px;
   margin: 12px 0;
-  border: 1px solid var(--jj-border);
-  border-radius: 8px;
-  padding: 10px 12px;
 }
-.error {
-  border-color: var(--jj-danger);
-  color: var(--jj-danger-soft);
-  background: var(--jj-danger-bg);
+
+.messages:empty {
+  display: none;
 }
-.loading {
-  color: var(--jj-muted);
-}
-.output,
-.diff,
-.details pre,
-.sourceSummary pre {
+
+.code,
+.workingStatus,
+.previewDetail {
   overflow: auto;
   max-height: 60vh;
+  margin: 0;
+  font: var(--dsw-font-markdown-code-block-small);
   white-space: pre;
   tab-size: 2;
 }
+
 .filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 9px 14px;
   padding: 12px 0;
-  border-bottom: 1px solid var(--jj-border);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
-.filters > input {
+
+.filterInput {
   flex: 1 1 150px;
   max-width: 260px;
 }
-.filters label,
-.sourceActions label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--jj-muted);
-}
-.filters input[type='date'] {
+
+.dateField {
   width: 142px;
-  padding: 6px;
 }
+
 .graphColumns {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(300px, 42%);
   align-items: start;
 }
+
 .revisionList {
   min-width: 0;
-  border-right: 1px solid var(--jj-border);
+  border-right: 1px solid var(--dsw-alias-border-l2);
 }
+
 .dayGroup + .dayGroup {
-  border-top: 1px solid var(--jj-border);
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
+
 .dayHeading {
   position: sticky;
   z-index: 1;
   top: 119px;
   padding: 8px 14px;
-  color: var(--jj-muted);
-  background: var(--jj-bg);
-  font-size: 12px;
-  font-weight: 650;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-1);
+  font: var(--dsw-font-xxs-strong-12);
 }
+
 .revision,
 .revisionSelected {
   position: relative;
   display: grid;
-  grid-template-columns: 28px minmax(140px, 1fr) auto auto 25px;
+  grid-template-columns: 28px minmax(140px, 1fr) auto auto auto;
   align-items: center;
   gap: 4px;
   min-height: 52px;
   padding: 8px 12px 8px 2px;
-  border-bottom: 1px solid color-mix(in srgb, var(--jj-border), transparent 45%);
+  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2), transparent 45%);
 }
+
 .revision:hover,
 .revisionSelected {
-  background: color-mix(in srgb, var(--jj-accent), transparent 93%);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary), transparent 93%);
 }
+
 .graphRail {
   position: relative;
   display: flex;
@@ -243,49 +150,53 @@
   align-items: center;
   justify-content: center;
 }
+
 .graphRail::before {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
   width: 2px;
-  background: color-mix(in srgb, var(--jj-accent), transparent 54%);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary), transparent 54%);
   content: '';
 }
+
 .node,
 .nodeCurrent {
   z-index: 1;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--jj-accent);
+  border: 2px solid var(--dsw-alias-state-business-primary);
   border-radius: 50%;
-  background: var(--jj-bg);
+  background: var(--dsw-alias-bg-layer-1);
 }
+
 .nodeCurrent {
-  background: var(--jj-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--jj-accent), transparent 82%);
+  background: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary), transparent 82%);
 }
+
 /*
  * Reference 14 packs each revision row into a single 22px text band: the title
  * and its meta share one line rather than stacking, which is what puts rows 52px
- * apart. Ours stacked them, so the body needed 57px and the row landed at 84 --
- * more than half again the reference's density.
+ * apart.
  */
 .revisionBody {
   display: flex;
   flex-wrap: wrap;
   min-width: 0;
-  min-height: 0;
   align-items: baseline;
   column-gap: 10px;
   row-gap: 2px;
-  border: 0 !important;
-  padding: 0 !important;
-  color: var(--jj-text) !important;
-  background: transparent !important;
-  font-weight: 400;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
+
 .revisionTitle {
   display: flex;
   min-width: 0;
@@ -294,88 +205,57 @@
   font-size: 15px;
   font-weight: 650;
 }
-.revisionTitle > span:last-child {
+
+.revisionSummary,
+.ancestorTitle,
+.filePath {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .revisionMeta,
 .labels {
   display: flex;
   overflow: hidden;
   align-items: center;
   gap: 6px;
-  margin-top: 0;
-  color: var(--jj-muted);
-  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
   white-space: nowrap;
 }
+
 .labels {
   grid-column: 2 / -1;
   margin-top: -4px;
 }
-.currentBadge,
-.workspaceBadge,
-.immutableBadge,
-.bookmark,
-.remoteBookmark,
-.tag {
-  display: inline-block;
-  border-radius: 999px;
-  padding: 2px 7px;
-  white-space: nowrap;
+
+.labels:empty {
+  display: none;
 }
-.currentBadge {
-  color: var(--jj-on-accent);
-  background: var(--jj-accent);
-  font-size: 10px;
-}
-.workspaceBadge {
-  border: 1px solid var(--jj-border);
-}
-.immutableBadge {
-  color: var(--jj-warn);
-  background: var(--jj-warn-bg);
-}
-.parentLink {
-  color: var(--jj-muted);
-}
+
 .ancestryBridge {
-  border-bottom: 1px dashed var(--jj-muted);
-  color: var(--jj-muted);
+  border-bottom: 1px dashed var(--dsw-alias-label-secondary);
 }
-.bookmark {
-  color: var(--jj-bookmark);
-  background: var(--jj-bookmark-bg);
+
+.draggableBookmark {
   cursor: grab;
 }
-.remoteBookmark {
-  color: var(--jj-remote);
-  background: var(--jj-remote-bg);
-}
-.tag {
-  color: var(--jj-tag);
-  background: var(--jj-tag-bg);
-}
+
 .relative {
-  color: var(--jj-muted);
+  color: var(--dsw-alias-label-secondary);
   white-space: nowrap;
 }
+
 .changeId {
-  color: var(--jj-accent);
-  font:
-    700 12px/1.2 ui-monospace,
-    monospace;
+  color: var(--dsw-alias-state-business-primary);
+  font: 700 12px/1.2 var(--dsw-font-mono);
 }
+
 .dragHandle {
-  width: 26px;
-  min-height: 28px !important;
-  border-color: transparent !important;
-  padding: 2px !important;
-  color: var(--jj-muted) !important;
-  background: transparent !important;
-  cursor: grab !important;
+  cursor: grab;
 }
+
 .details {
   position: sticky;
   top: 168px;
@@ -384,167 +264,133 @@
   overflow: auto;
   padding: 16px;
 }
-.details > p {
+
+.fullDescription {
+  margin: 0 0 8px;
   white-space: pre-wrap;
 }
+
 .counts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 12px 0 6px;
   font-weight: 700;
 }
+
 .fileList {
   margin: 0 0 12px;
   padding: 0;
   list-style: none;
 }
+
 .fileList li {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   padding: 4px 0;
-  border-bottom: 1px solid var(--jj-border);
-  font:
-    12px ui-monospace,
-    monospace;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  font: 12px var(--dsw-font-mono);
 }
-.fileList li span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.details details,
-.sourceView details {
+
+.disclosure {
   margin-top: 10px;
-  border: 1px solid var(--jj-border);
-  border-radius: 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
   padding: 8px 10px;
 }
-.details summary,
-.sourceView summary {
+
+.disclosure > summary {
   cursor: pointer;
   font-weight: 650;
 }
+
 .actionBox {
   display: grid;
   gap: 8px;
   margin-top: 16px;
-  border-top: 1px solid var(--jj-border);
+  border-top: 1px solid var(--dsw-alias-border-l2);
   padding-top: 12px;
 }
-.actionBox label {
-  display: grid;
-  gap: 6px;
-  color: var(--jj-muted);
-}
+
 .sourceView {
   padding-top: 14px;
 }
+
 .sourceSummary,
 .sourceColumns {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(300px, 1fr);
   gap: 18px;
 }
+
 .sourceSummary {
   align-items: start;
-  border-bottom: 1px solid var(--jj-border);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
   padding-bottom: 14px;
 }
-.sourceSummary pre {
+
+.workingStatus {
   max-height: 230px;
-  margin: 0;
-  border: 1px solid var(--jj-border);
-  border-radius: 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
   padding: 10px;
-  background: var(--jj-raised);
+  background: var(--dsw-alias-bg-module-platform);
 }
+
 .sourceActions {
   display: grid;
   align-content: start;
   gap: 8px;
   min-width: 0;
 }
-.sourceActions h3:not(:first-child) {
-  margin-top: 20px;
-}
+
 .ancestorList {
   display: grid;
   align-content: start;
   gap: 5px;
 }
+
 .ancestor {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  border-color: var(--jj-border) !important;
-  color: var(--jj-text) !important;
-  background: var(--jj-raised) !important;
+  min-height: 36px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  padding: 7px 12px;
+  color: inherit;
+  background: var(--dsw-alias-bg-module-platform);
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
-.ancestor span:nth-child(2) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ancestor code {
-  color: var(--jj-accent);
-}
+
 .fileChoices {
   display: grid;
   gap: 5px;
   max-height: 180px;
   overflow: auto;
-  border: 1px solid var(--jj-border);
-  border-radius: 7px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
   padding: 8px;
 }
-.fileChoices label {
+
+.previewSummary {
   display: block;
-  overflow-wrap: anywhere;
-  color: var(--jj-text);
+  margin-bottom: 10px;
 }
-.fileChoices input {
-  margin-right: 7px;
-}
-.disabledFile {
-  color: var(--jj-muted) !important;
-}
-.modalBackdrop {
-  position: fixed;
-  z-index: 10;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: var(--dsw-alias-bg-mask-1, #0009);
-}
-.modal {
-  width: min(680px, 100%);
-  max-height: 90vh;
-  overflow: auto;
-  border: 1px solid var(--jj-border);
-  border-radius: 12px;
-  padding: 20px;
-  background: var(--jj-bg);
-  box-shadow: var(--dsw-shadow-lv3);
-}
-.modal > strong {
-  display: block;
-  margin: 10px 0;
-}
-.modal pre {
-  overflow: auto;
+
+.previewDetail {
   max-height: 48vh;
-  border: 1px solid var(--jj-border);
-  border-radius: 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
   padding: 12px;
-  background: var(--jj-raised);
+  background: var(--dsw-alias-bg-module-platform);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 @media (max-width: 980px) {
@@ -562,7 +408,7 @@
   .details {
     position: static;
     max-height: none;
-    border-top: 1px solid var(--jj-border);
+    border-top: 1px solid var(--dsw-alias-border-l2);
   }
 }
 
@@ -573,24 +419,21 @@
   .repoForm {
     grid-template-columns: 1fr 1fr;
   }
-  .repoForm input {
+  .repoPath {
     grid-column: 1 / -1;
   }
   .filters {
     align-items: stretch;
   }
-  .filters > input {
+  .filterInput {
     max-width: none;
   }
   .revision,
   .revisionSelected {
-    grid-template-columns: 22px minmax(0, 1fr) auto 24px;
+    grid-template-columns: 22px minmax(0, 1fr) auto auto;
     gap: 6px;
   }
   .relative {
     display: none;
-  }
-  .labels {
-    grid-column: 2 / -1;
   }
 }

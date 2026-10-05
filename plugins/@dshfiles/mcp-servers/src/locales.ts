@@ -1,5 +1,5 @@
 import { defineLocale } from '@dshfiles/dshx/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
 export const MCP_LOCALE_NAMESPACE = 'settings.mcpServers'
 
@@ -148,5 +148,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'settings.mcpServers': keyof typeof en
   }
 }
+
+export type McpServersTranslate = TranslateNS<typeof MCP_LOCALE_NAMESPACE>
 
 export const mcpServersLocale = defineLocale(MCP_LOCALE_NAMESPACE, { en, zh })

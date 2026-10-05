@@ -103,3 +103,39 @@ export const quotaHistoryCycles = (points: readonly UsageHistoryPoint[], label: 
   }
   return [...cycles.values()]
 }
+
+const downsample = <T,>(values: readonly T[], limit: number): readonly T[] => {
+  if (values.length <= limit) return values
+  if (limit < 2) return values.slice(-limit)
+  const last = values.length - 1
+  return Array.from({ length: limit }, (_, index) => values[Math.round((index * last) / (limit - 1))]).filter((value): value is T => value !== undefined)
+}
+
+export interface QuotaHistoryRow {
+  readonly at: number
+  readonly percent: number
+  /** The provider window this reading belongs to; one colour per window. */
+  readonly window: string
+  /** Window plus reset cycle, so a line breaks where the provider reset it. */
+  readonly cycle: string
+}
+
+/**
+ * One line per labelled window per reset cycle, percent clamped to 0–100, with
+ * each window's cycles sharing a point budget so a long range stays drawable.
+ */
+export const quotaHistoryRows = (points: readonly UsageHistoryPoint[], pointLimit: number): readonly QuotaHistoryRow[] => {
+  const windows = [...new Set(points.flatMap(point => Object.keys(point.windows)))]
+  return windows.flatMap(window => {
+    const cycles = quotaHistoryCycles(points, window)
+    const perCycleLimit = Math.max(2, Math.floor(pointLimit / Math.max(1, cycles.length)))
+    return cycles.flatMap((cycle, cycleIndex) =>
+      downsample(cycle, perCycleLimit).map(point => ({
+        at: point.at,
+        percent: Math.max(0, Math.min(100, point.windows[window] ?? 0)),
+        window,
+        cycle: `${window}:${String(cycleIndex)}`,
+      })),
+    )
+  })
+}

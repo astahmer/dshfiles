@@ -1,4 +1,4 @@
-import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import {
   IconCheckOutlineRegular,
@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
+import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
@@ -58,7 +59,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 /** Decode one projection row, or `null` when it is not a queued message. */
 const asQueuedMessage = (value: unknown): QueuedMessage | null => {
   const record = asRecord(value)
-  if (record === null || typeof record.id !== 'string' || record.id.length === 0) return null
+  if (record === null || typeof record.id !== 'string') return null
   const content = Array.isArray(record.content)
     ? record.content.filter((block): block is TextBlock => asRecord(block) !== null && typeof (block as TextBlock).type === 'string')
     : []
@@ -67,7 +68,7 @@ const asQueuedMessage = (value: unknown): QueuedMessage | null => {
 
 type Direction = 'up' | 'down'
 
-export type QueueAction = Parameters<IConversation['updateQueue']>[1]
+export type QueueAction = { readonly kind: 'edit'; readonly content: readonly TextBlock[] } | { readonly kind: 'remove' } | { readonly kind: 'steer' }
 
 const textOf = (content: readonly TextBlock[]): string | null => {
   const text = content
@@ -99,7 +100,7 @@ const PREVIEW_CHARS = 200
 
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
-  readonly updateQueue: IConversation['updateQueue']
+  readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
 }
 
 /**
@@ -127,7 +128,6 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
 
   const [editing, setEditing] = useState<MessageId | null>(null)
   const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState<MessageId | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default: the list is the point of the dock, and a collapsed dock
@@ -156,24 +156,19 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     node?.setSelectionRange(node.value.length, node.value.length)
   }, [editing, rows])
 
-  const applyAction = async (itemId: MessageId, action: QueueAction): Promise<boolean> => {
-    setBusy(itemId)
-    try {
-      await props.updateQueue(itemId, action)
-      return true
-    } catch {
-      return false
-    } finally {
-      setBusy(current => (current === itemId ? null : current))
-    }
-  }
+  const queueAction = useMutation({
+    mutationFn: (request: { readonly itemId: MessageId; readonly action: QueueAction }) => props.updateQueue(request.itemId, request.action),
+  })
+  const busy = queueAction.isPending ? (queueAction.variables?.itemId ?? null) : null
 
-  const move = async (itemId: string, direction: Direction): Promise<void> => {
+  const applyAction = (itemId: MessageId, action: QueueAction): void => queueAction.mutate({ itemId, action })
+
+  const move = async (itemId: MessageId, direction: Direction): Promise<void> => {
     await queue.move({ sessionId: props.sessionId, itemId, direction })
   }
 
   /** Dragging to a far target takes several single steps, never a jump. */
-  const moveTowards = async (sourceId: string, targetIndex: number): Promise<void> => {
+  const moveTowards = async (sourceId: MessageId, targetIndex: number): Promise<void> => {
     const from = rows.findIndex(row => row.id === sourceId)
     if (from < 0 || targetIndex < 0) return
     const steps = targetIndex > from ? targetIndex - from : from - targetIndex
@@ -181,13 +176,12 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     for (let step = 0; step < steps; step += 1) await move(sourceId, direction)
   }
 
-  const saveEdit = async (): Promise<void> => {
+  const saveEdit = (): void => {
     if (editing === null || draft.trim().length === 0) return
-    const saved = await applyAction(editing, {
-      kind: 'edit',
-      content: [{ type: 'text', text: draft }],
-    })
-    if (saved) setEditing(null)
+    void queueAction.mutateAsync({ itemId: editing, action: { kind: 'edit', content: [{ type: 'text', text: draft }] } }).then(
+      () => setEditing(null),
+      () => undefined,
+    )
   }
 
   if (rowCount === 0) return null
@@ -243,7 +237,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                       const sourceId = dragId ?? event.dataTransfer.getData('text/plain')
                       setDragId(null)
                       setDropIndex(null)
-                      if (sourceId.length > 0 && sourceId !== row.id) void moveTowards(sourceId, index)
+                      if (sourceId.length > 0 && sourceId !== row.id) void moveTowards(MessageId(sourceId), index)
                     }}
                     onDragEnd={() => {
                       setDragId(null)
@@ -274,7 +268,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           onKeyDown={event => {
                             if (event.key === 'Enter' && !event.shiftKey) {
                               event.preventDefault()
-                              void saveEdit()
+                              saveEdit()
                             }
                             if (event.key === 'Escape') setEditing(null)
                           }}
@@ -293,7 +287,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                                 className={styles.action}
                                 aria-label="Save queued message"
                                 disabled={busy !== null || draft.trim().length === 0}
-                                onClick={() => void saveEdit()}
+                                onClick={saveEdit}
                               >
                                 <IconCheckOutlineRegular size={14} />
                               </button>
@@ -351,7 +345,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                                 className={styles.action}
                                 aria-label="Remove queued message"
                                 disabled={isBusy}
-                                onClick={() => void applyAction(row.id, { kind: 'remove' })}
+                                onClick={() => applyAction(row.id, { kind: 'remove' })}
                               >
                                 <IconTrashOutlineRegular size={14} />
                               </button>
@@ -362,7 +356,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                                 className={styles.action}
                                 aria-label="Steer with queued message"
                                 disabled={busy !== null || !running}
-                                onClick={() => void applyAction(row.id, { kind: 'steer' })}
+                                onClick={() => applyAction(row.id, { kind: 'steer' })}
                               >
                                 <IconSendOutlineRegular />
                               </button>

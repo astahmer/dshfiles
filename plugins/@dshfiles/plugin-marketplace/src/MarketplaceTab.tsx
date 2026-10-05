@@ -1,8 +1,10 @@
-import { IconDownloadOutlineMedium, IconLoadingOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconDownloadOutlineMedium, IconLoadingOutlineMedium, Modal, Pill, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useApi, useApiQuery, type PropsLocaleOf } from '@dshfiles/dshx/client'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { InstallFailureCode, MarketplaceCard, MarketplaceLocale } from './api.js'
+import { useApi, type PropsLocaleOf } from '@dshfiles/dshx/client'
+import { EmptyState, Notice } from '@dshfiles/plugin-ui'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
+import { useMemo, useState, type ReactNode } from 'react'
+import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
 import { marketplaceLocale, type MarketplaceLocaleKey } from './locales.js'
 import styles from './MarketplaceTab.module.css'
@@ -20,6 +22,8 @@ type ModalState =
       readonly code: InstallFailureCode
     }
 
+const CATALOG_QUERY_KEY = ['plugin-marketplace', 'list'] as const
+
 const FAILURE_COPY = {
   busy: 'busy',
   'catalog-unavailable': 'catalogUnavailable',
@@ -33,16 +37,36 @@ const FAILURE_COPY = {
   timeout: 'timeout',
 } as const satisfies Record<InstallFailureCode, MarketplaceLocaleKey>
 
-function currentLocale(): MarketplaceLocale {
+const MODAL_TITLE = {
+  confirm: 'installTitle',
+  risk: 'riskTitle',
+  success: 'installSuccessTitle',
+  failure: 'installFailedTitle',
+} as const satisfies Record<ModalState['kind'], MarketplaceLocaleKey>
+
+const currentLocale = (): MarketplaceLocale => {
   if (typeof document === 'undefined') return 'en'
   return document.documentElement.lang.toLocaleLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
-function interpolate(template: string, values: Readonly<Record<string, string>>): string {
-  return template.replace(/\{([^}]+)\}/g, (_match, key: string) => values[key] ?? '')
+const interpolate = (template: string, values: Readonly<Record<string, string>>): string =>
+  template.replace(/\{([^}]+)\}/g, (_match, key: string) => values[key] ?? '')
+
+const uniqueCards = (pages: readonly MarketplaceListOutput[]): readonly MarketplaceCard[] => {
+  const bySlug = new Map<string, MarketplaceCard>()
+  for (const page of pages) for (const card of page.items) if (!bySlug.has(card.slug)) bySlug.set(card.slug, card)
+  return [...bySlug.values()]
 }
 
-function PluginIcon({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode {
+const markInstalled = (catalog: InfiniteData<MarketplaceListOutput> | undefined, slug: string): InfiniteData<MarketplaceListOutput> | undefined =>
+  catalog === undefined
+    ? undefined
+    : {
+        ...catalog,
+        pages: catalog.pages.map(page => ({ ...page, items: page.items.map(item => (item.slug === slug ? { ...item, installed: true } : item)) })),
+      }
+
+const PluginIcon = ({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode => {
   const [failed, setFailed] = useState(false)
   if (plugin.iconUrl === null || failed) {
     return (
@@ -64,11 +88,9 @@ function PluginIcon({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode
   )
 }
 
-function sourceLabel(plugin: MarketplaceCard, t: Translate): string {
-  return t(plugin.badge)
-}
+const InstallSpinner = (): ReactNode => <IconLoadingOutlineMedium className={styles.spinner} />
 
-function InstallDialog({
+const InstallDialog = ({
   state,
   installing,
   t,
@@ -84,44 +106,62 @@ function InstallDialog({
   readonly onContinue: (plugin: MarketplaceCard) => void
   readonly onRetry: (plugin: MarketplaceCard) => void
   readonly onInstall: (plugin: MarketplaceCard) => void
-}): ReactNode {
-  const ref = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    const dialog = ref.current
-    if (dialog !== null && !dialog.open) dialog.showModal()
-    return () => {
-      if (dialog?.open) dialog.close()
-    }
-  }, [])
-
+}): ReactNode => {
   const confirm = state.kind === 'confirm'
   const risk = state.kind === 'risk'
-  const success = state.kind === 'success'
-  const title = confirm ? t('installTitle') : risk ? t('riskTitle') : success ? t('installSuccessTitle') : t('installFailedTitle')
+
+  const footer =
+    confirm || risk ? (
+      <>
+        <Button variant="outline" disabled={installing} onClick={onClose}>
+          {t('cancel')}
+        </Button>
+        <Button
+          variant="primary"
+          disabled={installing}
+          icon={installing ? <InstallSpinner /> : risk ? <IconDownloadOutlineMedium /> : undefined}
+          data-modal-autofocus
+          onClick={() => {
+            if (confirm) onContinue(state.plugin)
+            else onInstall(state.plugin)
+          }}
+        >
+          {installing ? t('downloading') : risk ? t('finalConfirmInstall') : t('continueInstall')}
+        </Button>
+      </>
+    ) : state.kind === 'failure' ? (
+      <>
+        <Button variant="outline" onClick={onClose}>
+          {t('cancel')}
+        </Button>
+        <Button
+          variant="primary"
+          data-modal-autofocus
+          onClick={() => {
+            onRetry(state.plugin)
+          }}
+        >
+          {t('retryInstall')}
+        </Button>
+      </>
+    ) : (
+      <Button variant="primary" data-modal-autofocus onClick={onClose}>
+        {t('close')}
+      </Button>
+    )
 
   return (
-    <dialog
-      ref={ref}
-      className={styles.dialog}
-      aria-labelledby="plugin-marketplace-dialog-title"
-      onCancel={event => {
-        event.preventDefault()
+    <Modal
+      open
+      title={t(MODAL_TITLE[state.kind])}
+      description={state.plugin.name}
+      closeLabel={t('closeDialog')}
+      footer={footer}
+      onClose={() => {
         if (!installing) onClose()
       }}
-      onClick={event => {
-        if (event.target === event.currentTarget && !installing) onClose()
-      }}
     >
-      <div className={styles.dialogSurface}>
-        <header className={styles.dialogHeader}>
-          <PluginIcon plugin={state.plugin} />
-          <div>
-            <h3 id="plugin-marketplace-dialog-title">{title}</h3>
-            <p>{state.plugin.name}</p>
-          </div>
-        </header>
-
+      <div className={styles.dialogBody}>
         {confirm ? (
           <>
             <p className={styles.dialogMessage}>{t('installToProfile')}</p>
@@ -138,287 +178,200 @@ function InstallDialog({
               </div>
               <div>
                 <dt>{t('sourceLabel')}</dt>
-                <dd>{sourceLabel(state.plugin, t)}</dd>
+                <dd>{t(state.plugin.badge)}</dd>
               </div>
             </dl>
-            <p className={styles.warning} role="note">
-              {t('riskWarning')}
-            </p>
           </>
         ) : null}
-        {risk ? (
-          <p className={styles.warning} role="alert">
-            {t('riskWarning')}
-          </p>
-        ) : null}
-        {success ? (
-          <p className={styles.successMessage} role="status">
-            {t('installSuccess')}
-          </p>
-        ) : null}
-        {state.kind === 'failure' ? (
-          <p className={styles.failureMessage} role="alert">
-            {t(FAILURE_COPY[state.code])}
-          </p>
-        ) : null}
-
-        <footer className={styles.dialogActions}>
-          {confirm || risk ? (
-            <>
-              <button type="button" className={styles.secondaryButton} disabled={installing} onClick={onClose}>
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={installing}
-                onClick={() => {
-                  if (confirm) onContinue(state.plugin)
-                  else onInstall(state.plugin)
-                }}
-              >
-                <span aria-hidden="true">
-                  {installing ? <IconLoadingOutlineMedium className={styles.spinner} /> : risk ? <IconDownloadOutlineMedium /> : null}
-                </span>
-                {installing ? t('downloading') : risk ? t('finalConfirmInstall') : t('continueInstall')}
-              </button>
-            </>
-          ) : state.kind === 'failure' ? (
-            <>
-              <button type="button" className={styles.secondaryButton} onClick={onClose}>
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => {
-                  onRetry(state.plugin)
-                }}
-              >
-                {t('retryInstall')}
-              </button>
-            </>
-          ) : (
-            <button type="button" className={styles.primaryButton} onClick={onClose}>
-              {t('close')}
-            </button>
-          )}
-        </footer>
+        {confirm || risk ? <Notice tone="warning">{t('riskWarning')}</Notice> : null}
+        {state.kind === 'success' ? <Notice tone="success">{t('installSuccess')}</Notice> : null}
+        {state.kind === 'failure' ? <Notice tone="danger">{t(FAILURE_COPY[state.code])}</Notice> : null}
       </div>
-    </dialog>
+    </Modal>
+  )
+}
+
+const PluginCard = ({
+  plugin,
+  installing,
+  installBusy,
+  failed,
+  t,
+  onDownload,
+}: {
+  readonly plugin: MarketplaceCard
+  readonly installing: boolean
+  readonly installBusy: boolean
+  readonly failed: boolean
+  readonly t: Translate
+  readonly onDownload: () => void
+}): ReactNode => {
+  const label = plugin.installed
+    ? t('installed')
+    : plugin.compatibility === 'unknown'
+      ? `${t('download')} · ${t('compatibilityUnknown')}`
+      : plugin.compatibility === 'incompatible'
+        ? `${t('download')} · ${t('incompatible')}`
+        : installing
+          ? t('downloading')
+          : failed
+            ? t('retry')
+            : t('download')
+  const accessibleLabel = plugin.installed ? `${plugin.name}: ${label}` : interpolate(t(failed ? 'retryPlugin' : 'downloadPlugin'), { name: plugin.name })
+
+  return (
+    <li className={styles.card}>
+      <div className={styles.cardHeader}>
+        <PluginIcon plugin={plugin} />
+        <div className={styles.identity}>
+          <div className={styles.titleLine}>
+            <h3>{plugin.name}</h3>
+            <Tag tone={plugin.badge === 'official' ? 'info' : 'neutral'}>{t(plugin.badge)}</Tag>
+          </div>
+          <p className={styles.description}>{plugin.description}</p>
+        </div>
+      </div>
+      <div className={styles.cardFooter}>
+        <div className={styles.metadata}>
+          <code title={plugin.packageName}>{plugin.packageName}</code>
+          <span aria-label={`${t('versionLabel')} ${plugin.version}`}>v{plugin.version}</span>
+        </div>
+        <Button
+          variant={plugin.installed ? 'outline' : 'primary'}
+          size="sm"
+          icon={installing ? <InstallSpinner /> : plugin.installed ? undefined : <IconDownloadOutlineMedium />}
+          disabled={plugin.installed || installBusy}
+          aria-label={accessibleLabel}
+          onClick={onDownload}
+        >
+          {label}
+        </Button>
+      </div>
+    </li>
   )
 }
 
 /** Settings tab for browsing and installing Framework Hub plugins. */
-export function MarketplaceTab({ t }: MarketplaceTabProps): ReactNode {
+export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const api = useApi(pluginMarketplaceApi)
+  const queryClient = useQueryClient()
   const locale = currentLocale()
   const [category, setCategory] = useState<string | undefined>()
-  const [items, setItems] = useState<readonly MarketplaceCard[]>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadMoreError, setLoadMoreError] = useState(false)
-  const [installingSlug, setInstallingSlug] = useState<string | null>(null)
   const [failedSlugs, setFailedSlugs] = useState<ReadonlySet<string>>(() => new Set())
   const [modal, setModal] = useState<ModalState | null>(null)
-  const queryInput = useMemo(() => ({ locale, ...(category === undefined ? {} : { category }) }), [category, locale])
-  const catalog = useApiQuery(pluginMarketplaceApi, 'list', {
-    input: queryInput,
+
+  const catalog = useInfiniteQuery({
+    queryKey: [...CATALOG_QUERY_KEY, locale, category ?? null],
+    queryFn: ({ pageParam, signal }) => api.list({ locale, category, cursor: pageParam ?? undefined }, { signal }),
+    initialPageParam: null,
+    getNextPageParam: (lastPage: MarketplaceListOutput): string | null => lastPage.nextCursor,
+    placeholderData: keepPreviousData,
   })
 
-  useEffect(() => {
-    if (catalog.status !== 'success' || catalog.fetchStatus !== 'idle') return
-    setItems(catalog.data.items)
-    setNextCursor(catalog.data.nextCursor)
-    setLoadMoreError(false)
-  }, [catalog.data, catalog.fetchStatus, catalog.status])
-
-  const categories = catalog.data?.categories ?? []
-  const initialLoading = catalog.status === 'pending' || (catalog.fetchStatus === 'fetching' && items.length === 0)
-
-  const selectCategory = (nextCategory: string | undefined): void => {
-    if (category === nextCategory) return
-    setCategory(nextCategory)
-    setItems([])
-    setNextCursor(null)
-    setLoadMoreError(false)
-  }
-
-  const loadMore = async (): Promise<void> => {
-    if (nextCursor === null || loadingMore) return
-    setLoadingMore(true)
-    setLoadMoreError(false)
-    try {
-      const page = await api.list({ ...queryInput, cursor: nextCursor })
-      setItems(current => {
-        const known = new Set(current.map(item => item.slug))
-        return [...current, ...page.items.filter(item => !known.has(item.slug))]
-      })
-      setNextCursor(page.nextCursor)
-    } catch {
-      setLoadMoreError(true)
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const install = async (plugin: MarketplaceCard): Promise<void> => {
-    if (installingSlug !== null) return
-    setInstallingSlug(plugin.slug)
-    try {
-      const result = await api.install({ slug: plugin.slug })
+  const install = useMutation({
+    mutationFn: (plugin: MarketplaceCard) => api.install({ slug: plugin.slug }),
+    onSuccess: (result, plugin) => {
       if (result.status === 'failed') {
         setFailedSlugs(current => new Set([...current, plugin.slug]))
         setModal({ kind: 'failure', plugin, code: result.code })
         return
       }
-      setFailedSlugs(current => {
-        const next = new Set(current)
-        next.delete(plugin.slug)
-        return next
-      })
-      setItems(current => current.map(item => (item.slug === plugin.slug ? { ...item, installed: true } : item)))
+      setFailedSlugs(current => new Set([...current].filter(slug => slug !== plugin.slug)))
+      queryClient.setQueriesData<InfiniteData<MarketplaceListOutput>>({ queryKey: CATALOG_QUERY_KEY }, data => markInstalled(data, plugin.slug))
       setModal({ kind: 'success', plugin: { ...plugin, installed: true } })
-      catalog.refetch()
-    } catch {
+      void queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY })
+    },
+    onError: (_error, plugin) => {
       setFailedSlugs(current => new Set([...current, plugin.slug]))
       setModal({ kind: 'failure', plugin, code: 'install-failed' })
-    } finally {
-      setInstallingSlug(null)
-    }
-  }
+    },
+  })
+
+  const showingPreviousCategory = catalog.isPlaceholderData
+  const items = useMemo(() => (showingPreviousCategory ? [] : uniqueCards(catalog.data?.pages ?? [])), [catalog.data, showingPreviousCategory])
+  const categories = catalog.data?.pages[0]?.categories ?? []
+  const initialLoading = catalog.isPending || (catalog.isFetching && items.length === 0)
+  const listFailed = catalog.isError && !catalog.isFetchNextPageError && items.length === 0
+  const installingSlug = install.isPending ? (install.variables?.slug ?? null) : null
 
   return (
-    <section className={styles.section} aria-busy={initialLoading || loadingMore}>
+    <section className={styles.section} aria-busy={initialLoading || catalog.isFetchingNextPage}>
       <nav className={styles.categories} aria-label={t('categoriesLabel')}>
-        <button
-          type="button"
+        <Pill
+          active={category === undefined}
           aria-pressed={category === undefined}
           onClick={() => {
-            selectCategory(undefined)
+            setCategory(undefined)
           }}
         >
           {t('all')}
-        </button>
+        </Pill>
         {categories.map(item => (
-          <button
+          <Pill
             key={item.slug}
-            type="button"
+            active={category === item.slug}
             aria-pressed={category === item.slug}
             onClick={() => {
-              selectCategory(item.slug)
+              setCategory(item.slug)
             }}
           >
             {item.name}
-          </button>
+          </Pill>
         ))}
       </nav>
 
-      {initialLoading ? (
-        <p className={styles.status} role="status">
-          {t('loading')}
-        </p>
+      {initialLoading ? <Notice>{t('loading')}</Notice> : null}
+      {listFailed && !initialLoading ? (
+        <Notice
+          tone="danger"
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void catalog.refetch()
+              }}
+            >
+              {t('retry')}
+            </Button>
+          }
+        >
+          {t('unavailable')}
+        </Notice>
       ) : null}
-      {catalog.status === 'error' && items.length === 0 ? (
-        <div className={styles.failure}>
-          <p role="alert">{t('unavailable')}</p>
-          <button type="button" onClick={catalog.refetch}>
-            {t('retry')}
-          </button>
-        </div>
-      ) : null}
-      {!initialLoading && catalog.status === 'success' && items.length === 0 ? <p className={styles.status}>{t('empty')}</p> : null}
+      {!initialLoading && catalog.isSuccess && items.length === 0 ? <EmptyState description={t('empty')} compact /> : null}
 
       {items.length > 0 ? (
         <ul className={styles.cards} aria-label={t('pluginsLabel')}>
-          {items.map(plugin => {
-            const installing = installingSlug === plugin.slug
-            const compatibilityUnknown = plugin.compatibility === 'unknown'
-            const incompatible = plugin.compatibility === 'incompatible'
-            const failed = failedSlugs.has(plugin.slug)
-            const label = plugin.installed
-              ? t('installed')
-              : compatibilityUnknown
-                ? `${t('download')} · ${t('compatibilityUnknown')}`
-                : incompatible
-                  ? `${t('download')} · ${t('incompatible')}`
-                  : installing
-                    ? t('downloading')
-                    : failed
-                      ? t('retry')
-                      : t('download')
-            const accessibleLabel = interpolate(t(failed ? 'retryPlugin' : 'downloadPlugin'), { name: plugin.name })
-            return (
-              <li className={styles.card} key={plugin.slug} data-badge={plugin.badge}>
-                <div className={styles.cardHeader}>
-                  <PluginIcon plugin={plugin} />
-                  <div className={styles.identity}>
-                    <div className={styles.titleLine}>
-                      <h3>{plugin.name}</h3>
-                      <span className={styles.badge} data-kind={plugin.badge}>
-                        {sourceLabel(plugin, t)}
-                      </span>
-                    </div>
-                    <p className={styles.description}>{plugin.description}</p>
-                  </div>
-                </div>
-                <div className={styles.cardFooter}>
-                  <div className={styles.metadata}>
-                    <code title={plugin.packageName}>{plugin.packageName}</code>
-                    <span aria-label={`${t('versionLabel')} ${plugin.version}`}>v{plugin.version}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.downloadButton}
-                    data-state={
-                      plugin.installed
-                        ? 'installed'
-                        : compatibilityUnknown
-                          ? 'unknown'
-                          : incompatible
-                            ? 'incompatible'
-                            : installing
-                              ? 'installing'
-                              : failed
-                                ? 'retry'
-                                : 'download'
-                    }
-                    disabled={plugin.installed || installingSlug !== null}
-                    aria-label={plugin.installed ? `${plugin.name}: ${label}` : accessibleLabel}
-                    onClick={() => {
-                      setModal({ kind: 'confirm', plugin })
-                    }}
-                  >
-                    {installing ? (
-                      <span aria-hidden="true">
-                        <IconLoadingOutlineMedium className={styles.spinner} />
-                      </span>
-                    ) : !plugin.installed ? (
-                      <span aria-hidden="true">
-                        <IconDownloadOutlineMedium />
-                      </span>
-                    ) : null}
-                    {label}
-                  </button>
-                </div>
-              </li>
-            )
-          })}
+          {items.map(plugin => (
+            <PluginCard
+              key={plugin.slug}
+              plugin={plugin}
+              installing={installingSlug === plugin.slug}
+              installBusy={installingSlug !== null}
+              failed={failedSlugs.has(plugin.slug)}
+              t={t}
+              onDownload={() => {
+                setModal({ kind: 'confirm', plugin })
+              }}
+            />
+          ))}
         </ul>
       ) : null}
 
-      {nextCursor !== null ? (
+      {catalog.hasNextPage && !showingPreviousCategory ? (
         <div className={styles.loadMoreRow}>
-          {loadMoreError ? <span role="alert">{t('unavailable')}</span> : null}
-          <button
-            type="button"
-            disabled={loadingMore}
+          {catalog.isFetchNextPageError ? <Notice tone="danger">{t('unavailable')}</Notice> : null}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={catalog.isFetchingNextPage}
             onClick={() => {
-              void loadMore()
+              void catalog.fetchNextPage()
             }}
           >
-            {loadingMore ? t('loadingMore') : loadMoreError ? t('retry') : t('loadMore')}
-          </button>
+            {catalog.isFetchingNextPage ? t('loadingMore') : catalog.isFetchNextPageError ? t('retry') : t('loadMore')}
+          </Button>
         </div>
       ) : null}
 
@@ -437,7 +390,7 @@ export function MarketplaceTab({ t }: MarketplaceTabProps): ReactNode {
             setModal({ kind: 'confirm', plugin })
           }}
           onInstall={plugin => {
-            void install(plugin)
+            if (installingSlug === null) install.mutate(plugin)
           }}
         />
       ) : null}
