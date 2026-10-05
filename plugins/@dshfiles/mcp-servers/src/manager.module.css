@@ -243,10 +243,16 @@ button:disabled {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
+/*
+ * Reference 07 lays the catalog out as two columns of roughly 558px with a
+ * generous gutter. auto-fit with a 340px track packed three 372px cards into
+ * the same width, so the track minimum is raised to the reference's own column
+ * width: the grid now breaks to two columns where the reference does.
+ */
 .catalogGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 24px;
 }
 .catalogCard {
   display: flex;
