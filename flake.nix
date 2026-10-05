@@ -124,10 +124,7 @@
       };
 
       devShell = pkgs.mkShell {
-        packages = [
-          pkgs.fnm
-          pkgs.pnpm
-        ];
+        packages = [ pkgs.fnm ];
 
         # dsh's native loader probe requires the official Node build. fnm only
         # prepends its directory to PATH, and mkShell leaves ~/.nix-profile/bin
@@ -141,9 +138,8 @@
           fi
           hash -r 2>/dev/null || true
 
-          # The plugin workspace pins pnpm 12 through corepack's lastKnownGood:
-          # the profile's node_modules was built by that major, and pnpm refuses
-          # to link against a store from a different one.
+          # pnpm comes only from fnm's corepack, pinned by packageManager; a
+          # second nixpkgs pnpm would shadow it with a different version.
           echo "dshx: node $(node --version), pnpm $(pnpm --version 2>/dev/null || echo 'n/a')"
         '';
       };
