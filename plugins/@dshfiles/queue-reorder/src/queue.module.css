@@ -1,9 +1,18 @@
+/*
+ * The composer geometry hooks this dock used to read
+ * (--dsh-composer-side-clearance, --dsh-composer-dock-inset,
+ * --dsh-composer-card-max-width, --dsh-composer-stack-gap) are not defined
+ * anywhere the dock can see them: the 402 properties the running Host sets on
+ * body contain no width token and none of those names. An unset custom property
+ * inside calc() invalidates the whole declaration, so the dock silently lost its
+ * width, max-width and insets and stretched with its container.
+ *
+ * There is no width token to reach for instead, so the dock stops guessing: it
+ * fills the box it is given and lets the Host own the measure.
+ */
 .dock {
   box-sizing: border-box;
-  width: calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
-  max-width: calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
-  margin: 0 auto calc(0px - var(--dsh-composer-stack-gap) - 3px);
-  padding: 0 var(--dsh-composer-dock-inset);
+  width: 100%;
   flex: none;
 }
 
