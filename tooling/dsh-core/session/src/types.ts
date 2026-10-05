@@ -15,6 +15,9 @@ import type {
   UserMessage,
 } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import type { SessionRuntimeBinding } from './runtime-binding.ts'
+
+export type { SessionRuntimeBinding, SessionRuntimeSelection } from './runtime-binding.ts'
 
 /** Identifies one session in the store (and its persistence artifacts). */
 export type SessionId = Branded<'SessionId'>
@@ -86,12 +89,14 @@ export type OptionalSessionSeq = SessionSeq | null
  * immutable prior-generation, and current fast-path rules are recorded in
  * `.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md`.
  */
-export const SESSION_FORMAT_VERSION = 4
+export const SESSION_FORMAT_VERSION = 5
 
 /**
  * Immutable validated storage metadata, kept outside the conversation event log.
  */
 export interface SessionHeader {
+  /** Opaque JSON metadata added by compatible Session extensions. */
+  readonly [key: string]: unknown
   /**
    * Current logical format version, stamped from {@link SESSION_FORMAT_VERSION}.
    * Historical physical headers are translated before entering this interface.
@@ -128,6 +133,8 @@ export interface SessionHeader {
    * would replay history the model can no longer act on.
    */
   readonly agentPreset?: string
+  /** Pinned runtime/account identity; provider-native identifiers stay host-only. */
+  readonly runtimeBinding?: SessionRuntimeBinding
 }
 
 /**
@@ -156,6 +163,7 @@ export interface CreateSessionOptions {
     readonly origin?: 'subagent'
     readonly delegationDepth?: number
     readonly agentPreset?: string
+    readonly runtimeBinding?: SessionRuntimeBinding
   }
 }
 

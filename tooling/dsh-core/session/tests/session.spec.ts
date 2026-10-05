@@ -23,6 +23,48 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 describe('Session', () => {
+  it('retains a validated runtime selection in its immutable header', () => {
+    const id = SessionId('runtime-selection')
+    const runtimeBinding = { driverKind: 'codex-cli', instanceId: 'work-account' }
+    const session = Session.create(id, [], {
+      version: SESSION_FORMAT_VERSION,
+      id,
+      createdAt: 1,
+      isSeeded: false,
+      runtimeBinding,
+    })
+
+    expect(session.header.runtimeBinding).toEqual(runtimeBinding)
+    expect(session.header.runtimeBinding).not.toBe(runtimeBinding)
+    expect(Object.isFrozen(session.header.runtimeBinding)).toBe(true)
+  })
+
+  it('rejects provider-native identifiers from durable runtime selections without echoing them', () => {
+    const id = SessionId('runtime-selection-private-id')
+    const privateNativeId = 'native-session-private-value'
+    const malformedHeader = Object.assign({
+      version: SESSION_FORMAT_VERSION,
+      id,
+      createdAt: 1,
+      isSeeded: false,
+    }, {
+      runtimeBinding: {
+        driverKind: 'codex-cli',
+        instanceId: 'work-account',
+        nativeSessionId: privateNativeId,
+      },
+    })
+    let failure: unknown
+    try {
+      Session.create(id, [], malformedHeader)
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toMatchObject({ message: 'session header runtimeBinding is invalid' })
+    expect(String(failure)).not.toContain(privateNativeId)
+  })
+
   it('exposes one stable readonly surface view', () => {
     const session = Session.create(SessionId('surface-view'))
     const surface = session.surface
@@ -1209,16 +1251,19 @@ describe('Session', () => {
 
   it('retains opaque logical header metadata except the physical v0 seed field', () => {
     const id = SessionId('header-extension')
+    const extension = { value: 'kept' }
     const session = Session.create(id, undefined, {
       version: SESSION_FORMAT_VERSION,
       id,
       createdAt: 123,
       isSeeded: false,
-      extension: { value: 'kept' },
-    } as SessionHeader)
+      extension,
+    })
 
-    expect((session.header as SessionHeader & { extension: { value: string } }).extension)
-      .toEqual({ value: 'kept' })
+    const retained = session.header.extension
+    expect(retained).toEqual(extension)
+    expect(retained).not.toBe(extension)
+    expect(Object.isFrozen(retained)).toBe(true)
   })
 
   it('rejects seed records with invalid fixed-envelope fields', () => {

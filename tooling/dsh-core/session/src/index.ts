@@ -21,6 +21,7 @@ import type { SessionSurface, SessionMessageProjection } from './surface.ts'
 import { foldRequestHeader } from './request-header.ts'
 import { ToolHistoryProjection } from './tool-history.ts'
 import type { ToolHistory } from '@deepseek-ai/dsh-llm'
+import { sessionRuntimeBindingSchema } from './runtime-binding.ts'
 
 import { buildForkSeed } from './fork.ts'
 
@@ -29,6 +30,7 @@ export * from './types.ts'
 export { SessionPreparation } from './preparation.ts'
 export type { SessionPreparationOptions } from './preparation.ts'
 export type { AssistantMessage, DeveloperMessage, SystemMessage, ToolResultMessage, UserMessage } from '@deepseek-ai/dsh-llm'
+export { sessionRuntimeBindingSchema, sessionRuntimeSelectionSchema } from './runtime-binding.ts'
 export { interruptedTurnClosers, ToolCallRecovery, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from './repair.ts'
 export type { SessionSurface, SurfaceFoldReplacement, SurfaceFoldResult, SessionMessageProjection, SessionMessageProjectionContext } from './surface.ts'
 export { deriveEventMessage, foldSurface, isAppendSurfaceEvent, isReplacementSurfaceEvent, isSurfaceEvent, isSurfaceEligibleType } from './surface.ts'
@@ -93,12 +95,31 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   }
 }
 
-/** Validate and freeze one detached creation header in place. */
+const sessionHeaderFields = new Set([
+  'version',
+  'id',
+  'createdAt',
+  'cwd',
+  'parentSession',
+  'isSeeded',
+  'origin',
+  'delegationDepth',
+  'agentPreset',
+  'runtimeBinding',
+])
+
+const isPlainJsonRecord = (input: unknown): input is Record<string, unknown> => {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return false
+  const prototype = Reflect.getPrototypeOf(input)
+  return prototype === Object.prototype || prototype === null
+}
+
+/** Validate a detached creation header while retaining opaque extension metadata. */
 function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
-  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+  if (!isPlainJsonRecord(input)) {
     throw new Error('session header is not a plain JSON record')
   }
-  const record = input as Record<string, unknown>
+  const record = input
   if (Object.hasOwn(record, 'seedLength')) {
     throw new Error('session header has invalid field "seedLength"')
   }
@@ -135,10 +156,34 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (record.agentPreset !== undefined && typeof record.agentPreset !== 'string') {
     throw new Error('session header agentPreset must be a string')
   }
-  return deepFreeze(record as unknown as SessionHeader)
+  let runtimeBinding: SessionHeader['runtimeBinding']
+  if (record.runtimeBinding !== undefined) {
+    try {
+      runtimeBinding = sessionRuntimeBindingSchema.parse(record.runtimeBinding)
+    } catch {
+      throw new Error('session header runtimeBinding is invalid')
+    }
+  }
+  const extensionMetadata = Object.fromEntries(
+    Object.entries(record).filter(([key]) => !sessionHeaderFields.has(key)),
+  )
+  const header: SessionHeader = {
+    ...extensionMetadata,
+    version: SESSION_FORMAT_VERSION,
+    id,
+    createdAt: record.createdAt,
+    ...(record.cwd === undefined ? {} : { cwd: record.cwd }),
+    ...(record.parentSession === undefined ? {} : { parentSession: brandString<SessionId>(record.parentSession) }),
+    isSeeded: record.isSeeded,
+    ...(record.origin === undefined ? {} : { origin: record.origin }),
+    ...(record.delegationDepth === undefined ? {} : { delegationDepth: record.delegationDepth }),
+    ...(record.agentPreset === undefined ? {} : { agentPreset: record.agentPreset }),
+    ...(runtimeBinding === undefined ? {} : { runtimeBinding }),
+  }
+  return deepFreeze(header)
 }
 
-/** Validate and freeze one exclusively owned persistence header in place. */
+/** Validate one persistence header whose source is exclusively owned by the Session. */
 function validateRestoredSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (input !== null && typeof input === 'object' && !Array.isArray(input)) {
     const prototype = Reflect.getPrototypeOf(input)
@@ -150,7 +195,7 @@ function validateRestoredSessionHeader(id: SessionId, input: unknown): SessionHe
 }
 
 /** Detach, validate, and freeze the creation metadata published by a session. */
-function snapshotSessionHeader(id: SessionId, source?: SessionHeader): SessionHeader {
+function snapshotSessionHeader(id: SessionId, source?: unknown): SessionHeader {
   const input: unknown = source === undefined
     ? { version: SESSION_FORMAT_VERSION, id, createdAt: Date.now(), isSeeded: false }
     : source
@@ -531,8 +576,8 @@ export class Session {
    */
   static fromRestore(
     id: SessionId,
-    seed: readonly SessionEvent[],
-    header: SessionHeader,
+    seed: readonly unknown[],
+    header: unknown,
     inheritedEventCount: SessionLogOffset,
     eventState: SessionSeedEventState,
     projections?: readonly SessionMessageProjection[],
@@ -549,8 +594,8 @@ export class Session {
 
   private constructor(
     id: SessionId,
-    seed?: readonly SessionEvent[],
-    header?: SessionHeader,
+    seed?: readonly unknown[],
+    header?: unknown,
     mode: 'snapshot' | SessionSeedEventState = 'snapshot',
     suppliedInheritedEventCount?: SessionLogOffset,
     projections: readonly SessionMessageProjection[] = [],
@@ -1056,6 +1101,7 @@ export class SessionStore extends Service {
       ...meta?.origin === undefined ? {} : { origin: meta.origin },
       ...meta?.delegationDepth === undefined ? {} : { delegationDepth: meta.delegationDepth },
       ...meta?.agentPreset === undefined ? {} : { agentPreset: meta.agentPreset },
+      ...meta?.runtimeBinding === undefined ? {} : { runtimeBinding: meta.runtimeBinding },
     }
     return Session.create(sessionId, seed, header, options?.inheritedEventCount, this.projections)
   }

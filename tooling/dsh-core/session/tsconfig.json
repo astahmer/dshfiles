@@ -1,36 +1,16 @@
 {
-  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "outDir": "lib/types",
     "rootDir": "src",
-    "outDir": "lib/types"
+    "types": ["node"]
   },
-  "include": [
-    "src"
-  ],
-  "references": [
-    {
-      "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../util/brand"
-    },
-    {
-      "path": "../../util/values"
-    },
-    {
-      "path": "../../llm/llm"
-    },
-    {
-      "path": "../../core/scope"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
-      "path": "../../typert/protocol"
-    }
-  ]
+  "include": ["src"]
 }
