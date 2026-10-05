@@ -247,7 +247,7 @@
   padding: 4px 10px;
   border-color: var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-state-business-primary);
-  color: var(--dsw-static-white, #fff);
+  color: var(--dsw-static-neutral-00, #fff);
   font-size: 11px;
   line-height: 18px;
   font-weight: 600;
@@ -392,9 +392,9 @@
 
 .warning {
   margin-top: 12px;
-  border-left: 2px solid var(--dsw-alias-state-warning-primary, #c78b21);
+  border-left: 2px solid var(--dsw-alias-state-warn-primary);
   padding: 7px 10px;
-  background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #c78b21) 8%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent);
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 18px;
@@ -423,7 +423,7 @@
 .primaryButton {
   border-color: var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-state-business-primary);
-  color: var(--dsw-static-white, #fff);
+  color: var(--dsw-static-neutral-00, #fff);
 }
 
 .spinner {
