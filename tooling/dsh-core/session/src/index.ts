@@ -246,10 +246,29 @@ export function snapshotSessionEvent<T extends SessionEvent>(event: T): T {
   return adoptSessionEvent(structuredClone(event))
 }
 
+/**
+ * Detach and validate one event envelope before persistence policy admission.
+ * Known event and surface rules run only after unsupported event types have
+ * had a chance to fail closed at the storage boundary.
+ */
+export function decodeSessionEvent(value: unknown, index: number): SessionEvent {
+  const snapshot = snapshotJsonValue(value)
+  if (snapshot === undefined) {
+    throw new Error(`session event at index ${index} is not losslessly JSON-serializable`)
+  }
+  assertSessionEventEnvelope(snapshot, index, 'session')
+  return snapshot
+}
+
 /** Validate the fixed event envelope after one-pass JSON materialization. */
-function assertSessionEventEnvelope(value: unknown, index: number): asserts value is SessionEvent {
+function assertSessionEventEnvelope(
+  value: unknown,
+  index: number,
+  boundary: 'seed' | 'session' = 'seed',
+): asserts value is SessionEvent {
+  const eventLabel = boundary === 'seed' ? 'seed event' : 'session event'
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`seed event at index ${index} has an invalid event envelope`)
+    throw new Error(`${eventLabel} at index ${index} has an invalid event envelope`)
   }
   const event = value as Record<string, unknown>
   for (const key in event) {
@@ -263,7 +282,7 @@ function assertSessionEventEnvelope(value: unknown, index: number): asserts valu
       case 'ignorable':
         break
       default:
-        throw new Error(`seed event at index ${index} has an invalid event envelope`)
+        throw new Error(`${eventLabel} at index ${index} has an invalid event envelope`)
     }
   }
   const type = event['type']
@@ -274,9 +293,9 @@ function assertSessionEventEnvelope(value: unknown, index: number): asserts valu
     || typeof time !== 'number' || !Number.isSafeInteger(time)
     || event['data'] === undefined
     || (event['ignorable'] !== undefined && event['ignorable'] !== true)) {
-    throw new Error(`seed event at index ${index} has an invalid event envelope`)
+    throw new Error(`${eventLabel} at index ${index} has an invalid event envelope`)
   }
-  validateSessionEventData(event as SessionEvent, `seed ${type} at index ${index}`)
+  validateSessionEventData(event as SessionEvent, `${boundary} ${type} at index ${index}`)
   switch (type) {
     case 'request/header':
     case 'developer/message':
@@ -285,13 +304,17 @@ function assertSessionEventEnvelope(value: unknown, index: number): asserts valu
     case 'assistant/attempt':
     case 'assistant/message':
     case 'tool/result':
-      assertCurrentLlmShape(event, index)
+      assertCurrentLlmShape(event, index, boundary)
       break
   }
 }
 
 /** Reject obsolete request headers and malformed messages at the seed/load boundary. */
-function assertCurrentLlmShape(event: Record<string, unknown>, index: number): void {
+function assertCurrentLlmShape(
+  event: Record<string, unknown>,
+  index: number,
+  boundary: 'seed' | 'session' = 'seed',
+): void {
   const data = event['data']
   const record = typeof data === 'object' && data !== null
     ? data as Record<string, unknown>
@@ -299,31 +322,31 @@ function assertCurrentLlmShape(event: Record<string, unknown>, index: number): v
   if (event['type'] === 'request/header') {
     const headerRecord = record?.['header'] as Record<string, unknown>
     const config = headerRecord['config']
-    if (!hasProviderModel(config)) throw new Error(`seed request/header at index ${index} lacks provider/model`)
+    if (!hasProviderModel(config)) throw new Error(`${boundary} request/header at index ${index} lacks provider/model`)
     const configRecord = config as Record<string, unknown>
     const reasoningEffort = configRecord['reasoningEffort']
     if (reasoningEffort !== undefined
       && (typeof reasoningEffort !== 'string' || reasoningEffort.length === 0)) {
-      throw new Error(`seed request/header at index ${index} has an invalid reasoningEffort`)
+      throw new Error(`${boundary} request/header at index ${index} has an invalid reasoningEffort`)
     }
-    assertAdapterDefaults(headerRecord['adapterDefaults'], configRecord, index)
+    assertAdapterDefaults(headerRecord['adapterDefaults'], configRecord, index, boundary)
     const reason = record?.['reason']
     if (reason !== 'initial' && reason !== 'resume' && reason !== 'change' && reason !== 'series') {
-      throw new Error(`seed request/header at index ${index} has an invalid reason`)
+      throw new Error(`${boundary} request/header at index ${index} has an invalid reason`)
     }
     if (record?.['startsSeries'] !== undefined && record['startsSeries'] !== true) {
-      throw new Error(`seed request/header at index ${index} has an invalid startsSeries marker`)
+      throw new Error(`${boundary} request/header at index ${index} has an invalid startsSeries marker`)
     }
   }
   const type = event['type']
   if (type === 'assistant/attempt') {
-    assertAssistantSettlementShape(record, type, index)
+    assertAssistantSettlementShape(record, type, index, boundary)
     return
   }
   if (!isMessageEventType(type)) return
-  assertMessageEventShape(event, `seed ${type} at index ${index}`)
+  assertMessageEventShape(event, `${boundary} ${type} at index ${index}`)
   if (type === 'assistant/message') {
-    assertAssistantSettlementShape(record, type, index)
+    assertAssistantSettlementShape(record, type, index, boundary)
   }
 }
 
@@ -332,13 +355,14 @@ function assertAssistantSettlementShape(
   data: Record<string, unknown> | undefined,
   type: 'assistant/attempt' | 'assistant/message',
   index: number,
+  boundary: 'seed' | 'session' = 'seed',
 ): void {
   const turn = data?.['turn']
   const step = data?.['step']
   if (typeof turn !== 'number' || !Number.isSafeInteger(turn) || turn < 0 || Object.is(turn, -0)
     || typeof step !== 'number' || !Number.isSafeInteger(step) || step < 0 || Object.is(step, -0)
     || !Array.isArray(data?.['stream'])) {
-    throw new Error(`seed ${type} at index ${index} has invalid settlement fields`)
+    throw new Error(`${boundary} ${type} at index ${index} has invalid settlement fields`)
   }
 }
 
@@ -349,17 +373,18 @@ function assertAdapterDefaults(
   value: unknown,
   config: Record<string, unknown>,
   index: number,
+  boundary: 'seed' | 'session' = 'seed',
 ): void {
   if (value === undefined) return
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`seed request/header at index ${index} has invalid adapterDefaults`)
+    throw new Error(`${boundary} request/header at index ${index} has invalid adapterDefaults`)
   }
   const defaults = value as Record<string, unknown>
   if (Object.keys(defaults).some(key => !allowedAdapterKeys.has(key))
     || Object.values(defaults).some(marker => marker !== true)
     || defaults['reasoningEffort'] === true && config['reasoningEffort'] === undefined
     || defaults['maxTokens'] === true && config['maxTokens'] === undefined) {
-    throw new Error(`seed request/header at index ${index} has invalid adapterDefaults`)
+    throw new Error(`${boundary} request/header at index ${index} has invalid adapterDefaults`)
   }
 }
 

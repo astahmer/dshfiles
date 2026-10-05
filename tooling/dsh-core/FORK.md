@@ -33,3 +33,7 @@ pnpm --dir tooling/dsh-core/session-format-catalog run test
 ```
 
 The AgentLoop package exposes only the focused `test:runtime` lane in this snapshot. The Session snapshot omits the upstream-only generator script, so its package test command excludes only `tests/gen-persistence-catalog.spec.ts`; do not describe that as a full upstream suite. Verify package identity through the actual DSH loader; workspace `createRequire` results and profile `link:` declarations do not prove which dependency an in-box importer loads. Never patch the installed global packages or the running web profile. Source and build checks are not activation proof.
+
+`session-persistence-jsonl` is an additional private snapshot from the same release commit, retaining its MIT license. This fork adapts generation scanning, catalog migration, and source-row admission for V5; it links to this fork's catalog so the writer uses the same format as Session and AgentLoop. The profile loader must still prove it resolves the local package and local Session/catalog identities before this counts as runtime acceptance.
+
+`session-persistence` is a private snapshot of the same release commit. It owns `decodeStoredEvents`, which decodes generic format events at the persistence boundary and replaces the JSONL backend's unsafe event-array cast with validated Session values. Its source files were verified against the upstream Git blob ids; the shared MIT license remains at `tooling/dsh-core/LICENSE`.

@@ -1,0 +1,5 @@
+autoInstallPeers: false
+dedupePeerDependents: true
+allowBuilds:
+  esbuild: set this to true or false
+  koffi: false

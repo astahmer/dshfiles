@@ -3,6 +3,7 @@ import { createMessage, createSystemMessage, createToolResultMessage, createUser
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import SessionStore, {
   adoptSessionEvent,
+  decodeSessionEvent,
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
@@ -241,6 +242,24 @@ describe('canonical event payload acceptance', () => {
   it.each([null, [], 1, 'invalid'])('reports malformed restored event envelopes without TypeError (%j)', (value) => {
     expect(() => Session.fromRestore(id, [value] as never, { ...header }, SessionLogOffset(0), 'detached'))
       .toThrow('seed event at index 0 has an invalid event envelope')
+  })
+})
+
+describe('persistence event decoding', () => {
+  it('detaches an imported event before exposing the validated SessionEvent type', () => {
+    const source = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }
+    const event = decodeSessionEvent(source, 0)
+
+    source.data.turn = 2
+
+    expect(event).not.toBe(source)
+    expect(event).toEqual({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
+  })
+
+  it('rejects fields outside the fixed event envelope', () => {
+    expect(() => decodeSessionEvent({
+      type: 'turn/start', seq: 0, time: 1, data: { turn: 1 }, extra: true,
+    }, 0)).toThrow('session event at index 0 has an invalid event envelope')
   })
 })
 
