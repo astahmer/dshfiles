@@ -4,26 +4,27 @@ Project Checks adds a session-scoped action in the native composer command menu.
 
 ## Configure trusted actions
 
-Actions belong in the profile's `cordis.patch.yml`, never in project-controlled configuration. Add this top-level patch row alongside the other entries and use absolute paths for roots:
+Actions belong in the profile's `cordis.patch.yml`, never in project-controlled configuration. Add the following under the existing `dshfiles-project-checks` row and use absolute paths for roots:
 
 ```yaml
-- id: dshfiles-project-checks
-  config:
-    actions:
-      - id: test
-        label: Test
-        description: Run the project test suite.
-        command: pnpm
-        args: [test]
-        root: /absolute/path/to/project
-        timeoutMs: 180000
-        verifyBeforeComplete: true
-      - id: typecheck
-        label: Typecheck
-        command: pnpm
-        args: [typecheck]
-        root: /absolute/path/to/project
-        timeoutMs: 120000
+- update:
+    - id: dshfiles-project-checks
+      config:
+        actions:
+          - id: test
+            label: Test
+            description: Run the project test suite.
+            command: pnpm
+            args: [test]
+            root: /absolute/path/to/project
+            timeoutMs: 180000
+            verifyBeforeComplete: true
+          - id: typecheck
+            label: Typecheck
+            command: pnpm
+            args: [typecheck]
+            root: /absolute/path/to/project
+            timeoutMs: 120000
 ```
 
 The process uses direct argv, the session directory as `cwd`, and DSH's scrubbed child environment. It does not evaluate shell text, read repository command config, forward credentials, or display raw command output. A session must resolve inside the configured root. One-shot actions have a 1–300 second timeout. Long-running development servers remain in DSH's owner-scoped terminal.

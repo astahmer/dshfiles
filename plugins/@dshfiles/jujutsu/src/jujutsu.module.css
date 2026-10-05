@@ -1,4 +1,23 @@
 .panel {
+  /* Keep DSH theme tokens primary and provide readable fallbacks outside Host. */
+  --jj-bg: var(--dsw-alias-bg-layer-1, #17191d);
+  --jj-raised: var(--dsw-alias-bg-module-platform, #202329);
+  --jj-border: var(--dsw-alias-border-l2, #34383f);
+  --jj-text: var(--dsw-alias-label-primary, #f1f3f5);
+  --jj-muted: var(--dsw-alias-label-secondary, #a2a7af);
+  --jj-accent: var(--dsw-alias-state-business-primary, #38bdf8);
+  --jj-danger: var(--dsw-alias-state-error-primary, #a33c46);
+  --jj-danger-soft: var(--dsw-alias-state-error-secondary, #ffc4c9);
+  --jj-danger-bg: var(--dsw-alias-file-diff-deleted-bg, #391e24);
+  --jj-warn: var(--dsw-alias-state-warn-primary, #dfc58b);
+  --jj-warn-bg: var(--dsw-alias-state-warn-tertiary, #493e27);
+  --jj-bookmark: var(--dsw-alias-label-primary-bluish, #d5e8ff);
+  --jj-bookmark-bg: var(--dsw-alias-state-business-tertiary, #254563);
+  --jj-tag: var(--dsw-alias-label-primary-bluish, #d7c8ff);
+  --jj-tag-bg: var(--dsw-alias-bg-multi-select, #3a3150);
+  --jj-remote: var(--dsw-alias-label-secondary, #aab3bf);
+  --jj-remote-bg: var(--dsw-alias-bg-module-platform, #30343a);
+  --jj-on-accent: var(--dsw-alias-label-primary-foreground, #071018);
   box-sizing: border-box;
   min-height: 100%;
   padding: 20px 24px 36px;
