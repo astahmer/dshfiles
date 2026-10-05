@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Config } from '../src/config.js'
-import {
-  cursorSessionRecordForHumanReconciliation,
-  cursorSessionRecordForResume,
-  cursorSessionRecordSchema,
-} from '../src/cursor-session-store.js'
+import { cursorSessionRecordForResume, cursorSessionRecordSchema } from '../src/cursor-session-store.js'
 
 describe('Cursor Agent config and recovery records', () => {
   it('defaults to no runtime instances and validates explicit credential aliases', () => {
@@ -104,7 +100,6 @@ describe('Cursor Agent config and recovery records', () => {
 
     expect(() => cursorSessionRecordForResume(record, 'work')).toThrow('outcome is uncertain')
   })
-
   it('clears only the exact user-confirmed prompt receipt', () => {
     const operationId = '2fd7516e-73dd-476b-90d6-6075786414db'
     const record = cursorSessionRecordSchema.parse({

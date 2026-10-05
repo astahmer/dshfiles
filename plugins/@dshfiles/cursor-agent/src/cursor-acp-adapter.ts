@@ -27,11 +27,11 @@ import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import type { SubprocessHandle } from '@deepseek-ai/dsh-subprocess'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import { CURSOR_AGENT_DRIVER_KIND } from './constants.js'
 import type { CursorAgentConfig, CursorInstanceConfig } from './config.js'
 import { cursorCredentialEnvironment } from './config.js'
-import {
-  cursorSessionDomain,
+import { cursorSessionDomain, cursorSessionRecordForResume, type CursorSessionRecord } from './cursor-session-store.js'
+
+const DRIVER_KIND = 'cursor-acp'
   cursorSessionRecordForHumanReconciliation,
   cursorSessionRecordForResume,
   type CursorRecoveryReceipt,
@@ -97,7 +97,7 @@ const cursorConfigDirectoryFor = async (instanceId: string): Promise<string> => 
     throw safeError('Cursor ACP could not secure its private runtime directory.')
   })
 
-  const driverRoot = join(runtimeRootReal, CURSOR_AGENT_DRIVER_KIND)
+  const driverRoot = join(runtimeRootReal, DRIVER_KIND)
   await mkdir(driverRoot, { recursive: true, mode: 0o700 }).catch(() => {
     throw safeError('Cursor ACP could not create its private provider directory.')
   })
@@ -468,7 +468,7 @@ const connectCursorSession = async (
 
 export class CursorAcpAdapter implements RuntimeDriverAdapter {
   readonly descriptor = Object.freeze({
-    id: CURSOR_AGENT_DRIVER_KIND,
+    id: DRIVER_KIND,
     title: 'Cursor Agent ACP',
     protocolVersion: 1 as const,
     capabilities: Object.freeze({ create: true, resume: true, fork: false, historyReplay: false, steering: true, rollback: false }),
@@ -540,21 +540,6 @@ export class CursorAcpAdapter implements RuntimeDriverAdapter {
     return this.track(new CursorRuntimeSession(request.session.id, instance.id, sessions, active))
   }
 
-  async recoveryReceipt(sessionId: string, instanceId?: string): Promise<CursorRecoveryReceipt | undefined> {
-    const sessions = await this.sessionStore()
-    const record = sessions.table('sessions').get(sessionId)
-    if (record === undefined) return undefined
-    if (instanceId !== undefined && record.instanceId !== instanceId) {
-      throw safeError('Cursor provider session belongs to a different runtime instance.')
-    }
-    if (record.state === 'creating') {
-      return { kind: 'creation', sessionId, instanceId: record.instanceId, operationId: record.operationId }
-    }
-    if (record.pendingOperation === undefined) return undefined
-    return { kind: 'prompt', sessionId, instanceId: record.instanceId, operation: record.pendingOperation }
-  }
-
-  async recoveryReceipts(): Promise<readonly CursorRecoveryReceipt[]> {
     const sessions = await this.sessionStore()
     const pending: CursorRecoveryReceipt[] = []
     for (const [sessionId, record] of sessions.table('sessions').entries()) {

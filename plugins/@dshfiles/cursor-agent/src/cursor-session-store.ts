@@ -10,12 +10,6 @@ const pendingOperationSchema = z
   })
   .strict()
 
-export type CursorPendingOperation = z.infer<typeof pendingOperationSchema>
-
-export type CursorRecoveryReceipt =
-  | { readonly kind: 'creation'; readonly sessionId: string; readonly instanceId: string; readonly operationId: string }
-  | { readonly kind: 'prompt'; readonly sessionId: string; readonly instanceId: string; readonly operation: CursorPendingOperation }
-
 export const cursorSessionRecordSchema = z.discriminatedUnion('state', [
   z
     .object({
@@ -46,7 +40,6 @@ export const cursorSessionRecordForResume = (record: CursorSessionRecord | undef
   return record
 }
 
-export const cursorSessionRecordForHumanReconciliation = (
   record: CursorSessionRecord | undefined,
   instanceId: string,
   operationId: string,
