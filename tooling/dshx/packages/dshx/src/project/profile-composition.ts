@@ -17,6 +17,8 @@ const exactBundlePresent = (dump: string, bundle: string): boolean =>
 export const compositionFailures = (dump: string, expectedBundles: readonly string[]): readonly string[] =>
   expectedBundles.filter(bundle => !exactBundlePresent(dump, bundle))
 
+const UNSUPPORTED_NODE_MARKER = 'node-addon-require-builtin unsupported'
+
 export const readProfileComposition = async (options: ProfileCompositionOptions): Promise<string> => {
   const child = spawnOwnedProcess(options.executable ?? 'dsh', ['--profile', options.profile, '--dump-config'], {
     cwd: options.projectRoot,
@@ -24,8 +26,15 @@ export const readProfileComposition = async (options: ProfileCompositionOptions)
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let stdout = ''
+  let stderrTail = ''
+  let unsupportedNode = false
   child.stdout?.on('data', (chunk: Buffer) => {
     stdout += chunk.toString('utf8')
+  })
+  child.stderr?.on('data', (chunk: Buffer) => {
+    const combined = stderrTail + chunk.toString('utf8')
+    unsupportedNode ||= combined.includes(UNSUPPORTED_NODE_MARKER)
+    stderrTail = combined.slice(-UNSUPPORTED_NODE_MARKER.length)
   })
   try {
     return await new Promise<string>((resolve, reject) => {
@@ -41,8 +50,15 @@ export const readProfileComposition = async (options: ProfileCompositionOptions)
       }
       const handleError = (error: Error): void => finish(new Error(`dsh --dump-config could not start: ${error.message}`))
       const handleClose = (code: number | null): void => {
-        if (code === 0) finish()
-        else finish(new Error(`dsh --dump-config exited with code ${String(code)}.`))
+        if (code === 0) {
+          finish()
+          return
+        }
+        if (unsupportedNode) {
+          finish(new Error(`dsh --dump-config failed because Node does not support ${UNSUPPORTED_NODE_MARKER}.`))
+          return
+        }
+        finish(new Error(`dsh --dump-config exited with code ${String(code)}.`))
       }
       const timer = setTimeout(() => finish(new Error(`dsh --dump-config did not finish within ${options.timeoutMs}ms.`)), options.timeoutMs)
       child.once('error', handleError)

@@ -221,10 +221,18 @@ async function validateSlotOccupancy(paths: Awaited<ReturnType<typeof resolveOpt
   const conflicts = slotOccupancyConflicts(await clientSlotRegistrations(paths.entry, paths.root))
   const first = conflicts[0]
   if (first === undefined) return
-  throw new DshxError('DSHX1206', `Client registers ${JSON.stringify(first.slot)} with the shipped id ${JSON.stringify(first.id)}.`, {
-    file: first.file,
-    hint: `Use a distinct id to render beside the shipped dock, or declare a \`priority\` on this registration to shadow it deliberately.`,
-  })
+  const identity = first.id === undefined ? (first.key === undefined ? undefined : `key ${JSON.stringify(first.key)}`) : `id ${JSON.stringify(first.id)}`
+  throw new DshxError(
+    'DSHX1206',
+    `Client registers ${JSON.stringify(first.slot)}${identity === undefined ? '' : ` with ${identity}`} and collides with shipped occupant ${JSON.stringify(first.occupant)} at line ${String(first.line)}.`,
+    {
+      file: first.file,
+      hint:
+        identity === undefined
+          ? 'This single Slot replaces the shipped shell. Register into one of its declared inner Slots, or declare a `priority` only when you intend to replace the shell.'
+          : 'Use a distinct id or key to render beside the shipped occupant, or declare a `priority` only when you intend to replace it.',
+    },
+  )
 }
 
 async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {

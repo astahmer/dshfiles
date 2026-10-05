@@ -1,8 +1,7 @@
-import { spawn } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { findAnnouncedUrl, stopProcessGroup } from './boot-check.js'
+import type { ChildProcess } from 'node:child_process'
+import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
+import { compositionFailures, readProfileComposition } from './profile-composition.js'
+export { compositionFailures }
 
 /**
  * Client boot verification.
@@ -14,11 +13,11 @@ import { findAnnouncedUrl, stopProcessGroup } from './boot-check.js'
  * `failed`, and surface only as a "Failed to load plugins" card naming whichever
  * entries happened to be affected. Neither reaches typecheck or the build.
  *
- * So this drives a real browser against a real boot. The Web UI records each
- * client entry's state in the DOM, which is what gets read back: an entry in
- * `failed`, or one reporting an import failure, is a defect. An entry left
- * `pending` on a live-host service is expected here and is not a failure, because
- * this check does not run a Host conversation.
+ * So this drives a real browser against a real boot. It requires DSH's native
+ * readiness signal, a mounted application root, and every requested Client entry
+ * in the boot manifest. An expected entry left pending is a defect. Other entries
+ * may stay pending only when the boot card names the service they await; this
+ * check deliberately starts no Host conversation.
  */
 
 export interface ClientBootCheckOptions {
@@ -27,16 +26,14 @@ export interface ClientBootCheckOptions {
   readonly port: number
   readonly executable?: string
   readonly timeoutMs?: number
-  /**
-   * A prepared profile directory (package.json with the expected bundles, run
-   * through its package manager) to boot from, via DSHX_BOOT_PROFILE_ROOT.
-   * Without one the check provisions nothing: DSH boots the profile it finds —
-   * or an empty one — and the browser pass proves only that the Web UI mounts,
-   * which is exactly the vacuous success this check exists to prevent.
-   */
-  readonly profileRoot?: string
-  /** Bundle ids that must appear in the offline composition before a browser is spent. */
-  readonly expectedBundles?: readonly string[]
+  /** Scratch DSH home that owns every file written by the check. */
+  readonly dshHome: string
+  /** Prepared profile directory with the expected bundles installed. */
+  readonly profileRoot: string
+  /** Bundle ids that must appear in offline composition before a browser is spent. */
+  readonly expectedBundles: readonly [string, ...string[]]
+  /** Client ids that must appear in DSH's boot manifest. */
+  readonly expectedClientEntries: readonly string[]
   /** Browser to drive the Web UI with. */
   readonly browserName?: 'chromium' | 'firefox' | 'webkit'
 }
@@ -58,16 +55,23 @@ export interface ClientBootCheckResult {
   readonly slotFailures: readonly { readonly slot: string }[]
   /** Expected bundles absent from the offline composition. */
   readonly compositionFailures: readonly string[]
+  /** Expected Client entries absent from DSH's boot manifest. */
+  readonly missingClientEntries: readonly string[]
+  /** The unavailability card remained mounted after the native readiness signal. */
+  readonly failureCardVisible: boolean
+  /** True only after DSH readiness resolved and the application root mounted. */
+  readonly browserReady: boolean
   readonly url?: string
   readonly timedOut: boolean
+  /** Host process or offline composition check could not complete. */
+  readonly processError?: string
   /** Set when the browser could not be driven at all. */
   readonly browserError?: string
+  /** A safe description of why native application readiness could not be proved. */
+  readonly readinessError?: string
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000
-
-/** Expected bundle ids missing from a `dsh --dump-config` composition document. */
-export const compositionFailures = (dump: string, expectedBundles: readonly string[]): readonly string[] => expectedBundles.filter(id => !dump.includes(id))
 
 /**
  * Recover entry states from the boot card text. The card prints the summary line
@@ -89,6 +93,16 @@ export const parseBootText = (text: string): ClientBootCheckEntry[] => {
   return entries
 }
 
+/** Pending is acceptable only for a non-target entry with an explicit native service wait. */
+export const clientEntryFailures = (entries: readonly ClientBootCheckEntry[], expectedClientEntries: readonly string[]): ClientBootCheckEntry[] => {
+  const expected = new Set(expectedClientEntries)
+  return entries.filter(entry => {
+    if (entry.state !== 'pending') return true
+    if (expected.has(entry.id)) return true
+    return !/^\(waiting for service: [^)]+\)$/.test(entry.detail ?? '')
+  })
+}
+
 const findFreePort = async (): Promise<number> => {
   const { createServer } = await import('node:net')
   return new Promise<number>((resolve, reject) => {
@@ -107,117 +121,148 @@ const findFreePort = async (): Promise<number> => {
   })
 }
 
+const waitForHostUrl = (child: ChildProcess, output: () => string, timeoutMs: number): Promise<{ readonly url?: string; readonly processError?: string }> =>
+  new Promise(resolve => {
+    let settled = false
+    const finish = (value: { readonly url?: string; readonly processError?: string }): void => {
+      if (settled) return
+      settled = true
+      clearInterval(timer)
+      child.off('error', handleError)
+      child.off('close', handleClose)
+      resolve(value)
+    }
+    const handleError = (error: Error): void => finish({ processError: `The Host could not start: ${error.message}` })
+    const handleClose = (code: number | null): void => finish({ processError: `The Host exited with code ${String(code)} before announcing its URL.` })
+    const timer = setInterval(() => {
+      const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output())
+      if (match?.[0] !== undefined) {
+        finish({ url: match[0] })
+        return
+      }
+      if (Date.now() - startedAt > timeoutMs) finish({})
+    }, 250)
+    const startedAt = Date.now()
+    child.once('error', handleError)
+    child.once('close', handleClose)
+  })
+
 export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<ClientBootCheckResult> => {
   const executable = options.executable ?? 'dsh'
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const port = options.port === 0 ? await findFreePort() : options.port
-  const ownedProfileRoot = options.profileRoot === undefined
-  const profileRoot = options.profileRoot ?? (await mkdtemp(join(tmpdir(), 'dshx-client-boot-')))
   let output = ''
-  const startedAt = Date.now()
-
-  // Offline composition first: a browser launch proves nothing about a bundle
-  // the profile never composed, so an absent expected bundle fails before boot.
   let composition: readonly string[] = []
-  if (options.expectedBundles !== undefined && options.expectedBundles.length > 0) {
-    const dump = await new Promise<string>((resolve, reject) => {
-      const child = spawn(executable, ['--profile', options.profile, '--dump-config'], {
-        cwd: options.projectRoot,
-        env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
-      let stdout = ''
-      child.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString('utf8')
-      })
-      let stderr = ''
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString('utf8')
-      })
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL')
-        reject(new Error(`dsh --dump-config did not finish within ${timeoutMs}ms.`))
-      }, timeoutMs)
-      child.once('exit', code => {
-        clearTimeout(timer)
-        if (code === 0) resolve(stdout)
-        else reject(new Error(`dsh --dump-config exited ${String(code)}: ${stderr.slice(0, 400)}`))
-      })
-    })
-    composition = compositionFailures(dump, options.expectedBundles)
-  }
-
-  let url: string | undefined
   let entries: ClientBootCheckEntry[] = []
   let slotFailures: readonly { readonly slot: string }[] = []
+  let missingClientEntries: readonly string[] = []
+  let browserReady = false
+  let failureCardVisible = false
+  let readinessError: string | undefined
   let browserError: string | undefined
-  if (composition.length === 0) {
-    const child = spawn(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
-      cwd: options.projectRoot,
-      env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
+  let processError: string | undefined
+  let timedOut = false
+  let host: ChildProcess | undefined
+  let launchUrl: string | undefined
+  try {
+    const dump = await readProfileComposition({
+      projectRoot: options.projectRoot,
+      profile: options.profile,
+      profileRoot: options.profileRoot,
+      dshHome: options.dshHome,
+      executable,
+      timeoutMs,
     })
-    const collect = (chunk: Buffer): void => {
-      output += chunk.toString('utf8')
-    }
-    child.stdout.on('data', collect)
-    child.stderr.on('data', collect)
+    composition = compositionFailures(dump, options.expectedBundles)
 
-    url = await new Promise<string | undefined>(resolve => {
-      const timer = setInterval(() => {
-        const announced = findAnnouncedUrl({ output })
-        if (announced !== undefined) {
-          clearInterval(timer)
-          resolve(announced)
-        }
-        if (Date.now() - startedAt > timeoutMs) {
-          clearInterval(timer)
-          resolve(undefined)
-        }
-      }, 250)
-      child.once('exit', () => {
-        clearInterval(timer)
-        resolve(undefined)
-      })
-    })
-
-    if (url !== undefined) {
-      await new Promise(resolve => setTimeout(resolve, 2_000))
+    if (composition.length === 0) {
       try {
-        const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
-        const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
-        const browser = await engine.launch({ headless: true })
-        try {
-          const page = await browser.newPage()
-          await page.goto(url, { waitUntil: 'domcontentloaded' })
-          const { readClientBootOutcome } = await import('./browser-boot.js')
-          const outcome = await readClientBootOutcome(page, { url, timeoutMs })
-          slotFailures = outcome.slotFailures
-          if (!outcome.ok) entries = parseBootText(outcome.text)
-        } finally {
-          await browser.close()
-        }
+        host = spawnOwnedProcess(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
+          cwd: options.projectRoot,
+          env: { ...process.env, DSH_HOME: options.dshHome, DSHX_BOOT_PROFILE_ROOT: options.profileRoot },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
       } catch (error) {
-        browserError = error instanceof Error ? error.message : String(error)
+        processError = error instanceof Error ? error.message : String(error)
+      }
+      if (host !== undefined) {
+        const collect = (chunk: Buffer): void => {
+          output += chunk.toString('utf8')
+        }
+        host.stdout?.on('data', collect)
+        host.stderr?.on('data', collect)
+        const readiness = await waitForHostUrl(host, () => output, timeoutMs)
+        launchUrl = readiness.url
+        processError = readiness.processError
+
+        if (launchUrl === undefined && processError === undefined) timedOut = true
+        if (launchUrl !== undefined) {
+          await new Promise(resolve => setTimeout(resolve, 2_000))
+          try {
+            const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
+            const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
+            const browser = await engine.launch({ headless: true })
+            try {
+              const page = await browser.newPage()
+              await page.goto(launchUrl, { waitUntil: 'domcontentloaded' })
+              const { readClientBootOutcome } = await import('./browser-boot.js')
+              const outcome = await readClientBootOutcome(page, {
+                timeoutMs,
+                expectedClientEntries: options.expectedClientEntries,
+                inspectSlotFailures: options.expectedClientEntries.length > 0,
+              })
+              browserReady = outcome.ready
+              missingClientEntries = outcome.missingClientEntries
+              failureCardVisible = outcome.failureCardVisible
+              readinessError = outcome.readinessError
+              timedOut ||= outcome.timedOut
+              slotFailures = outcome.slotFailures
+              entries = parseBootText(outcome.text)
+            } finally {
+              await browser.close()
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            browserError = message.replaceAll(launchUrl, new URL(launchUrl).origin)
+          }
+        }
       }
     }
-
-    await stopProcessGroup({ child, graceMs: 3000 })
+  } catch (error) {
+    processError = error instanceof Error ? error.message : String(error)
+  } finally {
+    try {
+      if (host !== undefined) await stopOwnedProcess(host)
+    } catch (error) {
+      processError ??= `Could not stop the check-owned Host: ${error instanceof Error ? error.message : String(error)}`
+    }
   }
 
-  if (ownedProfileRoot) await rm(profileRoot, { recursive: true, force: true })
-
-  const timedOut = composition.length === 0 && url === undefined
-  const failures = entries.filter(entry => entry.state !== 'pending')
+  const failures = clientEntryFailures(entries, options.expectedClientEntries)
+  const unexplainedFailureCard = failureCardVisible && entries.length === 0
   return {
-    ok: composition.length === 0 && !timedOut && browserError === undefined && failures.length === 0 && slotFailures.length === 0,
+    ok:
+      composition.length === 0 &&
+      missingClientEntries.length === 0 &&
+      browserReady &&
+      !unexplainedFailureCard &&
+      !timedOut &&
+      processError === undefined &&
+      browserError === undefined &&
+      readinessError === undefined &&
+      failures.length === 0 &&
+      slotFailures.length === 0,
     entries,
     failures,
     slotFailures,
     compositionFailures: composition,
+    missingClientEntries,
+    browserReady,
+    failureCardVisible,
     timedOut,
-    ...(url === undefined ? {} : { url }),
+    ...(processError === undefined ? {} : { processError }),
+    ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
     ...(browserError === undefined ? {} : { browserError }),
+    ...(readinessError === undefined ? {} : { readinessError }),
   }
 }
