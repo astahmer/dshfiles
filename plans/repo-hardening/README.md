@@ -197,8 +197,10 @@ wildcard declaration is a global script, so a module import cannot replace it.
       docs), stops the Host's process group (the pnpm shim orphaned it), and
       names a Nix-built Node (DSHX4112); 44 boot and platform tests
 
-Phase 6 evidence: root `pnpm check` exit 0 — dshx 460 tests, create-dshx 21,
-plugins 173; lint and format clean.
+Phase 6 evidence (2026-10-05): root `pnpm check` exit 0 — dshx 506 tests,
+create-dshx 25; all 14 plugin packages built, typechecked, and tested, and all
+13 profile boot checks passed. Lint and format gates exited 0; antislop warnings
+remain.
 
 Left open: the remaining catch blocks in jujutsu and ai-accounts convert errors
 into fail-closed domain messages on purpose and stay; the `as` casts warned by
