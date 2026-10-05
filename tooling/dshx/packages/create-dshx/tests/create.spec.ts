@@ -18,6 +18,18 @@ async function temp(): Promise<string> {
 const localDshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../dshx')
 
 describe('create-dshx', () => {
+  it('renders create help from its Citty command definition', async () => {
+    const output = new PassThrough()
+    const chunks: Buffer[] = []
+    output.on('data', chunk => chunks.push(Buffer.from(chunk)))
+    const exitCode = await runCreate(['--help'], { stdout: output, stderr: output })
+    output.end()
+
+    expect(exitCode).toBe(0)
+    expect(Buffer.concat(chunks).toString()).toContain('USAGE dshx create [OPTIONS] [<NAME>]')
+    expect(Buffer.concat(chunks).toString()).toContain('--template=<basic|ui|tool|full-stack|starter|showcase>')
+  })
+
   it('keeps generated DSH defaults aligned with the core compatibility registry', () => {
     expect(DEFAULT_DSH_RANGE).toBe(DEFAULT_COMPATIBILITY.dshRange)
     expect(DEFAULT_DSH_VERSION).toBe(DEFAULT_COMPATIBILITY.verified.latest)

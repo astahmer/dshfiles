@@ -1,4 +1,4 @@
-import { defineCommand, parseArgs as parseCittyArgs } from 'citty'
+import { defineCommand, parseArgs as parseCittyArgs, type ArgsDef } from 'citty'
 
 const platformCommandNames = [
   'status',
@@ -20,7 +20,32 @@ const platformCommandNames = [
 
 const cliInspectTargets = ['slots', 'tools', 'services', 'events', 'capabilities'] as const
 
-export type CliCommand = keyof NonNullable<typeof dshxCommand.subCommands> | (typeof platformCommandNames)[number]
+export const cliCommandMetadata = {
+  test: 'Run project-local Vitest tests.',
+  package: 'Build, validate, and pack a native plugin bundle.',
+  build: 'Build Host and Client plugin artifacts.',
+  check: 'Validate compatibility and project wiring.',
+  dev: 'Run a compatibility-aware DSH development session.',
+  inspect: 'Inspect Slots, Tools, Services, Events, or capabilities.',
+  add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
+  status: 'Check the authenticated local DSH Host connection.',
+  info: 'Show local DSHX and Node runtime information.',
+  doctor: 'Diagnose local DSHX and reachable DSH APIs.',
+  presets: 'List or inspect DSH Agent presets.',
+  models: 'List or select DSH models.',
+  skills: 'List Session skills.',
+  sessions: 'List, inspect, create, fork, cancel, and export DSH Sessions.',
+  plugins: 'List, inspect, enable, and disable DSH plugins.',
+  bundles: 'List, inspect, enable, and disable DSH bundles.',
+  commands: 'Inspect and run Session-scoped DSH commands.',
+  config: 'Read and update one DSH settings namespace.',
+  host: 'Record, verify, and select execution machines and DSH runtimes.',
+  runtime: 'Register, verify, select, and remove remote DSH runtimes.',
+  workspace: 'Create or open remote Workspaces on a recorded host.',
+  comm: 'Exchange durable messages between DSH Agents and external MCP clients.',
+} as const satisfies Readonly<Record<string, string>>
+
+export type CliCommand = keyof typeof cliCommandMetadata
 export type CliInspectTarget = (typeof cliInspectTargets)[number]
 
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
@@ -327,128 +352,130 @@ export const dshxCommand = defineCommand({
   args: sharedArgs,
   subCommands: {
     test: defineCommand({
-      meta: { name: 'test', description: 'Run project-local Vitest tests.' },
+      meta: { name: 'test', description: cliCommandMetadata.test },
       args: sharedArgs,
     }),
     package: defineCommand({
       meta: {
         name: 'package',
-        description: 'Build, validate, and pack a native plugin bundle.',
+        description: cliCommandMetadata.package,
       },
       args: sharedArgs,
     }),
     build: defineCommand({
       meta: {
         name: 'build',
-        description: 'Build Host and Client plugin artifacts.',
+        description: cliCommandMetadata.build,
       },
       args: sharedArgs,
     }),
     check: defineCommand({
       meta: {
         name: 'check',
-        description: 'Validate compatibility and project wiring.',
+        description: cliCommandMetadata.check,
       },
       args: sharedArgs,
     }),
     dev: defineCommand({
       meta: {
         name: 'dev',
-        description: 'Run a compatibility-aware DSH development session.',
+        description: cliCommandMetadata.dev,
       },
       args: sharedArgs,
     }),
     inspect: defineCommand({
       meta: {
         name: 'inspect',
-        description: 'Inspect Slots, Tools, Services, or Events.',
+        description: cliCommandMetadata.inspect,
       },
       args: sharedArgs,
     }),
     add: defineCommand({
       meta: {
         name: 'add',
-        description: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
+        description: cliCommandMetadata.add,
       },
       args: sharedArgs,
     }),
     status: defineCommand({
       meta: {
         name: 'status',
-        description: 'Check the authenticated local DSH Host connection.',
+        description: cliCommandMetadata.status,
       },
       args: sharedArgs,
     }),
     info: defineCommand({
       meta: {
         name: 'info',
-        description: 'Show local DSHX and Node runtime information.',
+        description: cliCommandMetadata.info,
       },
       args: sharedArgs,
     }),
     doctor: defineCommand({
       meta: {
         name: 'doctor',
-        description: 'Diagnose local DSHX and reachable DSH APIs.',
+        description: cliCommandMetadata.doctor,
       },
       args: sharedArgs,
     }),
     sessions: defineCommand({
       meta: {
         name: 'sessions',
-        description: 'List, inspect, create, fork, cancel, and export DSH Sessions.',
+        description: cliCommandMetadata.sessions,
       },
       args: sharedArgs,
     }),
     plugins: defineCommand({
       meta: {
         name: 'plugins',
-        description: 'List, inspect, enable, and disable DSH plugins.',
+        description: cliCommandMetadata.plugins,
       },
       args: sharedArgs,
     }),
     bundles: defineCommand({
       meta: {
         name: 'bundles',
-        description: 'List, inspect, enable, and disable DSH bundles.',
+        description: cliCommandMetadata.bundles,
       },
       args: sharedArgs,
     }),
     commands: defineCommand({
       meta: {
         name: 'commands',
-        description: 'Inspect and run Session-scoped DSH commands.',
+        description: cliCommandMetadata.commands,
       },
       args: sharedArgs,
     }),
     config: defineCommand({
       meta: {
         name: 'config',
-        description: 'Read and update one DSH settings namespace.',
+        description: cliCommandMetadata.config,
       },
       args: sharedArgs,
     }),
     host: defineCommand({
-      meta: { name: 'host', description: 'Record, verify, and select execution machines and DSH runtimes.' },
+      meta: { name: 'host', description: cliCommandMetadata.host },
       args: sharedArgs,
     }),
     runtime: defineCommand({
-      meta: { name: 'runtime', description: 'Register, verify, select, and remove remote DSH runtimes.' },
+      meta: { name: 'runtime', description: cliCommandMetadata.runtime },
       args: sharedArgs,
     }),
     workspace: defineCommand({
-      meta: { name: 'workspace', description: 'Create or open remote Workspaces on a recorded host.' },
+      meta: { name: 'workspace', description: cliCommandMetadata.workspace },
       args: sharedArgs,
     }),
     comm: defineCommand({
       meta: {
         name: 'comm',
-        description: 'Exchange durable messages between DSH Agents and external MCP clients.',
+        description: cliCommandMetadata.comm,
       },
       args: sharedArgs,
     }),
   },
 })
+
+export const cliCommandDescription = (command: CliCommand): string => cliCommandMetadata[command]
 
 const platformCommands: ReadonlySet<CliCommand> = new Set(platformCommandNames)
 
@@ -464,6 +491,8 @@ interface OptionContext {
   readonly boot: boolean
   readonly fix: boolean
 }
+
+export type CliOptionContext = OptionContext
 
 interface OptionScope {
   readonly allows: (context: OptionContext) => boolean
@@ -534,15 +563,41 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   priority: { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' },
   topic: { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' },
   limit: { allows: platformAction('comm', 'inbox'), usage: '--limit is only valid with comm inbox.' },
-  slot: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
-  provider: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
-  order: { allows: addTargets('ui', 'panel', 'api'), usage: 'Slot options are only valid with add ui.' },
+  slot: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
+  provider: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
+  order: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
   id: { allows: ({ command }) => command === 'add', usage: '--id is only valid with add commands.' },
   name: { allows: addTargets('tool', 'command'), usage: 'Name and description options are only valid with add tool or add command.' },
   description: { allows: addTargets('tool', 'command'), usage: 'Name and description options are only valid with add tool or add command.' },
   event: { allows: addTargets('hook'), usage: '--event is only valid with add hook.' },
   root: { allows: inspectSlots, usage: '--root is only valid with inspect slots.' },
   explain: { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' },
+}
+
+const toKebabCase = (value: string): string => value.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase())
+
+export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
+  const args: ArgsDef = {}
+  for (const [name, definition] of Object.entries(sharedArgs)) {
+    const scope = optionScopes[name]
+    if (scope !== undefined && !scope.allows(context)) continue
+    const required =
+      name === 'session' &&
+      (context.command === 'commands' || context.command === 'skills' || (context.command === 'models' && context.action === 'select'))
+    args[toKebabCase(name)] = required ? { ...definition, required: true } : definition
+  }
+  return args
+}
+
+export const cliArgsCommonToContexts = (contexts: readonly CliOptionContext[]): ArgsDef => {
+  const [firstContext, ...remainingContexts] = contexts
+  if (firstContext === undefined) return {}
+  const firstArgs = cliArgsForContext(firstContext)
+  const args: ArgsDef = {}
+  for (const [name, definition] of Object.entries(firstArgs)) {
+    if (remainingContexts.every(context => Object.hasOwn(cliArgsForContext(context), name))) args[name] = definition
+  }
+  return args
 }
 
 const isSet = (value: unknown): boolean => value !== undefined && value !== false

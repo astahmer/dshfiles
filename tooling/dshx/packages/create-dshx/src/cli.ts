@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { stdin, stdout, stderr } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { confirm as clackConfirm, isCancel, select as clackSelect, spinner as clackSpinner, text as clackText } from '@clack/prompts'
-import { defineCommand, parseArgs as parseCittyArgs } from 'citty'
+import { defineCommand, parseArgs as parseCittyArgs, renderUsage } from 'citty'
 import { createProject, DEFAULT_STYLE, DEFAULT_TEMPLATE, packageVersion, type CreateDependencies } from './create.js'
 import { TEMPLATE_REGISTRY } from './templates.js'
 import type { CreateIO, PackageManager, ProjectStyle, TemplateName } from './types.js'
@@ -73,7 +73,7 @@ const createArgs = {
 /** Citty command metadata for the published create-dshx binary. */
 export const createDshxCommand = defineCommand({
   meta: {
-    name: 'create-dshx',
+    name: 'dshx create',
     description: 'Create a typed DeepSeek Harness plugin project.',
   },
   args: createArgs,
@@ -118,10 +118,8 @@ function parseArgs(argv: readonly string[]): Args {
   }
 }
 
-function printHelp(output: { write: (text: string) => void }): void {
-  output.write(
-    'Usage: pnpm create dshx [name] [--template <basic|ui|tool|full-stack|starter|showcase>] [--style <css-modules|tailwind|none>] [--cwd <path>] [--install|--no-install] [--yes] [--package-manager <pnpm|yarn|npm>]\n',
-  )
+const printHelp = async (output: { write: (text: string) => void }): Promise<void> => {
+  output.write(await renderUsage(createDshxCommand))
 }
 
 export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {}, dependencies: CreateDependencies = {}): Promise<number> {
@@ -139,7 +137,7 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
     return 2
   }
   if (args.help) {
-    printHelp(output)
+    await printHelp(output)
     return 0
   }
   if (args.version) {

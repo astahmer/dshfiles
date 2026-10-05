@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import semver from 'semver'
 import { z } from 'zod'
 import type { CliArgs } from './args.js'
+import { renderCliUsage } from './usage.js'
 import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
 import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
@@ -1060,136 +1061,9 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
 const connectMultiHostRuntime = (runtime: PlatformCliRuntime): ((options: { readonly url?: string }) => Promise<MultiHost>) =>
   runtime.connectMultiHost ?? (options => connectMultiHost(options))
 
-export function platformHelp(args: CliArgs): string | undefined {
-  const group = args.command
-  const nested = args.platformArgs?.[0]
-  const output = '[--json] [--quiet] [--no-color]'
-  const connection = '[--url <launch-url>]'
-  if (group === 'status') return `Usage: dshx status ${connection} ${output}\nChecks authenticated Session, plugin, and bundle APIs.\n`
-  if (group === 'info') return `Usage: dshx info ${output}\nShows local DSHX and Node versions; it does not require a running DSH Host.\n`
-  if (group === 'doctor') return `Usage: dshx doctor ${connection} ${output}\nChecks local runtime facts and the DSH APIs available to this launch URL.\n`
-  if (group === 'sessions') {
-    if (nested === 'list')
-      return `Usage: dshx sessions list [--host <host-id|runtime-id>] ${connection} ${output}\nLists Sessions from the selected execution runtime. Without --host, uses the connected DSH Host.\n`
-    if (nested === 'search')
-      return `Usage: dshx sessions search <query...> ${connection} ${output}\nSearches visible Session content; DSH returns at most 20 snippets.\n`
-    if (nested === 'show') return `Usage: dshx sessions show <session-id> ${connection} ${output}\nShows one Session summary.\n`
-    if (nested === 'history')
-      return `Usage: dshx sessions history <session-id> [--max <count>] ${connection} ${output}\nReads bounded Session history through DSH's paging API.\n`
-    if (nested === 'create')
-      return `Usage: dshx sessions create [--host <host-id|runtime-id>] [--cwd <path>] [--agent-preset <id>] ${connection} ${output}\nCreates a Session on the selected execution runtime.\n`
-    if (nested === 'fork')
-      return `Usage: dshx sessions fork <session-id> [--at-seq <n>] ${connection} ${output}\nForks a Session, optionally from a sequence number.\n`
-    if (nested === 'cancel') return `Usage: dshx sessions cancel <session-id> ${connection} ${output}\nRequests cancellation of the Session's active work.\n`
-    if (nested === 'rename')
-      return `Usage: dshx sessions rename <session-id> <title...> ${connection} ${output}\nRenames a Session through DSH's durable Session API.\n`
-    if (nested === 'archive' || nested === 'unarchive')
-      return `Usage: dshx sessions ${nested} <session-id> ${connection} ${output}\n${nested === 'archive' ? 'Archives' : 'Restores'} a Session using DSH's reversible Workspace API. Active work is not stopped.\n`
-    if (nested === 'prompt')
-      return `Usage: dshx sessions prompt <session-id> <message...> [--mode queue|steer] ${connection} ${output}\nSends text to the Session Agent; defaults to queue. Ctrl-C asks DSH to cancel prompt admission.\n`
-    if (nested === 'export')
-      return `Usage: dshx sessions export <session-id> [--output <path>] ${connection} ${output}\nExports Session records as versioned DSHX JSON.\n`
-    return `Usage: dshx sessions <list|search|show|history|create|fork|cancel|rename|archive|unarchive|prompt|export> [arguments] [options]\nCommon options: [--host <host-id|runtime-id>] ${connection} ${output}\nSession creation: --cwd <path> --agent-preset <id>\nPrompt: --mode queue|steer\nHistory/fork: --max <count> --at-seq <n>\nExport: --output <path>\n`
-  }
-  if (group === 'plugins') {
-    if (nested === 'list') return `Usage: dshx plugins list ${connection} ${output}\nLists runtime plugin entries and their Loader state.\n`
-    if (nested === 'info') return `Usage: dshx plugins info <entry-id> ${connection} ${output}\nShows one runtime plugin entry.\n`
-    if (nested === 'check')
-      return `Usage: dshx plugins check <package-spec> ${connection} ${output}\nChecks what DSH's plugin manager can install without installing it.\n`
-    if (nested === 'enable' || nested === 'disable')
-      return `Usage: dshx plugins ${nested} <entry-id> ${connection} ${output}\nChanges the Host-owned plugin selection and reports application/restart state.\n`
-    return `Usage: dshx plugins <list|info|check|enable|disable> [entry-id|package-spec] ${connection} ${output}\n`
-  }
-  if (group === 'bundles') {
-    if (nested === 'list') return `Usage: dshx bundles list ${connection} ${output}\nLists bundles and their profile-wide selection/install state.\n`
-    if (nested === 'info') return `Usage: dshx bundles info <name> ${connection} ${output}\nShows one bundle and its rows.\n`
-    if (nested === 'install')
-      return `Usage: dshx bundles install <package-spec> ${connection} ${output}\nInstalls through DSH's bundle manager; Ctrl-C asks DSH to cancel and restore profile files.\n`
-    if (nested === 'remove') return `Usage: dshx bundles remove <name> ${connection} ${output}\nRemoves a profile-owned bundle through DSH's package manager.\n`
-    if (nested === 'enable' || nested === 'disable')
-      return `Usage: dshx bundles ${nested} <name> ${connection} ${output}\nChanges the Host-owned bundle selection and reports application/restart state.\n`
-    return `Usage: dshx bundles <list|info|install|remove|enable|disable> [name|package-spec] ${connection} ${output}\n`
-  }
-  if (group === 'presets') {
-    if (nested === 'list') return `Usage: dshx presets list ${connection} ${output}\nLists Agent presets declared by the connected DSH Host.\n`
-    if (nested === 'show') return `Usage: dshx presets show <id> ${connection} ${output}\nReads one declared Agent preset composition.\n`
-    return `Usage: dshx presets <list|show> [id] ${connection} ${output}\n`
-  }
-  if (group === 'models') {
-    if (nested === 'list') return `Usage: dshx models list ${connection} ${output}\nLists DSH's currently routable provider models and any lookup failures.\n`
-    if (nested === 'select')
-      return `Usage: dshx models select --session <session-id> <provider> <model> [--reasoning-effort <id>] ${connection} ${output}\nSelects a model for one Session; DSH may persist it as the new default.\n`
-    return `Usage: dshx models <list|select> [arguments] ${connection} ${output}\n`
-  }
-  if (group === 'skills')
-    return `Usage: dshx skills list --session <session-id> ${connection} ${output}\nLists the user-invocable skills visible in that Session's composition; skill bodies are not returned.\n`
-  if (group === 'commands') {
-    if (nested === 'list') return `Usage: dshx commands list --session <session-id> ${connection} ${output}\nLists commands available to the Session.\n`
-    if (nested === 'info')
-      return `Usage: dshx commands info <command-name> --session <session-id> ${connection} ${output}\nShows a command registered for the Session.\n`
-    if (nested === 'run')
-      return `Usage: dshx commands run <slash-command> --session <session-id> ${connection} ${output}\n       dshx commands run --line <slash-command> --session <session-id> ${connection} ${output}\nExecutes a registered Session command without a model turn; Ctrl-C cancels the request.\n`
-    return `Usage: dshx commands <list|info|run> [command-name|/line] --session <session-id> ${connection} ${output}\n`
-  }
-  if (group === 'config') {
-    if (nested === 'list') return `Usage: dshx config list ${connection} ${output}\nLists settings namespaces and their write/revision metadata.\n`
-    if (nested === 'get') return `Usage: dshx config get <namespace> [path] ${connection} ${output}\nReads Host-redacted settings values.\n`
-    if (nested === 'set')
-      return `Usage: dshx config set <namespace> <path> <json-value> ${connection} ${output}\nWrites one schema-validated setting using its current revision. Secret values must be changed in DSH Settings.\n`
-    if (nested === 'unset') return `Usage: dshx config unset <namespace> <path> ${connection} ${output}\nRemoves one setting using its current revision.\n`
-    return `Usage: dshx config <list|get|set|unset> [arguments] ${connection} ${output}\nValues use JSON syntax. Secret values are redacted and must be changed in DSH Settings.\n`
-  }
-  if (group === 'host') {
-    if (nested === 'list') return `Usage: dshx host list ${connection} ${output}\nLists recorded hosts and their connector targets.\n`
-    if (nested === 'status')
-      return `Usage: dshx host status <host-id> ${connection} ${output}\nChecks every registered runtime on the host and reports its workspaces and Sessions.\n`
-    if (nested === 'remove')
-      return `Usage: dshx host remove <host-id> [--directory-only] ${connection} ${output}\nRemoves the directory record. --directory-only also removes runtime references; remote data stays intact.\n`
-    if (nested === 'add')
-      return `Usage: dshx host add <id> <display-name...> (--local | --ssh-target <user@host>) ${connection} ${output}\nRecords one local or trusted SSH machine.\n`
-    return `Usage: dshx host <list|status|remove|add> [arguments] ${connection} ${output}\n`
-  }
-  if (group === 'runtime') {
-    if (nested === 'list') return `Usage: dshx runtime list [host-id] ${connection} ${output}\nLists runtimes registered on one host or across all hosts.\n`
-    if (nested === 'status')
-      return `Usage: dshx runtime status <runtime-id> ${connection} ${output}\nVerifies runtime identity before reading native workspace and Session state.\n`
-    if (nested === 'add')
-      return `Usage: dshx runtime add <host-id> <display-name...> [--launch-url-env <name> | --unit <systemd-unit> --remote-home <path>] ${connection} ${output}\nPins the DSH runtime identity after an authenticated connection.\n`
-    if (nested === 'remove')
-      return `Usage: dshx runtime remove <runtime-id> ${connection} ${output}\nRemoves only this local directory reference; runtime data remains intact.\n`
-    return `Usage: dshx runtime <list|status|add|remove> [arguments] ${connection} ${output}\n`
-  }
-  if (group === 'workspace') {
-    if (nested === 'list')
-      return `Usage: dshx workspace list <host-id|runtime-id> ${connection} ${output}\nLists native Workspaces from the selected runtime. A host with multiple runtimes is ambiguous.\n`
-    if (nested === 'open')
-      return `Usage: dshx workspace open <host-id|runtime-id> <absolute-path...> ${connection} ${output}\nCreates or resolves one Workspace on the selected runtime.\n`
-    return `Usage: dshx workspace <list|open> [arguments] ${connection} ${output}\n`
-  }
-  if (group === 'comm') {
-    const principal = '[--principal <name>]'
-    if (nested === 'agents') return `Usage: dshx comm agents ${principal} ${output}\nLists live DSH Agents and their Session ids.\n`
-    if (nested === 'topics') return `Usage: dshx comm topics ${principal} ${output}\nLists topics and subscriber counts.\n`
-    if (nested === 'subscribe')
-      return `Usage: dshx comm subscribe <topic> [--delivery quiet|queue] ${principal} ${output}\nSubscribes this external CLI principal.\n`
-    if (nested === 'unsubscribe') return `Usage: dshx comm unsubscribe <topic> ${principal} ${output}\nRemoves this external CLI principal from a topic.\n`
-    if (nested === 'publish')
-      return `Usage: dshx comm publish <topic> <message...> [--priority normal|urgent] ${principal} ${output}\nPublishes a durable peer message.\n`
-    if (nested === 'send')
-      return `Usage: dshx comm send <agent-session-id> <message...> [--priority normal|urgent] ${principal} ${output}\nSends a direct message to a DSH Agent inbox.\n`
-    if (nested === 'inbox')
-      return `Usage: dshx comm inbox [--topic <topic>] [--limit <count>] ${principal} ${output}\nReads unacknowledged messages for this external principal.\n`
-    if (nested === 'ack') return `Usage: dshx comm ack <message-id> ${principal} ${output}\nAcknowledges one inbox message.\n`
-    if (nested === 'mcp') return `Usage: dshx comm mcp [--principal <name>]\nRuns an MCP stdio server for external agent clients; stdout is reserved for MCP.\n`
-    return `Usage: dshx comm <agents|topics|subscribe|unsubscribe|publish|send|inbox|ack|mcp> [arguments] [options]\nCommon options: ${principal} ${output}\nMessages are durable; delivery defaults to quiet/queue and steering requires DSH Agent opt-in.\n`
-  }
-  return undefined
-}
-
 export async function runPlatformCli(args: CliArgs, runtime: PlatformCliRuntime): Promise<number> {
   if (args.help) {
-    const help = platformHelp(args)
-    if (help) write(runtime.io.stdout, help)
+    write(runtime.io.stdout, await renderCliUsage(args))
     return 0
   }
   return runPlatformAction(args, runtime)

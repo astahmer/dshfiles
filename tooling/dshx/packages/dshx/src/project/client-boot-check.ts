@@ -167,7 +167,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   let browserError: string | undefined
   let processError: string | undefined
   let spawnError: string | undefined
-  let evidence: string | undefined
+  let evidence: BrowserBootEvidence | undefined
   let timedOut = false
   let host: ChildProcess | undefined
   let launchUrl: string | undefined

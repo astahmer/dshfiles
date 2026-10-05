@@ -127,7 +127,8 @@ describe('DSH platform CLI', () => {
     })
 
     expect(helpExitCode).toBe(0)
-    expect(help()).toContain('Usage: dshx sessions export <session-id> [--output <path>]')
+    expect(help()).toContain('USAGE dshx sessions export [OPTIONS] <SESSION-ID>')
+    expect(help()).toContain('--output=<path>')
 
     const outputStreams = io()
     const output = capture(outputStreams.out)
@@ -155,7 +156,7 @@ describe('DSH platform CLI', () => {
     const stdout = capture(streams.out)
     const exitCode = await runCli(['runtime', 'list', '--help'], { io: streams, version: 'test-version' })
     expect(exitCode).toBe(0)
-    expect(stdout()).toContain('Usage: dshx runtime list')
+    expect(stdout()).toContain('USAGE dshx runtime list [OPTIONS] [<HOST-ID>]')
   })
 
   it('runs static Slot explanation without resolving a plugin project', async () => {

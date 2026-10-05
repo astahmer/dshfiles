@@ -160,6 +160,7 @@ describe('CLI argument parser', () => {
       json: true,
     })
     expect(() => parseCliArgs(['add'])).toThrow('requires a target')
+    expect(() => parseCliArgs(['add', 'panel', '--slot', 'sidebar'])).toThrow('Slot options are only valid with add ui.')
     expect(parseCliArgs(['add', 'tool'])).toMatchObject({ command: 'add', addTarget: 'tool' })
     expect(parseCliArgs(['add', 'command', '--name', 'status', '--description', 'Status'])).toMatchObject({
       command: 'add',
@@ -179,6 +180,26 @@ describe('CLI argument parser', () => {
   })
 })
 describe('CLI commands', () => {
+  it('renders root and target help from scoped Citty command metadata', async () => {
+    const rootStreams = io()
+    expect(await runCli(['--help'], { io: rootStreams })).toBe(0)
+    rootStreams.out.end()
+    rootStreams.err.end()
+    const rootOutput = await text(rootStreams.out)
+    expect(rootOutput).toContain('USAGE dshx [OPTIONS]')
+    expect(rootOutput).toContain('sessions')
+    expect(rootOutput).toContain('Check the authenticated local DSH Host connection.')
+
+    const targetStreams = io()
+    expect(await runCli(['add', 'panel', '--help'], { io: targetStreams })).toBe(0)
+    targetStreams.out.end()
+    targetStreams.err.end()
+    const targetOutput = await text(targetStreams.out)
+    expect(targetOutput).toContain('USAGE dshx add panel [OPTIONS]')
+    expect(targetOutput).toContain('--id=<id>')
+    expect(targetOutput).not.toContain('--slot=')
+  })
+
   it('explains native slot mode, ownership, registration identity, and replacement obligations as versioned JSON', async () => {
     const streams = io()
     const code = await runCli(['inspect', 'slots', '--explain', '--root', 'sidebar', '--json'], { io: streams })
@@ -262,6 +283,14 @@ describe('CLI commands', () => {
       declaration: '@deepseek-ai/dsh-client-ui-sidebar/client#SlotMap.sidebar.panellist',
     })
     expect(report.unavailable.some(capability => capability.name === 'conversationEvents')).toBe(true)
+  })
+
+  it('renders verified capability help for the capabilities target', async () => {
+    const streams = io()
+    expect(await runCli(['inspect', 'capabilities', '--help'], { io: streams })).toBe(0)
+    streams.out.end()
+    streams.err.end()
+    expect(await text(streams.out)).toContain('Inspect verified Client capabilities and native declarations.')
   })
 
   it('builds enabled faces in parallel and does not touch Profile APIs', async () => {

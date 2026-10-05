@@ -49,6 +49,7 @@ import type {
 import { assessProjectCompatibility, detectInstalledDshVersion, projectCompatibilityDiagnostics } from '../compat/index.js'
 import type { DshProjectCompatibilityAssessment } from '../compat/index.js'
 import { CliUsageError, parseCliArgs, type CliArgs } from './args.js'
+import { renderCliUsage } from './usage.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
 import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../platform/client.js'
@@ -1461,7 +1462,6 @@ const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => 
 const platformGroupsForRun = (): ReadonlySet<string> =>
   new Set(['status', 'info', 'doctor', 'sessions', 'plugins', 'bundles', 'presets', 'models', 'skills', 'commands', 'config', 'host', 'runtime', 'workspace', 'comm'])
 
-const platformCommandsForHelp = platformGroupsForRun
 
 export async function runCli(argv: readonly string[], options: CliRunOptions = {}): Promise<number> {
   const io = options.io ?? defaultIO()
@@ -1553,19 +1553,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   // before a Host is contacted.
   if (args.command === 'inspect' && args.explain) return await runSlotExplanation(args, io)
   if (args.help) {
-    const runtime = options.runtime ?? {}
-    if (args.command !== undefined && platformCommandsForHelp().has(args.command)) {
-      return runPlatformCli(args, {
-        io,
-        dshxVersion: options.version ?? VERSION,
-        ...(runtime.connectPlatform === undefined ? {} : { connect: runtime.connectPlatform }),
-        ...(runtime.connectCommunication === undefined ? {} : { connectCommunication: runtime.connectCommunication }),
-      })
-    }
-    write(
-      io.stdout,
-      'Usage: dshx <create|build|check|dev|test|package|inspect|add|status|info|doctor|sessions|plugins|bundles|presets|models|skills|commands|config|host|runtime|workspace|comm> [target] [options]\n\nOptions: --cwd <path> --verbose --help --version --quiet --no-color\ncheck/inspect/add: --json\ncheck: --runtime --fix --dry-run --boot --port <port>  (--boot --runtime also drives a real browser)\ndev: --open --port <port>\ninspect targets: slots, tools, services, events, capabilities\ninspect slots: --root <slot-name>, --explain\nadd targets: ui, panel, api, tool, command, hook\nadd ui options: --slot <name> --provider <package> --file <path> --id <id> --order <integer> --dry-run\nadd panel/api options: --id <slug> --dry-run\nadd tool options: --name <name> --description <text> --file <path> --dry-run\nadd command options: --name <name> --description <text> --file <path> --dry-run\nadd hook options: --event <name> --file <path> --dry-run\n\nDSH platform commands: status, info, doctor, sessions, plugins, bundles, presets, models, skills, commands, config, host, runtime, workspace, comm\nUse --json for stable machine-readable output. Set DSHX_URL to the tokenized local DSH launch URL, or pass --url.\n',
-    )
+    write(io.stdout, await renderCliUsage(args))
     return 0
   }
   if (args.version) {
