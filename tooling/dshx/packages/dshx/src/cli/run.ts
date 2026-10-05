@@ -1441,6 +1441,7 @@ const runSlotExplanation = async (args: CliArgs, io: CliIO): Promise<number> => 
   write(io.stdout, `  purpose    ${slot.purpose}\n`)
   if (slot.registration.length > 0) write(io.stdout, `  registration ${slot.registration.join(', ')}\n`)
   if (slot.ownerProps !== undefined) write(io.stdout, `  ownerProps ${slot.ownerProps.join(', ')}\n`)
+  if (slot.registrationMetadata !== undefined && slot.registrationMetadata.length > 0) write(io.stdout, `  metadata   ${slot.registrationMetadata.join(', ')}\n`)
   if (slot.shippedOccupants.length > 0) write(io.stdout, `  shipped IDs ${slot.shippedOccupants.join(', ')} (live occupants require runtime inspect)\n`)
   if (slot.childObligations.length > 0) {
     write(io.stdout, '  replacement obligations\n')

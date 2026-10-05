@@ -12,6 +12,7 @@ export interface ClientSlotReference {
   /** Registration identity when the native contract assigns one. */
   readonly identity?: 'id' | 'key'
   readonly registration: readonly string[]
+  readonly registrationMetadata?: readonly string[]
   /** Owner props projected by this SlotMap declaration. */
   readonly ownerProps?: readonly string[]
   readonly purpose: string
@@ -122,8 +123,9 @@ export const CLIENT_SLOT_REFERENCES: readonly ClientSlotReference[] = [
     scope: 'root',
     identity: 'id',
     registration: ['id', 'order', 'label'],
-    ownerProps: ['close: () => void'],
-    purpose: 'A page in the settings dialog. The shell owns navigation and visibility; the registrant owns page data and UI.',
+    registrationMetadata: ['settingsTargets?: readonly string[]'],
+    ownerProps: ['close: () => void', 'openSection(id)', 'openSettingsTarget(target)', 'target?', 'acknowledgeTarget(requestId)'],
+    purpose: 'A settings dialog section. Advertise handled ConfigForm entry ids in settingsTargets; the Host routes matching field targets here.',
     shippedOccupants: [],
     replaces: [],
     childObligations: [],
@@ -135,8 +137,8 @@ export const CLIENT_SLOT_REFERENCES: readonly ClientSlotReference[] = [
     kind: 'single',
     scope: 'root',
     registration: [],
-    ownerProps: ['wide: boolean', 'settingsOpen: boolean', 'settingsShortcut?', 'openSettings()', 'openOnboarding(id)'],
-    purpose: 'A sidebar account launcher that opens the shell-owned settings panel.',
+    ownerProps: ['wide: boolean', 'settingsOpen: boolean', 'settingsShortcut?', 'openSettings()', 'openSection(id)', 'openOnboarding(id)'],
+    purpose: 'A sidebar account launcher that opens the shell-owned settings panel with Host-owned section navigation.',
     shippedOccupants: [],
     replaces: [],
     childObligations: [],

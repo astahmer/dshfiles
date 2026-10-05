@@ -6,7 +6,7 @@ export const SETTINGS_SEARCH_LOCALE_NAMESPACE = 'dshfiles.settingsSearch'
 const en = {
   sectionLabel: 'Search',
   title: 'Settings Search',
-  searchSubtitle: 'Find a setting by name, description, entry, or section path. Selecting a result opens its live Host-backed value.',
+  searchSubtitle: 'Find a setting by name, description, entry, or section path. Supported entries open in their native Settings section; other results use the live Host-backed editor.',
   editorSubtitle: 'Open and edit the matching setting from its Host configuration entry.',
   searchSettings: 'Search settings',
   searchPlaceholder: 'Search settings…',
@@ -57,7 +57,7 @@ const en = {
 const zh = {
   sectionLabel: '搜索',
   title: '设置搜索',
-  searchSubtitle: '按名称、描述、条目或分区路径查找设置。选择结果即可打开其由 Host 提供的实时值。',
+  searchSubtitle: '按名称、描述、条目或分区路径查找设置。支持的条目会在其原生设置分区中打开；其他结果使用 Host 实时编辑器。',
   editorSubtitle: '从对应的 Host 配置条目中打开并编辑匹配的设置。',
   searchSettings: '搜索设置',
   searchPlaceholder: '搜索设置…',

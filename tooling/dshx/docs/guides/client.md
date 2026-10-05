@@ -96,8 +96,25 @@ Non-empty `locales` automatically requests the Cordis `locale` service, includin
 | `children`                                  | Declares child Slots consumed through `renderSlot` or `renderSlotChain`          |
 | `locale`                                    | Selects an official locale namespace and adds its typed locale props             |
 | `registrant`                                | Overrides official registration metadata where supported                         |
+| `metadata`                                  | Supplies the slot-specific metadata declared by its Host contract                |
 
 The helper preserves keyed/list/chain/session/maybe behavior from the official Slot types. If `children` are declared but the component does not consume `renderSlot` or `renderSlotChain`, `RendersCheck` produces a type error. `SlotContribution` is opaque: pass it to `defineClient({ slots })`; do not copy or inspect it.
+
+### Host Settings targets
+
+The DSH 0.2 `settings.section` contract can route a field target into a native section. A section opts in by declaring the ConfigForm entry ids it handles in `metadata.settingsTargets`; `dshx inspect slots --root settings.section --explain` reports the exact owner props and metadata shape.
+
+The Host supplies `openSection(id)` for section navigation and `openSettingsTarget({ entryId, fieldPath })` for field navigation. The latter returns `false` when no unique live section advertises the entry. A routed section receives `target` with the same `entryId` and path plus a `requestId`; after focusing or handling the field, call `acknowledgeTarget(requestId)`. `fieldPath` is a readonly array of schema path segments, so dotted field names remain unambiguous.
+
+```ts
+defineSlot('settings.section', {
+  id: 'my-settings',
+  metadata: { settingsTargets: ['my-settings-entry'] },
+  component: MySettingsSection,
+})
+```
+
+Import `@deepseek-ai/dsh-client-ui-settings/client` as a type-only module so `settings.section` and its Host target props enter the typed SlotMap. The section owns how a path resolves to one of its controls; the Host owns opening the section and delivering the request.
 
 ## Registration and lifecycle
 

@@ -20,20 +20,18 @@ onboarding, launchers, and shortcuts.
 
 ## Host navigation boundary
 
-The rc.2 `sidebar.settings` root owns a private `openSection(id)` store action.
-`settings.launcher` receives `openSettings()` and a regular `settings.section`
-owner receives only `close()`. No general section/field route service exists
-in the installed declarations. The Host does expose `ConfigForms.describe()`
-and `ConfigForms.get(entryId).mutate(pathOps, expectedRevision)`, so selecting
-a result can open a live editor for that exact entry and field path. It cannot
-switch to the entry's native settings page or focus its native row. A future
-Host API could accept the stable target `{ entryId, fieldPath }` and navigate
-to/focus the corresponding native editor; this package does not use DOM
-selectors or duplicate the underlying setting data.
+The Host Settings contract routes a field target `{ entryId, fieldPath }` to a
+unique `settings.section` registration that advertises the entry in
+`metadata.settingsTargets`. It opens that section and delivers the same target
+with a request id; the section owns locating and focusing its native control,
+then acknowledges the request. When no unique section advertises the entry,
+Settings Search keeps its live Host-backed editor for that exact field path.
+This package does not use DOM selectors or duplicate the underlying setting
+data.
 
-The rc.2 descriptor carries each namespace's schema and ancestor field labels,
-but no separate native sidebar category registry. Results show the owning
-entry id followed by schema section context.
+The Host describe mirror carries each namespace's schema and ancestor field
+labels. Settings Search uses the Host's section metadata for native routing;
+results show the owning entry id followed by schema section context.
 
 ## Marketplace decision and compatibility
 
@@ -46,8 +44,9 @@ there is no rc.2 section-owner API for that direct jump. The candidate was not
 adopted or ported; this package is built with the local `@dshfiles/dshx` fork
 and the installed rc.2 `ConfigForms`/slot APIs.
 
-Peer range: `@deepseek-ai/dsh >=0.2.0-rc.2 <0.3.0-0` and
-`@deepseek-ai/dsh-client-ui-settings 0.2.0-rc.2`. The plugin owns one
-`settings.section` contribution. The parent composition must add
-`@dshfiles/settings-search` and its package dependency; root manifests and
-profile composition are intentionally not changed here.
+The published rc.2 Settings declarations do not include the target route. This
+implementation depends on the companion DSH core change; the package peer
+range must be raised to the release that carries that contract before
+activation. The plugin owns one `settings.section` contribution. The parent
+composition must add `@dshfiles/settings-search` and its package dependency;
+root manifests and profile composition are intentionally not changed here.

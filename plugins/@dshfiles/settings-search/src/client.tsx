@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
 import {
@@ -31,6 +31,7 @@ const MAX_RESULTS = 60
 interface SettingsSearchPanelProps {
   readonly describe: SettingsDescribeFace
   readonly getForm: (entryId: string) => ConfigForm<unknown>
+  readonly openSettingsTarget: SettingsSectionOwnerProps['openSettingsTarget']
   readonly t: SettingsSearchTranslate
 }
 
@@ -244,7 +245,10 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const selectedNamespace = selected === null ? undefined : namespaces.find(namespace => namespace.ns === selected.target.entryId)
   const selectedTarget = selected === null ? undefined : allResults.find(result => result.id === selected.id)
 
-  const selectResult = (result: SettingsSearchResult): void => setSelected(result)
+  const selectResult = (result: SettingsSearchResult): void => {
+    if (props.openSettingsTarget(result.target)) return
+    setSelected(result)
+  }
 
   const navigateResults = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'ArrowDown' && visibleResults.length > 0) {
@@ -400,7 +404,14 @@ export default defineClient({
           label: () => translate('sectionLabel'),
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
-        props => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={props.t} />,
+        ({ openSettingsTarget, t }) => (
+          <SettingsSearchPanel
+            describe={ctx.configForms.describe()}
+            getForm={getForm}
+            openSettingsTarget={openSettingsTarget}
+            t={t}
+          />
+        ),
       ),
     )
   },
