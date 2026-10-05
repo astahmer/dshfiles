@@ -412,13 +412,20 @@
   padding: 4px 0;
 }
 
+/*
+ * A published widget keeps its intrinsic width and the track scrolls sideways
+ * rather than squeezing it -- but nothing bounded its height. A footer owner that
+ * renders a tall card (the third-party Command Code provider does, at 120px in a
+ * 61px row) painted outside the row and over its neighbours. The shell owns this
+ * track, so it bounds what may paint in it and clips the rest.
+ */
 .footerItem {
   display: inline-flex;
   flex: 0 0 auto;
   min-width: 0;
+  max-height: 100%;
   align-items: center;
-  /* A published widget keeps its intrinsic width; the track scrolls instead. */
-  max-width: none;
+  overflow: hidden;
 }
 
 .moreContainer {
