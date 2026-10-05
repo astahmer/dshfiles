@@ -1,0 +1,8 @@
+# Top-level Loader ids share one namespace across every bundle in a profile, so
+# the scope stays in the id. A bare `goal-stall-guard` would be a new global id
+# for a plugin only we own.
+- insert:
+    - id: dshfiles-goal-stall-guard
+      name: '@dshfiles/goal-stall-guard'
+      config:
+        stallThreshold: 3
