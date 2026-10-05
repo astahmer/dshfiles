@@ -85,11 +85,6 @@
         # Electron comes from the binary cache and is never built from source.
         dontFixup = true;
 
-        configurePhase = ''
-          export ELECTRON_SKIP_BINARY_DOWNLOAD=1
-          pnpm install --offline --frozen-lockfile --ignore-scripts
-        '';
-
         buildPhase = ''
           runHook preBuild
           pnpm run build
