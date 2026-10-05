@@ -4,7 +4,7 @@
 
 Survey date: 2026-10-05. This is a gap-only software backlog, following the reference survey of T3 Code, OpenCode 2, BB, Codex, Claude Code, Cursor, Pi, Oh My Pi and Amp. Existing functionality has been removed, including native capabilities whose activation still needs validation. Runtime acceptance work belongs to its existing owner, not this additions list.
 
-Evidence: installed DSH 0.2.0-rc.2 declarations, current owned plugin source, and web profile manifest. The active manifest composes AI Accounts, Queue Reorder, Shortcuts, Thread Sidebar, Jujutsu, MCP Servers, Secret Catalog, Settings Search, Agent Communication and Plugin Marketplace. Source/registration is not live acceptance. No live instance was restarted or altered.
+Evidence: installed DSH 0.2.0-rc.2 declarations, current owned plugin source, and a read-only refresh of the web profile manifest and composed config. The manifest includes AI Accounts, Queue Reorder, Shortcuts, Thread Sidebar, Jujutsu, MCP Servers, Secret Catalog, Settings Search, Agent Communication, Plugin Marketplace and Goal Stall Guard; it also includes `dshmarket` and `@mars-sea/dsh-commandcode-provider`. The offline config dump warns that `llm-openai-codex` and `preset-standard:tool-ask-user` patch targets are missing, so the active composition is not clean acceptance evidence. Source/registration is not live acceptance. No live instance was restarted or altered.
 
 Personality prompts and specialist roles are outside scope. A planned feature is not an implemented feature: dedicated plans can still represent real gaps and should be extended rather than duplicated.
 
