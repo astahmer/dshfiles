@@ -12,10 +12,7 @@ export default defineClientPlugin({
   uses: ['ui'],
   setup(api) {
     const translate = api.raw.ctx.locale.bind(JUJUTSU_LOCALE_NAMESPACE)
-    api.ui.register(
-      { name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: JUJUTSU_LOCALE_NAMESPACE },
-      PanelGlyph,
-    )
+    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: JUJUTSU_LOCALE_NAMESPACE }, PanelGlyph)
     api.ui.register({ name: 'main', key: PANEL_ID, locale: JUJUTSU_LOCALE_NAMESPACE }, JujutsuPanel)
   },
 })
