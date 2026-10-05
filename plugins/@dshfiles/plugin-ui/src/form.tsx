@@ -33,7 +33,13 @@ const labelledProps = (props: LabelledFieldProps): LabelledFieldProps => ({
   ...(props.required === undefined ? {} : { required: props.required }),
 })
 
-const TextField = (props: LabelledFieldProps & { readonly placeholder?: string; readonly type?: 'text' | 'url' | 'email' | 'password' | 'number'; readonly autoComplete?: string }): JSX.Element => {
+const TextField = (
+  props: LabelledFieldProps & {
+    readonly placeholder?: string
+    readonly type?: 'text' | 'url' | 'email' | 'password' | 'number'
+    readonly autoComplete?: string
+  },
+): JSX.Element => {
   const field = useFieldContext<string>()
   return (
     <Field {...labelledProps(props)} error={useVisibleErrors()}>
@@ -77,7 +83,9 @@ const SelectField = <Value extends string>(props: LabelledFieldProps & { readonl
   const field = useFieldContext<Value>()
   return (
     <Field {...labelledProps(props)} error={useVisibleErrors()}>
-      {control => <Select {...control} name={field.name} onBlur={field.handleBlur} onValueChange={field.handleChange} options={props.options} value={field.state.value} />}
+      {control => (
+        <Select {...control} name={field.name} onBlur={field.handleBlur} onValueChange={field.handleChange} options={props.options} value={field.state.value} />
+      )}
     </Field>
   )
 }
@@ -93,12 +101,12 @@ const SwitchField = (props: { readonly label: string; readonly title?: string })
 }
 
 /** Submit button that disables itself while the form is invalid or submitting. */
-const SubmitButton = (props: { readonly children: ReactNode; readonly className?: string }): JSX.Element => {
+const SubmitButton = (props: { readonly children: ReactNode; readonly className?: string; readonly disabled?: boolean }): JSX.Element => {
   const form = useFormContext()
   return (
     <form.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
       {([canSubmit, isSubmitting]) => (
-        <Button className={props.className} disabled={!canSubmit || isSubmitting} type="submit" variant="primary">
+        <Button className={props.className} disabled={props.disabled === true || !canSubmit || isSubmitting} type="submit" variant="primary">
           {props.children}
         </Button>
       )}
