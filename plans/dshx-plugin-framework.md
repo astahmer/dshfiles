@@ -273,7 +273,7 @@ All timing samples used official fnm Node **22.23.3**. Create measurements ran f
 | Warm offline dependency install | Not captured for the starting tree | 3.39 s | Same isolated store after first install |
 | Generated Basic typecheck / build / test / static check | Not captured for the starting tree | 1.36 / 2.66 / 1.24 / 0.45 s | Clean generated project, same install and Node |
 
-The measured improvement is workflow completeness: the original built CLI rejected `add panel` and `add api`; generated Slot work previously needed hand-maintained provider metadata. Current tests cover the CLI wiring, and a clean scratch UI template plus Basic-to-Slot scaffold both install and pass typecheck/build/tests. The latter used an injected exact Inspect fixture because the installed Host has no Slots provider; it does not claim live Slot activation.
+The measured improvement is workflow completeness: the original built CLI rejected `add panel` and `add api`; generated Slot work previously needed hand-maintained provider metadata. Current tests cover the CLI wiring, and a clean scratch UI template plus Basic-to-Slot scaffold both install and pass typecheck/build/tests. The latter used an injected exact Inspect fixture to isolate generated-project behavior; native live discovery and occupancy are verified separately below.
 
 Initial framework validation on 2026-10-05:
 
