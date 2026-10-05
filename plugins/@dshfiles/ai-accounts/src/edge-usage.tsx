@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { useApi } from '@dshfiles/dshx/client'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { aiAccountsApi, type AccountsUsage, type UsageCard } from './api.js'
 import styles from './accounts.module.css'
 
@@ -192,7 +193,9 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     return { left: centeredLeft, bottom: window.innerHeight - position.y + 8 }
   })()
 
-  return (
+  // Portal to the body: the sidebar foot has transformed ancestors, and a fixed
+  // backdrop inside one anchors to that ancestor instead of the viewport.
+  return createPortal(
     <aside className={styles.edgeOverlay} aria-label="AI Accounts usage">
       <button
         ref={triggerRef}
@@ -239,6 +242,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
           </ul>
         </div>
       ) : null}
-    </aside>
+    </aside>,
+    document.body,
   )
 }
