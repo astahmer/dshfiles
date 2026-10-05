@@ -1,6 +1,6 @@
 import { defineCommand, renderUsage } from 'citty'
 import type { ArgsDef, CommandDef, PositionalArgDef } from 'citty'
-import { cliArgsCommonToContexts, cliArgsForContext, cliCommandDescription, type CliArgs, type CliCommand, type CliOptionContext } from './args.js'
+import { cliArgsCommonToContexts, cliArgsForContext, cliCommandMetadata, type CliArgs, type CliCommand, type CliOptionContext } from './args.js'
 
 interface HelpCommandSpec {
   readonly description: string
@@ -46,7 +46,7 @@ const actionHelpGroup = (command: CliCommand, actions: HelpCommandSpecs): Comman
     helpActionCommands.set(`${command}:${action}`, actionCommand)
   }
   return defineCommand({
-    meta: { name: command, description: cliCommandDescription(command) },
+    meta: { name: command, description: cliCommandMetadata[command] },
     args: cliArgsCommonToContexts(actionContexts),
     subCommands,
   })
@@ -64,7 +64,7 @@ const targetHelpGroup = (
     helpActionCommands.set(`${command}:${target}`, targetCommand)
   }
   return defineCommand({
-    meta: { name: command, description: cliCommandDescription(command) },
+    meta: { name: command, description: cliCommandMetadata[command] },
     args: cliArgsCommonToContexts(contexts),
     subCommands,
   })
@@ -361,15 +361,6 @@ const inspectHelp = targetHelpGroup('inspect', {
       fix: false,
     }),
   },
-  capabilities: {
-    description: 'Inspect verified Client capabilities and native declarations.',
-    context: optionContext('inspect', undefined, {
-      inspectTarget: 'capabilities',
-      addTarget: undefined,
-      boot: false,
-      fix: false,
-    }),
-  },
 })
 
 const addHelp = targetHelpGroup('add', {
@@ -432,7 +423,7 @@ const addHelp = targetHelpGroup('add', {
 const simpleHelpCommand = (command: CliCommand, details: Partial<Pick<CliOptionContext, 'boot' | 'fix'>> = {}): CommandDef =>
   helpCommand(
     command,
-    cliCommandDescription(command),
+    cliCommandMetadata[command],
     optionContext(command, undefined, {
       inspectTarget: undefined,
       addTarget: undefined,

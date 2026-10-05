@@ -150,7 +150,8 @@ describe('DSH platform CLI', () => {
     })
 
     expect(helpExitCode).toBe(0)
-    expect(help()).toContain('Usage: dshx sessions export <session-id> [--output <path>]')
+    expect(help()).toContain('USAGE dshx sessions export [OPTIONS] <SESSION-ID>')
+    expect(help()).toContain('--output=<path>')
 
     const outputStreams = io()
     const output = capture(outputStreams.out)
@@ -327,6 +328,52 @@ describe('DSH platform CLI', () => {
         input: { hint: 'Optional scope', attachments: true },
       },
     ])
+  })
+
+  it('updates Host-owned Session attention through the Session Remote', async () => {
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
+    }[] = []
+    const responses = [
+      { lastPromptSeq: 4, readThroughSeq: 4, snoozed: false, unread: false },
+      { lastPromptSeq: 4, readThroughSeq: 4, snoozed: true, unread: false },
+    ]
+    const client = createDshPlatformClientFromTransport({
+      sessionCursor: async () => 0,
+      rpc: async (namespace, method, args) => {
+        calls.push({ namespace, method, args })
+        return responses[calls.length - 1]
+      },
+    })
+
+    await expect(client.sessions.updateAttention('session-1', { type: 'mark-read' })).resolves.toEqual({
+      lastPromptSeq: 4,
+      readThroughSeq: 4,
+      snoozed: false,
+      unread: false,
+    })
+    await expect(client.sessions.updateAttention('session-1', { type: 'set-snoozed', snoozed: true })).resolves.toEqual({
+      lastPromptSeq: 4,
+      readThroughSeq: 4,
+      snoozed: true,
+      unread: false,
+    })
+    expect(calls).toEqual([
+      {
+        namespace: 'session',
+        method: 'updateAttention',
+        args: { request: { sessionId: 'session-1', action: { type: 'mark-read' } } },
+      },
+      {
+        namespace: 'session',
+        method: 'updateAttention',
+        args: { request: { sessionId: 'session-1', action: { type: 'set-snoozed', snoozed: true } } },
+      },
+    ])
+    await expect(client.sessions.updateAttention('', { type: 'mark-read' })).rejects.toThrow()
+    expect(calls).toHaveLength(2)
   })
 
   it('uses revisioned settings mutations and rejects non slash-prefixed Session commands', async () => {

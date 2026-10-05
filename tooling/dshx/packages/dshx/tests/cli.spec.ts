@@ -126,9 +126,6 @@ describe('CLI argument parser', () => {
     expect(() => parseCliArgs(['add', 'panel', '--file', 'src/panel.ts'])).toThrow('--file')
     expect(() => parseCliArgs(['add', 'api', '--slot', 'sidebar'])).toThrow('Slot options')
     expect(() => parseCliArgs(['commands', 'list', '--line', '/status'])).toThrow('--line')
-  })
-
-  it('parses inspect targets and JSON mode', () => {
     expect(parseCliArgs(['inspect', 'slots', '--json'])).toMatchObject({ command: 'inspect', inspectTarget: 'slots', json: true })
     expect(parseCliArgs(['inspect', 'slots', '--root', 'sidebar.footer.action'])).toMatchObject({
       command: 'inspect',
@@ -184,7 +181,7 @@ describe('CLI commands', () => {
     rootStreams.out.end()
     rootStreams.err.end()
     const rootOutput = await text(rootStreams.out)
-    expect(rootOutput).toContain('USAGE dshx [OPTIONS] create|test|package|build')
+    expect(rootOutput).toContain('USAGE dshx [OPTIONS] create|test|package')
     expect(rootOutput).toContain('sessions')
     expect(rootOutput).toContain('Check the authenticated local DSH Host connection.')
 
@@ -196,72 +193,6 @@ describe('CLI commands', () => {
     expect(targetOutput).toContain('USAGE dshx add panel [OPTIONS]')
     expect(targetOutput).toContain('--id=<id>')
     expect(targetOutput).not.toContain('--slot=')
-  })
-
-  it('prints live slot catalog and occupancy facts in human Inspect output', async () => {
-    const streams = io()
-    const value = project()
-    const code = await runCli(['inspect', 'slots', '--root', 'sidebar.footer.action'], {
-      io: streams,
-      runtime: {
-        resolveConfig: async () => value,
-        inspectComposition: async (_project, target) => ({
-          profile: 'web',
-          target,
-          source: 'runtime',
-          items: [
-            { name: 'ui.root', type: 'factory', scope: 'root' },
-            {
-              name: 'sidebar.footer.action',
-              kind: 'list',
-              scope: 'root',
-              metadata: {
-                catalog: { registration: [{ name: 'id', required: true, type: 'string' }], replaceRisk: 'none', ownerProps: ['wide:boolean'] },
-                occupants: [{ registrant: '@test/footer', id: 'test.footer' }],
-                children: [{ name: 'sidebar.footer.action.icon', kind: 'single', scope: 'root' }],
-              },
-            },
-          ],
-          diagnostics: [],
-        }),
-      },
-    })
-    streams.out.end()
-    streams.err.end()
-    expect(code).toBe(0)
-    const output = await text(streams.out)
-    expect(output).toContain('catalog:')
-    expect(output).toContain('occupants:')
-    expect(output).toContain('children:')
-    expect(output).toContain('ui.root (factory / root)')
-  })
-
-  it('builds enabled faces in parallel and does not touch Profile APIs', async () => {
-    const streams = io()
-    const value = project()
-    const calls: string[] = []
-    const code = await runCli(['build'], {
-      io: streams,
-      runtime: {
-        ...offlineChecks,
-        resolveConfig: async () => value,
-        checkManifest: async () => [],
-        buildHost: async () => {
-          calls.push('host')
-          return {} as never
-        },
-        buildClient: async () => {
-          calls.push('client')
-          return {} as never
-        },
-        ensureProfile: vi.fn(),
-      },
-    })
-    expect(code).toBe(0)
-    expect(calls).toEqual(expect.arrayContaining(['host', 'client']))
-    streams.out.end()
-    streams.err.end()
-    await expect(text(streams.out)).resolves.toContain('Built @test/plugin')
   })
 
   it('uses terminal colors and compact relative artifact paths on a TTY', async () => {
