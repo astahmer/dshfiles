@@ -20,6 +20,7 @@ marketplace plugin instead of writing one.
 |---|---|---|
 | `agent-communication` | bundle | Durable topic and direct messaging between independent DSH Agents |
 | `ai-accounts` | bundle | Per-account Codex, OpenCode Go and Command Code provider instances |
+| `diff-viewed` | bundle | Viewed toggle and per-turn progress in the changed-files review tab |
 | `jujutsu` | bundle | Jujutsu revision graph and confirmed Source Control actions |
 | `mcp-servers` | bundle | Profile-wide MCP server configurations backed by native DSH MCP clients |
 | `plugin-marketplace` | bundle | Settings tab that installs DSH plugins from a catalog |
