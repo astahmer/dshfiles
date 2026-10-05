@@ -423,8 +423,16 @@
   display: inline-flex;
   flex: 0 0 auto;
   min-width: 0;
-  max-height: 100%;
+  /* The track's own height, not a percentage of it: the row's height comes from
+     the track's min/max, so a percentage here resolves against nothing and the
+     item grows to its content instead of being bounded. */
+  height: 100%;
+  max-height: 44px;
   align-items: center;
+  /* A footer entry may hand back a display:contents wrapper. That has no box, so
+     its child escapes this item's overflow and paints upward over the
+     neighbours. Containing it makes the item a real clip boundary again. */
+  contain: paint;
   overflow: hidden;
 }
 
