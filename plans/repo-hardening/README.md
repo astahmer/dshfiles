@@ -181,9 +181,11 @@ wildcard declaration is a global script, so a module import cannot replace it.
 
 - [x] ai-accounts: module singleton replaced by a context-owned runtime;
       `account-config.ts` builds config from the zod-validated store
-- [x] ai-accounts: `accounts-panel.tsx` 1072 → 63 lines over a state hook
-      and per-section files; `host.ts` 571 → 73 lines over route, profile,
-      registration, listener, API and sweep modules
+- [x] ai-accounts: `accounts-panel.tsx` 1058 → 47 lines over a state hook
+      and per-section files (redone on current code after the first split was
+      lost in the re-land; the account switch, which double-negated, now toggles)
+- [ ] ai-accounts: `host.ts` split, deferred while the Command Code route work
+      edits it; the old split (`c5b85f90b289`) is the guide
 - [x] queue-reorder: `as never` gone; dshx's decorator keeps component props
 - [x] mcp-servers: start failures reach the Host log through the redacting
       logger instead of vanishing; reconciler generic over its target (cast
@@ -208,19 +210,23 @@ antislop outside the files touched here.
 - [x] `pnpm profile:boot` checks the composed config, boots, and fails on any
       activation line; proven red by hiding jujutsu's built entry
 - [x] `probe` runs all ten owned bundles and boots clean
-- [ ] `web` gets all ten — blocked: nixfiles declares `web/package.json` from a
-      stale asset (`~/dev/dsh-plugins` era), so `nixapply` would revert it; and
-      a live `web` server is serving now
+- [x] `web` runs all eleven owned bundles. nixfiles now seeds
+      `web/package.json` and `cordis.patch.yml` only when absent (DSH rewrites
+      both, so a store link broke installs) from an asset matching the live
+      profile; `nixapply` is the user's to run
 - [x] Browser walk on probe (all ten bundles): four client crashes no other
       gate saw, now fixed: undeclared `inject` for services beyond dshx's
       full-runtime set (mcp-servers, secret-catalog, thread-sidebar's empty
       sidebar), imperative Slot components without `decorate` (useApi threw),
       and an unbound store `getSnapshot`. Jujutsu, MCP, Secret Catalog,
       Accounts and Settings panels then open with no console error
-- [ ] Polish seen in the walk: Secret Catalog heading and variable names are
-      near-invisible on the light theme; the ai-accounts quota footer overlaps
-      text in the sidebar
-- [ ] Toolchain gap behind two of those crashes, earned by three plugins:
+- [x] Polish seen in the walk: the Secret Catalog heading measured 18.9:1, but
+      its alias line was 3.7:1 and its names fell back from monospace (a font
+      shorthand in `font-family`); the ai-accounts footer meter lost its size
+      in the integration commit. The remaining footer overlap is the third-party
+      Command Code quota widget (about 116px in a 44px footer)
+- [ ] thread-sidebar: collapsed, the footer's items stack past the window
+- [ ] (owned by the `dshx-complete` workspace) Toolchain gap behind two of those crashes, earned by three plugins:
       dshx should either check every `ctx.<service>` against `inject` (it
       knows only locale, slots and sessions) or decorate imperative
       `ctx.slots.register` components itself. `profile:boot` covers the Host
@@ -248,14 +254,19 @@ settings, so it is a decision, not a fix.
       comment-bearing `tsconfig.json` files broke nixpkgs' jq normalization;
       the fetch drops that derived directory. Built and run on aarch64-darwin;
       Linux outputs only evaluated
-- [ ] One pnpm source: the dev shell still adds nixpkgs' pnpm 12.3.4 beside
-      corepack's 12.5.1
+- [x] One pnpm source: the dev shell takes pnpm only from corepack
 - [ ] The desktop derivation still runs `pnpm install` with network inside
       the build; same fix applies, left to its owner
 
 ## Phase 9 — New capability
 
-- [ ] Port sidebar-resize into thread-sidebar
-- [ ] Port sidebar-commands
-- [ ] Port diff-viewed, if a changes-panel slot exists
-- [ ] Desktop shell Phase 0 spike
+- [ ] Port sidebar-resize into thread-sidebar — blocked on the Host:
+      `dsh-client-ui-layout` exposes only `toggleSidebar()`, the frame starts at a
+      hardcoded 280px and forgets a dragged width. Needs a public width setter
+      and a persisted start width
+- [x] `@dshfiles/sidebar-commands`: `/goto` popup over sidebar panels and
+      recent sessions (built: `dsh-spotlight` targets the removed client runtime)
+- [x] `@dshfiles/diff-viewed`: Viewed toggle and n/m count in
+      `deliverables.review.file.actions`, keyed by session, turn and path.
+      Collapsing or filtering viewed files needs a Host change
+- [ ] Desktop shell Phase 0 spike — owned by `plans/desktop-shell`
