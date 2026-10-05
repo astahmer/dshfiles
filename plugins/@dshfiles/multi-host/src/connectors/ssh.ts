@@ -1,0 +1,272 @@
+import { Buffer } from 'node:buffer'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { runtimeLocatorSchema, hostConnectorSchema } from '../records.js'
+import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
+import { reserveLoopbackEndpoint } from './loopback.js'
+import { readRuntimeLaunch } from './ssh-journal.js'
+
+const outputLimit = 128 * 1024
+
+const sshTargetOf = (value: string): string => {
+  const parsed = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: value })
+  if (parsed.kind !== 'ssh') throw new GatewayUnavailableError('invalid-ssh-target', 'The SSH target is invalid.')
+  return parsed.sshTarget
+}
+
+const sshOptions = (): string[] => [
+  '-o',
+  'BatchMode=yes',
+  '-o',
+  'StrictHostKeyChecking=yes',
+  '-o',
+  'ExitOnForwardFailure=yes',
+  '-o',
+  'ForwardAgent=no',
+  '-o',
+  'PermitLocalCommand=no',
+  '-o',
+  'ConnectTimeout=8',
+  '-o',
+  'ServerAliveInterval=10',
+  '-o',
+  'ServerAliveCountMax=2',
+  '-v',
+]
+
+const safeSshError = (stderr: string, defaultCode: string, defaultMessage: string): GatewayUnavailableError => {
+  if (/host key verification failed|remote host identification has changed/i.test(stderr)) {
+    return new GatewayUnavailableError('host-key-rejected', 'SSH host identity is unknown or changed; verify it in known_hosts before connecting.')
+  }
+  if (/permission denied/i.test(stderr)) {
+    return new GatewayUnavailableError('ssh-authentication-failed', 'SSH authentication failed in BatchMode; configure a key for this host first.')
+  }
+  if (/could not resolve hostname|name or service not known/i.test(stderr)) {
+    return new GatewayUnavailableError('ssh-host-unresolved', 'The SSH target could not be resolved.')
+  }
+  if (/connection timed out|operation timed out|no route to host|connection refused/i.test(stderr)) {
+    return new GatewayUnavailableError('ssh-unreachable', 'The SSH target is unreachable.')
+  }
+  return new GatewayUnavailableError(defaultCode, defaultMessage)
+}
+
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
+
+const runSshCommand = async ({
+  sshTarget,
+  command,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly command: string
+  readonly signal?: AbortSignal
+}): Promise<string> => {
+  if (signal?.aborted) throw new GatewayUnavailableError('cancelled', 'The SSH request was cancelled.')
+  const target = sshTargetOf(sshTarget)
+  const child = spawn('ssh', [...sshOptions(), target, command], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let stdout = ''
+  let stderr = ''
+  let outputBytes = 0
+  let outputExceeded = false
+  const append = (current: string, chunk: Buffer | string): string => {
+    const content = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    outputBytes += content.byteLength
+    if (outputBytes > outputLimit) {
+      outputExceeded = true
+      void stopChild(child)
+      return current
+    }
+    return current + content.toString('utf8')
+  }
+  child.stdout?.on('data', chunk => {
+    try {
+      stdout = append(stdout, chunk)
+    } catch {}
+  })
+  child.stderr?.on('data', chunk => {
+    try {
+      stderr = append(stderr, chunk)
+    } catch {}
+  })
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let finished = false
+  let abortListener: (() => void) | undefined
+  try {
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', () => {
+        if (finished) return
+        finished = true
+        reject(new GatewayUnavailableError('ssh-unavailable', 'The ssh executable could not be started.'))
+      })
+      child.once('close', status => {
+        if (finished) return
+        finished = true
+        resolve(status)
+      })
+      timer = setTimeout(() => {
+        if (finished) return
+        finished = true
+        void stopChild(child)
+        reject(new GatewayUnavailableError('ssh-timeout', 'The SSH command exceeded its time limit.'))
+      }, 12_000)
+      abortListener = () => {
+        if (finished) return
+        finished = true
+        void stopChild(child)
+        reject(new GatewayUnavailableError('cancelled', 'The SSH request was cancelled.'))
+      }
+      signal?.addEventListener('abort', abortListener, { once: true })
+      if (signal?.aborted) abortListener()
+    })
+    if (outputExceeded) throw new GatewayUnavailableError('ssh-output-too-large', 'The SSH command returned more data than allowed.')
+    if (code !== 0) throw safeSshError(stderr, 'ssh-command-failed', 'The SSH command failed.')
+    return stdout
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+    if (abortListener !== undefined) signal?.removeEventListener('abort', abortListener)
+  }
+}
+
+const remoteLaunch = async ({
+  sshTarget,
+  unit,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly unit: string
+  readonly signal?: AbortSignal
+}): Promise<{ readonly port: number; readonly token: string }> => {
+  const parsed = runtimeLocatorSchema.parse({ kind: 'ssh', unit, remoteHome: '/runtime' })
+  if (parsed.kind !== 'ssh') throw new GatewayUnavailableError('invalid-runtime-locator', 'The SSH runtime locator is invalid.')
+  const launch = await readRuntimeLaunch({
+    readJournal: source =>
+      runSshCommand({
+        sshTarget,
+        command: `${source === 'user' ? 'journalctl --user --unit' : 'journalctl --user-unit'} ${shellQuote(parsed.unit)} --lines=80 --no-pager --output=cat`,
+        signal,
+      }),
+  })
+  if (launch === undefined) {
+    throw new GatewayUnavailableError('runtime-not-found', 'Could not read an active tokenized launch URL from the remote runtime journal.')
+  }
+  return launch
+}
+
+const stopChild = async (child: ChildProcess): Promise<void> => {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  child.kill('SIGTERM')
+  await Promise.race([
+    new Promise<void>(resolve => child.once('close', () => resolve())),
+    new Promise<void>(resolve =>
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+        resolve()
+      }, 1_500),
+    ),
+  ])
+}
+
+const openTunnel = async ({
+  sshTarget,
+  remotePort,
+  localAddress,
+  localPort,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly remotePort: number
+  readonly localAddress: string
+  readonly localPort: number
+  readonly signal?: AbortSignal
+}): Promise<ChildProcess> => {
+  const target = sshTargetOf(sshTarget)
+  const child = spawn('ssh', [...sshOptions(), '-N', '-L', `${localAddress}:${localPort}:127.0.0.1:${remotePort}`, target], {
+    stdio: ['ignore', 'ignore', 'pipe'],
+  })
+  let stderr = ''
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false
+      let timer: ReturnType<typeof setTimeout>
+      const cleanup = (): void => {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', onAbort)
+        child.stderr?.removeListener('data', onStderr)
+        child.removeListener('error', onError)
+        child.removeListener('close', onClose)
+      }
+      const finish = (error?: GatewayUnavailableError): void => {
+        if (settled) return
+        settled = true
+        cleanup()
+        if (error === undefined) resolve()
+        else reject(error)
+      }
+      const onStderr = (chunk: Buffer | string): void => {
+        const content = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk
+        stderr = (stderr + content).slice(-8_192)
+        if (stderr.includes(`Local forwarding listening on ${localAddress} port ${localPort}.`)) finish()
+      }
+      const onError = (): void => finish(new GatewayUnavailableError('ssh-unavailable', 'The ssh executable could not be started.'))
+      const onClose = (): void => finish(safeSshError(stderr, 'tunnel-failed', 'The SSH forwarding process exited before its loopback endpoint became ready.'))
+      const onAbort = (): void => finish(new GatewayUnavailableError('cancelled', 'The SSH tunnel request was cancelled.'))
+      child.stderr?.on('data', onStderr)
+      child.once('error', onError)
+      child.once('close', onClose)
+      timer = setTimeout(() => {
+        finish(new GatewayUnavailableError('tunnel-timeout', 'The SSH loopback forward did not become ready before its time limit.'))
+      }, 12_000)
+      signal?.addEventListener('abort', onAbort, { once: true })
+      if (signal?.aborted) onAbort()
+    })
+    return child
+  } catch (error) {
+    await stopChild(child)
+    throw error
+  }
+}
+
+export const connectSsh = async ({
+  sshTarget,
+  unit,
+  remoteHome,
+  originPort,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly unit: string
+  readonly remoteHome: string
+  readonly originPort?: number
+  readonly signal?: AbortSignal
+}): Promise<Gateway> => {
+  const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget })
+  const locator = runtimeLocatorSchema.parse({ kind: 'ssh', unit, remoteHome })
+  if (connector.kind !== 'ssh' || locator.kind !== 'ssh') {
+    throw new GatewayUnavailableError('invalid-runtime-locator', 'The SSH runtime locator is invalid.')
+  }
+  const launch = await remoteLaunch({ sshTarget: connector.sshTarget, unit: locator.unit, signal })
+  const endpoint = await reserveLoopbackEndpoint(originPort)
+  let child: ChildProcess
+  try {
+    child = await openTunnel({ sshTarget: connector.sshTarget, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port, signal })
+  } catch (error) {
+    endpoint.release()
+    throw error
+  }
+  const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
+  let disposed = false
+  return connectGateway({
+    launchUrl: localLaunchUrl,
+    signal,
+    createTransport: async origin => ({
+      origin: origin.origin,
+      launchUrl: localLaunchUrl,
+      dispose: async () => {
+        if (disposed) return
+        disposed = true
+        await stopChild(child)
+        endpoint.release()
+      },
+    }),
+  })
+}

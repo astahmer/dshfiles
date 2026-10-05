@@ -1,0 +1,4 @@
+- insert:
+    - id: dshfiles-multi-host
+      name: '@dshfiles/multi-host'
+      config: {}
