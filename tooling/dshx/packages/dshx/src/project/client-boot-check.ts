@@ -1,6 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
+import { isolatedHostEnvironment } from './scratch-profile.js'
 import type { BrowserBootEvidence } from './browser-boot.js'
 export { compositionFailures }
 
@@ -186,7 +187,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
       try {
         host = spawnOwnedProcess(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
           cwd: options.projectRoot,
-          env: { ...process.env, DSH_HOME: options.dshHome, DSHX_BOOT_PROFILE_ROOT: options.profileRoot },
+          env: isolatedHostEnvironment(options.dshHome, options.profileRoot),
           stdio: ['ignore', 'pipe', 'pipe'],
         })
       } catch (error) {

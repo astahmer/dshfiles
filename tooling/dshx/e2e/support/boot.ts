@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { prepareComposedBootProfile, type BootProfileBundle, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
+import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 
 const toolingRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const workspaceRoot = resolve(toolingRoot, '..')
@@ -31,7 +32,7 @@ export interface BootedProfile {
   close(): Promise<void>
 }
 
-const sanitizeOutput = (value: string): string => value.replaceAll(/http:\/\/127\.0\.0\.1:\d+\/\S*/g, '<private-url>')
+const sanitizeOutput = redactHostOutput
 
 export const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
   const entries = await readdir(pluginsRoot, { withFileTypes: true })
@@ -161,7 +162,7 @@ export const startScratchProfile = async (
   const port = await findFreePort()
   const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
     cwd: workspaceRoot,
-    env: { ...process.env, DSH_HOME: prepared.homeRoot, DSHX_BOOT_PROFILE_ROOT: prepared.profileRoot },
+    env: isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''

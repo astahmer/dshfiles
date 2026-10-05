@@ -1,4 +1,5 @@
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
+import { isolatedHostEnvironment } from './scratch-profile.js'
 
 export interface ProfileCompositionOptions {
   readonly projectRoot: string
@@ -22,7 +23,7 @@ const UNSUPPORTED_NODE_MARKER = 'node-addon-require-builtin unsupported'
 export const readProfileComposition = async (options: ProfileCompositionOptions): Promise<string> => {
   const child = spawnOwnedProcess(options.executable ?? 'dsh', ['--profile', options.profile, '--dump-config'], {
     cwd: options.projectRoot,
-    env: { ...process.env, DSH_HOME: options.dshHome, DSHX_BOOT_PROFILE_ROOT: options.profileRoot },
+    env: isolatedHostEnvironment(options.dshHome, options.profileRoot),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let stdout = ''
