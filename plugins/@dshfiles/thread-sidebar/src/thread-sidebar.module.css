@@ -212,11 +212,18 @@
   margin-top: 0.25rem;
 }
 
+/*
+ * The reference sets the group label as a quiet section caption: about 12px,
+ * not a heading, and one tier down from the row titles so the threads stay the
+ * loudest thing in the list. Measured against 01-thread-sidebar.png, where the
+ * "Active" caption occupies roughly ten rows of glyph against our 16px.
+ */
 .groupHeader {
   width: 100%;
   gap: 0.55rem;
   padding: 0.55rem 0.4rem;
   color: var(--dsw-alias-label-secondary);
+  font-size: 0.75rem;
   text-align: left;
 }
 
@@ -237,11 +244,16 @@
   font-size: 0.76rem;
 }
 
+/*
+ * The reference row is 70px tall (measured from 01-thread-sidebar.png). At 0.55rem
+ * of vertical padding around a three-line stack this landed on 73px, so the
+ * block padding is trimmed to close the difference rather than the line height.
+ */
 .row {
   gap: 0.25rem;
   min-width: 0;
-  padding: 0.55rem 0.3rem;
-  border-radius: 0.55rem;
+  padding: 0.5rem 0.3rem;
+  border-radius: var(--dsw-radius-sm);
 }
 
 .row:hover,
