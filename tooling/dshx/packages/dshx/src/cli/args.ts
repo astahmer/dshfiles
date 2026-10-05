@@ -1,29 +1,28 @@
 import { defineCommand, parseArgs as parseCittyArgs } from 'citty'
 
-export type CliCommand =
-  | 'build'
-  | 'check'
-  | 'dev'
-  | 'inspect'
-  | 'add'
-  | 'test'
-  | 'package'
-  | 'status'
-  | 'info'
-  | 'doctor'
-  | 'sessions'
-  | 'plugins'
-  | 'bundles'
-  | 'presets'
-  | 'models'
-  | 'skills'
-  | 'commands'
-  | 'config'
-  | 'host'
-  | 'runtime'
-  | 'workspace'
-  | 'comm'
-export type CliInspectTarget = 'slots' | 'tools' | 'services' | 'events' | 'capabilities'
+const platformCommandNames = [
+  'status',
+  'info',
+  'doctor',
+  'sessions',
+  'plugins',
+  'bundles',
+  'presets',
+  'models',
+  'skills',
+  'commands',
+  'config',
+  'host',
+  'runtime',
+  'workspace',
+  'comm',
+] as const
+
+const cliInspectTargets = ['slots', 'tools', 'services', 'events', 'capabilities'] as const
+
+export type CliCommand = keyof NonNullable<typeof dshxCommand.subCommands> | (typeof platformCommandNames)[number]
+export type CliInspectTarget = (typeof cliInspectTargets)[number]
+
 export type CliAddTarget = 'ui' | 'panel' | 'api' | 'tool' | 'command' | 'hook'
 
 export interface CliArgs {
@@ -451,23 +450,9 @@ export const dshxCommand = defineCommand({
   },
 })
 
-const platformCommands: ReadonlySet<CliCommand> = new Set([
-  'status',
-  'info',
-  'doctor',
-  'sessions',
-  'plugins',
-  'bundles',
-  'presets',
-  'models',
-  'skills',
-  'commands',
-  'config',
-  'host',
-  'runtime',
-  'workspace',
-  'comm',
-])
+const platformCommands: ReadonlySet<CliCommand> = new Set(platformCommandNames)
+
+const isCliInspectTarget = (value: string): value is CliInspectTarget => cliInspectTargets.some(target => target === value)
 
 const isPlatformCommand = (command: CliCommand | undefined): boolean => command !== undefined && platformCommands.has(command)
 
@@ -638,12 +623,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       command = token
       continue
     }
-    if (command === 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events' || token === 'capabilities')) {
+    if (command === 'inspect' && isCliInspectTarget(token)) {
       if (inspectTarget !== undefined) throw new CliUsageError('Only one inspect target may be specified.')
       inspectTarget = token
       continue
     }
-    if (command !== 'inspect' && (token === 'slots' || token === 'tools' || token === 'services' || token === 'events' || token === 'capabilities')) {
+    if (command !== 'inspect' && isCliInspectTarget(token)) {
       throw new CliUsageError('Inspect targets are only valid with the inspect command.')
     }
     if (command === 'add' && (token === 'ui' || token === 'panel' || token === 'api' || token === 'tool' || token === 'command' || token === 'hook')) {
