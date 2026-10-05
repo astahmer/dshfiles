@@ -66,6 +66,22 @@ const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string,
   return map
 }
 
+/**
+ * The reference carries the age of a thread on the right of its row ("22h"), so it
+ * is read off updatedAt rather than repeated as an absolute date the row already
+ * exposes in its title. Units stay inside the reference's own scale: nothing below
+ * a minute, and nothing long enough to push the title off its line.
+ */
+const relativeTime = (updatedAt: number): string => {
+  const elapsedMinutes = Math.max(0, Math.round((Date.now() - updatedAt) / 60000))
+  if (elapsedMinutes < 1) return 'now'
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m`
+  const hours = Math.round(elapsedMinutes / 60)
+  if (hours < 24) return `${hours}h`
+  const days = Math.round(hours / 24)
+  return days < 100 ? `${days}d` : `${Math.round(days / 30)}mo`
+}
+
 export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
@@ -448,7 +464,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             <section className={styles.group} key={section}>
               <button type="button" className={styles.groupHeader} aria-expanded={!collapsed} onClick={() => toggleSection(section)}>
                 <span>{props.tSidebar(sectionLabels[section])}</span>
-                <span className={styles.count}>{rows.length}</span>
+                <span className={styles.count}>({rows.length})</span>
                 <span aria-hidden="true">{collapsed ? '⌄' : '⌃'}</span>
               </button>
               {!collapsed
@@ -511,6 +527,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                             )}
                           </span>
                         </button>
+                        <span className={styles.rowTime} aria-hidden="true">
+                          {relativeTime(session.updatedAt)}
+                        </span>
                         <div className={styles.actions}>
                           {!archived ? (
                             <>

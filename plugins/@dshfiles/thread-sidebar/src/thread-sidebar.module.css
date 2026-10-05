@@ -244,6 +244,11 @@
   white-space: nowrap;
 }
 
+/*
+ * The reference writes its section tally inside parentheses and lets a rule run
+ * from the tally to the edge, so the header reads "Inactive (29) ─────" and the
+ * eye can find the end of a section without the toggle chevron doing that job.
+ */
 .groupHeader::after {
   height: 1px;
   flex: 1;
@@ -258,17 +263,20 @@
 }
 
 /*
- * Row pitch is the measured one. Reading 01-thread-sidebar.png at its native
- * 144dpi and halving to CSS px, the title bands of consecutive rows sit 55.5px
- * and 55.0px apart, so the reference pitch is 55.2px. Ours measured 70px.
+ * Row pitch is the measured one, and the measurement was calibrated rather than
+ * assumed: 01-thread-sidebar.png is 1332x1624-wide-equivalent for this gate's
+ * 1332x1622 viewport, so its pixels are CSS pixels and nothing is halved. Two
+ * independent elements agree -- the project filter's inset reads 29px in the
+ * image and 29px live -- which is what rules out a 2x capture.
  *
- * The stack inside is fixed by the type scale: a 17px title on a 1.25 line box,
- * a 13px project line, and a 13px machine line, with the two 0.1rem gaps already
- * in .openButton. That leaves the whole 15px of excess in the block padding, so
- * the padding is what carries the correction and the type stays legible.
+ * On that scale the title bands of consecutive rows sit 151px apart. Ours renders
+ * 55px. An earlier comment here halved the image on the strength of a nominal
+ * 144dpi and landed on 55.2px, which happened to equal what we already rendered
+ * and so read as agreement while the rail was actually ~2.7x tighter than the
+ * reference.
  */
 .row {
-  gap: 0.1rem;
+  gap: 0.6rem;
   min-width: 0;
   padding: 0.5rem 1.1rem;
   border-radius: var(--dsw-radius-sm);
@@ -280,9 +288,12 @@
 }
 
 /*
- * The three-line stack owns the type, not the rhythm: 17px title, 13px project
- * line, 13px machine line, and the two 0.1rem gaps. The row's pitch is set by
- * .row's padding, so this block only has to keep the three lines from merging.
+ * Two lines, not three: the title, then one dimmer context line. An earlier
+ * comment here described a three-line stack that the markup never rendered, and
+ * the row's padding was then sized to make room for a line that did not exist --
+ * which is how the row ended up shorter than the reference while the comment
+ * claimed it was matching. The pitch comes from the padding and the two type
+ * sizes; this block only has to keep those lines from merging.
  */
 .openButton {
   display: grid;
@@ -324,6 +335,24 @@ body[data-ds-dark-theme] .rowProject {
 
 .parentLabel {
   color: var(--dsw-alias-label-secondary);
+}
+
+/*
+ * The reference dates each row on the right ("22h") in the same dim tier as the
+ * project line. It is aria-hidden because the row's title attribute already
+ * carries the exact timestamp for anyone who needs it, and a second spoken date
+ * on every row would make the list far noisier to walk by keyboard.
+ */
+.rowTime {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+body[data-ds-dark-theme] .rowTime {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 /*
@@ -371,6 +400,16 @@ body[data-ds-dark-theme] .rowProject {
 .row:hover .actions,
 .row:focus-within .actions {
   opacity: 1;
+}
+
+/*
+ * The age and the verbs want the same few pixels at the end of the row, so the
+ * age steps aside for them rather than both being present and squeezed. It is
+ * hidden, not collapsed, so the row's height cannot change when it goes.
+ */
+.row:hover .rowTime,
+.row:focus-within .rowTime {
+  visibility: hidden;
 }
 
 .actions button {
