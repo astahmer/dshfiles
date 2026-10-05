@@ -2,8 +2,10 @@
 
 Package the DSH web UI as a native desktop app, the way BB ships `/Applications/bb.app`.
 
-Status: proposed. Written 2026-10-04 against DSH `0.2.0-rc.2`, Electron `43.7.7`
-from the pinned nixpkgs, and the installed `@bb/desktop` `0.44.0` bundle.
+Status: in progress. Written 2026-10-04 against DSH `0.2.0-rc.2` and the
+installed `@bb/desktop` `0.44.0` bundle. Phases 0–1 are verified. The current
+Nix wrapper builds with cached Electron `43.6.0`; signing and lifecycle edges
+remain open.
 
 ## Goal
 
@@ -124,11 +126,12 @@ settings surface, not a packaging concern.
 Per `AGENTS.md`, machine setup belongs in Nix, so the packaging lives there
 rather than in a checked-in `electron-builder` config that nothing would run.
 
-- `packages.desktop` in `flake.nix` → `nodePackages.electron-builder` (or a
-  `pnpm dlx electron-builder` step) producing a `.app`, `.dmg`, and later a
-  `.deb`, from `apps/desktop/package.json`.
-- Electron `43.7.7` is already in the pinned nixpkgs, so no source build is
-  needed — this satisfies the binary-first rule outright.
+- `packages.desktop` in `flake.nix` builds an unsigned store wrapper around
+  Electron and the compiled app. A signed `.app`, `.dmg`, and later a `.deb`
+  still need a packaging step.
+- Electron `43.6.0` is cached in the pinned nixpkgs. The aarch64-darwin wrapper
+  built on 2026-10-05 with hash-pinned dependencies and an offline pnpm install;
+  no source build or Electron binary download was used.
 - Auto-update: optional and second-stage. It needs a signed artifact and a
   published GitHub release; until both exist, updates are manual. Do not ship an
   updater pointed at a URL with nothing behind it.
@@ -143,8 +146,9 @@ rather than in a checked-in `electron-builder` config that nothing would run.
 | 3 | Nix packaging to a signed `.app` | `nix build .#desktop` yields an app that launches |
 | 4 | Auto-update, only with a real release channel | a published release updates a running install |
 
-Phases 0–1 are done. Phase 3 (Nix packaging to a `.app` and Linux packages) is the
-next real step; phase 4 is optional and blocked on having a release channel.
+Phases 0–1 are done. The unsigned Nix wrapper now builds, but it is not a
+signed `.app`; lifecycle edge checks and signed macOS/Linux packaging remain.
+Phase 4 is optional and blocked on having a release channel.
 
 ## Phase 1 result — verified
 
@@ -156,10 +160,11 @@ $ DSH_DESKTOP_PROFILE=probe electron .
   after SIGTERM to the app: no matching process
 ```
 
-Electron `43.7.7` from the pinned nixpkgs, fetched from `cache.nixos.org`. The
-package installs Electron's **types only** (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`), so
-the shell typechecks against the version it will run without fetching a second
-runtime.
+The runtime proof above used Electron `43.7.7` from the then-pinned nixpkgs.
+The current package uses Electron `43.6.0` from the current nixpkgs pin and
+builds successfully; its lifecycle proof has not yet been repeated on that
+version. Electron's binary download stays disabled
+(`ELECTRON_SKIP_BINARY_DOWNLOAD=1`), so the Nix cache supplies the runtime.
 
 Two things the implementation had to discover, both invisible in a plan:
 

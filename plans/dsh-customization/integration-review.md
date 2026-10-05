@@ -90,11 +90,13 @@ All plugin checks below used official Node 22.23.3 and pnpm 12.0.0.
   contained the five custom Client package identities. The server was stopped
   and its temporary home, including the private launch URL, was removed.
 
-The runner has no Chromium or Playwright executable/package, so this acceptance
-did not include browser-driven clicking through each page or control. Component
-logic and contracts are covered by the focused tests, and the combined host and
-client bundles were served successfully, but that is not a substitute for a
-visual/manual interaction pass.
+The original five-bundle acceptance on 2026-10-04 did not include
+browser-driven clicking through each page or control. The later Phase 7 browser
+walk recorded in `../repo-hardening/README.md` covered all ten then-installed
+probe bundles and fixed four client crashes. Its current client-contract smoke
+remains open there. The collapsed-rail footer overflow was also reproduced in
+an isolated DSH home and verified after the CSS repair: footer actions now stay
+inside a bounded, vertically scrollable region.
 
 ## Known DSH contract limits
 
@@ -146,10 +148,11 @@ names (`@dshfiles/thread-sidebar`), not the Loader row ids the bundles insert
 (`thread-sidebar`), which is what an earlier version of this section
 said. The shared picker is a dependency of Secret Catalog, not a bundle.
 
-The Installed column above records where each bundle runs as of 2026-10-04:
-`probe` boots all ten owned bundles with no activation failure
-(`pnpm profile:boot --profile probe`). `web` runs ai-accounts, queue-reorder and
-shortcuts; the rest wait on reconciling the nixfiles `web` asset.
+The current `web` manifest lists eleven owned bundles, and `probe` lists
+twelve. The all-ten probe browser walk and all-eleven web install verification
+above are the verified baseline from 2026-10-04; they do not cover the later
+`multi-host` entry now present in the probe manifest. The current profile counts
+are manifest facts, not blanket boot claims.
 
 ## Workstream history
 

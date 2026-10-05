@@ -184,8 +184,8 @@ wildcard declaration is a global script, so a module import cannot replace it.
 - [x] ai-accounts: `accounts-panel.tsx` 1058 → 47 lines over a state hook
       and per-section files (redone on current code after the first split was
       lost in the re-land; the account switch, which double-negated, now toggles)
-- [ ] ai-accounts: `host.ts` split, deferred while the Command Code route work
-      edits it; the old split (`c5b85f90b289`) is the guide
+- [x] ai-accounts: `host.ts` split into API/quota handlers, provider-profile
+      construction, and provider-route/config mapping modules
 - [x] queue-reorder: `as never` gone; dshx's decorator keeps component props
 - [x] mcp-servers: start failures reach the Host log through the redacting
       logger instead of vanishing; reconciler generic over its target (cast
@@ -225,7 +225,10 @@ antislop outside the files touched here.
       shorthand in `font-family`); the ai-accounts footer meter lost its size
       in the integration commit. The remaining footer overlap is the third-party
       Command Code quota widget (about 116px in a 44px footer)
-- [ ] thread-sidebar: collapsed, the footer's items stack past the window
+- [x] thread-sidebar: collapsed footer actions are bounded and scroll vertically.
+      Reproduced in an isolated DSH home: four actions painted down to y=1020
+      in an 876px viewport; after the CSS fix, wheel scrolling kept the last of
+      five actions inside the footer at y=872, before its y=876 boundary
 - [ ] (owned by the `dshx-complete` workspace) Toolchain gap behind two of those crashes, earned by three plugins:
       dshx should either check every `ctx.<service>` against `inject` (it
       knows only locale, slots and sessions) or decorate imperative
@@ -255,8 +258,10 @@ settings, so it is a decision, not a fix.
       the fetch drops that derived directory. Built and run on aarch64-darwin;
       Linux outputs only evaluated
 - [x] One pnpm source: the dev shell takes pnpm only from corepack
-- [ ] The desktop derivation still runs `pnpm install` with network inside
-      the build; same fix applies, left to its owner
+- [x] Desktop dependencies now use hash-pinned `fetchPnpmDeps` and the standard
+      `pnpmConfigHook` offline install. The aarch64-darwin Nix output builds with
+      TypeScript 7.0.2 and cached Electron 43.6.0; Electron's binary download is
+      skipped
 
 ## Phase 9 — New capability
 
@@ -269,4 +274,5 @@ settings, so it is a decision, not a fix.
 - [x] `@dshfiles/diff-viewed`: Viewed toggle and n/m count in
       `deliverables.review.file.actions`, keyed by session, turn and path.
       Collapsing or filtering viewed files needs a Host change
-- [ ] Desktop shell Phase 0 spike — owned by `plans/desktop-shell`
+- [x] Desktop shell Phase 0 spike — tokenized Host URL and provider RPC verified;
+      see `plans/desktop-shell/README.md`
