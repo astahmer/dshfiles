@@ -20,6 +20,7 @@ import { z } from 'zod'
 import type { Mutation, Revision } from './api.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
+import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import styles from './jujutsu.module.css'
 
 type View = 'graph' | 'source'
@@ -31,6 +32,7 @@ interface RevisionSelection {
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
 const SELECTED_REPO_KEY = 'dshfiles.jujutsu.selected'
+const REVIEW_PROGRESS_KEY = 'dshfiles.jujutsu.review-progress.v1'
 const REPO_HISTORY_LIMIT = 12
 const ANCESTOR_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 8, 10].map(count => ({ value: String(count), label: String(count) }))
 
@@ -118,6 +120,9 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
+  const [reviewStore, setReviewStore] = useState<ReviewStore>(() => readReviewStore(readStorage(REVIEW_PROGRESS_KEY)))
+  const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
+  const [reviewNotice, setReviewNotice] = useState('')
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
@@ -146,6 +151,12 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
     enabled: repoId !== null && selectedRevision !== undefined,
   })
   const details = detailsQuery.data
+  const selectedReviewProgress = reviewProgress(
+    reviewStore,
+    state?.root ?? '',
+    selectedRevision?.commitId ?? '',
+    details?.files ?? [],
+  )
 
   const workingDiffQuery = useQuery({
     queryKey: jujutsuKeys.workingDiff(repoId ?? ''),
@@ -269,6 +280,28 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
     const previewId = preview.id
     prepareMutation.reset()
     confirmMutation.mutate({ repoId, previewId })
+  }
+
+  const updateFileReview = (file: ReviewFile, reviewed: boolean): void => {
+    if (state === undefined || selectedRevision === undefined || file.contentDigest === null) return
+    const next = toggleFileReview(
+      reviewStore,
+      {
+        repositoryRoot: state.root,
+        commitId: selectedRevision.commitId,
+        path: file.path,
+        contentDigest: file.contentDigest,
+        reviewedAt: new Date().toISOString(),
+      },
+      reviewed,
+    )
+    try {
+      localStorage.setItem(REVIEW_PROGRESS_KEY, JSON.stringify(next))
+      setReviewStore(next)
+      setReviewNotice(reviewed ? 'Review progress saved in this browser.' : 'Review mark cleared.')
+    } catch {
+      setReviewNotice('Browser storage is unavailable. Review progress was not changed.')
+    }
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
@@ -501,18 +534,48 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
                       <>
                         <div className={styles.counts}>
                           {details.files.length} files · +{details.additions} −{details.deletions}
+                          <span>{selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed</span>
                           {details.truncated && <Tag tone="warning">diff truncated; counts partial</Tag>}
                         </div>
+                        <label className={styles.reviewFilter}>
+                          <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
+                          Hide reviewed files
+                        </label>
+                        {reviewNotice.length > 0 && (
+                          <p role="status" className={styles.muted}>
+                            {reviewNotice}
+                          </p>
+                        )}
                         <ul className={styles.fileList}>
-                          {details.files.map(file => (
-                            <li key={file.path}>
-                              <span className={styles.filePath}>{file.path}</span>
-                              <span>
-                                +{file.additions} −{file.deletions}
-                              </span>
-                            </li>
-                          ))}
+                          {details.files
+                            .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state?.root ?? '', selectedRevision.commitId, file))
+                            .map(file => {
+                              const reviewed = isFileReviewed(reviewStore, state?.root ?? '', selectedRevision.commitId, file)
+                              return (
+                                <li className={styles.reviewRow} key={file.path}>
+                                  <span className={styles.reviewPath}>{file.path}</span>
+                                  <span>
+                                    +{file.additions} −{file.deletions}
+                                  </span>
+                                  <label className={styles.reviewControl}>
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Mark ${file.path} reviewed`}
+                                      checked={reviewed}
+                                      disabled={file.contentDigest === null}
+                                      onChange={event => updateFileReview(file, event.target.checked)}
+                                    />
+                                    Reviewed
+                                  </label>
+                                </li>
+                              )
+                            })}
                         </ul>
+                        {hideReviewedFiles &&
+                          selectedReviewProgress.total > 0 &&
+                          selectedReviewProgress.reviewed === selectedReviewProgress.total && (
+                            <p className={styles.muted}>All reviewable files are hidden.</p>
+                          )}
                         <details className={styles.disclosure}>
                           <summary>Change evolution</summary>
                           <pre className={styles.code}>{details.evolution}</pre>

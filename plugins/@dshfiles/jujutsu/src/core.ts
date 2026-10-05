@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { isAbsolute, normalize, parse } from 'node:path'
 import type { Mutation } from './api.js'
 
@@ -5,6 +6,7 @@ export interface FileChange {
   readonly path: string
   readonly additions: number
   readonly deletions: number
+  readonly contentDigest: string | null
 }
 
 export interface PreparedMutation {
@@ -121,24 +123,26 @@ export const isRecordedJjGitPush = (attributes: string): boolean => {
   return tokens[0] === 'git' && tokens[1] === 'push' && !tokens.slice(2).some(token => token === '--dry-run' || token.startsWith('--dry-run='))
 }
 
-/** Count added and removed patch lines without counting diff headers. */
-export const parsePatchStats = (patch: string, paths: readonly string[]): FileChange[] => {
-  const files: { additions: number; deletions: number }[] = []
-  for (const line of patch.split('\n')) {
-    if (line.startsWith('diff --git ')) {
-      files.push({ additions: 0, deletions: 0 })
-      continue
+/** Count patch lines and fingerprint each exact per-file diff for review state. */
+export const parsePatchStats = (patch: string, paths: readonly string[], truncated = false): FileChange[] => {
+  const sections = patch.split(/(?=^diff --git )/m).filter(section => section.startsWith('diff --git '))
+  return sections.map((section, index) => {
+    let additions = 0
+    let deletions = 0
+    for (const line of section.split('\n')) {
+      if (line.startsWith('+++') || line.startsWith('---')) continue
+      if (line.startsWith('+')) additions += 1
+      else if (line.startsWith('-')) deletions += 1
     }
-    const current = files.at(-1)
-    if (current === undefined || line.startsWith('+++') || line.startsWith('---')) continue
-    if (line.startsWith('+')) current.additions += 1
-    else if (line.startsWith('-')) current.deletions += 1
-  }
-  return files.map((file, index) => ({
-    path: paths[index] ?? `Changed file ${index + 1}`,
-    additions: file.additions,
-    deletions: file.deletions,
-  }))
+    return {
+      path: paths[index] ?? `Changed file ${index + 1}`,
+      additions,
+      deletions,
+      contentDigest: truncated && index === sections.length - 1
+        ? null
+        : createHash('sha256').update(section).digest('hex'),
+    }
+  })
 }
 
 /** Remove likely credentials and URL userinfo before a remote preview reaches the browser. */

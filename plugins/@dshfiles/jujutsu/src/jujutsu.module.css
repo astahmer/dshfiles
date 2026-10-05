@@ -306,6 +306,32 @@
   font: 12px var(--dsw-font-mono);
 }
 
+.reviewFilter,
+.reviewControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.fileList li.reviewRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewPath {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewControl {
+  font-size: 11px;
+}
+
 .disclosure {
   margin-top: 10px;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -448,6 +474,14 @@
   }
   .relative {
     display: none;
+  }
+
+  .fileList li.reviewRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .reviewControl {
+    grid-column: 1 / -1;
   }
 }
 

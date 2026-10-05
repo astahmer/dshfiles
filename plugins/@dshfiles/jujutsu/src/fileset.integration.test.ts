@@ -70,6 +70,7 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
   const patch = runJj(repo, home, ['diff', '--revisions', workingCopy.commitId, '--git'])
   const changes = parsePatchStats(patch, changedPaths)
   assert.deepEqual(changes.map(change => change.path).sort(), unselected.slice().sort())
+  assert.ok(changes.every(change => change.contentDigest !== null))
   assert.equal(
     changes.reduce((count, change) => count + change.additions, 0),
     unselected.length,
