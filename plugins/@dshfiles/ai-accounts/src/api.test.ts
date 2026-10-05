@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountDraftSchema, type AccountDraft } from './api.js'
+import { accountDraftSchema, accountModelName, baseModelName, type AccountDraft } from './api.js'
 
 const draft: AccountDraft = {
   instanceId: 'commandcode_work',
@@ -44,4 +44,16 @@ describe('account draft boundary', () => {
   it.each(['relative/home', '~/../etc', '/Users/me/../../etc', '~/.codex/\0'])('refuses %s as a home path', homePath =>
     expect(accepts({ homePath })).toBe(false),
   )
+})
+
+describe('account model labels', () => {
+  it('identifies the account route in the model picker label', () => {
+    expect(accountModelName('codex-alex2', 'gpt-6-luna')).toBe('codex-alex2/gpt-6-luna')
+  })
+
+  it('removes only the matching account prefix for model curation', () => {
+    expect(baseModelName('codex-alex2', 'codex-alex2/gpt-6-luna')).toBe('gpt-6-luna')
+    expect(baseModelName('codex-alex2', 'codex-work/gpt-6-luna')).toBe('codex-work/gpt-6-luna')
+    expect(baseModelName('codex-alex2', 'gpt-6-luna')).toBe('gpt-6-luna')
+  })
 })

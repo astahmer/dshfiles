@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
-import { aiAccountsApi, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
+import { aiAccountsApi, baseModelName, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
 import { buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
 import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
@@ -50,7 +50,7 @@ export const accountsHostApi = aiAccountsApi.host({
         const info = await llm.resolveModelInfo(input.instanceId, model.id)
         return {
           id: model.id,
-          name: model.name,
+          name: baseModelName(input.instanceId, model.name),
           efforts: (info.reasoning?.efforts ?? []).map(effort => ({
             id: effort.id,
             name: effort.name,

@@ -2,6 +2,7 @@ import type { GenerateOptions, PreparedAdapterCall, StreamChunk } from '@deepsee
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import { accountModelName } from './api.js'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 
@@ -32,7 +33,7 @@ export const buildProfile = (params: {
   const models = params.upstream
     .getModels()
     .filter(model => !hidden.has(model.id))
-    .map(model => ({ ...model, provider: params.provider }))
+    .map(model => ({ ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }))
     .sort((left, right) => rank(left.id) - rank(right.id))
   const template = models.find(model => model.id.startsWith('gpt-'))
   for (const id of params.additionalModelIds) {
