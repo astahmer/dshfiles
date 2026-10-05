@@ -195,8 +195,43 @@ const checkKeyboard = async () => {
     await page.waitForTimeout(900)
     break
   }
+  // A visible ring is not enough: the Host's global styles provide one even when
+  // the shell declares none, which is how the shell went years without a ring of
+  // its own while every control still looked focused. So also require that the
+  // shell's own stylesheet names these controls.
+  const declared = await page.evaluate(() => {
+    // Match the shell's own declaration rather than any rule that happens to
+    // mention one of its classes: it is the only rule that covers the header
+    // row, More, the switch and the panel buttons together.
+    const required = ['visibilityToggle', 'moreButton', 'brandButton']
+    const isShellRule = selectorText =>
+      /focus-visible/.test(selectorText) && required.every(name => selectorText.includes(name))
+    const matched = []
+    let focusRules = 0
+    for (const sheet of document.styleSheets) {
+      let rules
+      try {
+        rules = sheet.cssRules
+      } catch {
+        continue
+      }
+      for (const rule of rules) {
+        if (rule.selectorText === undefined) continue
+        if (!/focus-visible/.test(rule.selectorText)) continue
+        if (!/outline/.test(rule.cssText)) continue
+        if (isShellRule(rule.selectorText)) {
+          focusRules += 1
+          if (matched.length < 3) matched.push(rule.selectorText.slice(0, 120))
+        }
+      }
+    }
+    return { focusRules, matched }
+  })
+
   await context.close()
   return {
+    shellFocusRules: declared.focusRules,
+    shellFocusSelectors: declared.matched,
     sidebarControls: reached.filter(r => r.insideSidebar).length,
     sidebarControlsWithoutRing: reached.filter(r => r.insideSidebar && !r.ring).length,
     panelRingsMissing: panelRings.filter(ring => !ring).length,
@@ -295,6 +330,9 @@ if (report.keyboard !== undefined) {
     problems.push(`${report.keyboard.sidebarControlsWithoutRing} sidebar control(s) have no focus ring`)
   }
   if (report.keyboard.panelRingsMissing > 0) problems.push(`${report.keyboard.panelRingsMissing} panel control(s) have no focus ring`)
+  if (report.keyboard.shellFocusRules === 0) {
+    problems.push('the shell declares no focus ring of its own; its controls inherit the Host\'s')
+  }
   if (!report.keyboard.switchReached) problems.push('the visibility switch is not reachable by Tab')
   else if (!report.keyboard.switchRing) problems.push('the visibility switch has no focus ring')
   if (!report.keyboard.switchOperated) problems.push('the visibility switch does not respond to Enter')
