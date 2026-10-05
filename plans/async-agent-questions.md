@@ -1,5 +1,13 @@
 # Async agent questions plan
 
+> **Current status (2026-10-05):** DSH 0.2.0-rc.2 already ships the root
+> `ask_user_question` timed mode. Its native service returns a pending call after
+> the foreground wait and keeps the question answerable. The subagent
+> `sendMessage` contract is one-way accepted inbox delivery; it has no correlated
+> reply wait or restart recovery. Do not implement the proposed child question
+> plugin until the Host provides that lifecycle. The child flow below is a
+> future design, not a claim about the installed runtime.
+
 ## Context
 
 - **Today the agent only asks blocking questions.** `ask_user_question` from
@@ -13,16 +21,16 @@
   The presets (`dsh-web-app/presets/standard.patch.yml`) declare
   `- id: tool-ask-user` with no `config`, so `mode` defaults to `legacy`.
 
-- **The current mode switch is bad ergonomics.** `timeout` doubles as the mode
-  selector: `timeout: -1` blocks forever, any positive value means async. There
-  is no way to express "async, and the question never goes stale" — the closest
-  is a huge timeout, which is a lie in the schema description.
+- **Root timed mode is already explicit.** `mode: timed` selects the native
+  pending-question path. Its `timeout` controls only how long the tool waits in
+  the foreground; after that, the question remains answerable. `timeout: -1`
+  selects a blocking wait. Do not add a second root question tool.
 
-- **Subagents cannot ask anything.** `UserQuestionService.assertLiveRoot`
-  (`dsh-user-questions/lib/index.js`) throws `DELEGATED_CALLER` when
-  `agents.roots()` does not include the calling agent. The rationale is
-  structural: the Web question card lives in the root Session's composer seat,
-  so a child's question would have no surface to render on.
+- **Subagents cannot open the native human-question card.**
+  `UserQuestionService.assertLiveRoot` throws `DELEGATED_CALLER` for a child.
+  The Web card belongs to the root Session's composer seat. A child can send a
+  message to its parent, but the installed service cannot connect that delivery
+  to a child call waiting for an answer.
 
 - **Two `ask_user_question` rows cannot coexist.** Both modes register the same
   tool name in the preset's single registry scope, and `NamedEntries.insert`
@@ -39,9 +47,10 @@
   not in a parent/child runtime relationship, so it does not directly solve
   "my subagent needs a decision".
 
-- **The seams needed for a child→parent question exist**: `Agent.parentAgent`
-  for runtime ownership, `AgentRegistry.roots()`, and `agent.steer(message)` for
-  delivering a reply into a live agent's next step.
+- **Only child-to-parent delivery exists.** `Agent.parentAgent` identifies the
+  parent and `ctx.subagents.sendMessage()` accepts a one-way inbox message. It
+  returns a `MessageId`, not a reply handle; no API waits for the correlated
+  answer or recovers that wait after restart.
 
 - The installed DSH is `0.2.0-rc.2`, and both the active global install and the
   `web` profile resolve the same `dsh-tool-ask-user@0.2.0-rc.2` build that
@@ -118,66 +127,54 @@ flowchart LR
 
 ### Operations / behavior
 
-| Operation | Result |
-|-----------|--------|
-| Root asks sync | Tool call blocks; card in composer; answer returns as tool result |
-| Root asks sync with timeout | Blocks; on expiry the call errors with `ASK_TIMED_OUT` |
-| Root asks async | Tool result is `{ pending: true, callId }`; agent continues |
-| Human answers a pending root question late | Steered in as a `user-question-reply` user message; projection closes the question |
-| Subagent asks | Routed to the live `parentAgent` as a steerable question |
-| Parent answers the child's question | Answer returns to the waiting child tool call |
-| Nobody answers before expiry | `onExpiry` runs: `ask-parent` / `recommended` / `defer` |
-| `defer` | Question written to `questions/<session>/<callId>.md`; child continues without the answer |
+| Operation | Installed DSH 0.2.0-rc.2 behavior |
+|-----------|-----------------------------------|
+| Root asks in legacy mode | Tool blocks on the native `userQuestions` service. |
+| Root asks in timed mode with `timeout: -1` | Tool blocks until the answer arrives. |
+| Root asks in timed mode with a positive timeout | Returns `{ pending: true, callId }` after the foreground wait; root agent continues and the question remains answerable. |
+| Human answers a pending root question | Native question service routes the answer through the existing root question path. Source contract verified; interactive UI acceptance remains open. |
+| Subagent sends a question to its parent | `sendMessage()` accepts one-way inbox delivery and returns `MessageId`. |
+| Parent answers the child | No correlated answer path exists; the child cannot receive that answer as its pending tool result. |
+| Child question expires or is deferred | No child question lifecycle or expiry policy exists in the installed Host. |
 
 ### Tech choices
 
 | Choice | Decision | Rationale |
 |--------|----------|-----------|
-| Fork DSH core to add `mode`/`timeout` | No | The tool row is config-driven; `mode`/`timeout` orthogonalisation is a small local wrapper, and a core fork costs upgrade pain for one schema field |
+| Add root `mode`/`timeout` support | No | Installed `dsh-tool-ask-user` already provides opt-in timed mode and foreground timeout. Configure the native row only after isolated acceptance. |
 | Reuse `ask_user_question` for async | Yes, for the root agent | Renaming breaks the Host projection and the UI tool row; reusing the name keeps the card, countdown, late-reply and review paths intact |
-| Separate tool `ask_parent_question` for subagents | Yes | A second row with the same name throws; a genuinely different name has its own registry entry and its own `parentAgent` routing. It does not need the `userQuestions` projection because it is not a human card. |
+| Separate tool `ask_parent_question` for subagents | Deferred | The Host has no correlated reply wait, answer persistence, or restart recovery. A plugin cannot provide honest blocking semantics over one-way inbox delivery. |
 | Route a child question through `ctx.userQuestions` | No | That seam asserts a live root and is coupled to the Web card + projection. A subagent question is agent-facing, not human-facing. |
 | Reuse `@dshfiles/agent-communication` for parent routing | No | It targets independent peers with durable topics and an allowlist for steering. Parent routing is a direct in-runtime relationship with no durability requirement. |
-| Force `recommended` on async questions | Yes | If a question can fall back to a default, the default must be declared. Sync questions keep it optional — the human is answering. |
-| Fork DSH at all | No | Everything needed is a preset row plus a new `@dshfiles` plugin using public seams (`parentAgent`, `steer`, `tools.register`). |
-| Build an orthogonal `mode` + optional `timeout` surface (was Phase 1) | **No — Phase 1 dropped** | A second tool name breaks `isTimedAskUserQuestionSchema`, which hard-codes both the `ask_user_question` name and the `timeout` parameter, so the card, countdown, late-reply and review paths would all die. One tool with one `timeout` field already expresses "block forever" (`-1`) and "async with a deadline" (any positive value). "Async that never goes stale" is expressed as a large timeout; the cost is only a description that reads slightly literally. |
-| Render a child question as a new Web composer card | **No — steerable message** | A card means a new client plugin, slot, tool view, locale dictionaries and a claim handshake — a reimplementation of the question card for a second surface. A steer into the parent's turn reuses the existing path, and the parent's escalation to the human then calls the ordinary root `ask_user_question`, which gets the full card for free. |
-| Deliver the child question via `ctx.subagents.sendMessage` | **Yes** | `dsh-tool-subagent-control` already ships bidirectional `send_message`: a child may target its direct parent, a working target receives the message at its next step boundary through Steer, and an inactive target starts or resumes a turn. The plugin needs no routing of its own. |
-| Require `recommended` on every async question | **Yes — load-bearing** | Without a declared default, expiry has only two outcomes: block (which defeats the purpose of async) or defer (which turns every timeout into file spam). Requiring `recommended` makes every async question auto-resolvable in one field. Sync questions keep it optional because the human is answering. |
-| Allow the parent to escalate to the human | **Yes — free** | The parent answers the steer with the ordinary root `ask_user_question`, which already provides card, countdown, late reply and durable projection. The escalation path adds no new surface. |
+| Force a `recommended` answer for root timed questions | No | Native timed questions stay open for a human answer; they do not auto-resolve on foreground timeout. |
+| Fork DSH core for child questions | Host change required | A plugin cannot add correlated inbox replies, durable answer identity, or wait recovery. The Host source is outside this checkout. |
+| Build another child composer card now | No | First establish Host-owned reply identity and lifecycle. Do not duplicate the native question UI. |
+| Deliver a child question via `ctx.subagents.sendMessage` | Notification only | `sendMessage` accepts a one-way inbox item and returns `MessageId`. It does not wait for a parent reply or reconnect that reply to the child call. |
+| Require `recommended` on child questions | Deferred | There is no child timeout/expiry lifecycle to consume such a default. Revisit only after the Host reply contract exists. |
+| Allow the parent to escalate to the human | Manual only | A parent may independently ask the root user, but the child cannot know which human answer resolves its message. |
 | Deferred questions layout | **Flat `questions/` in the workspace** | One file per deferred question, named `{iso-timestamp}_{question-slug}.md`. `ls questions/` is the index; no session nesting and no manifest to keep in sync. |
 | Deferred questions location | **Workspace-relative** | A question is about this repository's work, so the file is reviewable, committable and survives a machine move, unlike a `~/.dsh` path. A later session can read the folder to pick up unanswered decisions. |
 
 ### Architecture
 
 ```
-dsh-web-app preset (row, id-targeted)
-  tool-ask-user  mode: timed  timeout: <default>   ── root agent async + sync
-                                                   (timeout: -1 = block forever)
+dsh-web-app preset
+  tool-ask-user { mode: timed, timeout: <positive seconds> }
+    └─ native userQuestions.askTimed()
+         ├─ answer before timeout → normal tool result
+         └─ foreground timeout → pending { callId }, root question stays open
 
-@dshfiles/agent-questions (new plugin)
-  preset row: ask-parent-question
-    ├─ ToolDefinition ask_parent_question
-    │    questions[], recommended (required), context, onExpiry, timeout
-    ├─ resolve parent: exec.agent.parentAgent   (must exist)
-    ├─ deliver: ctx.subagents.sendMessage(parent, questionMessage)
-    │           └─ parent busy  → steer at its next step boundary
-    │              parent idle  → starts/resumes a turn
-    ├─ await: answer | abort | expiry
-    └─ onExpiry: recommended | defer
-  defer writer
-    questions/{iso-timestamp}_{question-slug}.md
-      { question, options, recommended, asking agent, context, status }
+subagent
+  ctx.subagents.sendMessage(parent, content)
+    └─ accepted inbox MessageId; no correlated answer wait
+
+Host prerequisite before any child-question plugin:
+  durable question id + answer delivery + cancellation + restart reconciliation
 ```
 
-The plugin is a child-scope row so it registers into the preset scope like every
-other tool row, and its tool takes sender identity from `ToolExecution.agent`,
-never from arguments. Delivery reuses `ctx.subagents.sendMessage`, so the plugin
-owns no routing, no lifecycle and no allowlist.
-
-The parent answers with either an `ask_parent_question`-shaped reply message or
-by escalating through the ordinary root `ask_user_question`, which is what makes
-the human in the loop one step away rather than a new surface.
+The native root tool owns human-facing timed questions. A future child question
+feature must use a Host-owned correlated reply contract; it must not infer an
+answer from unrelated parent messages or add a second question registry.
 
 ## What this allows
 
@@ -329,46 +326,30 @@ no session folder in its path: it is flat under the workspace `questions/`, with
 
 ## Implementation steps
 
-### Phase 0 — root async, no build
+### Phase 0 — native root timed path
 
-1. Edit the `preset-standard` bundle's `tool-ask-user` row to
-   `config: { mode: timed, timeout: <default> }`. It is a preset row, not a
-   top-level `cordis.patch.yml` entry.
-2. Restart the Host, run a session, and confirm the card counts down and a late
-   answer steers in.
-3. Add a durable rule to `AGENTS.md` describing `timeout: -1` vs a finite value.
+1. Keep the shipped preset default unchanged until isolated acceptance passes.
+2. In a scratch profile, set the existing `tool-ask-user` row to
+   `config: { mode: timed, timeout: 120 }`.
+3. Verify the human card, pending result, late answer, cancellation, and restart
+   behavior on a scratch Host. The current core package identity failure blocks
+   this interactive acceptance; do not use the active profile as a substitute.
 
-### Phase 1 — `@dshfiles/agent-questions`
+### Phase 1 — Host child-reply contract
 
-7. Scaffold the plugin next to `agent-communication` in this repo: `src/`,
-   `cordis.patch.yml`, `package.json` with the same peer-dependency shape.
-8. Implement `ask_parent_question`: validate ids, resolve `exec.agent.parentAgent`,
-   require a recommended option, and deliver the question through
-   `ctx.subagents.sendMessage` to that parent. No routing of its own — the
-   subagent service already accepts a child targeting its direct parent.
-9. Await the answer with a timeout, and run the expiry policy on expiry.
-10. Implement the expiry policies: `recommended` (returns the declared default),
-    `defer` (write the markdown file and return a "deferred" outcome), and the
-    default `ask-parent` which waits for the parent past the child's own turn.
-11. Implement the deferred-question writer: `questions/{iso-timestamp}_{slug}.md`
-    with the question, options, recommended option, the asking agent, a context
-    blurb, and a status line.
-12. Add a parent-side prompt rule so the parent knows a child question arrived
-    and that it should answer directly or escalate to the human through the
-    ordinary root `ask_user_question`.
+Do not scaffold `@dshfiles/agent-questions` yet. The Host must first provide a
+parent-scoped question request with a stable id, authenticated correlated answer,
+bounded cancellation, and restart reconciliation. The child must receive only
+the answer to its own request. Preserve the existing root question card and
+projection; do not invent a second question engine in a plugin.
 
-### Phase 2 — wire into the profile
+### Phase 2 — plugin after Host support
 
-13. Add the plugin as a `link:` dependency in the profile manifest and list it in
-    `dsh.profile.bundles`.
-14. Build the plugin and restart the Host; confirm activation and no scope leaks.
-
-### Phase 3 — hardening
-
-15. Add an agent-facing rule to `AGENTS.md`: prefer async, reserve sync for true
-    blockers, use `defer` for decisions a subagent cannot make.
-16. Bound the deferred file growth: prune answered or older-than-N files.
-17. Cover cancellation: a child disposal must abort its pending parent question.
+Once the Host contract exists, add a thin `ask_parent_question` tool that
+validates the request and delegates lifecycle to that service. Add recommended
+defaults or workspace files only if the Host exposes those as explicit outcomes.
+Test two concurrent child questions, wrong-parent answers, cancellation, parent
+shutdown, timeout, and restart before profile adoption.
 
 ## Open questions
 
@@ -392,26 +373,22 @@ Still open while building:
 
 ## Acceptance criteria
 
-- [ ] The `preset-standard` row sets `mode: timed` and a finite default timeout.
-- [ ] An async root question returns `{ pending: true, callId }` and the agent
-      continues in the same turn.
-- [ ] A human answering a pending question steers a `user-question-reply` user
-      message into the agent.
-- [ ] A sync question with no answer and `timeout: -1` blocks indefinitely; a
-      finite timeout releases the agent with a pending result instead of hanging.
-- [ ] A subagent can call `ask_parent_question` and blocks until the parent
-      answers, the recommended default is taken, or the question is deferred.
-- [ ] `ask_parent_question` rejects a call with no `recommended` option.
-- [ ] A deferred question produces `questions/{iso-timestamp}_{slug}.md`
-      containing the question, options, recommended option, asking agent,
-      session, context, and a status line.
-- [ ] No duplicate `ask_user_question` registration is introduced; the preset
-      mounts without a scope error.
-- [ ] A disposed subagent aborts its pending parent question without leaking a
-      wait or a file.
-- [ ] A durable `AGENTS.md` rule describes when to use sync, async, and defer.
+- [x] Installed source exposes root `mode: timed`, pending `{ callId }`, and the
+      native `userQuestions` service. This is source evidence only.
+- [ ] Scratch-profile browser acceptance proves timed card, pending continuation,
+      late answer, cancellation, and restart behavior.
+- [ ] Host provides a durable parent-scoped question id and correlated answer
+      wait with sender validation, cancellation, and restart recovery.
+- [ ] Concurrent child questions cannot consume each other's answers.
+- [ ] Only after the Host contract passes, the child tool calls it without
+      registering a second human question projection.
+- [ ] No plugin timer or unrelated parent message is treated as an answer.
 
 ## Decisions log
+
+Entries dated 2026-10-04 that describe `sendMessage` as bidirectional or promise
+plugin-level answer waits are superseded by the verified 2026-10-05 Host
+contract above. Keep them only as design history.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
