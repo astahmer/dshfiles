@@ -6,6 +6,7 @@
  * @module @deepseek-ai/dsh-session-persistence-jsonl
  */
 import z from '@deepseek-ai/schemastery';
+import { SessionFormatError } from '@deepseek-ai/dsh-session-format';
 import { createSessionFormatCatalogWithChildren, SessionFormatUnsupportedMigrationError, sessionFormatCatalog, } from '@deepseek-ai/dsh-session-format-catalog';
 import { assertV4RowAdmission } from '@deepseek-ai/dsh-session-format-v3-to-v4';
 import { readdirSync } from 'node:fs';
@@ -582,6 +583,10 @@ class JsonlSessionPersistence extends SessionPersistence {
     /** Translate generation-layer failures into the persistence seam's error vocabulary. */
     generationFailure(id, selected, error) {
         if (error instanceof JsonlGenerationUnsupportedMigrationError) {
+            const cause = error.reason.cause;
+            if (cause instanceof SessionFormatError && !(cause instanceof SessionFormatUnsupportedMigrationError)) {
+                return new SessionPersistenceCorruptionError(`session "${id}": stored log is corrupt: ${cause.message} (raw log: ${selected.sourcePath})`, { cause });
+            }
             return new SessionFormatUnsupportedError(`${error.message}; source v${error.fromVersion} artifact remains unchanged (raw log: ${selected.sourcePath})`, { kind: 'jsonl', path: selected.sourcePath });
         }
         if (error instanceof JsonlGenerationSourceChangedError)

@@ -8,6 +8,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { SessionFormatError } from '@deepseek-ai/dsh-session-format'
 import {
   createSessionFormatCatalogWithChildren,
   SessionFormatUnsupportedMigrationError,
@@ -732,6 +733,13 @@ class JsonlSessionPersistence extends SessionPersistence {
     error: unknown,
   ): Error {
     if (error instanceof JsonlGenerationUnsupportedMigrationError) {
+      const cause = error.reason.cause
+      if (cause instanceof SessionFormatError && !(cause instanceof SessionFormatUnsupportedMigrationError)) {
+        return new SessionPersistenceCorruptionError(
+          `session "${id}": stored log is corrupt: ${cause.message} (raw log: ${selected.sourcePath})`,
+          { cause },
+        )
+      }
       return new SessionFormatUnsupportedError(
         `${error.message}; source v${error.fromVersion} artifact remains unchanged (raw log: ${selected.sourcePath})`,
         { kind: 'jsonl', path: selected.sourcePath },

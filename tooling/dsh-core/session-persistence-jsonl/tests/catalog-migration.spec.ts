@@ -94,7 +94,7 @@ describe.each(['none', 'zstd'] as const)('historical catalog publication (%s)', 
     const revision = async () => (await f.ctx.sessionPersistence.stat(f.parent))!.revision
     const first = await revision()
     expect(await revision()).toBe(first)
-    await f.write('child', [f.descriptor], true)
+    await f.write('unrelated', [], false, 4)
     const added = await revision()
     expect(added).not.toBe(first)
     expect((await f.ctx.sessionPersistence.list()).find(row => row.header.id === f.parent)?.revision).toBe(added)
@@ -130,7 +130,7 @@ describe.each(['none', 'zstd'] as const)('historical catalog publication (%s)', 
     await rm(path)
     const removed = (await f.ctx.sessionPersistence.stat(f.parent))!.revision
     expect(removed).not.toBe(first)
-    await f.write('child', [], true, 5)
+    await f.write('child', [], true, 6)
     expect((await f.ctx.sessionPersistence.stat(f.parent))!.revision).not.toBe(removed)
     expect((await f.ctx.sessionPersistence.list()).find(row => row.header.id === f.parent)?.revision).not.toBe(removed)
   })

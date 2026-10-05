@@ -1,5 +1,6 @@
 import z from "@deepseek-ai/schemastery";
-import { SessionFormatUnsupportedMigrationError, createSessionFormatCatalogWithChildren, historicalSessionFormatCatalog, sessionFormatCatalog } from "@deepseek-ai/dsh-session-format-catalog";
+import { SessionFormatError, SessionFormatUnsupportedMigrationError, parseSessionFormatLogFilename, sessionFormatLogFilename } from "@deepseek-ai/dsh-session-format";
+import { SessionFormatUnsupportedMigrationError as SessionFormatUnsupportedMigrationError$1, createSessionFormatCatalogWithChildren, historicalSessionFormatCatalog, sessionFormatCatalog } from "@deepseek-ai/dsh-session-format-catalog";
 import { assertReleasedV4Relationships, assertV4RowAdmission, historicalChildCatalogSource } from "@deepseek-ai/dsh-session-format-v3-to-v4";
 import { readdirSync } from "node:fs";
 import { link, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, stat, truncate } from "node:fs/promises";
@@ -11,7 +12,6 @@ import { SessionAlreadyExistsError, SessionAlreadyOwnedError, SessionFormatUnsup
 import { BlockAssembler, errorChain, expandAssistantStream } from "@deepseek-ai/dsh-llm";
 import { tryLockExclusive } from "@deepseek-ai/node-addon-system/flock";
 import { KNOWN_SESSION_EVENT_TYPES, SESSION_FORMAT_VERSION, Session, SessionId, SessionLogOffset, decodeSessionEvent } from "@deepseek-ai/dsh-session";
-import { SessionFormatError, SessionFormatUnsupportedMigrationError as SessionFormatUnsupportedMigrationError$1, parseSessionFormatLogFilename, sessionFormatLogFilename } from "@deepseek-ai/dsh-session-format";
 import { constants, createZstdCompress, createZstdDecompress, zstdCompress, zstdDecompress, zstdDecompressSync } from "node:zlib";
 import { isDeepStrictEqual, promisify } from "node:util";
 import { constants as constants$1 } from "node:buffer";
@@ -1110,7 +1110,7 @@ var SessionLogScanner = class {
 			assertNoRetiredStoredEvent(this.meta, decoded);
 			assertV4RowAdmission(decoded, KNOWN_SESSION_EVENT_TYPES);
 		} catch (error) {
-			if (error instanceof SessionFormatUnsupportedMigrationError$1) throw new SessionFormatUnsupportedError(error.message);
+			if (error instanceof SessionFormatUnsupportedMigrationError) throw new SessionFormatUnsupportedError(error.message);
 			throw error;
 		}
 		if (this.issue !== void 0) {
@@ -2225,7 +2225,7 @@ async function prepareCatalogFacts(parentId, sources, compression, signal) {
 	for (const source of sources) {
 		signal.throwIfAborted();
 		const version = parseGenerationLogFilename(basename(source.path), compression);
-		if (version === void 0) throw new SessionFormatUnsupportedMigrationError$1(`unrecognized historical child generation ${source.path}`);
+		if (version === void 0) throw new SessionFormatUnsupportedMigrationError(`unrecognized historical child generation ${source.path}`);
 		const witness = {
 			path: source.path,
 			identity: await stat(source.path, { bigint: true })
@@ -2427,7 +2427,7 @@ var JsonlSessionPersistence = class extends SessionPersistence {
 			validateSourceRow: (row, sourceVersion) => {
 				if (sourceVersion === 4) assertV4RowAdmission(row, KNOWN_SESSION_EVENT_TYPES);
 			},
-			isUnsupportedMigrationError: (error) => error instanceof SessionFormatUnsupportedMigrationError
+			isUnsupportedMigrationError: (error) => error instanceof SessionFormatUnsupportedMigrationError$1
 		};
 		this.assertUsableRoot();
 		this.tracker.install(ctx);
@@ -2787,10 +2787,14 @@ var JsonlSessionPersistence = class extends SessionPersistence {
 	}
 	/** Translate generation-layer failures into the persistence seam's error vocabulary. */
 	generationFailure(id, selected, error) {
-		if (error instanceof JsonlGenerationUnsupportedMigrationError) return new SessionFormatUnsupportedError(`${error.message}; source v${error.fromVersion} artifact remains unchanged (raw log: ${selected.sourcePath})`, {
-			kind: "jsonl",
-			path: selected.sourcePath
-		});
+		if (error instanceof JsonlGenerationUnsupportedMigrationError) {
+			const cause = error.reason.cause;
+			if (cause instanceof SessionFormatError && !(cause instanceof SessionFormatUnsupportedMigrationError$1)) return new SessionPersistenceCorruptionError(`session "${id}": stored log is corrupt: ${cause.message} (raw log: ${selected.sourcePath})`, { cause });
+			return new SessionFormatUnsupportedError(`${error.message}; source v${error.fromVersion} artifact remains unchanged (raw log: ${selected.sourcePath})`, {
+				kind: "jsonl",
+				path: selected.sourcePath
+			});
+		}
 		if (error instanceof JsonlGenerationSourceChangedError) return error;
 		if (error instanceof SessionFormatUnsupportedError || error instanceof SessionPersistenceCorruptionError || isErrnoException(error) || error instanceof DOMException && error.name === "AbortError") return error;
 		return new SessionPersistenceCorruptionError(`session "${id}": stored log is corrupt: ${String(error)} (raw log: ${selected.sourcePath})`, { cause: error });
