@@ -65,9 +65,10 @@ The shell has a horizontal drag handle between its navigation header and the
 project/thread region. It adjusts the header's height while preserving at least
 120px for the thread list. The height is saved with the other browser
 preferences; double-clicking the handle restores the content-sized default.
-Arrow keys resize in 24px steps, and Home/End move to the smallest/largest
-available header size. The handle is hidden when the Host collapses the sidebar
-to its narrow rail, where the thread region is not rendered.
+Arrow keys resize in 24px steps, Home/End move to the smallest/largest
+available header size, and the 0 key restores the content-sized default. The handle
+is hidden when the Host collapses the sidebar to its narrow rail, where the
+thread region is not rendered.
 
 ## Installed DSH 0.2.0-rc.2 sidebar contract
 
