@@ -33,6 +33,12 @@ export interface ProjectFolderPickerProps {
   readonly onSelect: (selection: ProjectFolderSelection) => void
   readonly onClose: () => void
   readonly title?: string
+  /**
+   * Identity of the machine these paths live on, shown with each row the way the
+   * reference does. The picker is host-agnostic, so this is supplied by the
+   * caller that knows it rather than read here.
+   */
+  readonly machineName?: string
 }
 
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
@@ -272,7 +278,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   </span>
                   <span className={styles.itemText}>
                     <strong>{project.title}</strong>
-                    <small>{project.canonicalPath}</small>
+                    <small>
+                      {props.machineName === undefined ? null : `${props.machineName} · `}
+                      {project.canonicalPath}
+                    </small>
                   </span>
                   {index < 9 && <kbd>⌘ {index + 1}</kbd>}
                 </button>
