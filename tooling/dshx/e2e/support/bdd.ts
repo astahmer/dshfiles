@@ -11,7 +11,7 @@ import { readClientBootOutcome, type BrowserBootOptions, type BrowserBootOutcome
  * The base test must be playwright-bdd's own, not @playwright/test's, because the
  * BDD fixtures are attached to it.
  */
-export const { Given, When, Then, After } = createBdd(bddTest)
+export const { Before, Given, When, Then, After } = createBdd(bddTest)
 
 /** Read DSH's native readiness, expected manifest entries, audit, and Slot errors. */
 export const readBootOutcome = (page: Page, options: BrowserBootOptions): Promise<BrowserBootOutcome> => readClientBootOutcome(page, options)
