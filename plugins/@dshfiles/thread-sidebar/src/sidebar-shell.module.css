@@ -513,3 +513,18 @@
 .moreItem > * {
   width: 100%;
 }
+
+/*
+ * Every transition here is a colour, opacity or transform change under 150ms, but
+ * a reader who asks the platform for reduced motion should not get them either.
+ * plugin-marketplace already guards its spinner the same way; this applies the
+ * guard to the shell rather than leaving the preference half-honoured.
+ */
+@media (prefers-reduced-motion: reduce) {
+
+  .visibilityToggle,
+  .visibilityThumb,
+  .projectFilter > summary::after {
+    transition: none;
+  }
+}

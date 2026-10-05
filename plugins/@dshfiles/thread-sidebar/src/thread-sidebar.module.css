@@ -426,3 +426,11 @@ body[data-ds-dark-theme] .rowProject {
   outline: 2px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color);
   outline-offset: 2px;
 }
+
+@media (prefers-reduced-motion: reduce) {
+
+  .projectFilter > summary::after,
+  .actions {
+    transition: none;
+  }
+}
