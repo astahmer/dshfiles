@@ -45,7 +45,9 @@ describe('DSH platform CLI', () => {
       platformArgs: ['run', '/help'],
       session: 'session-1',
     })
-    expect(parseCliArgs(['runtime', 'add', 'server-a', 'Profile A', '--unit', 'dsh-a.service', '--remote-home', '/home/deploy/runtime-a', '--json'])).toMatchObject({
+    expect(
+      parseCliArgs(['runtime', 'add', 'server-a', 'Profile A', '--unit', 'dsh-a.service', '--remote-home', '/home/deploy/runtime-a', '--json']),
+    ).toMatchObject({
       command: 'runtime',
       platformArgs: ['add', 'server-a', 'Profile A'],
       unit: 'dsh-a.service',
@@ -58,8 +60,10 @@ describe('DSH platform CLI', () => {
       hostSelector: 'server-a',
       json: true,
     })
-    expect(parseCliArgs(['workspace', 'open', 'runtime-a', '/srv/work']))
-      .toMatchObject({ command: 'workspace', platformArgs: ['open', 'runtime-a', '/srv/work'] })
+    expect(parseCliArgs(['workspace', 'open', 'runtime-a', '/srv/work'])).toMatchObject({
+      command: 'workspace',
+      platformArgs: ['open', 'runtime-a', '/srv/work'],
+    })
     expect(() => parseCliArgs(['sessions', 'list', '--host', 'server-a', '--local'])).toThrow('--local is only valid with host add')
     expect(() => parseCliArgs(['commands', 'run', '/help'])).toThrow('--session')
     expect(() => parseCliArgs(['config', 'set', 'plugin', 'enabled', 'not-json'])).not.toThrow()

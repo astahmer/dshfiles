@@ -879,16 +879,19 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       if (id === undefined || nameParts.join(' ').trim().length === 0) throw new CliUsageError('runtime add requires a host id and display name.')
       const localRuntime = launchUrlEnv !== undefined
       const sshRuntime = unit !== undefined || remoteHome !== undefined
-      if (localRuntime === sshRuntime) throw new CliUsageError('runtime add requires --launch-url-env <name> for local runtimes, or both --unit and --remote-home for SSH runtimes.')
+      if (localRuntime === sshRuntime)
+        throw new CliUsageError('runtime add requires --launch-url-env <name> for local runtimes, or both --unit and --remote-home for SSH runtimes.')
       if (sshRuntime && (unit === undefined || remoteHome === undefined)) throw new CliUsageError('SSH runtime add requires both --unit and --remote-home.')
-      if (launchUrlEnv !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(launchUrlEnv)) throw new CliUsageError('--launch-url-env requires an environment variable name.')
+      if (launchUrlEnv !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(launchUrlEnv))
+        throw new CliUsageError('--launch-url-env requires an environment variable name.')
     }
   }
   if (command === 'workspace' && !help) {
     const [action, id, ...pathParts] = platformArgs
     if (!['list', 'open'].includes(action ?? '')) throw new CliUsageError('workspace requires list or open.')
     if (action === 'list' && (id === undefined || pathParts.length > 0)) throw new CliUsageError('workspace list requires exactly one host or runtime id.')
-    if (action === 'open' && (id === undefined || pathParts.join(' ').trim().length === 0)) throw new CliUsageError('workspace open requires a host or runtime id and an absolute path.')
+    if (action === 'open' && (id === undefined || pathParts.join(' ').trim().length === 0))
+      throw new CliUsageError('workspace open requires a host or runtime id and an absolute path.')
   }
   if (!platformCommand && platformArgs.length > 0) throw new CliUsageError('Unexpected positional arguments.')
   if (command !== 'inspect' && inspectTarget !== undefined) throw new CliUsageError('Inspect targets are only valid with the inspect command.')

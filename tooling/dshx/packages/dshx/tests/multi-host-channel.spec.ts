@@ -36,9 +36,10 @@ describe('multi-host headless API client', () => {
       apiRequests.push(apiRequest)
       const rpcId = typeof apiRequest === 'object' && apiRequest !== null && 'rpcId' in apiRequest ? apiRequest.rpcId : ''
       response.writeHead(200, { 'content-type': 'application/json' })
-      const output = request.url === `/api/${channel}/runtimeUpsert`
-        ? { ok: false, code: 'identity-unavailable', message: 'The connected runtime did not provide the multi-host identity API.' }
-        : { hosts: [], runtimes: [] }
+      const output =
+        request.url === `/api/${channel}/runtimeUpsert`
+          ? { ok: false, code: 'identity-unavailable', message: 'The connected runtime did not provide the multi-host identity API.' }
+          : { hosts: [], runtimes: [] }
       response.end(JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value: { version: 1, output } } }))
     })
     await new Promise<void>((resolve, reject) => {
@@ -51,11 +52,13 @@ describe('multi-host headless API client', () => {
 
     const client = await connectMultiHost({ url: `${origin}/?token=launch-token` })
     await expect(client.list()).resolves.toEqual({ hosts: [], runtimes: [] })
-    await expect(client.runtimeUpsert({
-      hostId: 'vps-check',
-      name: 'VPS runtime',
-      locator: { kind: 'local', launchUrl: 'http://127.0.0.1:40123/?token=synthetic-runtime-token' },
-    })).resolves.toEqual({ ok: false, code: 'identity-unavailable', message: 'The connected runtime did not provide the multi-host identity API.' })
+    await expect(
+      client.runtimeUpsert({
+        hostId: 'vps-check',
+        name: 'VPS runtime',
+        locator: { kind: 'local', launchUrl: 'http://127.0.0.1:40123/?token=synthetic-runtime-token' },
+      }),
+    ).resolves.toEqual({ ok: false, code: 'identity-unavailable', message: 'The connected runtime did not provide the multi-host identity API.' })
 
     expect(apiCookie).toBe('dsh-session=synthetic')
     expect(apiRequests[0]).toMatchObject({ type: 'client-request', method: `${channel}/list`, payload: { version: 1 } })

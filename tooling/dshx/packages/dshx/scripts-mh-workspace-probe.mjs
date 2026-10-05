@@ -1,6 +1,9 @@
 const origin = process.env.MH_ORIGIN
 const res = await fetch(`${origin}/?token=${process.env.MH_TOKEN}`, { redirect: 'manual' })
-const cookie = res.headers.getSetCookie().map(c => c.split(';', 1)[0]).join('; ')
+const cookie = res.headers
+  .getSetCookie()
+  .map(c => c.split(';', 1)[0])
+  .join('; ')
 const enc = encodeURIComponent
 const raw = async (ns, m, args) => {
   const r = await fetch(`${origin}/api/${enc(ns)}/${enc(m)}`, {

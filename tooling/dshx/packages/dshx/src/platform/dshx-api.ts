@@ -4,17 +4,21 @@ import { apiChannel } from '../api/runtime.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, loopbackLaunchUrl } from './client.js'
 
-const responseSchema = z.object({
-  type: z.literal('server-response'),
-  rpcId: z.string(),
-  result: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.unknown() }).passthrough(),
-    z.object({
-      ok: z.literal(false),
-      error: z.object({ code: z.string().optional(), message: z.string() }).passthrough(),
-    }).passthrough(),
-  ]),
-}).passthrough()
+const responseSchema = z
+  .object({
+    type: z.literal('server-response'),
+    rpcId: z.string(),
+    result: z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), value: z.unknown() }).passthrough(),
+      z
+        .object({
+          ok: z.literal(false),
+          error: z.object({ code: z.string().optional(), message: z.string() }).passthrough(),
+        })
+        .passthrough(),
+    ]),
+  })
+  .passthrough()
 
 const outputSchema = z.object({ version: z.number().int(), output: z.unknown() }).passthrough()
 
@@ -32,14 +36,7 @@ export interface DshxApiCallerOptions {
 const safeMessage = (message: string): string => message.replace(/([?&]token=)[^&\s]*/gi, '$1[redacted]')
 
 /** Calls one versioned DSHX Host API using an existing authenticated native session. */
-export const createDshxApiCaller = ({
-  origin,
-  cookie,
-  packageId,
-  apiId,
-  version,
-  fetch: request = fetch,
-}: DshxApiCallerOptions): DshxApiCall => {
+export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version, fetch: request = fetch }: DshxApiCallerOptions): DshxApiCall => {
   const channel = apiChannel(packageId, apiId)
   return async (method, input, signal) => {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(method)) throw new DshPlatformError('invalid-method', 'DSHX API method names must be plain identifiers.')
@@ -50,7 +47,12 @@ export const createDshxApiCaller = ({
         method: 'POST',
         redirect: 'error',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ type: 'client-request', rpcId, method: channel.slice(1) + '/' + method, payload: input === undefined ? { version } : { version, input } }),
+        body: JSON.stringify({
+          type: 'client-request',
+          rpcId,
+          method: channel.slice(1) + '/' + method,
+          payload: input === undefined ? { version } : { version, input },
+        }),
         ...(signal === undefined ? {} : { signal }),
       })
     } catch {
@@ -107,7 +109,11 @@ export const connectDshxApi = async ({
   if (!exchange.ok && exchange.status !== 302 && exchange.status !== 303) {
     throw new DshPlatformError('authentication-failed', 'DSH launch authentication failed with HTTP ' + exchange.status + '.')
   }
-  const cookie = exchange.headers.getSetCookie().map(item => item.split(';', 1)[0]).filter(Boolean).join('; ')
+  const cookie = exchange.headers
+    .getSetCookie()
+    .map(item => item.split(';', 1)[0])
+    .filter(Boolean)
+    .join('; ')
   if (!cookie) throw new DshPlatformError('authentication-failed', 'DSH did not issue an authenticated session cookie for the launch URL.')
   return createDshxApiCaller({ origin: parsed.origin, cookie, packageId, apiId, version, fetch: request })
 }

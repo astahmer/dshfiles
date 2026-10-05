@@ -10,14 +10,16 @@ const connectorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('local') }).strict(),
   z.object({ kind: z.literal('ssh'), sshTarget: z.string().min(1).max(255) }).strict(),
 ])
-const identitySchema = z.object({
-  protocolVersion: z.literal(1),
-  runtimeId: z.string().uuid(),
-  profile: profileSchema,
-  homeLeaf: z.string().min(1).max(128),
-  dshVersion: z.string().min(1).max(80),
-  capabilities: z.array(z.enum(['workspace', 'session', 'agent'])).max(8),
-}).strict()
+const identitySchema = z
+  .object({
+    protocolVersion: z.literal(1),
+    runtimeId: z.string().uuid(),
+    profile: profileSchema,
+    homeLeaf: z.string().min(1).max(128),
+    dshVersion: z.string().min(1).max(80),
+    capabilities: z.array(z.enum(['workspace', 'session', 'agent'])).max(8),
+  })
+  .strict()
 const hostSummarySchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120),
@@ -69,14 +71,9 @@ const runtimeRegistrationSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }).strict(),
   z.object({ ok: z.literal(false), code: z.string().min(1).max(128), message: z.string().max(2048) }).strict(),
 ])
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
-  z.string(),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-  z.array(jsonValueSchema),
-  z.record(z.string(), jsonValueSchema),
-]))
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
+)
 export { nativeRpcRequestSchema } from './native-rpc.js'
 const nativeRpcResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: jsonValueSchema }).strict(),
@@ -141,13 +138,15 @@ export const connectMultiHost = async (options: { readonly url?: string }): Prom
     runtimeStatus: async runtimeId => runtimeStatusSchema.parse(await call('runtimeStatus', { runtimeId })),
     workspaceOpen: async (runtimeId, path) => workspaceOpenSchema.parse(await call('workspaceOpen', { runtimeId, path })),
     runtimeCall: async (runtimeId, request, signal) => nativeRpcResultSchema.parse(await call('runtimeCall', toJsonValue({ runtimeId, request }), signal)),
-    sessionCursor: async (runtimeId, sessionId) => z.object({ cursor: z.number().int().safe().min(-1) }).parse(await call('sessionCursor', { runtimeId, sessionId })),
+    sessionCursor: async (runtimeId, sessionId) =>
+      z.object({ cursor: z.number().int().safe().min(-1) }).parse(await call('sessionCursor', { runtimeId, sessionId })),
     runtimeOpenView: async runtimeId => runtimeViewSchema.parse(await call('runtimeOpenView', { runtimeId })),
     runtimeCloseView: async leaseId => z.object({ closed: z.boolean() }).parse(await call('runtimeCloseView', { leaseId })),
     runtimeRemove: async runtimeId => z.object({ removed: z.boolean() }).parse(await call('runtimeRemove', { runtimeId })),
   }
 }
 
-export const multiHostConnectionError = (error: unknown): DshPlatformError => error instanceof DshPlatformError
-  ? error
-  : new DshPlatformError('multi-host-unavailable', 'The multi-host API request failed. Check that the local DSH plugin is active and reconnect.')
+export const multiHostConnectionError = (error: unknown): DshPlatformError =>
+  error instanceof DshPlatformError
+    ? error
+    : new DshPlatformError('multi-host-unavailable', 'The multi-host API request failed. Check that the local DSH plugin is active and reconnect.')

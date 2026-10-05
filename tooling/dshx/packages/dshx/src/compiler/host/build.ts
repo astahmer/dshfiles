@@ -78,13 +78,13 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
             ? `${VIRTUAL_HOST_PUBLIC}-api`
             : source === DSHX_SETTINGS_PUBLIC
               ? `${VIRTUAL_HOST_PUBLIC}-settings`
-            : source === DSHX_COMMUNICATION_PUBLIC
-              ? VIRTUAL_HOST_COMMUNICATION_PUBLIC
-              : source === DSHX_PLATFORM_HOST_API_PUBLIC
-                ? VIRTUAL_HOST_PLATFORM_API_PUBLIC
-                : source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
-                  ? VIRTUAL_HOST_NATIVE_RPC_PUBLIC
-                  : VIRTUAL_HOST_ENTRY
+              : source === DSHX_COMMUNICATION_PUBLIC
+                ? VIRTUAL_HOST_COMMUNICATION_PUBLIC
+                : source === DSHX_PLATFORM_HOST_API_PUBLIC
+                  ? VIRTUAL_HOST_PLATFORM_API_PUBLIC
+                  : source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
+                    ? VIRTUAL_HOST_NATIVE_RPC_PUBLIC
+                    : VIRTUAL_HOST_ENTRY
       }
       return null
     },
