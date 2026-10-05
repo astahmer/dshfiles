@@ -13,6 +13,7 @@ test-results/
 playwright-report/
 
 .playwright-cli/
+.dsh-e2e-evidence/
 
 # Generated narrow core fork output.
 tooling/dsh-core/agent/lib/

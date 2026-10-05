@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test'
 import { defineBddProject } from 'playwright-bdd'
+import { E2E_VIEWPORT } from './e2e/support/evidence.js'
 
 /**
  * Behavior E2E for the DSH Web UI.
@@ -15,6 +16,7 @@ import { defineBddProject } from 'playwright-bdd'
  */
 export default defineConfig({
   ...defineBddProject({
+    name: 'web-e2e',
     features: 'e2e/features/*.feature',
     steps: 'e2e/support/steps.ts',
   }),
@@ -24,10 +26,13 @@ export default defineConfig({
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never' }], ['./e2e/support/evidence-reporter.ts']]
+    : [['list'], ['./e2e/support/evidence-reporter.ts']],
   use: {
     trace: 'off',
     screenshot: 'only-on-failure',
+    viewport: E2E_VIEWPORT,
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
 })

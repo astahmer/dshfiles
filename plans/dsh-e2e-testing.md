@@ -12,7 +12,7 @@ in the browser:
 - Fixing that let queue-reorder run for the first time, and it immediately
   collided with `@deepseek-ai/dsh-client-ui-conversation` over the `conversation`
   locale namespace. The shipped Locale runtime rejects a duplicate
-  `(namespace, locale)` pair, so a *shipped* plugin died and seven more fell to
+  `(namespace, locale)` pair, so a _shipped_ plugin died and seven more fell to
   `pending (waiting for service: uiConversation)`.
 
 `tsc` passed. `dshx check` passed. The build produced a valid artifact. The
@@ -26,14 +26,14 @@ concrete evidence that a hand-built DOM shim is the wrong instrument.
 
 ### What exists today
 
-| Layer | Tool | Reaches a browser half bug? |
-|-------|------|----------------------------|
-| Typecheck | `tsc` | Only if the contract is expressible in types |
-| Unit | Vitest, node env | No DOM, no host |
-| Build guard | `dshx check`, compiler plugins | Static only |
-| Host boot | `dshx check --boot` | Server half only |
-| DSH smoke | `scripts/smoke-dsh.mjs`, `playwright-cli` | Yes, for a scaffolded plugin |
-| Profile smoke | none | No |
+| Layer         | Tool                                      | Reaches a browser half bug?                  |
+| ------------- | ----------------------------------------- | -------------------------------------------- |
+| Typecheck     | `tsc`                                     | Only if the contract is expressible in types |
+| Unit          | Vitest, node env                          | No DOM, no host                              |
+| Build guard   | `dshx check`, compiler plugins            | Static only                                  |
+| Host boot     | `dshx check --boot`                       | Server half only                             |
+| DSH smoke     | `scripts/smoke-dsh.mjs`, `playwright-cli` | Yes, for a scaffolded plugin                 |
+| Profile smoke | none                                      | No                                           |
 
 `scripts/smoke-dsh.mjs` already drives a real browser via `playwright-cli`
 (`open` → `snapshot` → `run-code`). That is the closest thing to the missing
@@ -56,8 +56,8 @@ actually run the suite.
 
 ## What
 
-A layered E2E strategy, with the layer boundary drawn by *where the defect can
-live* rather than by tooling preference.
+A layered E2E strategy, with the layer boundary drawn by _where the defect can
+live_ rather than by tooling preference.
 
 1. **Static contract checks** — the cheap layer, extended so whole classes of
    cross-plugin defects never reach a browser. Implemented in
@@ -83,7 +83,7 @@ none, because it rots and then lies.
 
 ### Conceptual model
 
-Classify a defect by the earliest layer that can *see* it, and put a check there.
+Classify a defect by the earliest layer that can _see_ it, and put a check there.
 
 ```mermaid
 flowchart TD
@@ -107,20 +107,20 @@ frameworks doubles that cost for no extra coverage.
 - `dshx check --boot` proves the server half loads. Adding `--runtime` extends it
   with the browser pass, which asserts no client entry is `failed`.
 - `scripts/smoke-dsh.mjs` proves a scaffolded plugin works against a pinned DSH.
-- The new profile smoke proves *this repo's* profile — the real
+- The new profile smoke proves _this repo's_ profile — the real
   `~/.dsh/profiles/web` composition — boots clean, which is the check that would
   have caught both defects on the day they shipped.
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| jsdom | Rejected | Lacks `EventSource`, has no module loader, and a stubbed `fetch` produced a false 36-entry failure. It simulates the browser rather than running it. |
-| Vitest browser mode | Rejected | Wrong lifecycle. These tests must boot a *DSH profile*, own a port, and assert across a whole plugin graph; Vitest browser mode assumes it owns the page and starts from a fixture URL. It would fight the thing being tested. |
-| Playwright BDD (`test.step` / `playwright.test()`) | **Recommended for journeys** | See the section below. |
-| Plain `@playwright/test` specs | Used only for boot assertions | The boot check is one assertion against one DOM node. A feature file for it would be ceremony. |
-| Mock the host | Rejected | The defects were precisely about services the host provides and packages negotiate between. A mock reproduces the assumption under test. |
-| One browser per run | Rejected | 15-20s each. Boot smoke shares a single launch across all entry assertions. |
+| Choice                                             | Decision                      | Rationale                                                                                                                                                                                                                      |
+| -------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| jsdom                                              | Rejected                      | Lacks `EventSource`, has no module loader, and a stubbed `fetch` produced a false 36-entry failure. It simulates the browser rather than running it.                                                                           |
+| Vitest browser mode                                | Rejected                      | Wrong lifecycle. These tests must boot a _DSH profile_, own a port, and assert across a whole plugin graph; Vitest browser mode assumes it owns the page and starts from a fixture URL. It would fight the thing being tested. |
+| Playwright BDD (`test.step` / `playwright.test()`) | **Recommended for journeys**  | See the section below.                                                                                                                                                                                                         |
+| Plain `@playwright/test` specs                     | Used only for boot assertions | The boot check is one assertion against one DOM node. A feature file for it would be ceremony.                                                                                                                                 |
+| Mock the host                                      | Rejected                      | The defects were precisely about services the host provides and packages negotiate between. A mock reproduces the assumption under test.                                                                                       |
+| One browser per run                                | Rejected                      | 15-20s each. Boot smoke shares a single launch across all entry assertions.                                                                                                                                                    |
 
 ### Why Gherkin earns its keep, and where it does not
 
@@ -129,7 +129,7 @@ specific failure mode that plain specs have and feature files do not.
 
 A behavior E2E test for this product is a sequence of UI steps: open the panel,
 send a message, wait for a reply, drag a queue row. Written as imperative spec
-code, the *intent* is buried under selectors and waits. When the UI shifts — a
+code, the _intent_ is buried under selectors and waits. When the UI shifts — a
 heading changes, a button moves — the spec breaks, and the fix is to re-read 40
 lines of Playwright code and guess which line the change invalidated. In a
 feature file the breakage is usually visible on sight, because the step is
@@ -267,21 +267,70 @@ In CI, the same run attaches a Playwright trace on failure.
 
 ## Data model
 
-The boot card is the contract surface. Its shape is the thing to pin:
+The boot card remains the contract surface for startup assertions. Each browser
+run now also writes a bounded local receipt that links the run to its JJ source
+revision and, in CI, the provider's source run URL:
 
 ```typescript
-interface ClientBootOutcome {
-  /** True when the Web UI mounted without a plugin failure card. */
-  ok: boolean
-  /** Every entry line the card printed, with state and detail. */
-  entries: Array<{ id: string; state: 'failed' | 'pending' | 'error'; detail?: string }>
+interface E2EStep {
+  sequence: number
+  parentSequence: number | null
+  title: string
+  category: 'action' | 'assertion'
+  outcome: 'passed' | 'failed'
+  offsetMs: number
+  durationMs: number
+}
+
+interface E2EAttachment {
+  sequence: number
+  name: string
+  kind: 'screenshot' | 'trace'
+  contentType: string
+  file: string
+  sizeBytes: number
+  sha256: string
+}
+
+interface E2ETest {
+  key: string
+  titlePath: string[]
+  file: string
+  line: number
+  expectedStatus: string
+  outcome: 'passed' | 'failed' | 'cancelled'
+  durationMs: number
+  retry: number
+  steps: E2EStep[]
+  attachments: E2EAttachment[]
+}
+
+interface E2ERunEvidence {
+  schemaVersion: 1
+  runId: string
+  startedAt: string
+  completedAt: string
+  outcome: 'passed' | 'failed' | 'cancelled'
+  source: { revision: string | null; runUrl: string | null }
+  browser: {
+    engine: 'chromium'
+    viewport: { width: number; height: number }
+    actionIdentity: 'ordered Playwright test steps'
+    frameIdentity: 'test-scoped; trace retains internal frame order'
+    frameAlignment: 'trace-only; no synthetic action-to-frame mapping'
+  }
+  tests: E2ETest[]
 }
 ```
 
-A stable accessor for this — rather than screen-scraping the card in each test —
-is what makes later E2E assertions cheap. Worth proposing upstream as a documented
-`window.__DSH_BOOT_STATE__`, since a public test hook is better than every
-downstream project parsing a localized DOM string.
+Only failure screenshots and trace archives are copied. Artifact bytes, bytes
+per run, total retained bytes and retained run count are capped; paths and token
+URLs are not included in the manifest. The trace keeps its own action/frame
+ordering. A separate screenshot-to-action identity is not inferred.
+
+A stable accessor for the boot card — rather than screen-scraping it in each
+test — is still worth proposing upstream as a documented
+`window.__DSH_BOOT_STATE__`.
 
 ## Implementation steps
 
@@ -303,7 +352,9 @@ downstream project parsing a localized DOM string.
 7. Add the first user-visible journey now that the harness exists: send a message,
    assert a reply renders, assert the queue lists the second message beneath the
    first.
-7. Propose `window.__DSH_BOOT_STATE__` upstream so both the boot smoke and the
+8. Add a bounded evidence reporter with ordered named steps, retained failure
+   screenshots/traces, JJ source identity and a CI source-run URL.
+9. Propose `window.__DSH_BOOT_STATE__` upstream so both the boot smoke and the
    journey steps read a documented hook instead of parsing a localized DOM card.
 
 ## Open questions
@@ -329,16 +380,21 @@ downstream project parsing a localized DOM string.
 - [ ] A fresh clone reaches the browser tests without a manual browser install.
 - [ ] Both original defects are covered: the missing `slots` service by the static
       check, the locale collision by the type-level refusal and the boot smoke.
+- [x] Failed and interrupted runs retain a bounded, source-linked manifest.
+- [x] Ordered named actions and assertions are recorded without copying prompt,
+      page text, Host stdout or tokenized local URLs into the manifest.
+- [x] Frame ordering is tied to the Playwright trace; the manifest does not invent
+      action-to-frame correlation.
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-04 | Rejected jsdom for boot verification | It produced a false 36-entry failure from a stubbed `fetch` and a spurious `dsh-client-hmr` error from a missing `EventSource`. |
-| 2026-10-04 | Rejected Playwright BDD | A second runner and config for no coverage; `smoke-dsh.mjs` already drives a real page. |
-| 2026-10-04 | Rejected Vitest browser mode | These tests boot a DSH profile and own a port; browser mode assumes it owns the page and starts from a fixture URL. |
-| 2026-10-04 | Adopted Gherkin for journeys, plain specs for single assertions | The intent of a journey is buried under selectors in a spec, and the shared setup is the reusable part — which is what step definitions are for. A boot assertion is one node and gains nothing from a feature file. |
-| 2026-10-04 | One boot harness shared by smoke and journeys | A browser launch is the expensive unit; two harnesses would pay for it twice. |
-| 2026-10-04 | Boot smoke shares one launch across all entry assertions | One browser launch is the expensive unit; per-entry launches would make the layer unusable. |
-| 2026-10-04 | Keep `playwright-cli` in `smoke-dsh.mjs`, use `@playwright/test` for the profile smoke and journeys | The former drives an already-running DSH; the latter owns a lifecycle and needs assertions, retries, and traces. |
-| 2026-10-04 | `pending` on a live-host service is not a failure | The smoke does not run a Host conversation, so those entries can never reach `active` here. Treating them as defects would make the check permanently red. |
+| Date       | Decision                                                                                            | Rationale                                                                                                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-04 | Rejected jsdom for boot verification                                                                | It produced a false 36-entry failure from a stubbed `fetch` and a spurious `dsh-client-hmr` error from a missing `EventSource`.                                                                                      |
+| 2026-10-04 | Rejected Playwright BDD                                                                             | A second runner and config for no coverage; `smoke-dsh.mjs` already drives a real page.                                                                                                                              |
+| 2026-10-04 | Rejected Vitest browser mode                                                                        | These tests boot a DSH profile and own a port; browser mode assumes it owns the page and starts from a fixture URL.                                                                                                  |
+| 2026-10-04 | Adopted Gherkin for journeys, plain specs for single assertions                                     | The intent of a journey is buried under selectors in a spec, and the shared setup is the reusable part — which is what step definitions are for. A boot assertion is one node and gains nothing from a feature file. |
+| 2026-10-04 | One boot harness shared by smoke and journeys                                                       | A browser launch is the expensive unit; two harnesses would pay for it twice.                                                                                                                                        |
+| 2026-10-04 | Boot smoke shares one launch across all entry assertions                                            | One browser launch is the expensive unit; per-entry launches would make the layer unusable.                                                                                                                          |
+| 2026-10-04 | Keep `playwright-cli` in `smoke-dsh.mjs`, use `@playwright/test` for the profile smoke and journeys | The former drives an already-running DSH; the latter owns a lifecycle and needs assertions, retries, and traces.                                                                                                     |
+| 2026-10-04 | `pending` on a live-host service is not a failure                                                   | The smoke does not run a Host conversation, so those entries can never reach `active` here. Treating them as defects would make the check permanently red.                                                           |
