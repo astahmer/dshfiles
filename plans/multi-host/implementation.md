@@ -312,8 +312,8 @@ retain sanitized evidence and the test home's disposition.
 |---|---|---|
 | P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see `validation.md`. |
 | P2 — identity, directory, CLI | Complete | Local x2, Pi, and VPS; distinct native IDs for identical workspace paths; remote CLI session creation, ambiguity rejection, wrong-token rejection, and restart persistence. |
-| P3 — reliability | Partial | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, and one-host outage isolation passed. Synthetic lost-reply handling and no-replay reconciliation passed; the remote-runtime reply-drop gate remains unverified. |
-| P4 — first-class UI | Partial | Online host switching and session creation passed. Offline stale-card/reconnect UI and approval/upload/terminal routing lack final preview evidence. |
+| P3 — reliability | Complete | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, one-host outage isolation, and an admitted Pi session-create whose reply was dropped through the real SSH connector passed without replay. |
+| P4 — first-class UI | Partial | Online host switching/session creation, offline stale-card/reconnect, and the Pi native runtime view in a distinct browser origin passed in the collaborative preview. Approval, upload, terminal interaction, and the UI popup's close/reopen cycle still lack browser proof. |
 | P5 — second machine and rollout | Partial | Pi ARM64 plus VPS and local runtimes passed concurrently; source profile registration was checked in an isolated nixfiles workspace. Durable declarative supervision and daily-profile activation remain pending. |
 
 ## Acceptance criteria
@@ -347,9 +347,9 @@ suites or format unrelated shared changes.
    service, if agent turns are expected to survive host logouts? The accepted model
    turn used a disposable credential already present on the VPS; this plan does not
    persist or migrate that credential.
-3. Browser proof for an offline runtime's stale card, reconnect flow, and native
-   approval/upload/terminal routing is still pending. The collaborative preview
-   automation host was unavailable during the final outage pass.
+3. Browser proof for native approval, upload, terminal interaction, and the UI
+   popup's close/reopen cycle is still pending. Offline stale-card/reconnect and
+   loading the Pi native view in an isolated browser origin passed.
 4. Matching LSP availability and client-context isolation for a later unified UI
    remain deferred; the installed DSH composition advertises no remote LSP contract.
 
