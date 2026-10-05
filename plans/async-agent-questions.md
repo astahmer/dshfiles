@@ -355,16 +355,29 @@ projection; do not invent a second question engine in a plugin.
 
 ### Phase 2 — plugin after Host support
 
-The Host contract and thin child `ask_parent_question` tool now pass focused
-service/storage checks, a fresh scratch Host activation, and focused tool build
-and type checks. The direct parent uses `answer_parent_question` after deciding
-or after asking a human with native `ask_user_question`. Two concurrent
-questions, wrong-parent answers, cancellation, timeout, and service recreation
-are covered. Host shutdown interrupts the waiter without cancelling the durable
-row; a restarted service can answer and reattach. The tool reports expiry
-without selecting a default or writing a deferred file because neither outcome
-is part of the Host contract yet. Do not adopt in a profile until the remaining
-browser and process-restart acceptance gates pass.
+The Host contract and child `ask_parent_question` tool pass focused
+service/storage checks, a fresh scratch Host activation, and focused build and
+type checks. The direct parent uses `answer_parent_question` after deciding or
+after asking a human with native `ask_user_question`. Two concurrent
+questions, wrong-parent answers, cancellation, timeout, service recreation, and
+deferred Markdown files are covered. Host shutdown interrupts the waiter
+without cancelling the durable row; a restarted service can answer and
+reattach.
+
+The same plugin service now supports revisioned Markdown feedback without a
+second question engine. A child anchors the exact selected lines and whole-file
+SHA-256, then the recorded direct parent can resolve up to 20 items in one call,
+including after the child Agent stops. The durable parent-scoped row remains the
+source of truth; the native `sendMessage` path can cold-resume a persisted direct
+child for a one-way notice, while a failed wake leaves the receipt retrievable
+after reattachment. The Host checks the current revision at submission,
+resolution, and retrieval; changed or unreadable documents produce a durable
+stale receipt and are never applied automatically. JSON Storage Domain v3
+remains compatible with version 1 and 2 question data. Service and JSON-backend
+tests cover service/domain reopen, child shutdown, the 20-item limit, stale
+targets, and later retrieval. They do not prove an actual provider-backed child
+cold-resume. Element anchors remain gated on an accepted browser/evidence
+provider; no browser or human-answer acceptance is claimed by scratch Host boot.
 
 ## Open questions
 
@@ -404,6 +417,12 @@ Still open while building:
       a new default.
 - [x] Deferred outcomes persist their file path, reattach idempotently, reject
       path changes, and never overwrite an edited or symlinked file.
+- [x] Markdown feedback binds an exact workspace-relative excerpt to a
+      whole-file revision and rejects traversal, symlinks, and changed text.
+- [x] Parents can batch up to 20 feedback resolutions; ownership, durable
+      receipts, stale checks, and late retrieval after JSON domain reopen and
+      child Agent shutdown are tested.
+- [ ] Element anchors are integrated with an accepted browser/evidence provider.
 
 ## Decisions log
 
