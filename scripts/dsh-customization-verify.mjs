@@ -90,9 +90,9 @@ const runControl = async () => {
 const EXPECTED = {
   '01 filter inset': 29,
   '01 group caption': '12px',
-  '01 row height': 151,
   '01 title inset': 34,
   '01 title font': '20px',
+  '01 row share of rail': 18,
   '01 title above context': true,
   '01 actions hidden at rest': true,
   '02 compact target': 68,
@@ -121,11 +121,20 @@ const measure = async () => {
     const project = row?.querySelector('[class*="_rowProject"]')
     const actions = row?.querySelector('[class*="_actions"]')
     const compact = q('nav[aria-label] button')
+    const shell = q('[class*="_shell_"]')
+    const railWidth = shell === null ? 0 : shell.getBoundingClientRect().width
+    const rowHeight = row == null ? 0 : row.getBoundingClientRect().height
     return {
       '01 filter inset': filter === null ? null : Math.round(filter.getBoundingClientRect().left),
       '01 filter font': filter === null ? null : getComputedStyle(filter).fontSize,
       '01 group caption': group === null ? null : getComputedStyle(group).fontSize,
-      '01 row height': row === null ? null : Math.round(row.getBoundingClientRect().height),
+      '01 row height': row == null ? null : Math.round(rowHeight),
+      '01 rail width': Math.round(railWidth),
+      // The reference row is 151px tall in an 822px rail. Gating that absolute
+      // against a rail this profile caps at 419px would leave a permanent red
+      // meaning "narrower than the reference", not "broken". The share of the
+      // rail a row occupies survives the width, so that is what gets gated.
+      '01 row share of rail': row == null || railWidth === 0 ? null : Math.round((rowHeight / railWidth) * 100),
       '01 title inset': title == null ? null : Math.round(title.getBoundingClientRect().left),
       '01 title font': title == null ? null : getComputedStyle(title).fontSize,
       '01 title above context':
@@ -224,8 +233,17 @@ const measurePanels = async () => {
     const { context, page } = await openPage()
     await page.locator('[class*="_rowTitle_"]').first().click()
     await page.waitForTimeout(3000)
-    await page.locator('button[aria-label="Add files or run commands"]').first().click()
-    await page.waitForTimeout(1800)
+    // The composer's + is disabled while the thread is running, so a blind click
+    // waits out the 30s actionability timeout and then throws, ending the run
+    // before it can report. Pick a thread that is not mid-run, and if every one
+    // of them is, record that rather than dying on it.
+    const addButton = page.locator('button[aria-label="Add files or run commands"]:not([disabled])').first()
+    const reachable = (await addButton.count()) > 0
+    if (reachable) {
+      await addButton.click({ timeout: 10000 })
+      await page.waitForTimeout(1800)
+    }
+    values['05 composer menu reachable'] = reachable
     Object.assign(
       values,
       await page.evaluate(() => {
@@ -366,22 +384,36 @@ const measurePanels = async () => {
 
 const panels = control.detected ? await measurePanels() : null
 const allMeasured = measured === null || panels === null ? null : { ...measured, ...panels }
+
+// A surface that could not be opened is not evidence about that surface. When the
+// composer's menu was unreachable -- every thread mid-run, so the + is disabled --
+// 05 and 06 would otherwise be compared against a null they never had a chance to
+// produce, and the run would report a regression in a panel it never opened.
+const gated = { ...allMeasured }
+const unreachable = allMeasured?.['05 composer menu reachable'] === false
+if (unreachable) {
+  for (const key of ['05 menu lists MCP', '05 menu item count', '06 quick panel open', '06 quick panel heading', '06 quick panel actions']) {
+    delete gated[key]
+  }
+}
+
 const mismatches =
-  allMeasured === null
+  gated === null
     ? ['not measured: the control failed']
     : Object.entries(EXPECTED)
-        .filter(([key, want]) => allMeasured[key] !== want)
-        .map(([key, want]) => `${key}: expected ${want}, measured ${allMeasured[key]}`)
+        .filter(([key, want]) => gated[key] !== want)
+        .map(([key, want]) => `${key}: expected ${want}, measured ${gated[key]}`)
 
-// "Could not look" and "looked and found nothing" must not print the same thing.
-// An unrunnable control is a setup problem with a fixable cause; a control that
-// ran and missed its injected fault is a broken gate. Only the second is UNTRUSTED.
+const notGated = unreachable
+  ? ["05 and 06 were not compared: every thread was mid-run, so the composer's + was disabled"]
+  : []
+
 const verdict = !control.ran
   ? `NOT RUN: the control had nothing to test (${control.reason})`
   : !control.detected
     ? 'UNTRUSTED: the probe was shown a fault and missed it'
     : mismatches.length === 0
-      ? 'matches the reference on every measured value'
+      ? `matches the reference on every measured value${notGated.length === 0 ? '' : ` (${notGated.join('; ')})`}`
       : `${mismatches.length} value(s) drift from the reference`
 
 process.stdout.write(
@@ -391,6 +423,7 @@ process.stdout.write(
       control,
       trusted: control.ran && control.detected,
       measured: allMeasured,
+      notGated,
       mismatches,
       verdict,
     },
