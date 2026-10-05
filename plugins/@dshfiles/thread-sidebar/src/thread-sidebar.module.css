@@ -308,12 +308,24 @@
   opacity: 0.65;
 }
 
+/*
+ * The project line carries real text, so it needs the body-text tier, not the
+ * caption tier. Measured against the shipped palette: --dsw-alias-label-tertiary
+ * on the sidebar fill is 3.49:1 on light and 4.71:1 on dark, so no single tier
+ * clears WCAG AA (4.5:1) in both. --dsw-alias-label-secondary clears light at
+ * 5.50:1 and falls to 2.99:1 on dark, so the tier is chosen per theme using
+ * DSH's own body[data-ds-dark-theme] attribute.
+ */
 .rowProject {
   overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+body[data-ds-dark-theme] .rowProject {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .parentLabel {
