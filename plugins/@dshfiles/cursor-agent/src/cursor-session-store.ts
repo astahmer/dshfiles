@@ -30,6 +30,15 @@ export const cursorSessionRecordSchema = z.discriminatedUnion('state', [
 ])
 
 export type CursorSessionRecord = z.infer<typeof cursorSessionRecordSchema>
+export type ReadyCursorSessionRecord = Extract<CursorSessionRecord, { state: 'ready' }>
+
+export const cursorSessionRecordForResume = (record: CursorSessionRecord | undefined, instanceId: string): ReadyCursorSessionRecord => {
+  if (record === undefined) throw new Error('Cursor provider session record is missing; refusing to create a replacement.')
+  if (record.instanceId !== instanceId) throw new Error('Cursor provider session belongs to a different runtime instance.')
+  if (record.state === 'creating') throw new Error('Cursor session creation outcome is uncertain; refusing to create a replacement.')
+  if (record.pendingOperation !== undefined) throw new Error('Cursor prompt outcome is uncertain; refusing to replay possible workspace changes.')
+  return record
+}
 
 export const cursorSessionDomain = defineDomain({
   name: 'cursor_agent_sessions',

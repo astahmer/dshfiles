@@ -29,7 +29,7 @@ import type { SubprocessHandle } from '@deepseek-ai/dsh-subprocess'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { CursorAgentConfig, CursorInstanceConfig } from './config.js'
 import { cursorCredentialEnvironment } from './config.js'
-import { cursorSessionDomain, type CursorSessionRecord } from './cursor-session-store.js'
+import { cursorSessionDomain, cursorSessionRecordForResume, type CursorSessionRecord } from './cursor-session-store.js'
 
 const DRIVER_KIND = 'cursor-acp'
 const CURSOR_EXECUTABLE = 'agent'
@@ -524,11 +524,7 @@ export class CursorAcpAdapter implements RuntimeDriverAdapter {
   async resume(request: RuntimeDriverOpenRequest): Promise<RuntimeDriverSession> {
     const instance = this.instance(request.instanceId)
     const sessions = await this.sessionStore()
-    const record = sessions.table('sessions').get(request.session.id)
-    if (record === undefined) throw safeError('Cursor provider session record is missing; refusing to create a replacement.')
-    if (record.instanceId !== instance.id) throw safeError('Cursor provider session belongs to a different runtime instance.')
-    if (record.state === 'creating') throw safeError('Cursor session creation outcome is uncertain; refusing to create a replacement.')
-    if (record.pendingOperation !== undefined) throw safeError('Cursor prompt outcome is uncertain; refusing to replay possible workspace changes.')
+    const record = cursorSessionRecordForResume(sessions.table('sessions').get(request.session.id), instance.id)
     const credential = await this.resolveCredential(instance)
     const configDirectory = await cursorConfigDirectoryFor(instance.id)
     const active = await connectCursorSession(this.ctx, request, instance, credential, configDirectory, {
