@@ -15,6 +15,7 @@
  * back to its error boundary fails just as an entry that never reaches active does.
  */
 
+import { spawn } from 'node:child_process'
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -26,9 +27,40 @@ const webProfile = join(process.env.HOME ?? '', '.dsh/profiles/web')
 const profileName = 'isolated'
 const baseBundles = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
 
-const { checkClientBoot } = await import(
-  resolve(workspace, 'tooling/dshx/packages/dshx/dist/project/client-boot-check.js')
-)
+const { checkClientBoot } = await import(resolve(workspace, 'tooling/dshx/packages/dshx/dist/project/client-boot-check.js'))
+
+/**
+ * DSH's native loader fails on a Node build it does not pin, and every plugin
+ * then fails uniformly, which reads like a plugin defect. Refuse to run on a
+ * Node other than the one the repository pins, naming both versions.
+ */
+const pinnedNode = async () => {
+  const pinned = (await readFile(join(workspace, '.node-version'), 'utf8')).trim()
+  if (pinned !== '' && pinned !== process.versions.node) {
+    throw new Error(
+      `This gate boots real DSH hosts, which only run on the repository's pinned Node ${pinned}; this process is Node ${process.versions.node}. Rerun with: fnm exec --using ${pinned} node scripts/boot-check-web.mjs`,
+    )
+  }
+}
+
+/** The package manager installs the profile's link: dependencies. */
+const pnpmInstall = profileDir =>
+  new Promise((resolve, reject) => {
+    const child = spawn('pnpm', ['install', '--prefer-offline'], { cwd: profileDir, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    child.stderr.on('data', chunk => {
+      stderr += String(chunk)
+    })
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(new Error(`pnpm install in ${profileDir} timed out: ${stderr.slice(-400)}`))
+    }, 180_000)
+    child.once('exit', code => {
+      clearTimeout(timer)
+      if (code === 0) resolve()
+      else reject(new Error(`pnpm install exited ${String(code)}: ${stderr.slice(-400)}`))
+    })
+  })
 
 /** Directories that are packages: a `dsh` block is what makes one a plugin. */
 const listPlugins = async () => {
@@ -46,14 +78,17 @@ const listPlugins = async () => {
   return plugins.sort((left, right) => left.id.localeCompare(right.id))
 }
 
-/** One plugin alone: its own DSH_HOME and profile, booted by the shared checker. */
+/**
+ * One plugin alone: its own DSH_HOME, a profile provisioned with the link: route
+ * the repository verified, and DSHX_BOOT_PROFILE_ROOT pointed at that profile —
+ * the variable DSH resolves profiles from, so the plugin is really composed and
+ * booted rather than silently absent from an empty default profile.
+ */
 const bootAlone = async (plugin, sourceProfile) => {
   const home = await mkdtemp(join(tmpdir(), 'dshx-boot-'))
   const profileDir = join(home, 'profiles', profileName)
   await mkdir(profileDir, { recursive: true })
-  const inherited = Object.fromEntries(
-    Object.entries(sourceProfile.dependencies ?? {}).filter(([name]) => !name.startsWith('@dshfiles/')),
-  )
+  const inherited = Object.fromEntries(Object.entries(sourceProfile.dependencies ?? {}).filter(([name]) => !name.startsWith('@dshfiles/')))
   await writeFile(
     join(profileDir, 'package.json'),
     `${JSON.stringify(
@@ -67,12 +102,20 @@ const bootAlone = async (plugin, sourceProfile) => {
     )}\n`,
   )
   await cp(join(webProfile, 'pnpm-workspace.yaml'), join(profileDir, 'pnpm-workspace.yaml')).catch(() => undefined)
+  await pnpmInstall(profileDir)
 
-  // checkClientBoot owns the Host and the browser; DSH_HOME is what isolates the profile.
+  // checkClientBoot owns the Host and the browser; the prepared profile root and
+  // the expected bundle id make a vacuous boot impossible.
   const previousHome = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
-    return await checkClientBoot({ projectRoot: workspace, profile: profileName, port: 0 })
+    return await checkClientBoot({
+      projectRoot: workspace,
+      profile: profileName,
+      port: 0,
+      profileRoot: profileDir,
+      expectedBundles: [plugin.id],
+    })
   } finally {
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
@@ -82,6 +125,9 @@ const bootAlone = async (plugin, sourceProfile) => {
 
 const describe = result => {
   if (result.browserError !== undefined) return result.browserError.split('\n')[0]
+  if (result.compositionFailures.length > 0) {
+    return `was never composed: the offline dump-config is missing ${result.compositionFailures.join(', ')}`
+  }
   if (result.slotFailures.length > 0) {
     return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}, so those panels are blank even though every entry activated`
   }
@@ -91,6 +137,7 @@ const describe = result => {
 }
 
 const main = async () => {
+  await pinnedNode()
   const plugins = await listPlugins()
   if (plugins.length === 0) throw new Error('no plugins found to boot')
   const sourceProfile = JSON.parse(await readFile(join(webProfile, 'package.json'), 'utf8'))
@@ -101,6 +148,7 @@ const main = async () => {
       ok: false,
       failures: [],
       slotFailures: [],
+      compositionFailures: [],
       browserError: error instanceof Error ? error.message : String(error),
     }))
     const problem = describe(result)

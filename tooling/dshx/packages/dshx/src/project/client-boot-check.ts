@@ -26,6 +26,16 @@ export interface ClientBootCheckOptions {
   readonly port: number
   readonly executable?: string
   readonly timeoutMs?: number
+  /**
+   * A prepared profile directory (package.json with the expected bundles, run
+   * through its package manager) to boot from, via DSHX_BOOT_PROFILE_ROOT.
+   * Without one the check provisions nothing: DSH boots the profile it finds —
+   * or an empty one — and the browser pass proves only that the Web UI mounts,
+   * which is exactly the vacuous success this check exists to prevent.
+   */
+  readonly profileRoot?: string
+  /** Bundle ids that must appear in the offline composition before a browser is spent. */
+  readonly expectedBundles?: readonly string[]
   /** Browser to drive the Web UI with. */
   readonly browserName?: 'chromium' | 'firefox' | 'webkit'
 }
@@ -45,6 +55,8 @@ export interface ClientBootCheckResult {
   readonly failures: readonly ClientBootCheckEntry[]
   /** Slots that mounted an error boundary instead of their entry. */
   readonly slotFailures: readonly { readonly slot: string }[]
+  /** Expected bundles absent from the offline composition. */
+  readonly compositionFailures: readonly string[]
   readonly url?: string
   readonly timedOut: boolean
   /** Set when the browser could not be driven at all. */
@@ -52,6 +64,9 @@ export interface ClientBootCheckResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000
+
+/** Expected bundle ids missing from a `dsh --dump-config` composition document. */
+export const compositionFailures = (dump: string, expectedBundles: readonly string[]): readonly string[] => expectedBundles.filter(id => !dump.includes(id))
 
 /**
  * Recover entry states from the boot card text. The card prints the summary line
@@ -95,83 +110,120 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   const executable = options.executable ?? 'dsh'
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const port = options.port === 0 ? await findFreePort() : options.port
-  const profileRoot = await mkdtemp(join(tmpdir(), 'dshx-client-boot-'))
+  const ownedProfileRoot = options.profileRoot === undefined
+  const profileRoot = options.profileRoot ?? (await mkdtemp(join(tmpdir(), 'dshx-client-boot-')))
   let output = ''
   const startedAt = Date.now()
 
-  const child = spawn(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
-    cwd: options.projectRoot,
-    env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  const collect = (chunk: Buffer): void => {
-    output += chunk.toString('utf8')
-  }
-  child.stdout.on('data', collect)
-  child.stderr.on('data', collect)
-
-  const url = await new Promise<string | undefined>(resolve => {
-    const timer = setInterval(() => {
-      const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output)
-      if (match?.[0] !== undefined) {
-        clearInterval(timer)
-        resolve(match[0])
-      }
-      if (Date.now() - startedAt > timeoutMs) {
-        clearInterval(timer)
-        resolve(undefined)
-      }
-    }, 250)
-    child.once('exit', () => {
-      clearInterval(timer)
-      resolve(undefined)
+  // Offline composition first: a browser launch proves nothing about a bundle
+  // the profile never composed, so an absent expected bundle fails before boot.
+  let composition: readonly string[] = []
+  if (options.expectedBundles !== undefined && options.expectedBundles.length > 0) {
+    const dump = await new Promise<string>((resolve, reject) => {
+      const child = spawn(executable, ['--profile', options.profile, '--dump-config'], {
+        cwd: options.projectRoot,
+        env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let stdout = ''
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString('utf8')
+      })
+      let stderr = ''
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString('utf8')
+      })
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL')
+        reject(new Error(`dsh --dump-config did not finish within ${timeoutMs}ms.`))
+      }, timeoutMs)
+      child.once('exit', code => {
+        clearTimeout(timer)
+        if (code === 0) resolve(stdout)
+        else reject(new Error(`dsh --dump-config exited ${String(code)}: ${stderr.slice(0, 400)}`))
+      })
     })
-  })
+    composition = compositionFailures(dump, options.expectedBundles)
+  }
 
+  let url: string | undefined
   let entries: ClientBootCheckEntry[] = []
   let slotFailures: readonly { readonly slot: string }[] = []
   let browserError: string | undefined
-  if (url !== undefined) {
-    await new Promise(resolve => setTimeout(resolve, 2_000))
-    try {
-      const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
-      const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
-      const browser = await engine.launch({ headless: true })
-      try {
-        const page = await browser.newPage()
-        await page.goto(url, { waitUntil: 'domcontentloaded' })
-        const { readClientBootOutcome } = await import('./browser-boot.js')
-        const outcome = await readClientBootOutcome(page, { url, timeoutMs })
-        slotFailures = outcome.slotFailures
-        if (!outcome.ok) entries = parseBootText(outcome.text)
-      } finally {
-        await browser.close()
-      }
-    } catch (error) {
-      browserError = error instanceof Error ? error.message : String(error)
+  if (composition.length === 0) {
+    const child = spawn(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
+      cwd: options.projectRoot,
+      env: { ...process.env, DSHX_BOOT_PROFILE_ROOT: profileRoot },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const collect = (chunk: Buffer): void => {
+      output += chunk.toString('utf8')
     }
+    child.stdout.on('data', collect)
+    child.stderr.on('data', collect)
+
+    url = await new Promise<string | undefined>(resolve => {
+      const timer = setInterval(() => {
+        const match = /http:\/\/127\.0\.0\.1:\d+\/\S*/.exec(output)
+        if (match?.[0] !== undefined) {
+          clearInterval(timer)
+          resolve(match[0])
+        }
+        if (Date.now() - startedAt > timeoutMs) {
+          clearInterval(timer)
+          resolve(undefined)
+        }
+      }, 250)
+      child.once('exit', () => {
+        clearInterval(timer)
+        resolve(undefined)
+      })
+    })
+
+    if (url !== undefined) {
+      await new Promise(resolve => setTimeout(resolve, 2_000))
+      try {
+        const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
+        const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
+        const browser = await engine.launch({ headless: true })
+        try {
+          const page = await browser.newPage()
+          await page.goto(url, { waitUntil: 'domcontentloaded' })
+          const { readClientBootOutcome } = await import('./browser-boot.js')
+          const outcome = await readClientBootOutcome(page, { url, timeoutMs })
+          slotFailures = outcome.slotFailures
+          if (!outcome.ok) entries = parseBootText(outcome.text)
+        } finally {
+          await browser.close()
+        }
+      } catch (error) {
+        browserError = error instanceof Error ? error.message : String(error)
+      }
+    }
+
+    child.kill('SIGTERM')
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL')
+        resolve()
+      }, 3000)
+      child.once('exit', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+    })
   }
 
-  child.kill('SIGTERM')
-  await new Promise<void>(resolve => {
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL')
-      resolve()
-    }, 3000)
-    child.once('exit', () => {
-      clearTimeout(timer)
-      resolve()
-    })
-  })
-  await rm(profileRoot, { recursive: true, force: true })
+  if (ownedProfileRoot) await rm(profileRoot, { recursive: true, force: true })
 
-  const timedOut = url === undefined
+  const timedOut = composition.length === 0 && url === undefined
   const failures = entries.filter(entry => entry.state !== 'pending')
   return {
-    ok: !timedOut && browserError === undefined && failures.length === 0 && slotFailures.length === 0,
+    ok: composition.length === 0 && !timedOut && browserError === undefined && failures.length === 0 && slotFailures.length === 0,
     entries,
     failures,
     slotFailures,
+    compositionFailures: composition,
     timedOut,
     ...(url === undefined ? {} : { url }),
     ...(browserError === undefined ? {} : { browserError }),

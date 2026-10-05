@@ -12,6 +12,10 @@
     "test": "pnpm --filter @dshfiles/dshx test",
     "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test && pnpm run test:boot",
     "test:boot": "node scripts/boot-check-web.mjs",
+    "test:e2e": "pnpm run test:e2e:gen && playwright test --config=playwright.e2e.config.ts",
+    "test:e2e:boot": "pnpm run test:e2e",
+    "test:e2e:gen": "bddgen test --config=playwright.e2e.config.ts"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "knip": "6.32.2",

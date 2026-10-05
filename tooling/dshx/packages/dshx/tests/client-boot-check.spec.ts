@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBootText } from '../src/project/client-boot-check.js'
+import { compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
 import { slotRenderFailures } from '../src/project/browser-boot.js'
 
 /**
@@ -78,5 +78,13 @@ describe('slot render failures', () => {
 
   it('ignores a marker with no Slot name', () => {
     expect(slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar' }])
+  })
+})
+
+describe('offline composition gate', () => {
+  it('names every expected bundle the dump-config document does not compose', () => {
+    const dump = ['# == @deepseek-ai/dsh-base', '- id: dshfiles-shortcuts', '  name: "@dshfiles/shortcuts"', '# == @deepseek-ai/dsh-web-app'].join('\n')
+    expect(compositionFailures(dump, ['@dshfiles/shortcuts'])).toEqual([])
+    expect(compositionFailures(dump, ['@dshfiles/shortcuts', '@dshfiles/ai-accounts'])).toEqual(['@dshfiles/ai-accounts'])
   })
 })
