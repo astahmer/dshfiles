@@ -119,17 +119,12 @@ test('diff parser counts patch lines, skips headers, and maps file names', () =>
     '+++ b/b.txt',
     '+added',
   ].join('\n')
-  const changes = parsePatchStats(patch, ['src/a.ts', 'b.txt'])
-  assert.deepEqual(
-    changes.map(({ path, additions, deletions }) => ({ path, additions, deletions })),
+  assert.deepEqual(parsePatchStats(patch, ['src/a.ts', 'b.txt']),
     [
       { path: 'src/a.ts', additions: 2, deletions: 1 },
       { path: 'b.txt', additions: 1, deletions: 0 },
     ],
   )
-  assert.match(changes[0]?.contentDigest ?? '', /^[a-f0-9]{64}$/)
-  assert.notEqual(changes[0]?.contentDigest, changes[1]?.contentDigest)
-  assert.equal(parsePatchStats(patch, ['src/a.ts', 'b.txt'], true)[1]?.contentDigest, null)
 })
 
 test('revision parser fails closed on malformed JSONL', () => {

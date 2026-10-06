@@ -56,10 +56,6 @@ export const fileChangeSchema = z.object({
   path: z.string().max(2048),
   additions: z.number().int().min(0),
   deletions: z.number().int().min(0),
-  contentDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable(),
 })
 
 export const stateSchema = z.object({

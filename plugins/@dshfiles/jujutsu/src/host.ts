@@ -516,7 +516,7 @@ const jujutsuHostApi = jujutsuApi.host({
     const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, {
       outputLimit: 118_000,
     })
-    const files = parsePatchStats(patch.stdout, paths, patch.truncated)
+    const files = parsePatchStats(patch.stdout, paths)
     return {
       files,
       additions: files.reduce((sum, file) => sum + file.additions, 0),

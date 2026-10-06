@@ -253,7 +253,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const graphLaneCount = graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1)
   const graphWidth = graphLaneCount * 14
   const groups = useMemo(() => groupRows(visibleRevisions), [visibleRevisions])
-
   const selectedDescribeText =
     selectedRevision === undefined ? '' : (describeDrafts[selectedRevision.commitId] ?? editableDescription(selectedRevision.description))
   const workingDescribeText = workingCopy === undefined ? '' : (describeDrafts[workingCopy.commitId] ?? editableDescription(workingCopy.description))
@@ -508,6 +507,103 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   <Field className={styles.dateField} label="To">
                     {control => <Input {...control} onChange={event => setToDate(event.target.value)} type="date" value={toDate} />}
                   </Field>
+                  {selectedRevision !== undefined && (
+                    <>
+                      <div className={styles.titleRow}>
+                    <h2>Revision {selectedRevision.shortestChangeId}</h2>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      onClick={() => setSelection(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <p>{selectedRevision.description || '(no description)'}</p>
+                  <div className={styles.detailMeta}>
+                    {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
+                  </div>
+                  {details ? (
+                    <>
+                      <div className={styles.counts}>
+                        {details.files.length} files · +{details.additions} −{details.deletions}
+                        <span>
+                          {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
+                        </span>
+                        {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
+                      </div>
+                      <label className={styles.reviewFilter}>
+                        <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
+                        Hide reviewed files
+                      </label>
+                      {reviewNotice.length > 0 && (
+                        <p role="status" className={styles.muted}>
+                          {reviewNotice}
+                        </p>
+                      )}
+                      <ul className={styles.fileList}>
+                        {details.files
+                          .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file))
+                          .map(file => {
+                            const reviewed = isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)
+                            return (
+                              <li className={styles.reviewRow} key={file.path}>
+                                <span className={styles.reviewPath}>{file.path}</span>
+                                <span>
+                                  +{file.additions} −{file.deletions}
+                                </span>
+                                <label className={styles.reviewControl}>
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Mark ${file.path} reviewed`}
+                                    checked={reviewed}
+                                    disabled={file.contentDigest === null}
+                                    onChange={event => updateFileReview(file, event.target.checked)}
+                                  />
+                                  Reviewed
+                                </label>
+                              </li>
+                            )
+                          })}
+                      </ul>
+                      {hideReviewedFiles &&
+                        details.files.length > 0 &&
+                        details.files.every(file => isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)) && (
+                          <p className={styles.muted}>All reviewable files are hidden.</p>
+                        )}
+                      <details>
+                        <summary>Change evolution</summary>
+                        <pre>{details.evolution}</pre>
+                      </details>
+                      <details open>
+                        <summary>Diff</summary>
+                        <pre className={styles.diff}>{details.patch}</pre>
+                      </details>
+                    </>
+                  ) : (
+                    <p className={styles.muted}>Loading revision details…</p>
+                  )}
+                  {!selectedRevision.immutable && (
+                    <div className={styles.actionBox}>
+                      <label>
+                        New description
+                        <textarea
+                          value={selectedDescribeText}
+                          onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
+                          rows={3}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!selectedDescribeChanged}
+                        onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
+                      >
+                        Preview describe
+                      </button>
+                    </div>
+                  )}
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -544,7 +640,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 ))}
                 {visibleRevisions.length === 0 && <EmptyState compact title="No revisions match these filters." />}
               </div>
-              {selectedRevision !== undefined && (
+              {sidePanel && selectedRevision !== undefined && (
                 <aside className={styles.details}>
                   <>
                     <div className={styles.titleRow}>
