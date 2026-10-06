@@ -6,6 +6,7 @@ import type { UsageHistoryScheduler } from './usage-recorder.js'
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
   scheduler?: UsageHistoryScheduler
+  refreshRoutes?: () => Promise<void>
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

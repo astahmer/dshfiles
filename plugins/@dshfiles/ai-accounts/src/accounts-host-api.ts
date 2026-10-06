@@ -37,7 +37,7 @@ export const accountsHostApi = aiAccountsApi.host({
   },
   setDistribution: async ({ input, ctx }) => {
     await setDistribution(input.distribution)
-    accountRuntime(ctx)?.accounts?.pool.setDistribution(input.distribution)
+    await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
@@ -137,7 +137,13 @@ const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
  * rejects a duplicate route for one already taken.
  */
 const refreshRoutes = async (ctx: Context): Promise<void> => {
-  const activeAccounts = accountRuntime(ctx)?.accounts
+  const runtime = accountRuntime(ctx)
+  if (runtime === undefined) return
+  if (runtime.refreshRoutes !== undefined) {
+    await runtime.refreshRoutes()
+    return
+  }
+  const activeAccounts = runtime.accounts
   if (activeAccounts === undefined) return
   const file = await readAccountFile()
   const config = configFromAccountsFile(file)

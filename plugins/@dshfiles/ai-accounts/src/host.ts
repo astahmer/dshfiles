@@ -6,7 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@dshfiles/dshx/client'
 import { accountsFile, accountsHostApi } from './accounts-host-api.js'
 export { accountsSnapshot } from './accounts-host-api.js'
-import { primeAccountFile, readAccountFileSync } from './account-store.js'
+import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { createUsageHistoryScheduler } from './usage-recorder.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
@@ -14,7 +14,7 @@ import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
@@ -65,13 +65,9 @@ export default definePlugin({
     // before the first read: an unprimed cache answers emptyFile(), which
     // registers no routes at all and hides the whole page.
     primeAccountFile()
-    const file = readAccountFileSync()
-    const config = configFromAccountsFile(file)
-    const { routes, rejected } = buildRoutes(config)
-    for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
-    if (routes.size === 0) return
-    const enabled = [...routes].filter(([, route]) => route.enabled)
-    if (enabled.length === 0) return
+    const initialFile = readAccountFileSync()
+    let config = configFromAccountsFile(initialFile)
+    let routes = buildRoutes(config).routes
 
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
@@ -94,42 +90,66 @@ export default definePlugin({
     // whenever the caller did not choose an effort.
     // Curation comes from the same file, so a hidden model cannot outlive the
     // account that hid it.
-    const curation = readAccountFileSync().accounts.map(
-      account =>
-        [
-          account.instanceId,
-          {
-            hiddenModelIds: account.hiddenModelIds,
-            favoriteModelIds: account.favoriteModelIds,
-            modelOrder: account.modelOrder,
-          },
-        ] as const,
-    )
+    const buildProfiles = (
+      nextConfig: typeof config,
+      nextRoutes: ReadonlyMap<string, Route>,
+      sourceFile: ReturnType<typeof readAccountFileSync>,
+    ): Map<string, ResolvedPiAiProviderProfile> => {
+      const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
+      const curation = sourceFile.accounts.map(
+        account =>
+          [
+            account.instanceId,
+            {
+              hiddenModelIds: account.hiddenModelIds,
+              favoriteModelIds: account.favoriteModelIds,
+              modelOrder: account.modelOrder,
+            },
+          ] as const,
+      )
+      const reasoningPins = sourceFile.accounts.map(
+        account =>
+          [
+            account.instanceId,
+            typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null ? (account.reasoningDefaults as Record<string, string>) : {},
+          ] as const,
+      )
 
-    const reasoningPins = readAccountFileSync().accounts.map(
-      account =>
-        [
-          account.instanceId,
-          typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null ? (account.reasoningDefaults as Record<string, string>) : {},
-        ] as const,
-    )
+      return new Map<string, ResolvedPiAiProviderProfile>(
+        enabled.map(([id, route]) => [
+          id,
+          buildProfile({
+            upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
+            provider: id,
+            displayName: route.displayName,
+            reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
+            ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
+            additionalModelIds:
+              route.kind === CODEX_KIND
+                ? (nextConfig.codexAccounts.find(account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id)?.additionalModelIds ?? [])
+                : [],
+          }),
+        ]),
+      )
+    }
 
-    const profiles = new Map<string, ResolvedPiAiProviderProfile>(
-      enabled.map(([id, route]) => [
-        id,
-        buildProfile({
-          upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
-          provider: id,
-          displayName: route.displayName,
-          reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
-          ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
-          additionalModelIds:
-            route.kind === CODEX_KIND
-              ? (config.codexAccounts.find(account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id)?.additionalModelIds ?? [])
-              : [],
-        }),
-      ]),
-    )
+    const buildReasoningDefaults = (
+      sourceFile: ReturnType<typeof readAccountFileSync>,
+    ): Map<string, Readonly<Record<string, string>>> =>
+      new Map(
+        sourceFile.accounts.map(
+          account =>
+            [
+              account.instanceId,
+              typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null
+                ? (account.reasoningDefaults as Record<string, string>)
+                : {},
+            ] as const,
+        ),
+      )
+
+    let profiles = buildProfiles(config, routes, initialFile)
+    const reasoningDefaults = buildReasoningDefaults(initialFile)
 
     const pool = createAccountPool({
       distribution: config.distribution,
@@ -195,41 +215,90 @@ export default definePlugin({
           },
         },
       },
-      { reasoningDefaults: new Map(reasoningPins) },
+      { reasoningDefaults },
     )
 
-    const disposers: Array<() => void> = []
+    let adapterRegistration: AdapterRegistrationHandle | undefined
+    let directoryRegistration: DirectoryRegistrationHandle | undefined
+    const modelDiscoveries = new Map<string, { readonly route: KeyedRoute; readonly dispose: () => void }>()
 
-    llm.registerConfigurableProviders(
-      enabled.map(([id, route]) => ({
+    const registerCommandCodeDiscovery = (id: string, route: KeyedRoute): void => {
+      const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
+        const entries = await fetchCommandCodeCatalog(discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: route.apiKeyEnv }))
+        return entries.map(entry => ({
+          id: entry.id,
+          contextWindow: 128_000,
+          maxTokens: 8_192,
+          inputModalities: ['text'],
+        }))
+      })
+      modelDiscoveries.set(id, { route, dispose })
+    }
+
+    const applyRouteSnapshot = (sourceFile: ReturnType<typeof readAccountFileSync>): void => {
+      const nextConfig = configFromAccountsFile(sourceFile)
+      const { routes: nextRoutes, rejected } = buildRoutes(nextConfig)
+      for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
+      const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
+      const providers = enabled.map(([id]) => id)
+      const directoryEntries = enabled.map(([id, route]) => ({
         provider: id,
         displayName: route.displayName,
         settingsNs: `ai-accounts.${route.kind}.${id}`,
         settingsPath: [],
-      })),
-    )
-    llm.registerAdapter(
-      enabled.map(([id]) => id),
-      adapter,
-    )
+      }))
 
-    // Offer catalog discovery for each route's settings namespace, so the Models
-    // page can interrogate the endpoint and offer newly advertised models rather
-    // than leaving the picker on whatever shipped with the plugin.
-    for (const [id, route] of enabled) {
-      if (route.kind !== COMMANDCODE_KIND) continue
-      disposers.push(
-        llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
-          const entries = await fetchCommandCodeCatalog(discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }))
-          return entries.map(entry => ({
-            id: entry.id,
-            contextWindow: 128_000,
-            maxTokens: 8_192,
-            inputModalities: ['text'],
-          }))
-        }),
-      )
+      if (adapterRegistration === undefined) {
+        if (providers.length > 0) adapterRegistration = llm.registerAdapter(providers, adapter)
+      } else {
+        adapterRegistration.replace(providers)
+      }
+      if (directoryRegistration === undefined) {
+        if (directoryEntries.length > 0) directoryRegistration = llm.registerConfigurableProviders(directoryEntries)
+      } else {
+        directoryRegistration.replace(directoryEntries)
+      }
+
+      for (const [id, registration] of modelDiscoveries) {
+        const nextRoute = nextRoutes.get(id)
+        if (
+          nextRoute?.kind === COMMANDCODE_KIND &&
+          nextRoute.enabled &&
+          registration.route.apiBaseUrl === nextRoute.apiBaseUrl &&
+          registration.route.apiKeyEnv === nextRoute.apiKeyEnv
+        ) {
+          continue
+        }
+        registration.dispose()
+        modelDiscoveries.delete(id)
+      }
+      for (const [id, route] of enabled) {
+        if (route.kind !== COMMANDCODE_KIND || modelDiscoveries.has(id)) continue
+        registerCommandCodeDiscovery(id, route)
+      }
+
+      pool.replace([...nextRoutes].map(([id, route]) => ({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })))
+      pool.setDistribution(nextConfig.distribution)
+      config = nextConfig
+      routes = nextRoutes
+      profiles = buildProfiles(nextConfig, nextRoutes, sourceFile)
+      reasoningDefaults.clear()
+      for (const [id, pins] of buildReasoningDefaults(sourceFile)) reasoningDefaults.set(id, pins)
+      runtime.accounts = { config, pool }
     }
+
+    applyRouteSnapshot(initialFile)
+    let refreshQueue: Promise<void> = Promise.resolve()
+    const refreshRoutes = (): Promise<void> => {
+      const next = refreshQueue.then(async () => applyRouteSnapshot(await readAccountFile()))
+      refreshQueue = next.catch(() => {
+        ctx.logger.warn('ai-accounts: provider route refresh failed')
+      })
+      return next
+    }
+    runtime.refreshRoutes = refreshRoutes
+
+    const disposers: Array<() => void> = []
 
     ctx.effect(() => {
       disposers.push(
@@ -289,6 +358,9 @@ export default definePlugin({
       )
 
       return () => {
+        if (runtime.refreshRoutes === refreshRoutes) delete runtime.refreshRoutes
+        for (const registration of modelDiscoveries.values()) registration.dispose()
+        modelDiscoveries.clear()
         for (const dispose of disposers) dispose()
         for (const dispose of perAgent.values()) dispose()
         perAgent.clear()

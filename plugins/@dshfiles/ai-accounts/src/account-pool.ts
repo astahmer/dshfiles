@@ -58,6 +58,7 @@ export interface AccountPoolOptions {
 
 export interface AccountPool {
   put(account: PoolAccountInput): void
+  replace(accounts: readonly PoolAccountInput[]): void
   acquire(conversationKey: string | undefined, now?: number): PoolAccount | undefined
   noteServed(accountId: string): void
   noteRateLimited(accountId: string, retryAfterMs: number | undefined): void
@@ -121,6 +122,37 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
         cooldownMs: undefined,
         lastUsedAt: 0,
       })
+    },
+
+    replace(nextAccounts) {
+      const reconciled = new Map<string, PoolAccount>()
+      for (const input of nextAccounts) {
+        const existing = accounts.get(input.id)
+        reconciled.set(
+          input.id,
+          existing === undefined
+            ? {
+                ...input,
+                enabled: input.enabled !== false,
+                cooldownUntil: 0,
+                cooldownMs: undefined,
+                lastUsedAt: 0,
+              }
+            : {
+                ...existing,
+                kind: input.kind,
+                label: input.label,
+                enabled: input.enabled !== false,
+              },
+        )
+      }
+
+      accounts.clear()
+      for (const [id, account] of reconciled) accounts.set(id, account)
+      for (const [conversationKey, accountId] of affinity) {
+        if (reconciled.get(accountId)?.enabled !== true) affinity.delete(conversationKey)
+      }
+      cursor %= Math.max(accounts.size, 1)
     },
 
     /**
