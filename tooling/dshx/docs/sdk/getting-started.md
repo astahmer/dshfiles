@@ -4,6 +4,22 @@ The new API is additive. `defineHost`, `defineClient`, `defineSlot`, native name
 
 This page documents implemented APIs. Our [source fork](../../FORK.md) is built locally; the upstream npm package does not contain these changes.
 
+### Host package bundling
+
+Host packages stay external by default so DSH can provide one shared runtime identity. A Host may opt specific package roots into its single-file artifact when it must use a local fork:
+
+```ts
+import { defineConfig } from '@dshfiles/dshx'
+
+export default defineConfig({
+  host: {
+    bundleDependencies: ['@deepseek-ai/dsh-agent', '@deepseek-ai/dsh-session'],
+  },
+})
+```
+
+The list accepts bare package roots, not subpaths. Node built-ins and `@deepseek-ai/cordis` remain external; bundling another Cordis copy would split the Host's service identity.
+
 ## Create and develop
 
 Build the source fork's `create-dshx` and `@dshfiles/dshx` packages, then invoke its CLI:

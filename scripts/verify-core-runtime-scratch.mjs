@@ -24,19 +24,28 @@ const profileName = 'core-runtime'
 const bridgePath = resolve(repoRoot, 'plugins/@dshfiles/dsh-core-runtime')
 const cursorPluginPath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent')
 const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
-const apiSessionControllerPath = process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH === undefined
-  ? resolve(coreRoot, 'api-session-controller')
-  : resolve(repoRoot, process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH)
+const apiSessionControllerPath =
+  process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH === undefined
+    ? resolve(coreRoot, 'api-session-controller')
+    : resolve(repoRoot, process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH)
 const cursorInstanceId = 'scratch-fixture'
 const cursorCredential = 'scratch-only-cursor-fixture'
-const corePackages = ['api-session-controller', 'agent', 'agent-loop', 'session', 'session-persistence', 'session-persistence-jsonl', 'session-format-catalog', 'session-format-v4-to-v5']
+const corePackages = [
+  'api-session-controller',
+  'agent',
+  'agent-loop',
+  'session',
+  'session-persistence',
+  'session-persistence-jsonl',
+  'session-format-catalog',
+  'session-format-v4-to-v5',
+]
 const extraDependencies = {
   '@dshfiles/dsh-core-runtime': `link:${bridgePath}`,
   '@dshfiles/cursor-agent': `link:${cursorPluginPath}`,
-  ...Object.fromEntries(corePackages.map(name => [
-    `@deepseek-ai/dsh-${name}`,
-    `link:${name === 'api-session-controller' ? apiSessionControllerPath : resolve(coreRoot, name)}`,
-  ])),
+  ...Object.fromEntries(
+    corePackages.map(name => [`@deepseek-ai/dsh-${name}`, `link:${name === 'api-session-controller' ? apiSessionControllerPath : resolve(coreRoot, name)}`]),
+  ),
 }
 
 const scratch = await createScratchProfile({
@@ -137,12 +146,8 @@ const waitForHistoryText = async (platform, sessionId, text) => {
   while (Date.now() < expiresAt) {
     const history = await platform.sessions.history(sessionId)
     const events = history.records.map(record => record.event ?? record)
-    const response = events.find(
-      event => event.type === 'assistant/message' && JSON.stringify(event).includes(text),
-    )
-    const turnEnded = response !== undefined && events.some(
-      event => event.type === 'turn/end' && event.data.turn === response.data.turn,
-    )
+    const response = events.find(event => event.type === 'assistant/message' && JSON.stringify(event).includes(text))
+    const turnEnded = response !== undefined && events.some(event => event.type === 'turn/end' && event.data.turn === response.data.turn)
     if (turnEnded) return history
     await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
   }
@@ -173,7 +178,13 @@ const waitForHistoryText = async (platform, sessionId, text) => {
     return `${type}:error:${reason.error?.code ?? 'UNKNOWN'}:${failure}:${safeMessage}`
   })
   const cursorEventTypes = await readFile(cursorEventsPath, 'utf8')
-    .then(contents => contents.trim().split('\n').filter(Boolean).map(line => JSON.parse(line).type))
+    .then(contents =>
+      contents
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => JSON.parse(line).type),
+    )
     .catch(() => [])
   const cursorLaunchState = await readFile(cursorLaunchMarkerPath, 'utf8').catch(() => 'not-launched')
   throw new Error(
@@ -186,9 +197,9 @@ const waitForHistoryError = async (platform, sessionId, expectedMessage) => {
   while (Date.now() < expiresAt) {
     const history = await platform.sessions.history(sessionId)
     const events = history.records.map(record => record.event ?? record)
-    const failure = events.find(event => event.type === 'turn/end'
-      && event.data.reason?.kind === 'error'
-      && event.data.reason.error?.message?.includes(expectedMessage))
+    const failure = events.find(
+      event => event.type === 'turn/end' && event.data.reason?.kind === 'error' && event.data.reason.error?.message?.includes(expectedMessage),
+    )
     if (failure !== undefined) return history
     await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
   }
@@ -203,11 +214,12 @@ const commandResultText = (result, description) => {
   return typeof command.text === 'string' ? command.text : ''
 }
 
-const readCursorEvents = async () => (await readFile(cursorEventsPath, 'utf8'))
-  .trim()
-  .split('\n')
-  .filter(Boolean)
-  .map(line => JSON.parse(line))
+const readCursorEvents = async () =>
+  (await readFile(cursorEventsPath, 'utf8'))
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line))
 
 const waitForCursorEvents = async (accept, description) => {
   const expiresAt = Date.now() + 15_000
@@ -219,9 +231,79 @@ const waitForCursorEvents = async (accept, description) => {
   throw new Error(`Scratch Cursor fixture did not produce ${description} within 15 seconds.`)
 }
 
-const signalHostTree = (child, signal) => process.platform === 'win32'
-  ? child.kill(signal)
-  : process.kill(-child.pid, signal)
+const signalHostTree = (child, signal) => (process.platform === 'win32' ? child.kill(signal) : process.kill(-child.pid, signal))
+
+const verifyPublicCliBoot = async () => {
+  const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
+  let output = ''
+  const child = spawn('dsh', [profileName, '--patch', cursorOverlayPath, '--port', '0', '--no-open'], {
+    cwd: repoRoot,
+    detached: process.platform !== 'win32',
+    env: {
+      ...environment,
+      CURSOR_API_KEY: cursorCredential,
+      PATH: [cursorExecutableDirectory, environment.PATH].filter(Boolean).join(delimiter),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const exited = new Promise(resolveExit => child.once('close', (code, signal) => resolveExit({ code, signal })))
+  const collect = chunk => {
+    output = `${output}${chunk.toString('utf8')}`.slice(-64_000)
+  }
+  const ready = new Promise((resolveReady, rejectReady) => {
+    const timeout = setTimeout(() => {
+      rejectReady(new Error(`Public DSH CLI did not print its ready URL within 45 seconds.\n${redactHostOutput(output.slice(-4_000))}`))
+    }, 45_000)
+    const inspect = () => {
+      if (/http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/.test(output)) {
+        clearTimeout(timeout)
+        resolveReady()
+      }
+    }
+    child.stdout.on('data', chunk => {
+      collect(chunk)
+      inspect()
+    })
+    child.stderr.on('data', chunk => {
+      collect(chunk)
+      inspect()
+    })
+    child.once('error', error => {
+      clearTimeout(timeout)
+      rejectReady(new Error(`Public DSH CLI could not start: ${error.name}.`))
+    })
+    child.once('close', (code, signal) => {
+      if (!/http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/.test(output)) {
+        clearTimeout(timeout)
+        rejectReady(new Error(`Public DSH CLI exited before ready: code=${String(code)}, signal=${String(signal)}.\n${redactHostOutput(output.slice(-4_000))}`))
+      }
+    })
+  })
+
+  try {
+    await Promise.race([
+      ready,
+      exited.then(({ code, signal }) => {
+        throw new Error(`Public DSH CLI exited before ready: code=${String(code)}, signal=${String(signal)}.\n${redactHostOutput(output.slice(-4_000))}`)
+      }),
+    ])
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
+    assert.ok(!output.includes('agents.registerRuntimeDriver is not a function'), redactHostOutput(output.slice(-8_000)))
+    const activationFailures = output.split('\n').filter(line => /failed to import|did not activate|pending \(waiting for service:/i.test(line))
+    const bridgeFailures = activationFailures.filter(line => /dshfiles-core-runtime|cursor-agent/i.test(line))
+    assert.deepEqual(bridgeFailures, [], redactHostOutput(bridgeFailures.join('\n')))
+    const unrelatedFailures = activationFailures.filter(line => !/dshfiles-core-runtime|cursor-agent/i.test(line))
+    process.stdout.write('PASS: public dsh CLI booted the local core runtime and Cursor adapter without a provider request.\n')
+    if (unrelatedFailures.length > 0) {
+      process.stdout.write(`PUBLIC CLI activation blockers: ${redactHostOutput(unrelatedFailures.join('\n'))}\n`)
+    }
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) signalHostTree(child, 'SIGTERM')
+    const exit = await Promise.race([exited, new Promise(resolveTimeout => setTimeout(() => resolveTimeout(undefined), 8_000))])
+    if (exit === undefined && child.exitCode === null && child.signalCode === null) signalHostTree(child, 'SIGKILL')
+    if (exit === undefined) await exited
+  }
+}
 
 const stopHost = async () => {
   const child = host
@@ -259,16 +341,17 @@ const crashHost = async () => {
 try {
   await scratch.install()
   const configEnvironment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
-  const composedConfig = spawnSync(
-    'dsh',
-    ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath],
-    { encoding: 'utf8', env: configEnvironment },
-  )
+  const composedConfig = spawnSync('dsh', ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath], {
+    encoding: 'utf8',
+    env: configEnvironment,
+  })
   if (composedConfig.status !== 0) throw new Error(`Scratch profile composition failed with exit code ${String(composedConfig.status)}.`)
   assert.ok(
     composedConfig.stdout.includes('Scratch ACP fixture'),
     `Scratch profile composition omitted the synthetic Cursor instance (bundle=${composedConfig.stdout.includes('@dshfiles/cursor-agent')}, id=${composedConfig.stdout.includes('dshfiles-cursor-agent')}, fixture=${composedConfig.stdout.includes('Scratch ACP fixture')}).`,
   )
+  assert.ok(composedConfig.stdout.includes('dshfiles-core-runtime'), 'Scratch composition omitted the local core runtime Host row.')
+  await verifyPublicCliBoot()
   const platform = await startHost()
   const bundles = await platform.bundles.list()
   for (const name of ['@dshfiles/dsh-core-runtime', '@dshfiles/cursor-agent']) {
@@ -293,8 +376,7 @@ try {
   await writeFile(cursorResponseGatePath, 'hold response until the verifier crashes the scratch Host\n')
   await platform.sessions.prompt(cursorSession.sessionId, 'synthetic interrupted provider turn', 'queue')
   const inFlightCursorEvents = await waitForCursorEvents(
-    events => events.filter(event => event.type === 'prompt').length === 2
-      && events.filter(event => event.type === 'response').length === 1,
+    events => events.filter(event => event.type === 'prompt').length === 2 && events.filter(event => event.type === 'response').length === 1,
     'the second in-flight provider prompt',
   )
   await crashHost()
@@ -332,9 +414,7 @@ try {
     recoveredCursorEvents.some(event => event.type === 'turn/end' && event.data.reason?.kind === 'interrupted'),
     'The in-flight turn was not marked interrupted after Host recovery.',
   )
-  const recoveredPromptSeqs = recoveredCursorEvents
-    .filter(event => event.type === 'user/message' && event.data.source.kind === 'user')
-    .map(event => event.seq)
+  const recoveredPromptSeqs = recoveredCursorEvents.filter(event => event.type === 'user/message' && event.data.source.kind === 'user').map(event => event.seq)
   assert.ok(recoveredPromptSeqs.length > 0, 'No user prompt sequence was recovered after Host termination.')
   assert.deepEqual(
     recoveredCursorSummary.attention,
@@ -359,9 +439,10 @@ try {
     'A turn remained unclosed after the interrupted Session resumed.',
   )
   assert.ok(
-    recoveredTurnEvents.some(event => event.type === 'turn/end'
-      && event.data.reason?.kind === 'error'
-      && event.data.reason.error?.message?.includes('Cursor prompt outcome is uncertain')),
+    recoveredTurnEvents.some(
+      event =>
+        event.type === 'turn/end' && event.data.reason?.kind === 'error' && event.data.reason.error?.message?.includes('Cursor prompt outcome is uncertain'),
+    ),
     'The unresolved Cursor provider outcome was not surfaced to the Session.',
   )
   const recoveredTurnText = JSON.stringify(recoveredTurnHistory.records)
@@ -389,15 +470,19 @@ try {
     inFlightCursorEvents.filter(event => event.type === 'response').length,
     'Cursor runtime exposed a response for the interrupted provider call.',
   )
-  assert.equal(cursorEventsBeforeReconcile.filter(event => event.type === 'response-notification-failed:closed').length, 1, 'The interrupted ACP process did not confirm its response was detached from the crashed Host.')
+  assert.equal(
+    cursorEventsBeforeReconcile.filter(event => event.type === 'response-notification-failed:closed').length,
+    1,
+    'The interrupted ACP process did not confirm its response was detached from the crashed Host.',
+  )
 
   const recoverySession = await restartedPlatform.sessions.create({ cwd: repoRoot })
   const recoveryCommands = await restartedPlatform.commands.list(recoverySession.sessionId)
-  assert.ok(recoveryCommands.some(command => command.name === 'cursor-reconcile'), 'The recovery command was not registered on the working Session.')
-  const statusResult = await restartedPlatform.commands.execute(
-    recoverySession.sessionId,
-    `/cursor-reconcile status ${cursorSession.sessionId}`,
+  assert.ok(
+    recoveryCommands.some(command => command.name === 'cursor-reconcile'),
+    'The recovery command was not registered on the working Session.',
   )
+  const statusResult = await restartedPlatform.commands.execute(recoverySession.sessionId, `/cursor-reconcile status ${cursorSession.sessionId}`)
   const statusText = commandResultText(statusResult, 'status')
   const operationId = statusText.match(/receipt ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
   assert.ok(operationId, `Status did not return a pending Cursor operation receipt: ${statusText}`)
@@ -407,11 +492,11 @@ try {
   )
   const confirmationText = commandResultText(confirmationResult, 'confirmation')
   assert.ok(confirmationText.includes('durably recorded in the invoking Session'), 'Confirmation did not report its durable source Session.')
-  const clearedStatus = await restartedPlatform.commands.execute(
-    recoverySession.sessionId,
-    `/cursor-reconcile status ${cursorSession.sessionId}`,
+  const clearedStatus = await restartedPlatform.commands.execute(recoverySession.sessionId, `/cursor-reconcile status ${cursorSession.sessionId}`)
+  assert.ok(
+    commandResultText(clearedStatus, 'post-confirm status').includes('No unsettled Cursor runtime receipt'),
+    'Confirmation did not clear the exact target receipt.',
   )
-  assert.ok(commandResultText(clearedStatus, 'post-confirm status').includes('No unsettled Cursor runtime receipt'), 'Confirmation did not clear the exact target receipt.')
 
   const confirmationHistory = await restartedPlatform.sessions.history(recoverySession.sessionId)
   const confirmationEvents = confirmationHistory.records.map(record => record.event ?? record)
@@ -420,9 +505,21 @@ try {
     'The invoking Session did not durably record the exact human confirmation command.',
   )
   const cursorEventsAfterReconcile = await readCursorEvents()
-  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'process-start').length, cursorEventsBeforeReconcile.filter(event => event.type === 'process-start').length, 'Reconciliation started a Cursor process.')
-  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'load').length, cursorEventsBeforeReconcile.filter(event => event.type === 'load').length, 'Reconciliation loaded the provider session.')
-  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'prompt').length, cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length, 'Reconciliation replayed or submitted a provider prompt.')
+  assert.equal(
+    cursorEventsAfterReconcile.filter(event => event.type === 'process-start').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'process-start').length,
+    'Reconciliation started a Cursor process.',
+  )
+  assert.equal(
+    cursorEventsAfterReconcile.filter(event => event.type === 'load').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'load').length,
+    'Reconciliation loaded the provider session.',
+  )
+  assert.equal(
+    cursorEventsAfterReconcile.filter(event => event.type === 'prompt').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length,
+    'Reconciliation replayed or submitted a provider prompt.',
+  )
 
   await stopHost()
   const durablePlatform = await startHost()
@@ -444,11 +541,29 @@ try {
   )
 
   const cursorEventsAfterResume = await readCursorEvents()
-  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'new').length, 1, 'Recovery created a replacement Cursor ACP session instead of reusing the original.')
-  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'load').length, cursorEventsBeforeReconcile.filter(event => event.type === 'load').length + 1, 'Recovery did not resume the original Cursor ACP session exactly once.')
-  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'prompt').length, cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length + 1, 'Recovery replayed the uncertain prompt instead of submitting only the new prompt.')
-  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'response').length, cursorEventsBeforeReconcile.filter(event => event.type === 'response').length + 1, 'The post-reconciliation Cursor prompt did not produce exactly one response.')
-  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records and unread attention, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`)
+  assert.equal(
+    cursorEventsAfterResume.filter(event => event.type === 'new').length,
+    1,
+    'Recovery created a replacement Cursor ACP session instead of reusing the original.',
+  )
+  assert.equal(
+    cursorEventsAfterResume.filter(event => event.type === 'load').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'load').length + 1,
+    'Recovery did not resume the original Cursor ACP session exactly once.',
+  )
+  assert.equal(
+    cursorEventsAfterResume.filter(event => event.type === 'prompt').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length + 1,
+    'Recovery replayed the uncertain prompt instead of submitting only the new prompt.',
+  )
+  assert.equal(
+    cursorEventsAfterResume.filter(event => event.type === 'response').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'response').length + 1,
+    'The post-reconciliation Cursor prompt did not produce exactly one response.',
+  )
+  process.stdout.write(
+    `PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records and unread attention, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`,
+  )
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`${redactHostOutput(message)}\n`)

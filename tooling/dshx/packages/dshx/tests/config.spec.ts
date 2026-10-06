@@ -133,6 +133,26 @@ describe('resolveDshxConfig', () => {
     })
   })
 
+  it('normalizes explicitly bundled Host package roots', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { host: { bundleDependencies: ['@test/local-core', 'zod'] } }\n")
+
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({
+      hostBundleDependencies: ['@test/local-core', 'zod'],
+    })
+  })
+
+  it('rejects Host bundle subpaths, duplicates, and Cordis identity', async () => {
+    for (const dependencies of ["['@test/local-core/subpath']", "['@test/local-core', '@test/local-core']", "['@deepseek-ai/cordis']"]) {
+      const { root } = await temporaryProject()
+      await source(root, 'src/host.ts')
+      await writeFile(resolve(root, 'dshx.config.ts'), `export default { host: { bundleDependencies: ${dependencies} } }\n`)
+
+      await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({ code: 'DSHX4004' })
+    }
+  })
+
   it('resolves any independently enabled Host or Client entry', async () => {
     const hostProject = await temporaryProject({ name: '@test/host', type: 'module' })
     const hostEntry = await source(hostProject.root, 'src/host.ts')

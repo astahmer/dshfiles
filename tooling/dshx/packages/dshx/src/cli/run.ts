@@ -361,6 +361,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       outDir: project.outDir,
       sourcemap: project.build.sourcemap,
       declarations: project.build.declarations ?? true,
+      bundleDependencies: project.hostBundleDependencies ?? [],
       ...(project.hostVitePlugins === undefined ? {} : { vite: { plugins: project.hostVitePlugins } }),
       compatibility,
     }),

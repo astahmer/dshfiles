@@ -11,15 +11,9 @@
   name: '@deepseek-ai/dsh-agent-loop'
   disabled: true
 - insert:
-    - id: dshfiles-core-runtime-session
-      name: '@dshfiles/dsh-core-runtime/session'
-    - id: dshfiles-core-runtime-agent
-      name: '@dshfiles/dsh-core-runtime/agent'
+    - id: dshfiles-core-runtime
+      name: '@dshfiles/dsh-core-runtime'
     - id: dshfiles-core-runtime-session-persistence-jsonl
       name: '@dshfiles/dsh-core-runtime/session-persistence-jsonl'
       config:
         root: !!js dshHomePath('sessions')
-    - id: dshfiles-core-runtime-agent-loop
-      name: '@dshfiles/dsh-core-runtime/agent-loop'
-      config:
-        agents: []

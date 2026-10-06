@@ -9,6 +9,7 @@ const CONFIG_FILENAME = 'dshx.config.ts'
 const PACKAGE_FILENAME = 'package.json'
 const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
+const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
 const VITE_KEYS = new Set(['plugins'])
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -85,6 +86,30 @@ function optionalNonEmptyString(value: unknown, field: string, file: string): st
   return value
 }
 
+function optionalPackageNames(value: unknown, field: string, file: string): readonly string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    throw new DshxError('DSHX4004', `${field} must be an array of bare package roots.`, {
+      file,
+      hint: 'List package roots such as "@scope/package"; subpaths and Cordis are not allowed.',
+    })
+  }
+  const names = value.filter((name): name is string => typeof name === 'string')
+  const packageName = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
+  if (
+    names.length !== value.length ||
+    names.some(name => !packageName.test(name)) ||
+    new Set(names).size !== names.length ||
+    names.includes('@deepseek-ai/cordis')
+  ) {
+    throw new DshxError('DSHX4004', `${field} must contain unique bare package roots and cannot bundle Cordis.`, {
+      file,
+      hint: 'Use unique package roots such as "@scope/package". DSHX keeps the Host Cordis identity external.',
+    })
+  }
+  return names
+}
+
 function validateConfig(value: unknown, file: string): DshxConfig {
   if (!isObject(value)) {
     throw new DshxError('DSHX4003', 'dshx.config.ts must default-export an object.', {
@@ -105,8 +130,9 @@ function validateConfig(value: unknown, file: string): DshxConfig {
         hint: `Replace the removed string shorthand with ${field}: { entry: "src/${field}.ts${field === 'client' ? 'x' : ''}" }.`,
       })
     }
-    rejectUnknownKeys(candidate, FACE_KEYS, field, file)
+    rejectUnknownKeys(candidate, field === 'host' ? HOST_FACE_KEYS : FACE_KEYS, field, file)
     optionalNonEmptyString(candidate.entry, `${field}.entry`, file)
+    if (field === 'host') optionalPackageNames(candidate.bundleDependencies, 'host.bundleDependencies', file)
     if (candidate.vite !== undefined) {
       if (!isObject(candidate.vite)) {
         throw new DshxError('DSHX4004', `${field}.vite must be an object.`, {
@@ -255,6 +281,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
   }
   const hostEntry = await resolveEntry(root, loaded.config.host, 'src/host.ts', 'host', loaded.configFile)
   const clientEntry = await resolveEntry(root, loaded.config.client, 'src/client.tsx', 'client', loaded.configFile)
+  const hostBundleDependencies = loaded.config.host === false ? [] : (loaded.config.host?.bundleDependencies ?? [])
   if (hostEntry === undefined && clientEntry === undefined) {
     throw new DshxError('DSHX4006', 'No Host or Client entry is enabled for this project.', {
       file: loaded.configFile ?? packageFile,
@@ -271,6 +298,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     name: loaded.config.name ?? packageId,
     ...(hostEntry === undefined ? {} : { hostEntry }),
     ...(clientEntry === undefined ? {} : { clientEntry }),
+    hostBundleDependencies,
     ...(hostVitePlugins.length === 0 ? {} : { hostVitePlugins }),
     ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
     outDir: resolve(root, 'dist'),

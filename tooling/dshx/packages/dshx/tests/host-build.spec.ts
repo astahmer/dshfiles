@@ -367,6 +367,57 @@ describe('host compiler', () => {
     expect(await readFile(resolve(root, 'dist/index.d.ts'), 'utf8')).toContain('export declare function apply(ctx: Context')
   })
 
+  it('bundles selected Host package roots and leaves other packages external', async () => {
+    const root = await temporaryProject()
+    const selectedPackage = resolve(root, 'node_modules/@test/local-core')
+    await mkdir(selectedPackage, { recursive: true })
+    await writeFile(resolve(selectedPackage, 'package.json'), JSON.stringify({ name: '@test/local-core', type: 'module' }))
+    await writeFile(resolve(selectedPackage, 'index.js'), "export const rootValue = 'local-core-root'\n")
+    await writeFile(resolve(selectedPackage, 'nested.js'), "export const nestedValue = 'local-core-nested'\n")
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { rootValue } from '@test/local-core'",
+        "import { nestedValue } from '@test/local-core/nested.js'",
+        "import { externalValue } from '@test/local-core-extra'",
+        "import { sharedValue } from '@test/shared-host-package'",
+        'export const name = `${rootValue}:${nestedValue}:${externalValue}:${sharedValue}`',
+        'export const inject = []',
+        'export function apply() {}',
+        '',
+      ].join('\n'),
+    )
+
+    await buildHost({
+      packageId: '@dshx/fixture-plugin',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+      bundleDependencies: ['@test/local-core'],
+    })
+
+    const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(code).toContain('local-core-root')
+    expect(code).toContain('local-core-nested')
+    expect(code).not.toMatch(/from ['"]@test\/local-core(?:\/|['"])/)
+    expect(code).toContain('@test/local-core-extra')
+    expect(code).toContain('@test/shared-host-package')
+  })
+
+  it('keeps Cordis external when called through the programmatic Host API', async () => {
+    const root = await temporaryProject()
+
+    await expect(
+      buildHost({
+        packageId: '@dshx/fixture-plugin',
+        root,
+        entry: 'src/host.ts',
+        outDir: 'dist',
+        bundleDependencies: ['@deepseek-ai/cordis'],
+      }),
+    ).rejects.toMatchObject({ code: 'DSHX4004' })
+  })
+
   it('builds a client-only project with the standard no-op Host entry', async () => {
     const root = await temporaryProject()
     await buildHost({

@@ -39,6 +39,7 @@ export interface BuildHostOptions {
   readonly root?: string
   readonly sourcemap?: boolean
   readonly declarations?: boolean
+  readonly bundleDependencies?: readonly string[]
   readonly vite?: ViteExtensionOptions
   readonly compatibility?: DshCompatibility
 }
@@ -171,14 +172,25 @@ async function resolveOptions(options: BuildHostOptions) {
 }
 
 async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildHostOptions, watch: boolean): Promise<InlineConfig> {
-  const external = (source: string): boolean =>
-    source !== DSHX_HOST_PUBLIC &&
-    source !== DSHX_API_PUBLIC &&
-    source !== DSHX_SETTINGS_PUBLIC &&
-    source !== DSHX_COMMUNICATION_PUBLIC &&
-    source !== DSHX_PLATFORM_HOST_API_PUBLIC &&
-    source !== DSHX_PLATFORM_NATIVE_RPC_PUBLIC &&
-    isHostExternal(source)
+  const bundleDependencies = options.bundleDependencies ?? []
+  if (bundleDependencies.includes('@deepseek-ai/cordis')) {
+    throw new DshxError('DSHX4004', 'Host bundleDependencies cannot include @deepseek-ai/cordis.', {
+      hint: 'Keep the Host Cordis identity external.',
+    })
+  }
+  const dshxPublicModules = [
+    DSHX_HOST_PUBLIC,
+    DSHX_API_PUBLIC,
+    DSHX_SETTINGS_PUBLIC,
+    DSHX_COMMUNICATION_PUBLIC,
+    DSHX_PLATFORM_HOST_API_PUBLIC,
+    DSHX_PLATFORM_NATIVE_RPC_PUBLIC,
+  ]
+  const external = (source: string): boolean => {
+    if (dshxPublicModules.includes(source)) return false
+    const bundled = bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
+    return !bundled && isHostExternal(source)
+  }
   const assetsInlineLimit = (): boolean => true
   const output = {
     format: 'es',
@@ -209,6 +221,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       }),
       singleHostChunkPlugin(),
     ],
+    ssr: { noExternal: [...bundleDependencies] },
     build: {
       // A Host artifact runs inside the DSH Node process, so the build must
       // run the server environment: without a server consumer Vite treats
