@@ -249,7 +249,7 @@ describe('DSH platform CLI', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it('preserves Host Session projections and command input descriptors', async () => {
+  it('preserves Host Session attention, projections, and command input descriptors', async () => {
     const client = createDshPlatformClientFromTransport({
       sessionCursor: async () => 0,
       rpc: async (namespace, method) => {
@@ -263,6 +263,12 @@ describe('DSH platform CLI', () => {
                 blank: false,
                 agentAvailable: true,
                 projections: { summary: 'Ready', state: 'idle' },
+                attention: {
+                  lastPromptSeq: 7,
+                  readThroughSeq: 2,
+                  snoozed: false,
+                  unread: true,
+                },
               },
             ],
           }
@@ -285,6 +291,12 @@ describe('DSH platform CLI', () => {
       {
         sessionId: 'session-1',
         projections: { summary: 'Ready', state: 'idle' },
+        attention: {
+          lastPromptSeq: 7,
+          readThroughSeq: 2,
+          snoozed: false,
+          unread: true,
+        },
       },
     ])
     expect(await client.commands.list('session-1')).toEqual([

@@ -24,13 +24,19 @@ const profileName = 'core-runtime'
 const bridgePath = resolve(repoRoot, 'plugins/@dshfiles/dsh-core-runtime')
 const cursorPluginPath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent')
 const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
+const apiSessionControllerPath = process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH === undefined
+  ? resolve(coreRoot, 'api-session-controller')
+  : resolve(repoRoot, process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH)
 const cursorInstanceId = 'scratch-fixture'
 const cursorCredential = 'scratch-only-cursor-fixture'
 const corePackages = ['api-session-controller', 'agent', 'agent-loop', 'session', 'session-persistence', 'session-persistence-jsonl', 'session-format-catalog', 'session-format-v4-to-v5']
 const extraDependencies = {
   '@dshfiles/dsh-core-runtime': `link:${bridgePath}`,
   '@dshfiles/cursor-agent': `link:${cursorPluginPath}`,
-  ...Object.fromEntries(corePackages.map(name => [`@deepseek-ai/dsh-${name}`, `link:${resolve(coreRoot, name)}`])),
+  ...Object.fromEntries(corePackages.map(name => [
+    `@deepseek-ai/dsh-${name}`,
+    `link:${name === 'api-session-controller' ? apiSessionControllerPath : resolve(coreRoot, name)}`,
+  ])),
 }
 
 const scratch = await createScratchProfile({
@@ -309,6 +315,8 @@ try {
     restartedSessions.some(session => session.sessionId === cursorSession.sessionId),
     'Cursor-bound Session was missing after the unclean Host termination.',
   )
+  const recoveredCursorSummary = restartedSessions.find(session => session.sessionId === cursorSession.sessionId)
+  assert.ok(recoveredCursorSummary, 'Cursor-bound Session summary was missing after the unclean Host termination.')
   const restartedHistory = await restartedPlatform.sessions.history(created.sessionId)
   assert.deepEqual(restartedHistory.records, initialHistory.records, 'Session history changed across Host restart.')
   const recoveredCursorHistory = await restartedPlatform.sessions.history(cursorSession.sessionId)
@@ -323,6 +331,20 @@ try {
   assert.ok(
     recoveredCursorEvents.some(event => event.type === 'turn/end' && event.data.reason?.kind === 'interrupted'),
     'The in-flight turn was not marked interrupted after Host recovery.',
+  )
+  const recoveredPromptSeqs = recoveredCursorEvents
+    .filter(event => event.type === 'user/message' && event.data.source.kind === 'user')
+    .map(event => event.seq)
+  assert.ok(recoveredPromptSeqs.length > 0, 'No user prompt sequence was recovered after Host termination.')
+  assert.deepEqual(
+    recoveredCursorSummary.attention,
+    {
+      lastPromptSeq: Math.max(...recoveredPromptSeqs),
+      readThroughSeq: -1,
+      snoozed: false,
+      unread: true,
+    },
+    'Session attention did not recover the unread prompt watermark after Host termination.',
   )
   await restartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic provider turn after crash recovery', 'queue')
   const recoveredTurnHistory = await waitForHistoryError(
@@ -426,7 +448,7 @@ try {
   assert.equal(cursorEventsAfterResume.filter(event => event.type === 'load').length, cursorEventsBeforeReconcile.filter(event => event.type === 'load').length + 1, 'Recovery did not resume the original Cursor ACP session exactly once.')
   assert.equal(cursorEventsAfterResume.filter(event => event.type === 'prompt').length, cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length + 1, 'Recovery replayed the uncertain prompt instead of submitting only the new prompt.')
   assert.equal(cursorEventsAfterResume.filter(event => event.type === 'response').length, cursorEventsBeforeReconcile.filter(event => event.type === 'response').length + 1, 'The post-reconciliation Cursor prompt did not produce exactly one response.')
-  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`)
+  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records and unread attention, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`)
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`${redactHostOutput(message)}\n`)

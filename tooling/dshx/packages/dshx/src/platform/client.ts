@@ -10,6 +10,14 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
+const sessionAttentionSummarySchema = z.object({
+  lastPromptSeq: z.number().int().nullable(),
+  readThroughSeq: z.number().int(),
+  snoozed: z.boolean(),
+  unread: z.boolean(),
+})
+export type SessionAttentionSummary = z.infer<typeof sessionAttentionSummarySchema>
+
 const sessionSummarySchema = z.object({
   agentAvailable: z.boolean(),
   sessionId: z.string(),
@@ -20,6 +28,7 @@ const sessionSummarySchema = z.object({
   origin: z.enum(['subagent']).optional(),
   cwd: z.string().optional(),
   projections: jsonValueSchema.optional(),
+  attention: sessionAttentionSummarySchema.nullable().optional(),
 })
 
 const sessionSearchItemSchema = z.object({
@@ -212,6 +221,7 @@ export interface SessionSummary {
   readonly origin?: 'subagent'
   readonly cwd?: string
   readonly projections?: JsonValue
+  readonly attention?: SessionAttentionSummary | null
 }
 
 export interface SessionSearchItem {
@@ -481,6 +491,7 @@ function mapSession(value: unknown): SessionSummary {
     ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
     ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
     ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
+    ...(parsed.attention === undefined ? {} : { attention: parsed.attention }),
   }
 }
 
