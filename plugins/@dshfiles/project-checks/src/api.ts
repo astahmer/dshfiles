@@ -42,7 +42,7 @@ export const hookEventSchema = z.object({
   dialect: z.enum(['claude-code', 'codex']).nullable(),
   decision: z.string().max(40).nullable(),
   exitCode: z.number().int().nullable(),
-  durationMs: z.number().int().nonnegative().nullable(),
+  durationMs: z.number().nonnegative().nullable(),
   stderrPresent: z.boolean(),
 })
 
