@@ -42,15 +42,19 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     attachmentCount: input.attachmentIds.length,
     referenceCount: input.occurrences.length,
   })
-  const sentPrompts = useMemo(() => chatOrder
-    .flatMap(key => {
-      const node = chatNodes.get(key)
-      if (node?.kind !== 'user') return []
-      const prompt = sentPromptFromNode(node.data)
-      return prompt === null ? [] : [prompt]
-    })
-    .slice(-MAX_SENT_PROMPTS)
-    .reverse(), [chatNodes, chatOrder])
+  const sentPrompts = useMemo(
+    () =>
+      chatOrder
+        .flatMap(key => {
+          const node = chatNodes.get(key)
+          if (node?.kind !== 'user') return []
+          const prompt = sentPromptFromNode(node.data)
+          return prompt === null ? [] : [prompt]
+        })
+        .slice(-MAX_SENT_PROMPTS)
+        .reverse(),
+    [chatNodes, chatOrder],
+  )
 
   useEffect(() => {
     if (!isOpen) return
@@ -81,13 +85,15 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
 
   const saveCurrent = (): void => {
     if (block !== null) {
-      setMessage(block === 'rich-content'
-        ? 'Remove reference chips and attachments before saving a text-only draft.'
-        : block === 'too-long'
-          ? 'This draft is too long to save.'
-          : block === 'busy'
-            ? 'Wait for the current composer action to finish.'
-            : 'Enter text before saving a draft.')
+      setMessage(
+        block === 'rich-content'
+          ? 'Remove reference chips and attachments before saving a text-only draft.'
+          : block === 'too-long'
+            ? 'This draft is too long to save.'
+            : block === 'busy'
+              ? 'Wait for the current composer action to finish.'
+              : 'Enter text before saving a draft.',
+      )
       return
     }
     const result = saveDraft(store, {
@@ -97,11 +103,13 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       now: new Date().toISOString(),
     })
     if (!result.ok) {
-      setMessage(result.reason === 'too-large'
-        ? 'The draft store is full. Remove a saved draft and try again.'
-        : result.reason === 'limit'
-          ? 'The stash holds 20 drafts. Remove one before saving another.'
-          : 'The draft title or contents are invalid.')
+      setMessage(
+        result.reason === 'too-large'
+          ? 'The draft store is full. Remove a saved draft and try again.'
+          : result.reason === 'limit'
+            ? 'The stash holds 20 drafts. Remove one before saving another.'
+            : 'The draft title or contents are invalid.',
+      )
       return
     }
     if (persistStore(result.store, result.serialized)) {
@@ -157,7 +165,9 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
         <section id="prompt-stash-drafts-panel" className={styles.panel} role="dialog" aria-label="Saved prompt drafts">
           <div className={styles.heading}>
             <h2>Saved drafts</h2>
-            <button type="button" className={styles.button} onClick={() => setIsOpen(false)} aria-label="Close saved drafts">Close</button>
+            <button type="button" className={styles.button} onClick={() => setIsOpen(false)} aria-label="Close saved drafts">
+              Close
+            </button>
           </div>
           <p className={styles.note}>Stored in this browser only. Text drafts only; references and files stay in the composer.</p>
           <div className={styles.actions}>
@@ -169,17 +179,25 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
               value={title}
               onChange={event => setTitle(event.currentTarget.value)}
             />
-            <button type="button" className={styles.button} disabled={block !== null} onClick={saveCurrent}>Save current</button>
+            <button type="button" className={styles.button} disabled={block !== null} onClick={saveCurrent}>
+              Save current
+            </button>
           </div>
-          {store.drafts.length === 0 ? <p className={styles.empty}>No saved drafts yet.</p> : (
+          {store.drafts.length === 0 ? (
+            <p className={styles.empty}>No saved drafts yet.</p>
+          ) : (
             <ul className={styles.list}>
               {store.drafts.map(draft => (
                 <li className={styles.item} key={draft.id}>
                   <span className={styles.itemTitle}>{draft.title}</span>
                   <span className={styles.preview}>{previewText(draft.text)}</span>
                   <div className={styles.actions}>
-                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSaved(draft)}>Insert</button>
-                    <button type="button" className={styles.button} onClick={() => deleteSaved(draft.id)}>Remove</button>
+                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSaved(draft)}>
+                      Insert
+                    </button>
+                    <button type="button" className={styles.button} onClick={() => deleteSaved(draft.id)}>
+                      Remove
+                    </button>
                   </div>
                 </li>
               ))}
@@ -188,18 +206,26 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           <section className={styles.history} aria-label="Sent prompt history">
             <h3>Sent prompts in this session</h3>
             <p className={styles.note}>Text-only user messages from the loaded conversation. File and reference messages stay in the transcript.</p>
-            {sentPrompts.length === 0 ? <p className={styles.empty}>No sent text prompts are loaded for this session.</p> : (
+            {sentPrompts.length === 0 ? (
+              <p className={styles.empty}>No sent text prompts are loaded for this session.</p>
+            ) : (
               <ul className={styles.list}>
                 {sentPrompts.map(prompt => (
                   <li className={styles.item} key={prompt.id}>
                     <span className={styles.preview}>{previewText(prompt.text)}</span>
-                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSentPrompt(prompt)}>Insert</button>
+                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSentPrompt(prompt)}>
+                      Insert
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
           </section>
-          {message.length > 0 ? <p className={styles.message} role="status">{message}</p> : null}
+          {message.length > 0 ? (
+            <p className={styles.message} role="status">
+              {message}
+            </p>
+          ) : null}
         </section>
       ) : null}
     </div>

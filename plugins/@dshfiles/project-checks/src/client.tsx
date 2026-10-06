@@ -153,7 +153,11 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         </div>
       </header>
 
-      {notice.length > 0 && <p className={styles.notice} role="status">{notice}</p>}
+      {notice.length > 0 && (
+        <p className={styles.notice} role="status">
+          {notice}
+        </p>
+      )}
 
       <section className={styles.section} aria-labelledby="project-action-title">
         <h3 id="project-action-title">Actions</h3>
@@ -163,7 +167,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
             <li className={styles.action} key={action.id}>
               <div className={styles.actionCopy}>
                 <strong>{action.label}</strong>
-                <span>{action.description || (action.verifyBeforeComplete ? 'Runs before the agent completes a turn.' : 'One-shot trusted project action.')}</span>
+                <span>
+                  {action.description || (action.verifyBeforeComplete ? 'Runs before the agent completes a turn.' : 'One-shot trusted project action.')}
+                </span>
               </div>
               <button type="button" disabled={busyAction !== null} onClick={() => void run(action)}>
                 {busyAction === action.id ? 'Running…' : 'Run'}
@@ -183,7 +189,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
                 <strong>{receipt.label}</strong>
                 <span data-status={receipt.status}>{receipt.status}</span>
               </div>
-              <span>{formatTime(receipt.finishedAt)} · {receipt.durationMs} ms{receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}</span>
+              <span>
+                {formatTime(receipt.finishedAt)} · {receipt.durationMs} ms{receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}
+              </span>
               <span>{freshnessLabel(receipt)}</span>
               {receipt.failure !== null ? <span>Runner state: {receipt.failure}</span> : null}
             </li>
@@ -193,13 +201,18 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
 
       <section className={styles.section} aria-labelledby="project-hooks-title">
         <h3 id="project-hooks-title">Native hook results</h3>
-        <p className={styles.note}>The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.</p>
+        <p className={styles.note}>
+          The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.
+        </p>
         {hooks.length === 0 ? <p className={styles.empty}>No native hook records are available for this session.</p> : null}
         <ul className={styles.hookList}>
           {hooks.map(event => (
             <li className={styles.hook} key={`${event.seq}-${event.kind}`}>
               <strong>{event.point}</strong>
-              <span>Turn {event.turn} · {event.kind}{event.dialect === null ? '' : ` · ${event.dialect}`}</span>
+              <span>
+                Turn {event.turn} · {event.kind}
+                {event.dialect === null ? '' : ` · ${event.dialect}`}
+              </span>
               {event.kind === 'result' ? (
                 <span>
                   {event.decision ?? 'no decision'} · exit {event.exitCode ?? 'unknown'} · {event.durationMs ?? 0} ms

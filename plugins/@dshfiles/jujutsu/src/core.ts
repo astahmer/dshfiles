@@ -138,9 +138,7 @@ export const parsePatchStats = (patch: string, paths: readonly string[], truncat
       path: paths[index] ?? `Changed file ${index + 1}`,
       additions,
       deletions,
-      contentDigest: truncated && index === sections.length - 1
-        ? null
-        : createHash('sha256').update(section).digest('hex'),
+      contentDigest: truncated && index === sections.length - 1 ? null : createHash('sha256').update(section).digest('hex'),
     }
   })
 }

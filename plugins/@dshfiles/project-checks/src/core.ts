@@ -40,10 +40,7 @@ export const isWithinRoot = (root: string, cwd: string): boolean => {
   return pathFromRoot === '' || (pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
 }
 
-export const receiptFreshness = (
-  receiptRevision: string | null,
-  currentRevision: string | null,
-): 'current' | 'stale' | 'unknown' => {
+export const receiptFreshness = (receiptRevision: string | null, currentRevision: string | null): 'current' | 'stale' | 'unknown' => {
   if (receiptRevision === null || currentRevision === null) return 'unknown'
   return receiptRevision === currentRevision ? 'current' : 'stale'
 }

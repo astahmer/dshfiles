@@ -12,15 +12,8 @@ import { defineHost } from '@dshfiles/dshx/host'
 import { randomUUID } from 'node:crypto'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
-import { z } from 'zod'
 import { projectChecksApi, type ProjectHookEvent } from './api.js'
-import {
-  isWithinRoot,
-  projectChecksConfigSchema,
-  receiptFreshness,
-  verificationPrompt,
-  type ProjectAction,
-} from './core.js'
+import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
 import { projectChecksDomain, receiptKey, trimReceiptRows, type StoredReceipt } from './store.js'
 
 const ENTRY_ID = 'dshfiles-project-checks'
@@ -55,9 +48,7 @@ interface ReceiptOptions {
 }
 
 function entryFor(ctx: Context) {
-  const matches = ctx.configEditor
-    .entries()
-    .filter(entry => entry.options.id === ENTRY_ID && entry.options.name === PACKAGE_NAME)
+  const matches = ctx.configEditor.entries().filter(entry => entry.options.id === ENTRY_ID && entry.options.name === PACKAGE_NAME)
   if (matches.length !== 1 || matches[0]?.fiber === undefined) throw new Error('Project checks profile row is unavailable.')
   return matches[0]
 }
@@ -175,12 +166,7 @@ const sourceRevision = async (ctx: Context, cwd: string, signal?: AbortSignal): 
   return REVISION_PATTERN.test(revision) ? revision : null
 }
 
-const runAction = async (
-  ctx: Context,
-  sessionId: string,
-  action: ProjectAction,
-  options: ReceiptOptions,
-): Promise<StoredReceipt> => {
+const runAction = async (ctx: Context, sessionId: string, action: ProjectAction, options: ReceiptOptions): Promise<StoredReceipt> => {
   const paths = await sessionPaths(ctx, sessionId, action)
   const startedAt = Date.now()
   const beforeRevision = await sourceRevision(ctx, paths.cwd, options.signal)
@@ -329,13 +315,16 @@ const hostApi = projectChecksApi.host({
       signal,
       requireRevision: false,
     })
-    const freshness = receiptFreshness(receipt.sourceRevision, await (async () => {
-      try {
-        return await sourceRevision(ctx, (await sessionPaths(ctx, input.sessionId, action)).cwd)
-      } catch {
-        return null
-      }
-    })())
+    const freshness = receiptFreshness(
+      receipt.sourceRevision,
+      await (async () => {
+        try {
+          return await sourceRevision(ctx, (await sessionPaths(ctx, input.sessionId, action)).cwd)
+        } catch {
+          return null
+        }
+      })(),
+    )
     return { ...receipt, freshness }
   },
 })
@@ -364,9 +353,7 @@ export default defineHost({
       if (available.length === 0 || signal.aborted) return
 
       const previous = await readStoredReceipts(ctx, sessionId)
-      const previousAttempts = previous
-        .filter(receipt => receipt.automatic && receipt.verificationTurn === turn)
-        .map(receipt => receipt.attempt)
+      const previousAttempts = previous.filter(receipt => receipt.automatic && receipt.verificationTurn === turn).map(receipt => receipt.attempt)
       const attempt = Math.max(0, ...previousAttempts) + 1
       if (attempt > config.maxVerificationAttempts) throw new Error('Project verification attempt limit was exceeded.')
 

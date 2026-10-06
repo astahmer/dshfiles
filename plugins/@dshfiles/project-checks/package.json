@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Trusted project actions, completion receipts, and native hook result visibility for DSH.",
-  "files": ["dist", "cordis.patch.yml", "README.md"],
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -59,7 +63,9 @@
     "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [

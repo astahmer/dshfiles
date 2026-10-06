@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
-import { isolatedHostEnvironment } from './scratch-profile.js'
+import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import type { BrowserBootEvidence } from './browser-boot.js'
 export { compositionFailures }
 
@@ -89,7 +89,8 @@ export const parseBootText = (text: string): ClientBootCheckEntry[] => {
     const line = raw.trim()
     const match = /^(?<id>@[^:]+): (?<state>failed|pending|error)\b(?<detail>.*)$/.exec(line)
     if (match?.groups === undefined) continue
-    const detail = match.groups.detail?.trim().replace(/^:\s*/, '')
+    const rawDetail = match.groups.detail?.trim().replace(/^:\s*/, '')
+    const detail = rawDetail === undefined ? undefined : redactHostOutput(rawDetail)
     entries.push({
       id: match.groups.id ?? '',
       state: match.groups.state ?? '',
@@ -233,7 +234,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            browserError = message.replaceAll(launchUrl, new URL(launchUrl).origin)
+            browserError = redactHostOutput(message)
           }
         }
       }
@@ -271,11 +272,11 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     browserReady,
     failureCardVisible,
     timedOut,
-    ...(processError === undefined ? {} : { processError }),
-    ...(spawnError === undefined ? {} : { spawnError }),
+    ...(processError === undefined ? {} : { processError: redactHostOutput(processError) }),
+    ...(spawnError === undefined ? {} : { spawnError: redactHostOutput(spawnError) }),
     ...(evidence === undefined ? {} : { evidence }),
     ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
-    ...(browserError === undefined ? {} : { browserError }),
-    ...(readinessError === undefined ? {} : { readinessError }),
+    ...(browserError === undefined ? {} : { browserError: redactHostOutput(browserError) }),
+    ...(readinessError === undefined ? {} : { readinessError: redactHostOutput(readinessError) }),
   }
 }

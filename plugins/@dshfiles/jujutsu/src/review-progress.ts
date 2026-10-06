@@ -3,21 +3,26 @@ import { z } from 'zod'
 export const MAX_REVIEW_MARKS = 3_000
 export const MAX_REVIEW_STORE_BYTES = 1_200_000
 
-const reviewMarkSchema = z.object({
-  repositoryRoot: z.string().min(1).max(2048),
-  commitId: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
-  path: z.string().min(1).max(2048),
-  contentDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  reviewedAt: z.string().datetime(),
-}).strict()
+const reviewMarkSchema = z
+  .object({
+    repositoryRoot: z.string().min(1).max(2048),
+    commitId: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+    path: z.string().min(1).max(2048),
+    contentDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    reviewedAt: z.string().datetime(),
+  })
+  .strict()
 
-const reviewStoreSchema = z.object({
-  schemaVersion: z.literal(1),
-  marks: z.array(reviewMarkSchema).max(MAX_REVIEW_MARKS),
-}).strict().superRefine((store, context) => {
-  const keys = store.marks.map(mark => `${mark.repositoryRoot}\u0000${mark.commitId}\u0000${mark.path}\u0000${mark.contentDigest}`)
-  if (new Set(keys).size !== keys.length) context.addIssue({ code: 'custom', message: 'Review marks must be unique.' })
-})
+const reviewStoreSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    marks: z.array(reviewMarkSchema).max(MAX_REVIEW_MARKS),
+  })
+  .strict()
+  .superRefine((store, context) => {
+    const keys = store.marks.map(mark => `${mark.repositoryRoot}\u0000${mark.commitId}\u0000${mark.path}\u0000${mark.contentDigest}`)
+    if (new Set(keys).size !== keys.length) context.addIssue({ code: 'custom', message: 'Review marks must be unique.' })
+  })
 
 export type ReviewMark = z.infer<typeof reviewMarkSchema>
 export type ReviewStore = z.infer<typeof reviewStoreSchema>
@@ -40,29 +45,15 @@ export const readReviewStore = (source: string | null): ReviewStore => {
   }
 }
 
-export const isFileReviewed = (
-  store: ReviewStore,
-  repositoryRoot: string,
-  commitId: string,
-  file: ReviewFile,
-): boolean => file.contentDigest !== null && store.marks.some(mark =>
-  mark.repositoryRoot === repositoryRoot &&
-  mark.commitId === commitId &&
-  mark.path === file.path &&
-  mark.contentDigest === file.contentDigest,
-)
-
-export const toggleFileReview = (
-  store: ReviewStore,
-  mark: ReviewMark,
-  reviewed: boolean,
-): ReviewStore => {
-  const previous = store.marks.filter(item =>
-    item.repositoryRoot !== mark.repositoryRoot || item.commitId !== mark.commitId || item.path !== mark.path,
+export const isFileReviewed = (store: ReviewStore, repositoryRoot: string, commitId: string, file: ReviewFile): boolean =>
+  file.contentDigest !== null &&
+  store.marks.some(
+    mark => mark.repositoryRoot === repositoryRoot && mark.commitId === commitId && mark.path === file.path && mark.contentDigest === file.contentDigest,
   )
-  const ordered = reviewed
-    ? [...previous, mark].sort((left, right) => right.reviewedAt.localeCompare(left.reviewedAt)).slice(0, MAX_REVIEW_MARKS)
-    : previous
+
+export const toggleFileReview = (store: ReviewStore, mark: ReviewMark, reviewed: boolean): ReviewStore => {
+  const previous = store.marks.filter(item => item.repositoryRoot !== mark.repositoryRoot || item.commitId !== mark.commitId || item.path !== mark.path)
+  const ordered = reviewed ? [...previous, mark].sort((left, right) => right.reviewedAt.localeCompare(left.reviewedAt)).slice(0, MAX_REVIEW_MARKS) : previous
   const encoder = new TextEncoder()
   const emptySize = encoder.encode(JSON.stringify({ schemaVersion: 1, marks: [] })).byteLength
   const boundedMarks: ReviewMark[] = []

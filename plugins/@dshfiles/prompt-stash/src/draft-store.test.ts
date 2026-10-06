@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { defaultDraftTitle, draftSaveBlock, MAX_SAVED_DRAFTS, readDraftStore, removeDraft, saveDraft, sentPromptFromNode, type DraftStore } from './draft-store.js'
+import {
+  defaultDraftTitle,
+  draftSaveBlock,
+  MAX_SAVED_DRAFTS,
+  readDraftStore,
+  removeDraft,
+  saveDraft,
+  sentPromptFromNode,
+  type DraftStore,
+} from './draft-store.js'
 
 const draft = (index: number) => ({
   id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -61,16 +70,23 @@ describe('saved prompt drafts', () => {
 
 describe('sent prompt history', () => {
   it('reads only bounded plain-text user messages', () => {
-    expect(sentPromptFromNode({
-      kind: 'user',
-      seq: 4,
-      content: [{ type: 'text', text: 'Earlier prompt' }],
-    })).toEqual({ id: 4, text: 'Earlier prompt' })
-    expect(sentPromptFromNode({
-      kind: 'user',
-      seq: 5,
-      content: [{ type: 'text', text: 'first ' }, { type: 'text', text: 'second' }],
-    })).toEqual({ id: 5, text: 'first second' })
+    expect(
+      sentPromptFromNode({
+        kind: 'user',
+        seq: 4,
+        content: [{ type: 'text', text: 'Earlier prompt' }],
+      }),
+    ).toEqual({ id: 4, text: 'Earlier prompt' })
+    expect(
+      sentPromptFromNode({
+        kind: 'user',
+        seq: 5,
+        content: [
+          { type: 'text', text: 'first ' },
+          { type: 'text', text: 'second' },
+        ],
+      }),
+    ).toEqual({ id: 5, text: 'first second' })
     expect(sentPromptFromNode({ kind: 'steering', seq: 6, content: [{ type: 'text', text: 'steer' }] })).toBeNull()
     expect(sentPromptFromNode({ kind: 'user', seq: 7, content: [{ type: 'text', text: 'prompt' }, { type: 'file' }] })).toBeNull()
     expect(sentPromptFromNode({ kind: 'user', seq: 8, content: [{ type: 'text', text: 'x'.repeat(24_001) }] })).toBeNull()

@@ -7,33 +7,42 @@ export const MAX_DRAFT_STORE_BYTES = 512_000
 export const MAX_SENT_PROMPTS = 50
 export const MAX_SENT_PROMPT_TEXT_CHARS = 24_000
 
-const sentPromptBlockSchema = z.object({
-  type: z.string().min(1).max(80),
-  text: z.string().max(MAX_SENT_PROMPT_TEXT_CHARS).optional(),
-}).passthrough()
+const sentPromptBlockSchema = z
+  .object({
+    type: z.string().min(1).max(80),
+    text: z.string().max(MAX_SENT_PROMPT_TEXT_CHARS).optional(),
+  })
+  .passthrough()
 
-const sentPromptNodeSchema = z.object({
-  kind: z.literal('user'),
-  seq: z.number().int().min(0),
-  content: z.array(sentPromptBlockSchema).max(256),
-}).passthrough()
+const sentPromptNodeSchema = z
+  .object({
+    kind: z.literal('user'),
+    seq: z.number().int().min(0),
+    content: z.array(sentPromptBlockSchema).max(256),
+  })
+  .passthrough()
 
-const savedDraftSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().min(1).max(MAX_DRAFT_TITLE_CHARS),
-  text: z.string().min(1).max(MAX_DRAFT_TEXT_CHARS),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-}).strict()
+const savedDraftSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string().min(1).max(MAX_DRAFT_TITLE_CHARS),
+    text: z.string().min(1).max(MAX_DRAFT_TEXT_CHARS),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  })
+  .strict()
 
-const draftStoreSchema = z.object({
-  schemaVersion: z.literal(1),
-  drafts: z.array(savedDraftSchema).max(MAX_SAVED_DRAFTS),
-}).strict().superRefine((store, context) => {
-  if (new Set(store.drafts.map(draft => draft.id)).size !== store.drafts.length) {
-    context.addIssue({ code: 'custom', message: 'Saved draft ids must be unique.' })
-  }
-})
+const draftStoreSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    drafts: z.array(savedDraftSchema).max(MAX_SAVED_DRAFTS),
+  })
+  .strict()
+  .superRefine((store, context) => {
+    if (new Set(store.drafts.map(draft => draft.id)).size !== store.drafts.length) {
+      context.addIssue({ code: 'custom', message: 'Saved draft ids must be unique.' })
+    }
+  })
 
 export type SavedDraft = z.infer<typeof savedDraftSchema>
 export type DraftStore = z.infer<typeof draftStoreSchema>
@@ -100,10 +109,11 @@ export const saveDraft = (
   return { ok: true, store, serialized }
 }
 
-export const removeDraft = (current: DraftStore, draftId: string): DraftStore => draftStoreSchema.parse({
-  schemaVersion: 1,
-  drafts: current.drafts.filter(draft => draft.id !== draftId),
-})
+export const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
+  draftStoreSchema.parse({
+    schemaVersion: 1,
+    drafts: current.drafts.filter(draft => draft.id !== draftId),
+  })
 
 export const sentPromptFromNode = (source: unknown): SentPrompt | null => {
   const result = sentPromptNodeSchema.safeParse(source)

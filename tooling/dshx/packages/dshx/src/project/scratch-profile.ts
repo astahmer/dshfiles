@@ -12,11 +12,14 @@ const sourceManifestSchema = z.object({
   dsh: z.object({ profile: z.object({ bundles: z.array(z.string()).optional() }).optional() }).optional(),
 })
 const profileNameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
-const dependencySpecifierSchema = z.string().min(1).refine(specifier => {
-  if (/[\r\n]|:\/\//.test(specifier)) return false
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(specifier)?.[1]?.toLowerCase()
-  return scheme === undefined || ['link', 'file', 'workspace', 'npm'].includes(scheme)
-})
+const dependencySpecifierSchema = z
+  .string()
+  .min(1)
+  .refine(specifier => {
+    if (/[\r\n]|:\/\//.test(specifier)) return false
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(specifier)?.[1]?.toLowerCase()
+    return scheme === undefined || ['link', 'file', 'workspace', 'npm'].includes(scheme)
+  })
 
 export interface ScratchProfileOptions {
   readonly profileName: string
@@ -93,9 +96,7 @@ const installProfile = async (profileRoot: string, home: string): Promise<void> 
 export const createScratchProfile = async (options: ScratchProfileOptions): Promise<ScratchProfile> => {
   const parsedName = profileNameSchema.safeParse(options.profileName)
   if (!parsedName.success) throw new Error('The E2E scratch profile name is invalid.')
-  const sourceRoot = resolve(
-    options.sourceProfileRoot ?? process.env.DSH_E2E_SOURCE_PROFILE_ROOT ?? join(homedir(), '.dsh/profiles/web'),
-  )
+  const sourceRoot = resolve(options.sourceProfileRoot ?? process.env.DSH_E2E_SOURCE_PROFILE_ROOT ?? join(homedir(), '.dsh/profiles/web'))
   const home = await mkdtemp(join(tmpdir(), 'dshx-e2e-home-'))
   const profileRoot = join(home, 'profiles', options.profileName)
 
@@ -152,11 +153,7 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
   }
 }
 
-export const isolatedHostEnvironment = (
-  home: string,
-  profileRoot: string,
-  source: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv => {
+export const isolatedHostEnvironment = (home: string, profileRoot: string, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => {
   const allowedNames = ['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM', 'USER', 'LOGNAME']
   const environment = Object.fromEntries(
     allowedNames.flatMap(name => {
@@ -175,5 +172,4 @@ export const isolatedHostEnvironment = (
   }
 }
 
-export const redactHostOutput = (output: string): string =>
-  output.replace(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/g, match => `${new URL(match).origin}/[redacted]`)
+export const redactHostOutput = (output: string): string => output.replace(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/g, match => `${new URL(match).origin}/[redacted]`)

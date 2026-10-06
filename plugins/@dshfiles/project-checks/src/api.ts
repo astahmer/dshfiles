@@ -23,7 +23,10 @@ export const receiptSchema = z.object({
   finishedAt: z.number().int().nonnegative(),
   durationMs: z.number().int().nonnegative(),
   exitCode: z.number().int().nullable(),
-  sourceRevision: z.string().regex(/^[a-f0-9]{40,64}$/).nullable(),
+  sourceRevision: z
+    .string()
+    .regex(/^[a-f0-9]{40,64}$/)
+    .nullable(),
   verificationTurn: z.number().int().nonnegative().nullable(),
   automatic: z.boolean(),
   attempt: z.number().int().min(0).max(2),

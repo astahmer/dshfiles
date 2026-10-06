@@ -42,6 +42,13 @@ describe('client boot card parsing', () => {
     ])
   })
 
+  it('redacts tokenized local URLs from entry details', () => {
+    const entries = parseBootText('@dshfiles/demo: failed: opened http://127.0.0.1:3199/private-token')
+    expect(entries).toEqual([
+      { id: '@dshfiles/demo', state: 'failed', detail: 'opened http://127.0.0.1:3199/[redacted]' },
+    ])
+  })
+
   it('returns nothing for a card that lists only the failed entries', () => {
     const text = [
       'Failed to load plugins',
