@@ -25,6 +25,14 @@ Create a DSH Session with runtime binding `{ driverKind: 'cursor-acp', instanceI
 
 Cursor ACP currently accepts text prompts. Fork, rollback, image input, and project-defined MCP servers are reported as unsupported. Permission requests can map only to a DSH approval followed by ACP `allow_once`; no persistent allow is granted. If a process stops after an operation begins but before DSH records and acknowledges its response, resume stops with an uncertain-operation error instead of replaying a possible workspace edit.
 
+### Reconcile an uncertain prompt
+
+Use `/cursor-reconcile list` from any working Session to find unsettled Cursor runtime receipts. Inspect a specific receipt with `/cursor-reconcile status <session-id>`. After checking Cursor and that workspace, and waiting for provider work to settle, run `/cursor-reconcile confirm <session-id> <operation-id> verified` for an uncertain prompt.
+
+The confirmation is recorded and flushed in the invoking Session before the exact target prompt receipt is cleared. A live target Agent must be idle and is held under maintenance during reconciliation; a target Session still being initialized is refused. This also allows recovery when Cursor resume fails before publishing an Agent. The prior prompt is never resubmitted, and later resume reuses the existing Cursor Session. Status checks do not start or authenticate Cursor.
+
+An uncertain provider-session creation receipt is listed and reported, but cannot be cleared safely because its native session id may be unavailable. Leave that receipt unchanged and create a new Cursor-bound Session to continue; the affected Session remains blocked.
+
 Cursor's per-instance configuration is stored below `$DSH_HOME/runtime-drivers/cursor-acp/<instance-id>` (or `~/.dsh` when `DSH_HOME` is unset) with private directory permissions. The plugin does not start or authenticate Cursor during status checks.
 
 ## Develop

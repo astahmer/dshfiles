@@ -189,6 +189,14 @@ const waitForHistoryError = async (platform, sessionId, expectedMessage) => {
   throw new Error('Scratch Session did not surface the expected uncertain Cursor outcome.')
 }
 
+const commandResultText = (result, description) => {
+  const command = typeof result === 'object' && result !== null && 'result' in result ? result.result : result
+  if (typeof command !== 'object' || command === null || !('kind' in command) || command.kind !== 'success') {
+    throw new Error(`Scratch ${description} command failed: ${JSON.stringify(result)}`)
+  }
+  return typeof command.text === 'string' ? command.text : ''
+}
+
 const readCursorEvents = async () => (await readFile(cursorEventsPath, 'utf8'))
   .trim()
   .split('\n')
@@ -337,30 +345,88 @@ try {
   const recoveredTurnText = JSON.stringify(recoveredTurnHistory.records)
   assert.ok(!recoveredTurnText.includes('cursor-fixture-response-2'), 'The Host replayed the unresolved provider operation after recovery.')
   assert.ok(recoveredTurnText.includes('synthetic provider turn after crash recovery'), 'The rejected post-crash prompt was not retained in Session history.')
-  const cursorEvents = await readCursorEvents()
-  assert.equal(cursorEvents.filter(event => event.type === 'new').length, 1, 'Cursor runtime did not create exactly one ACP session.')
+  const cursorEventsBeforeReconcile = await readCursorEvents()
+  assert.equal(cursorEventsBeforeReconcile.filter(event => event.type === 'new').length, 1, 'Cursor runtime did not create exactly one ACP session.')
   assert.equal(
-    cursorEvents.filter(event => event.type === 'process-start').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'process-start').length,
     inFlightCursorEvents.filter(event => event.type === 'process-start').length,
     'Cursor runtime launched a new provider process after the Host crash.',
   )
   assert.equal(
-    cursorEvents.filter(event => event.type === 'load').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'load').length,
     inFlightCursorEvents.filter(event => event.type === 'load').length,
     'Cursor runtime loaded the uncertain provider session after the Host crash.',
   )
   assert.equal(
-    cursorEvents.filter(event => event.type === 'prompt').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length,
     inFlightCursorEvents.filter(event => event.type === 'prompt').length,
     'Cursor runtime replayed an uncertain prompt or launched a rejected post-crash prompt.',
   )
   assert.equal(
-    cursorEvents.filter(event => event.type === 'response').length,
+    cursorEventsBeforeReconcile.filter(event => event.type === 'response').length,
     inFlightCursorEvents.filter(event => event.type === 'response').length,
     'Cursor runtime exposed a response for the interrupted provider call.',
   )
-  assert.equal(cursorEvents.filter(event => event.type === 'response-notification-failed:closed').length, 1, 'The interrupted ACP process did not confirm its response was detached from the crashed Host.')
-  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records, marked the in-flight turn interrupted, surfaced its uncertain provider outcome, and refused a new provider resume without replay.\n`)
+  assert.equal(cursorEventsBeforeReconcile.filter(event => event.type === 'response-notification-failed:closed').length, 1, 'The interrupted ACP process did not confirm its response was detached from the crashed Host.')
+
+  const recoverySession = await restartedPlatform.sessions.create({ cwd: repoRoot })
+  const recoveryCommands = await restartedPlatform.commands.list(recoverySession.sessionId)
+  assert.ok(recoveryCommands.some(command => command.name === 'cursor-reconcile'), 'The recovery command was not registered on the working Session.')
+  const statusResult = await restartedPlatform.commands.execute(
+    recoverySession.sessionId,
+    `/cursor-reconcile status ${cursorSession.sessionId}`,
+  )
+  const statusText = commandResultText(statusResult, 'status')
+  const operationId = statusText.match(/receipt ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
+  assert.ok(operationId, `Status did not return a pending Cursor operation receipt: ${statusText}`)
+  const confirmationResult = await restartedPlatform.commands.execute(
+    recoverySession.sessionId,
+    `/cursor-reconcile confirm ${cursorSession.sessionId} ${operationId} verified`,
+  )
+  const confirmationText = commandResultText(confirmationResult, 'confirmation')
+  assert.ok(confirmationText.includes('durably recorded in the invoking Session'), 'Confirmation did not report its durable source Session.')
+  const clearedStatus = await restartedPlatform.commands.execute(
+    recoverySession.sessionId,
+    `/cursor-reconcile status ${cursorSession.sessionId}`,
+  )
+  assert.ok(commandResultText(clearedStatus, 'post-confirm status').includes('No unsettled Cursor runtime receipt'), 'Confirmation did not clear the exact target receipt.')
+
+  const confirmationHistory = await restartedPlatform.sessions.history(recoverySession.sessionId)
+  const confirmationEvents = confirmationHistory.records.map(record => record.event ?? record)
+  assert.ok(
+    confirmationEvents.some(event => event.type === 'command/run' && JSON.stringify(event).includes(operationId)),
+    'The invoking Session did not durably record the exact human confirmation command.',
+  )
+  const cursorEventsAfterReconcile = await readCursorEvents()
+  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'process-start').length, cursorEventsBeforeReconcile.filter(event => event.type === 'process-start').length, 'Reconciliation started a Cursor process.')
+  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'load').length, cursorEventsBeforeReconcile.filter(event => event.type === 'load').length, 'Reconciliation loaded the provider session.')
+  assert.equal(cursorEventsAfterReconcile.filter(event => event.type === 'prompt').length, cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length, 'Reconciliation replayed or submitted a provider prompt.')
+
+  await stopHost()
+  const durablePlatform = await startHost()
+  const durableConfirmationHistory = await durablePlatform.sessions.history(recoverySession.sessionId)
+  const durableConfirmationEvents = durableConfirmationHistory.records.map(record => record.event ?? record)
+  assert.ok(
+    durableConfirmationEvents.some(event => event.type === 'command/run' && JSON.stringify(event).includes(operationId)),
+    'The invoking Session confirmation did not survive a Host restart.',
+  )
+  await durablePlatform.sessions.prompt(cursorSession.sessionId, 'synthetic provider turn after explicit reconciliation', 'queue')
+  const postReconcileHistory = await waitForHistoryText(durablePlatform, cursorSession.sessionId, 'cursor-fixture-response-3')
+  assert.ok(
+    JSON.stringify(postReconcileHistory.records).includes('synthetic provider turn after explicit reconciliation'),
+    'The post-reconciliation prompt was not retained in the recovered Session.',
+  )
+  assert.ok(
+    !JSON.stringify(postReconcileHistory.records).includes('cursor-fixture-response-2'),
+    'The previously uncertain provider response was replayed into Session history.',
+  )
+
+  const cursorEventsAfterResume = await readCursorEvents()
+  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'new').length, 1, 'Recovery created a replacement Cursor ACP session instead of reusing the original.')
+  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'load').length, cursorEventsBeforeReconcile.filter(event => event.type === 'load').length + 1, 'Recovery did not resume the original Cursor ACP session exactly once.')
+  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'prompt').length, cursorEventsBeforeReconcile.filter(event => event.type === 'prompt').length + 1, 'Recovery replayed the uncertain prompt instead of submitting only the new prompt.')
+  assert.equal(cursorEventsAfterResume.filter(event => event.type === 'response').length, cursorEventsBeforeReconcile.filter(event => event.type === 'response').length + 1, 'The post-reconciliation Cursor prompt did not produce exactly one response.')
+  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`)
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`${redactHostOutput(message)}\n`)
