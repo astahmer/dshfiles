@@ -1,0 +1,46 @@
+import type { ParentQuestionAgent, ParentQuestionOutcome, ParentQuestionService } from './service.js'
+import type { ParentQuestionRecord } from './store.js'
+
+export const askParentQuestion = async (input: {
+  readonly service: ParentQuestionService
+  readonly agent: ParentQuestionAgent
+  readonly operationId: string
+  readonly question: string
+  readonly context?: string
+  readonly options: ParentQuestionRecord['options']
+  readonly timeoutMs: number
+  readonly signal: AbortSignal
+}): Promise<ParentQuestionOutcome> => {
+  const receipt = await input.service.request({
+    agent: input.agent,
+    operationId: input.operationId,
+    question: input.question,
+    ...input.context === undefined ? {} : { context: input.context },
+    options: input.options,
+    timeoutMs: input.timeoutMs,
+    signal: input.signal,
+  })
+  return input.service.wait({ agent: input.agent, questionId: receipt.questionId, signal: input.signal })
+}
+
+export const reattachParentQuestion = (input: {
+  readonly service: ParentQuestionService
+  readonly agent: ParentQuestionAgent
+  readonly questionId: string
+  readonly signal: AbortSignal
+}): Promise<ParentQuestionOutcome> => input.service.wait({
+  agent: input.agent,
+  questionId: input.questionId,
+  signal: input.signal,
+})
+
+export const answerParentQuestion = (input: {
+  readonly service: ParentQuestionService
+  readonly agent: ParentQuestionAgent
+  readonly questionId: string
+  readonly answer: string
+}): Promise<ParentQuestionOutcome> => input.service.answer({
+  agent: input.agent,
+  questionId: input.questionId,
+  answer: input.answer,
+})

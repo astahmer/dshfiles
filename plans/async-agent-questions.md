@@ -351,13 +351,16 @@ projection; do not invent a second question engine in a plugin.
 
 ### Phase 2 — plugin after Host support
 
-The Host contract now passes focused service/storage checks and a fresh scratch
-Host activation. Add the thin child `ask_parent_question` tool and an authorized
-parent answer action that calls the Host service after the parent uses the
-native `ask_user_question` path. Add recommended defaults or workspace files
-only if the Host exposes those as explicit outcomes. Test two concurrent child
-questions, wrong-parent answers, cancellation, parent shutdown, timeout, and
-restart before profile adoption.
+The Host contract and thin child `ask_parent_question` tool now pass focused
+service/storage checks, a fresh scratch Host activation, and focused tool build
+and type checks. The direct parent uses `answer_parent_question` after deciding
+or after asking a human with native `ask_user_question`. Two concurrent
+questions, wrong-parent answers, cancellation, timeout, and service recreation
+are covered. Host shutdown interrupts the waiter without cancelling the durable
+row; a restarted service can answer and reattach. The tool reports expiry
+without selecting a default or writing a deferred file because neither outcome
+is part of the Host contract yet. Do not adopt in a profile until the remaining
+browser and process-restart acceptance gates pass.
 
 ## Open questions
 
@@ -388,7 +391,7 @@ Still open while building:
 - [x] Host provides a durable parent-scoped question id and correlated answer
       wait with sender validation, cancellation, and restart recovery.
 - [x] Concurrent child questions cannot consume each other's answers.
-- [ ] Only after the Host contract passes, the child tool calls it without
+- [x] Only after the Host contract passes, the child tool calls it without
       registering a second human question projection.
 - [x] No plugin timer or unrelated parent message is treated as an answer.
 

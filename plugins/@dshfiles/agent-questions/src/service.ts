@@ -400,9 +400,9 @@ export const createParentQuestionService = (input: {
     close: async () => {
       if (closed) return
       closed = true
-      const interrupted = new Error('Parent question wait was interrupted by Host shutdown.')
-      for (const questionWaiters of waiters.values()) {
-        for (const waiter of questionWaiters) waiter.reject(interrupted)
+      for (const [questionId, questionWaiters] of waiters.entries()) {
+        const outcome: ParentQuestionOutcome = { kind: 'interrupted', questionId }
+        for (const waiter of questionWaiters) waiter.resolve(outcome)
       }
       waiters.clear()
     },

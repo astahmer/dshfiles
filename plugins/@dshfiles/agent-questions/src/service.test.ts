@@ -5,6 +5,7 @@ import {
   type ParentQuestionRuntime,
 } from './service.js'
 import type { ParentQuestionRecord, ParentQuestionTable } from './store.js'
+import { answerParentQuestion, askParentQuestion, reattachParentQuestion } from './tool-flow.js'
 
 const createMemoryTable = (): ParentQuestionTable => {
   const records = new Map<string, ParentQuestionRecord>()
@@ -200,6 +201,42 @@ describe('parent question Host contract', () => {
     })
     expect(recovered).toEqual(answer)
     await resumedService.close()
+  })
+
+  it('interrupts Host waiters without cancelling their durable question', async () => {
+    const table = createMemoryTable()
+    const firstService = makeService(table)
+    const input = requestInput({})
+    const waiting = askParentQuestion({ service: firstService, ...input })
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    await firstService.close()
+    const interrupted = await waiting
+    expect(interrupted.kind).toBe('interrupted')
+    if (interrupted.kind !== 'interrupted') throw new Error('Host shutdown must interrupt the parent question wait.')
+    expect(Array.from(table.entries()).map(([, record]) => record.status)).toEqual(['pending'])
+
+    const restartedService = makeService(table)
+    const answer = await answerParentQuestion({
+      service: restartedService,
+      agent: root,
+      questionId: interrupted.questionId,
+      answer: 'The durable wait can reattach after Host recreation.',
+    })
+    const recovered = await reattachParentQuestion({
+      service: restartedService,
+      agent: firstChild,
+      questionId: interrupted.questionId,
+      signal: new AbortController().signal,
+    })
+
+    expect(answer.kind).toBe('answered')
+    expect(recovered).toEqual({
+      kind: 'answered',
+      questionId: interrupted.questionId,
+      answer: 'The durable wait can reattach after Host recreation.',
+    })
+    await restartedService.close()
   })
 
   it('cancels the durable request when the child cancels its wait', async () => {

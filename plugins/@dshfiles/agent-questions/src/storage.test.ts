@@ -81,10 +81,9 @@ describe('parent question JSON storage', () => {
         questionId: receipt.questionId,
         signal: new AbortController().signal,
       })
-      const interrupted = expect(waiting).rejects.toThrow('interrupted by Host shutdown')
       await setImmediate()
       await firstService.close()
-      await interrupted
+      await expect(waiting).resolves.toEqual({ kind: 'interrupted', questionId: receipt.questionId })
       expect([...first.table.entries()].find(([, record]) => record.questionId === receipt.questionId)?.[1].status)
         .toBe('pending')
       await first.domain.close()
