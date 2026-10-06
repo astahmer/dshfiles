@@ -27,6 +27,38 @@ const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
 export const Config = projectChecksConfigSchema
 
 type ProcessFailure = 'spawn-failed' | 'process-group-failed' | 'cancelled' | 'timed-out'
+type ReceiptStage =
+  | 'resolve-session-paths'
+  | 'capture-source-revision-before'
+  | 'run-command'
+  | 'capture-source-revision-after'
+  | 'persist-receipt'
+  | 'list-receipts'
+  | 'materialize-receipts'
+type ApiDiagnosticOperation = 'manual-run' | 'verification-run' | 'list-receipts'
+
+const safeErrorCode = (cause: unknown): string | null => {
+  if (!(cause instanceof Error) || !('code' in cause)) return null
+  const code = cause.code
+  if (typeof code !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(code)) return null
+  return code
+}
+
+const reportApiFailure = (
+  operation: ApiDiagnosticOperation,
+  diagnosticId: string,
+  stage: ReceiptStage,
+  cause: unknown,
+): void => {
+  console.error('Project Checks API operation failed', {
+    api: 'project-checks',
+    operation,
+    diagnosticId,
+    stage,
+    errorType: cause instanceof Error ? cause.name.slice(0, 64) : typeof cause,
+    errorCode: safeErrorCode(cause),
+  })
+}
 
 interface ProcessResult {
   readonly exitCode: number | null
@@ -70,10 +102,35 @@ const sessionPaths = async (ctx: Context, sessionId: string, action: ProjectActi
   return { root, cwd }
 }
 
-const storageFor = async (ctx: Context) => {
+const openProjectChecksDomain = (ctx: Context) => {
   const storage = ctx.get('storageDomain')
   if (storage === undefined) throw new Error('Project checks storage is unavailable.')
   return storage.open(projectChecksDomain)
+}
+
+type ProjectChecksDomain = Awaited<ReturnType<typeof openProjectChecksDomain>>
+
+const storageDomains = new WeakMap<Context, Promise<ProjectChecksDomain>>()
+
+const storageFor = (ctx: Context): Promise<ProjectChecksDomain> => {
+  const existing = storageDomains.get(ctx)
+  if (existing !== undefined) return existing
+  const opening = Promise.resolve().then(() => openProjectChecksDomain(ctx))
+  storageDomains.set(ctx, opening)
+  void opening.catch(() => {
+    if (storageDomains.get(ctx) === opening) storageDomains.delete(ctx)
+  })
+  return opening
+}
+
+const closeProjectChecksDomain = async (ctx: Context): Promise<void> => {
+  const opening = storageDomains.get(ctx)
+  if (opening === undefined) return
+  try {
+    await opening.then(domain => domain.close(), () => undefined)
+  } finally {
+    if (storageDomains.get(ctx) === opening) storageDomains.delete(ctx)
+  }
 }
 
 const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<StoredReceipt[]> => {
@@ -167,51 +224,62 @@ const sourceRevision = async (ctx: Context, cwd: string, signal?: AbortSignal): 
 }
 
 const runAction = async (ctx: Context, sessionId: string, action: ProjectAction, options: ReceiptOptions): Promise<StoredReceipt> => {
-  const paths = await sessionPaths(ctx, sessionId, action)
-  const startedAt = Date.now()
-  const beforeRevision = await sourceRevision(ctx, paths.cwd, options.signal)
-  let status: StoredReceipt['status'] = 'failed'
-  let failure: StoredReceipt['failure'] = null
-  let exitCode: number | null = null
-  let afterRevision: string | null = beforeRevision
+  const diagnosticId = randomUUID()
+  let stage: ReceiptStage = 'resolve-session-paths'
+  try {
+    const paths = await sessionPaths(ctx, sessionId, action)
+    const startedAt = Date.now()
+    stage = 'capture-source-revision-before'
+    const beforeRevision = await sourceRevision(ctx, paths.cwd, options.signal)
+    let status: StoredReceipt['status'] = 'failed'
+    let failure: StoredReceipt['failure'] = null
+    let exitCode: number | null = null
+    let afterRevision: string | null = beforeRevision
 
-  if (options.requireRevision && beforeRevision === null) {
-    failure = 'revision-unavailable'
-  } else {
-    const result = await runManaged(ctx, action.command, action.args, paths.cwd, action.timeoutMs, options.signal)
-    exitCode = result.exitCode
-    if (result.failure === 'cancelled') status = 'cancelled'
-    else if (result.failure === 'timed-out') status = 'timed-out'
-    else if (result.failure === 'process-group-failed') failure = 'process-group-failed'
-    else if (result.failure === 'spawn-failed') failure = 'spawn-failed'
-    else status = result.exitCode === 0 ? 'passed' : 'failed'
+    if (options.requireRevision && beforeRevision === null) {
+      failure = 'revision-unavailable'
+    } else {
+      stage = 'run-command'
+      const result = await runManaged(ctx, action.command, action.args, paths.cwd, action.timeoutMs, options.signal)
+      exitCode = result.exitCode
+      if (result.failure === 'cancelled') status = 'cancelled'
+      else if (result.failure === 'timed-out') status = 'timed-out'
+      else if (result.failure === 'process-group-failed') failure = 'process-group-failed'
+      else if (result.failure === 'spawn-failed') failure = 'spawn-failed'
+      else status = result.exitCode === 0 ? 'passed' : 'failed'
 
-    afterRevision = await sourceRevision(ctx, paths.cwd, options.signal)
-    if (status === 'passed' && beforeRevision !== null && afterRevision !== beforeRevision) {
-      status = 'failed'
-      failure = 'source-changed'
+      stage = 'capture-source-revision-after'
+      afterRevision = await sourceRevision(ctx, paths.cwd, options.signal)
+      if (status === 'passed' && beforeRevision !== null && afterRevision !== beforeRevision) {
+        status = 'failed'
+        failure = 'source-changed'
+      }
     }
-  }
 
-  const finishedAt = Date.now()
-  const receipt: StoredReceipt = {
-    id: randomUUID(),
-    sessionId,
-    actionId: action.id,
-    label: action.label,
-    status,
-    failure,
-    startedAt,
-    finishedAt,
-    durationMs: Math.max(0, finishedAt - startedAt),
-    exitCode,
-    sourceRevision: afterRevision,
-    verificationTurn: options.verificationTurn,
-    automatic: options.automatic,
-    attempt: options.attempt,
+    const finishedAt = Date.now()
+    const receipt: StoredReceipt = {
+      id: diagnosticId,
+      sessionId,
+      actionId: action.id,
+      label: action.label,
+      status,
+      failure,
+      startedAt,
+      finishedAt,
+      durationMs: Math.max(0, finishedAt - startedAt),
+      exitCode,
+      sourceRevision: afterRevision,
+      verificationTurn: options.verificationTurn,
+      automatic: options.automatic,
+      attempt: options.attempt,
+    }
+    stage = 'persist-receipt'
+    await persistReceipt(ctx, receipt)
+    return receipt
+  } catch (cause) {
+    reportApiFailure(options.automatic ? 'verification-run' : 'manual-run', diagnosticId, stage, cause)
+    throw cause
   }
-  await persistReceipt(ctx, receipt)
-  return receipt
 }
 
 const apiActions = async (ctx: Context, sessionId: string) => {
@@ -235,27 +303,35 @@ const apiActions = async (ctx: Context, sessionId: string) => {
 }
 
 const apiReceipts = async (ctx: Context, sessionId: string) => {
-  const receipts = await readStoredReceipts(ctx, sessionId)
-  const actions = configFor(ctx).actions
-  const revisions = new Map<string, Promise<string | null>>()
-  return Promise.all(
-    receipts.map(async receipt => {
-      const action = actions.find(candidate => candidate.id === receipt.actionId)
-      if (action === undefined) return { ...receipt, freshness: 'unknown' as const }
-      let revision = revisions.get(action.root)
-      if (revision === undefined) {
-        revision = (async () => {
-          try {
-            return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
-          } catch {
-            return null
-          }
-        })()
-        revisions.set(action.root, revision)
-      }
-      return { ...receipt, freshness: receiptFreshness(receipt.sourceRevision, await revision) }
-    }),
-  )
+  const diagnosticId = randomUUID()
+  let stage: ReceiptStage = 'list-receipts'
+  try {
+    const receipts = await readStoredReceipts(ctx, sessionId)
+    const actions = configFor(ctx).actions
+    const revisions = new Map<string, Promise<string | null>>()
+    stage = 'materialize-receipts'
+    return await Promise.all(
+      receipts.map(async receipt => {
+        const action = actions.find(candidate => candidate.id === receipt.actionId)
+        if (action === undefined) return { ...receipt, freshness: 'unknown' as const }
+        let revision = revisions.get(action.root)
+        if (revision === undefined) {
+          revision = (async () => {
+            try {
+              return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
+            } catch {
+              return null
+            }
+          })()
+          revisions.set(action.root, revision)
+        }
+        return { ...receipt, freshness: receiptFreshness(receipt.sourceRevision, await revision) }
+      }),
+    )
+  } catch (cause) {
+    reportApiFailure('list-receipts', diagnosticId, stage, cause)
+    throw cause
+  }
 }
 
 const hookEvents = async (ctx: Context, sessionId: string): Promise<ProjectHookEvent[]> => {
@@ -336,6 +412,7 @@ export default defineHost({
   apis: [hostApi],
   setup: ctx => {
     const config = configFor(ctx)
+    ctx.effect(() => async () => closeProjectChecksDomain(ctx), 'Project Checks receipt domain')
     if (!config.actions.some(action => action.verifyBeforeComplete)) return
 
     ctx.on('agent/turn-stopping', async ({ agent, turn, signal }) => {
