@@ -1,5 +1,5 @@
 import type { ParentQuestionAgent, ParentQuestionOutcome, ParentQuestionService } from './service.js'
-import type { ParentQuestionRecord } from './store.js'
+import type { ParentQuestionExpiryBehavior, ParentQuestionRecord } from './store.js'
 
 export const askParentQuestion = async (input: {
   readonly service: ParentQuestionService
@@ -8,6 +8,8 @@ export const askParentQuestion = async (input: {
   readonly question: string
   readonly context?: string
   readonly options: ParentQuestionRecord['options']
+  readonly recommendedOptionId: string
+  readonly expiryBehavior: ParentQuestionExpiryBehavior
   readonly timeoutMs: number
   readonly signal: AbortSignal
 }): Promise<ParentQuestionOutcome> => {
@@ -17,6 +19,8 @@ export const askParentQuestion = async (input: {
     question: input.question,
     ...input.context === undefined ? {} : { context: input.context },
     options: input.options,
+    recommendedOptionId: input.recommendedOptionId,
+    expiryBehavior: input.expiryBehavior,
     timeoutMs: input.timeoutMs,
     signal: input.signal,
   })

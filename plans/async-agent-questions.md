@@ -127,15 +127,15 @@ flowchart LR
 
 ### Operations / behavior
 
-| Operation | Installed DSH 0.2.0-rc.2 behavior |
-|-----------|-----------------------------------|
+| Operation | Behavior |
+|-----------|----------|
 | Root asks in legacy mode | Tool blocks on the native `userQuestions` service. |
 | Root asks in timed mode with `timeout: -1` | Tool blocks until the answer arrives. |
 | Root asks in timed mode with a positive timeout | Returns `{ pending: true, callId }` after the foreground wait; root agent continues and the question remains answerable. |
 | Human answers a pending root question | Native question service routes the answer through the existing root question path. Source contract verified; interactive UI acceptance remains open. |
-| Subagent sends a question to its parent | `sendMessage()` accepts one-way inbox delivery and returns `MessageId`. |
-| Parent answers the child | No correlated answer path exists; the child cannot receive that answer as its pending tool result. |
-| Child question expires or is deferred | No child question lifecycle or expiry policy exists in the installed Host. |
+| Subagent sends a question to its parent | The plugin persists a direct-parent question with a durable id, then uses one-way inbox delivery as the notification and wakeup; the durable row remains the source of truth. |
+| Parent answers the child | `answer_parent_question` verifies the exact live parent and stores the answer against the question id; the matching child wait resolves. |
+| Child question expires or is deferred | Every new request selects a valid recommendation and `recommended` or `defer`; defer writes and records a private workspace Markdown file. Legacy version-1 rows expire without a new default. |
 
 ### Tech choices
 
@@ -143,16 +143,16 @@ flowchart LR
 |--------|----------|-----------|
 | Add root `mode`/`timeout` support | No | Installed `dsh-tool-ask-user` already provides opt-in timed mode and foreground timeout. Configure the native row only after isolated acceptance. |
 | Reuse `ask_user_question` for async | Yes, for the root agent | Renaming breaks the Host projection and the UI tool row; reusing the name keeps the card, countdown, late-reply and review paths intact |
-| Separate tool `ask_parent_question` for subagents | Deferred | The Host has no correlated reply wait, answer persistence, or restart recovery. A plugin cannot provide honest blocking semantics over one-way inbox delivery. |
+| Separate tool `ask_parent_question` for subagents | Yes | The Host-owned Storage Domain correlates a direct parent's answer to one durable child question; inbox delivery is only the wakeup. |
 | Route a child question through `ctx.userQuestions` | No | That seam asserts a live root and is coupled to the Web card + projection. A subagent question is agent-facing, not human-facing. |
 | Reuse `@dshfiles/agent-communication` for parent routing | No | It targets independent peers with durable topics and an allowlist for steering. Parent routing is a direct in-runtime relationship with no durability requirement. |
 | Force a `recommended` answer for root timed questions | No | Native timed questions stay open for a human answer; they do not auto-resolve on foreground timeout. |
-| Fork DSH core for child questions | No for the scoped Host contract | A Host-only DSHX bundle can own durable identity, sender validation, and recovery through Storage Domain; `sendMessage` remains a wakeup only. The end-to-end answer action is still Phase 2. |
+| Fork DSH core for child questions | No for the scoped Host contract | A Host-only DSHX bundle owns durable identity, sender validation, correlated answers, and expiry through Storage Domain; `sendMessage` remains a notification, not an answer transport. |
 | Build another child composer card now | No | First establish Host-owned reply identity and lifecycle. Do not duplicate the native question UI. |
 | Deliver a child question via `ctx.subagents.sendMessage` | Notification only | `sendMessage` accepts a one-way inbox item and returns `MessageId`. It does not wait for a parent reply or reconnect that reply to the child call. |
-| Require `recommended` on child questions | Deferred | There is no child timeout/expiry lifecycle to consume such a default. Revisit only after the Host reply contract exists. |
+| Require `recommended` on child questions | Yes | Every new child request names one of its options and an explicit expiry behavior. `recommended` returns that option; `defer` writes a workspace record. Version-1 rows remain readable and expire without an invented default. |
 | Allow the parent to escalate to the human | Manual only | A parent may independently ask the root user, but the child cannot know which human answer resolves its message. |
-| Deferred questions layout | **Flat `questions/` in the workspace** | One file per deferred question, named `{iso-timestamp}_{question-slug}.md`. `ls questions/` is the index; no session nesting and no manifest to keep in sync. |
+| Deferred questions layout | **Flat `questions/` in the workspace** | One file per deferred question, named `{file-safe-iso-timestamp}_{question-slug}.md`; a stable question-id suffix resolves timestamp/slug collisions. `ls questions/` is the index; no session nesting and no manifest to keep in sync. |
 | Deferred questions location | **Workspace-relative** | A question is about this repository's work, so the file is reviewable, committable and survives a machine move, unlike a `~/.dsh` path. A later session can read the folder to pick up unanswered decisions. |
 
 ### Architecture
@@ -300,15 +300,17 @@ erDiagram
     }
 
     DEFERRED_QUESTION {
-        ToolCallId callId PK
+        string questionId PK
         string sessionId FK
         string agentId
-        AskUserQuestionItem questions
-        string recommendedLabel
+        AskUserQuestionItem question
+        string recommendedOptionId
+        string expiryBehavior
         string context
-        string status "open | answered | dropped"
-        string filePath
-        datetime writtenAt
+        string status "deferred"
+        string relativeFilePath
+        datetime createdAt
+        datetime deferredAt
     }
 
     CHILD_ANSWER {
@@ -322,7 +324,9 @@ erDiagram
 `DEFERRED_QUESTION` is durable state the plugin owns; the DSH `userQuestions`
 projection owns `PENDING_QUESTION` and stays untouched. `DEFERRED_QUESTION` has
 no session folder in its path: it is flat under the workspace `questions/`, with
-`sessionId` recorded in the file body.
+`sessionId` recorded in the file body. Its file is an open decision record and
+not a separate answer transport; a later edit does not deliver a child-tool
+response.
 
 ## Implementation steps
 
@@ -394,6 +398,12 @@ Still open while building:
 - [x] Only after the Host contract passes, the child tool calls it without
       registering a second human question projection.
 - [x] No plugin timer or unrelated parent message is treated as an answer.
+- [x] Every new child question names an existing recommended option and an
+      explicit `recommended` or `defer` expiry behavior.
+- [x] Version-1 pending questions remain readable and expire without selecting
+      a new default.
+- [x] Deferred outcomes persist their file path, reattach idempotently, reject
+      path changes, and never overwrite an edited or symlinked file.
 
 ## Decisions log
 

@@ -2,8 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import {
+  deferredFilePathSchema,
+  parentQuestionExpiryBehaviorSchema,
   parentQuestionRecordSchema,
   parentQuestionOptionsSchema,
+  type ParentQuestionExpiryBehavior,
   type ParentQuestionRecord,
   type ParentQuestionTable,
 } from './store.js'
@@ -13,8 +16,18 @@ const requestInputSchema = z.object({
   question: z.string().trim().min(1).max(4_000),
   context: z.string().max(16_000).optional(),
   options: parentQuestionOptionsSchema,
+  recommendedOptionId: z.string().trim().min(1).max(80),
+  expiryBehavior: parentQuestionExpiryBehaviorSchema,
   timeoutMs: z.number().int().min(1_000).max(3_600_000),
-}).strict()
+}).strict().superRefine((request, context) => {
+  if (!request.options.some(option => option.id === request.recommendedOptionId)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['recommendedOptionId'],
+      message: 'The recommended option must exist in the question options.',
+    })
+  }
+})
 
 const answerInputSchema = z.string().trim().min(1).max(4_000)
 
@@ -40,6 +53,23 @@ export interface ParentQuestionRuntime {
 
 export type ParentQuestionOutcome =
   | { readonly kind: 'answered'; readonly questionId: string; readonly answer: string }
+  | {
+    readonly kind: 'recommended'
+    readonly questionId: string
+    readonly option: ParentQuestionRecord['options'][number]
+  }
+  | {
+    readonly kind: 'deferred'
+    readonly questionId: string
+    readonly childSessionId: string
+    readonly question: string
+    readonly context?: string
+    readonly options: ParentQuestionRecord['options']
+    readonly recommendedOption: ParentQuestionRecord['options'][number]
+    readonly createdAt: number
+    readonly deferredAt: number
+    readonly filePath?: string
+  }
   | { readonly kind: 'cancelled' | 'expired' | 'delivery-failed' | 'interrupted'; readonly questionId: string }
 
 export interface ParentQuestionReceipt {
@@ -55,6 +85,8 @@ export interface ParentQuestionService {
     readonly question: string
     readonly context?: string
     readonly options: ParentQuestionRecord['options']
+    readonly recommendedOptionId: string
+    readonly expiryBehavior: ParentQuestionExpiryBehavior
     readonly timeoutMs: number
     readonly signal: AbortSignal
   }): Promise<ParentQuestionReceipt>
@@ -71,6 +103,11 @@ export interface ParentQuestionService {
   cancel(input: {
     readonly agent: ParentQuestionAgent
     readonly questionId: string
+  }): Promise<ParentQuestionOutcome>
+  recordDeferredFile(input: {
+    readonly agent: ParentQuestionAgent
+    readonly questionId: string
+    readonly filePath: string
   }): Promise<ParentQuestionOutcome>
   close(): Promise<void>
 }
@@ -107,6 +144,28 @@ const outcomeOf = (record: ParentQuestionRecord): ParentQuestionOutcome => {
   if (record.status === 'answered') {
     if (record.answer === undefined) throw new Error('An answered question has no answer.')
     return { kind: 'answered', questionId: record.questionId, answer: record.answer }
+  }
+  if (record.status === 'recommended' || record.status === 'deferred') {
+    if (record.recommendedOptionId === undefined) {
+      throw new Error('A question outcome has no recommended option.')
+    }
+    const recommendedOption = record.options.find(option => option.id === record.recommendedOptionId)
+    if (recommendedOption === undefined) throw new Error('A question outcome has an unknown recommended option.')
+    if (record.status === 'recommended') {
+      return { kind: 'recommended', questionId: record.questionId, option: recommendedOption }
+    }
+    return {
+      kind: 'deferred',
+      questionId: record.questionId,
+      childSessionId: record.childSessionId,
+      question: record.question,
+      ...record.context === undefined ? {} : { context: record.context },
+      options: record.options,
+      recommendedOption,
+      createdAt: record.createdAt,
+      deferredAt: record.updatedAt,
+      ...record.deferredFilePath === undefined ? {} : { filePath: record.deferredFilePath },
+    }
   }
   if (record.status === 'pending') throw new Error('A pending question has no terminal outcome.')
   return { kind: record.status, questionId: record.questionId }
@@ -189,7 +248,15 @@ export const createParentQuestionService = (input: {
     table: ParentQuestionTable,
     key: string,
     record: ParentQuestionRecord,
-  ): Promise<ParentQuestionRecord> => settle(table, key, record.questionId, 'expired')
+  ): Promise<ParentQuestionRecord> => {
+    if (record.expiryBehavior === 'recommended' && record.recommendedOptionId !== undefined) {
+      return settle(table, key, record.questionId, 'recommended')
+    }
+    if (record.expiryBehavior === 'defer' && record.recommendedOptionId !== undefined) {
+      return settle(table, key, record.questionId, 'deferred')
+    }
+    return settle(table, key, record.questionId, 'expired')
+  }
 
   const findAuthorizedChildQuestion = async (
     agent: ParentQuestionAgent,
@@ -263,6 +330,8 @@ export const createParentQuestionService = (input: {
         question: request.question,
         ...request.context === undefined ? {} : { context: request.context },
         options: request.options,
+        recommendedOptionId: request.recommendedOptionId,
+        expiryBehavior: request.expiryBehavior,
         timeoutMs: request.timeoutMs,
       })
       const parentSessionId = input.runtime.parentSessionId(request.agent.id)
@@ -282,7 +351,10 @@ export const createParentQuestionService = (input: {
             || record.childSessionId !== request.agent.id
             || record.question !== parsed.question
             || record.context !== parsed.context
-            || JSON.stringify(record.options) !== JSON.stringify(parsed.options)) {
+            || JSON.stringify(record.options) !== JSON.stringify(parsed.options)
+            || (record.recommendedOptionId !== undefined
+              && (record.recommendedOptionId !== parsed.recommendedOptionId
+                || record.expiryBehavior !== parsed.expiryBehavior))) {
             throw new Error('Question operation id was reused with different input.')
           }
           if (record.status !== 'pending' || record.notificationMessageId !== undefined) return receiptOf(record)
@@ -310,6 +382,8 @@ export const createParentQuestionService = (input: {
             question: parsed.question,
             ...parsed.context === undefined ? {} : { context: parsed.context },
             options: parsed.options,
+            recommendedOptionId: parsed.recommendedOptionId,
+            expiryBehavior: parsed.expiryBehavior,
             status: 'pending',
             createdAt: timestamp,
             expiresAt: timestamp + parsed.timeoutMs,
@@ -396,6 +470,28 @@ export const createParentQuestionService = (input: {
         return outcomeOf(await settleExpired(found.table, found.key, found.record))
       }
       return outcomeOf(await settle(found.table, found.key, cancelRequest.questionId, 'cancelled'))
+    },
+    recordDeferredFile: async fileRequest => {
+      assertOpen()
+      const filePath = deferredFilePathSchema.parse(fileRequest.filePath)
+      return runWithLock(operationLocks, `deferred-file:${fileRequest.questionId}`, async () => {
+        const found = await findAuthorizedChildQuestion(fileRequest.agent, fileRequest.questionId)
+        if (found.record.status !== 'deferred') {
+          throw new Error(`Parent question is ${found.record.status}; only deferred questions can attach a file.`)
+        }
+        if (found.record.deferredFilePath !== undefined && found.record.deferredFilePath !== filePath) {
+          throw new Error('Deferred question already has a different file path.')
+        }
+        const updated = await found.table.update(found.key, current => {
+          if (current.questionId !== fileRequest.questionId || current.status !== 'deferred') return current
+          if (current.deferredFilePath !== undefined && current.deferredFilePath !== filePath) {
+            throw new Error('Deferred question already has a different file path.')
+          }
+          return parentQuestionRecordSchema.parse({ ...current, deferredFilePath: filePath })
+        })
+        if (updated.status !== 'deferred') throw new Error(`Parent question is ${updated.status}.`)
+        return outcomeOf(updated)
+      })
     },
     close: async () => {
       if (closed) return

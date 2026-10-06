@@ -4,7 +4,11 @@ import {
   type ParentQuestionAgent,
   type ParentQuestionRuntime,
 } from './service.js'
-import type { ParentQuestionRecord, ParentQuestionTable } from './store.js'
+import type {
+  ParentQuestionExpiryBehavior,
+  ParentQuestionRecord,
+  ParentQuestionTable,
+} from './store.js'
 import { answerParentQuestion, askParentQuestion, reattachParentQuestion } from './tool-flow.js'
 
 const createMemoryTable = (): ParentQuestionTable => {
@@ -68,6 +72,8 @@ const requestInput = (input: {
   readonly agent?: ParentQuestionAgent
   readonly operationId?: string
   readonly question?: string
+  readonly recommendedOptionId?: string
+  readonly expiryBehavior?: ParentQuestionExpiryBehavior
   readonly timeoutMs?: number
 }) => ({
   agent: input.agent ?? firstChild,
@@ -78,6 +84,8 @@ const requestInput = (input: {
     { id: 'expand-contract', label: 'Expand and contract' },
     { id: 'direct', label: 'Replace in one migration' },
   ],
+  recommendedOptionId: input.recommendedOptionId ?? 'expand-contract',
+  expiryBehavior: input.expiryBehavior ?? 'recommended',
   timeoutMs: input.timeoutMs ?? 30_000,
   signal: new AbortController().signal,
 })
@@ -93,6 +101,18 @@ describe('parent question Host contract', () => {
 
     expect(duplicate).toEqual(first)
     expect(table.size).toBe(1)
+    await service.close()
+  })
+
+  it('rejects a missing recommendation and changed expiry policy on an idempotent dispatch', async () => {
+    const service = makeService(createMemoryTable())
+    const input = requestInput({})
+
+    await expect(service.request({ ...input, recommendedOptionId: 'unknown' }))
+      .rejects.toThrow('The recommended option must exist in the question options.')
+    await service.request(input)
+    await expect(service.request({ ...input, expiryBehavior: 'defer' }))
+      .rejects.toThrow('Question operation id was reused with different input.')
     await service.close()
   })
 
@@ -259,7 +279,7 @@ describe('parent question Host contract', () => {
     await service.close()
   })
 
-  it('expires a pending request at its persisted deadline', async () => {
+  it('uses the recommended option when a question reaches its persisted deadline', async () => {
     let timestamp = 1_000_000
     const service = makeService(createMemoryTable(), () => timestamp)
     const request = await service.request(requestInput({ timeoutMs: 1_000 }))
@@ -270,7 +290,57 @@ describe('parent question Host contract', () => {
       questionId: request.questionId,
       signal: new AbortController().signal,
     })
-    expect(outcome).toEqual({ kind: 'expired', questionId: request.questionId })
+    expect(outcome).toEqual({
+      kind: 'recommended',
+      questionId: request.questionId,
+      option: { id: 'expand-contract', label: 'Expand and contract' },
+    })
+    await service.close()
+  })
+
+  it('returns deferred question data and attaches one safe relative file path', async () => {
+    let timestamp = 1_000_000
+    const table = createMemoryTable()
+    const service = makeService(table, () => timestamp)
+    const request = await service.request(requestInput({ timeoutMs: 1_000, expiryBehavior: 'defer' }))
+    timestamp += 1_000
+
+    const outcome = await service.wait({
+      agent: firstChild,
+      questionId: request.questionId,
+      signal: new AbortController().signal,
+    })
+    expect(outcome).toEqual({
+      kind: 'deferred',
+      questionId: request.questionId,
+      childSessionId: firstChild.id,
+      question: 'Which migration strategy should I use?',
+      context: 'The migration needs to preserve existing account data.',
+      options: [
+        { id: 'expand-contract', label: 'Expand and contract' },
+        { id: 'direct', label: 'Replace in one migration' },
+      ],
+      recommendedOption: { id: 'expand-contract', label: 'Expand and contract' },
+      createdAt: 1_000_000,
+      deferredAt: 1_001_000,
+    })
+
+    const filePath = 'questions/2026-10-06T10-00-00-000Z_migration.md'
+    const recorded = await service.recordDeferredFile({ agent: firstChild, questionId: request.questionId, filePath })
+    expect(recorded).toMatchObject({ kind: 'deferred', filePath })
+    await expect(service.recordDeferredFile({ agent: firstChild, questionId: request.questionId, filePath }))
+      .resolves.toEqual(recorded)
+    await expect(service.recordDeferredFile({
+      agent: firstChild,
+      questionId: request.questionId,
+      filePath: 'questions/other-question.md',
+    })).rejects.toThrow('Deferred question already has a different file path.')
+    await expect(service.recordDeferredFile({
+      agent: unrelatedAgent,
+      questionId: request.questionId,
+      filePath,
+    })).rejects.toThrow('Only the requesting direct child can read or cancel this question.')
+    expect(table.entries().next().value?.[1].deferredFilePath).toBe(filePath)
     await service.close()
   })
 

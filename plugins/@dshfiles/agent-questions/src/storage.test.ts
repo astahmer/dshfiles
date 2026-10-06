@@ -12,7 +12,7 @@ import {
   type ParentQuestionAgent,
   type ParentQuestionRuntime,
 } from './service.js'
-import { parentQuestionDomain } from './store.js'
+import { parentQuestionDomain, parentQuestionRecordSchema } from './store.js'
 
 const parent: ParentQuestionAgent = { id: 'root-session' }
 const child: ParentQuestionAgent = { id: 'child-session' }
@@ -45,10 +45,32 @@ const openQuestionStorage = async (root: string) => {
   return { context, domain, table: domain.table('questions') }
 }
 
+const legacyQuestionDomain = StorageDomain.defineDomain({
+  name: parentQuestionDomain.name,
+  version: 1,
+  layout: 'per-record',
+  tables: {
+    questions: {
+      valueSchema: parentQuestionRecordSchema,
+      __key: 'questions',
+    },
+  },
+})
+
+const openLegacyQuestionStorage = async (root: string) => {
+  const context = new Context()
+  await context.plugin(Storage)
+  await context.plugin(StorageJson, { root })
+  await context.plugin(StorageDomain, { backend: 'json' })
+  const domain = await context.storageDomain.open(legacyQuestionDomain)
+  return { context, domain, table: domain.table('questions') }
+}
+
 const createService = (
   table: Awaited<ReturnType<typeof openQuestionStorage>>['table'],
   runtime: ParentQuestionRuntime,
-) => createParentQuestionService({ table: async () => table, runtime })
+  now: () => number = Date.now,
+) => createParentQuestionService({ table: async () => table, runtime, now })
 
 describe('parent question JSON storage', () => {
   it('keeps a pending question answerable across Host shutdown and durable reopen', async () => {
@@ -73,6 +95,8 @@ describe('parent question JSON storage', () => {
           { id: 'expand-contract', label: 'Expand and contract' },
           { id: 'direct', label: 'Replace in one migration' },
         ],
+        recommendedOptionId: 'expand-contract',
+        expiryBehavior: 'recommended',
         timeoutMs: 30_000,
         signal: new AbortController().signal,
       })
@@ -128,6 +152,119 @@ describe('parent question JSON storage', () => {
       await thirdService?.close()
       await third?.domain.close()
       await third?.context.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('opens v1 pending rows and keeps their no-default expiry semantics', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-agent-questions-v1-'))
+    let legacy: Awaited<ReturnType<typeof openLegacyQuestionStorage>> | undefined
+    let current: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+    let service: ReturnType<typeof createService> | undefined
+    const questionId = '00000000-0000-4000-8000-000000000001'
+
+    try {
+      legacy = await openLegacyQuestionStorage(root)
+      await legacy.table.put('legacy-question', {
+        questionId,
+        parentSessionId: parent.id,
+        childSessionId: child.id,
+        operationId: 'legacy-operation',
+        question: 'Continue the older request?',
+        options: [
+          { id: 'continue', label: 'Continue' },
+          { id: 'stop', label: 'Stop' },
+        ],
+        status: 'pending',
+        createdAt: 1_000,
+        expiresAt: 2_000,
+        updatedAt: 1_000,
+      })
+      await legacy.domain.close()
+      await legacy.context.fiber.dispose()
+      legacy = undefined
+
+      current = await openQuestionStorage(root)
+      const currentRuntime = createRuntime()
+      service = createService(current.table, currentRuntime.runtime, () => 2_000)
+      const outcome = await service.wait({
+        agent: currentRuntime.child,
+        questionId,
+        signal: new AbortController().signal,
+      })
+
+      expect(outcome).toEqual({ kind: 'expired', questionId })
+      expect([...current.table.entries()][0]?.[1].status).toBe('expired')
+    } finally {
+      await service?.close()
+      await current?.domain.close()
+      await current?.context.fiber.dispose()
+      await legacy?.domain.close()
+      await legacy?.context.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reattaches to a deferred outcome and file path after JSON domain reopen', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-agent-questions-deferred-'))
+    let first: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+    let second: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+    let firstService: ReturnType<typeof createService> | undefined
+    let secondService: ReturnType<typeof createService> | undefined
+    let timestamp = 10_000
+
+    try {
+      first = await openQuestionStorage(root)
+      const firstRuntime = createRuntime()
+      firstService = createService(first.table, firstRuntime.runtime, () => timestamp)
+      const receipt = await firstService.request({
+        agent: firstRuntime.child,
+        operationId: 'deferred-question-call',
+        question: 'Which release plan should I use?',
+        options: [
+          { id: 'staged', label: 'Release in stages' },
+          { id: 'single', label: 'Release in one step' },
+        ],
+        recommendedOptionId: 'staged',
+        expiryBehavior: 'defer',
+        timeoutMs: 1_000,
+        signal: new AbortController().signal,
+      })
+      timestamp += 1_000
+      const deferred = await firstService.wait({
+        agent: firstRuntime.child,
+        questionId: receipt.questionId,
+        signal: new AbortController().signal,
+      })
+      expect(deferred.kind).toBe('deferred')
+      const attached = await firstService.recordDeferredFile({
+        agent: firstRuntime.child,
+        questionId: receipt.questionId,
+        filePath: 'questions/2026-10-06T10-00-00-000Z_release-plan.md',
+      })
+      await firstService.close()
+      await first.domain.close()
+      await first.context.fiber.dispose()
+      first = undefined
+
+      second = await openQuestionStorage(root)
+      const secondRuntime = createRuntime()
+      secondService = createService(second.table, secondRuntime.runtime, () => timestamp)
+      const recovered = await secondService.wait({
+        agent: secondRuntime.child,
+        questionId: receipt.questionId,
+        signal: new AbortController().signal,
+      })
+
+      expect(attached).toMatchObject({ kind: 'deferred', filePath: 'questions/2026-10-06T10-00-00-000Z_release-plan.md' })
+      expect(recovered).toEqual(attached)
+    } finally {
+      await firstService?.close()
+      await first?.domain.close()
+      await first?.context.fiber.dispose()
+      await secondService?.close()
+      await second?.domain.close()
+      await second?.context.fiber.dispose()
       await rm(root, { recursive: true, force: true })
     }
   })
