@@ -1,6 +1,6 @@
 # Multi-host validation
 
-Validated 2026-10-05 with fnm's official Node 22.23.3 and installed DSH 0.2.0-rc.2.
+Validated 2026-10-06 with fnm's official Node 22.23.3 and installed DSH 0.2.0-rc.2.
 
 | Check | Result |
 |---|---|
@@ -105,10 +105,14 @@ gates recorded below.
 | P3 protocol and host-key rejection | Runtime identity schema pins protocol version `1`; the focused regression check rejects version `2`. A live Pi connection through the real SSH connector and OpenSSH rejected a deliberately mismatched temporary known-host key as `host-key-rejected`; the temporary key store and wrapper were discarded without changing saved SSH trust. |
 | P3 admitted-mutation loss | Synthetic failure injection passed through `connectGateway`/`callNativeRpc`. A second live proof used the real SSH connector to Pi: a test shim read the successful remote response, dropped it before the caller received it, got `unknown-mutation-outcome`, then listed exactly one new blank session with no replay. No model ran. Three additional blank Pi scratch sessions from the two earlier exploratory calls and this proof remain in the retained scratch home. |
 | P4 browser flow | Online host switching and session creation across local and remote runtimes passed earlier. Pi persistent runtime opened in an isolated browser origin; after a stale view was closed, reopening loaded the current DSH UI and its retained workspaces and sessions. AI Accounts showed the OpenCode Go profile enabled with 30 models and credentials present in the service environment. The Go models endpoint returned HTTP 401 with the installed credential, so no model turn was accepted. Approval, upload, and terminal interaction remain unverified; VPS PTY passed through the native CLI path in P1. |
-| Engineering checks | Multi-host plugin: 6 test files / 20 tests passed, typecheck and build passed. DSHX: full suite passed with one worker (43 files / 447 tests); the focused multi-host/API set also passed (5 files / 52 tests), followed by typecheck and build. Oxfmt check passed on 42 owned/selected files. Scoped Oxlint exited 0 with 281 warning-only antislop findings and no errors; the selection includes large pre-existing DSHX CLI/API files. |
+| Engineering checks | Full root `pnpm check` passed on official Node 22.23.3. DSHX passed (43 files / 442 tests), create-dshx passed (2 files / 21 tests), all 12 plugin bundles passed contract, build, typecheck, and test checks, and the offline boot check activated all 12. Knip passed; Oxlint exited 0 with warning-only antislop findings and no errors; Oxfmt matched all 405 files. |
 | P5 second machine | Passed: official Node 24.20.0 ARM64 was signature-checked and used for Pi; VPS x64 and two isolated local runtimes were online concurrently. Pi package install used prebuilt artifacts with lifecycle scripts disabled. |
 | P5 profile source | Isolated nixfiles workspace contains one owned bundle and patch row; the local link resolves to this plugin and package name matches. Scratch `--dump-config` saw the patch row, but activation was skipped because the scratch profile had no `node_modules`. This remains source-composition evidence only; shared web profile was not edited or restarted. |
 | P5 durable deployment | Partial: `home-infra-dsh-pi-runtime` now pins release `2026-10-06-dsh-0.2.0-rc.2-1a3edab5` to source change `1a3edab54f52` and deploys the persistent Pi service as a systemd user unit. The release staged from official ARM64 artifacts and activated successfully; rollback behavior has not been exercised. |
 | P5 provider credential | Alias `opencode-go-pi` maps to `OPENCODE_GO_PI`; the deployment helper writes it as `OPENCODE_API_KEY` in the protected runtime environment file. The account profile renders as authenticated because the environment variable is present, but the Go models endpoint returned HTTP 401 with the installed key and Pi session/user-agent headers. Credential acceptance and any model turn remain unverified. |
 
 Persistent Pi systemd user service remains active on the pinned release; the T3 manager remains open. The Pi runtime view was closed and reopened during validation. Remote journals and test homes remain retained; no shared DSH 3080 process or original VPS runtime was touched.
+
+The full plugin check now builds bundles before running tests that import their
+built entries. It also restores the shortcuts keyboard suite; that regression
+coverage caught and fixed checkbox targets being treated as editable fields.

@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "dshx build",
-    "test": "vitest run",
+    "test": "vitest run --environment jsdom",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
