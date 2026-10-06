@@ -358,6 +358,7 @@ const request = async <Item>({
   const paths = endpointPaths(project.packageId, env)
   const { metadata } = await readMetadata(paths.metadataPath, project, paths.socketPath)
   const requestId = `inspect-${randomUUID()}`
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const payload =
     JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
   const value = await requestJsonLine(paths.socketPath, payload, {

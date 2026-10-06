@@ -735,7 +735,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       name,
       description,
       event,
-      file,
       root,
       explain,
       boot,
@@ -917,7 +916,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError(`A command is required: ${Object.keys(cliSubCommands).join(', ')}.`)
   }
   return {
-    ...(command === undefined ? {} : { command }),
+    command,
     explain: explain === true,
     boot: boot === true,
     ...(inspectTarget === undefined ? {} : { inspectTarget }),

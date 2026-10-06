@@ -18,7 +18,7 @@ describe('create-dshx', () => {
     const output = new PassThrough()
     const chunks: Buffer[] = []
     output.on('data', chunk => chunks.push(Buffer.from(chunk)))
-    const exitCode = await runCreate(['--package-manager', 'pnpm', '--help'], { stdout: output, stderr: output })
+    const exitCode = await runCreate(['--help'], { stdout: output, stderr: output })
     output.end()
 
     expect(exitCode).toBe(0)
