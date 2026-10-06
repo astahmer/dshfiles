@@ -3,7 +3,7 @@ import { access, realpath } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import type { DevProjectWatcher } from './types.js'
 
-/** Watch exact project files and normalize atomic editor saves across platforms. */
+/** Watch file identities through their parent directories so atomic replacements remain observable. */
 export async function watchProjectFiles(files: readonly string[], onChange: (file: string) => void): Promise<DevProjectWatcher> {
   const watchedFiles = new Map<string, string>()
   const watchedDirectories = new Set<string>()
@@ -44,7 +44,7 @@ export async function watchProjectFiles(files: readonly string[], onChange: (fil
     async close() {
       if (closed) return
       closed = true
-      await watcher.close()
+      for (const watcher of watchers) watcher.close()
     },
   }
 }
