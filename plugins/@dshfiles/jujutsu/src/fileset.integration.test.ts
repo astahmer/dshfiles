@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
 import { buildMutationArgv, parseJsonLines, parsePatchStats, rootFileFileset } from './core.ts'
-import { revisionSchema } from './api.ts'
+import { revisionSchema, type Mutation } from './api.ts'
 import { EVOLUTION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
 import { describeDraftChanged } from './graph.ts'
 
@@ -94,4 +94,33 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
     },
   )
   assert.ok(evolution.some(row => row.commitId === described.commitId && row.predecessors.length > 0))
+})
+
+test('workspace-add creates a sibling at the chosen revision and preserves dirty source files', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspaces-'))
+  const repo = join(home, 'repo')
+  const parent = join(home, 'workspaces')
+  const destination = join(parent, 'review-at-base')
+  await mkdir(repo)
+  await mkdir(parent)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+
+  runJj(repo, home, ['git', 'init', '--no-colocate'])
+  await writeFile(join(repo, 'base.txt'), 'committed base\n')
+  runJj(repo, home, ['status'])
+  runJj(repo, home, ['describe', '--message', 'workspace base'])
+  const commitId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  await writeFile(join(repo, 'draft.txt'), 'keep in source workspace\n')
+  const sourceStatus = runJj(repo, home, ['status'])
+
+  const action: Mutation = { kind: 'workspace-add', parentPath: parent, name: 'review-at-base', commitId }
+  runJj(repo, home, buildMutationArgv(action))
+
+  assert.equal(await realpath(runJj(destination, home, ['root']).trim()), await realpath(destination))
+  assert.equal(await readFile(join(destination, 'base.txt'), 'utf8'), 'committed base\n')
+  await assert.rejects(readFile(join(destination, 'draft.txt')), { code: 'ENOENT' })
+  assert.equal(await readFile(join(repo, 'draft.txt'), 'utf8'), 'keep in source workspace\n')
+  assert.match(runJj(repo, home, ['status']), /draft\.txt/)
+  assert.match(runJj(repo, home, ['workspace', 'list']), /review-at-base/)
+  assert.match(sourceStatus, /draft\.txt/)
 })

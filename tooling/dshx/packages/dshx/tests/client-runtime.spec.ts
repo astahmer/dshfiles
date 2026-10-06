@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
-import type { LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
+import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
 import { slotContributionParts } from '../src/client/define.js'
 import { localeDefinitionParts } from '../src/client/locale.js'
 import type { ClientConversationContribution } from '../src/client/types.js'
@@ -22,6 +22,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+declare module '../src/client/index.js' {
+  interface ClientServiceMap {
+    sessions: {
+      fork(input: { readonly sessionId: string; readonly atSeq: number }): Promise<string>
+    }
+  }
+}
+
 function conversationContribution(kind = 'review-job'): ClientConversationContribution {
   return defineConversation({
     kind,
@@ -37,14 +45,26 @@ describe('defineClient', () => {
     const original = {
       name: 'literal-client' as const,
       inject: ['slots'] as const,
-      setup(ctx: Context) {
-        expectTypeOf(ctx).toEqualTypeOf<Context>()
+      setup(ctx: ClientContext) {
+        expectTypeOf(ctx).toEqualTypeOf<ClientContext>()
       },
     }
     const definition = defineClient(original)
     expect(definition).toBe(original)
     expectTypeOf(definition.name).toEqualTypeOf<'literal-client'>()
     expectTypeOf(definition.inject).toEqualTypeOf<readonly ['slots']>()
+  })
+
+  it('replaces a same-named Cordis Host service with the declared Client service contract', () => {
+    const definition = defineClient({
+      inject: ['sessions'],
+      setup(ctx) {
+        expectTypeOf(ctx.sessions.fork).toEqualTypeOf<(input: { readonly sessionId: string; readonly atSeq: number }) => Promise<string>>()
+        // @ts-expect-error Host-only SessionStore operations are not part of the Client Session API.
+        ctx.sessions.create('session-id')
+      },
+    })
+    expect(definition.inject).toEqual(['sessions'])
   })
 
   it('rejects removed Client api declarations at compile time', () => {

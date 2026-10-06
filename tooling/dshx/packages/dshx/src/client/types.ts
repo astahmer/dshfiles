@@ -21,6 +21,11 @@ declare const localeDefinitionBrand: unique symbol
 
 type LocaleDictionary = Readonly<Record<string, string>>
 
+/** Client service contracts that replace same-named Host services in Cordis Context. */
+export interface ClientServiceMap {}
+
+export type ClientContext = Omit<Context, keyof ClientServiceMap> & ClientServiceMap
+
 /** Complete set of dictionaries accepted by the official zh/en Locale provider. */
 export type LocaleDictionaries = Readonly<Record<BuiltInLocaleId, LocaleDictionary>>
 
@@ -63,7 +68,7 @@ export interface ClientDefinition {
   readonly locales?: readonly LocaleDefinition[]
   readonly conversations?: readonly ClientConversationContribution[]
   readonly slots?: readonly SlotContribution[]
-  readonly setup?: (ctx: Context, decorate: ClientComponentDecorator) => void | Effect<void>
+  readonly setup?: (ctx: ClientContext, decorate: ClientComponentDecorator) => void | Effect<void>
 }
 
 type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]

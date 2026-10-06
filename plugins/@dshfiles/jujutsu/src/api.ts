@@ -25,6 +25,7 @@ const repoIdSchema = z.string().uuid()
 const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
 const remoteNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
 const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/)
+export const workspaceNameSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
 
 export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
@@ -39,11 +40,12 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bookmark-move'), bookmark: bookmarkNameSchema, destinationId: commitIdSchema }),
   z.object({ kind: z.literal('fetch'), remote: remoteNameSchema }),
   z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
+  z.object({ kind: z.literal('workspace-add'), parentPath: z.string().min(1).max(2048), name: workspaceNameSchema, commitId: commitIdSchema }),
 ])
 
 export const previewSchema = z.object({
   id: z.string().uuid(),
-  kind: z.enum(['describe', 'split', 'squash', 'rebase', 'bookmark-move', 'fetch', 'push']),
+  kind: z.enum(['describe', 'split', 'squash', 'rebase', 'bookmark-move', 'fetch', 'push', 'workspace-add']),
   title: z.string().max(200),
   summary: z.string().max(1000),
   detail: z.string().max(8000),
@@ -105,7 +107,7 @@ export const jujutsuApi = defineApi({
     }),
     confirm: method({
       input: z.object({ repoId: repoIdSchema, previewId: z.string().uuid() }),
-      output: z.object({ message: z.string().max(1000), output: z.string().max(12_000) }),
+      output: z.object({ message: z.string().max(1000), output: z.string().max(12_000), workspacePath: z.string().max(2048).nullable() }),
     }),
   },
 })

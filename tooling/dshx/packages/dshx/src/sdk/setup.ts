@@ -1,13 +1,14 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { ClientContext, ClientDefinition } from '../client/types.js'
 
 type Setup = (ctx: Context) => void | Effect<void>
 type Metadata = { readonly packageId: string }
 type HostSetup = (ctx: Context, config: unknown, metadata: Metadata) => void | Effect<void>
 type ComponentDecorator = <Component>(component: Component) => Component
-type ClientSetup = (ctx: Context, decorate: ComponentDecorator, metadata: Metadata) => void | Effect<void>
+type ClientSetup = (ctx: ClientContext, decorate: ComponentDecorator, metadata: Metadata) => void | Effect<void>
 // A defineClient({ setup }) handler receives the component decorator as its
 // second argument, so the runtime accepts more than the one-argument Host shape.
-type ClientDefinitionSetup = (ctx: Context, decorate: ComponentDecorator) => void | Effect<void>
+type ClientDefinitionSetup = NonNullable<ClientDefinition['setup']>
 // Definition metadata only. Cordis still owns activation, identity, and cleanup.
 const hosts = new WeakMap<Setup, HostSetup>()
 const clients = new WeakMap<Setup, ClientSetup>()
@@ -25,7 +26,7 @@ export function invokeHostSetup(setup: Setup | undefined, ctx: Context, config: 
 }
 export function invokeClientSetup(
   setup: ClientDefinitionSetup | undefined,
-  ctx: Context,
+  ctx: ClientContext,
   decorate: ComponentDecorator,
   metadata: Metadata,
 ): void | Effect<void> {

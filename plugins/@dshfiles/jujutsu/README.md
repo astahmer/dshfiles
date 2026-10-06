@@ -17,6 +17,12 @@ contracts.
 - Repository path selection/history, refresh, remote fetch, and bookmark push.
 - Dragging a local bookmark or revision onto a revision prepares a move/rebase
   preview. Every mutation, fetch, and push needs a second explicit confirmation.
+- Create an isolated JJ workspace at a listed revision, then explicitly open a
+  DSH Session in that directory.
+- Browse durable event sequence boundaries for a listed Session, load older
+  history, and fork/open a child at the selected boundary through the native
+  Session Controller. This history control does not display message contents
+  or transient stream chunks.
 
 ## Host and command boundary
 
@@ -50,9 +56,16 @@ directory handle or Host-issued repository capability. Canonicalization and
 device/inode checks substantially constrain symlink replacement, but a narrow
 TOCTOU window remains between the final path check and process launch. Closing
 that last race requires a Host/subprocess contract that binds process launch to
-an already-open directory handle. The UI also uses a typed path field because
-the Host contract exposes no native repository picker or registered-workspace
-selection API.
+an already-open directory handle. Repository registration still uses a typed
+path field because the Host contract exposes no repository picker.
+
+Workspace provisioning uses the Client `uiWorkspace.pickDirectory` picker.
+The Host treats its result as untrusted: it canonicalizes an existing parent,
+rejects destinations inside or above the registered repository tree and any
+existing destination, then repeats those checks at confirmation. `jj workspace
+add` receives the validated path and name as separate argv values. Opening a
+Session in the created directory is a separate user action through the native
+Session and UI Workspace services.
 
 Revision details show file counts, diff line counts, evolution history, and the
 selected revision's full diff. Description drafts are keyed by revision, so

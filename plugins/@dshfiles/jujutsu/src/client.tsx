@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
   Button,
   Checkbox,
@@ -20,6 +21,8 @@ import { z } from 'zod'
 import type { Mutation, Revision } from './api.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
+import { SessionForkPanel } from './session-fork-panel.js'
+import { WorkspaceProvisioner } from './workspace-provisioner.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import styles from './jujutsu.module.css'
 
@@ -28,6 +31,14 @@ type View = 'graph' | 'source'
 interface RevisionSelection {
   readonly commitId: string
   readonly changeId: string
+}
+
+interface JujutsuPanelProps {
+  readonly surface?: 'main' | 'side-panel'
+  readonly sessions: ISessions
+  readonly openSession: (sessionId: SessionSummary['id']) => void
+  readonly pickDirectory: () => Promise<string | null>
+  readonly launchSession: (cwd: string) => Promise<void>
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -103,7 +114,7 @@ const firstLine = (description: string): string => description.split('\n')[0] ||
 
 const editableDescription = (description: string): string => description.replace(/\n+$/, '')
 
-export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' } = {}): JSX.Element => {
+export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const sidePanel = props.surface === 'side-panel'
   const api = useApi(jujutsuApi)
   const queryClient = useQueryClient()
@@ -132,6 +143,7 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
   const [squashText, setSquashText] = useState('')
   const [squashTarget, setSquashTarget] = useState('')
   const [showWorkingDiff, setShowWorkingDiff] = useState(false)
+  const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
 
   const stateQuery = useQuery({
     queryKey: jujutsuKeys.state(repoId ?? ''),
@@ -171,6 +183,9 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
 
   const confirmMutation = useMutation({
     mutationFn: (input: { readonly repoId: string; readonly previewId: string }) => api.confirm(input),
+    onSuccess: result => {
+      if (result.workspacePath !== null) setProvisionedPath(result.workspacePath)
+    },
     onSettled: (_result, _error, input) => queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(input.repoId) }),
   })
 
@@ -178,6 +193,7 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
     mutationFn: (repositoryPath: string) => api.registerRepository({ path: repositoryPath }),
     onSuccess: registered => {
       prepareMutation.reset()
+      setProvisionedPath(null)
       setRepoId(registered.repoId)
       setPath(registered.root)
       setSelection(null)
@@ -270,6 +286,7 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
 
   const askForConfirmation = (action: Mutation): void => {
     if (repoId === null) return
+    if (action.kind === 'workspace-add') setProvisionedPath(null)
     registerMutation.reset()
     confirmMutation.reset()
     prepareMutation.mutate({ repoId, action })
@@ -441,6 +458,18 @@ export const JujutsuPanel = (props: { readonly surface?: 'main' | 'side-panel' }
         )}
         {busy && !loadingRepository && <Notice tone="info">Working…</Notice>}
       </div>
+
+      {!sidePanel && <SessionForkPanel sessions={props.sessions} openSession={props.openSession} />}
+      {!sidePanel && state !== undefined && (
+        <WorkspaceProvisioner
+          revisions={state.revisions}
+          selectedCommitId={selectedRevision?.commitId ?? null}
+          provisionedPath={provisionedPath}
+          onPreview={askForConfirmation}
+          pickDirectory={props.pickDirectory}
+          launchSession={props.launchSession}
+        />
+      )}
 
       <section aria-labelledby={activeView.id} className={view === 'graph' ? undefined : styles.sourceView} id={activeView.panelId} role="tabpanel">
         {state === undefined ? (

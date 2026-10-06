@@ -1,5 +1,7 @@
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
@@ -13,12 +15,26 @@ const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 export default defineClient({
   name: '@dshfiles/jujutsu',
   // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
-  inject: ['slots', 'sidebarRightTabs'],
+  inject: ['slots', 'sidebarRightTabs', 'sessions', 'uiWorkspace'],
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
+    const panelForSurface = (surface: 'main' | 'side-panel') =>
+      decorate(() => (
+        <PluginQueryProvider>
+          <JujutsuPanel
+            surface={surface}
+            sessions={ctx.sessions}
+            openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+            pickDirectory={() => ctx.uiWorkspace.pickDirectory()}
+            launchSession={async cwd => {
+              const sessionId = await ctx.sessions.create({ cwd })
+              ctx.uiWorkspace.openSession(sessionId)
+            }}
+          />
+        </PluginQueryProvider>
+      ))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(MainJujutsuSlot)))
     ctx.effect(
       () =>
         ctx.sidebarRightTabs.register({
@@ -37,23 +53,12 @@ export default defineClient({
         }),
       'dshfiles-jujutsu: right pane tab type',
     )
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
     ctx.slots.inject('sidebar.right.pane.tab', () =>
-      ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, decorate(JujutsuRightPane)),
+      ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')),
     )
   },
 })
-
-const MainJujutsuSlot = (): JSX.Element => (
-  <PluginQueryProvider>
-    <JujutsuPanel surface="main" />
-  </PluginQueryProvider>
-)
-
-const JujutsuRightPane = (): JSX.Element => (
-  <PluginQueryProvider>
-    <JujutsuPanel surface="side-panel" />
-  </PluginQueryProvider>
-)
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg

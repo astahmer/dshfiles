@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, normalize, relative } from 'node:path'
+import { isAbsolute, join, normalize, relative } from 'node:path'
 import { defineHost } from '@dshfiles/dshx/host'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import {
@@ -19,6 +19,7 @@ import {
   type PreparedMutation,
 } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { resolveWorkspaceDestination } from './workspace-path.js'
 
 const MAX_OUTPUT = 1_160_000
 const MAX_STDERR = 64_000
@@ -355,7 +356,7 @@ const findRevision = (revisions: readonly Revision[], commitId: string): Revisio
   return row
 }
 
-const mutationPreview = (action: Mutation, revisions: readonly Revision[], selectedPaths: readonly string[]) => {
+const mutationPreview = (action: Mutation, revisions: readonly Revision[], selectedPaths: readonly string[], workspacePath?: string) => {
   switch (action.kind) {
     case 'describe': {
       const revision = findRevision(revisions, action.commitId)
@@ -428,6 +429,18 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
         summary: 'Push ' + action.bookmark + ' to ' + action.remote,
         detail: 'JJ dry-run preview follows. The real push starts only after confirmation.',
       }
+    case 'workspace-add': {
+      const revision = findRevision(revisions, action.commitId)
+      if (workspacePath === undefined) throw new Error('Workspace destination was not validated.')
+      return {
+        title: 'Create isolated workspace',
+        summary: 'Add ' + action.name + ' at ' + revision.shortestChangeId,
+        detail:
+          'Destination: ' + workspacePath +
+          '\nBase: ' + revision.shortestChangeId + ' (' + revision.commitId + ')' +
+          '\nThe current workspace and its working files remain in place.',
+      }
+    }
   }
 }
 
@@ -438,22 +451,29 @@ const prepareMutation = async (
   action: Mutation,
   signal: AbortSignal | undefined,
 ): Promise<PreparedMutation> => {
-  const paths = action.kind === 'split' ? await readPaths(ctx, repo, action.commitId, signal) : current.state.changedPaths
-  const preview = mutationPreview(action, current.state.revisions, paths)
-  const argv = buildMutationArgv(action)
-  let detail = preview.detail
-  if (action.kind === 'fetch' || action.kind === 'push') {
-    if (!current.state.remoteNames.includes(action.remote)) throw new Error('Remote is no longer configured. Refresh and select a listed remote.')
+  let preparedAction = action
+  let workspacePath: string | undefined
+  if (action.kind === 'workspace-add') {
+    const destination = await resolveWorkspaceDestination(repo.root, action.parentPath, action.name)
+    preparedAction = { ...action, parentPath: destination.parentPath }
+    workspacePath = destination.path
   }
-  if (action.kind === 'push') {
-    if (!current.state.revisions.some(row => row.localBookmarks.includes(action.bookmark)))
+  const paths = preparedAction.kind === 'split' ? await readPaths(ctx, repo, preparedAction.commitId, signal) : current.state.changedPaths
+  const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
+  const argv = buildMutationArgv(preparedAction)
+  let detail = preview.detail
+  if (preparedAction.kind === 'fetch' || preparedAction.kind === 'push') {
+    if (!current.state.remoteNames.includes(preparedAction.remote)) throw new Error('Remote is no longer configured. Refresh and select a listed remote.')
+  }
+  if (preparedAction.kind === 'push') {
+    if (!current.state.revisions.some(row => row.localBookmarks.includes(preparedAction.bookmark)))
       throw new Error('Bookmark is no longer present. Refresh and choose a listed bookmark.')
     try {
       const dryRun = await runAt(
         ctx,
         repo.root,
         repo.identity,
-        ['git', 'push', '--dry-run', '--remote', action.remote, '--bookmark', action.bookmark],
+        ['git', 'push', '--dry-run', '--remote', preparedAction.remote, '--bookmark', preparedAction.bookmark],
         signal,
         { timeoutMs: NETWORK_TIMEOUT },
       )
@@ -469,7 +489,7 @@ const prepareMutation = async (
     root: repo.root,
     identity: current.identity,
     fingerprint: current.fingerprint,
-    action,
+    action: preparedAction,
     argv,
     title: preview.title,
     summary: preview.summary,
@@ -525,12 +545,25 @@ const jujutsuHostApi = jujutsuApi.host({
     const prepared = previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
     if (prepared === undefined) throw new Error('Preview expired or repository state changed. Refresh and preview again.')
     await assertRepoIdentity(repo)
+    let workspacePath: string | null = null
+    if (prepared.action.kind === 'workspace-add') {
+      const destination = await resolveWorkspaceDestination(repo.root, prepared.action.parentPath, prepared.action.name)
+      const expectedPath = join(prepared.action.parentPath, prepared.action.name)
+      if (destination.parentPath !== prepared.action.parentPath || destination.path !== expectedPath) {
+        throw new Error('Workspace destination changed after preview. Prepare the action again.')
+      }
+      workspacePath = destination.path
+    }
     const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
       timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
     })
     await assertRepoIdentity(repo)
     const output = redactRemoteOutput(result.stdout, 11_000)
-    return { message: prepared.title + ' completed.', output: output + (result.truncated ? '\n[command output truncated]' : '') }
+    return {
+      message: prepared.title + ' completed.',
+      output: output + (result.truncated ? '\n[command output truncated]' : ''),
+      workspacePath,
+    }
   },
 })
 

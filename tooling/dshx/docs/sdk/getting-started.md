@@ -221,6 +221,31 @@ const result = await host.get()
 
 For components, existing `useApi` and `useApiQuery` hooks retain their native Connection provider, cancellation, and inferred result types. The compiler uses the same package identity on both halves. Connection owns Host/Origin and browser authentication. DSH 0.2 does not support the old per-handler `authority` option; explicit values now fail with a corrective message. Use native admission primitives for stricter policies. JSON transport rejects values that would be lost or changed by serialization, including non-finite numbers, class instances and nested undefined values.
 
+## Client service contracts
+
+Cordis uses one `Context` type for Host and Client packages, even when a service
+name has different contracts on each side. Extend DSHX's `ClientServiceMap` to
+replace only the Client view of that property; use the official service types
+instead of restating them or augmenting Cordis globally:
+
+```ts
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
+
+declare module '@dshfiles/dshx/client' {
+  interface ClientServiceMap {
+    sessions: ISessions
+    uiWorkspace: UiWorkspace
+  }
+}
+```
+
+`defineClient({ setup(ctx) { … } })` then receives this mapped `ClientContext`.
+Declare the corresponding official packages as plugin peers and inject the
+services required at runtime. DSHX maps these recognized Client services to
+their native providers; the type map changes TypeScript's Client contract and
+does not create a provider or grant additional Host authority.
+
 ## Settings in DSH 0.2
 
 ```ts

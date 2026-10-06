@@ -62,6 +62,14 @@ test('split argv quotes each listed path as one exact JJ root-file fileset', () 
   assert.throws(() => rootFileFileset('bad\0name'), /workspace-relative/)
 })
 
+test('workspace-add uses a listed revision and one literal isolated destination argument', () => {
+  const action: Mutation = { kind: 'workspace-add', parentPath: '/tmp/workspaces', name: 'review-branch-1', commitId: id }
+  assert.deepEqual(buildMutationArgv(action), ['workspace', 'add', '--name', 'review-branch-1', '--revision', id, '/tmp/workspaces/review-branch-1'])
+  assert.throws(() => buildMutationArgv({ ...action, parentPath: 'relative' }), /absolute/)
+  assert.throws(() => buildMutationArgv({ ...action, name: '../outside' }), /workspace name/)
+  assert.throws(() => buildMutationArgv({ ...action, commitId: 'not-a-revision' }), /visible revision/)
+})
+
 test('revision text search includes full IDs and all requested labels', () => {
   const revision = {
     description: 'Improve sorting',

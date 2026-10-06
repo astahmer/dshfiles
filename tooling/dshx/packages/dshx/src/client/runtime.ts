@@ -4,6 +4,7 @@ import { DshxError } from '../diagnostics.js'
 import type {
   ClientComponentDecorator,
   ClientConversationContribution,
+  ClientContext,
   ClientDefinition,
   LocaleDefinition,
   LocaleDictionaries,
@@ -11,7 +12,7 @@ import type {
 } from './types.js'
 import { isSlotContribution, slotContributionParts } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
-import { isConversationContribution } from '../conversation/define.js'
+import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
 import { createApiClientRuntime, provideApiContext } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
@@ -44,11 +45,16 @@ interface ClientSlotsService {
   register(options: Record<string, unknown>, component: unknown): unknown
 }
 
+interface ClientConversationEventsService {
+  register(definition: unknown): unknown
+}
+
 interface ClientLocaleService {
   register(namespace: string, dictionaries: LocaleDictionaries): () => void
 }
 
-type ClientRuntimeContext = Context & {
+type ClientRuntimeContext = ClientContext & {
+  readonly conversationEvents: ClientConversationEventsService
   readonly locale: ClientLocaleService
   readonly slots: ClientSlotsService
 }
@@ -293,6 +299,11 @@ function registerLocales(client: ClientRuntimeContext, definition: ClientDefinit
 }
 
 function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator): void {
+  for (const conversation of definition.conversations ?? []) {
+    const { definition: conversationDefinition, renderer } = getConversationContributionParts(conversation)
+    client.conversationEvents.register(conversationDefinition)
+    client.slots.inject(renderer.name, () => client.slots.register({ name: renderer.name, ...renderer.options }, decorate(renderer.component)))
+  }
   for (const slot of definition.slots ?? []) {
     const { name, options, component } = slotContributionParts(slot)
     client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(component)))
@@ -305,7 +316,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
   const hasLocales = (definition.locales?.length ?? 0) > 0
   const hasConversations = (definition.conversations?.length ?? 0) > 0
   const compatibility = metadata.compatibility ?? PROTOCOL_2_COMPATIBILITY
-  if (hasConversations) {
+  if (hasConversations && compatibility.client.conversation?.componentContributions !== true) {
     fail(
       'DSHX2302',
       'This DSH version has no native conversation event registry.',
@@ -323,7 +334,8 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
     ...new Set([
       ...(definition.inject ?? []),
       ...(hasLocales || usesFullRuntime ? CLIENT_DEFAULT_SERVICES.filter(service => service === 'locale') : []),
-      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime ? CLIENT_DEFAULT_SERVICES.filter(service => service === 'slots') : []),
+      ...(hasConversations ? ['conversationEvents'] : []),
+      ...((definition.slots?.length ?? 0) > 0 || usesFullRuntime || hasConversations ? CLIENT_DEFAULT_SERVICES.filter(service => service === 'slots') : []),
       ...(hasApiCapability ? ['connection'] : []),
     ]),
   ]
@@ -340,7 +352,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         const decorate = ((component: unknown): unknown =>
           settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
         registerContributions(client, definition, decorate)
-        return invokeClientSetup(definition.setup, ctx, decorate, metadata)
+        return invokeClientSetup(definition.setup, client, decorate, metadata)
       }
       const apiClient = createApiClientRuntime(ctx, metadata.packageId)
       // The decorator returns a context-providing wrapper, which is a different
@@ -352,7 +364,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
       }) as ComponentDecorator
       registerContributions(client, definition, decorate)
-      return invokeClientSetup(definition.setup, ctx, decorate, metadata)
+      return invokeClientSetup(definition.setup, client, decorate, metadata)
     },
   }
 }

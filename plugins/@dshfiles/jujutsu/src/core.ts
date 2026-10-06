@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { isAbsolute, normalize, parse } from 'node:path'
-import type { Mutation } from './api.js'
+import { isAbsolute, join, normalize, parse } from 'node:path'
+import { workspaceNameSchema, type Mutation } from './api.js'
 
 export interface FileChange {
   readonly path: string
@@ -92,6 +92,9 @@ export const buildMutationArgv = (action: Mutation): readonly string[] => {
         throw new Error('Invalid push target.')
       }
       return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
+    case 'workspace-add':
+      if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name and visible revision.')
+      return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
   }
 }
 
