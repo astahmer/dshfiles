@@ -186,7 +186,7 @@ describe('CLI commands', () => {
     rootStreams.out.end()
     rootStreams.err.end()
     const rootOutput = await text(rootStreams.out)
-    expect(rootOutput).toContain('USAGE dshx [OPTIONS]')
+    expect(rootOutput).toContain('USAGE dshx [OPTIONS] test|package|build')
     expect(rootOutput).toContain('sessions')
     expect(rootOutput).toContain('Check the authenticated local DSH Host connection.')
 

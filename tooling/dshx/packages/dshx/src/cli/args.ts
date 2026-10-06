@@ -807,6 +807,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       name,
       description,
       event,
+      file,
       root,
       explain,
       boot,
@@ -989,9 +990,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(topic === undefined ? {} : { topic }),
       ...(limit === undefined ? {} : { limit }),
     }
-  if (command === undefined) throw new CliUsageError('A command is required: build, check, dev, test, package, inspect, or add.')
+  if (command === undefined && !help && !version) {
+    throw new CliUsageError(`A command is required: ${Object.keys(cliCommandMetadata).join(', ')}.`)
+  }
   return {
-    command,
+    ...(command === undefined ? {} : { command }),
     explain: explain === true,
     boot: boot === true,
     ...(inspectTarget === undefined ? {} : { inspectTarget }),

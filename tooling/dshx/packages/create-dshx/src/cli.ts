@@ -39,7 +39,7 @@ const createArgs = {
     description: 'Install dependencies after generation.',
     negativeDescription: 'Skip dependency installation.',
   },
-  packageManager: {
+  'package-manager': {
     type: 'enum',
     options: ['pnpm', 'yarn', 'npm'] as string[],
     description: 'Use a specific package manager.',
