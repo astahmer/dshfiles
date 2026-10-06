@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "lib",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/agent.ts", "src/agent-loop.ts", "src/session.ts", "src/session-persistence-jsonl.ts"]
+}

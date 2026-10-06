@@ -8,6 +8,7 @@ const sourceFiles = [
   ['session', '../tooling/dsh-core/session/src/index.ts'],
   ['session-persistence', '../tooling/dsh-core/session-persistence/src/index.ts'],
   ['session-persistence-jsonl', '../tooling/dsh-core/session-persistence-jsonl/src/index.ts'],
+  ['core-runtime-bridge', '../plugins/@dshfiles/dsh-core-runtime/src/host.ts'],
 ]
 const dependencies = [
   '@deepseek-ai/cordis',
