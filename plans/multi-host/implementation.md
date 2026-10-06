@@ -313,8 +313,8 @@ retain sanitized evidence and the test home's disposition.
 | P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see `validation.md`. |
 | P2 — identity, directory, CLI | Complete | Local x2, Pi, and VPS; distinct native IDs for identical workspace paths; remote CLI session creation, ambiguity rejection, wrong-token rejection, and restart persistence. |
 | P3 — reliability | Complete | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, one-host outage isolation, and an admitted Pi session-create whose reply was dropped through the real SSH connector passed without replay. |
-| P4 — first-class UI | Partial | Online host switching/session creation, offline stale-card/reconnect, and the Pi native runtime view in a distinct browser origin passed in the collaborative preview. Approval, upload, terminal interaction, and the UI popup's close/reopen cycle still lack browser proof. |
-| P5 — second machine and rollout | Partial | Pi ARM64 plus VPS and local runtimes passed concurrently; source profile registration was checked in an isolated nixfiles workspace. Durable declarative supervision and daily-profile activation remain pending. |
+| P4 — first-class UI | Partial | Online host switching/session creation and Pi native runtime view passed. The persistent Pi view was closed and reopened successfully. The OpenCode Go profile and model catalog render, but the configured credential receives HTTP 401 from the Go models endpoint; no model turn was accepted, so approval, upload, and terminal interaction remain unverified. |
+| P5 — second machine and rollout | Partial | Pi ARM64, VPS, and local runtimes passed concurrently. A pinned persistent Pi release now runs under its declarative user service. Rollback exercise and daily-profile activation remain pending behind P4 browser acceptance. |
 
 ## Acceptance criteria
 
