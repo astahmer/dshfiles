@@ -14,7 +14,7 @@ export interface TitledSessionSummary extends SessionSummary {
 }
 
 /** One flattened session-list row with lineage depth. */
-export interface SessionListEntry {
+export interface SessionListEntry extends Pick<TitledSessionSummary, 'attention'> {
   sessionId: SessionId
   title?: string
   updatedAt: number

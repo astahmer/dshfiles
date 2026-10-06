@@ -7,7 +7,6 @@ import type {} from '@deepseek-ai/dsh-client-file-upload/client'
 import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import { createSessionControlStream } from './transport.ts'
 import { ClientSessions } from './sessions/service.ts'
-import type { SessionRemotes } from './sessions/remotes.ts'
 import type {} from '../remote-events.ts'
 
 export {
@@ -111,7 +110,7 @@ export const inject = [
  * @param ctx - Client Cordis context.
  */
 export function apply(ctx: Context): void {
-  const remotes = ctx.remote as unknown as SessionRemotes
+  const remotes = ctx.remote
   const connection = ctx.get('connection') as ConnectionHandle
   const sessions = new ClientSessions(ctx, remotes)
   ctx.remote.$on('api-session/added', (summary) => { sessions.handleSessionAdded(summary) })

@@ -4,7 +4,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SessionId, SessionSummary } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionSummary } from '../src/types.ts'
 import { flattenLineage } from '../src/client/sessions/lineage.ts'
 
 const s = (id: string, updatedAt: number, parent?: string): SessionSummary => ({ agentAvailable: true,
@@ -29,6 +30,12 @@ describe('Session lineage flattening', () => {
   it('degrades an orphan (absent parent) to root level without dropping it', () => {
     const out = flattenLineage([s('orphan', 20, 'ghost-parent'), s('root', 10)])
     expect(out.map(e => [e.sessionId, e.depth])).toEqual([['orphan', 0], ['root', 0]])
+  })
+
+  it('preserves synchronized attention summaries on list rows', () => {
+    const attention = { lastPromptSeq: 4, readThroughSeq: 2, snoozed: false, unread: true }
+    const [row] = flattenLineage([{ ...s('a', 10), attention }])
+    expect(row?.attention).toEqual(attention)
   })
 
   it('fails soft on a two-node cycle: all entries emitted, warn fired, no hang', () => {

@@ -9,6 +9,8 @@
     "src/index.ts",
     "src/types.ts",
     "src/remote-events.ts",
+    "src/attention-controller.ts",
+    "src/attention-store.ts",
     "src/agent.ts",
     "src/assistant-stream.ts",
     "src/catalog.ts",

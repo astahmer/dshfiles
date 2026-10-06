@@ -685,6 +685,7 @@ export class ClientSessions implements ISessions {
         running: snapshot.running,
         retainedBy: record.retention.retainedBy,
         blank: snapshot.blank,
+        attention: previous?.attention ?? null,
         parentId: address.parentSessionId,
         origin: 'subagent',
         ...(projectionValues === undefined ? {} : { projectionValues }),

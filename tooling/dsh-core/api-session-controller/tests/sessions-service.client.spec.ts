@@ -754,6 +754,19 @@ describe('catalog-addressed navigation', () => {
     expect(b.mock.remote.session.projections).toHaveBeenCalledOnce()
   })
 
+  it('uses unknown attention for a retained child missing from current projections', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'root' }])
+    b.mock.remote.session.projections.mockResolvedValue(ok({
+      asOfSeq: 0, values: { subagentCatalog: [] },
+    }))
+    using child = b.svc.retain({
+      parentSessionId: sid('root'), childSessionId: sid('child'), mode: 'continuable',
+    }, { source: 'controllerOperation' })
+    await child.ready
+    expect(b.svc.list.getSnapshot().byId[sid('child')]?.attention).toBeNull()
+  })
+
   for (const title of [undefined, 'Investigate startup']) {
     it(`loads an unretained one-shot child with projected title ${String(title)}`, async ({ bench }) => {
       const b = bench()
