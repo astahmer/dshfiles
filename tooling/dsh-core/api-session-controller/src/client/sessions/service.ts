@@ -5,6 +5,7 @@ import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
+import type { SessionAttentionSummary, SessionAttentionUpdateRequest } from '../../types.ts'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import {
   createSnapshotStore, notifySubscribers, type ObservableSnapshot, type SnapshotStore,
@@ -46,6 +47,7 @@ export interface SessionSummary {
    */
   blank: boolean
   updatedAt: number
+  attention: SessionAttentionSummary | null
   /** Current host-computed projection values retained by the object layer. */
   projectionValues?: Readonly<Partial<SessionProjectionMap>>
 }
@@ -354,6 +356,13 @@ export class ClientSessions implements ISessions {
     return this.manager.refreshList()
   }
 
+  updateAttention(
+    request: SessionAttentionUpdateRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionAttentionSummary>> {
+    return this.manager.updateAttention(request, signal)
+  }
+
   /**
    * Search the Host's visible message-content index. Results stay
    * request-local; the list snapshot remains the metadata authority.
@@ -406,6 +415,10 @@ export class ClientSessions implements ISessions {
    */
   handleSessionActivity(...args: Parameters<SessionManager['handleSessionActivity']>): void {
     this.manager.handleSessionActivity(...args)
+  }
+
+  handleSessionAttention(...args: Parameters<SessionManager['handleSessionAttention']>): void {
+    this.manager.handleSessionAttention(...args)
   }
 
   /**
@@ -622,6 +635,7 @@ export class ClientSessions implements ISessions {
         retainedBy: this.retentionSnapshot(entry.sessionId).retainedBy,
         blank: entry.blank,
         updatedAt: entry.updatedAt,
+        attention: entry.attention ?? null,
         ...(entry.projectionValues === undefined
           ? {}
           : { projectionValues: entry.projectionValues }),
@@ -644,6 +658,7 @@ export class ClientSessions implements ISessions {
             id: childId, displayTitle, parentId: parentId as SessionId,
             origin: 'subagent', running: this.scopes.get(childId)?.session.getSnapshot().running ?? false, blank: false, updatedAt: 0,
             retainedBy: this.retentionSnapshot(childId).retainedBy,
+            attention: null,
             ...(projectionValues === undefined ? {} : { projectionValues }),
             ...(title === undefined ? {} : { title }),
           }

@@ -49,6 +49,25 @@ export interface SessionListMetadata {
   readonly lastPromptAt: number | null
 }
 
+/** Durable Session attention state exposed to every connected Client. */
+export interface SessionAttentionSummary {
+  readonly lastPromptSeq: number | null
+  readonly readThroughSeq: number
+  readonly snoozed: boolean
+  readonly unread: boolean
+}
+
+/** One user-directed update to synchronized Session attention state. */
+export type SessionAttentionAction =
+  | { readonly type: 'mark-read' }
+  | { readonly type: 'set-snoozed'; readonly snoozed: boolean }
+
+/** Addressed update to one Session's Host-owned attention state. */
+export interface SessionAttentionUpdateRequest {
+  readonly sessionId: SessionId
+  readonly action: SessionAttentionAction
+}
+
 /**
  * Every available wire value a Session-list row carries as partial, possibly
  * stale hints. `kind` and `asOfSeq` are independent facts: `kind` says which
@@ -185,6 +204,7 @@ export interface SessionSummary {
   readonly origin?: 'subagent'
   readonly cwd?: string
   readonly projections?: SessionProjectionHints
+  readonly attention?: SessionAttentionSummary | null
 }
 
 /** One session-content search result. */
@@ -201,6 +221,7 @@ export const SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS = 240
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
+    'session/not-found': { readonly sessionId: SessionId }
     'session/provider-credentials-unavailable': Record<string, never>
     'session/provider-models-unavailable': { readonly provider: string }
     'session/model-unavailable': { readonly provider: string; readonly model: string }
@@ -599,6 +620,8 @@ declare module '@deepseek-ai/cordis' {
      * @param summary - current list row for the Session.
      */
     'api-session/added'(summary: SessionSummary): void
+    /** Synchronized read/snooze state changed for one Session. */
+    'api-session/attention'(sessionId: SessionId, attention: SessionAttentionSummary): void
     /**
      * A Session left the live Host registry.
      * @mode emit

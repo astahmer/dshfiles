@@ -9,6 +9,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
+import type { SessionAttentionSummary, SessionAttentionUpdateRequest } from '../../types.ts'
 import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type { SessionBinding, SessionListState } from '../sessions/service.ts'
@@ -49,6 +50,11 @@ export interface SessionRetainInfo {
 export interface ISessions {
   /** Host catalog and local reference-source counts; navigation belongs to view owners. */
   readonly list: ObservableSnapshot<SessionListState>
+  /** Update durable read or snooze state without opening or resuming an Agent. */
+  updateAttention(
+    request: SessionAttentionUpdateRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionAttentionSummary>>
   /**
    * Retain an exact Client generation and start its shared initial history opening.
    * @param target - known identity or durable direct-parent address.

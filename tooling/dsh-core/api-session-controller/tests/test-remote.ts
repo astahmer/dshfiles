@@ -34,6 +34,8 @@ import {
 import SessionController from '../src/index.ts'
 import type {
   ModelCatalog,
+  SessionAttentionSummary,
+  SessionAttentionUpdateRequest,
   SessionAttachmentRequest,
   SessionAttachmentValue,
   SessionCancelRequest,
@@ -72,6 +74,7 @@ export interface TestSessionRemote {
   ): Promise<RemoteResult<readonly SessionWorkspacePathApplication[]>>
   canOpenWorkspacePath(): Promise<RemoteResult<boolean>>
   list(request: SessionListRequest, signal?: AbortSignal): Promise<RemoteResult<SessionListValue>>
+  updateAttention(request: SessionAttentionUpdateRequest, signal?: AbortSignal): Promise<RemoteResult<SessionAttentionSummary>>
   search(request: SessionSearchRequest, signal?: AbortSignal): Promise<RemoteResult<SessionSearchValue>>
   create(request: SessionCreateRequest): Promise<RemoteResult<SessionCreateValue>>
   selectModel(request: SessionSelectModelRequest): Promise<RemoteResult<SessionSelectModelValue>>
@@ -106,6 +109,20 @@ export interface TestSessionRemoteDefaults {
 }
 
 const installed = new WeakMap<Context, SessionController>()
+
+function provideTestStorageDomain(ctx: Context): void {
+  if (ctx.get('storageDomain') !== undefined) return
+  const records = new Map<string, unknown>()
+  ctx.provide('storageDomain', {
+    open: async () => ({
+      table: () => ({
+        get: (key: string) => records.get(key),
+        put: async (key: string, value: unknown) => { records.set(key, value) },
+      }),
+      close: async () => {},
+    }),
+  } as never)
+}
 
 const TEST_IMAGE_LIMITS: ImageAttachmentLimits = Object.freeze({
   maxImageBytes: 5 * 1024 * 1024,
@@ -288,6 +305,7 @@ function installControllers(
       retirePrompt: () => {},
     } as never)
   }
+  provideTestStorageDomain(ctx)
   installSessionReadTestServices(ctx)
   const cwd = vi.spyOn(process, 'cwd').mockReturnValue(defaults.cwd)
   let controller: SessionController
@@ -353,6 +371,10 @@ export function createSessionTestRemote(
     canOpenWorkspacePath: () => remoteResult(() => direct.canOpenWorkspacePath()),
     list: (request, signal = new AbortController().signal) => remoteResult(
       () => direct.list(request, signal),
+      signal,
+    ),
+    updateAttention: (request, signal = new AbortController().signal) => remoteResult(
+      () => direct.updateAttention(request, signal),
       signal,
     ),
     search: (request, signal = new AbortController().signal) => remoteResult(

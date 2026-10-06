@@ -42,6 +42,8 @@ type InjectedActions = {
   unarchiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
+  markRead: (sessionId: SessionSummary['id']) => Promise<boolean>
+  setSnoozed: (sessionId: SessionSummary['id'], snoozed: boolean) => Promise<boolean>
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useWorkspaces'> &
@@ -120,6 +122,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
   const archiveInFlight = useRef(false)
+  const legacyParkMigrationAttempts = useRef(new Set<SessionSummary['id']>())
+  const readMarkAttempts = useRef(new Map<SessionSummary['id'], number>())
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
   const latestAutoArchive = useRef<{
@@ -135,7 +139,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceBySession = useMemo(() => workspaceForSessions(workspaceState.items), [workspaceState.items])
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
-  const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const displayWorkspaces = useMemo(
     () =>
       workspaceState.items.map(workspace => ({
@@ -145,7 +148,52 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     [props.tSidebar, workspaceState.items],
   )
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
+  const parkedSessionIds = useMemo(() => {
+    const localFallback = setIncludes(preferences.parkedSessionIds)
+    return new Set(sessions.flatMap(session => {
+      const parked = session.attention === null || session.attention === undefined
+        ? localFallback.has(session.id)
+        : session.attention.snoozed
+      return parked ? [session.id] : []
+    }))
+  }, [preferences.parkedSessionIds, sessions])
   const selectedSession = useMemo(() => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0), [sessionState.byId])
+
+  useEffect(() => {
+    if (sessionState.phase !== 'ready') return
+    const legacyParked = setIncludes(preferences.parkedSessionIds)
+    for (const session of sessions) {
+      if (!legacyParked.has(session.id)
+        || (session.attention !== null && session.attention !== undefined)
+        || legacyParkMigrationAttempts.current.has(session.id)) continue
+      legacyParkMigrationAttempts.current.add(session.id)
+      void props.setSnoozed(session.id, true).then(success => {
+        if (!success) {
+          legacyParkMigrationAttempts.current.delete(session.id)
+          setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+        }
+      }).catch(() => {
+        legacyParkMigrationAttempts.current.delete(session.id)
+        setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+      })
+    }
+  }, [preferences.parkedSessionIds, props.setSnoozed, props.tSidebar, sessionState.phase, sessions])
+
+  useEffect(() => {
+    const attention = selectedSession?.attention
+    if (selectedSession === undefined || attention === null || attention === undefined || !attention.unread) return
+    if (readMarkAttempts.current.get(selectedSession.id) === attention.lastPromptSeq) return
+    readMarkAttempts.current.set(selectedSession.id, attention.lastPromptSeq ?? -1)
+    void props.markRead(selectedSession.id).then(success => {
+      if (!success) {
+        readMarkAttempts.current.delete(selectedSession.id)
+        setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+      }
+    }).catch(() => {
+      readMarkAttempts.current.delete(selectedSession.id)
+      setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+    })
+  }, [props.markRead, props.tSidebar, selectedSession])
 
   useEffect(() => {
     const onPopState = (): void => {
@@ -221,10 +269,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
-    const next = preferences.parkedSessionIds.includes(sessionId)
-      ? preferences.parkedSessionIds.filter(id => id !== sessionId)
-      : [...preferences.parkedSessionIds, sessionId]
-    changePreferences({ parkedSessionIds: next })
+    void props.setSnoozed(sessionId, !parkedSessionIds.has(sessionId)).then(success => {
+      if (!success) setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+      else setNotice(null)
+    }).catch(() => {
+      setNotice(props.tSidebar('threadSidebarAttentionFailure'))
+    })
   }
 
   const toggleSection = (section: SidebarSection): void => {
@@ -513,6 +563,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                             one trailing line.
                           */}
                           <span className={styles.rowTitle}>
+                            {session.attention?.unread ? (
+                              <span className={styles.unreadDot} role="img" aria-label={props.tSidebar('threadSidebarUnread')}>
+                                ●
+                              </span>
+                            ) : null}
                             {session.running ? (
                               <span className={styles.runningDot} title={props.tSidebar('threadSidebarWorking')}>
                                 <StateDot state="ongoing" size={12} />

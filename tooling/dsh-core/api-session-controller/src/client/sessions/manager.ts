@@ -5,6 +5,8 @@ import { SessionSeq, type SessionId, type SessionSeqCursor } from '@deepseek-ai/
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type {
+  SessionAttentionSummary,
+  SessionAttentionUpdateRequest,
   SessionControlBaseline,
   SessionControlFrame,
   SessionProjectionHints,
@@ -77,6 +79,7 @@ type SessionListMutation =
   | { kind: 'remove'; sessionId: SessionId }
   | { kind: 'status'; sessionId: SessionId; running: boolean; agentAvailable: boolean }
   | { kind: 'activity'; sessionId: SessionId; updatedAt: number }
+  | { kind: 'attention'; sessionId: SessionId; attention: SessionAttentionSummary }
   /** Local first-send flip: the sender clears blank without waiting for a host frame. */
   | { kind: 'engaged'; sessionId: SessionId }
 
@@ -456,6 +459,15 @@ export class SessionManager {
     return this.listInflight
   }
 
+  async updateAttention(
+    request: SessionAttentionUpdateRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionAttentionSummary>> {
+    const result = await this.remote.session.updateAttention(request, signal)
+    if (result.ok) this.handleSessionAttention(request.sessionId, result.value)
+    return result
+  }
+
   /**
    * Search visible session message content without adding transient query
    * state to the list snapshot.
@@ -718,6 +730,10 @@ export class SessionManager {
     this.recordMutation({ kind: 'activity', sessionId, updatedAt })
   }
 
+  handleSessionAttention(sessionId: SessionId, attention: SessionAttentionSummary): void {
+    this.recordMutation({ kind: 'attention', sessionId, attention })
+  }
+
   /**
    * Surface one live Agent failure on an already-materialized Session.
    * @param sessionId - Session whose Agent failed.
@@ -775,6 +791,7 @@ export class SessionManager {
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.projectionValues === entry.projectionValues
+        && prev.attention === entry.attention
       ) return prev
       this.entryCache.set(entry.sessionId, entry)
       return entry
@@ -819,6 +836,7 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
           ? { parentSessionId: mutation.summary.parentSessionId } : {}),
         ...(existing.origin === undefined && mutation.summary.origin !== undefined
           ? { origin: mutation.summary.origin } : {}),
+        ...(mutation.summary.attention === undefined ? {} : { attention: mutation.summary.attention }),
       }
       if (filled.cwd === existing.cwd && filled.parentSessionId === existing.parentSessionId
         && filled.origin === existing.origin && filled.blank === existing.blank
@@ -839,6 +857,11 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
       return summaries.map(summary => summary.sessionId === mutation.sessionId
         && mutation.updatedAt > summary.updatedAt
         ? { ...summary, updatedAt: mutation.updatedAt }
+        : summary)
+    case 'attention':
+      return summaries.map(summary => summary.sessionId === mutation.sessionId
+        && summary.attention !== mutation.attention
+        ? { ...summary, attention: mutation.attention }
         : summary)
     case 'engaged':
       return summaries.map(summary => summary.sessionId === mutation.sessionId && summary.blank

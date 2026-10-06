@@ -317,6 +317,13 @@ body[data-ds-dark-theme] .rowTime {
   vertical-align: middle;
 }
 
+.unreadDot {
+  margin-inline-end: 0.35em;
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+}
+
 /* The reference keeps every row clean and reveals its verbs on hover, so the
    actions do not compete with the title until the row is actually addressed. */
 .actions {

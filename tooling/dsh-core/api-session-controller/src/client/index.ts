@@ -28,6 +28,7 @@ export { createScope, scopeOf } from './scope.ts'
 export type { AgentContext, AgentScopeHandle } from './scope.ts'
 export { SessionCreateError, SessionForkError } from './sessions/service.ts'
 export type { SessionBinding, SessionListState, SessionSummary } from './sessions/service.ts'
+export type { SessionAttentionSummary, SessionAttentionAction, SessionAttentionUpdateRequest } from '../types.ts'
 export type {
   SessionListPhase,
   SessionListSnapshot,
@@ -120,6 +121,9 @@ export function apply(ctx: Context): void {
   })
   ctx.remote.$on('api-session/activity', (sessionId, updatedAt) => {
     sessions.handleSessionActivity(sessionId, updatedAt)
+  })
+  ctx.remote.$on('api-session/attention', (sessionId, attention) => {
+    sessions.handleSessionAttention(sessionId, attention)
   })
   ctx.remote.$on('api-session/error', (sessionId, message) => {
     sessions.handleSessionError(sessionId, message)
