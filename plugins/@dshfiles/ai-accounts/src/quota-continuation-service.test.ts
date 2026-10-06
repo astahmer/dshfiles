@@ -3,11 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { ScheduleId, createAfterScheduleRecord } from '@deepseek-ai/dsh-schedule'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-continuation.js'
 import { promptFor } from './quota-continuation-message.js'
@@ -25,9 +26,9 @@ const openContext = async (root: string) => {
   return context
 }
 
-const createFailureAgent = (id: string): QuotaFailureAgent => ({
+const createFailureAgent = (id: string, seq = 12): QuotaFailureAgent => ({
   id: SessionId(id),
-  session: { seq: 12 },
+  session: { seq },
   inbox: { nextTurn: [], nextStep: [] },
 })
 
@@ -179,6 +180,54 @@ describe('quota continuation service', () => {
         content: [{ type: 'text', text: promptFor(record.continuationId) }],
       })
       expect((await service.list()).continuations[0]?.state).toBe('queued')
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('invalidates recovery when newer persisted Session work exists', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-new-work-'))
+    const sessionId = SessionId('quota-new-work-session')
+    const session = Session.create(sessionId)
+    const sequenceAfterFailedPrompt = 1
+    const prompts: SessionPromptRequest[] = []
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      session.append(
+        'user/message',
+        createUserMessage({ content: [{ type: 'text', text: 'the request that hit quota' }], source: { kind: 'user' } }),
+        { surfaceOp: 'append' },
+      )
+      context = await openContext(root)
+      service = createQuotaContinuationService({
+        context,
+        readResetAt: async () => null,
+        sessionController: {
+          inspect: async () => ({ events: session.ownEvents() }),
+          prompt: async (request: SessionPromptRequest) => {
+            prompts.push(request)
+            return { accepted: true as const }
+          },
+        },
+      })
+      await service.recordFailure(createFailureAgent(sessionId, sequenceAfterFailedPrompt), 'codex_work')
+      const [record] = (await service.list()).continuations
+      expect(record).toBeDefined()
+      if (record === undefined) throw new Error('Quota continuation was not stored.')
+
+      session.append(
+        'user/message',
+        createUserMessage({ content: [{ type: 'text', text: 'a newer request' }], source: { kind: 'user' } }),
+        { surfaceOp: 'append' },
+      )
+
+      await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: false })
+      expect(prompts).toHaveLength(0)
+      await expect(service.list()).resolves.toMatchObject({ continuations: [] })
     } finally {
       await service?.close()
       await context?.fiber.dispose()

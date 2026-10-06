@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { ScheduleRecord } from '@deepseek-ai/dsh-schedule'
+import { ScheduleId, type ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -96,8 +96,7 @@ const requestIdFor = (continuationId: string): SessionRequestId => {
 }
 
 const scheduleIdFor = (scheduleId: string): ScheduleRecord['id'] => {
-  // Schedule is optional at runtime; its id brand has no constructor requirement.
-  return scheduleId as ScheduleRecord['id']
+  return ScheduleId(scheduleId)
 }
 
 const createQuotaContinuationService = ({
