@@ -1,5 +1,8 @@
 packages:
   - '@dshfiles/*'
+  - '../tooling/dsh-core/*'
+  # This package retains upstream workspace peers whose sources are not in this checkout.
+  - '!../tooling/dsh-core/api-session-controller'
 
 peerDependencyRules:
   allowedVersions:
@@ -15,6 +18,7 @@ dedupePeerDependents: true
 allowBuilds:
   '@deepseek-ai/dsh-subprocess-local': false
   '@google/genai': false
+  esbuild: true
   koffi: false
   node-pty: false
   protobufjs: false
