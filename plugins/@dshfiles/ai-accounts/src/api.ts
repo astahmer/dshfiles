@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
 /**
@@ -296,5 +297,26 @@ export const aiAccountsApi = defineApi({
 
     /** Read now and record, so a fresh chart does not wait for the next poll. */
     collectUsage: method({ input: z.void(), output: z.object({ recorded: z.number() }) }),
+    /** Durable quota-blocked Sessions that can be resumed or snoozed by the user. */
+    quotaContinuations: method({
+      input: z.void(),
+      output: z.object({
+        scheduleAvailable: z.boolean(),
+        continuations: z.array(quotaContinuationSummarySchema).max(500),
+      }),
+    }),
+    /** Queue the exact stored continuation through the native Session Controller. */
+    resumeQuotaContinuation: method({
+      input: z.object({ continuationId: z.string().uuid() }),
+      output: z.object({ accepted: z.boolean() }),
+    }),
+    /** Snooze only the continuation's recovery timing; it does not change quota reset evidence. */
+    snoozeQuotaContinuation: method({
+      input: z.object({
+        continuationId: z.string().uuid(),
+        duration: z.enum(['one-hour', 'four-hours', 'one-day', 'unsnooze']),
+      }),
+      output: z.object({ updated: z.boolean() }),
+    }),
   },
 })

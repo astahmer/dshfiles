@@ -1047,6 +1047,67 @@
   line-height: 1.55;
 }
 
+.continuationList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.continuationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+
+.continuationItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.continuationCopy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.continuationCopy strong {
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+  font-size: 11px;
+}
+
+.continuationMeta {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.continuationActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (width <= 760px) {
+  .continuationItem {
+    flex-direction: column;
+  }
+
+  .continuationActions {
+    justify-content: flex-start;
+  }
+}
+
 @media (width <= 900px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);

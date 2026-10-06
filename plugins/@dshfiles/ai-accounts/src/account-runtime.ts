@@ -2,10 +2,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { AiAccountsConfig } from './account-config.js'
 import type { createAccountPool } from './account-pool.js'
 import type { UsageHistoryScheduler } from './usage-recorder.js'
+import type { QuotaContinuationService } from './quota-continuation.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
   scheduler?: UsageHistoryScheduler
+  quotaContinuations?: QuotaContinuationService
   refreshRoutes?: () => Promise<void>
 }
 

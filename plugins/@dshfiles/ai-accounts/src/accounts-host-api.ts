@@ -7,6 +7,7 @@ import { readCodexUsage, readOpenCodeUsage } from './usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { readKeyFromEnv } from './credentials.js'
 import { resolveCodexHomeLayout } from './codex-home.js'
+import { knownQuotaResetAt } from './quota-reset.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -17,6 +18,12 @@ export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
   buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [])
 
 export const accountsSnapshot = accountsFile
+
+const quotaContinuationServiceFor = (ctx: Context) => {
+  const service = accountRuntime(ctx)?.quotaContinuations
+  if (service === undefined) throw new Error('Quota recovery service is unavailable')
+  return service
+}
 
 export const accountsHostApi = aiAccountsApi.host({
   read: async ({ ctx }) => {
@@ -74,6 +81,10 @@ export const accountsHostApi = aiAccountsApi.host({
     return next.overlays
   },
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
+  quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
+  resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
+  snoozeQuotaContinuation: async ({ input, ctx }) =>
+    quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 
 /**
@@ -94,6 +105,12 @@ const readAccountUsage = async (account: AccountProfile): Promise<UsageCard> => 
   }
   if (account.kind === 'commandcode') return unsupported()
   return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv))
+}
+
+export const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
+  const account = (await accountsFile(ctx)).accounts.find(profile => profile.instanceId === accountId)
+  if (account === undefined) return null
+  return knownQuotaResetAt(await readAccountUsage(account), Date.now())
 }
 
 const unsupported = (): UsageCard => ({

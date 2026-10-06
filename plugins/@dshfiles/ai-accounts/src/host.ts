@@ -3,7 +3,7 @@ import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import { accountsFile, accountsHostApi } from './accounts-host-api.js'
+import { accountsFile, accountsHostApi, readQuotaResetAt } from './accounts-host-api.js'
 export { accountsSnapshot } from './accounts-host-api.js'
 import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
@@ -23,6 +23,7 @@ import { createAccountPool, isRateLimitFailure } from './account-pool.js'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
+import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
 import { COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute } from './provider-routes.js'
 export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND } from './provider-routes.js'
@@ -45,13 +46,23 @@ export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND } from './provider-routes.j
 
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm', 'connection', 'webServer', 'storageDomain'],
+  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController'],
   apis: [accountsHostApi],
   tools: [aiAccountsTool],
   setup: api => {
     const ctx = api.raw.ctx
     const runtime = activateAccountRuntime(ctx)
     runtime.scheduler = createUsageHistoryScheduler(ctx, async () => (await accountsFile(ctx)).accounts)
+    const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => readQuotaResetAt(ctx, accountId) })
+    runtime.quotaContinuations = quotaContinuations
+    ctx.effect(() => {
+      const stopQuotaContinuations = quotaContinuations.start()
+      return () => {
+        stopQuotaContinuations()
+        if (runtime.quotaContinuations === quotaContinuations) delete runtime.quotaContinuations
+        void quotaContinuations.close().catch(() => ctx.logger.warn('ai-accounts: quota recovery storage could not close cleanly'))
+      }
+    })
     // Cordis activates this plugin synchronously, so the cache must hold the file
     // before the first read: an unprimed cache answers emptyFile(), which
     // registers no routes at all and hides the whole page.
@@ -324,14 +335,16 @@ export default definePlugin({
           const id = agent.id
           perAgent.get(id)?.()
           const dispose = agent.ctx.effect(() => {
-            const offRequestError = agent.ctx.on('agent/request-error', (error, next) => {
+            const offRequestError = agent.ctx.on('agent/request-error', async (error, next) => {
               if (!isRateLimitFailure(error.failure)) return next()
               const served = pool.acquire(id)
               if (served?.id !== error.provider) return next()
               pool.noteRateLimited(error.provider, error.failure.providerRetryAfterMs)
               pool.unbind(id)
               ctx.logger.info(`ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`)
-              return next()
+              const action = await next()
+              if (action === undefined) await quotaContinuations.recordFailure(agent, served.id)
+              return action
             })
             agent.ctx.on('agent/disposed', () => pool.unbind(id))
             return () => offRequestError()

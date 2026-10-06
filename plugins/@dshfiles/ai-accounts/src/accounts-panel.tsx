@@ -3,6 +3,7 @@ import type {} from '@dshfiles/dshx/client'
 import { AccountDetail } from './account-detail.js'
 import { AccountRail } from './account-rail.js'
 import { AccountsToolbar } from './accounts-toolbar.js'
+import { QuotaContinuations } from './quota-continuations.js'
 import styles from './accounts.module.css'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
 
@@ -26,6 +27,8 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   return (
     <div className={styles.page}>
       <AccountsToolbar state={state} file={state.file} />
+
+      <QuotaContinuations accountId={state.selectedId} />
 
       <div className={styles.layout}>
         <AccountRail state={state} file={state.file} />
