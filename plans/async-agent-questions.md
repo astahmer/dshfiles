@@ -147,7 +147,7 @@ flowchart LR
 | Route a child question through `ctx.userQuestions` | No | That seam asserts a live root and is coupled to the Web card + projection. A subagent question is agent-facing, not human-facing. |
 | Reuse `@dshfiles/agent-communication` for parent routing | No | It targets independent peers with durable topics and an allowlist for steering. Parent routing is a direct in-runtime relationship with no durability requirement. |
 | Force a `recommended` answer for root timed questions | No | Native timed questions stay open for a human answer; they do not auto-resolve on foreground timeout. |
-| Fork DSH core for child questions | Host change required | A plugin cannot add correlated inbox replies, durable answer identity, or wait recovery. The Host source is outside this checkout. |
+| Fork DSH core for child questions | No for the scoped Host contract | A Host-only DSHX bundle can own durable identity, sender validation, and recovery through Storage Domain; `sendMessage` remains a wakeup only. The end-to-end answer action is still Phase 2. |
 | Build another child composer card now | No | First establish Host-owned reply identity and lifecycle. Do not duplicate the native question UI. |
 | Deliver a child question via `ctx.subagents.sendMessage` | Notification only | `sendMessage` accepts a one-way inbox item and returns `MessageId`. It does not wait for a parent reply or reconnect that reply to the child call. |
 | Require `recommended` on child questions | Deferred | There is no child timeout/expiry lifecycle to consume such a default. Revisit only after the Host reply contract exists. |
@@ -337,7 +337,13 @@ no session folder in its path: it is flat under the workspace `questions/`, with
 
 ### Phase 1 — Host child-reply contract
 
-Do not scaffold `@dshfiles/agent-questions` yet. The Host must first provide a
+`@dshfiles/agent-questions` now provides the Host-only contract over the public
+Storage Domain, Agent registry, ownership, and subagent-message seams. It stores
+a stable parent-scoped question id, accepts an answer only from the exact live
+parent, lets only the requesting child wait or cancel, and preserves pending
+questions across Host/service recreation. The parent inbox notice is only a
+wakeup: prose messages never settle a child question. Preserve the existing
+root question card and projection; this bundle adds no client surface.
 parent-scoped question request with a stable id, authenticated correlated answer,
 bounded cancellation, and restart reconciliation. The child must receive only
 the answer to its own request. Preserve the existing root question card and
@@ -345,11 +351,13 @@ projection; do not invent a second question engine in a plugin.
 
 ### Phase 2 — plugin after Host support
 
-Once the Host contract exists, add a thin `ask_parent_question` tool that
-validates the request and delegates lifecycle to that service. Add recommended
-defaults or workspace files only if the Host exposes those as explicit outcomes.
-Test two concurrent child questions, wrong-parent answers, cancellation, parent
-shutdown, timeout, and restart before profile adoption.
+The Host contract now passes focused service/storage checks and a fresh scratch
+Host activation. Add the thin child `ask_parent_question` tool and an authorized
+parent answer action that calls the Host service after the parent uses the
+native `ask_user_question` path. Add recommended defaults or workspace files
+only if the Host exposes those as explicit outcomes. Test two concurrent child
+questions, wrong-parent answers, cancellation, parent shutdown, timeout, and
+restart before profile adoption.
 
 ## Open questions
 
@@ -377,12 +385,12 @@ Still open while building:
       native `userQuestions` service. This is source evidence only.
 - [ ] Scratch-profile browser acceptance proves timed card, pending continuation,
       late answer, cancellation, and restart behavior.
-- [ ] Host provides a durable parent-scoped question id and correlated answer
+- [x] Host provides a durable parent-scoped question id and correlated answer
       wait with sender validation, cancellation, and restart recovery.
-- [ ] Concurrent child questions cannot consume each other's answers.
+- [x] Concurrent child questions cannot consume each other's answers.
 - [ ] Only after the Host contract passes, the child tool calls it without
       registering a second human question projection.
-- [ ] No plugin timer or unrelated parent message is treated as an answer.
+- [x] No plugin timer or unrelated parent message is treated as an answer.
 
 ## Decisions log
 
@@ -392,6 +400,7 @@ contract above. Keep them only as design history.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-06 | Put the correlated contract in a Host-only DSHX bundle | The real JSON Storage Domain and a fresh DSH Host both accept the bundle; the Host service owns IDs, authorization, answer state, cancellation, and recovery while leaving the native root question projection unchanged. |
 | 2026-10-04 | Reuse `ask_user_question` in timed mode for root async | Renaming breaks the Host projection and the UI tool row, both of which hard-code the name |
 | 2026-10-04 | No DSH core fork | Every requirement is a preset row or a plugin over public seams |
 | 2026-10-04 | Separate tool name for subagent questions | Two rows with the same name throw on duplicate insertion in the preset's single scope |
