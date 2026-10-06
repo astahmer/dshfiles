@@ -138,7 +138,6 @@ These are requirements for existing owner schemas, not a proposal for one centra
 | Phase 6 — conditional expansion         | Review complete; no tracks admitted | All seven tracks now have explicit decisions below and were checked against current profile composition and acceptance gates. No repeated unmet workflow or measured baseline gap justified runtime expansion; the LSP peer mismatch and missing Host maintenance/rebind seams remain gates. |
 | Phase 7 — polish                        | Deferred behind functional acceptance | No cosmetic change was admitted while Phase 3 action receipts and Phase 1/2/4/5 Host-dependent exits remain open. Responsive and reduced-motion runtime acceptance is not claimed. |
 
-||||||| ltokntmt 94bf8ef0 "feat(goal-stall-guard): pause a goal whose rounds stopped making progress" (parents of rebased revision)
 
 ### Execution status (2026-10-05)
 
