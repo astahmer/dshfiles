@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -48,6 +48,7 @@ const cursorFixturePath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent/test
 const cursorOverlayPath = resolve(scratch.home, 'cursor-runtime.patch.yml')
 const cursorProjectRoot = resolve(scratch.home, 'cursor-project')
 const cursorEventsPath = resolve(scratch.home, 'runtime-drivers', 'cursor-acp', cursorInstanceId, 'fixture-events.jsonl')
+const cursorResponseGatePath = resolve(dirname(cursorEventsPath), 'hold-prompt-response')
 await mkdir(cursorExecutableDirectory, { recursive: true })
 await mkdir(cursorProjectRoot, { recursive: true })
 await writeFile(
@@ -69,6 +70,7 @@ const startHost = async () => {
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const child = spawn(process.execPath, [resolve(repoRoot, 'scripts/core-runtime-scratch-host.mjs')], {
     cwd: repoRoot,
+    detached: process.platform !== 'win32',
     env: {
       ...environment,
       DSHX_BOOT_PROFILE_NAME: profileName,
@@ -128,7 +130,14 @@ const waitForHistoryText = async (platform, sessionId, text) => {
   const expiresAt = Date.now() + 15_000
   while (Date.now() < expiresAt) {
     const history = await platform.sessions.history(sessionId)
-    if (JSON.stringify(history.records).includes(text)) return history
+    const events = history.records.map(record => record.event ?? record)
+    const response = events.find(
+      event => event.type === 'assistant/message' && JSON.stringify(event).includes(text),
+    )
+    const turnEnded = response !== undefined && events.some(
+      event => event.type === 'turn/end' && event.data.turn === response.data.turn,
+    )
+    if (turnEnded) return history
     await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
   }
   const history = await platform.sessions.history(sessionId)
@@ -150,7 +159,12 @@ const waitForHistoryText = async (platform, sessionId, text) => {
             : message.includes('Cursor ACP prompt failed')
               ? 'cursor-acp-prompt-failed'
               : 'unclassified'
-    return `${type}:error:${reason.error?.code ?? 'UNKNOWN'}:${failure}`
+    const safeMessage = redactHostOutput(message)
+      .replaceAll(cursorCredential, '[scratch-credential]')
+      .replaceAll('synthetic', '[scratch]')
+      .replaceAll('\n', ' ')
+      .slice(0, 180)
+    return `${type}:error:${reason.error?.code ?? 'UNKNOWN'}:${failure}:${safeMessage}`
   })
   const cursorEventTypes = await readFile(cursorEventsPath, 'utf8')
     .then(contents => contents.trim().split('\n').filter(Boolean).map(line => JSON.parse(line).type))
@@ -161,10 +175,44 @@ const waitForHistoryText = async (platform, sessionId, text) => {
   )
 }
 
+const waitForHistoryError = async (platform, sessionId, expectedMessage) => {
+  const expiresAt = Date.now() + 15_000
+  while (Date.now() < expiresAt) {
+    const history = await platform.sessions.history(sessionId)
+    const events = history.records.map(record => record.event ?? record)
+    const failure = events.find(event => event.type === 'turn/end'
+      && event.data.reason?.kind === 'error'
+      && event.data.reason.error?.message?.includes(expectedMessage))
+    if (failure !== undefined) return history
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
+  }
+  throw new Error('Scratch Session did not surface the expected uncertain Cursor outcome.')
+}
+
+const readCursorEvents = async () => (await readFile(cursorEventsPath, 'utf8'))
+  .trim()
+  .split('\n')
+  .filter(Boolean)
+  .map(line => JSON.parse(line))
+
+const waitForCursorEvents = async (accept, description) => {
+  const expiresAt = Date.now() + 15_000
+  while (Date.now() < expiresAt) {
+    const events = await readCursorEvents()
+    if (accept(events)) return events
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
+  }
+  throw new Error(`Scratch Cursor fixture did not produce ${description} within 15 seconds.`)
+}
+
+const signalHostTree = (child, signal) => process.platform === 'win32'
+  ? child.kill(signal)
+  : process.kill(-child.pid, signal)
+
 const stopHost = async () => {
   const child = host
   if (child === undefined || child.exitCode !== null || child.signalCode !== null) return
-  child.kill('SIGTERM')
+  signalHostTree(child, 'SIGTERM')
   let timeout
   try {
     await Promise.race([
@@ -174,12 +222,23 @@ const stopHost = async () => {
       }),
     ])
   } catch (error) {
-    child.kill('SIGKILL')
+    signalHostTree(child, 'SIGKILL')
     await hostExited
     throw error
   } finally {
     clearTimeout(timeout)
   }
+  host = undefined
+}
+
+const crashHost = async () => {
+  const child = host
+  if (child === undefined || child.exitCode !== null || child.signalCode !== null) {
+    throw new Error('No active owned scratch Host is available for the crash-recovery check.')
+  }
+  assert.equal(signalHostTree(child, 'SIGKILL'), true, 'Could not terminate the owned scratch Host process tree.')
+  const exit = await hostExited
+  assert.equal(exit.signal, 'SIGKILL', 'Scratch Host did not exit from the requested unclean termination.')
   host = undefined
 }
 
@@ -216,9 +275,21 @@ try {
     runtimeBinding: { driverKind: 'cursor-acp', instanceId: cursorInstanceId },
   })
   await platform.sessions.prompt(cursorSession.sessionId, 'synthetic first provider turn', 'queue')
-  await waitForHistoryText(platform, cursorSession.sessionId, 'cursor-fixture-response-1')
-
-  await stopHost()
+  const initialCursorHistory = await waitForHistoryText(platform, cursorSession.sessionId, 'cursor-fixture-response-1')
+  await writeFile(cursorResponseGatePath, 'hold response until the verifier crashes the scratch Host\n')
+  await platform.sessions.prompt(cursorSession.sessionId, 'synthetic interrupted provider turn', 'queue')
+  const inFlightCursorEvents = await waitForCursorEvents(
+    events => events.filter(event => event.type === 'prompt').length === 2
+      && events.filter(event => event.type === 'response').length === 1,
+    'the second in-flight provider prompt',
+  )
+  await crashHost()
+  assert.equal(inFlightCursorEvents.filter(event => event.type === 'prompt').length, 2)
+  await unlink(cursorResponseGatePath)
+  await waitForCursorEvents(
+    events => events.some(event => event.type === 'response-notification-failed:closed'),
+    'the interrupted ACP process to report its lost Host connection',
+  )
 
   const restartedPlatform = await startHost()
   const restartedSessions = await restartedPlatform.sessions.list()
@@ -226,15 +297,70 @@ try {
     restartedSessions.some(session => session.sessionId === created.sessionId),
     'Session was missing after Host restart.',
   )
+  assert.ok(
+    restartedSessions.some(session => session.sessionId === cursorSession.sessionId),
+    'Cursor-bound Session was missing after the unclean Host termination.',
+  )
   const restartedHistory = await restartedPlatform.sessions.history(created.sessionId)
   assert.deepEqual(restartedHistory.records, initialHistory.records, 'Session history changed across Host restart.')
-  await restartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic resumed provider turn', 'queue')
-  await waitForHistoryText(restartedPlatform, cursorSession.sessionId, 'cursor-fixture-response-2')
-  const cursorEvents = (await readFile(cursorEventsPath, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  const recoveredCursorHistory = await restartedPlatform.sessions.history(cursorSession.sessionId)
+  const recoveredCursorText = JSON.stringify(recoveredCursorHistory.records)
+  const recoveredCursorEvents = recoveredCursorHistory.records.map(record => record.event ?? record)
+  assert.ok(
+    recoveredCursorHistory.records.length >= initialCursorHistory.records.length,
+    'Cursor-bound Session history lost records after the unclean Host termination.',
+  )
+  assert.ok(recoveredCursorText.includes('synthetic interrupted provider turn'), 'The interrupted user prompt was not recovered.')
+  assert.ok(!recoveredCursorText.includes('cursor-fixture-response-2'), 'The unresolved provider operation was reported as completed.')
+  assert.ok(
+    recoveredCursorEvents.some(event => event.type === 'turn/end' && event.data.reason?.kind === 'interrupted'),
+    'The in-flight turn was not marked interrupted after Host recovery.',
+  )
+  await restartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic provider turn after crash recovery', 'queue')
+  const recoveredTurnHistory = await waitForHistoryError(
+    restartedPlatform,
+    cursorSession.sessionId,
+    'Cursor prompt outcome is uncertain; refusing to replay possible workspace changes.',
+  )
+  const recoveredTurnEvents = recoveredTurnHistory.records.map(record => record.event ?? record)
+  assert.equal(
+    recoveredTurnEvents.filter(event => event.type === 'turn/start').length,
+    recoveredTurnEvents.filter(event => event.type === 'turn/end').length,
+    'A turn remained unclosed after the interrupted Session resumed.',
+  )
+  assert.ok(
+    recoveredTurnEvents.some(event => event.type === 'turn/end'
+      && event.data.reason?.kind === 'error'
+      && event.data.reason.error?.message?.includes('Cursor prompt outcome is uncertain')),
+    'The unresolved Cursor provider outcome was not surfaced to the Session.',
+  )
+  const recoveredTurnText = JSON.stringify(recoveredTurnHistory.records)
+  assert.ok(!recoveredTurnText.includes('cursor-fixture-response-2'), 'The Host replayed the unresolved provider operation after recovery.')
+  assert.ok(recoveredTurnText.includes('synthetic provider turn after crash recovery'), 'The rejected post-crash prompt was not retained in Session history.')
+  const cursorEvents = await readCursorEvents()
   assert.equal(cursorEvents.filter(event => event.type === 'new').length, 1, 'Cursor runtime did not create exactly one ACP session.')
-  assert.equal(cursorEvents.filter(event => event.type === 'load').length, 1, 'Cursor runtime did not resume its ACP session after Host restart.')
-  assert.equal(cursorEvents.filter(event => event.type === 'prompt').length, 2, 'Cursor runtime did not complete both synthetic turns.')
-  process.stdout.write(`PASS: local Agent and Cursor runtime loaded; Host restart resumed the same ACP session; native Session retained ${restartedHistory.records.length} public history records.\n`)
+  assert.equal(
+    cursorEvents.filter(event => event.type === 'process-start').length,
+    inFlightCursorEvents.filter(event => event.type === 'process-start').length,
+    'Cursor runtime launched a new provider process after the Host crash.',
+  )
+  assert.equal(
+    cursorEvents.filter(event => event.type === 'load').length,
+    inFlightCursorEvents.filter(event => event.type === 'load').length,
+    'Cursor runtime loaded the uncertain provider session after the Host crash.',
+  )
+  assert.equal(
+    cursorEvents.filter(event => event.type === 'prompt').length,
+    inFlightCursorEvents.filter(event => event.type === 'prompt').length,
+    'Cursor runtime replayed an uncertain prompt or launched a rejected post-crash prompt.',
+  )
+  assert.equal(
+    cursorEvents.filter(event => event.type === 'response').length,
+    inFlightCursorEvents.filter(event => event.type === 'response').length,
+    'Cursor runtime exposed a response for the interrupted provider call.',
+  )
+  assert.equal(cursorEvents.filter(event => event.type === 'response-notification-failed:closed').length, 1, 'The interrupted ACP process did not confirm its response was detached from the crashed Host.')
+  process.stdout.write(`PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records, marked the in-flight turn interrupted, surfaced its uncertain provider outcome, and refused a new provider resume without replay.\n`)
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`${redactHostOutput(message)}\n`)
