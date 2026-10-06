@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { isIPv4 } from 'node:net'
+import type { SessionRuntimeSelection } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import WebSocket, { type RawData } from 'ws'
 
@@ -370,8 +371,11 @@ export interface DshPlatformClient {
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
     }>
-    create(input: { readonly cwd?: string; readonly agentPreset?: string }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
-    fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
+    create(input: {
+      readonly cwd?: string
+      readonly agentPreset?: string
+      readonly runtimeBinding?: SessionRuntimeSelection
+    }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
     rename(sessionId: string, title: string): Promise<{ readonly title: string; readonly seq: number }>
     archive(sessionId: string): Promise<{ readonly archivedSessionIds: readonly string[] }>

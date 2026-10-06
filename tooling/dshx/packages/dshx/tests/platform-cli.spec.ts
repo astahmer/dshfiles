@@ -33,6 +33,29 @@ function clientWith(rpc: DshPlatformTransport['rpc']): DshPlatformClient {
 }
 
 describe('DSH platform CLI', () => {
+  it('forwards a selected runtime binding through Host Session creation', async () => {
+    let createArgs: Parameters<DshPlatformTransport['rpc']>[2] | undefined
+    const client = clientWith(async (namespace, method, args) => {
+      expect(namespace).toBe('session')
+      expect(method).toBe('create')
+      createArgs = args
+      return { sessionId: 'cursor-session' }
+    })
+
+    await expect(
+      client.sessions.create({
+        cwd: '/tmp/runtime-workspace',
+        runtimeBinding: { driverKind: 'cursor-acp', instanceId: 'work-account' },
+      }),
+    ).resolves.toEqual({ sessionId: 'cursor-session' })
+    expect(createArgs).toEqual({
+      request: {
+        cwd: '/tmp/runtime-workspace',
+        runtimeBinding: { driverKind: 'cursor-acp', instanceId: 'work-account' },
+      },
+    })
+  })
+
   it('parses platform command groups and scoped options', () => {
     expect(parseCliArgs(['sessions', 'history', 'session-1', '--max', '50', '--json'])).toMatchObject({
       command: 'sessions',
