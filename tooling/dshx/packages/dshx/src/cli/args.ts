@@ -524,7 +524,6 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   explain: { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' },
 }
 
-const toKebabCase = (value: string): string => value.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase())
 
 export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
   const args: ArgsDef = {}
