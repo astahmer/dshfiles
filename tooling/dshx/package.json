@@ -18,12 +18,12 @@
     "test:e2e:gen": "bddgen test --config=playwright.e2e.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1",
     "@types/node": "catalog:",
     "knip": "6.32.2",
-    "playwright-bdd": "^8.5.1",
     "typescript": "catalog:",
     "vitest": "catalog:",
+    "@playwright/test": "1.56.1",
+    "playwright-bdd": "^8.5.1",
     "ws": "8.21.3",
     "zod": "4.6.5"
   },

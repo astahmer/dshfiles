@@ -1,6 +1,6 @@
 # Multi-host validation
 
-Validated 2026-10-05 with fnm's official Node 22.23.3 and installed DSH 0.2.0-rc.2.
+Validated 2026-10-06 with fnm's official Node 22.23.3 and installed DSH 0.2.0-rc.2.
 
 | Check | Result |
 |---|---|
