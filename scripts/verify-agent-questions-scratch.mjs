@@ -82,7 +82,7 @@ const startHost = async () => {
   await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
   assert.equal(child.exitCode, null, 'Scratch Host exited after printing its tokenized URL.')
   const activationFailures = output.split('\n').filter(line => /failed to import|did not activate|pending \(waiting for service:/i.test(line))
-  assert.deepEqual(activationFailures, [], redactHostOutput(output.slice(-6_000)))
+  assert.deepEqual(activationFailures, [], redactHostOutput(activationFailures.join('\n')))
 }
 
 const stopHost = async () => {
