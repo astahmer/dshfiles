@@ -50,6 +50,42 @@ export class ApiSessionAttention {
     return this.store.summary(sessionId)
   }
 
+  async reconcile(sessionId: SessionId, signal?: AbortSignal): Promise<SessionAttentionSummary | null> {
+    await this.ready
+    signal?.throwIfAborted()
+    const expectedCursor = this.store.reconciliationCursor(sessionId)
+    const attached = this.ctx.sessions.get(sessionId)
+    if (attached !== undefined && attached.seq - 1 === expectedCursor) {
+      return this.store.summary(sessionId)
+    }
+
+    const observation = await this.ctx.sessionQuery.observeSession(sessionId, {
+      ...(signal === undefined ? {} : { signal }),
+      projectionMode: 'none',
+    })
+    try {
+      signal?.throwIfAborted()
+      if (observation.cursor === expectedCursor) return this.store.summary(sessionId)
+      const replace = observation.cursor < expectedCursor
+      const promptSeqs = observation.events
+        .filter(event => (replace || event.seq > expectedCursor)
+          && event.type === 'user/message'
+          && event.data.source.kind === 'user')
+        .map(event => event.seq)
+      const before = this.store.summary(sessionId)
+      const attention = await this.store.reconcile(sessionId, expectedCursor, observation.cursor, promptSeqs)
+      if (before?.lastPromptSeq !== attention.lastPromptSeq
+        || before?.readThroughSeq !== attention.readThroughSeq
+        || before?.snoozed !== attention.snoozed
+        || before?.unread !== attention.unread) {
+        this.ctx.emit('api-session/attention', sessionId, attention)
+      }
+      return attention
+    } finally {
+      observation[Symbol.dispose]()
+    }
+  }
+
   async flush(): Promise<void> {
     await this.ready
     await this.promptTail

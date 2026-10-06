@@ -8,6 +8,7 @@ import type { SessionAttentionSummary } from './types.ts'
 
 const attentionRecordSchema = z.object({
   lastPromptSeq: z.number().int().nonnegative().nullable(),
+  observedThroughSeq: z.number().int().min(-1).default(-1),
   readThroughSeq: z.number().int().min(-1),
   snoozed: z.boolean(),
 }).strict()
@@ -16,19 +17,23 @@ type AttentionRecord = z.infer<typeof attentionRecordSchema>
 
 export const sessionAttentionDomainSpec = defineDomain({
   name: 'dsh_api_session_attention',
-  version: 1,
+  version: 2,
+  compatibleVersions: [1],
   layout: 'per-record',
   tables: { sessions: domainTable(attentionRecordSchema) },
 })
 
 const initialAttention = (): AttentionRecord => ({
   lastPromptSeq: null,
+  observedThroughSeq: -1,
   readThroughSeq: -1,
   snoozed: false,
 })
 
 const summarize = (record: AttentionRecord): SessionAttentionSummary => ({
-  ...record,
+  lastPromptSeq: record.lastPromptSeq,
+  readThroughSeq: record.readThroughSeq,
+  snoozed: record.snoozed,
   unread: record.lastPromptSeq !== null && record.lastPromptSeq > record.readThroughSeq,
 })
 
@@ -50,7 +55,42 @@ export class SessionAttentionStore {
     return this.update(sessionId, current => ({
       ...current,
       lastPromptSeq: current.lastPromptSeq === null ? seq : Math.max(current.lastPromptSeq, seq),
+      observedThroughSeq: Math.max(current.observedThroughSeq, seq),
     }))
+  }
+
+  reconciliationCursor(sessionId: SessionId): number {
+    return this.domain?.table('sessions').get(sessionId)?.observedThroughSeq ?? -1
+  }
+
+  reconcile(
+    sessionId: SessionId,
+    expectedCursor: number,
+    cursor: number,
+    promptSeqs: readonly number[],
+  ): Promise<SessionAttentionSummary> {
+    const latestPromptSeq = promptSeqs.reduce<number | null>(
+      (latest, seq) => latest === null ? seq : Math.max(latest, seq),
+      null,
+    )
+    return this.update(sessionId, current => {
+      if (cursor < current.observedThroughSeq) {
+        if (current.observedThroughSeq !== expectedCursor) return current
+        return {
+          ...current,
+          lastPromptSeq: latestPromptSeq,
+          observedThroughSeq: cursor,
+          readThroughSeq: Math.min(current.readThroughSeq, cursor),
+        }
+      }
+      return {
+        ...current,
+        lastPromptSeq: latestPromptSeq === null
+          ? current.lastPromptSeq
+          : current.lastPromptSeq === null ? latestPromptSeq : Math.max(current.lastPromptSeq, latestPromptSeq),
+        observedThroughSeq: Math.max(current.observedThroughSeq, cursor),
+      }
+    })
   }
 
   markRead(sessionId: SessionId, throughSeq: number): Promise<SessionAttentionSummary> {

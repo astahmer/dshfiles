@@ -22,6 +22,11 @@ const SEARCH_PROVIDER_CALL_LIMIT = 100
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
+type SessionAttentionReconciler = (
+  sessionId: SessionId,
+  signal?: AbortSignal,
+) => Promise<SessionAttentionSummary | null>
+
 const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
   blank: z.boolean(),
   lastPromptAt: z.number().nullable(),
@@ -74,11 +79,15 @@ export function truncateUnicodeCodePoints(value: string, maximum: number): strin
 
 /** Owns list projection registration, bounded cold summaries, and authorized search. */
 export class ApiSessionList {
+  private readonly reconcileAttention: SessionAttentionReconciler
+
   /** @param ctx - Host context carrying Session, query, persistence, and projection services. */
   constructor(
     private readonly ctx: Context,
     private readonly attentionFor: (sessionId: SessionId) => SessionAttentionSummary | null = () => null,
+    reconcileAttention?: SessionAttentionReconciler,
   ) {
+    this.reconcileAttention = reconcileAttention ?? (async sessionId => this.attentionFor(sessionId))
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
@@ -107,7 +116,10 @@ export class ApiSessionList {
    * @param session - attached Session to summarize.
    * @returns current list metadata and available projections.
    */
-  summaryFor(session: Session): SessionSummary {
+  summaryFor(
+    session: Session,
+    attention: SessionAttentionSummary | null = this.attentionFor(session.id),
+  ): SessionSummary {
     const projections = this.projectionsFor(session.header, session)
     const metadata = projections?.values.sessionListMetadata
     return {
@@ -118,7 +130,7 @@ export class ApiSessionList {
       blank: metadata?.blank ?? session.seq === 0,
       ...listFields(session.header),
       ...(projections === undefined ? {} : { projections }),
-      attention: this.attentionFor(session.id),
+      attention,
     }
   }
 
@@ -131,23 +143,43 @@ export class ApiSessionList {
     signal?.throwIfAborted()
     const records = await this.ctx.sessionQuery.listSessions(signal)
     signal?.throwIfAborted()
+    const attentionBySession = new Map<SessionId, SessionAttentionSummary | null>()
+    for (const record of records) {
+      const live = this.ctx.sessions.get(record.header.id)
+      if (live === undefined && record.header.cwd === undefined) continue
+      signal?.throwIfAborted()
+      try {
+        attentionBySession.set(record.header.id, await this.reconcileAttention(record.header.id, signal))
+      } catch (error: unknown) {
+        signal?.throwIfAborted()
+        this.ctx.logger.warn(
+          `api-session.list: attention for "${record.header.id}" could not be reconciled; serving it as unknown: ${String(error)}`,
+        )
+        attentionBySession.set(record.header.id, null)
+      }
+    }
     const items: SessionSummary[] = []
     const cold: SessionHeader[] = []
     for (const record of records) {
       const live = this.ctx.sessions.get(record.header.id)
       if (live !== undefined) {
-        items.push(this.summaryFor(live))
+        items.push(this.summaryFor(live, attentionBySession.get(live.id) ?? null))
         continue
       }
       if (record.header.cwd === undefined) continue
       cold.push(record.header)
     }
-    for (const header of cold) items.push(this.summarizeCold(header))
+    for (const header of cold) {
+      items.push(this.summarizeCold(header, attentionBySession.get(header.id) ?? null))
+    }
     items.sort((left, right) => right.updatedAt - left.updatedAt)
     return items
   }
 
-  private summarizeCold(header: SessionHeader): SessionSummary {
+  private summarizeCold(
+    header: SessionHeader,
+    attention: SessionAttentionSummary | null = this.attentionFor(header.id),
+  ): SessionSummary {
     const projections = this.projectionsFor(header, undefined)
     const metadata = projections?.values.sessionListMetadata
     return {
@@ -159,7 +191,7 @@ export class ApiSessionList {
       blank: metadata?.blank ?? false,
       ...listFields(header),
       ...(projections === undefined ? {} : { projections }),
-      attention: this.attentionFor(header.id),
+      attention,
     }
   }
 
