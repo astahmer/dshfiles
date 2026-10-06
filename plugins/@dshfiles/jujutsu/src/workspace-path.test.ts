@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import { resolveWorkspaceDestination } from './workspace-path.ts'
+import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.ts'
 
 test('workspace destination must be a new sibling outside the registered repository tree', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-path-'))
@@ -19,6 +19,24 @@ test('workspace destination must be a new sibling outside the registered reposit
   assert.equal(destination.path, join(canonicalParent, 'review-branch'))
   await assert.rejects(resolveWorkspaceDestination(repository, repository, 'nested-workspace'), /outside the registered repository tree/)
   await assert.rejects(resolveWorkspaceDestination(repository, root, 'repository'), /outside the registered repository tree/)
+})
+
+test('workspace preview identity detects replacing the selected parent at the same path', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-parent-'))
+  const repository = join(root, 'repository')
+  const parent = join(root, 'workspaces')
+  await mkdir(repository)
+  await mkdir(parent)
+  onTestFinished(() => rm(root, { recursive: true, force: true }))
+
+  const previewed = await resolveWorkspaceDestination(repository, parent, 'review-branch')
+  await rename(parent, join(root, 'workspaces-before-replacement'))
+  await mkdir(parent)
+  const confirmed = await resolveWorkspaceDestination(repository, parent, 'review-branch')
+
+  assert.equal(previewed.parentPath, confirmed.parentPath)
+  assert.equal(previewed.path, confirmed.path)
+  assert.equal(sameWorkspaceParent(previewed.parentIdentity, confirmed.parentIdentity), false)
 })
 
 test('workspace destination rejects unsafe names, filesystem roots, and existing targets', async () => {

@@ -1,5 +1,5 @@
+/* Theme aliases resolve once here, with readable fallbacks outside Host. */
 .panel {
-  /* Keep DSH theme tokens primary and provide readable fallbacks outside Host. */
   --jj-bg: var(--dsw-alias-bg-layer-1, #17191d);
   --jj-raised: var(--dsw-alias-bg-module-platform, #202329);
   --jj-border: var(--dsw-alias-border-l2, #34383f);
@@ -21,10 +21,46 @@
   box-sizing: border-box;
   min-height: 100%;
   padding: 20px 24px 36px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-1);
-  font: var(--dsw-font-s-14);
+  color: var(--jj-text);
+  background: var(--jj-bg);
+  font: var(--dsw-font-s-14, 14px/1.45 system-ui, sans-serif);
 }
+.panel * {
+  box-sizing: border-box;
+}
+.panel button,
+.panel input,
+.panel select,
+.panel textarea {
+  font: inherit;
+}
+.panel button {
+  color: inherit;
+  cursor: pointer;
+}
+.panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.panel h1,
+.panel h2,
+.panel h3,
+.panel p {
+  margin-top: 0;
+}
+.panel h1 {
+  margin-bottom: 3px;
+  font-size: 1.8rem;
+}
+.panel h2 {
+  margin-bottom: 8px;
+  font-size: 17px;
+}
+.panel h3 {
+  margin: 14px 0 8px;
+  font-size: 14px;
+}
+
 
 .sidePanel {
   height: 100%;
@@ -36,7 +72,7 @@
   z-index: 3;
   top: 0;
   padding-bottom: 12px;
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--jj-bg);
 }
 
 .titleRow {
@@ -61,8 +97,9 @@
   font: var(--dsw-font-s-strong-14);
 }
 
-.muted {
-  color: var(--dsw-alias-label-secondary);
+.muted,
+.detailMeta {
+  color: var(--jj-muted);
 }
 
 .repoForm {
@@ -70,6 +107,21 @@
   grid-template-columns: minmax(180px, 1fr) auto minmax(90px, auto) auto minmax(90px, auto) auto;
   gap: 8px;
   margin: 16px 0 8px;
+}
+
+.panel input:not([type='checkbox']),
+.panel select,
+.panel textarea {
+  min-width: 0;
+  border: 1px solid var(--jj-border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--jj-text);
+  background: var(--jj-raised);
+}
+.panel textarea {
+  width: 100%;
+  resize: vertical;
 }
 
 .repoPath {

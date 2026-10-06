@@ -14,6 +14,7 @@ export interface PreparedMutation {
   readonly identity: string
   readonly fingerprint: string
   readonly action: Mutation
+  readonly workspaceParentIdentity?: { readonly device: string; readonly inode: string }
   readonly argv: readonly string[]
   readonly title: string
   readonly summary: string

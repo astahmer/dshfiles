@@ -62,10 +62,13 @@ path field because the Host contract exposes no repository picker.
 Workspace provisioning uses the Client `uiWorkspace.pickDirectory` picker.
 The Host treats its result as untrusted: it canonicalizes an existing parent,
 rejects destinations inside or above the registered repository tree and any
-existing destination, then repeats those checks at confirmation. `jj workspace
-add` receives the validated path and name as separate argv values. Opening a
-Session in the created directory is a separate user action through the native
-Session and UI Workspace services.
+existing destination, and binds the preview to the parent directory's device
+and inode before repeating the checks at confirmation. `jj workspace add`
+receives the validated path and name as separate argv values. The final path
+check and process launch still have a narrow TOCTOU window because the Host
+subprocess API has no opened-directory handle. Opening a Session in the created
+directory is a separate user action through the native Session and UI
+Workspace services.
 
 Revision details show file counts, diff line counts, evolution history, and the
 selected revision's full diff. Description drafts are keyed by revision, so

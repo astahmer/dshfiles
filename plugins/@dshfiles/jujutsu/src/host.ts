@@ -19,7 +19,7 @@ import {
   type PreparedMutation,
 } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
-import { resolveWorkspaceDestination } from './workspace-path.js'
+import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
 const MAX_OUTPUT = 1_160_000
 const MAX_STDERR = 64_000
@@ -453,10 +453,12 @@ const prepareMutation = async (
 ): Promise<PreparedMutation> => {
   let preparedAction = action
   let workspacePath: string | undefined
+  let workspaceParentIdentity: { readonly device: string; readonly inode: string } | undefined
   if (action.kind === 'workspace-add') {
     const destination = await resolveWorkspaceDestination(repo.root, action.parentPath, action.name)
     preparedAction = { ...action, parentPath: destination.parentPath }
     workspacePath = destination.path
+    workspaceParentIdentity = destination.parentIdentity
   }
   const paths = preparedAction.kind === 'split' ? await readPaths(ctx, repo, preparedAction.commitId, signal) : current.state.changedPaths
   const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
@@ -490,6 +492,7 @@ const prepareMutation = async (
     identity: current.identity,
     fingerprint: current.fingerprint,
     action: preparedAction,
+    ...(workspaceParentIdentity === undefined ? {} : { workspaceParentIdentity }),
     argv,
     title: preview.title,
     summary: preview.summary,
@@ -516,7 +519,7 @@ const jujutsuHostApi = jujutsuApi.host({
     const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, {
       outputLimit: 118_000,
     })
-    const files = parsePatchStats(patch.stdout, paths)
+    const files = parsePatchStats(patch.stdout, paths, patch.truncated)
     return {
       files,
       additions: files.reduce((sum, file) => sum + file.additions, 0),
@@ -549,7 +552,12 @@ const jujutsuHostApi = jujutsuApi.host({
     if (prepared.action.kind === 'workspace-add') {
       const destination = await resolveWorkspaceDestination(repo.root, prepared.action.parentPath, prepared.action.name)
       const expectedPath = join(prepared.action.parentPath, prepared.action.name)
-      if (destination.parentPath !== prepared.action.parentPath || destination.path !== expectedPath) {
+      if (
+        prepared.workspaceParentIdentity === undefined ||
+        !sameWorkspaceParent(prepared.workspaceParentIdentity, destination.parentIdentity) ||
+        destination.parentPath !== prepared.action.parentPath ||
+        destination.path !== expectedPath
+      ) {
         throw new Error('Workspace destination changed after preview. Prepare the action again.')
       }
       workspacePath = destination.path

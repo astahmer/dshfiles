@@ -8,14 +8,23 @@ const pathContains = (parentPath: string, candidatePath: string): boolean => {
   return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith('..' + sep) && !isAbsolute(relativePath))
 }
 
+export interface WorkspaceParentIdentity {
+  readonly device: string
+  readonly inode: string
+}
+
+export const sameWorkspaceParent = (left: WorkspaceParentIdentity, right: WorkspaceParentIdentity): boolean =>
+  left.device === right.device && left.inode === right.inode
+
 export const resolveWorkspaceDestination = async (
   repositoryPath: string,
   selectedParentPath: string,
   name: string,
-): Promise<{ readonly parentPath: string; readonly path: string }> => {
+): Promise<{ readonly parentPath: string; readonly path: string; readonly parentIdentity: WorkspaceParentIdentity }> => {
   if (!workspaceNameSchema.safeParse(name).success) throw new Error('Choose a valid Jujutsu workspace name.')
   const parentPath = await realpath(validatedRepositoryPath(selectedParentPath))
-  if (!(await stat(parentPath)).isDirectory()) throw new Error('Choose an existing parent directory for the new workspace.')
+  const parentStat = await stat(parentPath, { bigint: true })
+  if (!parentStat.isDirectory()) throw new Error('Choose an existing parent directory for the new workspace.')
   const repositoryRoot = await realpath(repositoryPath)
   const destination = join(parentPath, name)
   if (pathContains(repositoryRoot, destination) || pathContains(destination, repositoryRoot)) {
@@ -27,5 +36,9 @@ export const resolveWorkspaceDestination = async (
   } catch (error) {
     if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error
   }
-  return { parentPath, path: destination }
+  return {
+    parentPath,
+    path: destination,
+    parentIdentity: { device: parentStat.dev.toString(), inode: parentStat.ino.toString() },
+  }
 }
