@@ -24,7 +24,7 @@
     "playwright-bdd": "^8.5.1",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "ws": "^8.18.0",
+    "ws": "8.21.3",
     "zod": "4.6.5"
   },
   "engines": {
