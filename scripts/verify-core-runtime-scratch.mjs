@@ -373,14 +373,39 @@ try {
   })
   await platform.sessions.prompt(cursorSession.sessionId, 'synthetic first provider turn', 'queue')
   const initialCursorHistory = await waitForHistoryText(platform, cursorSession.sessionId, 'cursor-fixture-response-1')
+
+  await stopHost()
+  const cleanRestartedPlatform = await startHost()
+  const cleanRestartedSessions = await cleanRestartedPlatform.sessions.list()
+  assert.ok(
+    cleanRestartedSessions.some(session => session.sessionId === cursorSession.sessionId),
+    'Cursor-bound Session was missing after a clean Host restart.',
+  )
+  const cleanRestartedCursorHistory = await cleanRestartedPlatform.sessions.history(cursorSession.sessionId)
+  assert.deepEqual(
+    cleanRestartedCursorHistory.records,
+    initialCursorHistory.records,
+    'Cursor Session history changed across a clean Host restart.',
+  )
+  await cleanRestartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic resumed provider turn', 'queue')
+  await waitForHistoryText(cleanRestartedPlatform, cursorSession.sessionId, 'cursor-fixture-response-2')
+  const cleanRestartEvents = await waitForCursorEvents(
+    events => events.filter(event => event.type === 'prompt').length === 2 && events.filter(event => event.type === 'response').length === 2,
+    'the resumed Cursor provider turn after a clean Host restart',
+  )
+  assert.equal(cleanRestartEvents.filter(event => event.type === 'new').length, 1, 'Clean restart created a replacement Cursor ACP session.')
+  assert.equal(cleanRestartEvents.filter(event => event.type === 'load').length, 1, 'Clean restart did not load the existing Cursor ACP session.')
+  assert.equal(cleanRestartEvents.filter(event => event.type === 'prompt').length, 2, 'Clean restart did not submit exactly two Cursor prompts.')
+  assert.equal(cleanRestartEvents.filter(event => event.type === 'response').length, 2, 'Clean restart did not complete exactly two Cursor responses.')
+
   await writeFile(cursorResponseGatePath, 'hold response until the verifier crashes the scratch Host\n')
-  await platform.sessions.prompt(cursorSession.sessionId, 'synthetic interrupted provider turn', 'queue')
+  await cleanRestartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic interrupted provider turn', 'queue')
   const inFlightCursorEvents = await waitForCursorEvents(
-    events => events.filter(event => event.type === 'prompt').length === 2 && events.filter(event => event.type === 'response').length === 1,
+    events => events.filter(event => event.type === 'prompt').length === 3 && events.filter(event => event.type === 'response').length === 2,
     'the second in-flight provider prompt',
   )
   await crashHost()
-  assert.equal(inFlightCursorEvents.filter(event => event.type === 'prompt').length, 2)
+  assert.equal(inFlightCursorEvents.filter(event => event.type === 'prompt').length, 3)
   await unlink(cursorResponseGatePath)
   await waitForCursorEvents(
     events => events.some(event => event.type === 'response-notification-failed:closed'),
@@ -409,7 +434,7 @@ try {
     'Cursor-bound Session history lost records after the unclean Host termination.',
   )
   assert.ok(recoveredCursorText.includes('synthetic interrupted provider turn'), 'The interrupted user prompt was not recovered.')
-  assert.ok(!recoveredCursorText.includes('cursor-fixture-response-2'), 'The unresolved provider operation was reported as completed.')
+  assert.ok(!recoveredCursorText.includes('cursor-fixture-response-3'), 'The unresolved provider operation was reported as completed.')
   assert.ok(
     recoveredCursorEvents.some(event => event.type === 'turn/end' && event.data.reason?.kind === 'interrupted'),
     'The in-flight turn was not marked interrupted after Host recovery.',
@@ -446,7 +471,7 @@ try {
     'The unresolved Cursor provider outcome was not surfaced to the Session.',
   )
   const recoveredTurnText = JSON.stringify(recoveredTurnHistory.records)
-  assert.ok(!recoveredTurnText.includes('cursor-fixture-response-2'), 'The Host replayed the unresolved provider operation after recovery.')
+  assert.ok(!recoveredTurnText.includes('cursor-fixture-response-3'), 'The Host replayed the unresolved provider operation after recovery.')
   assert.ok(recoveredTurnText.includes('synthetic provider turn after crash recovery'), 'The rejected post-crash prompt was not retained in Session history.')
   const cursorEventsBeforeReconcile = await readCursorEvents()
   assert.equal(cursorEventsBeforeReconcile.filter(event => event.type === 'new').length, 1, 'Cursor runtime did not create exactly one ACP session.')
@@ -530,13 +555,13 @@ try {
     'The invoking Session confirmation did not survive a Host restart.',
   )
   await durablePlatform.sessions.prompt(cursorSession.sessionId, 'synthetic provider turn after explicit reconciliation', 'queue')
-  const postReconcileHistory = await waitForHistoryText(durablePlatform, cursorSession.sessionId, 'cursor-fixture-response-3')
+  const postReconcileHistory = await waitForHistoryText(durablePlatform, cursorSession.sessionId, 'cursor-fixture-response-4')
   assert.ok(
     JSON.stringify(postReconcileHistory.records).includes('synthetic provider turn after explicit reconciliation'),
     'The post-reconciliation prompt was not retained in the recovered Session.',
   )
   assert.ok(
-    !JSON.stringify(postReconcileHistory.records).includes('cursor-fixture-response-2'),
+    !JSON.stringify(postReconcileHistory.records).includes('cursor-fixture-response-3'),
     'The previously uncertain provider response was replayed into Session history.',
   )
 
