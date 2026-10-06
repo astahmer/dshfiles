@@ -37,6 +37,7 @@
         "src/cli/bin.ts",
         "src/cli/index.ts",
         "src/compiler/host/index.ts",
+        "scripts-mh-workspace-probe.mjs",
       ],
       "ignoreDependencies": ["@deepseek-ai/dsh"],
     },
