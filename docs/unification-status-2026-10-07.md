@@ -7,6 +7,122 @@ source-to-copy tree checks and final branch checks below pass.
 
 ## Current checkpoint
 
+### Resume checkpoint — 2026-10-07, evening
+
+This subsection supersedes older IDs/status claims below. Work is in
+`/Users/astahmer/dev/dshfiles-unified`, thread
+`18ba7fff-942f-4f50-86b5-a9f0e135a2be`. The user confirmed the default writer
+finished and authorized moving its workspace. No `main` move, push, workspace
+forget, or bookmark cleanup has happened in this resume yet.
+
+Completed:
+
+1. Listed all registered workspaces, captured their statuses, and checked T3:
+   only this thread was running. Source directories have not been deleted.
+2. Duplicated the entire already-linear `main..3a80becd` chain once. Repaired
+   copied Citty conflicts only, with per-target preflights. Clean copied tip
+   `24cf34722e8047da0cfae927e38b7192a8ebbeb7` has zero conflicted ancestors and
+   **an empty full-tree diff** against source
+   `3a80becda0e96a463094f831eee5310665270946`.
+3. Captured latest default WIP
+   `d84e533fd485e7ca51ede6253c11d39ec70d6a41`, duplicated and rebased only its
+   copy. Copy `b8f74cc703d4e1e2a3cf15998cc0e2e6b2805e93` has **an empty
+   full-tree diff** against that source. Its 18 paths include Workspace Restore
+   UI/controller/store/policy and tests. Default remained untouched.
+4. Audited source domains. Plugin UI matched source exactly before formatting;
+   Settings has later locale/style changes while preserving Host navigation.
+   Roadmap-resume feedback has later parent-error and batch-boundary fixes.
+5. Found missing continuation work, rather than treating every nonempty diff as
+   harmless: cold-restart feedback validation, its scratch fixture, native row
+   config handling, Controller bundle composition, and verifier helpers.
+   Duplicated/rebased `42cce768..07101e02` (11 revisions) onto the isolated
+   spine. Tail tip `3c4e51a17261c4f25c9130a712983da0c7ef3a66` was conflict-free.
+   The core-runtime package, scratch verifier, and Host SDK file matched the
+   continuation source exactly at that checkpoint, before subsequent repairs.
+6. Regenerated the plugin lockfile from merged manifests and completed frozen
+   installs. Restored the truncated scaffold test from CLI source; removed an
+   unused bridge variable. Reconciled typed Host config with native row config;
+   separated Client setup typing from Host Context; preserved both attention
+   call forms; added runtime-peer declarations required by the new guard.
+7. Fixed `defineHost` schema inference and added type coverage. Fixed the normal
+   core bundle build/typecheck scripts to use their dependency-scope wrapper;
+   corrected that wrapper to use the plugin package's dependency directory.
+8. Restored README feature index and Project Checks README. Ran repository
+   formatter. All formatting changes remain reviewable in the current revision.
+9. Reused eight local core compiled packages only after source/build-input
+   equality. This alone does **not** prove compiled artifacts are current:
+   Workspace Restore artifacts were stale and are being regenerated separately.
+10. Prepared isolated native source clone at
+    `/private/tmp/dsh-unify-controller-source`, based on the previously used
+    pinned `/private/tmp/dsh-api-gen-639ed` workspace. Copied current Controller
+    source/build configs there. Fixed five incomplete `finally` blocks, unused
+    bindings, and a branded Workspace ID error in the local source. Build only
+    this modified TypeScript package; do not build the whole DSH workspace.
+
+Measured checks so far:
+
+- DSHX TypeScript check passed after contract repairs.
+- Focused Client/Host/config/attention/E2E-contract tests: 115/115 passed.
+- Scaffold tests: 22/22 passed.
+- Additional build/config/offline-boot-contract tests: 57/57 passed.
+- Browser evidence tests: 4/4 passed after downloading official prebuilt
+  Chromium headless shell. No native/browser source compilation was used.
+- The first broad DSHX run reported 521 passed, 14 failed, 1 skipped. Failures
+  included missing browser executable, stale help/API expectations, missing
+  runtime peers in scaffold fixtures, and unprepared boot fixtures. Some are
+  repaired above; a final bounded rerun is still required. Do not cite the old
+  totals as final results.
+- Plugin checks have exposed and driven actual repairs; no full plugin pass is
+  claimed yet. Latest blocking package was Jujutsu: API schema lost
+  `contentDigest`, and Workspace Restore uses a release Controller dependency
+  instead of the local generated package. Both source fixes are now applied;
+  generated Controller package remains the next gate.
+
+Remaining for this integration, in order:
+
+1. Finish Controller Host/client compile, Typert generation, bundle, guarded
+   sync, and its focused Workspace Restore tests. Never hand-edit generated
+   output. The old native source failed the guarded source-equality gate.
+2. Run plugin build/typecheck/tests and final DSHX focused/broad checks; record
+   exact remaining failures. Avoid repeatedly rerunning unrelated known failures.
+3. Verify isolated profile composition/boot; leave the live web process alone.
+4. Commit focused repairs and formatting separately; scan the final explicit
+   ancestry for conflicts, merges, empty revisions and undescribed revisions.
+   Remove empty copied revisions only, and require final-tree equality before
+   and after this history cleanup.
+5. Recheck default has not changed since `d84e533f`. Preserve all source tips,
+   old `main`, current operation and bookmark/workspace inventory. Reduce
+   temporary bookmarks; forget only accounted-for workspaces, without deleting
+   their directories. A stale old squash process was observed waiting in an
+   editor; handle it before final history moves to prevent a delayed rewrite.
+6. Move `main` to the proven local tip, then make default a clean empty child.
+   Reconcile the integration summary and update this ledger with final IDs.
+7. Push only after the validation/preservation gates are satisfied. No push has
+   occurred. Product acceptance gaps below must remain explicit.
+
+Product acceptance still separate from history unification:
+
+- Phase 1A/1B/1C: a credentialed provider turn, real Cursor side effects, and
+  provider restart/recovery remain distinct from synthetic scratch proofs.
+- Phase 1D: active-profile attention API/UI and automatic quota wake remain
+  gated; the active profile lacks proven Schedule composition.
+- Phase 2: parent/child panel and feedback need full installed Host/browser
+  acceptance, including cold restart; do not infer that from unit tests.
+- Multi-Host: real SSH/process/PTY/LSP/MCP lifecycle, qualified host/workspace UI
+  with offline behavior, and production connection semantics remain acceptance
+  gates. Keep Pi local 401 versus reported remote 200 discrepancy parked.
+- Project Checks: authenticated/native execution and broad verification gaps
+  remain as recorded in the software roadmap; do not claim production pass.
+- Phase 7 cosmetics remains deliberately deferred, not unfinished required work.
+- Native provider plans, creator mode, and unrelated optional additions are not
+  authorized implementation work in this unification pass.
+
+Evidence logs and clone/generator commands are under
+`/private/tmp/dsh-unify-20261007/`. Retain compact durable results in this file;
+these scratch paths are not a substitute for checked-in status.
+
+### Earlier checkpoints (historical, not current)
+
 - Integration workspace: `/Users/astahmer/dev/dshfiles-unified`.
 - The integration workspace is now an empty WIP above the latest ledger
   revision. The README feature index is committed at

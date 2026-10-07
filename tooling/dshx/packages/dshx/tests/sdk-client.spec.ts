@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createTestClient, createTestHost, mountPlugin } from '../src/testing/index.js'
 import { definePlugin, defineTool } from '../src/host/index.js'
 import { defineClientPlugin } from '../src/client/index.js'
-import type { Context } from '@deepseek-ai/cordis'
+import type { ClientContext } from '../src/client/types.js'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 
 describe('native SDK testing utilities', () => {
@@ -108,7 +108,7 @@ describe('native SDK testing utilities', () => {
       )
     let rootDispose = declare()
     try {
-      let raw: Context | undefined
+      let raw: ClientContext | undefined
       const definition = defineClientPlugin({
         id: 'example',
         uses: ['ui'],

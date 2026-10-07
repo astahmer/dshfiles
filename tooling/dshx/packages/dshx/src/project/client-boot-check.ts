@@ -1,3 +1,5 @@
+import { access } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
@@ -128,7 +130,11 @@ const findFreePort = async (): Promise<number> => {
   })
 }
 
-const waitForHostUrl = (child: ChildProcess, output: () => string, timeoutMs: number): Promise<{ readonly url?: string; readonly processError?: string; readonly spawnError?: string }> =>
+const waitForHostUrl = (
+  child: ChildProcess,
+  output: () => string,
+  timeoutMs: number,
+): Promise<{ readonly url?: string; readonly processError?: string; readonly spawnError?: string }> =>
   new Promise(resolve => {
     let settled = false
     const finish = (value: { readonly url?: string; readonly processError?: string; readonly spawnError?: string }): void => {
@@ -174,6 +180,11 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   let host: ChildProcess | undefined
   let launchUrl: string | undefined
   try {
+    try {
+      await access(join(options.profileRoot, 'package.json'))
+    } catch {
+      throw new Error('Client boot requires a prepared isolated profileRoot with package.json.')
+    }
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,

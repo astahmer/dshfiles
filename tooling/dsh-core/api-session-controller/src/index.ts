@@ -352,6 +352,7 @@ export class SessionController extends TypertRemoteService {
       return await this.commands.create(request)
     } finally {
       release()
+    }
   }
 
   /**
@@ -366,6 +367,7 @@ export class SessionController extends TypertRemoteService {
       return await this.commands.selectModel(request)
     } finally {
       release()
+    }
   }
 
   /**
@@ -502,6 +504,7 @@ export class SessionController extends TypertRemoteService {
       return await this.commands.fork(request)
     } finally {
       release()
+    }
   }
 
   /**
@@ -518,6 +521,7 @@ export class SessionController extends TypertRemoteService {
       return await this.commands.prompt(request)
     } finally {
       release()
+    }
   }
 
   /**
@@ -542,6 +546,7 @@ export class SessionController extends TypertRemoteService {
       return await this.commands.updateQueue(request)
     } finally {
       release()
+    }
   }
 
   /**

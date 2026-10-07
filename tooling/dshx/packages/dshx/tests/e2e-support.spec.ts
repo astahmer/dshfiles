@@ -77,9 +77,19 @@ describe('E2E scratch profile provisioning', () => {
   })
 
   it('refuses to treat an unprepared empty profile as a client boot pass', async () => {
-    const result = await checkClientBoot({ projectRoot: process.cwd(), profile: 'empty', port: 0 })
+    const dshHome = await mkdtemp(join(tmpdir(), 'dshx-unprepared-home-'))
+    const result = await checkClientBoot({
+      projectRoot: process.cwd(),
+      profile: 'empty',
+      port: 0,
+      dshHome,
+      profileRoot: join(dshHome, 'unprepared'),
+      expectedBundles: ['@dshfiles/unprepared'],
+      expectedClientEntries: [],
+    })
+    await rm(dshHome, { recursive: true, force: true })
     expect(result.ok).toBe(false)
-    expect(result.setupError).toContain('prepared isolated profileRoot')
+    expect(result.processError).toContain('prepared isolated profileRoot')
   })
 })
 
@@ -227,9 +237,9 @@ describe('bounded E2E evidence', () => {
       })
       recordEvidenceAssertion(run, 'plugin-activation', 'failed')
 
-      await expect(
-        finishEvidenceRun(run, 'passed', { sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' }),
-      ).rejects.toThrow('a passed run cannot contain a failed assertion')
+      await expect(finishEvidenceRun(run, 'passed', { sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' })).rejects.toThrow(
+        'a passed run cannot contain a failed assertion',
+      )
     } finally {
       await rm(outputRoot, { recursive: true, force: true })
     }

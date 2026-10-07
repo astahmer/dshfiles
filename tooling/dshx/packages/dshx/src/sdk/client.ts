@@ -1,6 +1,6 @@
 import { adaptClientSetup } from './setup.js'
 import { CLIENT_CAPABILITY_INJECTIONS } from 'create-dshx/runtime-capabilities'
-import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { Effect } from '@deepseek-ai/cordis'
 import { createElement } from 'react'
 import type { ComposedProps, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
 import { createApiClient } from '../api/runtime.js'
-import type { ClientDefinition } from '../client/types.js'
+import type { ClientContext, ClientDefinition } from '../client/types.js'
 import { assertPluginId, createBaseApi, type BasePluginApi } from './lifecycle.js'
 
 export interface UiApi {
@@ -69,7 +69,7 @@ export interface ClientCapabilities {
 }
 
 export type ClientCapability = keyof ClientCapabilities
-export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi & Pick<ClientCapabilities, Uses[number]>
+export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi<ClientContext> & Pick<ClientCapabilities, Uses[number]>
 
 export interface ClientPluginDefinition<Uses extends readonly ClientCapability[] = readonly []> extends Omit<ClientDefinition, 'name' | 'setup'> {
   readonly id: string
@@ -80,7 +80,7 @@ export interface ClientPluginDefinition<Uses extends readonly ClientCapability[]
 
 /** @internal Only this adapter erases the native slot overload implementation. */
 export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
-  ctx: Context,
+  ctx: ClientContext,
   uses: Uses,
   packageId: string,
   decorate: (component: unknown) => unknown = component => component,

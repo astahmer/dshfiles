@@ -16,7 +16,10 @@ describe('SDK source to native plugin', () => {
     const client = await createTestClient()
     try {
       await mkdir(resolve(root, 'src'))
-      await writeFile(resolve(root, 'package.json'), JSON.stringify({ name: '@test/sdk-build', type: 'module' }))
+      await writeFile(
+        resolve(root, 'package.json'),
+        JSON.stringify({ name: '@test/sdk-build', type: 'module', peerDependencies: { '@deepseek-ai/dsh-tools': '>=0.2.0-rc.1 <0.3.0-0' } }),
+      )
       await writeFile(
         resolve(root, 'src/host.ts'),
         `

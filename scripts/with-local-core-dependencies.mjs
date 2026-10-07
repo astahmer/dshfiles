@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packageDirectory = resolve(repoRoot, 'plugins/@dshfiles/dsh-core-runtime')
-const dependencyDirectory = resolve(repoRoot, 'plugins/node_modules')
+const dependencyDirectory = resolve(packageDirectory, 'node_modules')
 const packageDependencyLink = resolve(repoRoot, 'tooling/dsh-core/api-session-controller/node_modules')
 const [command, ...args] = process.argv.slice(2)
 
@@ -25,6 +25,9 @@ try {
     createdLink = true
   }
 
+  if (command === '--prepare') {
+    process.stdout.write('Prepared local Controller dependency identity.\n')
+  } else {
   const result = spawnSync(command, args, {
     cwd: packageDirectory,
     env: process.env,
@@ -32,6 +35,7 @@ try {
   })
   if (result.error !== undefined) throw result.error
   process.exitCode = result.status ?? 1
+  }
 } finally {
-  if (createdLink) await unlink(packageDependencyLink)
+  if (createdLink && command !== '--prepare') await unlink(packageDependencyLink)
 }

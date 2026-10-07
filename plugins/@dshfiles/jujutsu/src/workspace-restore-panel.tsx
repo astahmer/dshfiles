@@ -1,9 +1,4 @@
-import type {
-  ISessions,
-  SessionSummary,
-  SessionWorkspaceRestorePreview,
-  SessionWorkspaceRestoreReceipt,
-} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionSummary, SessionWorkspaceRestorePreview, SessionWorkspaceRestoreReceipt } from '@deepseek-ai/dsh-api-session-controller/client'
 import { ConfirmDialog } from '@dshfiles/plugin-ui'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import styles from './jujutsu.module.css'
@@ -54,11 +49,14 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
     setError(null)
     setPreview(null)
     try {
-      const result = await props.sessions.prepareWorkspaceRestore({
-        sessionId: selectedSessionId,
-        action,
-        ...(action === 'restore' ? { targetCommitId: props.targetCommitId ?? undefined } : {}),
-      }, currentOperation.controller.signal)
+      const result = await props.sessions.prepareWorkspaceRestore(
+        {
+          sessionId: selectedSessionId,
+          action,
+          ...(action === 'restore' ? { targetCommitId: props.targetCommitId ?? undefined } : {}),
+        },
+        currentOperation.controller.signal,
+      )
       if (operation.current !== currentOperation) return
       if (!result.ok) {
         setError(result.error.message)
@@ -90,10 +88,7 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
     setBusy(true)
     setError(null)
     try {
-      const result = await props.sessions.confirmWorkspaceRestore(
-        { previewId: preview.previewId },
-        currentOperation.controller.signal,
-      )
+      const result = await props.sessions.confirmWorkspaceRestore({ previewId: preview.previewId }, currentOperation.controller.signal)
       if (operation.current !== currentOperation) return
       if (!result.ok) {
         setError(result.error.message)
@@ -123,10 +118,7 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
     setError(null)
     setPreview(null)
     try {
-      const result = await props.sessions.workspaceRestoreStatus(
-        { sessionId: selectedSessionId },
-        currentOperation.controller.signal,
-      )
+      const result = await props.sessions.workspaceRestoreStatus({ sessionId: selectedSessionId }, currentOperation.controller.signal)
       if (operation.current !== currentOperation) return
       if (!result.ok) {
         setError(result.error.message)
@@ -174,7 +166,9 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
             })}
           </select>
         </label>
-        <span className={styles.sessionPath} title={props.workspacePath}>{props.workspacePath}</span>
+        <span className={styles.sessionPath} title={props.workspacePath}>
+          {props.workspacePath}
+        </span>
         <button
           className={styles.secondary}
           disabled={selectedSessionId === '' || props.targetCommitId === null || busy}
@@ -183,17 +177,16 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
         >
           Preview file restore
         </button>
-        <button
-          className={styles.secondary}
-          disabled={selectedSessionId === '' || busy}
-          onClick={() => void inspectStatus()}
-          type="button"
-        >
+        <button className={styles.secondary} disabled={selectedSessionId === '' || busy} onClick={() => void inspectStatus()} type="button">
           Inspect latest restore status
         </button>
       </div>
       {selectedSession !== undefined && <p className={styles.muted}>Selected: {selectedSession.displayTitle}</p>}
-      {error !== null && <p className={styles.sessionToolError} role="alert">{error}</p>}
+      {error !== null && (
+        <p className={styles.sessionToolError} role="alert">
+          {error}
+        </p>
+      )}
       {receipt !== null && (
         <div className={styles.sessionToolAction} role="status">
           <span>
@@ -213,8 +206,31 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
           {receipt.state === 'uncertain' && <span>Outcome is uncertain; inspect status again after the Host can verify the JJ process has stopped.</span>}
         </div>
       )}
-      {busy && <p className={styles.muted} role="status">Checking workspace state…</p>}
-      {preview !== null && (
+      {busy && (
+        <p className={styles.muted} role="status">
+          Checking workspace state…
+        </p>
+      )}
+      {preview !== null && preview.changedPathsTruncated && (
+        <div className={styles.sessionToolError} role="alert">
+          <p>The path list is truncated. The Host will not apply a restore unless every changed path is shown.</p>
+          <p>Inspect the complete diff from this workspace:</p>
+          <code>
+            jj diff --from {preview.currentCommitId} --to {preview.targetCommitId}
+          </code>
+          <ul className={styles.previewDetail}>
+            {preview.changedPaths.map(changedPath => (
+              <li key={`${changedPath.status}:${changedPath.path}`}>
+                {changedPath.status} · {changedPath.path}
+              </li>
+            ))}
+          </ul>
+          <button className={styles.secondary} onClick={() => setPreview(null)} type="button">
+            Close path preview
+          </button>
+        </div>
+      )}
+      {preview !== null && !preview.changedPathsTruncated && (
         <ConfirmDialog
           busy={busy}
           cancelLabel="Cancel"
@@ -230,12 +246,17 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
           </strong>
           <p className={styles.muted}>Workspace: {preview.workspacePath}</p>
           <p className={styles.muted}>Conversation history remains unchanged. An interrupted JJ restore may need explicit recovery.</p>
-          <ul className={styles.previewDetail}>
-            {preview.changedPaths.map(changedPath => (
-              <li key={`${changedPath.status}:${changedPath.path}`}>{changedPath.status} · {changedPath.path}</li>
-            ))}
-          </ul>
-          {preview.changedPathsTruncated && <p className={styles.muted}>Path list is truncated; inspect the complete JJ diff before confirming.</p>}
+          {preview.changedPaths.length === 0 ? (
+            <p className={styles.muted}>This restore has no tracked file changes.</p>
+          ) : (
+            <ul className={styles.previewDetail}>
+              {preview.changedPaths.map(changedPath => (
+                <li key={`${changedPath.status}:${changedPath.path}`}>
+                  {changedPath.status} · {changedPath.path}
+                </li>
+              ))}
+            </ul>
+          )}
         </ConfirmDialog>
       )}
     </section>

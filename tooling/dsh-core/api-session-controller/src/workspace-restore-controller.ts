@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { lstat, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { realpath, stat } from 'node:fs/promises'
+import { isAbsolute, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { SessionId as createSessionId } from '@deepseek-ai/dsh-session'
@@ -183,6 +183,17 @@ export class SessionWorkspaceRestoreController {
     })
   }
 
+  private trackTask<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.disposed) return Promise.reject(badRequest('The filesystem restore service is shutting down.'))
+    let finishTask = (): void => {}
+    const activeTask = new Promise<void>(resolveTask => { finishTask = resolveTask })
+    this.activeTasks.add(activeTask)
+    return operation().finally(() => {
+      this.activeTasks.delete(activeTask)
+      finishTask()
+    })
+  }
+
   private async openAndRecover(): Promise<void> {
     await this.store.open(this.ctx.storageDomain)
     const pending = this.store.list().filter(journal =>
@@ -211,9 +222,17 @@ export class SessionWorkspaceRestoreController {
     request: SessionWorkspaceRestorePrepareRequest,
     signal: AbortSignal,
   ): Promise<SessionWorkspaceRestorePreview> {
+    return this.trackTask(() => this.prepareOperation(request, signal))
+  }
+
+  private async prepareOperation(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal: AbortSignal,
+  ): Promise<SessionWorkspaceRestorePreview> {
     await this.ready
+    if (this.disposed) throw badRequest('The filesystem restore service is shutting down.')
     signal.throwIfAborted()
-    const { workspace, owners } = this.resolveOwner(request.sessionId)
+    const { workspace } = this.resolveOwner(request.sessionId)
     let activeOperation = this.active.get(workspace.id)
     if (activeOperation?.phase === 'running' || activeOperation?.processQuiescence !== undefined) {
       throw badRequest('A filesystem restore is still active for this workspace.')
@@ -329,11 +348,15 @@ export class SessionWorkspaceRestoreController {
     signal: AbortSignal,
   ): Promise<SessionWorkspaceRestoreReceipt> {
     await this.ready
+    if (this.disposed) throw badRequest('The filesystem restore service is shutting down.')
     signal.throwIfAborted()
     const preview = this.previews.get(request.previewId)
     this.previews.delete(request.previewId)
     if (preview === undefined || preview.expiresAt <= Date.now()) {
       throw badRequest('Restore preview expired; prepare it again before confirming.')
+    }
+    if (preview.changedPathsTruncated) {
+      throw badRequest('This restore preview omits paths, so it cannot be confirmed.')
     }
 
     const { workspace, owners } = this.resolveOwner(preview.sessionId)
@@ -393,6 +416,9 @@ export class SessionWorkspaceRestoreController {
         preview.attemptTargetCommitId,
         signal,
       )
+      if (changedPaths.paths.length > MAX_PREVIEW_PATHS) {
+        throw badRequest('This restore changes too many paths to confirm from a bounded preview.')
+      }
       try {
         await Promise.all(changedPaths.paths.map(path => assertNoSymlinkWorkspacePath(workspace.path, path.path)))
       } catch {
@@ -442,7 +468,9 @@ export class SessionWorkspaceRestoreController {
           operation.phase = 'recovery'
           if (error instanceof RestoreCommandFailure && error.processQuiescence !== undefined) {
             operation.processQuiescence = error.processQuiescence
-            void this.reconcileAfterQuiescence(workspace.id, operation)
+            const recoveryTask = this.reconcileAfterQuiescence(workspace.id, operation)
+            this.activeTasks.add(recoveryTask)
+            void recoveryTask.finally(() => this.activeTasks.delete(recoveryTask))
           }
           return this.toReceipt(failed)
         }
@@ -483,7 +511,15 @@ export class SessionWorkspaceRestoreController {
     request: SessionWorkspaceRestoreStatusRequest,
     signal: AbortSignal,
   ): Promise<SessionWorkspaceRestoreReceipt | null> {
+    return this.trackTask(() => this.statusOperation(request, signal))
+  }
+
+  private async statusOperation(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal: AbortSignal,
+  ): Promise<SessionWorkspaceRestoreReceipt | null> {
     await this.ready
+    if (this.disposed) throw badRequest('The filesystem restore service is shutting down.')
     signal.throwIfAborted()
     const journal = this.store.list()
       .filter(candidate => candidate.sessionId === request.sessionId)
@@ -577,7 +613,10 @@ export class SessionWorkspaceRestoreController {
     for (const operation of this.active.values()) {
       if (operation.phase === 'running') operation.abortController.abort()
     }
-    await Promise.allSettled([...this.activeTasks])
+    await Promise.allSettled([this.ready])
+    while (this.activeTasks.size > 0) {
+      await Promise.allSettled([...this.activeTasks])
+    }
     await this.store.close()
   }
 
@@ -807,7 +846,7 @@ export class SessionWorkspaceRestoreController {
     this.active.delete(workspaceId)
   }
 
-  private async reconcileAfterQuiescence(workspaceId: string, operation: ActiveRestore): Promise<void> {
+  private async reconcileAfterQuiescence(workspaceId: WorkspaceId, operation: ActiveRestore): Promise<void> {
     try {
       const processQuiescence = operation.processQuiescence
       if (processQuiescence === undefined) return

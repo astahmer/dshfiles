@@ -580,6 +580,7 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
       peerDependencies: {
         ...Object.fromEntries(template.clientProviders.map(provider => [provider, context.dshRange])),
         ...template.peerDependencies(context),
+        '@deepseek-ai/dsh-tools': context.dshRange,
       },
     },
     null,

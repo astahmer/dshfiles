@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
-import { copyFile, lstat, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { cp, copyFile, lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -39,124 +41,120 @@ if (
   throw new Error('The local controller, source controller, and Typert generator versions must match.')
 }
 
-for (const directory of ['src']) {
-  await assertDirectoriesMatch(join(localPackageRoot, directory), join(upstreamPackageRoot, directory))
-}
-
-for (const filename of ['tsconfig.json', 'tsconfig.host.json', 'tsconfig.client.json', 'tsdown.config.ts']) {
-  const localContents = await readFile(join(localPackageRoot, filename))
-  const upstreamContents = await readFile(join(upstreamPackageRoot, filename))
-  if (!localContents.equals(upstreamContents)) {
-    throw new Error(`Local controller build input differs from the pinned DSH source: ${filename}`)
-  }
-}
-
-const generatorModule = await import('@deepseek-ai/dsh-typert-generator')
 const packageName = localManifest.name
-const workspaceModel = new generatorModule.WorkspaceAnalyzer({
-  root: dshSourceRoot,
-  hostConfig: 'tsconfig.host.json',
-  clientConfig: 'tsconfig.client.json',
-  packages: [packageName],
-  faces: ['host'],
-  checkDiagnostics: false,
-  mode: 'check',
-}).analyze()
-const hostFace = workspaceModel.faces.find(face => face.face === 'host')
+const overlayRoot = await mkdtemp(join(tmpdir(), 'dsh-api-session-controller-sync-'))
 
-if (hostFace === undefined) throw new Error('Typert did not analyze the controller Host face.')
+try {
+  await cp(dshSourceRoot, overlayRoot, {
+    recursive: true,
+    filter: path => !relative(dshSourceRoot, path).split(sep).some(segment =>
+      segment === 'node_modules' || segment === '.git' || segment === '.jj',
+    ),
+  })
+  await symlink(join(dshSourceRoot, 'node_modules'), join(overlayRoot, 'node_modules'), 'dir')
+  await linkNestedNodeModules(join(dshSourceRoot, 'packages'), join(overlayRoot, 'packages'))
+  await linkNestedNodeModules(join(dshSourceRoot, 'vendor'), join(overlayRoot, 'vendor'))
 
-const generatedHost = new generatorModule.FaceModelEmitter(hostFace).emit(packageName)
-const generatedFiles = new Map([
-  ['typert.host.js', generatedHost.js],
-  ['typert.host.d.ts', generatedHost.dts],
-  ['typert.remote-client.js', generatedHost.remote?.js],
-  ['typert.remote-client.d.ts', generatedHost.remote?.dts],
-  ['typert.remote-client.d.ts.map', generatedHost.remote?.dtsMap],
-])
-
-const upstreamLibRoot = join(upstreamPackageRoot, 'lib')
-for (const [filename, generatedContents] of generatedFiles) {
-  if (generatedContents === undefined) throw new Error(`Typert did not emit ${filename}.`)
-  const upstreamContents = await readFile(join(upstreamLibRoot, filename), 'utf8')
-  if (upstreamContents !== generatedContents) {
-    throw new Error(`Pinned DSH build output is stale for ${filename}; rebuild the DSH Host face first.`)
+  const overlayPackageRoot = join(overlayRoot, 'packages/api/session-controller')
+  await rm(join(overlayPackageRoot, 'src'), { recursive: true, force: true })
+  await cp(join(localPackageRoot, 'src'), join(overlayPackageRoot, 'src'), { recursive: true })
+  for (const filename of ['package.json', 'tsconfig.json', 'tsconfig.host.json', 'tsconfig.client.json', 'tsdown.config.ts']) {
+    await copyFile(join(localPackageRoot, filename), join(overlayPackageRoot, filename))
   }
-}
 
-const requiredRemoteEndpoints = [
-  'updateAttention',
-  'prepareWorkspaceRestore',
-  'confirmWorkspaceRestore',
-  'workspaceRestoreStatus',
-]
-for (const endpoint of requiredRemoteEndpoints) {
-  if (
-    generatedHost.remote?.dts.includes(`${endpoint}:`) !== true
-    || generatedHost.remote.dts.includes(`'session/${endpoint}':`) !== true
-  ) {
-    throw new Error(`Generated Remote contract is missing the Session ${endpoint} endpoint.`)
+  const typescript = join(dshSourceRoot, 'node_modules/typescript/bin/tsc')
+  const tsdown = join(dshSourceRoot, 'node_modules/.bin/tsdown')
+  run(process.execPath, [typescript, '--project', join(overlayPackageRoot, 'tsconfig.host.json'), '--emitDeclarationOnly'], overlayRoot)
+
+  const generatorModule = await import('@deepseek-ai/dsh-typert-generator')
+  const workspaceModel = new generatorModule.WorkspaceAnalyzer({
+    root: overlayRoot,
+    hostConfig: 'tsconfig.host.json',
+    clientConfig: 'tsconfig.client.json',
+    packages: [packageName],
+    faces: ['host'],
+    checkDiagnostics: false,
+    mode: 'check',
+  }).analyze()
+  const hostFace = workspaceModel.faces.find(face => face.face === 'host')
+  if (hostFace === undefined) throw new Error('Typert did not analyze the local Controller Host face.')
+
+  const generatedHost = new generatorModule.FaceModelEmitter(hostFace).emit(packageName)
+  const generatedFiles = new Map([
+    ['typert.host.js', generatedHost.js],
+    ['typert.host.d.ts', generatedHost.dts],
+    ['typert.remote-client.js', generatedHost.remote?.js],
+    ['typert.remote-client.d.ts', generatedHost.remote?.dts],
+    ['typert.remote-client.d.ts.map', generatedHost.remote?.dtsMap],
+  ])
+  for (const [filename, generatedContents] of generatedFiles) {
+    if (generatedContents === undefined) throw new Error(`Typert did not emit ${filename}.`)
+    await writeFile(join(overlayPackageRoot, 'lib', filename), generatedContents)
   }
-}
 
-for (const [filename, expectedText] of [
-  ['index.js', 'workspaceRestoreStatus'],
-  ['client.js', 'workspaceRestoreStatus'],
-  ['types/index.d.ts', 'SessionWorkspaceRestorePrepareRequest'],
-  ['typert.remote-client.d.ts', 'workspaceRestoreStatus'],
-]) {
-  const contents = await readFile(join(upstreamLibRoot, filename), 'utf8')
-  if (!contents.includes(expectedText)) throw new Error(`Pinned DSH output ${filename} is missing ${expectedText}.`)
-}
-
-const sourceFiles = await regularFiles(upstreamLibRoot)
-const destinationLibRoot = join(localPackageRoot, 'lib')
-await ensureRealDirectory(destinationLibRoot)
-const destinationFiles = await regularFiles(destinationLibRoot)
-const sourceNames = new Set(sourceFiles.map(file => file.relativePath))
-
-for (const destinationFile of destinationFiles) {
-  if (!sourceNames.has(destinationFile.relativePath)) {
-    await rm(destinationFile.absolutePath)
+  const requiredRemoteEndpoints = [
+    'updateAttention',
+    'prepareWorkspaceRestore',
+    'confirmWorkspaceRestore',
+    'workspaceRestoreStatus',
+  ]
+  for (const endpoint of requiredRemoteEndpoints) {
+    if (
+      generatedHost.remote?.dts.includes(`${endpoint}:`) !== true
+      || generatedHost.remote.dts.includes(`'session/${endpoint}':`) !== true
+    ) {
+      throw new Error(`Generated Remote contract is missing the Session ${endpoint} endpoint.`)
+    }
   }
-}
 
-for (const sourceFile of sourceFiles) {
-  const destinationPath = join(destinationLibRoot, sourceFile.relativePath)
-  await mkdir(dirname(destinationPath), { recursive: true })
-  await copyFile(sourceFile.absolutePath, destinationPath)
-}
+  const clientTypeOutput = runClientDeclarations(typescript, overlayPackageRoot, overlayRoot)
+  const expectedClientDiagnostic = /src\/client\/index\.ts\(\d+,\d+\): error TS2717: Subsequent property declarations must have the same type\.\s+Property 'sessions' must be of type 'SessionStore', but here has type 'ISessions'\./
+  if (clientTypeOutput.diagnostics.length > 0) {
+    if (clientTypeOutput.diagnostics.length !== 1 || !expectedClientDiagnostic.test(clientTypeOutput.diagnostics[0])) {
+      throw new Error(`Controller Client declaration generation found unexpected TypeScript errors:\n${clientTypeOutput.diagnostics.join('\n')}`)
+    }
+    process.stderr.write(`Known pinned DSH Client type conflict: ${clientTypeOutput.diagnostics[0]}\n`)
+  }
 
-const digest = createHash('sha256')
-for (const sourceFile of sourceFiles) {
-  digest.update(sourceFile.relativePath)
-  digest.update('\0')
-  digest.update(await readFile(sourceFile.absolutePath))
-  digest.update('\0')
-}
+  await assertContains(join(overlayPackageRoot, 'lib/types/index.d.ts'), 'SessionWorkspaceRestorePrepareRequest')
+  await assertContains(join(overlayPackageRoot, 'lib/types/client/sessions/manager.d.ts'), 'workspaceRestoreStatus')
+  const hostBundle = run(tsdown, ['--env.DSH_BUILD_FACE', 'host'], overlayPackageRoot)
+  const clientBundle = run(tsdown, ['--env.DSH_BUILD_FACE', 'client'], overlayPackageRoot)
+  if (!hostBundle.includes('Build complete') || !clientBundle.includes('Build complete')) {
+    throw new Error('The Controller Host and Client bundle builds did not complete.')
+  }
 
-process.stdout.write(`Synced ${sourceFiles.length} controller build files; SHA-256 ${digest.digest('hex')}.\n`)
+  const sourceLibRoot = join(overlayPackageRoot, 'lib')
+  const sourceFiles = await regularFiles(sourceLibRoot)
+  const destinationLibRoot = join(localPackageRoot, 'lib')
+  await ensureRealDirectory(destinationLibRoot)
+  const destinationFiles = await regularFiles(destinationLibRoot)
+  const sourceNames = new Set(sourceFiles.map(file => file.relativePath))
+
+  for (const destinationFile of destinationFiles) {
+    if (!sourceNames.has(destinationFile.relativePath)) await rm(destinationFile.absolutePath)
+  }
+
+  for (const sourceFile of sourceFiles) {
+    const destinationPath = join(destinationLibRoot, sourceFile.relativePath)
+    await mkdir(dirname(destinationPath), { recursive: true })
+    await copyFile(sourceFile.absolutePath, destinationPath)
+  }
+
+  const digest = createHash('sha256')
+  for (const sourceFile of sourceFiles) {
+    digest.update(sourceFile.relativePath)
+    digest.update('\0')
+    digest.update(await readFile(sourceFile.absolutePath))
+    digest.update('\0')
+  }
+  process.stdout.write(`Synced ${sourceFiles.length} Controller outputs from the local source overlay; SHA-256 ${digest.digest('hex')}.\n`)
+} finally {
+  await rm(overlayRoot, { recursive: true, force: true })
+}
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'))
-}
-
-async function assertDirectoriesMatch(localDirectory, upstreamDirectory) {
-  const localFiles = await regularFiles(localDirectory)
-  const upstreamFiles = await regularFiles(upstreamDirectory)
-  const localNames = localFiles.map(file => file.relativePath)
-  const upstreamNames = upstreamFiles.map(file => file.relativePath)
-
-  if (localNames.length !== upstreamNames.length || localNames.some((name, index) => name !== upstreamNames[index])) {
-    throw new Error(`Local controller source file set differs from the pinned DSH source: ${relative(localPackageRoot, localDirectory)}`)
-  }
-
-  for (const [index, localFile] of localFiles.entries()) {
-    const upstreamFile = upstreamFiles[index]
-    if (upstreamFile === undefined || !(await readFile(localFile.absolutePath)).equals(await readFile(upstreamFile.absolutePath))) {
-      throw new Error(`Local controller source differs from the pinned DSH source: ${localFile.relativePath}`)
-    }
-  }
 }
 
 async function regularFiles(directory) {
@@ -178,6 +176,50 @@ async function regularFiles(directory) {
 
   await visit(directory)
   return files.sort((left, right) => left.relativePath.localeCompare(right.relativePath))
+}
+
+async function linkNestedNodeModules(sourceDirectory, destinationDirectory) {
+  for (const entry of await readdir(sourceDirectory, { withFileTypes: true })) {
+    if (!entry.isDirectory() && entry.name !== 'node_modules') continue
+    if (entry.name === '.git' || entry.name === '.jj') continue
+    const sourcePath = join(sourceDirectory, entry.name)
+    const destinationPath = join(destinationDirectory, entry.name)
+    if (entry.name === 'node_modules') {
+      await symlink(sourcePath, destinationPath, 'dir')
+      continue
+    }
+    try {
+      if ((await lstat(destinationPath)).isDirectory()) {
+        await linkNestedNodeModules(sourcePath, destinationPath)
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+    }
+  }
+}
+
+function run(command, args, cwd) {
+  return execFileSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 20 * 1024 * 1024,
+  })
+}
+
+function runClientDeclarations(typescript, packageRoot, workspaceRoot) {
+  try {
+    run(process.execPath, [typescript, '--project', join(packageRoot, 'tsconfig.client.json'), '--emitDeclarationOnly', '--pretty', 'false'], workspaceRoot)
+    return { diagnostics: [] }
+  } catch (error) {
+    const output = [error.stdout, error.stderr].filter(Boolean).join('\n')
+    return { diagnostics: output.split('\n').filter(line => /error TS\d+/.test(line)) }
+  }
+}
+
+async function assertContains(path, expectedText) {
+  const contents = await readFile(path, 'utf8')
+  if (!contents.includes(expectedText)) throw new Error(`${relative(repositoryRoot, path)} is missing ${expectedText}.`)
 }
 
 async function ensureRealDirectory(directory) {

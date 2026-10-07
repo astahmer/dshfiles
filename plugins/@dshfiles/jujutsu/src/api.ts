@@ -25,7 +25,11 @@ const repoIdSchema = z.string().uuid()
 const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
 const remoteNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
 const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/)
-export const workspaceNameSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+export const workspaceNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
 
 export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('describe'), commitId: commitIdSchema, message: z.string().max(4000) }),
@@ -53,6 +57,10 @@ export const previewSchema = z.object({
 })
 
 export const fileChangeSchema = z.object({
+  contentDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
   path: z.string().max(2048),
   additions: z.number().int().min(0),
   deletions: z.number().int().min(0),

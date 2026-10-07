@@ -1,10 +1,4 @@
-import type {
-  ISessions,
-  SessionEventWindow,
-  SessionReference,
-  SessionSnapshot,
-  SessionSummary,
-} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionEventWindow, SessionReference, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { durableForkBoundaries } from './fork-boundaries.js'
 import styles from './jujutsu.module.css'
@@ -81,12 +75,12 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
   }, [props.sessions, selectedSessionId])
 
   const activeReference = reference?.sessionId === selectedSessionId ? reference : null
-  const activeWindow = historyWindow?.sessionId === selectedSessionId ? historyWindow.window : null
-  const activeStatus = sessionStatus?.sessionId === selectedSessionId ? sessionStatus.snapshot : null
-  const activeError = historyError?.sessionId === selectedSessionId ? historyError.message : null
+  const activeWindow = historyWindow !== null && historyWindow.sessionId === selectedSessionId ? historyWindow.window : null
+  const activeStatus = sessionStatus !== null && sessionStatus.sessionId === selectedSessionId ? sessionStatus.snapshot : null
+  const activeError = historyError !== null && historyError.sessionId === selectedSessionId ? historyError.message : null
   const boundaries = useMemo(() => durableForkBoundaries(activeWindow?.entries ?? []), [activeWindow?.entries])
   const selectedBoundarySeq =
-    selectedBoundary?.sessionId === selectedSessionId && boundaries.some(boundary => boundary.seq === selectedBoundary.seq)
+    selectedBoundary !== null && selectedBoundary.sessionId === selectedSessionId && boundaries.some(boundary => boundary.seq === selectedBoundary.seq)
       ? selectedBoundary.seq
       : boundaries.at(-1)?.seq
   const selectedSession = selectedSessionId === '' ? undefined : sessionList.byId[selectedSessionId]
@@ -125,11 +119,17 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
   return (
     <section className={styles.sessionTools} aria-labelledby="jj-session-fork-title">
       <h2 id="jj-session-fork-title">Fork a Session at a history boundary</h2>
-      <p className={styles.muted}>Choose a listed Session and a durable event sequence. Message contents and transient stream chunks stay out of this history control.</p>
+      <p className={styles.muted}>
+        Choose a listed Session and a durable event sequence. Message contents and transient stream chunks stay out of this history control.
+      </p>
       <div className={styles.sessionToolGrid}>
         <label>
           Session
-          <select aria-label="Session to fork" value={selectedSessionId} onChange={event => setSelectedSessionId(sessionList.ids.find(id => id === event.target.value) ?? '')}>
+          <select
+            aria-label="Session to fork"
+            value={selectedSessionId}
+            onChange={event => setSelectedSessionId(sessionList.ids.find(id => id === event.target.value) ?? '')}
+          >
             <option value="">Choose a Session</option>
             {sessionList.ids.map(id => {
               const summary = sessionList.byId[id]
@@ -186,10 +186,21 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
           {loadingOlderSessionId === selectedSessionId ? 'Loading older history…' : 'Load older boundaries'}
         </button>
       )}
-      {activeError !== null && <p className={styles.sessionToolError} role="alert">{activeError}</p>}
-      {forkError !== null && <p className={styles.sessionToolError} role="alert">{forkError}</p>}
+      {activeError !== null && (
+        <p className={styles.sessionToolError} role="alert">
+          {activeError}
+        </p>
+      )}
+      {forkError !== null && (
+        <p className={styles.sessionToolError} role="alert">
+          {forkError}
+        </p>
+      )}
       {forkedSessionId !== null && <p className={styles.statusLine}>Fork created and opened: {forkedSessionId}</p>}
-      <p className={styles.muted}>The Host balances a cut inside an open turn. The fork keeps its source history lineage; choosing it grants no added authority over parent or sibling Sessions.</p>
+      <p className={styles.muted}>
+        The Host balances a cut inside an open turn. The fork keeps its source history lineage; choosing it grants no added authority over parent or sibling
+        Sessions.
+      </p>
     </section>
   )
 }

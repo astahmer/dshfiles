@@ -225,6 +225,30 @@ describe('SessionWorkspaceRestoreController', () => {
       .rejects.toThrow(/expired/)
   })
 
+  it('refuses to apply a restore when the bounded path preview is truncated', async () => {
+    const fixture = await createRepository()
+    temporaryRoot = fixture.root
+    for (let index = 0; index < 201; index += 1) {
+      await writeFile(join(fixture.path, `added-${index}.txt`), 'new file\n')
+    }
+    hostContext = await createContext(fixture)
+    const controller = new SessionWorkspaceRestoreController(hostContext)
+    await controller.ready
+
+    const preview = await controller.prepare({
+      sessionId: fixture.sessionId,
+      action: 'restore',
+      targetCommitId: fixture.targetCommitId,
+    }, new AbortController().signal)
+    expect(preview.changedPaths).toHaveLength(200)
+    expect(preview.changedPathsTruncated).toBe(true)
+    await expect(controller.confirm({ previewId: preview.previewId }, new AbortController().signal))
+      .rejects.toThrow('This restore preview omits paths, so it cannot be confirmed.')
+
+    expect(await readFile(fixture.contentPath, 'utf8')).toBe('current\n')
+    expect(await readFile(join(fixture.path, 'added-200.txt'), 'utf8')).toBe('new file\n')
+  })
+
   it('rejects stale previews without replacing an edit made after preview', async () => {
     const fixture = await createRepository()
     temporaryRoot = fixture.root

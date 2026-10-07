@@ -37,7 +37,7 @@ export interface CreatedClientPlugin {
   readonly name: string
   readonly inject?: unknown
   readonly Config?: unknown
-  apply(ctx: Context, config?: unknown): unknown
+  apply(ctx: Context | ClientContext, config?: unknown): unknown
 }
 
 interface ClientSlotsService {
@@ -383,7 +383,7 @@ export function createClientModule(source: Record<string, unknown>, metadata: Cl
   if (source.name !== undefined && (typeof source.name !== 'string' || source.name.trim() === '')) {
     fail('DSHX2102', 'Native Client export name must be a non-empty string.', metadata, 'Remove name to use the resolved logical project name.')
   }
-  const apply = source.apply as (ctx: Context, config?: unknown) => unknown
+  const apply = source.apply as (ctx: Context | ClientContext, config?: unknown) => unknown
   return {
     name: (source.name as string | undefined) ?? fallbackName(metadata),
     ...(source.inject === undefined ? {} : { inject: source.inject }),

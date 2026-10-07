@@ -22,3 +22,5 @@ tooling/dsh-core/api-session-controller/lib/
 tooling/dsh-core/session/lib/
 tooling/dsh-core/session-format-catalog/lib/
 tooling/dsh-core/session-format-v4-to-v5/lib/
+
+/tooling/dsh-core/api-session-controller/node_modules

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { PassThrough } from 'node:stream'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createProject, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION, detectPackageManager, packageVersion, validateProjectName } from '../src/index.js'
 import { renderProjectTemplate } from '../src/templates.js'
@@ -88,7 +89,9 @@ describe('create-dshx', () => {
       scripts: Record<string, string>
       dsh: { client: { inject: string[] } }
     }
-    expect(manifest.devDependencies['@dshfiles/dshx']).toBe(packageVersion())
+    const dshxDependency = manifest.devDependencies['@dshfiles/dshx']
+    expect(dshxDependency).toMatch(/^link:/)
+    expect(resolve(result.root, dshxDependency!.slice('link:'.length))).toBe(fileURLToPath(new URL('../../dshx', import.meta.url)))
     expect(manifest.devDependencies.typescript).toBe('^7.0.2')
     expect(manifest.devDependencies.oxlint).toBe('1.86.0')
     expect(manifest.devDependencies.oxfmt).toBe('0.71.0')

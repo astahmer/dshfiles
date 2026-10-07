@@ -68,7 +68,7 @@ export interface ClientDefinition {
   readonly locales?: readonly LocaleDefinition[]
   readonly conversations?: readonly ClientConversationContribution[]
   readonly slots?: readonly SlotContribution[]
-  readonly setup?: (ctx: ClientContext, decorate: ClientComponentDecorator) => void | Effect<void>
+  readonly setup?: (ctx: ClientContext, decorate: ClientComponentDecorator, metadata?: { readonly packageId: string }) => void | Effect<void>
 }
 
 type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]

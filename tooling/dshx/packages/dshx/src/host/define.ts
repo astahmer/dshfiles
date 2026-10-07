@@ -8,12 +8,11 @@ export type PromptContributionParts = { readonly kind: 'section'; readonly value
 const promptContributions = new WeakMap<object, PromptContributionParts>()
 
 /** Preserve a Host definition exactly while providing contextual types. */
-export function defineHost<
-  const ConfigSchema extends StandardSchemaV1 = StandardSchemaV1,
-  const T extends HostDefinition<ConfigSchema> = HostDefinition<ConfigSchema>,
->(
-  definition: T & HostDefinition<ConfigSchema> & Record<Exclude<keyof T, keyof HostDefinition<ConfigSchema>>, never>,
-): T {
+export function defineHost<const ConfigSchema extends StandardSchemaV1, const T extends HostDefinition<ConfigSchema>>(
+  definition: T & { readonly Config: ConfigSchema } & HostDefinition<ConfigSchema> & Record<Exclude<keyof T, keyof HostDefinition<ConfigSchema>>, never>,
+): T
+export function defineHost<const T extends HostDefinition>(definition: T & Record<Exclude<keyof T, keyof HostDefinition>, never>): T
+export function defineHost<const T>(definition: T): T {
   return definition
 }
 

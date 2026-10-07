@@ -6,9 +6,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const profileName = process.env.DSHX_BOOT_PROFILE_NAME
+const profileRoot = process.env.DSHX_BOOT_PROFILE_ROOT
 const home = process.env.DSH_HOME
 const patchFile = process.env.DSHX_BOOT_PATCH_FILE
-if (profileName === undefined || home === undefined)
+if (profileName === undefined || home === undefined || profileRoot === undefined)
   throw new Error('Scratch Host requires DSHX_BOOT_PROFILE_NAME and DSH_HOME.')
 
 const dshShimPath = execFileSync('which', ['dsh'], { encoding: 'utf8' }).trim()

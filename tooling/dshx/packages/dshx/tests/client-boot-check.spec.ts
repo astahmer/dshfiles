@@ -44,9 +44,7 @@ describe('client boot card parsing', () => {
 
   it('redacts tokenized local URLs from entry details', () => {
     const entries = parseBootText('@dshfiles/demo: failed: opened http://127.0.0.1:3199/private-token')
-    expect(entries).toEqual([
-      { id: '@dshfiles/demo', state: 'failed', detail: 'opened http://127.0.0.1:3199/[redacted]' },
-    ])
+    expect(entries).toEqual([{ id: '@dshfiles/demo', state: 'failed', detail: 'opened http://127.0.0.1:3199/[redacted]' }])
   })
 
   it('returns nothing for a card that lists only the failed entries', () => {
@@ -121,6 +119,7 @@ describe('offline composition gate', () => {
 
   it('reports a failed composition process and preserves caller-owned profiles', async () => {
     const profileRoot = await mkdtemp(join(tmpdir(), 'dshx-caller-profile-'))
+    await writeFile(join(profileRoot, 'package.json'), '{}')
     try {
       const result = await checkClientBoot({
         projectRoot: process.cwd(),
@@ -146,6 +145,7 @@ describe('offline composition gate', () => {
     const marker = join(root, 'host-started')
     const executable = join(root, 'dsh-fixture')
     await mkdir(profileRoot, { recursive: true })
+    await writeFile(join(profileRoot, 'package.json'), '{}')
     await writeFile(
       executable,
       `#!${process.execPath}\nif (process.argv.includes('--dump-config')) process.stdout.write('@deepseek-ai/dsh-base\\n'); else require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')\n`,

@@ -50,6 +50,8 @@ for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.m
 
 ## Documentation
 
+- [Unification status and remaining work](docs/unification-status-2026-10-07.md): completion, blockers, recovery, and cleanup ledger.
+
 - [`AGENTS.md`](AGENTS.md): project boundaries, safe profile workflow, and development rules.
 - [`docs/profile-installs.md`](docs/profile-installs.md): profile install and composition behavior.
 - [`docs/creator-mode.md`](docs/creator-mode.md): creator-mode availability and setup.

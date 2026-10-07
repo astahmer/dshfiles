@@ -10,7 +10,7 @@ type ClientSetup = (ctx: ClientContext, decorate: ComponentDecorator, metadata: 
 type ClientDefinitionSetup = NonNullable<ClientDefinition['setup']>
 // Definition metadata only. Cordis still owns activation, identity, and cleanup.
 const hosts = new WeakMap<Setup, HostSetup>()
-const clients = new WeakMap<Setup, ClientSetup>()
+const clients = new WeakMap<ClientDefinitionSetup, ClientSetup>()
 
 export function adaptHostSetup(fallback: Setup, setup: HostSetup): Setup {
   hosts.set(fallback, setup)
@@ -33,7 +33,7 @@ export function unwrapRowConfig(config: unknown): Record<string, unknown> {
   return output
 }
 
-export function adaptClientSetup(fallback: Setup, setup: ClientSetup): Setup {
+export function adaptClientSetup(fallback: ClientDefinitionSetup, setup: ClientSetup): ClientDefinitionSetup {
   clients.set(fallback, setup)
   return fallback
 }
@@ -50,6 +50,7 @@ export function invokeClientSetup(
   metadata: Metadata,
 ): void | Effect<void> {
   if (setup === undefined) return undefined
-  if (clients.has(setup as Setup)) return clients.get(setup as Setup)!(ctx, decorate, metadata)
-  return (setup as ClientSetup)(ctx, decorate, metadata)
+  const adapted = clients.get(setup)
+  if (adapted !== undefined) return adapted(ctx, decorate, metadata)
+  return setup(ctx, decorate, metadata)
 }

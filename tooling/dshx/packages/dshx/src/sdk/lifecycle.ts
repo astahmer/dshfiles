@@ -9,9 +9,11 @@ export interface LifecycleApi {
 /** Native event signatures and dispatch modes remain intact. */
 export type EventsApi = Pick<Context, 'on' | 'once' | 'emit' | 'parallel' | 'serial' | 'bail' | 'waterfall'>
 
-export interface BasePluginApi {
+type PluginContext = Pick<Context, keyof EventsApi | 'effect'>
+
+export interface BasePluginApi<ContextType extends PluginContext = Context> {
   /** The actual scoped context: native services, DI, effects, and advanced APIs. */
-  readonly raw: { readonly ctx: Context }
+  readonly raw: { readonly ctx: ContextType }
   /**
    * This plugin's own row configuration, already unwrapped to plain values.
    *
@@ -24,7 +26,7 @@ export interface BasePluginApi {
   readonly events: EventsApi
 }
 
-export function createBaseApi(ctx: Context, config: Record<string, unknown> = {}): BasePluginApi {
+export function createBaseApi<ContextType extends PluginContext>(ctx: ContextType, config: Record<string, unknown> = {}): BasePluginApi<ContextType> {
   return {
     raw: { ctx },
     config: Object.freeze({ ...config }),

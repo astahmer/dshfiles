@@ -150,12 +150,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
   const parkedSessionIds = useMemo(() => {
     const localFallback = setIncludes(preferences.parkedSessionIds)
-    return new Set(sessions.flatMap(session => {
-      const parked = session.attention === null || session.attention === undefined
-        ? localFallback.has(session.id)
-        : session.attention.snoozed
-      return parked ? [session.id] : []
-    }))
+    return new Set(
+      sessions.flatMap(session => {
+        const parked = session.attention === null || session.attention === undefined ? localFallback.has(session.id) : session.attention.snoozed
+        return parked ? [session.id] : []
+      }),
+    )
   }, [preferences.parkedSessionIds, sessions])
   const selectedSession = useMemo(() => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0), [sessionState.byId])
 
@@ -163,19 +163,25 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (sessionState.phase !== 'ready') return
     const legacyParked = setIncludes(preferences.parkedSessionIds)
     for (const session of sessions) {
-      if (!legacyParked.has(session.id)
-        || (session.attention !== null && session.attention !== undefined)
-        || legacyParkMigrationAttempts.current.has(session.id)) continue
+      if (
+        !legacyParked.has(session.id) ||
+        (session.attention !== null && session.attention !== undefined) ||
+        legacyParkMigrationAttempts.current.has(session.id)
+      )
+        continue
       legacyParkMigrationAttempts.current.add(session.id)
-      void props.setSnoozed(session.id, true).then(success => {
-        if (!success) {
+      void props
+        .setSnoozed(session.id, true)
+        .then(success => {
+          if (!success) {
+            legacyParkMigrationAttempts.current.delete(session.id)
+            setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+          }
+        })
+        .catch(() => {
           legacyParkMigrationAttempts.current.delete(session.id)
-          setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-        }
-      }).catch(() => {
-        legacyParkMigrationAttempts.current.delete(session.id)
-        setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-      })
+          setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+        })
     }
   }, [preferences.parkedSessionIds, props.setSnoozed, props.tSidebar, sessionState.phase, sessions])
 
@@ -184,15 +190,18 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (selectedSession === undefined || attention === null || attention === undefined || !attention.unread) return
     if (readMarkAttempts.current.get(selectedSession.id) === attention.lastPromptSeq) return
     readMarkAttempts.current.set(selectedSession.id, attention.lastPromptSeq ?? -1)
-    void props.markRead(selectedSession.id).then(success => {
-      if (!success) {
+    void props
+      .markRead(selectedSession.id)
+      .then(success => {
+        if (!success) {
+          readMarkAttempts.current.delete(selectedSession.id)
+          setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+        }
+      })
+      .catch(() => {
         readMarkAttempts.current.delete(selectedSession.id)
-        setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-      }
-    }).catch(() => {
-      readMarkAttempts.current.delete(selectedSession.id)
-      setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-    })
+        setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+      })
   }, [props.markRead, props.tSidebar, selectedSession])
 
   useEffect(() => {
@@ -269,12 +278,15 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
-    void props.setSnoozed(sessionId, !parkedSessionIds.has(sessionId)).then(success => {
-      if (!success) setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-      else setNotice(null)
-    }).catch(() => {
-      setNotice(props.tSidebar('threadSidebarAttentionFailure'))
-    })
+    void props
+      .setSnoozed(sessionId, !parkedSessionIds.has(sessionId))
+      .then(success => {
+        if (!success) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+        else setNotice(null)
+      })
+      .catch(() => {
+        setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
+      })
   }
 
   const toggleSection = (section: SidebarSection): void => {
@@ -484,7 +496,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                 checked={preferences.excludedWorkspaceIds.includes(workspace.id)}
                 label={workspace.title}
                 onChange={checked => {
-                  const next = checked ? [...preferences.excludedWorkspaceIds, workspace.id] : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
+                  const next = checked
+                    ? [...preferences.excludedWorkspaceIds, workspace.id]
+                    : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
                   changePreferences({ excludedWorkspaceIds: next })
                 }}
               />

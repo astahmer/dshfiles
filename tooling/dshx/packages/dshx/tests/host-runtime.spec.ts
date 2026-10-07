@@ -333,6 +333,15 @@ describe('Host runtime adapter', () => {
     expect(() => createHostPlugin({ settings: [contract, contract] }, { packageId: '@test/plugin' })).toThrow('one Settings contract')
   })
 
+  it('infers configured Host output without an explicit schema argument', () => {
+    defineHost({
+      Config: z.object({ sessionRoot: z.string() }),
+      setup(_context, config) {
+        expectTypeOf(config.sessionRoot).toEqualTypeOf<string>()
+      },
+    })
+  })
+
   it('preserves native Host name, inject, Config, apply and config argument', () => {
     const Config = { validate: true }
     const apply = vi.fn(() => 'native-result')
