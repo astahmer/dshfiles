@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, realpathSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -27,6 +27,46 @@ const appBootPackagePath = dshRequire.resolve('@deepseek-ai/dsh-app-boot/package
 const appBootPackageRoot = dirname(appBootPackagePath)
 const appBootPath = resolve(appBootPackageRoot, 'lib/index.js')
 const profileBootPath = resolve(dshPackageRoot, 'lib/profile-boot.js')
+
+const createScratchInstallationAnchor = installedResolution => {
+  const installationRoot = resolve(home, '.dshx-scratch-installation')
+  const nodeModulesRoot = resolve(installationRoot, 'node_modules')
+  const anchorPath = resolve(installationRoot, 'package.json')
+  const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
+  const installationEntries = installedResolution.entries.filter(entry => entry.scope === 'installation')
+  const packageTargets = new Map(installationEntries.map(entry => [entry.name, entry.packageDir]))
+  const localCorePackages = installedResolution.linkedRoots
+    .filter(root => root.name.startsWith('@deepseek-ai/dsh-') && root.realPath.startsWith(`${coreRoot}/`))
+    .map(root => [root.name, root.realPath])
+  for (const [name, path] of localCorePackages) packageTargets.set(name, path)
+  if (!localCorePackages.some(([name]) => name === '@deepseek-ai/dsh-session')) {
+    throw new Error('Scratch profile did not link the local dsh-session core package.')
+  }
+  const dependencies = Object.fromEntries([...packageTargets.keys()].map(name => [name, '*']))
+  mkdirSync(nodeModulesRoot, { recursive: true })
+
+  for (const [name, packageDirectory] of packageTargets) {
+    const packagePath = resolve(nodeModulesRoot, name)
+    mkdirSync(dirname(packagePath), { recursive: true })
+    const targetPath = realpathSync(packageDirectory)
+    try {
+      const existingTargetPath = realpathSync(packagePath)
+      if (existingTargetPath !== targetPath) {
+        throw new Error(`Scratch installation link for ${name} points to an unexpected package.`)
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+      symlinkSync(targetPath, packagePath, 'dir')
+    }
+  }
+
+  writeFileSync(anchorPath, `${JSON.stringify({
+    name: '@dshx/scratch-installation',
+    version: '0.0.0',
+    dependencies,
+  }, null, 2)}\n`)
+  return { anchorPath, localCorePackages }
+}
 
 if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
   const internalLoader = dshRequire('node-addon-require-builtin')
@@ -64,7 +104,9 @@ if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
 const appBoot = await import(pathToFileURL(appBootPath).href)
 const profile = appBoot.loadProfile('dsh', profileName, dshPackagePath, home)
 if (resolve(profile.dir) !== resolve(profileRoot)) throw new Error('Scratch profile resolution loaded a different profile directory.')
-const resolution = await appBoot.createRuntimeResolution({ installAnchor: dshPackagePath, profile, home })
+const installedResolution = await appBoot.createRuntimeResolution({ installAnchor: dshPackagePath, profile, home })
+const { anchorPath: installAnchor, localCorePackages } = createScratchInstallationAnchor(installedResolution)
+const resolution = await appBoot.createRuntimeResolution({ installAnchor, profile, home })
 if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
   const sessionEntries = resolution.entries.filter(entry => entry.name === '@deepseek-ai/dsh-session')
   const sessionLinks = resolution.linkedRoots.filter(root => root.name === '@deepseek-ai/dsh-session')
@@ -73,6 +115,7 @@ if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
       localPackage: resolution.localPackageNames.includes('@deepseek-ai/dsh-session'),
       entries: sessionEntries.map(({ name, scope, packageDir }) => ({ name, scope, packageDir })),
       linkedRoots: sessionLinks,
+      localCorePackages,
     })}\n`,
   )
 }
@@ -80,6 +123,20 @@ const scopeEntry = resolution.entries.find(entry => entry.name === '@deepseek-ai
 if (scopeEntry === undefined || scopeEntry.scope !== 'installation' || scopeEntry.packageDir.startsWith(repoRoot))
   throw new Error('Scratch Host did not resolve dsh-scope from the DSH installation.')
 console.log('Scratch Host dsh-scope resolves from the DSH installation.')
+const sessionEntry = resolution.entries.find(entry => entry.name === '@deepseek-ai/dsh-session')
+if (
+  sessionEntry === undefined ||
+  realpathSync(sessionEntry.packageDir) !== realpathSync(resolve(repoRoot, 'tooling/dsh-core/session'))
+) {
+  throw new Error('Scratch Host did not resolve dsh-session from the local core source package.')
+}
+for (const [name, localPath] of localCorePackages) {
+  const entry = resolution.entries.find(candidate => candidate.name === name)
+  if (entry === undefined || realpathSync(entry.packageDir) !== realpathSync(localPath)) {
+    throw new Error(`Scratch Host did not resolve ${name} from its local core source package.`)
+  }
+}
+console.log(`Scratch Host resolves local core packages: ${localCorePackages.map(([name]) => name).join(', ')}.`)
 const { runProfile } = await import(pathToFileURL(profileBootPath).href)
 const syntheticCursorCredential = process.env.DSHX_SCRATCH_CURSOR_CREDENTIAL
 const launchEnvironmentEntry = name => {
@@ -94,7 +151,7 @@ const environment = {
 await runProfile({
   environment,
   profile: profileName,
-  resolvedProfile: { profile, installAnchor: dshPackagePath },
+  resolvedProfile: { profile, installAnchor },
   patchFiles: patchFile === undefined ? [] : [patchFile],
   args: ['--port', '0', '--no-open'],
 })
