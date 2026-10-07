@@ -386,6 +386,7 @@ export interface DshPlatformClient {
       readonly agentPreset?: string
       readonly runtimeBinding?: SessionRuntimeSelection
     }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
+    fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
     rename(sessionId: string, title: string): Promise<{ readonly title: string; readonly seq: number }>
     archive(sessionId: string): Promise<{ readonly archivedSessionIds: readonly string[] }>

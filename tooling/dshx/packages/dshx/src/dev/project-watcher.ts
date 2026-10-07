@@ -41,10 +41,10 @@ export async function watchProjectFiles(files: readonly string[], onChange: (fil
 
   let closed = false
   return {
-    async close() {
-      if (closed) return
-      closed = true
-      for (const watcher of watchers) watcher.close()
-    },
+      async close() {
+        if (closed) return
+        closed = true
+        await watcher.close()
+      },
   }
 }

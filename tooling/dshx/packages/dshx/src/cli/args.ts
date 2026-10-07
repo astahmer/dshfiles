@@ -419,7 +419,11 @@ export const dshxCommand = defineCommand({
   subCommands: cliSubCommands,
 })
 
-export const cliCommandDescription = (command: CliCommand): string => cliSubCommands[command].meta.description
+export const cliCommandDescription = (command: CliCommand): string => {
+  const meta = cliSubCommands[command]?.meta
+  if (meta === undefined || typeof meta === 'function' || meta instanceof Promise) return ''
+  return typeof meta.description === 'string' ? meta.description : ''
+}
 
 const isCliCommand = (value: string | undefined): value is CliCommand => value !== undefined && Object.hasOwn(cliSubCommands, value)
 
@@ -915,7 +919,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new CliUsageError(`A command is required: ${Object.keys(cliSubCommands).join(', ')}.`)
   }
   return {
-    command,
+    ...(command === undefined ? {} : { command }),
     explain: explain === true,
     boot: boot === true,
     ...(inspectTarget === undefined ? {} : { inspectTarget }),
