@@ -5,11 +5,10 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const profileName = process.env.DSHX_BOOT_PROFILE_NAME
-const profileRoot = process.env.DSHX_BOOT_PROFILE_ROOT
 const home = process.env.DSH_HOME
 const patchFile = process.env.DSHX_BOOT_PATCH_FILE
-if (profileName === undefined || profileRoot === undefined || home === undefined)
-  throw new Error('Scratch Host requires DSHX_BOOT_PROFILE_NAME, DSHX_BOOT_PROFILE_ROOT, and DSH_HOME.')
+if (profileName === undefined || home === undefined)
+  throw new Error('Scratch Host requires DSHX_BOOT_PROFILE_NAME and DSH_HOME.')
 
 const dshShimPath = execFileSync('which', ['dsh'], { encoding: 'utf8' }).trim()
 const dshShim = readFileSync(dshShimPath, 'utf8')
@@ -43,7 +42,7 @@ const environment = {
 await runProfile({
   environment,
   profile: profileName,
-  resolvedProfile: { profile, installAnchor: resolve(profileRoot, 'package.json') },
+  resolvedProfile: { profile, installAnchor: dshPackagePath },
   patchFiles: patchFile === undefined ? [] : [patchFile],
   args: ['--port', '0', '--no-open'],
 })

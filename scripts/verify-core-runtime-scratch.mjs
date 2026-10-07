@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { access, chmod, cp, mkdir, readFile, readdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
+import { access, chmod, copyFile, cp, mkdir, readFile, readdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { builtinModules, createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { delimiter, dirname, resolve } from 'node:path'
+import { delimiter, dirname, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -47,7 +47,12 @@ const corePackages = [
   'session-format-catalog',
   'session-format-v4-to-v5',
 ]
-const localCorePackageNames = new Set(corePackages.map(name => `@deepseek-ai/dsh-${name}`))
+const localCorePackageRoots = new Map(corePackages.map(name => [
+  `@deepseek-ai/dsh-${name}`,
+  name === 'api-session-controller' ? apiSessionControllerPath : resolve(coreRoot, name),
+]))
+const localCorePackageNames = new Set(localCorePackageRoots.keys())
+const nodeBuiltinPackageNames = new Set(builtinModules.map(name => name.replace(/^node:/, '').split('/')[0]))
 const sourceProfileRoot = resolve(homedir(), '.dsh/profiles/web')
 
 const resolveRuntimeCordisPackage = async () => {
@@ -101,6 +106,138 @@ const resolveRuntimeCordisPackage = async () => {
   return packageRoot
 }
 
+let dshAppBootRequire
+const runtimePackageRoots = new Map()
+
+const resolveDshAppBootRequire = async () => {
+  if (dshAppBootRequire !== undefined) return dshAppBootRequire
+
+  const pnpmHome = process.env.PNPM_HOME ?? resolve(homedir(), '.local/share/pnpm')
+  const globalRoot = resolve(pnpmHome, 'global')
+  const globalVersions = await readdir(globalRoot, { withFileTypes: true }).catch(() => [])
+  const appBootManifests = new Set()
+
+  for (const globalVersion of globalVersions) {
+    if (!globalVersion.isDirectory() || !/^v\d+$/.test(globalVersion.name)) continue
+    const installRoots = await readdir(resolve(globalRoot, globalVersion.name), { withFileTypes: true }).catch(() => [])
+
+    for (const installRoot of installRoots) {
+      if (!installRoot.isDirectory()) continue
+      const pnpmPackagesRoot = resolve(globalRoot, globalVersion.name, installRoot.name, 'node_modules/.pnpm')
+      const packageEntries = await readdir(pnpmPackagesRoot, { withFileTypes: true }).catch(() => [])
+
+      for (const packageEntry of packageEntries) {
+        if (!packageEntry.isDirectory() || !packageEntry.name.startsWith('@deepseek-ai+dsh-app-boot@' + dshOutput.stdout.trim())) continue
+        const manifestPath = resolve(
+          pnpmPackagesRoot,
+          packageEntry.name,
+          'node_modules/@deepseek-ai/dsh-app-boot/package.json',
+        )
+        try {
+          appBootManifests.add(await realpath(manifestPath))
+        } catch {}
+      }
+    }
+  }
+
+  if (appBootManifests.size !== 1) {
+    throw new Error('Expected one installed DSH app runtime; found ' + appBootManifests.size + '.')
+  }
+
+  const appBootManifest = [...appBootManifests][0]
+  if (appBootManifest === undefined) throw new Error('The installed DSH app runtime path is unavailable.')
+  dshAppBootRequire = createRequire(appBootManifest)
+  return dshAppBootRequire
+}
+
+const resolveRuntimePackageRoot = async packageName => {
+  const cached = runtimePackageRoots.get(packageName)
+  if (cached !== undefined) return cached
+
+  const explicitPackagePath = packageName === '@deepseek-ai/cordis'
+    ? process.env.DSH_RUNTIME_CORDIS_PACKAGE
+    : packageName === '@deepseek-ai/dsh-scope'
+      ? process.env.DSH_RUNTIME_SCOPE_PACKAGE
+      : undefined
+  let packageRoot
+  if (explicitPackagePath !== undefined && explicitPackagePath.trim() !== '') {
+    packageRoot = await realpath(resolve(explicitPackagePath))
+  } else {
+    const runtimeRequire = await resolveDshAppBootRequire()
+    let packageManifestPath
+    try {
+      packageManifestPath = runtimeRequire.resolve(packageName + '/package.json')
+    } catch {
+      const sourcePackagePath = resolve(sourceProfileRoot, 'node_modules', ...packageName.split('/'))
+      packageManifestPath = resolve(await realpath(sourcePackagePath), 'package.json')
+    }
+    packageRoot = dirname(await realpath(packageManifestPath))
+  }
+
+  const manifest = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'))
+  if (manifest.name !== packageName || typeof manifest.version !== 'string') {
+    throw new Error('The installed DSH runtime package is invalid: ' + packageName)
+  }
+  if (packageName === '@deepseek-ai/cordis' && manifest.version !== '4.0.4') {
+    throw new Error('The installed DSH Cordis peer must be version 4.0.4; found ' + manifest.version + '.')
+  }
+  if (packageName.startsWith('@deepseek-ai/dsh-') && manifest.version !== dshOutput.stdout.trim()) {
+    throw new Error('The installed DSH runtime package ' + packageName + ' must match DSH ' + dshOutput.stdout.trim() + '; found ' + manifest.version + '.')
+  }
+
+  runtimePackageRoots.set(packageName, packageRoot)
+  return packageRoot
+}
+
+const packageNameOf = specifier => {
+  const parts = specifier.split('/')
+  return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]
+}
+
+const packageRootFromEntry = async (packageName, entryPath) => {
+  let directory = dirname(await realpath(entryPath))
+  while (true) {
+    try {
+      const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
+      if (manifest.name === packageName) return directory
+    } catch {}
+    const parent = dirname(directory)
+    if (parent === directory) break
+    directory = parent
+  }
+  throw new Error('Could not find the package root for ' + packageName + '.')
+}
+
+const externalImportSpecifiers = async entryPath => {
+  const contents = await readFile(entryPath, 'utf8')
+  const specifiers = new Set()
+  const patterns = [
+    /^\s*(?:import|export)\s+(?:[^;\n]*?\sfrom\s+)?['"]([^'"]+)['"]/gm,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ]
+  for (const pattern of patterns) {
+    for (const match of contents.matchAll(pattern)) {
+      if (match[1] !== undefined) specifiers.add(match[1])
+    }
+  }
+  return [...specifiers].sort()
+}
+
+const runtimeJavaScriptFiles = async directory => {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
+  const files = []
+  for (const entry of entries) {
+    const entryPath = resolve(directory, entry.name)
+    if (entry.isDirectory() && entry.name !== 'node_modules') {
+      files.push(...await runtimeJavaScriptFiles(entryPath))
+      continue
+    }
+    if (entry.isFile() && /\.(?:cjs|js|mjs)$/.test(entry.name)) files.push(entryPath)
+  }
+  return files
+}
+
 const resolveControllerRuntimeDependencies = async () => {
   const sourceManifest = JSON.parse(await readFile(resolve(apiSessionControllerPath, 'package.json'), 'utf8'))
   const packageNames = [...new Set([...Object.keys(sourceManifest.dependencies ?? {}), ...Object.keys(sourceManifest.peerDependencies ?? {})])].sort()
@@ -112,6 +249,11 @@ const resolveControllerRuntimeDependencies = async () => {
 
     if (packageName === '@deepseek-ai/cordis') {
       dependencies[packageName] = `link:${runtimeCordisPackagePath}`
+      continue
+    }
+
+    if (packageName.startsWith('@deepseek-ai/') && packageName !== '@deepseek-ai/schemastery') {
+      dependencies[packageName] = 'link:' + await resolveRuntimePackageRoot(packageName)
       continue
     }
 
@@ -150,6 +292,99 @@ const scratch = await createScratchProfile({
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
   extraDependencies,
 })
+
+const copyRuntimePackageArtifacts = async (sourceRoot, destinationRoot) => {
+  const entries = await readdir(sourceRoot, { withFileTypes: true })
+  await mkdir(destinationRoot, { recursive: true })
+  await copyFile(resolve(sourceRoot, 'package.json'), resolve(destinationRoot, 'package.json'))
+  for (const entry of entries) {
+    if (entry.isDirectory() && ['dist', 'lib'].includes(entry.name)) {
+      await cp(resolve(sourceRoot, entry.name), resolve(destinationRoot, entry.name), { recursive: true })
+      continue
+    }
+    if (entry.isFile() && entry.name === 'cordis.patch.yml') {
+      await copyFile(resolve(sourceRoot, entry.name), resolve(destinationRoot, entry.name))
+    }
+  }
+}
+
+const installScratchLocalBundleCopies = async () => {
+  const profileManifestPath = resolve(scratch.profileRoot, 'package.json')
+  const profileManifest = JSON.parse(await readFile(profileManifestPath, 'utf8'))
+  const localPackages = [
+    ...[...localCorePackageRoots]
+      .filter(([name]) => name !== '@deepseek-ai/dsh-api-session-controller')
+      .map(([name, sourceRoot]) => ({ name, sourceRoot })),
+    { name: '@dshfiles/dsh-core-runtime', sourceRoot: bridgePath },
+    { name: '@dshfiles/cursor-agent', sourceRoot: cursorPluginPath },
+  ]
+  const localPackageCopyRoots = new Map()
+
+  for (const localPackage of localPackages) {
+    const sourceManifest = JSON.parse(await readFile(resolve(localPackage.sourceRoot, 'package.json'), 'utf8'))
+    if (sourceManifest.name !== localPackage.name) {
+      throw new Error('The local package name does not match the scratch overlay entry: ' + localPackage.name)
+    }
+    const destinationRoot = resolve(scratch.home, 'local-packages', ...localPackage.name.split('/'))
+    await copyRuntimePackageArtifacts(localPackage.sourceRoot, destinationRoot)
+    localPackageCopyRoots.set(localPackage.name, destinationRoot)
+    profileManifest.dependencies[localPackage.name] = 'link:' + destinationRoot
+  }
+
+  for (const localPackage of localPackages) {
+    const sourceFiles = (await Promise.all(['dist', 'lib'].map(directory =>
+      runtimeJavaScriptFiles(resolve(localPackage.sourceRoot, directory)),
+    ))).flat()
+    if (sourceFiles.length === 0) throw new Error('No built runtime JavaScript was found for ' + localPackage.name + '.')
+    const importSources = new Map()
+
+    for (const sourceFile of sourceFiles) {
+      for (const specifier of await externalImportSpecifiers(sourceFile)) {
+        if (specifier.startsWith('.') || specifier.startsWith('node:') || specifier.startsWith('file:') || specifier.startsWith('data:') || specifier.startsWith('#')) continue
+        const packageName = packageNameOf(specifier)
+        if (nodeBuiltinPackageNames.has(packageName)) continue
+        if (!importSources.has(packageName)) importSources.set(packageName, { sourceFile, specifier })
+      }
+    }
+
+    const destinationRoot = localPackageCopyRoots.get(localPackage.name)
+    if (destinationRoot === undefined) throw new Error('Scratch package destination is unavailable: ' + localPackage.name)
+    const destinationNodeModules = resolve(destinationRoot, 'node_modules')
+    await mkdir(destinationNodeModules, { recursive: true })
+
+    for (const [packageName, sourceImport] of importSources) {
+      if (packageName === localPackage.name) continue
+      const sourceFile = sourceImport.sourceFile
+      const specifier = sourceImport.specifier
+      const localDependencyRoot = localPackageCopyRoots.get(packageName)
+      const packageRoot = localDependencyRoot !== undefined
+        ? localDependencyRoot
+        : packageName.startsWith('@deepseek-ai/')
+          ? await resolveRuntimePackageRoot(packageName)
+          : await packageRootFromEntry(packageName, createRequire(sourceFile).resolve(specifier))
+      const linkPath = resolve(destinationNodeModules, ...packageName.split('/'))
+      await mkdir(dirname(linkPath), { recursive: true })
+      await symlink(packageRoot, linkPath, 'dir')
+
+      if (packageName.startsWith('@deepseek-ai/')) {
+        const destinationSourceFile = resolve(destinationRoot, relative(localPackage.sourceRoot, sourceFile))
+        const resolvedEntry = createRequire(destinationSourceFile).resolve(specifier)
+        const resolvedRoot = await packageRootFromEntry(packageName, resolvedEntry)
+        const expectedRoot = localDependencyRoot ?? await resolveRuntimePackageRoot(packageName)
+        assert.equal(
+          resolvedRoot,
+          await realpath(expectedRoot),
+          localPackage.name + ' must share the expected DSH package identity for ' + packageName + '.',
+        )
+      }
+    }
+  }
+
+  await writeFile(profileManifestPath, JSON.stringify(profileManifest, null, 2) + '\n')
+  process.stdout.write(
+    'PASS: scratch copied ' + localPackages.length + ' runtime packages and unified their imported DSH package identities.\n',
+  )
+}
 
 const installControllerDependencyOverlay = async profilePackagePath => {
   const overlayRoot = resolve(scratch.home, 'controller-dependency-overlay')
@@ -418,6 +653,31 @@ const verifyPublicCliBoot = async () => {
     process.stdout.write(`Session Controller module export: ${controllerImport.stdout.trim()}\n`)
   }
   let output = ''
+  const runtimeRequire = await resolveDshAppBootRequire()
+  for (const packageName of ['@deepseek-ai/dsh-web-app/startup', '@deepseek-ai/dsh-web-app']) {
+    let packageEntry
+    try {
+      packageEntry = runtimeRequire.resolve(packageName)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      process.stdout.write('Installed web package resolution failed for ' + packageName + ': ' + redactHostOutput(detail) + '\n')
+      continue
+    }
+    const importProbe = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', 'await import(' + JSON.stringify(pathToFileURL(packageEntry).href) + ')'],
+      { cwd: scratch.profileRoot, env: environment, encoding: 'utf8', timeout: 10_000 },
+    )
+    if (importProbe.status === 0) continue
+    const detail = [importProbe.stderr, importProbe.stdout, importProbe.error?.message]
+      .filter(value => typeof value === 'string' && value.trim() !== '')
+      .join('\n')
+      .slice(-4_000)
+    process.stdout.write(
+      'Installed web package import failed for ' + packageName + ' (exit ' + String(importProbe.status) + '):\n' +
+        redactHostOutput(detail).replaceAll(cursorCredential, '[redacted]') + '\n',
+    )
+  }
   const child = spawn('dsh', [profileName, '--patch', cursorOverlayPath, '--port', '0', '--no-open'], {
     cwd: repoRoot,
     detached: process.platform !== 'win32',
@@ -551,6 +811,7 @@ const crashHost = async () => {
 let verificationStage = 'scratch profile installation'
 
 try {
+  await installScratchLocalBundleCopies()
   await scratch.install()
   verificationStage = 'local Session Controller installation'
   await installProfileLocalApiSessionController()
