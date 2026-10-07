@@ -240,8 +240,12 @@ const startHost = async () => {
   ])
 
   await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
-  const activationFailures = output.split('\n').filter(line => /failed to import|did not activate|pending \(waiting for service:/i.test(line))
-  assert.deepEqual(activationFailures, [], redactHostOutput(activationFailures.join('\n')))
+  await waitFor(() => Promise.resolve(output.match(/DSHFILES_PROFILE_READINESS (.+)/)?.[1]), value => value !== undefined, 'settled Loader readiness')
+  const readinessSchema = z.object({ inactive: z.array(z.object({ id: z.string(), name: z.string(), state: z.number().nullable() })) })
+  const readinessText = output.match(/DSHFILES_PROFILE_READINESS (.+)/)?.[1]
+  assert.ok(readinessText, 'Scratch Host did not report settled Loader readiness.')
+  const readiness = readinessSchema.parse(JSON.parse(readinessText))
+  assert.deepEqual(readiness.inactive, [], 'Scratch Host retains inactive Loader entries.')
   const launchUrl = output.match(/http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/)?.[0]
   assert.ok(launchUrl, 'Scratch Host did not print its tokenized launch URL.')
   const captureFetch = async (input, init) => {

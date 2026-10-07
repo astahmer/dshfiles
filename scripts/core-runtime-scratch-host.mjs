@@ -94,6 +94,9 @@ for (const [name, localPath] of localCorePackages) {
 }
 console.log(`Scratch Host resolves local core packages: ${localCorePackages.map(([name]) => name).join(', ')}.`)
 const { runProfile } = await import(pathToFileURL(profileBootPath).href)
+const readinessPatchPath = resolve(home, 'profile-readiness.patch.yml')
+writeFileSync(readinessPatchPath, `- insert:\n    - id: dshfiles-profile-readiness\n      name: ${JSON.stringify(resolve(repoRoot, 'scripts/fixtures/profile-readiness.mjs'))}\n`)
+
 const syntheticCursorCredential = process.env.DSHX_SCRATCH_CURSOR_CREDENTIAL
 const launchEnvironmentEntry = name => {
   if (name !== 'CURSOR_API_KEY' || syntheticCursorCredential !== 'scratch-only-cursor-fixture') return undefined
@@ -108,7 +111,7 @@ await runProfile({
   environment,
   profile: profileName,
   resolvedProfile: { profile, installAnchor },
-  patchFiles: patchFile === undefined ? [] : [patchFile],
+  patchFiles: [readinessPatchPath, ...(patchFile === undefined ? [] : [patchFile])],
   args: ['--port', '0', '--no-open'],
 })
 
