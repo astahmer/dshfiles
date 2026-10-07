@@ -6,7 +6,7 @@ import { DshxError } from '../../diagnostics.js'
 import type { DshCompatibility } from '../../compat/types.js'
 import { artifactDeclarationPlugin, buildReport, buildWatcher, kernelBoundaryPlugin, resolveUserPlugins } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
-import { isHostExternal, singleHostChunkPlugin } from './guards.js'
+import { hostPeerDependencyPlugin, isHostExternal, singleHostChunkPlugin } from './guards.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
@@ -210,6 +210,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       hostEntryPlugin(paths, options),
       ...userPlugins,
       artifactDeclarationPlugin('host', paths.outDir, options.declarations ?? true),
+      hostPeerDependencyPlugin(paths.root),
       kernelBoundaryPlugin({
         face: 'host',
         root: paths.root,

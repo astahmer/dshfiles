@@ -404,6 +404,66 @@ describe('host compiler', () => {
     expect(code).toContain('@test/shared-host-package')
   })
 
+  it('requires external DSH Host imports to be peer dependencies', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { createScope } from '@deepseek-ai/dsh-scope'",
+        "export const scopeFactory = createScope",
+        "export const loadLlm = () => import('@deepseek-ai/dsh-llm')",
+        "export const inject = []",
+        "export function apply() {}",
+        '',
+      ].join('\n'),
+    )
+    const options = {
+      packageId: '@dshx/fixture-plugin',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+    }
+
+    await expect(buildHost(options)).rejects.toMatchObject({
+      errors: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'DshxError',
+          pluginCode: 'DSHX4005',
+          message: expect.stringContaining('@deepseek-ai/dsh-llm, @deepseek-ai/dsh-scope'),
+        }),
+      ]),
+    })
+
+    const packageFile = resolve(root, 'package.json')
+    const manifest: unknown = JSON.parse(await readFile(packageFile, 'utf8'))
+    if (
+      typeof manifest !== 'object' ||
+      manifest === null ||
+      Array.isArray(manifest) ||
+      !('peerDependencies' in manifest)
+    ) {
+      throw new TypeError('Host fixture package.json has no peerDependencies object.')
+    }
+    const peerDependencies = manifest.peerDependencies
+    if (typeof peerDependencies !== 'object' || peerDependencies === null || Array.isArray(peerDependencies)) {
+      throw new TypeError('Host fixture peerDependencies must be an object.')
+    }
+    const updatedManifest = {
+      ...manifest,
+      peerDependencies: {
+        ...peerDependencies,
+        '@deepseek-ai/dsh-scope': '>=0.2.0-rc.1 <0.3.0-0',
+        '@deepseek-ai/dsh-llm': '>=0.2.0-rc.1 <0.3.0-0',
+      },
+    }
+    await writeFile(packageFile, JSON.stringify(updatedManifest, null, 2) + '\n')
+
+    await buildHost(options)
+    const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(code).toContain('@deepseek-ai/dsh-scope')
+    expect(code).toContain('@deepseek-ai/dsh-llm')
+  })
+
   it('keeps Cordis external when called through the programmatic Host API', async () => {
     const root = await temporaryProject()
 

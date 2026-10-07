@@ -2,8 +2,9 @@ import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, realpathSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const profileName = process.env.DSHX_BOOT_PROFILE_NAME
 const home = process.env.DSH_HOME
 const patchFile = process.env.DSHX_BOOT_PATCH_FILE
@@ -26,8 +27,59 @@ const appBootPackagePath = dshRequire.resolve('@deepseek-ai/dsh-app-boot/package
 const appBootPackageRoot = dirname(appBootPackagePath)
 const appBootPath = resolve(appBootPackageRoot, 'lib/index.js')
 const profileBootPath = resolve(dshPackageRoot, 'lib/profile-boot.js')
+
+if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
+  const internalLoader = dshRequire('node-addon-require-builtin')
+    .requireBuiltin('internal/modules/esm/loader')
+    .getOrInitializeCascadedLoader()
+  const importModule = internalLoader.import
+  const resolveModule = internalLoader.resolve
+  internalLoader.resolve = async function (specifier, parentUrl, options) {
+    const resolution = await resolveModule.call(this, specifier, parentUrl, options)
+    if (
+      specifier === '@deepseek-ai/dsh-session' &&
+      String(parentUrl).includes('/dsh-api-session-controller/')
+    ) {
+      process.stderr.write(`Session Controller dsh-session resolution: ${resolution.url}\n`)
+    }
+    return resolution
+  }
+  internalLoader.import = async function (specifier, parentUrl, options) {
+    try {
+      return await importModule.call(this, specifier, parentUrl, options)
+    } catch (error) {
+      if (
+        specifier === '@deepseek-ai/dsh-api-session-controller' ||
+        String(parentUrl).includes('/dsh-api-session-controller/')
+      ) {
+        process.stderr.write(
+          `Session Controller import failure from ${String(parentUrl)}: ${error.stack ?? error}\n`,
+        )
+      }
+      throw error
+    }
+  }
+}
+
 const appBoot = await import(pathToFileURL(appBootPath).href)
 const profile = appBoot.loadProfile('dsh', profileName, dshPackagePath, home)
+if (resolve(profile.dir) !== resolve(profileRoot)) throw new Error('Scratch profile resolution loaded a different profile directory.')
+const resolution = await appBoot.createRuntimeResolution({ installAnchor: dshPackagePath, profile, home })
+if (process.env.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1') {
+  const sessionEntries = resolution.entries.filter(entry => entry.name === '@deepseek-ai/dsh-session')
+  const sessionLinks = resolution.linkedRoots.filter(root => root.name === '@deepseek-ai/dsh-session')
+  process.stderr.write(
+    `Scratch dsh-session resolution inputs: ${JSON.stringify({
+      localPackage: resolution.localPackageNames.includes('@deepseek-ai/dsh-session'),
+      entries: sessionEntries.map(({ name, scope, packageDir }) => ({ name, scope, packageDir })),
+      linkedRoots: sessionLinks,
+    })}\n`,
+  )
+}
+const scopeEntry = resolution.entries.find(entry => entry.name === '@deepseek-ai/dsh-scope')
+if (scopeEntry === undefined || scopeEntry.scope !== 'installation' || scopeEntry.packageDir.startsWith(repoRoot))
+  throw new Error('Scratch Host did not resolve dsh-scope from the DSH installation.')
+console.log('Scratch Host dsh-scope resolves from the DSH installation.')
 const { runProfile } = await import(pathToFileURL(profileBootPath).href)
 const syntheticCursorCredential = process.env.DSHX_SCRATCH_CURSOR_CREDENTIAL
 const launchEnvironmentEntry = name => {
