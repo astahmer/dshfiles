@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { access, chmod, cp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -55,6 +55,19 @@ const scratch = await createScratchProfile({
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
   extraDependencies,
 })
+
+const installProfileLocalApiSessionController = async () => {
+  const packageEntryPath = resolve(apiSessionControllerPath, 'lib/index.js')
+  await access(packageEntryPath).catch(() => {
+    throw new Error(
+      `Generated API Session Controller output is required for public CLI acceptance; set DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH to a package containing lib/index.js.`,
+    )
+  })
+  const profilePackagePath = resolve(scratch.profileRoot, 'node_modules/@deepseek-ai/dsh-api-session-controller')
+  await rm(profilePackagePath, { force: true, recursive: true })
+  await cp(apiSessionControllerPath, profilePackagePath, { recursive: true })
+}
+
 const cursorExecutableDirectory = resolve(scratch.home, 'bin')
 const cursorExecutablePath = resolve(cursorExecutableDirectory, 'agent')
 const cursorLauncherPath = resolve(scratch.home, 'cursor-acp-launcher.mjs')
@@ -98,7 +111,7 @@ const startHost = async () => {
   host = child
   hostExited = new Promise(resolveExit => child.once('close', (code, signal) => resolveExit({ code, signal })))
   const collect = chunk => {
-    output = `${output}${chunk.toString('utf8')}`.slice(-64_000)
+    output = `${output}${chunk.toString('utf8')}`.slice(-512_000)
   }
   child.stdout.on('data', collect)
   child.stderr.on('data', collect)
@@ -235,6 +248,20 @@ const signalHostTree = (child, signal) => (process.platform === 'win32' ? child.
 
 const verifyPublicCliBoot = async () => {
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
+  const controllerImport = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', "await import('@deepseek-ai/dsh-api-session-controller')"],
+    { cwd: scratch.profileRoot, env: environment, encoding: 'utf8', timeout: 10_000 },
+  )
+  if (controllerImport.status !== 0) {
+    const detail = [controllerImport.stderr, controllerImport.stdout, controllerImport.error?.message]
+      .filter(value => typeof value === 'string' && value.trim() !== '')
+      .join('\n')
+      .slice(-4_000)
+    process.stdout.write(
+      `Session Controller package import probe failed (exit ${String(controllerImport.status)}):\n${redactHostOutput(detail)}\n`,
+    )
+  }
   let output = ''
   const child = spawn('dsh', [profileName, '--patch', cursorOverlayPath, '--port', '0', '--no-open'], {
     cwd: repoRoot,
@@ -296,6 +323,30 @@ const verifyPublicCliBoot = async () => {
     process.stdout.write('PASS: public dsh CLI booted the local core runtime and Cursor adapter without a provider request.\n')
     if (unrelatedFailures.length > 0) {
       process.stdout.write(`PUBLIC CLI activation blockers: ${redactHostOutput(unrelatedFailures.join('\n'))}\n`)
+      const outputLines = output.split('\n')
+      const controllerFailureIndex = outputLines.findIndex(line => /session-controller.*failed to import/i.test(line))
+      if (controllerFailureIndex >= 0) {
+        const controllerFailureContext = outputLines
+          .slice(Math.max(0, controllerFailureIndex - 3), Math.min(outputLines.length, controllerFailureIndex + 12))
+          .filter(line => !/http:\/\/127\.0\.0\.1:\d+\/\?token=/i.test(line))
+          .join('\n')
+        process.stdout.write(
+          `Session Controller import context:\n${redactHostOutput(controllerFailureContext).replaceAll(cursorCredential, '[redacted]')}\n`,
+        )
+      }
+      const errorIndexes = outputLines.flatMap((line, index) =>
+        /\b(?:Error|Exception|ERR_[A-Z_]+|Cannot find (?:module|package))\b/i.test(line) ? [index] : [],
+      )
+      const errorContext = errorIndexes.flatMap(index =>
+        outputLines.slice(Math.max(0, index - 1), Math.min(outputLines.length, index + 6)),
+      )
+      if (errorContext.length > 0) {
+        const sanitizedErrorContext = [...new Set(errorContext)]
+          .filter(line => !/http:\/\/127\.0\.0\.1:\d+\/\?token=/i.test(line))
+          .slice(-40)
+          .join('\n')
+        process.stdout.write(`CLI startup error details:\n${redactHostOutput(sanitizedErrorContext).replaceAll(cursorCredential, '[redacted]')}\n`)
+      }
     }
   } finally {
     if (child.exitCode === null && child.signalCode === null) signalHostTree(child, 'SIGTERM')
@@ -340,6 +391,7 @@ const crashHost = async () => {
 
 try {
   await scratch.install()
+  await installProfileLocalApiSessionController()
   const configEnvironment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const composedConfig = spawnSync('dsh', ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath], {
     encoding: 'utf8',
