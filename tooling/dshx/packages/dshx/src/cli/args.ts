@@ -384,8 +384,8 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   directoryOnly: { allows: platformAction('host', 'remove'), usage: '--directory-only is only valid with host remove.' },
   line: { allows: platformAction('commands', 'run'), usage: '--line is only valid with commands run.' },
   file: {
-    allows: addTargets('ui', 'tool', 'command', 'hook'),
-    usage: '--file is only valid with add ui, tool, command, or hook.',
+    allows: context => context.command === 'test' || addTargets('ui', 'tool', 'command', 'hook')(context),
+    usage: '--file is only valid with test or add ui, tool, command, or hook.',
   },
   output: { allows: platformAction('sessions', 'export'), usage: '--output is only valid with sessions export.' },
   agentPreset: { allows: platformAction('sessions', 'create'), usage: '--agent-preset is only valid with sessions create.' },

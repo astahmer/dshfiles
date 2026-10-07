@@ -62,8 +62,12 @@ try {
     await copyFile(join(localPackageRoot, filename), join(overlayPackageRoot, filename))
   }
 
+  const overlayAgentRoot = join(overlayRoot, 'packages/core/agent')
+  await copyFile(join(repositoryRoot, 'tooling/dsh-core/agent/src/types.ts'), join(overlayAgentRoot, 'src/types.ts'))
+
   const typescript = join(dshSourceRoot, 'node_modules/typescript/bin/tsc')
   const tsdown = join(dshSourceRoot, 'node_modules/.bin/tsdown')
+  run(process.execPath, [typescript, '--project', join(overlayAgentRoot, 'tsconfig.json'), '--emitDeclarationOnly'], overlayRoot)
   run(process.execPath, [typescript, '--project', join(overlayPackageRoot, 'tsconfig.host.json'), '--emitDeclarationOnly'], overlayRoot)
 
   const generatorModule = await import('@deepseek-ai/dsh-typert-generator')
@@ -108,12 +112,8 @@ try {
   }
 
   const clientTypeOutput = runClientDeclarations(typescript, overlayPackageRoot, overlayRoot)
-  const expectedClientDiagnostic = /src\/client\/index\.ts\(\d+,\d+\): error TS2717: Subsequent property declarations must have the same type\.\s+Property 'sessions' must be of type 'SessionStore', but here has type 'ISessions'\./
   if (clientTypeOutput.diagnostics.length > 0) {
-    if (clientTypeOutput.diagnostics.length !== 1 || !expectedClientDiagnostic.test(clientTypeOutput.diagnostics[0])) {
-      throw new Error(`Controller Client declaration generation found unexpected TypeScript errors:\n${clientTypeOutput.diagnostics.join('\n')}`)
-    }
-    process.stderr.write(`Known pinned DSH Client type conflict: ${clientTypeOutput.diagnostics[0]}\n`)
+    throw new Error(`Controller Client declaration generation failed:\n${clientTypeOutput.diagnostics.join('\n')}`)
   }
 
   await assertContains(join(overlayPackageRoot, 'lib/types/index.d.ts'), 'SessionWorkspaceRestorePrepareRequest')

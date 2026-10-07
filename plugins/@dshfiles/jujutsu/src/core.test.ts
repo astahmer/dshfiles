@@ -120,9 +120,17 @@ test('diff parser counts patch lines, skips headers, and maps file names', () =>
     '+added',
   ].join('\n')
   assert.deepEqual(parsePatchStats(patch, ['src/a.ts', 'b.txt']), [
-    { path: 'src/a.ts', additions: 2, deletions: 1 },
-    { path: 'b.txt', additions: 1, deletions: 0 },
+    { path: 'src/a.ts', additions: 2, deletions: 1, contentDigest: '7b577f521ab5cfc984f7b562f17697700de0a3c796709166da15ab470909d489' },
+    { path: 'b.txt', additions: 1, deletions: 0, contentDigest: '48f7b673681313e27cddb7fb06cd055a093a676794aed405f8205b14923f2420' },
   ])
+})
+
+test('diff review digest changes with exact content and refuses a truncated final file', () => {
+  const patch = 'diff --git a/a.txt b/a.txt\n+first\n'
+  const first = parsePatchStats(patch, ['a.txt'])[0]
+  const changed = parsePatchStats(patch.replace('first', 'second'), ['a.txt'])[0]
+  assert.notEqual(first?.contentDigest, changed?.contentDigest)
+  assert.equal(parsePatchStats(patch, ['a.txt'], true)[0]?.contentDigest, null)
 })
 
 test('revision parser fails closed on malformed JSONL', () => {

@@ -72,6 +72,17 @@ Logs: `/private/tmp/dsh-unify-20261007/`. These are local diagnostics; the resul
 
 Known native Client declaration diagnostic: `sessions` is declared as both native `SessionStore` and Controller `ISessions` (TS2717). The generation script tolerates only that exact pinned diagnostic and rejects other errors. This is not a full native Client typecheck pass.
 
+## Integrated setup follow-through — current run
+
+Logs: `/private/tmp/dsh-finish-20261007/`. Started from clean default `78e38a3c`, parent/main `3a72f71f`; default was the sole registered workspace. Existing recovery refs retained.
+
+- DSHX's eight reported failures reproduced. Scoped `test --file` correctly; contextual help assertions now test command usage/options. Removed `apiChannel` from the public authoring entry: no external source consumers found, internal transport/tests retain it. Focused three-file suite passes 27/27 after rebuilding.
+- Prompt Stash reproduced: mixed image/text content rejected the whole message. Text projection now excludes attachments while preserving multiline text. Jujutsu reproduced: stale expected rows omitted exact-content SHA-256. Expectations and content-change/truncation checks reconciled. Selected tests: Prompt Stash 18/18, Jujutsu 22/22, Settings Search 10/10.
+- Settings Search chooses supported inline ConfigForm editing: rc.2 settings section owns only `close`; field navigation requires a native shell change. Removed dependency on absent navigation contract, retained existing in-place editor.
+- Native Agent shared `/types` had acquired Host-only Session/options/services. Restored identity-only Agent there; runtime-types already owns live augmentation. Controller sync overlays this source, regenerates Agent declarations, and rejects every Client diagnostic. Generated 166 outputs with no TS2717 exception; SHA-256 `8804be4cc5c9cf1c3c249a4ed29f40d18c06b6fd2b6bf72fd170a4e1affbd5ce`.
+- Plugin workspace overrides select one local Agent/Controller identity across native Client consumers. Combined graph validation and runtime composition still in progress.
+- Profile sync currently selects every owned bundle; bounded selection required before web promotion. No web profile writes or live restart performed.
+
 ## Remaining engineering gates — finite queue
 
 1. **Settings Search Host capability:** installed DSH 0.2.0-rc.2 runtime and declarations both lack `SettingsSectionOwnerProps.openSettingsTarget` and `SettingsNavigationTarget`. Add the real native seam or choose a supported product behavior. Do not use casts, module augmentation or state mutation to pretend it exists. Then build/typecheck and run an isolated browser navigation check.

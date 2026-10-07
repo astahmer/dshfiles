@@ -36,3 +36,6 @@ overrides:
   '@deepseek-ai/cordis': 4.0.4
   '@deepseek-ai/cordis-plugin-include': 1.0.9
   '@deepseek-ai/cordis-plugin-loader': 1.0.5
+
+  '@deepseek-ai/dsh-agent': link:../tooling/dsh-core/agent
+  '@deepseek-ai/dsh-api-session-controller': link:../tooling/dsh-core/api-session-controller

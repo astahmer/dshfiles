@@ -1,8 +1,9 @@
 import { z } from 'zod'
 
-import type { SettingsNavigationTarget } from '@deepseek-ai/dsh-client-ui-settings/client'
-
-export type SettingsSearchTarget = SettingsNavigationTarget
+export interface SettingsSearchTarget {
+  readonly entryId: string
+  readonly fieldPath: readonly string[]
+}
 
 export interface SettingsSecretPath {
   readonly path: readonly string[]

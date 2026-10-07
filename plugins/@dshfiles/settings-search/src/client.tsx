@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
 import {
@@ -31,7 +31,6 @@ const MAX_RESULTS = 60
 interface SettingsSearchPanelProps {
   readonly describe: SettingsDescribeFace
   readonly getForm: (entryId: string) => ConfigForm<unknown>
-  readonly openSettingsTarget: SettingsSectionOwnerProps['openSettingsTarget']
   readonly t: SettingsSearchTranslate
 }
 
@@ -246,7 +245,6 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const selectedTarget = selected === null ? undefined : allResults.find(result => result.id === selected.id)
 
   const selectResult = (result: SettingsSearchResult): void => {
-    if (props.openSettingsTarget(result.target)) return
     setSelected(result)
   }
 
@@ -404,8 +402,8 @@ export default defineClient({
           label: () => translate('sectionLabel'),
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
-        ({ openSettingsTarget, t }) => (
-          <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} openSettingsTarget={openSettingsTarget} t={t} />
+        ({ t }) => (
+          <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={t} />
         ),
       ),
     )

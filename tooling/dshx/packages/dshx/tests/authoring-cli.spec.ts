@@ -11,7 +11,9 @@ describe('advertised authoring commands', () => {
   it.each(['ui', 'panel', 'api', 'tool', 'command', 'hook'])('accepts add %s through the built executable', async target => {
     const result = await execute(process.execPath, [executable, 'add', target, '--help'])
     expect(result.stderr).toBe('')
-    expect(result.stdout).toContain('add targets: ui, panel, api, tool, command, hook')
+    expect(result.stdout).toContain(`USAGE dshx add ${target}`)
+    expect(result.stdout).toContain('--dry-run')
+    expect(result.stdout).toContain('--help')
     expect(parseCliArgs(['add', target, '--dry-run']).addTarget).toBe(target)
   })
 

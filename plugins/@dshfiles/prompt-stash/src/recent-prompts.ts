@@ -51,7 +51,6 @@ export const projectRecentPrompts = (newestFirstNodes: Iterable<unknown>): reado
     if (!messageResult.success || messageResult.data.seq !== nodeResult.data.anchorSeq) continue
 
     const textBlocks = messageResult.data.content.map(block => textBlockSchema.safeParse(block))
-    if (textBlocks.length === 0 || textBlocks.some(result => !result.success)) continue
 
     const text = textBlocks.flatMap(result => (result.success ? [result.data.text] : [])).join('')
     if (text.length > MAX_RECENT_PROMPT_TEXT_LENGTH || text.trim().length === 0) continue
