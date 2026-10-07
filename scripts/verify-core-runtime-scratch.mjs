@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { access, chmod, cp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises'
+import { access, chmod, cp, mkdir, readFile, readdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { delimiter, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -24,6 +25,12 @@ const profileName = 'core-runtime'
 const bridgePath = resolve(repoRoot, 'plugins/@dshfiles/dsh-core-runtime')
 const cursorPluginPath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent')
 const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
+const dshSourceRootValue = process.env.DSH_SOURCE_ROOT
+if (dshSourceRootValue === undefined || dshSourceRootValue.trim() === '') {
+  throw new Error('Set DSH_SOURCE_ROOT to the matching full DSH source checkout for the package dependency overlay.')
+}
+const dshSourceRoot = resolve(dshSourceRootValue)
+const upstreamApiSessionControllerRoot = resolve(dshSourceRoot, 'packages/api/session-controller')
 const apiSessionControllerPath =
   process.env.DSHX_SCRATCH_API_SESSION_CONTROLLER_PATH === undefined
     ? resolve(coreRoot, 'api-session-controller')
@@ -40,6 +47,94 @@ const corePackages = [
   'session-format-catalog',
   'session-format-v4-to-v5',
 ]
+const localCorePackageNames = new Set(corePackages.map(name => `@deepseek-ai/dsh-${name}`))
+const sourceProfileRoot = resolve(homedir(), '.dsh/profiles/web')
+
+const resolveRuntimeCordisPackage = async () => {
+  const explicitPackagePath = process.env.DSH_RUNTIME_CORDIS_PACKAGE
+  const packageRoots = new Set()
+
+  if (explicitPackagePath !== undefined && explicitPackagePath.trim() !== '') {
+    packageRoots.add(await realpath(resolve(explicitPackagePath)))
+  } else {
+    const pnpmHome = process.env.PNPM_HOME ?? resolve(homedir(), '.local/share/pnpm')
+    const globalRoot = resolve(pnpmHome, 'global')
+    const globalVersions = await readdir(globalRoot, { withFileTypes: true }).catch(() => [])
+
+    for (const globalVersion of globalVersions) {
+      if (!globalVersion.isDirectory() || !/^v\d+$/.test(globalVersion.name)) continue
+      const installRoots = await readdir(resolve(globalRoot, globalVersion.name), { withFileTypes: true }).catch(() => [])
+
+      for (const installRoot of installRoots) {
+        if (!installRoot.isDirectory()) continue
+        const pnpmPackagesRoot = resolve(globalRoot, globalVersion.name, installRoot.name, 'node_modules/.pnpm')
+        const packageEntries = await readdir(pnpmPackagesRoot, { withFileTypes: true }).catch(() => [])
+
+        for (const packageEntry of packageEntries) {
+          if (!packageEntry.isDirectory() || !packageEntry.name.startsWith(`@deepseek-ai+dsh-app-boot@${dshOutput.stdout.trim()}`)) continue
+          const appBootManifestPath = resolve(
+            pnpmPackagesRoot,
+            packageEntry.name,
+            'node_modules/@deepseek-ai/dsh-app-boot/package.json',
+          )
+
+          try {
+            const cordisManifestPath = createRequire(appBootManifestPath).resolve('@deepseek-ai/cordis/package.json')
+            packageRoots.add(dirname(await realpath(cordisManifestPath)))
+          } catch {}
+        }
+      }
+    }
+  }
+
+  if (packageRoots.size !== 1) {
+    throw new Error(`Expected one Cordis peer from the installed DSH runtime; found ${packageRoots.size}. Set DSH_RUNTIME_CORDIS_PACKAGE.`)
+  }
+
+  const packageRoot = [...packageRoots][0]
+  if (packageRoot === undefined) throw new Error('The installed DSH Cordis package path is unavailable.')
+  const manifest = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'))
+  if (manifest.name !== '@deepseek-ai/cordis' || manifest.version !== '4.0.4') {
+    throw new Error(`The installed DSH Cordis peer must be version 4.0.4; found ${String(manifest.version)}.`)
+  }
+  await access(resolve(packageRoot, manifest.exports?.['.']?.default ?? manifest.main))
+  return packageRoot
+}
+
+const resolveControllerRuntimeDependencies = async () => {
+  const sourceManifest = JSON.parse(await readFile(resolve(apiSessionControllerPath, 'package.json'), 'utf8'))
+  const packageNames = [...new Set([...Object.keys(sourceManifest.dependencies ?? {}), ...Object.keys(sourceManifest.peerDependencies ?? {})])].sort()
+  const runtimeCordisPackagePath = await resolveRuntimeCordisPackage()
+  const dependencies = {}
+
+  for (const packageName of packageNames) {
+    if (localCorePackageNames.has(packageName)) continue
+
+    if (packageName === '@deepseek-ai/cordis') {
+      dependencies[packageName] = `link:${runtimeCordisPackagePath}`
+      continue
+    }
+
+    if (packageName === '@deepseek-ai/schemastery') {
+      const sourcePackagePath = resolve(sourceProfileRoot, 'node_modules', ...packageName.split('/'))
+      dependencies[packageName] = `link:${await realpath(sourcePackagePath)}`
+      continue
+    }
+
+    const sourcePackagePath = resolve(upstreamApiSessionControllerRoot, 'node_modules', ...packageName.split('/'))
+    const dependencyPath = await realpath(sourcePackagePath).catch(() => {
+      throw new Error(`The pinned DSH Controller dependency is missing from its source install: ${packageName}`)
+    })
+    const dependencyManifest = JSON.parse(await readFile(resolve(dependencyPath, 'package.json'), 'utf8'))
+    if (dependencyManifest.name !== packageName || typeof dependencyManifest.version !== 'string') {
+      throw new Error(`The pinned DSH dependency manifest is invalid: ${packageName}`)
+    }
+    dependencies[packageName] = dependencyManifest.version
+  }
+
+  return dependencies
+}
+
 const extraDependencies = {
   '@dshfiles/dsh-core-runtime': `link:${bridgePath}`,
   '@dshfiles/cursor-agent': `link:${cursorPluginPath}`,
@@ -50,11 +145,45 @@ const extraDependencies = {
 
 const scratch = await createScratchProfile({
   profileName,
-  sourceProfileRoot: resolve(homedir(), '.dsh/profiles/web'),
+  sourceProfileRoot,
   bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@dshfiles/dsh-core-runtime', '@dshfiles/cursor-agent'],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
   extraDependencies,
 })
+
+const installControllerDependencyOverlay = async profilePackagePath => {
+  const overlayRoot = resolve(scratch.home, 'controller-dependency-overlay')
+  const dependencies = await resolveControllerRuntimeDependencies()
+  await mkdir(overlayRoot, { recursive: true })
+  await writeFile(
+    resolve(overlayRoot, 'package.json'),
+    `${JSON.stringify({ name: 'dsh-controller-dependency-overlay', version: '0.0.0', private: true, dependencies }, null, 2)}\n`,
+  )
+  await writeFile(resolve(overlayRoot, 'pnpm-workspace.yaml'), await readFile(resolve(repoRoot, 'tooling/dshx/pnpm-workspace.yaml'), 'utf8'))
+
+  const install = spawnSync('pnpm', ['install', '--prefer-offline', '--config.userconfig=/dev/null', '--config.globalconfig=/dev/null'], {
+    cwd: overlayRoot,
+    encoding: 'utf8',
+    timeout: 180_000,
+  })
+  if (install.status !== 0) {
+    const detail = `${install.stderr}\n${install.stdout}`.trim().slice(-3_000).replaceAll(scratch.home, '[scratch-home]')
+    throw new Error(`Session Controller dependency overlay install failed: ${String(install.status)}\n${detail}`)
+  }
+
+  let linkedPackages = 0
+  for (const packageName of Object.keys(dependencies)) {
+    const sourcePath = resolve(overlayRoot, 'node_modules', ...packageName.split('/'))
+    const dependencyPath = await realpath(sourcePath)
+    const overlayPath = resolve(profilePackagePath, 'node_modules', ...packageName.split('/'))
+    await mkdir(dirname(overlayPath), { recursive: true })
+    await rm(overlayPath, { force: true, recursive: true })
+    await symlink(dependencyPath, overlayPath, 'dir')
+    linkedPackages += 1
+  }
+
+  process.stdout.write(`Session Controller dependency overlay linked ${linkedPackages} package roots.\n`)
+}
 
 const installProfileLocalApiSessionController = async () => {
   const packageEntryPath = resolve(apiSessionControllerPath, 'lib/index.js')
@@ -66,6 +195,8 @@ const installProfileLocalApiSessionController = async () => {
   const profilePackagePath = resolve(scratch.profileRoot, 'node_modules/@deepseek-ai/dsh-api-session-controller')
   await rm(profilePackagePath, { force: true, recursive: true })
   await cp(apiSessionControllerPath, profilePackagePath, { recursive: true })
+  await rm(resolve(profilePackagePath, 'node_modules'), { force: true, recursive: true })
+  await installControllerDependencyOverlay(profilePackagePath)
 }
 
 const cursorExecutableDirectory = resolve(scratch.home, 'bin')
@@ -248,9 +379,31 @@ const signalHostTree = (child, signal) => (process.platform === 'win32' ? child.
 
 const verifyPublicCliBoot = async () => {
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
+  const composedConfig = spawnSync('dsh', [profileName, '--dump-config'], {
+    cwd: repoRoot,
+    env: environment,
+    encoding: 'utf8',
+    timeout: 10_000,
+  })
+  assert.equal(composedConfig.status, 0, `Scratch profile config composition failed: ${composedConfig.stderr}`)
+  assert.match(
+    composedConfig.stdout,
+    /id:\s*session-controller\s*\n\s*name:\s*['"]@deepseek-ai\/dsh-api-session-controller['"]/,
+    'Scratch profile composition is missing the Session Controller row.',
+  )
+  const configLines = composedConfig.stdout.split('\n')
+  const controllerRowIndex = configLines.findIndex(line => /id:\s*session-controller/.test(line))
+  const controllerRow = configLines.slice(controllerRowIndex, controllerRowIndex + 6).join('\n')
+  assert.doesNotMatch(controllerRow, /disabled:\s*true/, 'The scratch Session Controller row must be enabled.')
+  process.stdout.write('PASS: scratch composition includes the Session Controller row.\n')
+
   const controllerImport = spawnSync(
     process.execPath,
-    ['--input-type=module', '-e', "await import('@deepseek-ai/dsh-api-session-controller')"],
+    [
+      '--input-type=module',
+      '-e',
+      "const module = await import('@deepseek-ai/dsh-api-session-controller'); if (typeof module.default !== 'function') process.exitCode = 1; console.log(JSON.stringify({ defaultType: typeof module.default, defaultName: module.default?.name }))",
+    ],
     { cwd: scratch.profileRoot, env: environment, encoding: 'utf8', timeout: 10_000 },
   )
   if (controllerImport.status !== 0) {
@@ -261,6 +414,8 @@ const verifyPublicCliBoot = async () => {
     process.stdout.write(
       `Session Controller package import probe failed (exit ${String(controllerImport.status)}):\n${redactHostOutput(detail)}\n`,
     )
+  } else {
+    process.stdout.write(`Session Controller module export: ${controllerImport.stdout.trim()}\n`)
   }
   let output = ''
   const child = spawn('dsh', [profileName, '--patch', cursorOverlayPath, '--port', '0', '--no-open'], {
@@ -317,6 +472,10 @@ const verifyPublicCliBoot = async () => {
     await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
     assert.ok(!output.includes('agents.registerRuntimeDriver is not a function'), redactHostOutput(output.slice(-8_000)))
     const activationFailures = output.split('\n').filter(line => /failed to import|did not activate|pending \(waiting for service:/i.test(line))
+    const controllerTrace = output.split('\n').filter(line => /session-controller|sessionController/i.test(line))
+    process.stdout.write(
+      `Session Controller startup trace: ${controllerTrace.length === 0 ? '[no controller-specific lines]' : redactHostOutput(controllerTrace.join('\n'))}\n`,
+    )
     const bridgeFailures = activationFailures.filter(line => /dshfiles-core-runtime|cursor-agent/i.test(line))
     assert.deepEqual(bridgeFailures, [], redactHostOutput(bridgeFailures.join('\n')))
     const unrelatedFailures = activationFailures.filter(line => !/dshfiles-core-runtime|cursor-agent/i.test(line))
@@ -389,8 +548,11 @@ const crashHost = async () => {
   host = undefined
 }
 
+let verificationStage = 'scratch profile installation'
+
 try {
   await scratch.install()
+  verificationStage = 'local Session Controller installation'
   await installProfileLocalApiSessionController()
   const configEnvironment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const composedConfig = spawnSync('dsh', ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath], {
@@ -403,7 +565,9 @@ try {
     `Scratch profile composition omitted the synthetic Cursor instance (bundle=${composedConfig.stdout.includes('@dshfiles/cursor-agent')}, id=${composedConfig.stdout.includes('dshfiles-cursor-agent')}, fixture=${composedConfig.stdout.includes('Scratch ACP fixture')}).`,
   )
   assert.ok(composedConfig.stdout.includes('dshfiles-core-runtime'), 'Scratch composition omitted the local core runtime Host row.')
+  verificationStage = 'public DSH CLI activation'
   await verifyPublicCliBoot()
+  verificationStage = 'scratch Host activation'
   const platform = await startHost()
   const bundles = await platform.bundles.list()
   for (const name of ['@dshfiles/dsh-core-runtime', '@dshfiles/cursor-agent']) {
@@ -412,20 +576,25 @@ try {
       `Scratch profile did not activate ${name}.`,
     )
   }
-  const created = await platform.sessions.create({ cwd: repoRoot })
+  verificationStage = 'native Session creation'
+  const created = await platform.sessions.create({ cwd: repoRoot, agentPreset: 'minimal' })
   const initialSessions = await platform.sessions.list()
   assert.ok(
     initialSessions.some(session => session.sessionId === created.sessionId),
     'Host did not list the created Session.',
   )
   const initialHistory = await platform.sessions.history(created.sessionId)
+  verificationStage = 'Cursor-bound Session creation'
   const cursorSession = await platform.sessions.create({
     cwd: cursorProjectRoot,
+    agentPreset: 'minimal',
     runtimeBinding: { driverKind: 'cursor-acp', instanceId: cursorInstanceId },
   })
+  verificationStage = 'first synthetic Cursor provider turn'
   await platform.sessions.prompt(cursorSession.sessionId, 'synthetic first provider turn', 'queue')
   const initialCursorHistory = await waitForHistoryText(platform, cursorSession.sessionId, 'cursor-fixture-response-1')
 
+  verificationStage = 'clean Host restart and provider resume'
   await stopHost()
   const cleanRestartedPlatform = await startHost()
   const cleanRestartedSessions = await cleanRestartedPlatform.sessions.list()
@@ -450,6 +619,7 @@ try {
   assert.equal(cleanRestartEvents.filter(event => event.type === 'prompt').length, 2, 'Clean restart did not submit exactly two Cursor prompts.')
   assert.equal(cleanRestartEvents.filter(event => event.type === 'response').length, 2, 'Clean restart did not complete exactly two Cursor responses.')
 
+  verificationStage = 'in-flight provider interruption'
   await writeFile(cursorResponseGatePath, 'hold response until the verifier crashes the scratch Host\n')
   await cleanRestartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic interrupted provider turn', 'queue')
   const inFlightCursorEvents = await waitForCursorEvents(
@@ -464,6 +634,7 @@ try {
     'the interrupted ACP process to report its lost Host connection',
   )
 
+  verificationStage = 'SIGKILL recovery and uncertain-work refusal'
   const restartedPlatform = await startHost()
   const restartedSessions = await restartedPlatform.sessions.list()
   assert.ok(
@@ -553,7 +724,8 @@ try {
     'The interrupted ACP process did not confirm its response was detached from the crashed Host.',
   )
 
-  const recoverySession = await restartedPlatform.sessions.create({ cwd: repoRoot })
+  verificationStage = 'durable human reconciliation'
+  const recoverySession = await restartedPlatform.sessions.create({ cwd: repoRoot, agentPreset: 'minimal' })
   const recoveryCommands = await restartedPlatform.commands.list(recoverySession.sessionId)
   assert.ok(
     recoveryCommands.some(command => command.name === 'cursor-reconcile'),
@@ -598,6 +770,7 @@ try {
     'Reconciliation replayed or submitted a provider prompt.',
   )
 
+  verificationStage = 'post-reconciliation restart and provider resume'
   await stopHost()
   const durablePlatform = await startHost()
   const durableConfirmationHistory = await durablePlatform.sessions.history(recoverySession.sessionId)
@@ -642,8 +815,10 @@ try {
     `PASS: SIGKILL recovered ${recoveredTurnHistory.records.length} public Session records and unread attention, refused uncertain work without replay, durably recorded human reconciliation from a separate Session, cleared the exact receipt across restart, and resumed the same Cursor ACP session for one new prompt.\n`,
   )
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  process.stderr.write(`${redactHostOutput(message)}\n`)
+  const detail = error instanceof Error ? error.stack ?? error.message : String(error)
+  process.stderr.write(
+    `Scratch runtime verification failed during ${verificationStage}:\n${redactHostOutput(detail).replaceAll(cursorCredential, '[scratch-credential]')}\n`,
+  )
   process.exitCode = 1
 } finally {
   await stopHost().catch(error => {

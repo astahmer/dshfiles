@@ -9,6 +9,7 @@
     "check:plugins": "pnpm --dir plugins run check",
     "verify:cordis-identity": "node scripts/verify-cordis-identity.mjs",
     "verify:core-runtime-identity": "node scripts/verify-core-runtime-identity.mjs",
+    "sync:core-api-session-controller": "node scripts/sync-dsh-core-api-session-controller.mjs",
     "verify:core-runtime-scratch": "node scripts/verify-core-runtime-scratch.mjs",
     "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && node --experimental-strip-types scripts/verify-project-checks-scratch.mjs",
     "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
@@ -24,6 +25,8 @@
     "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && node --experimental-strip-types scripts/verify-project-checks-scratch.mjs"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2",
     "@types/node": "^22.20.5",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
