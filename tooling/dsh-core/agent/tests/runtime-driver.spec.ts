@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { describe, expect, it } from 'vitest'
 import type { RuntimeDriverAdapter, RuntimeDriverDescriptor, RuntimeDriverSession } from '@deepseek-ai/dsh-agent'
@@ -104,6 +104,39 @@ describe('named runtime drivers', () => {
       })).rejects.toThrow('does not support resume')
       expect(context.sessions.get(SessionId('unknown'))).toBeUndefined()
       expect(context.sessions.get(SessionId('unsupported'))).toBeUndefined()
+    } finally {
+      await context.fiber.dispose()
+    }
+  })
+
+  it('allows history-replay drivers to handle seeded forks without native fork capability', async () => {
+    const context = await createRuntime()
+    const descriptor = runtimeDriverDescriptorSchema.parse({
+      id: 'portable-history',
+      title: 'Portable history driver',
+      protocolVersion: 1,
+      capabilities: { create: true, resume: false, fork: false, historyReplay: true, steering: true, rollback: false },
+    })
+    const runtime = createRuntimeDriver(descriptor)
+    try {
+      context.agents.registerRuntimeDriver(runtime.adapter)
+      const handle = await context.agents.create({
+        sessionId: SessionId('portable-history-fork'),
+        seed: [],
+        inheritedEventCount: SessionLogOffset(0),
+        meta: {
+          parentSession: SessionId('portable-history-parent'),
+          isSeeded: true,
+          runtimeBinding: { driverKind: descriptor.id, instanceId: 'test-account' },
+        },
+      })
+
+      expect(handle.agent.session.header.runtimeBinding).toEqual({
+        driverKind: descriptor.id,
+        instanceId: 'test-account',
+      })
+      expect(runtime.counts).toEqual({ created: 0, resumed: 0, prompted: 0, acknowledged: 0, disposed: 0 })
+      await handle.dispose()
     } finally {
       await context.fiber.dispose()
     }
