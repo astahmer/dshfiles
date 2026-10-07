@@ -41,4 +41,6 @@ path may cold-resume the persisted direct child to deliver a notice; the durable
 receipt remains authoritative if that wake fails. If the document changes or
 becomes unreadable before resolution or retrieval, the receipt is marked stale
 and the feedback must be re-anchored before the child acts. Feedback is never
-applied automatically. Element anchors still require a browser/evidence provider.
+applied automatically. Cold-session revision checks read the persisted Session
+header through `dsh-session-query`; feedback rows keep only the workspace-relative
+path and hash. Element anchors still require a browser/evidence provider.

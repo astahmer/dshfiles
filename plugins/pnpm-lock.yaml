@@ -597,6 +597,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+      '@deepseek-ai/dsh-session-query':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(f7b752878ffd7711088ab36556c005d1)
       '@deepseek-ai/dsh-storage':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)

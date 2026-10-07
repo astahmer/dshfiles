@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-agent-questions-cold-resume-fixture
+      name: '@dshfiles/agent-questions-cold-resume-fixture'

@@ -5,6 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subagent'
 import { z } from 'zod'
@@ -394,7 +395,18 @@ const setupHost = (context: Context): void => {
         return parent !== undefined && context.agents.isOwnedBy(SessionId(childSessionId), parent)
       },
       currentRevision: async ({ childSessionId, path }) => {
-        const workspacePath = context.sessions.get(SessionId(childSessionId))?.header.cwd
+        let workspacePath = context.sessions.get(SessionId(childSessionId))?.header.cwd
+        if (workspacePath === undefined) {
+          let observation: Awaited<ReturnType<typeof context.sessionQuery.observeSession>> | undefined
+          try {
+            observation = await context.sessionQuery.observeSession(SessionId(childSessionId))
+            workspacePath = observation.header.cwd
+          } catch {
+            return null
+          } finally {
+            observation?.[Symbol.dispose]()
+          }
+        }
         if (workspacePath === undefined) return null
         return currentMarkdownRevision({ workspacePath, path })
       },
@@ -437,7 +449,7 @@ const setupHost = (context: Context): void => {
 
 export default defineHost({
   name: 'agent-questions',
-  inject: ['agents', 'sessions', 'subagents', 'storageDomain'],
+  inject: ['agents', 'sessions', 'sessionQuery', 'subagents', 'storageDomain'],
   tools: [
     askParentQuestionTool,
     answerParentQuestionTool,
