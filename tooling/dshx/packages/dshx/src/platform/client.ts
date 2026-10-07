@@ -17,6 +17,11 @@ const sessionAttentionSummarySchema = z.object({
   unread: z.boolean(),
 })
 export type SessionAttentionSummary = z.infer<typeof sessionAttentionSummarySchema>
+const sessionAttentionActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('mark-read') }),
+  z.object({ type: z.literal('set-snoozed'), snoozed: z.boolean() }),
+])
+export type SessionAttentionAction = z.infer<typeof sessionAttentionActionSchema>
 
 const sessionSummarySchema = z.object({
   agentAvailable: z.boolean(),
@@ -377,6 +382,11 @@ export interface DshPlatformTransport {
 export interface DshPlatformClient {
   readonly sessions: {
     list(): Promise<readonly SessionSummary[]>
+    updateAttention(
+      sessionId: string,
+      action: SessionAttentionAction,
+      signal?: AbortSignal,
+    ): Promise<SessionAttentionSummary>
     search(query: string): Promise<{
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
@@ -701,6 +711,17 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   return {
     sessions: {
       list: listSessions,
+      updateAttention: async (sessionId, action, signal) => {
+        const request = z
+          .object({
+            sessionId: z.string().min(1),
+            action: sessionAttentionActionSchema,
+          })
+          .parse({ sessionId, action })
+        return sessionAttentionSummarySchema.parse(
+          await transport.rpc('session', 'updateAttention', { request }, signal),
+        )
+      },
       search: async query => {
         const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', { request: { query } }))
         return { items: result.items, hasMore: result.hasMore }

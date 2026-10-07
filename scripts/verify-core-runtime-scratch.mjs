@@ -895,6 +895,23 @@ try {
   verificationStage = 'first synthetic Cursor provider turn'
   await platform.sessions.prompt(cursorSession.sessionId, 'synthetic first provider turn', 'queue')
   const initialCursorHistory = await waitForHistoryText(platform, cursorSession.sessionId, 'cursor-fixture-response-1')
+  const markedCursorAttention = await platform.sessions.updateAttention(cursorSession.sessionId, { type: 'mark-read' })
+  assert.equal(markedCursorAttention.unread, false, 'The generated attention Remote did not mark the Session read.')
+  assert.ok(markedCursorAttention.lastPromptSeq !== null, 'The attention Remote omitted the admitted prompt sequence.')
+  const snoozedCursorAttention = await platform.sessions.updateAttention(cursorSession.sessionId, {
+    type: 'set-snoozed',
+    snoozed: true,
+  })
+  assert.equal(snoozedCursorAttention.snoozed, true, 'The generated attention Remote did not persist snooze.')
+  const activeCursorAttention = await platform.sessions.updateAttention(cursorSession.sessionId, {
+    type: 'set-snoozed',
+    snoozed: false,
+  })
+  assert.equal(activeCursorAttention.snoozed, false, 'The generated attention Remote did not clear snooze.')
+  const initialCursorSummary = (await platform.sessions.list()).find(
+    session => session.sessionId === cursorSession.sessionId,
+  )
+  assert.deepEqual(initialCursorSummary?.attention, activeCursorAttention, 'Session listing did not receive synchronized attention.')
 
   verificationStage = 'clean Host restart and provider resume'
   await stopHost()
@@ -910,8 +927,18 @@ try {
     initialCursorHistory.records,
     'Cursor Session history changed across a clean Host restart.',
   )
+  const cleanRestartedCursorSummary = cleanRestartedSessions.find(session => session.sessionId === cursorSession.sessionId)
+  assert.deepEqual(
+    cleanRestartedCursorSummary?.attention,
+    activeCursorAttention,
+    'Session attention changed across a clean Host restart.',
+  )
   await cleanRestartedPlatform.sessions.prompt(cursorSession.sessionId, 'synthetic resumed provider turn', 'queue')
   await waitForHistoryText(cleanRestartedPlatform, cursorSession.sessionId, 'cursor-fixture-response-2')
+  const resumedCursorSummary = (await cleanRestartedPlatform.sessions.list()).find(
+    session => session.sessionId === cursorSession.sessionId,
+  )
+  assert.equal(resumedCursorSummary?.attention?.unread, true, 'A new prompt after restart did not become unread.')
   const cleanRestartEvents = await waitForCursorEvents(
     events => events.filter(event => event.type === 'prompt').length === 2 && events.filter(event => event.type === 'response').length === 2,
     'the resumed Cursor provider turn after a clean Host restart',
@@ -970,7 +997,7 @@ try {
     recoveredCursorSummary.attention,
     {
       lastPromptSeq: Math.max(...recoveredPromptSeqs),
-      readThroughSeq: -1,
+      readThroughSeq: activeCursorAttention.readThroughSeq,
       snoozed: false,
       unread: true,
     },
