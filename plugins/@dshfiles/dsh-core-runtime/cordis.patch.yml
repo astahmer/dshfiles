@@ -17,4 +17,4 @@
     - id: dshfiles-core-runtime
       name: '@dshfiles/dsh-core-runtime'
       config:
-        sessionRoot: !!js dshHomePath('sessions')
+        sessionPersistenceRoot: !!js dshHomePath('sessions')

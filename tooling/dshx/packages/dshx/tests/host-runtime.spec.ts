@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import Schema from '@deepseek-ai/schemastery'
 import { defineTool as officialDefineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
+import { z } from 'zod'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   defineCommand,
@@ -76,6 +77,15 @@ describe('defineHost', () => {
     expectTypeOf(definition.tools).toEqualTypeOf<readonly [ToolDefinition]>()
   })
 
+  it('infers Host setup config from its Standard Schema output', () => {
+    defineHost({
+      Config: z.object({ sessionPersistenceRoot: z.string() }),
+      setup(_ctx, config) {
+        expectTypeOf(config.sessionPersistenceRoot).toBeString()
+      },
+    })
+  })
+
   it('preserves the official Command definition and invocation types', () => {
     const command = defineCommand({
       name: 'status',
@@ -133,6 +143,22 @@ describe('defineHost', () => {
 })
 
 describe('Host runtime adapter', () => {
+  it('passes unwrapped Loader config to plain Host setup', () => {
+    const received = vi.fn()
+    const plugin = createHostPlugin(
+      defineHost({
+        Config: z.object({ sessionPersistenceRoot: z.string() }),
+        setup(_ctx, config) {
+          received(config)
+        },
+      }),
+      { packageId: '@test/plugin' },
+    )
+
+    plugin.apply(context(vi.fn(() => vi.fn())), { sessionPersistenceRoot: () => '/tmp/sessions' })
+    expect(received).toHaveBeenCalledWith({ sessionPersistenceRoot: '/tmp/sessions' })
+  })
+
   it('merges inject in order, registers official tools, then calls setup', async () => {
     const calls: string[] = []
     const first = tool('first')

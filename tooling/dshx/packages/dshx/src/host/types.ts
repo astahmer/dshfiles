@@ -28,15 +28,15 @@ export interface PromptContextContribution<Prompt extends PromptContext = Prompt
 export type PromptContribution = PromptSectionContribution | PromptContextContribution
 
 /** Author-facing Host definition backed by the official Cordis context and Tool model. */
-export interface HostDefinition {
+export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = StandardSchemaV1> {
   readonly name?: string
   readonly inject?: readonly string[]
   readonly tools?: readonly ToolDefinition[]
   readonly commands?: readonly CommandDefinition[]
   readonly prompts?: readonly PromptContribution[]
   /** Native Loader Config schema for profile-owned fields that are not DSHX Settings. */
-  readonly Config?: StandardSchemaV1
+  readonly Config?: ConfigSchema
   readonly settings?: readonly SettingsContribution[]
   readonly apis?: readonly ApiHostRegistration<Record<string, AnyApiMethodDefinition>, any>[]
-  readonly setup?: (ctx: Context, config?: unknown) => void | Effect<void>
+  readonly setup?: (ctx: Context, config: StandardSchemaV1.InferOutput<ConfigSchema>) => void | Effect<void>
 }

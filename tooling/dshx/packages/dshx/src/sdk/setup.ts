@@ -1,13 +1,12 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
 
-type Setup = (ctx: Context) => void | Effect<void>
+type Setup = (ctx: Context, config: unknown) => void | Effect<void>
 type Metadata = { readonly packageId: string }
 type HostSetup = (ctx: Context, config: unknown, metadata: Metadata) => void | Effect<void>
 type ComponentDecorator = <Component>(component: Component) => Component
 type ClientSetup = (ctx: ClientContext, decorate: ComponentDecorator, metadata: Metadata) => void | Effect<void>
-// A defineClient({ setup }) handler receives the component decorator as its
-// second argument, so the runtime accepts more than the one-argument Host shape.
+// A defineClient({ setup }) handler receives the component decorator second and metadata third.
 type ClientDefinitionSetup = NonNullable<ClientDefinition['setup']>
 // Definition metadata only. Cordis still owns activation, identity, and cleanup.
 const hosts = new WeakMap<Setup, HostSetup>()
@@ -17,12 +16,32 @@ export function adaptHostSetup(fallback: Setup, setup: HostSetup): Setup {
   hosts.set(fallback, setup)
   return fallback
 }
+
+/**
+ * Normalize the row config the Loader hands to `apply`.
+ *
+ * Schemastery passes resolver objects whose fields are getters. Resolve those
+ * fields once before exposing the config to Host setup code.
+ */
+export function unwrapRowConfig(config: unknown): Record<string, unknown> {
+  if (config === null || config === undefined || typeof config !== 'object') return {}
+  const resolved = config as Record<string, unknown>
+  const output: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(resolved)) {
+    output[key] = typeof value === 'function' ? (value as () => unknown)() : value
+  }
+  return output
+}
+
 export function adaptClientSetup(fallback: Setup, setup: ClientSetup): Setup {
   clients.set(fallback, setup)
   return fallback
 }
 export function invokeHostSetup(setup: Setup | undefined, ctx: Context, config: unknown, metadata: Metadata): void | Effect<void> {
-  return setup === undefined ? undefined : hosts.has(setup) ? hosts.get(setup)!(ctx, config, metadata) : setup(ctx)
+  if (setup === undefined) return undefined
+  const adapted = hosts.get(setup)
+  if (adapted !== undefined) return adapted(ctx, config, metadata)
+  return setup(ctx, unwrapRowConfig(config))
 }
 export function invokeClientSetup(
   setup: ClientDefinitionSetup | undefined,
