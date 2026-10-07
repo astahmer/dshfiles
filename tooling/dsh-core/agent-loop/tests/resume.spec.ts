@@ -1,12 +1,20 @@
 import { ToolCallId, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { appendFile, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionLogOffset, SessionSeq, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
+import SessionStore, {
+  buildForkSeed,
+  SessionLogOffset,
+  SessionSeq,
+  Session,
+  SessionId,
+  TOOL_NOT_STARTED,
+  TOOL_OUTCOME_UNKNOWN,
+} from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture, TOOL_RUNTIME_SCHEDULER } from '@deepseek-ai/dsh-tools'
@@ -14,6 +22,7 @@ import AgentRegistry, { type Agent, type RuntimeDriverAdapter, type RuntimeDrive
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { generationLogPath } from '@deepseek-ai/dsh-session-persistence-jsonl/src/format.ts'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
@@ -1143,6 +1152,117 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
 
     await resumedHandle.dispose()
     await resumedContext.fiber.dispose()
+  })
+
+  it('migrates V3 history before a bound fork replays it to a runtime driver', async () => {
+    const sourceId = SessionId('legacy-v3-handoff-source')
+    const targetId = SessionId('legacy-v3-handoff-target')
+    const root = await mkdtemp(join(tmpdir(), 'dsh-v3-handoff-'))
+    dirs.push(root)
+    const legacyPath = generationLogPath(root, undefined, sourceId, 3, 'none')
+    const legacyEvents: SessionEvent[] = [
+      { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+      { type: 'step/start', seq: SessionSeq(1), time: 2, data: { turn: 1, step: 1 } },
+      {
+        type: 'user/message', seq: SessionSeq(2), time: 3, surfaceOp: 'append',
+        data: createUserMessage({ content: [{ type: 'text', text: 'legacy question' }], source: { kind: 'user' } }),
+      },
+      {
+        type: 'assistant/message', seq: SessionSeq(3), time: 4, surfaceOp: 'append',
+        data: {
+          turn: 1,
+          step: 1,
+          message: createMessage({
+            role: 'assistant',
+            content: [{ type: 'text', text: 'legacy answer' }],
+            source: { kind: 'model', provider: 'legacy', model: 'v1' },
+          }),
+          stream: [],
+        },
+      },
+      { type: 'step/end', seq: SessionSeq(4), time: 5, data: { turn: 1, step: 1 } },
+      { type: 'turn/end', seq: SessionSeq(5), time: 6, data: { turn: 1, reason: { kind: 'completed' } } },
+    ]
+    const legacyHeader = {
+      type: 'session', version: 3, id: sourceId, createdAt: 1, isSeeded: false, delegationDepth: 0,
+    }
+    const legacyBytes = Buffer.from(`${[legacyHeader, ...legacyEvents].map(row => JSON.stringify(row)).join('\n')}\n`)
+    await mkdir(dirname(legacyPath), { recursive: true })
+    await writeFile(legacyPath, legacyBytes)
+
+    const context = await mountPersistentHarness(root, new MockAdapter([]), 'none')
+    try {
+      const source = await context.sessionPersistence.open(sourceId, 'read')
+      let migratedEvents: readonly SessionEvent[]
+      try {
+        migratedEvents = (await source.read()).events
+        expect(source.header.version).toBe(5)
+      } finally {
+        await source.close()
+      }
+      const migratedWriter = await context.sessionPersistence.open(sourceId, 'write')
+      try {
+        expect((await migratedWriter.read()).events).toEqual(migratedEvents)
+      } finally {
+        await migratedWriter.close()
+      }
+
+      const observedHistory: Array<readonly RuntimeDriverHistoryMessage[]> = []
+      const observedPrompts: string[][] = []
+      const runtimeBinding = { driverKind: 'history-replay-driver', instanceId: 'local' }
+      const adapter: RuntimeDriverAdapter = {
+        descriptor: {
+          id: runtimeBinding.driverKind,
+          title: 'History replay driver',
+          protocolVersion: 1,
+          capabilities: {
+            create: true,
+            resume: false,
+            fork: true,
+            historyReplay: true,
+            steering: true,
+            rollback: false,
+          },
+        },
+        create: async request => {
+          observedHistory.push(request.history?.messages ?? [])
+          return {
+            prompt: async (prompt, publish) => {
+              observedPrompts.push(prompt.messages.flatMap(message => message.content
+                .flatMap(block => block.type === 'text' ? [block.text] : [])))
+              publish({ type: 'text-delta', text: 'handoff answer' })
+              return { outcome: 'completed' }
+            },
+            acknowledgePrompt: async () => undefined,
+            cancel: () => undefined,
+            dispose: async () => undefined,
+          }
+        },
+        resume: async () => { throw new Error('Native resume is unavailable.') },
+        status: async () => ({ availability: 'available', authentication: 'authenticated' }),
+      }
+      context.agents.registerRuntimeDriver(adapter)
+      const seed = buildForkSeed(migratedEvents, SessionSeq(migratedEvents.length - 1))
+      const handoff = await context.agents.create({
+        sessionId: targetId,
+        seed,
+        inheritedEventCount: SessionLogOffset(migratedEvents.length),
+        meta: { cwd: '/w', parentSession: sourceId, isSeeded: true, runtimeBinding },
+      })
+      handoff.agent.followup(createUserMessage({
+        content: [{ type: 'text', text: 'new prompt remains intact' }],
+        source: { kind: 'user' },
+      }))
+      await handoff.agent.whenIdle()
+
+      expect(observedHistory.map(messages => messages.map(message => message.parts.join(''))))
+        .toEqual([['legacy question', 'legacy answer']])
+      expect(observedPrompts).toEqual([['new prompt remains intact']])
+      expect(await readFile(legacyPath)).toEqual(legacyBytes)
+      expect(await readFile(generationLogPath(root, undefined, sourceId, 5, 'none'))).not.toHaveLength(0)
+    } finally {
+      await context.fiber.dispose()
+    }
   })
 
   it('resume rejects when session persistence is not configured', async () => {
