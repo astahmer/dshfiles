@@ -10,9 +10,14 @@ const MAX_FRAMES = 8
 const MAX_REPORT_BYTES = 64 * 1024
 const MAX_CATALOG_BYTES = 16 * 1024
 const MAX_EXPECTED_STEPS = 64
+const MAX_ASSERTIONS = 64
 const MAX_RETAINED_RUNS = 10
 const MAX_RETAINED_BYTES = 20 * 1024 * 1024
 const stepIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+const assertionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+const evidenceAssertionSchema = z
+  .object({ assertionId: assertionIdSchema, outcome: z.enum(['passed', 'failed']) })
+  .strict()
 const frameSchema = z
   .object({
     frameId: z.string().regex(/^frame-[0-9]{3}$/),
@@ -50,6 +55,7 @@ const evidenceManifestSchema = z
     expectedStepIds: z.array(stepIdSchema).max(MAX_EXPECTED_STEPS),
     completedStepIds: z.array(stepIdSchema),
     missingStepIds: z.array(stepIdSchema),
+    assertions: z.array(evidenceAssertionSchema).max(MAX_ASSERTIONS).default([]),
     frames: z.array(frameSchema).max(MAX_FRAMES + 1),
   })
   .strict()
@@ -57,8 +63,15 @@ const evidenceManifestSchema = z
     const expected = new Set(manifest.expectedStepIds)
     const completed = new Set(manifest.completedStepIds)
     const missing = new Set(manifest.missingStepIds)
+    const assertionIds = manifest.assertions.map(assertion => assertion.assertionId)
     if (expected.size !== manifest.expectedStepIds.length || completed.size !== manifest.completedStepIds.length) {
       context.addIssue({ code: 'custom', message: 'step ids must be unique' })
+    }
+    if (new Set(assertionIds).size !== assertionIds.length) {
+      context.addIssue({ code: 'custom', message: 'assertion ids must be unique' })
+    }
+    if (manifest.status === 'passed' && manifest.assertions.some(assertion => assertion.outcome === 'failed')) {
+      context.addIssue({ code: 'custom', message: 'a passed run cannot contain a failed assertion' })
     }
     if (manifest.completedStepIds.some(stepId => !expected.has(stepId))) {
       context.addIssue({ code: 'custom', message: 'completed steps must be expected' })
@@ -91,6 +104,7 @@ const evidenceManifestSchema = z
 
 export type EvidenceStatus = 'passed' | 'failed' | 'interrupted' | 'partial' | 'skipped'
 export type EvidenceManifest = z.infer<typeof evidenceManifestSchema>
+export type EvidenceAssertion = EvidenceManifest['assertions'][number]
 
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, character => {
@@ -163,19 +177,37 @@ export const renderEvidenceReport = (manifest: EvidenceManifest): string => {
       return `<li><span class="step-state ${recorded ? 'recorded' : 'missing'}">${recorded ? 'Recorded' : 'Missing'}</span><code>${escapeHtml(stepId)}</code></li>`
     })
     .join('\n')
+  const assertions =
+    manifest.assertions.length === 0
+      ? '<p>No individual assertion results were recorded for this run.</p>'
+      : `<ol class="assertions">${manifest.assertions
+          .map(assertion => `<li><span class="assertion-state ${assertion.outcome}">${assertion.outcome}</span><code>${escapeHtml(assertion.assertionId)}</code></li>`)
+          .join('\n')}</ol>`
   const frames = manifest.frames
-    .map(frame => {
+    .map((frame, index) => {
       const label = escapeHtml(frame.stepId)
       const image =
         frame.path === null
           ? `<p class="missing">Frame unavailable: ${escapeHtml(frame.missingReason ?? 'unknown')}</p>`
           : `<img src="./${escapeHtml(frame.path)}" alt="Screenshot for ${label}" loading="lazy">`
-      return `<figure id="${escapeHtml(frame.frameId)}"><figcaption><strong>${escapeHtml(frame.frameId)}</strong> · ${label} · ${escapeHtml(frame.capturedAt)}</figcaption>${image}</figure>`
+      const previous = manifest.frames[index - 1]
+      const next = manifest.frames[index + 1]
+      const previousControl =
+        previous === undefined
+          ? '<span aria-disabled="true">Previous frame</span>'
+          : `<a rel="prev" href="#${escapeHtml(previous.frameId)}">Previous frame</a>`
+      const nextControl =
+        next === undefined
+          ? '<span aria-disabled="true">Next frame</span>'
+          : `<a rel="next" href="#${escapeHtml(next.frameId)}">Next frame</a>`
+      const controls = `<nav class="frame-controls" aria-label="Screenshot replay controls">${previousControl}<span>Frame ${String(index + 1)} of ${String(manifest.frames.length)}</span>${nextControl}</nav>`
+      return `<figure id="${escapeHtml(frame.frameId)}"><figcaption><strong>${escapeHtml(frame.frameId)}</strong> · ${label} · ${escapeHtml(frame.capturedAt)}</figcaption>${controls}${image}</figure>`
     })
     .join('\n')
   const timeline = manifest.frames
-    .map(frame => `<li><a href="#${escapeHtml(frame.frameId)}"><code>${escapeHtml(frame.frameId)}</code> · ${escapeHtml(frame.stepId)}</a></li>`)
+    .map((frame, index) => `<li><a href="#${escapeHtml(frame.frameId)}"><code>${escapeHtml(frame.frameId)}</code> · ${escapeHtml(frame.stepId)} (${String(index + 1)} of ${String(manifest.frames.length)})</a></li>`)
     .join('\n')
+  const replayStart = manifest.frames.length === 0 ? '' : '<p><a class="replay-start" href="#frame-001">Start screenshot replay</a></p>'
 
   return `<!doctype html>
 <html lang="en">
@@ -185,13 +217,14 @@ export const renderEvidenceReport = (manifest: EvidenceManifest): string => {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <title>DSHX E2E ${escapeHtml(manifest.runId)}</title>
 <style>
-:root{color-scheme:light dark;font:14px/1.5 system-ui,sans-serif}body{max-width:1000px;margin:32px auto;padding:0 20px}header,section{border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:12px;padding:16px;margin:16px 0}h1,h2,p{margin-top:0}.summary{display:flex;flex-wrap:wrap;gap:12px}.status{font-weight:700;text-transform:uppercase}.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:0;list-style:none}.steps li{display:flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:8px;padding:8px}.step-state{font-size:11px;text-transform:uppercase}.recorded{color:#188a55}.missing{color:#bd4c37}figure{margin:18px 0;padding-bottom:18px;border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent)}figcaption{margin-bottom:8px}img{display:block;max-width:100%;height:auto;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:8px}code{overflow-wrap:anywhere}
+:root{color-scheme:light dark;font:14px/1.5 system-ui,sans-serif}body{max-width:1000px;margin:32px auto;padding:0 20px}header,section{border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:12px;padding:16px;margin:16px 0}h1,h2,p{margin-top:0}.summary{display:flex;flex-wrap:wrap;gap:12px}.status{font-weight:700;text-transform:uppercase}.steps,.assertions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;padding:0;list-style:none}.steps li,.assertions li{display:flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:8px;padding:8px}.step-state,.assertion-state{font-size:11px;text-transform:uppercase}.recorded,.passed{color:#188a55}.missing,.failed{color:#bd4c37}.frame-controls{display:flex;justify-content:space-between;gap:12px;margin:12px 0}.frame-controls a,.replay-start{display:inline-block;border:1px solid color-mix(in srgb,currentColor 24%,transparent);border-radius:6px;padding:6px 10px}figure{display:none;margin:18px 0;padding-bottom:18px;border-bottom:1px solid color-mix(in srgb,currentColor 14%,transparent);scroll-margin-top:16px}figure:target{display:block}figcaption{margin-bottom:8px}img{display:block;max-width:100%;height:auto;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:8px}code{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <header><h1>DSHX E2E evidence</h1><div class="summary"><span class="status">${escapeHtml(manifest.status)}</span><span>${escapeHtml(manifest.suiteId)}</span><time datetime="${escapeHtml(manifest.createdAt)}">${escapeHtml(manifest.createdAt)}</time></div><p>Run <code>${escapeHtml(manifest.runId)}</code> · scenario digest <code>${escapeHtml(manifest.scenarioDigest)}</code></p><p>${sourceIdentity}</p></header>
 <section><h2>Expected steps</h2><p>Recorded means the harness reached that step. Missing steps are not counted as covered.</p><ul class="steps">${steps}</ul></section>
-<section><h2>Screenshot timeline</h2><p>Only stored screenshots appear below. This report does not reconstruct browser state or infer missing coverage.</p>${timeline.length > 0 ? `<nav aria-label="Screenshot timeline"><ol>${timeline}</ol></nav>` : ''}${frames || '<p>No screenshots were retained for this run.</p>'}</section>
+<section><h2>Assertion results</h2><p>Only static assertion ids and pass/fail outcomes are stored; failure text and page content are excluded.</p>${assertions}</section>
+<section><h2>Screenshot timeline replay</h2><p>Step through screenshots in capture order. This replays stored frames only; it does not reconstruct browser state or infer missing coverage.</p>${replayStart}${timeline.length > 0 ? `<nav aria-label="Screenshot timeline"><ol>${timeline}</ol></nav>` : ''}${frames || '<p>No screenshots were retained for this run.</p>'}</section>
 </body>
 </html>\n`
 }
@@ -205,6 +238,7 @@ export interface EvidenceRun {
   readonly outputRoot: string
   readonly runDirectory: string
   readonly completedStepIds: Set<string>
+  readonly assertions: EvidenceManifest['assertions']
   readonly frames: EvidenceManifest['frames']
 }
 
@@ -270,6 +304,7 @@ export const createEvidenceRun = async (options: {
     outputRoot,
     runDirectory,
     completedStepIds: new Set(),
+    assertions: [],
     frames: [],
   }
 }
@@ -278,6 +313,20 @@ export const completeEvidenceStep = (run: EvidenceRun, stepId: string): void => 
   const parsed = stepIdSchema.safeParse(stepId)
   if (!parsed.success) throw new Error('The evidence step id is not a valid static id.')
   if (run.expectedStepIds.includes(stepId)) run.completedStepIds.add(stepId)
+}
+
+export const recordEvidenceAssertion = (
+  run: EvidenceRun,
+  assertionId: string,
+  outcome: EvidenceAssertion['outcome'],
+): void => {
+  const assertion = evidenceAssertionSchema.safeParse({ assertionId, outcome })
+  if (!assertion.success) throw new Error('The evidence assertion must use a static id and a pass/fail outcome.')
+  if (run.assertions.length >= MAX_ASSERTIONS) throw new Error('The E2E evidence run exceeded its assertion limit.')
+  if (run.assertions.some(recorded => recorded.assertionId === assertionId)) {
+    throw new Error('The evidence assertion id must be unique within a run.')
+  }
+  run.assertions.push(assertion.data)
 }
 
 const frameMetadata = (
@@ -459,6 +508,7 @@ export const finishEvidenceRun = async (
     expectedStepIds,
     completedStepIds,
     missingStepIds,
+    assertions: run.assertions,
     frames: run.frames,
   })
   const temporaryPath = join(run.runDirectory, 'manifest.json.tmp')

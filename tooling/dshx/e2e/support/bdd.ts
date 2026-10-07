@@ -1,5 +1,5 @@
-import { test as bddTest, type Page } from 'playwright-bdd'
-import { createBdd } from 'playwright-bdd'
+import type { Page } from '@playwright/test'
+import { createBdd, test as bddTest } from 'playwright-bdd'
 import { readClientBootOutcome, type BrowserBootOptions, type BrowserBootOutcome } from '../../packages/dshx/src/project/browser-boot.js'
 
 /**

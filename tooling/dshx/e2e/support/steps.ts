@@ -10,6 +10,7 @@ import {
   completeEvidenceStep,
   createEvidenceRun,
   finishEvidenceRun,
+  recordEvidenceAssertion,
   type EvidenceRun,
   type EvidenceStatus,
 } from './evidence-runs.js'
@@ -33,6 +34,21 @@ const evidenceRunFor = (page: Page): EvidenceRun => {
   const run = evidenceRuns.get(page)
   if (run === undefined) throw new Error('the evidence run was not initialized for this scenario')
   return run
+}
+
+const recordAssertion = async (
+  page: Page,
+  assertionId: string,
+  assertion: () => void | Promise<void>,
+): Promise<void> => {
+  const run = evidenceRunFor(page)
+  try {
+    await assertion()
+  } catch (error) {
+    recordEvidenceAssertion(run, assertionId, 'failed')
+    throw error
+  }
+  recordEvidenceAssertion(run, assertionId, 'passed')
 }
 
 const evidenceStatus = (status: string | undefined): EvidenceStatus => {
@@ -102,7 +118,9 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   const outcome = await readProfileOutcome(page, profile)
-  assertClientBootReady(outcome, profile, 'The composed scratch profile did not reach a clean Client boot.')
+  await recordAssertion(page, 'web-ui-has-no-failed-client-entry', () =>
+    assertClientBootReady(outcome, profile, 'The composed scratch profile did not reach a clean Client boot.')
+  )
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })
@@ -112,7 +130,9 @@ Then('the Web UI mounts without a failure card', async ({ page }: { page: Page }
   const pluginBoot = [...(boots?.values() ?? [])][0]
   if (pluginBoot === undefined) throw new Error('No isolated plugin profile is running for this scenario.')
   const outcome = await readProfileOutcome(page, pluginBoot)
-  assertClientBootReady(outcome, pluginBoot, `${pluginBoot.pluginId} did not reach a clean Client boot.`)
+  await recordAssertion(page, 'isolated-plugin-has-no-failed-client-entry', () =>
+    assertClientBootReady(outcome, pluginBoot, `${pluginBoot.pluginId} did not reach a clean Client boot.`)
+  )
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })
@@ -121,17 +141,24 @@ Then('every client entry that failed to activate is reported by id', async ({ pa
   const profile = profileFor(page)
   const outcome = await readProfileOutcome(page, profile)
   if (outcome.text === '') {
+    await recordAssertion(page, 'failure-card-has-no-unreported-entry', () => expect(outcome.text).toBe(''))
     completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
     return
   }
   const failures = clientEntryFailures(parseBootText(outcome.text), profile.expectedClientEntries)
-  for (const entry of failures) {
-    expect(outcome.text).toContain(`${entry.id}:`)
-    if (entry.state === 'failed') expect(outcome.text).toContain(`${entry.id}: failed`)
-  }
-  expect(failures.length > 0 || /web boot: \d+ entr/.test(outcome.text)).toBe(true)
-  expect(profile.output()).not.toContain('EADDRINUSE')
+  await recordAssertion(page, 'failed-client-entry-ids-are-reported', () => {
+    for (const entry of failures) {
+      expect(outcome.text).toContain(`${entry.id}:`)
+      if (entry.state === 'failed') expect(outcome.text).toContain(`${entry.id}: failed`)
+    }
+  })
+  await recordAssertion(page, 'failure-card-identifies-boot-state', () =>
+    expect(failures.length > 0 || /web boot: \d+ entr/.test(outcome.text)).toBe(true)
+  )
+  await recordAssertion(page, 'scratch-host-port-is-available', () =>
+    expect(profile.output()).not.toContain('EADDRINUSE')
+  )
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })
@@ -171,7 +198,9 @@ Then('no Slot fell back to its error boundary', async ({ page }: { page: Page })
   const profile = profiles.get(page) ?? [...(isolatedBoots.get(page)?.values() ?? [])][0]
   if (profile === undefined) throw new Error('No DSH profile is running for this scenario.')
   const outcome = await readProfileOutcome(page, profile)
-  expect(outcome.slotFailures, `these Slots mounted an error boundary instead of their entry:\n${profile.output()}`).toEqual([])
+  await recordAssertion(page, 'plugin-slots-do-not-use-error-boundaries', () =>
+    expect(outcome.slotFailures, `these Slots mounted an error boundary instead of their entry:\n${profile.output()}`).toEqual([])
+  )
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })

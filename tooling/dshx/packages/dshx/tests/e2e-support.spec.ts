@@ -8,6 +8,7 @@ import {
   createEvidenceRun,
   finishEvidenceRun,
   pruneEvidenceRuns,
+  recordEvidenceAssertion,
   renderEvidenceReport,
   sourceRunFromEnvironment,
   storeEvidenceFrame,
@@ -93,12 +94,16 @@ describe('bounded E2E evidence', () => {
         outputRoot,
       })
       await storeEvidenceFrame(run, 'assertion-complete', new Uint8Array([1, 2, 3]), { width: 1280, height: 800 })
+      await storeEvidenceFrame(run, 'final-state', new Uint8Array([4, 5, 6]), { width: 1280, height: 800 })
       completeEvidenceStep(run, 'profile-booted')
+      recordEvidenceAssertion(run, 'client-entry-activation', 'passed')
+      recordEvidenceAssertion(run, 'slot-mount', 'failed')
+      expect(() => recordEvidenceAssertion(run, 'slot-mount', 'passed')).toThrow('unique')
       const manifest = await finishEvidenceRun(run, 'failed', {
         sourceRun: 'https://github.com/acme/dshfiles/actions/runs/12001',
         sourceRunMissingReason: null,
       })
-      expect(manifest.frames.map(frame => frame.frameId)).toEqual(['frame-001'])
+      expect(manifest.frames.map(frame => frame.frameId)).toEqual(['frame-001', 'frame-002'])
       expect(manifest.frames[0]).toMatchObject({
         stepId: 'assertion-complete',
         path: 'frames/frame-001.jpg',
@@ -107,13 +112,25 @@ describe('bounded E2E evidence', () => {
       })
       expect(manifest.missingStepIds).toEqual(['host-cleanup'])
       expect(manifest.status).toBe('failed')
+      expect(manifest.assertions).toEqual([
+        { assertionId: 'client-entry-activation', outcome: 'passed' },
+        { assertionId: 'slot-mount', outcome: 'failed' },
+      ])
       expect(manifest.sourceRun).toBe('https://github.com/acme/dshfiles/actions/runs/12001')
       const serialized = await readFile(join(run.runDirectory, 'manifest.json'), 'utf8')
       const report = await readFile(join(run.runDirectory, 'report.html'), 'utf8')
       expect(serialized).not.toContain('private title is hashed')
       expect(serialized).not.toContain('127.0.0.1')
-      expect(report).toContain('Screenshot timeline')
+      expect(report).toContain('Screenshot timeline replay')
+      expect(report).toContain('Start screenshot replay')
+      expect(report).toContain('href="#frame-002"')
+      expect(report).toContain('Previous frame')
+      expect(report).toContain('Next frame')
+      expect(report).toContain('Assertion results')
+      expect(report).toContain('client-entry-activation')
+      expect(report).toContain('slot-mount')
       expect(report).toContain('./frames/frame-001.jpg')
+      expect(report).toContain('./frames/frame-002.jpg')
       expect(report).toContain('failed')
       expect(report).toContain('assertion-complete')
       expect(report).toContain('host-cleanup')
@@ -148,6 +165,71 @@ describe('bounded E2E evidence', () => {
       expect(manifest.status).toBe('skipped')
       expect(manifest.missingStepIds).toEqual(['assertion-complete'])
       await expect(readFile(join(run.runDirectory, 'report.html'), 'utf8')).resolves.toContain('skipped')
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('records interrupted runs distinctly and leaves unfinished steps missing', async () => {
+    const outputRoot = await mkdtemp(join(tmpdir(), 'dshx-evidence-interrupted-'))
+    try {
+      const run = await createEvidenceRun({
+        suiteId: 'client-plugin-boot',
+        scenarioPath: ['interrupted scenario'],
+        expectedStepIds: ['profile-booted', 'assertion-complete'],
+        outputRoot,
+      })
+      const manifest = await finishEvidenceRun(run, 'interrupted', {
+        sourceRun: null,
+        sourceRunMissingReason: 'ci-metadata-absent',
+      })
+
+      expect(manifest.status).toBe('interrupted')
+      expect(manifest.missingStepIds).toEqual(['profile-booted', 'assertion-complete'])
+      await expect(readFile(join(run.runDirectory, 'report.html'), 'utf8')).resolves.toContain('interrupted')
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps prior version 1 manifests without assertion receipts valid for retention', async () => {
+    const outputRoot = await mkdtemp(join(tmpdir(), 'dshx-evidence-legacy-'))
+    try {
+      const run = await createEvidenceRun({
+        suiteId: 'client-plugin-boot',
+        scenarioPath: ['legacy manifest'],
+        expectedStepIds: [],
+        outputRoot,
+      })
+      await finishEvidenceRun(run, 'passed', { sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' })
+      const manifestPath = join(run.runDirectory, 'manifest.json')
+      const legacyManifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+      delete legacyManifest.assertions
+      await writeFile(manifestPath, `${JSON.stringify(legacyManifest)}\n`)
+
+      await pruneEvidenceRuns(outputRoot)
+
+      await expect(readFile(manifestPath, 'utf8')).resolves.toContain('dshx-e2e')
+      await expect(readFile(join(outputRoot, 'catalog/index.html'), 'utf8')).resolves.toContain(run.runId)
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a passed run with a failed assertion receipt', async () => {
+    const outputRoot = await mkdtemp(join(tmpdir(), 'dshx-evidence-assertion-status-'))
+    try {
+      const run = await createEvidenceRun({
+        suiteId: 'client-plugin-boot',
+        scenarioPath: ['failed assertion'],
+        expectedStepIds: [],
+        outputRoot,
+      })
+      recordEvidenceAssertion(run, 'plugin-activation', 'failed')
+
+      await expect(
+        finishEvidenceRun(run, 'passed', { sourceRun: null, sourceRunMissingReason: 'ci-metadata-absent' }),
+      ).rejects.toThrow('a passed run cannot contain a failed assertion')
     } finally {
       await rm(outputRoot, { recursive: true, force: true })
     }
