@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { execFileSync, spawn } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { constants } from 'node:fs'
 import { access } from 'node:fs/promises'
 import { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SessionWorkspaceRestoreController } from '../src/workspace-restore-controller.ts'
 import { WorkspaceRestoreStore } from '../src/workspace-restore-store.ts'
@@ -17,8 +17,8 @@ interface RepositoryFixture {
   readonly path: string
   readonly storagePath: string
   readonly contentPath: string
-  readonly sessionId: ReturnType<typeof SessionId>
-  readonly workspaceId: ReturnType<typeof WorkspaceId>
+  readonly sessionId: SessionId
+  readonly workspaceId: WorkspaceId
   readonly targetCommitId: string
   readonly currentCommitId: string
 }
@@ -28,10 +28,11 @@ interface HostContextOptions {
   readonly archivedSessionIds?: readonly SessionId[]
   readonly runningSessionIds?: readonly SessionId[]
   readonly otherWorkspacePaths?: readonly string[]
+  readonly jujutsuExecutable?: string
 }
 
-const sessionId = (value: string): SessionId => value as SessionId
-const workspaceId = (value: string): WorkspaceId => value as WorkspaceId
+const sessionId = (value: string): SessionId => SessionId(value)
+const workspaceId = (value: string): WorkspaceId => WorkspaceId(value)
 
 const runJujutsu = (cwd: string, args: readonly string[]): string => execFileSync(
   'jj',
@@ -159,7 +160,7 @@ const createRepository = async (): Promise<RepositoryFixture> => {
 const createContext = async (fixture: RepositoryFixture, options: HostContextOptions = {}): Promise<Context> => {
   const ctx = new Context()
   ctx.provide('storageDomain', testStorageDomain(fixture.storagePath) as never)
-  ctx.provide('subprocess', testSubprocess(await findJujutsu()) as never)
+  ctx.provide('subprocess', testSubprocess(options.jujutsuExecutable ?? await findJujutsu()) as never)
   const sessionIds = [fixture.sessionId, ...(options.ownerSessionIds ?? [])]
   const workspace = {
     id: fixture.workspaceId,
@@ -339,6 +340,55 @@ describe('SessionWorkspaceRestoreController', () => {
       action: 'restore',
       targetCommitId: fixture.targetCommitId,
     }, new AbortController().signal)).rejects.toThrow(/symbolic-link path/)
+  })
+
+  it('records a partial command failure and recovers through an explicit rollback', async () => {
+    const fixture = await createRepository()
+    temporaryRoot = fixture.root
+    const executable = await findJujutsu()
+    const markerPath = join(fixture.root, 'restore-failed-once')
+    const wrapperPath = join(fixture.root, 'jj-partial-failure.mjs')
+    const wrapper = [
+      '#!/usr/bin/env node',
+      "import { spawnSync } from 'node:child_process'",
+      "import { existsSync, writeFileSync } from 'node:fs'",
+      `const executable = ${JSON.stringify(executable)}`,
+      `const contentPath = ${JSON.stringify(fixture.contentPath)}`,
+      `const markerPath = ${JSON.stringify(markerPath)}`,
+      'const args = process.argv.slice(2)',
+      "if (args.includes('restore') && !existsSync(markerPath)) {",
+      "  writeFileSync(markerPath, 'failed once')",
+      "  writeFileSync(contentPath, 'partial\\n')",
+      '  process.exit(23)',
+      '}',
+      "const result = spawnSync(executable, args, { stdio: 'inherit' })",
+      'process.exit(result.status ?? 1)',
+      '',
+    ].join('\n')
+    await writeFile(wrapperPath, wrapper)
+    await chmod(wrapperPath, 0o755)
+    hostContext = await createContext(fixture, { jujutsuExecutable: wrapperPath })
+    const controller = new SessionWorkspaceRestoreController(hostContext)
+    await controller.ready
+
+    const preview = await controller.prepare({
+      sessionId: fixture.sessionId,
+      action: 'restore',
+      targetCommitId: fixture.targetCommitId,
+    }, new AbortController().signal)
+    const partial = await controller.confirm({ previewId: preview.previewId }, new AbortController().signal)
+
+    expect(partial.state).toBe('partial')
+    expect(partial.failure).toBe('command-failed')
+    expect(partial.canRollback).toBe(true)
+    expect(await readFile(fixture.contentPath, 'utf8')).toBe('partial\n')
+
+    const rollbackPreview = await controller.prepare({ sessionId: fixture.sessionId, action: 'rollback' }, new AbortController().signal)
+    const rolledBack = await controller.confirm({ previewId: rollbackPreview.previewId }, new AbortController().signal)
+
+    expect(rolledBack.state).toBe('rolled-back')
+    expect(await readFile(fixture.contentPath, 'utf8')).toBe('current\n')
+    await controller.dispose()
   })
 
   it('reconciles a durable applying receipt against the real workspace after Host restart', async () => {
