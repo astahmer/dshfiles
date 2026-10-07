@@ -14,12 +14,11 @@ const Config = z.object({
 export default defineHost({
   Config,
   async setup(ctx, config) {
-    ctx.plugin(JsonlSessionPersistence, { root: config.sessionPersistenceRoot })
-    ctx.plugin(SessionStore)
-    ctx.plugin(AgentRegistry)
-    ctx.plugin(AgentLoop, { agents: [] })
-    const sessionController = ctx.plugin(SessionController, { nativeOpen: canOpenNativePath() })
-    await sessionController
+    await ctx.plugin(JsonlSessionPersistence, { root: config.sessionPersistenceRoot }).await()
+    await ctx.plugin(SessionStore).await()
+    await ctx.plugin(AgentRegistry).await()
+    await ctx.plugin(AgentLoop, { agents: [] }).await()
+    await ctx.plugin(SessionController, { nativeOpen: canOpenNativePath() }).await()
     return () => undefined
   },
 })

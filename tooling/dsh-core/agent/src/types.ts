@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-agent/types
  */
 
+import type {} from '@deepseek-ai/dsh-session-projection/types'
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
 // Type-only: the Workspace registry's archive-admission family map this registry merges `turn` into.
 import type {} from '@deepseek-ai/dsh-workspace/types'
@@ -52,6 +53,12 @@ export interface InboxState {
 export interface InboxWireState {
   readonly 'next-turn': readonly JsonValue[]
   readonly 'next-step': readonly JsonValue[]
+}
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionMap {
+    inbox: InboxWireState
+  }
 }
 
 /**

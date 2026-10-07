@@ -68,7 +68,7 @@ try {
   const typescript = join(dshSourceRoot, 'node_modules/typescript/bin/tsc')
   const tsdown = join(dshSourceRoot, 'node_modules/.bin/tsdown')
   run(process.execPath, [typescript, '--project', join(overlayAgentRoot, 'tsconfig.json'), '--emitDeclarationOnly'], overlayRoot)
-  run(process.execPath, [typescript, '--project', join(overlayPackageRoot, 'tsconfig.host.json'), '--emitDeclarationOnly'], overlayRoot)
+  run(process.execPath, [typescript, '--project', join(overlayPackageRoot, 'tsconfig.host.json')], overlayRoot)
 
   const generatorModule = await import('@deepseek-ai/dsh-typert-generator')
   const workspaceModel = new generatorModule.WorkspaceAnalyzer({
@@ -209,7 +209,7 @@ function run(command, args, cwd) {
 
 function runClientDeclarations(typescript, packageRoot, workspaceRoot) {
   try {
-    run(process.execPath, [typescript, '--project', join(packageRoot, 'tsconfig.client.json'), '--emitDeclarationOnly', '--pretty', 'false'], workspaceRoot)
+    run(process.execPath, [typescript, '--project', join(packageRoot, 'tsconfig.client.json'), '--pretty', 'false'], workspaceRoot)
     return { diagnostics: [] }
   } catch (error) {
     const output = [error.stdout, error.stderr].filter(Boolean).join('\n')

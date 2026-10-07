@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -157,7 +158,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       }),
     )
   }, [preferences.parkedSessionIds, sessions])
-  const selectedSession = useMemo(() => Object.values(sessionState.byId).find(session => (session.retainedBy.mainView ?? 0) > 0), [sessionState.byId])
+  const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
 
   useEffect(() => {
     if (sessionState.phase !== 'ready') return
@@ -217,7 +218,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => {
     if (routeRequest === null || sessionState.phase !== 'ready') return
-    const target = Object.values(sessionState.byId).find(session => session.id === routeRequest)
+    const target = sessions.find(session => session.id === routeRequest)
     if (target === undefined) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarLinkNotFound') })
       window.history.replaceState(window.history.state, '', clearThreadUrl(window.location.href))
@@ -232,7 +233,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
     props.open(target.id)
-  }, [props.open, props.tSidebar, routeRequest, sessionState.byId, sessionState.phase])
+  }, [props.open, props.tSidebar, routeRequest, sessions, sessionState.phase])
 
   useEffect(() => {
     const selected = selectedSession

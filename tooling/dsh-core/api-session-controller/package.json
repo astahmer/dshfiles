@@ -37,7 +37,11 @@
       "default": "./lib/typert.remote-client.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client/module": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/types/client/index.js"
+    }
   },
   "dsh": {
     "client": {

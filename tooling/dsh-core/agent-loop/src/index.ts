@@ -19,7 +19,6 @@ import type {
   AgentSetup,
   CreateAgentOptions,
   InboxState,
-  InboxWireState,
   ResumeAgentOptions,
   SessionStartSource,
   TurnBoundaryProjection,
@@ -42,9 +41,6 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     inbox: InboxState
     turnBoundary: TurnBoundaryProjection
-  }
-  interface SessionProjectionMap {
-    inbox: InboxWireState
   }
 }
 

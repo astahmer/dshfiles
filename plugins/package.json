@@ -11,6 +11,9 @@
     "check": "pnpm run contract && pnpm run build && pnpm run typecheck && pnpm run test"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-agent": "link:../tooling/dsh-core/agent",
+    "@deepseek-ai/dsh-api-session-controller": "link:../tooling/dsh-core/api-session-controller",
+    "@deepseek-ai/dsh-session": "link:../tooling/dsh-core/session",
     "@types/node": "^22.19.0",
     "typescript": "7.0.2",
     "zod": "^4.4.3"

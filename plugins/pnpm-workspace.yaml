@@ -39,3 +39,4 @@ overrides:
 
   '@deepseek-ai/dsh-agent': link:../tooling/dsh-core/agent
   '@deepseek-ai/dsh-api-session-controller': link:../tooling/dsh-core/api-session-controller
+  '@deepseek-ai/dsh-session': link:../tooling/dsh-core/session

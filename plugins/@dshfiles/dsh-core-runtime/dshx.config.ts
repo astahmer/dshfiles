@@ -28,7 +28,16 @@ export default defineConfig({
     ],
     vite: { plugins: [copySessionPersistenceVerifier()] },
   },
-  client: { entry: 'src/client.ts' },
+  client: {
+    entry: 'src/client.ts',
+    bundleDependencies: [
+      '@deepseek-ai/dsh-api-session-controller',
+      '@deepseek-ai/dsh-typert-protocol',
+      '@deepseek-ai/dsh-util-crypto',
+      '@deepseek-ai/dsh-util-values',
+      '@deepseek-ai/dsh-util-workspace-path',
+    ],
+  },
   profile: 'vanilla',
   build: { declarations: true },
 })
