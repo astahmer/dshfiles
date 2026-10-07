@@ -1,52 +1,78 @@
 # dshfiles
 
-Our [DeepSeek Harness](https://dshmarket.com) (DSH) setup: the plugins we own,
-and the toolchain that builds them. `AGENTS.md` explains when to adopt a
-marketplace plugin instead of writing one.
+A personal [DeepSeek Harness](https://dshmarket.com) (DSH) setup: adopted
+marketplace plugins, DSH-specific bundles, and the local toolchain that builds
+and verifies them. We adopt a maintained plugin when it covers the need; we own
+capabilities where the DSH APIs or product workflow need a focused extension.
 
-## Layout
+## What it includes
 
-| Path | What lives there |
+### Owned DSH bundles
+
+| Package | Capability |
 |---|---|
-| `plugins/@dshfiles/*` | Owned plugins, one pnpm workspace |
-| `tooling/dshx` | `@dshfiles/dshx`, our hard fork of the dshx build tool (`FORK.md`) |
-| `apps/desktop` | Electron shell around `dsh web` |
-| `scripts` | Profile sync, boot smoke, browser probe |
-| `plans` | Living plans; `plans/repo-hardening` tracks the current cleanup |
+| `agent-communication` | Durable topic and direct messages between independent Agents, quiet by default. |
+| `agent-questions` | Parent-scoped questions, deferred answers, and revisioned Markdown feedback with durable receipts. |
+| `ai-accounts` | Account-aware provider setup and model routing for supported providers. |
+| `cursor-agent` | Cursor ACP sessions with explicit recovery for uncertain prompts. |
+| `diff-viewed` | Mark changed files as viewed and track progress per turn. |
+| `dsh-core-runtime` | Load local core runtime forks in a scratch profile for isolated verification. |
+| `goal-stall-guard` | Pause goals whose rounds have stopped making progress. |
+| `jujutsu` | Browse the revision graph and run confirmed Source Control actions. |
+| `mcp-servers` | Configure profile-wide MCP servers through DSH's native MCP clients. |
+| `multi-host` | Manage execution machines and runtimes through shared Host APIs, UI, and CLI. |
+| `plugin-marketplace` | Find and install DSH plugins from the Framework Hub catalog. |
+| `project-checks` | Run trusted project actions and inspect completion receipts and native hook results. |
+| `prompt-stash` | Save reusable prompts and bounded composer drafts locally. |
+| `queue-reorder` | Reorder queued messages through DSH's durable inbox splice. |
+| `secret-catalog` | Browse project-scoped `secret` CLI aliases without sending values to the Client. |
+| `settings-search` | Search Settings fields by label, section, and option, then edit them in place. |
+| `shortcuts` | Claim keyboard shortcuts before the browser handles them. |
+| `sidebar-commands` | Use `/goto` to open a sidebar panel or recent session. |
+| `thread-sidebar` | Group project threads and customize DSH navigation. |
 
-## Plugins
+### Shared libraries
 
-| Package | Kind | What it does |
-|---|---|---|
-| `agent-communication` | bundle | Durable topic and direct messaging between independent DSH Agents |
-| `ai-accounts` | bundle | Per-account Codex, OpenCode Go and Command Code provider instances |
-| `diff-viewed` | bundle | Viewed toggle and per-turn progress in the changed-files review tab |
-| `jujutsu` | bundle | Jujutsu revision graph and confirmed Source Control actions |
-| `mcp-servers` | bundle | Profile-wide MCP server configurations backed by native DSH MCP clients |
-| `plugin-marketplace` | bundle | Settings tab that installs DSH plugins from a catalog |
-| `project-folder-picker` | library | React picker for registered projects and Host folders |
-| `queue-reorder` | bundle | Drag-to-reorder the message queue through the durable inbox splice |
-| `secret-catalog` | bundle | Browse and manage `secret` CLI aliases per project |
-| `settings-search` | bundle | Search every Settings field and edit it in place |
-| `shortcuts` | bundle | Capture-phase keyboard shortcuts that beat the browser's own |
-| `sidebar-commands` | bundle | `/goto` slash command that opens a sidebar panel or a recent session |
-| `thread-sidebar` | bundle | Project-scoped thread groups replacing the DSH sidebar |
+| Package | Capability |
+|---|---|
+| `plugin-ui` | Shared UI components and TanStack Query, Table, Form, and Charts bindings. |
+| `project-folder-picker` | A reusable picker for registered projects and Host folders. |
 
-A bundle is a cordis bundle with a `cordis.patch.yml`; a library is imported by
-bundles and never installed on its own.
+Bundles are Cordis packages with a `cordis.patch.yml`. Libraries are imported by
+bundles and are not installed on their own.
 
-## Working here
+### Toolchain
 
-Node comes from fnm (`.node-version`), not Nix: `dsh` fails at boot on Nix's
-Node build. See `AGENTS.md` for the details and the other traps.
+`tooling/dshx` is the locally owned `@dshfiles/dshx` fork for DSH 0.2. It
+provides plugin scaffolding, build and profile checks, runtime inspection, and
+the CLI used by owned plugins. See [`tooling/dshx/FORK.md`](tooling/dshx/FORK.md)
+for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.md).
+
+## Documentation
+
+- [`AGENTS.md`](AGENTS.md): project boundaries, safe profile workflow, and development rules.
+- [`docs/profile-installs.md`](docs/profile-installs.md): profile install and composition behavior.
+- [`docs/creator-mode.md`](docs/creator-mode.md): creator-mode availability and setup.
+- [`plans/software-additions-roadmap.md`](plans/software-additions-roadmap.md): runtime and product roadmap with evidence gates.
+- [`plans/async-agent-questions.md`](plans/async-agent-questions.md): durable Agent questions and Markdown feedback.
+- [`plans/multi-host/implementation.md`](plans/multi-host/implementation.md): MultiHost design and implementation.
+- [`plans/dshx-plugin-framework.md`](plans/dshx-plugin-framework.md): DSHX framework delivery and remaining Host gaps.
+- [`plans/repo-hardening/README.md`](plans/repo-hardening/README.md): hardening work and validation records.
+
+## Develop and verify
+
+Use the Node version pinned by `.node-version` through fnm. DSH must run on the
+official Node build; Nix's Node build is not compatible with its native loader.
 
 ```sh
-pnpm install:all          # both workspaces
-pnpm check                # dshx and plugin gates, lint, format
+pnpm install:all
+pnpm check
 pnpm profile:sync --profile probe
 fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
 ```
 
-`profile:sync` links every owned bundle into a profile and installs it;
-`profile:boot` boots that profile and fails on any entry that did not activate.
-Try changes in `probe` before `web`.
+`profile:sync` links owned bundles into a profile. `profile:boot` checks that
+all composed entries activate. Try changes in the isolated `probe` profile
+before promoting them to `web`; never restart the live web profile from a
+validation run. See [`AGENTS.md`](AGENTS.md) for the full workflow and runtime
+boundaries.
