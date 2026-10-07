@@ -13,7 +13,5 @@
 - insert:
     - id: dshfiles-core-runtime
       name: '@dshfiles/dsh-core-runtime'
-    - id: dshfiles-core-runtime-session-persistence-jsonl
-      name: '@dshfiles/dsh-core-runtime/session-persistence-jsonl'
       config:
-        root: !!js dshHomePath('sessions')
+        sessionRoot: !!js dshHomePath('sessions')

@@ -319,6 +319,24 @@ const installScratchLocalBundleCopies = async () => {
     { name: '@dshfiles/cursor-agent', sourceRoot: cursorPluginPath },
   ]
   const localPackageCopyRoots = new Map()
+  const resolveLocalDependencyRoot = async packageName => {
+    for (const localPackage of localPackages) {
+      const sourceManifest = JSON.parse(await readFile(resolve(localPackage.sourceRoot, 'package.json'), 'utf8'))
+      const declaredDependencies = {
+        ...sourceManifest.dependencies,
+        ...sourceManifest.optionalDependencies,
+        ...sourceManifest.peerDependencies,
+      }
+      if (!Object.hasOwn(declaredDependencies, packageName)) continue
+
+      try {
+        const sourceRequire = createRequire(resolve(localPackage.sourceRoot, 'package.json'))
+        const entryPath = sourceRequire.resolve(packageName)
+        return await packageRootFromEntry(packageName, entryPath)
+      } catch {}
+    }
+    return resolveRuntimePackageRoot(packageName)
+  }
 
   for (const localPackage of localPackages) {
     const sourceManifest = JSON.parse(await readFile(resolve(localPackage.sourceRoot, 'package.json'), 'utf8'))
@@ -357,11 +375,18 @@ const installScratchLocalBundleCopies = async () => {
       const sourceFile = sourceImport.sourceFile
       const specifier = sourceImport.specifier
       const localDependencyRoot = localPackageCopyRoots.get(packageName)
-      const packageRoot = localDependencyRoot !== undefined
-        ? localDependencyRoot
-        : packageName.startsWith('@deepseek-ai/')
-          ? await resolveRuntimePackageRoot(packageName)
-          : await packageRootFromEntry(packageName, createRequire(sourceFile).resolve(specifier))
+      let packageRoot
+      if (localDependencyRoot !== undefined) {
+        packageRoot = localDependencyRoot
+      } else if (packageName.startsWith('@deepseek-ai/')) {
+        packageRoot = await resolveRuntimePackageRoot(packageName)
+      } else {
+        try {
+          packageRoot = await packageRootFromEntry(packageName, createRequire(sourceFile).resolve(specifier))
+        } catch {
+          packageRoot = await resolveLocalDependencyRoot(packageName)
+        }
+      }
       const linkPath = resolve(destinationNodeModules, ...packageName.split('/'))
       await mkdir(dirname(linkPath), { recursive: true })
       await symlink(packageRoot, linkPath, 'dir')
@@ -631,6 +656,22 @@ const verifyPublicCliBoot = async () => {
   const controllerRow = configLines.slice(controllerRowIndex, controllerRowIndex + 6).join('\n')
   assert.doesNotMatch(controllerRow, /disabled:\s*true/, 'The scratch Session Controller row must be enabled.')
   process.stdout.write('PASS: scratch composition includes the Session Controller row.\n')
+
+  const coreRuntimeRowIndex = configLines.findIndex(line => /id:\s*dshfiles-core-runtime/.test(line))
+  assert.notEqual(coreRuntimeRowIndex, -1, 'Scratch profile composition is missing the core runtime row.')
+  const coreRuntimeRow = configLines.slice(coreRuntimeRowIndex, coreRuntimeRowIndex + 10).join('\n')
+  assert.match(coreRuntimeRow, /sessionRoot:/, 'Scratch core runtime config is missing the isolated session root.')
+
+  const persistenceRowIndex = configLines.findIndex(line => /id:\s*session-persistence-jsonl/.test(line))
+  assert.notEqual(persistenceRowIndex, -1, 'Scratch profile composition is missing the native JSONL persistence row.')
+  const persistenceRow = configLines.slice(persistenceRowIndex, persistenceRowIndex + 8).join('\n')
+  assert.match(persistenceRow, /disabled:\s*true/, 'Scratch profile must disable the native V4 JSONL persistence row.')
+  assert.equal(
+    configLines.some(line => /id:\s*dshfiles-core-runtime-session-persistence-jsonl/.test(line)),
+    false,
+    'Scratch profile must register persistence through the bundled core runtime entry.',
+  )
+  process.stdout.write('PASS: scratch composition routes JSONL persistence through the local core runtime.\n')
 
   const controllerImport = spawnSync(
     process.execPath,
