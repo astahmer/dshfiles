@@ -76,16 +76,24 @@ const persistentRoots = async (): Promise<{ attentionRoot: string; sessionRoot: 
   }
 }
 
-const killAfterAttentionCommit = async (
-  attentionRoot: string,
-  sessionRoot: string,
-  sessionId: SessionId,
-): Promise<void> => {
+const killWorkerAtBoundary = async ({
+  attentionRoot,
+  sessionRoot,
+  sessionId,
+  workerFile,
+  readyMarker,
+}: {
+  readonly attentionRoot: string
+  readonly sessionRoot: string
+  readonly sessionId: SessionId
+  readonly workerFile: string
+  readonly readyMarker: string
+}): Promise<void> => {
   const testDirectory = dirname(fileURLToPath(import.meta.url))
   const repoRoot = resolve(testDirectory, '../../../..')
   const worker = spawn(process.execPath, [
     '--import', 'tsx',
-    resolve(testDirectory, 'session-attention-crash-worker.mjs'),
+    resolve(testDirectory, workerFile),
   ], {
     cwd: resolve(repoRoot, 'tooling/dsh-core/session-persistence-jsonl'),
     env: {
@@ -108,7 +116,7 @@ const killAfterAttentionCommit = async (
       if (worker.exitCode !== null || worker.signalCode !== null) {
         throw new Error(`Crash worker exited before readiness: ${errors}`)
       }
-      expect(output).toContain('ATTENTION_DURABLE')
+      expect(output).toContain(readyMarker)
     }, { timeout: 10_000 })
     expect(worker.kill('SIGKILL')).toBe(true)
     const [, signal] = await exited
@@ -301,7 +309,13 @@ describe('Host session attention', () => {
     const { attentionRoot, sessionRoot } = await persistentRoots()
     let verifier: Awaited<ReturnType<typeof persistentHarness>> | undefined
     try {
-      await killAfterAttentionCommit(attentionRoot, sessionRoot, sessionId)
+      await killWorkerAtBoundary({
+        attentionRoot,
+        sessionRoot,
+        sessionId,
+        workerFile: 'session-attention-crash-worker.mjs',
+        readyMarker: 'ATTENTION_DURABLE',
+      })
 
       verifier = await persistentHarness(attentionRoot, sessionRoot)
       expect(verifier.attention.summary(sessionId)).toEqual({
@@ -315,6 +329,36 @@ describe('Host session attention', () => {
         readThroughSeq: -1,
         snoozed: false,
         unread: false,
+      })
+    } finally {
+      await verifier?.ctx.fiber.dispose()
+      await Promise.all([
+        rm(attentionRoot, { recursive: true, force: true }),
+        rm(sessionRoot, { recursive: true, force: true }),
+      ])
+    }
+  }, 15_000)
+
+  it('rebuilds a missing sidecar from the durable Session log across SIGKILL', async () => {
+    const sessionId = SessionId('attention-session-first-sigkill-session')
+    const { attentionRoot, sessionRoot } = await persistentRoots()
+    let verifier: Awaited<ReturnType<typeof persistentHarness>> | undefined
+    try {
+      await killWorkerAtBoundary({
+        attentionRoot,
+        sessionRoot,
+        sessionId,
+        workerFile: 'session-attention-session-first-crash-worker.mjs',
+        readyMarker: 'SESSION_LOG_DURABLE_ATTENTION_PENDING',
+      })
+
+      verifier = await persistentHarness(attentionRoot, sessionRoot)
+      expect(verifier.attention.summary(sessionId)).toBeNull()
+      await expect(verifier.attention.reconcile(sessionId)).resolves.toEqual({
+        lastPromptSeq: 0,
+        readThroughSeq: -1,
+        snoozed: false,
+        unread: true,
       })
     } finally {
       await verifier?.ctx.fiber.dispose()
