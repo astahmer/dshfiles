@@ -458,6 +458,18 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             {props.renderSlot('sidebar.brand.mark', { size: 24 }) ?? <span aria-hidden="true">◈</span>}
           </button>
           {wide ? <span className={styles.brandName}>{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span> : null}
+          {wide ? (
+            <button
+              type="button"
+              className={`${styles.brandButton} ${styles.customizeButton}`}
+              aria-label={text(props.t, 'threadSidebarCustomize')}
+              aria-expanded={customizeOpen}
+              title={text(props.t, 'threadSidebarCustomize')}
+              onClick={() => setCustomizeOpen(value => !value)}
+            >
+              <IconSettingsOutlineRegular size={18} />
+            </button>
+          ) : null}
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
 
@@ -481,29 +493,24 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           })}
         </nav>
 
-        {wide ? (
+        {wide && searchOpen ? (
           <div className={styles.headerTools}>
-            {searchOpen ? (
-              <Input
-                ref={searchInput}
-                className={styles.searchInput}
-                icon={<IconSearchOutlineRegular size={16} />}
-                type="search"
-                aria-label={text(props.t, 'threadSidebarSearch')}
-                placeholder={text(props.t, 'threadSidebarSearchPlaceholder')}
-                value={threadQuery}
-                onChange={event => setThreadQuery(event.currentTarget.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Escape') {
-                    setThreadQuery('')
-                    setSearchOpen(false)
-                  }
-                }}
-              />
-            ) : null}
-            <Button variant="outline" size="sm" aria-expanded={customizeOpen} onClick={() => setCustomizeOpen(value => !value)}>
-              {text(props.t, 'threadSidebarCustomize')}
-            </Button>
+            <Input
+              ref={searchInput}
+              className={styles.searchInput}
+              icon={<IconSearchOutlineRegular size={16} />}
+              type="search"
+              aria-label={text(props.t, 'threadSidebarSearch')}
+              placeholder={text(props.t, 'threadSidebarSearchPlaceholder')}
+              value={threadQuery}
+              onChange={event => setThreadQuery(event.currentTarget.value)}
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  setThreadQuery('')
+                  setSearchOpen(false)
+                }
+              }}
+            />
           </div>
         ) : null}
       </div>

@@ -13,7 +13,7 @@
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
-.titleRow,
+.projectTitleRow,
 .groupHeader,
 .row,
 .actions {
@@ -21,14 +21,8 @@
   align-items: center;
 }
 
-.titleRow {
+.projectTitleRow {
   justify-content: space-between;
-}
-
-.title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
 }
 
 .iconButton,
@@ -60,16 +54,11 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/*
- * The reference sets the project filter as the sidebar's one large label: its
- * cap-to-descender span measures 22px, which is roughly a 21px font, and it is
- * inset to 29px with the chevron pushed to the far edge. Ours rendered at
- * 13.28px on a 13px inset, which read as a form control rather than the
- * sidebar's primary scope switch.
- */
 .projectFilter {
   display: block;
-  margin: 0.25rem 1rem;
+  min-width: 0;
+  flex: 1;
+  margin: 0;
 }
 
 .projectFilterTrigger {
@@ -84,7 +73,7 @@
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
   font: inherit;
-  font-size: 1.3rem;
+  font-size: 1.125rem;
   font-weight: 500;
   text-align: left;
 }
@@ -102,6 +91,14 @@
 
 .projectFilterTrigger[aria-expanded='true']::after {
   transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
+}
+
+.projectTitleRow {
+  gap: 0.35rem;
+}
+
+.projectTitleRow .iconButton {
+  flex: 0 0 auto;
 }
 
 .settings {
@@ -154,30 +151,25 @@
   margin-top: 0.25rem;
 }
 
-/*
- * The reference sets the group label as a quiet section caption: about 12px,
- * not a heading, and one tier down from the row titles so the threads stay the
- * loudest thing in the list. Measured against 01-thread-sidebar.png, where the
- * "Active" caption occupies roughly ten rows of glyph against our 16px.
- */
 .groupHeader {
   width: 100%;
   gap: 0.55rem;
-  padding: 0.55rem 0.4rem;
+  padding: 0.45rem 0.4rem;
   color: var(--dsw-alias-label-secondary);
   font-size: 0.75rem;
   text-align: left;
+}
+
+.count {
+  min-width: 0;
+  text-align: left;
+  font-size: inherit;
 }
 
 .groupHeader > :first-child {
   white-space: nowrap;
 }
 
-/*
- * The reference writes its section tally inside parentheses and lets a rule run
- * from the tally to the edge, so the header reads "Inactive (29) ─────" and the
- * eye can find the end of a section without the toggle chevron doing that job.
- */
 .groupHeader::after {
   height: 1px;
   flex: 1;
@@ -185,55 +177,22 @@
   content: '';
 }
 
-.count {
-  min-width: 1.3rem;
-  text-align: center;
-  font-size: 0.76rem;
-}
-
-/*
- * Row pitch is the measured one, and the measurement was calibrated rather than
- * assumed: 01-thread-sidebar.png is 1332x1624-wide-equivalent for this gate's
- * 1332x1622 viewport, so its pixels are CSS pixels and nothing is halved. Two
- * independent elements agree -- the project filter's inset reads 29px in the
- * image and 29px live -- which is what rules out a 2x capture.
- *
- * On that scale the title bands of consecutive rows sit 151px apart. Ours renders
- * 55px. An earlier comment here halved the image on the strength of a nominal
- * 144dpi and landed on 55.2px, which happened to equal what we already rendered
- * and so read as agreement while the rail was actually ~2.7x tighter than the
- * reference.
- */
-/*
- * Inset and type are read off 01-thread-sidebar.png at its measured 1:1 scale:
- * the title's ink starts 34px from the rail edge and its cap-to-descender spans
- * 23-25px, which is a ~20px font. We sat at 31px and 17px, so the title read a
- * size down and started closer to the edge than the reference does.
- *
- * The 34px is the row's own padding only because .sections already insets 7.2px
- * and a depth-0 row adds none of its own, so this is measured against the rail
- * edge and not re-derived from the total.
- */
 .row {
   gap: 0.6rem;
   min-width: 0;
-  padding: 0.5rem 1.3125rem;
+  padding: 0.55rem 0.6rem;
   border-radius: var(--dsw-radius-sm);
 }
 
 .row:hover,
 .row:focus-within {
-  background: var(--dsw-specific-sidebar-nav-item-hover);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
-/*
- * Two lines, not three: the title, then one dimmer context line. An earlier
- * comment here described a three-line stack that the markup never rendered, and
- * the row's padding was then sized to make room for a line that did not exist --
- * which is how the row ended up shorter than the reference while the comment
- * claimed it was matching. The pitch comes from the padding and the two type
- * sizes; this block only has to keep those lines from merging.
- */
+.row[data-selected='true'] {
+  background: var(--dsw-alias-bg-layer-1);
+}
+
 .openButton {
   display: grid;
   min-width: 0;
@@ -260,7 +219,16 @@
  * 5.50:1 and falls to 2.99:1 on dark, so the tier is chosen per theme using
  * DSH's own body[data-ds-dark-theme] attribute.
  */
+.rowProjectLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .rowProject {
+  min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-secondary);
   font-size: 0.75rem;
@@ -276,12 +244,7 @@ body[data-ds-dark-theme] .rowProject {
   color: var(--dsw-alias-label-secondary);
 }
 
-/*
- * The reference dates each row on the right ("22h") in the same dim tier as the
- * project line. It is aria-hidden because the row's title attribute already
- * carries the exact timestamp for anyone who needs it, and a second spoken date
- * on every row would make the list far noisier to walk by keyboard.
- */
+/* The exact timestamp remains available through the row's title attribute. */
 .rowTime {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
@@ -294,14 +257,19 @@ body[data-ds-dark-theme] .rowTime {
   color: var(--dsw-alias-label-tertiary);
 }
 
-/*
- * The reference's title ink measures 23-25px cap-to-descender, which is a ~20px
- * font; an earlier reading here put it at 12px and set 17px, which read a size
- * down against the reference.
- */
+body[data-ds-dark-theme] .rowProjectLine .rowTime {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rowTimeRunning,
+body[data-ds-dark-theme] .rowTimeRunning {
+  color: var(--dsw-alias-brand-primary);
+  font-weight: 600;
+}
+
 .rowTitle {
   overflow: hidden;
-  font-size: 1.25rem;
+  font-size: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

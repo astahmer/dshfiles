@@ -17,10 +17,9 @@ import {
   Input,
   Menu,
   MenuItemButton,
-  StateDot,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { EmptyState, Field, Notice, TextArea, VisuallyHidden, type NoticeTone } from '@dshfiles/plugin-ui'
+import { EmptyState, Field, Notice, TextArea, type NoticeTone } from '@dshfiles/plugin-ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import {
   isAutoArchiveCandidate,
@@ -413,8 +412,27 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   return (
     <section className={styles.sidebar} aria-label={props.tSidebar('threadSidebarTitle')}>
       <header className={styles.header}>
-        <div className={styles.titleRow}>
-          <h2 className={styles.title}>{props.tSidebar('threadSidebarTitle')}</h2>
+        <div className={styles.projectTitleRow}>
+          <Menu
+            className={styles.projectFilter}
+            open={projectMenuOpen}
+            portal
+            items={projectMenuItems}
+            selectedId={projectFilterValue}
+            onSelect={selectProject}
+            onClose={() => setProjectMenuOpen(false)}
+            anchor={
+              <button
+                type="button"
+                className={styles.projectFilterTrigger}
+                aria-haspopup="menu"
+                aria-expanded={projectMenuOpen}
+                onClick={() => setProjectMenuOpen(value => !value)}
+              >
+                {projectFilterLabel}
+              </button>
+            }
+          />
           {withTooltip(
             props.tSidebar('threadSidebarSettings'),
             <button
@@ -428,28 +446,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             </button>,
           )}
         </div>
-        {/* The reference shows one plain label with a chevron, not a doubled
-            label plus a boxed <select>, so the trigger is the label itself. */}
-        <Menu
-          className={styles.projectFilter}
-          open={projectMenuOpen}
-          portal
-          items={projectMenuItems}
-          selectedId={projectFilterValue}
-          onSelect={selectProject}
-          onClose={() => setProjectMenuOpen(false)}
-          anchor={
-            <button
-              type="button"
-              className={styles.projectFilterTrigger}
-              aria-haspopup="menu"
-              aria-expanded={projectMenuOpen}
-              onClick={() => setProjectMenuOpen(value => !value)}
-            >
-              {projectFilterLabel}
-            </button>
-          }
-        />
       </header>
 
       {settingsOpen ? (
@@ -554,6 +550,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                     return (
                       <article
                         className={styles.row}
+                        data-selected={selectedSession?.id === session.id}
                         data-lineage-depth={lineage.depth}
                         key={session.id}
                         onContextMenu={event => {
@@ -569,41 +566,30 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                           title={new Date(session.updatedAt).toLocaleString()}
                           onClick={() => openThread(session.id)}
                         >
-                          {/*
-                            The reference leads each row with its title, then a
-                            single dimmer line of context beneath it. A project
-                            name stacked above the title made the title the
-                            second line and pushed the row past the reference
-                            height, so the project and the run state now share
-                            one trailing line.
-                          */}
+                          <span className={styles.rowProjectLine}>
+                            <span className={styles.rowProject}>
+                              {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
+                              {lineage.parentTitle === undefined ? null : (
+                                <span className={styles.parentLabel}>
+                                  {' · '}
+                                  {props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
+                                </span>
+                              )}
+                            </span>
+                            <span className={session.running ? `${styles.rowTime} ${styles.rowTimeRunning}` : styles.rowTime}>
+                              {session.running ? `${props.tSidebar('threadSidebarWorking')} · ` : ''}
+                              {relativeTime(session.updatedAt)}
+                            </span>
+                          </span>
                           <span className={styles.rowTitle}>
                             {session.attention?.unread ? (
                               <span className={styles.unreadDot} role="img" aria-label={props.tSidebar('threadSidebarUnread')}>
                                 ●
                               </span>
                             ) : null}
-                            {session.running ? (
-                              <span className={styles.runningDot} title={props.tSidebar('threadSidebarWorking')}>
-                                <StateDot state="ongoing" size={12} />
-                                <VisuallyHidden>{props.tSidebar('threadSidebarWorking')}</VisuallyHidden>
-                              </span>
-                            ) : null}
                             {session.displayTitle}
                           </span>
-                          <span className={styles.rowProject}>
-                            {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
-                            {lineage.parentTitle === undefined ? null : (
-                              <span className={styles.parentLabel}>
-                                {' · '}
-                                {props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
-                              </span>
-                            )}
-                          </span>
                         </button>
-                        <span className={styles.rowTime} aria-hidden="true">
-                          {relativeTime(session.updatedAt)}
-                        </span>
                         <div className={styles.actions}>
                           {!archived ? (
                             <>
