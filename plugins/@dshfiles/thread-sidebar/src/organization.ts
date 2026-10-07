@@ -30,9 +30,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
   parkedSessionIds: [],
-  // Everything in the sidebar's working set starts open: pinned, active and
-  // inactive are where a thread is found and acted on, and parked keeps its short
-  // rows in view. Archived is storage, so it starts folded until asked for.
+  // Keep every working section open; archived threads stay folded until requested.
   collapsedSections: ['archived'],
   workspaceFilter: null,
   headerMode: 'compact',

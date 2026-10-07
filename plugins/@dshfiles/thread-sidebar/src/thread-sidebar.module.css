@@ -8,8 +8,7 @@
 
 .header {
   display: grid;
-  gap: var(--dsw-radius-sm);
-  padding: 0.75rem 0.8rem;
+  padding: 0.25rem 0.25rem 0;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
@@ -64,6 +63,7 @@
 .projectFilterTrigger {
   display: flex;
   width: 100%;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
@@ -76,6 +76,7 @@
   font-size: 1.125rem;
   font-weight: 500;
   text-align: left;
+  padding-inline: 0.75rem;
 }
 
 .projectFilterTrigger::after {
@@ -93,12 +94,8 @@
   transform: rotate(-135deg) translate(-0.15rem, -0.15rem);
 }
 
-.projectTitleRow {
-  gap: 0.35rem;
-}
-
-.projectTitleRow .iconButton {
-  flex: 0 0 auto;
+.projectFilterTrigger[data-settings-open='true'] {
+  color: var(--dsw-alias-label-secondary);
 }
 
 .settings {
@@ -144,7 +141,7 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 0.25rem 0.45rem 0.75rem;
+  padding: 0.25rem 0.5rem 0.75rem;
 }
 
 .group {
@@ -153,8 +150,8 @@
 
 .groupHeader {
   width: 100%;
-  gap: 0.55rem;
-  padding: 0.45rem 0.4rem;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
   color: var(--dsw-alias-label-secondary);
   font-size: 0.75rem;
   text-align: left;
@@ -178,10 +175,11 @@
 }
 
 .row {
+  position: relative;
   gap: 0.6rem;
   min-width: 0;
-  padding: 0.55rem 0.6rem;
-  border-radius: var(--dsw-radius-sm);
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--dsw-radius-md);
 }
 
 .row:hover,
@@ -190,14 +188,14 @@
 }
 
 .row[data-selected='true'] {
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .openButton {
   display: grid;
   min-width: 0;
   flex: 1;
-  gap: 0.1rem;
+  gap: 0.2rem;
   border: 0;
   background: transparent;
   color: inherit;
@@ -228,7 +226,10 @@
 }
 
 .rowProject {
+  display: flex;
   min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
   overflow: hidden;
   color: var(--dsw-alias-label-secondary);
   font-size: 0.75rem;
@@ -236,8 +237,30 @@
   white-space: nowrap;
 }
 
+.projectIcon {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.rowProjectName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 body[data-ds-dark-theme] .rowProject {
   color: var(--dsw-alias-label-tertiary);
+}
+
+.rowProjectLine .rowTime {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rowProjectLine .rowTimeRunning,
+body[data-ds-dark-theme] .rowProjectLine .rowTimeRunning {
+  color: var(--dsw-alias-brand-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .parentLabel {
@@ -257,21 +280,34 @@ body[data-ds-dark-theme] .rowTime {
   color: var(--dsw-alias-label-tertiary);
 }
 
-body[data-ds-dark-theme] .rowProjectLine .rowTime {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.rowTimeRunning,
-body[data-ds-dark-theme] .rowTimeRunning {
-  color: var(--dsw-alias-brand-primary);
-  font-weight: 600;
-}
-
 .rowTitle {
   overflow: hidden;
   font-size: 1rem;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rowContext {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.rowDirectory {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-ds-dark-theme] .rowContext,
+body[data-ds-dark-theme] .parentLabel {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .runningDot {
@@ -290,6 +326,9 @@ body[data-ds-dark-theme] .rowTimeRunning {
 /* The reference keeps every row clean and reveals its verbs on hover, so the
    actions do not compete with the title until the row is actually addressed. */
 .actions {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
   gap: 0.1rem;
   opacity: 0;
   transition: opacity 120ms ease;
@@ -298,16 +337,6 @@ body[data-ds-dark-theme] .rowTimeRunning {
 .row:hover .actions,
 .row:focus-within .actions {
   opacity: 1;
-}
-
-/*
- * The age and the verbs want the same few pixels at the end of the row, so the
- * age steps aside for them rather than both being present and squeezed. It is
- * hidden, not collapsed, so the row's height cannot change when it goes.
- */
-.row:hover .rowTime,
-.row:focus-within .rowTime {
-  visibility: hidden;
 }
 
 .actions button {

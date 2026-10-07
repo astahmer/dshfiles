@@ -6,13 +6,13 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   Checkbox,
   IconArchiveOutlineRegular,
+  IconFolderOpenOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular,
   IconPauseOutlineRegular,
   IconPinFillRegular,
   IconPinOutlineRegular,
   IconPlayOutlineRegular,
-  IconSettingsOutlineRegular,
   IconUnarchiveOutlineRegular,
   Input,
   Menu,
@@ -67,6 +67,8 @@ interface SidebarNotice {
 
 const ALL_PROJECTS = '__all__'
 const UNASSIGNED_PROJECT = '__unassigned__'
+const SIDEBAR_SETTINGS = '__sidebar-settings__'
+const SIDEBAR_SETTINGS_LABEL = '__sidebar-settings-label__'
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'inactive', 'archived']
 
@@ -385,6 +387,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const selectProject = (value: string): void => {
     setProjectMenuOpen(false)
+    if (value === SIDEBAR_SETTINGS) {
+      setSettingsOpen(current => !current)
+      return
+    }
+    setSettingsOpen(false)
     if (value === ALL_PROJECTS) changePreferences({ workspaceFilter: null })
     else if (value === UNASSIGNED_PROJECT) changePreferences({ workspaceFilter: '' })
     else changePreferences({ workspaceFilter: value })
@@ -394,6 +401,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     { id: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
     { id: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
     ...displayWorkspaces.map(workspace => ({ id: workspace.id, label: workspace.title })),
+    { type: 'separator' as const, id: SIDEBAR_SETTINGS_LABEL },
+    { id: SIDEBAR_SETTINGS, label: props.tSidebar('threadSidebarSettings') },
   ]
 
   const projectFilterLabel = projectMenuItems.find(item => item.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
@@ -427,24 +436,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                 className={styles.projectFilterTrigger}
                 aria-haspopup="menu"
                 aria-expanded={projectMenuOpen}
+                data-settings-open={settingsOpen}
                 onClick={() => setProjectMenuOpen(value => !value)}
               >
                 {projectFilterLabel}
               </button>
             }
           />
-          {withTooltip(
-            props.tSidebar('threadSidebarSettings'),
-            <button
-              type="button"
-              className={styles.iconButton}
-              aria-label={props.tSidebar('threadSidebarSettings')}
-              aria-expanded={settingsOpen}
-              onClick={() => setSettingsOpen(value => !value)}
-            >
-              <IconSettingsOutlineRegular size={18} />
-            </button>,
-          )}
         </div>
       </header>
 
@@ -568,7 +566,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                         >
                           <span className={styles.rowProjectLine}>
                             <span className={styles.rowProject}>
-                              {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
+                              <IconFolderOpenOutlineRegular className={styles.projectIcon} size={14} aria-hidden="true" />
+                              <span className={styles.rowProjectName}>{workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}</span>
                               {lineage.parentTitle === undefined ? null : (
                                 <span className={styles.parentLabel}>
                                   {' · '}
@@ -589,6 +588,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                             ) : null}
                             {session.displayTitle}
                           </span>
+                          {session.cwd ? (
+                            <span className={styles.rowContext}>
+                              <span className={styles.rowDirectory}>{session.cwd}</span>
+                            </span>
+                          ) : null}
                         </button>
                         <div className={styles.actions}>
                           {!archived ? (

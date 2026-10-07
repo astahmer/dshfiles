@@ -461,7 +461,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           {wide ? (
             <button
               type="button"
-              className={`${styles.brandButton} ${styles.customizeButton}`}
+              className={styles.customizeButton}
               aria-label={text(props.t, 'threadSidebarCustomize')}
               aria-expanded={customizeOpen}
               title={text(props.t, 'threadSidebarCustomize')}

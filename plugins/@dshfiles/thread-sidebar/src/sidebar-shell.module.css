@@ -23,10 +23,6 @@
   padding: 0 12px;
 }
 
-.customizeButton {
-  margin-left: auto;
-}
-
 .rail .brandRow {
   justify-content: center;
   padding: 0;
@@ -42,6 +38,7 @@
 }
 
 .brandButton,
+.customizeButton,
 .headerLink,
 .selectedLink,
 .moreButton {
@@ -58,6 +55,7 @@
 }
 
 .brandButton:hover,
+.customizeButton:hover,
 .headerLink:hover,
 .selectedLink:hover,
 .moreButton:hover {
@@ -69,6 +67,22 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.customizeButton {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
 }
 
 /*
@@ -309,6 +323,7 @@
  * inherited by luck.
  */
 .brandButton:focus-visible,
+.customizeButton:focus-visible,
 .headerLink:focus-visible,
 .selectedLink:focus-visible,
 .moreButton:focus-visible,

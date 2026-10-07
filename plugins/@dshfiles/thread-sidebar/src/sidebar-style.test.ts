@@ -8,8 +8,12 @@ test('sidebar rows keep project and age above the thread title', async () => {
   const client = await readSidebarFile('./client.tsx')
   const css = await readSidebarFile('./thread-sidebar.module.css')
 
-  assert.match(client, /className=\{styles\.rowProjectLine\}[\s\S]*className=\{styles\.rowProject\}[\s\S]*styles\.rowTime[\s\S]*className=\{styles\.rowTitle\}/)
+  assert.match(
+    client,
+    /className=\{styles\.rowProjectLine\}[\s\S]*className=\{styles\.rowProject\}[\s\S]*styles\.rowTime[\s\S]*className=\{styles\.rowTitle\}[\s\S]*session\.cwd[\s\S]*className=\{styles\.rowContext\}/,
+  )
   assert.match(css, /\.rowProjectLine\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*space-between;/)
+  assert.match(css, /\.row\s*\{[^}]*min-height:\s*72px;/)
   assert.match(css, /\.rowTitle\s*\{[^}]*font-size:\s*1rem;/)
 })
 
@@ -28,7 +32,11 @@ test('sidebar header customization has no extra toolbar row', async () => {
   const css = await readSidebarFile('./sidebar-shell.module.css')
 
   assert.doesNotMatch(shell, /<Button[^>]*>[\s\S]*?text\(props\.t, 'threadSidebarCustomize'\)[\s\S]*?<\/Button>/)
-  assert.match(shell, /aria-label=\{text\(props\.t, 'threadSidebarCustomize'\)\}/)
+  assert.match(shell, /className=\{styles\.customizeButton\}/)
+  assert.match(shell, /<IconSettingsOutlineRegular size=\{18\} \/>/)
   assert.doesNotMatch(client, /<h2 className=\{styles\.title\}>/)
-  assert.match(css, /\.customizeButton\s*\{\s*margin-left:\s*auto;/)
+  assert.match(client, /id: SIDEBAR_SETTINGS, label: props\.tSidebar\('threadSidebarSettings'\)/)
+  assert.match(client, /type: 'separator' as const, id: SIDEBAR_SETTINGS_LABEL/)
+  assert.match(client, /if \(value === SIDEBAR_SETTINGS\)/)
+  assert.match(css, /\.customizeButton\s*\{\s*display:\s*inline-flex;[\s\S]*margin-left:\s*auto;/)
 })
