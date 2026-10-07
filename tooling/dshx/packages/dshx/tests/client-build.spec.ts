@@ -22,6 +22,25 @@ afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
 })
 describe('client compiler', () => {
+  it('embeds an explicit owned Client dependency while preserving platform identities', async () => {
+    const root = await temporaryProject()
+    const dependencyRoot = resolve(root, 'node_modules/@deepseek-ai/dsh-owned-client')
+    await mkdir(dependencyRoot, { recursive: true })
+    await writeFile(resolve(dependencyRoot, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-owned-client', type: 'module', exports: './index.js' }))
+    await writeFile(resolve(dependencyRoot, 'index.js'), 'export const ownedValue = "owned-client-value"')
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      "import { defineClient } from '@dshfiles/dshx/client'; import { ownedValue } from '@deepseek-ai/dsh-owned-client'; export default defineClient({ setup() { globalThis.console.log(ownedValue) } })",
+    )
+    const options = { packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' }
+    await expect(buildClient(options)).rejects.toThrow('DSHX1202')
+    await buildClient({ ...options, bundleDependencies: ['@deepseek-ai/dsh-owned-client'] })
+    const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+    expect(code).toContain('owned-client-value')
+    expect(code).not.toContain('require("@deepseek-ai/dsh-owned-client")')
+    await expect(buildClient({ ...options, bundleDependencies: ['@deepseek-ai/cordis'] })).rejects.toMatchObject({ code: 'DSHX4004' })
+  })
+
   it('emits one lazy-CJS bundle with external React, owned CSS, and a TSX sourcemap', async () => {
     const root = await temporaryProject()
     await buildClient({

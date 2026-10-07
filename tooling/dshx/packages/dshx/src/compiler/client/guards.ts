@@ -8,7 +8,7 @@ const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
 /** Reject imports that cannot execute in a DSH browser bundle. */
-export function clientGuardPlugin(externals: ReadonlySet<string>, packageId: string): Plugin {
+export function clientGuardPlugin(externals: ReadonlySet<string>, packageId: string, bundleDependencies: readonly string[] = []): Plugin {
   return {
     name: 'dshx-client-guards',
     enforce: 'pre',
@@ -19,7 +19,12 @@ export function clientGuardPlugin(externals: ReadonlySet<string>, packageId: str
           hint: 'Move this import to the Host entry.',
         })
       }
-      if (!source.startsWith('@deepseek-ai/') || externals.has(source)) return null
+      if (
+        !source.startsWith('@deepseek-ai/') ||
+        externals.has(source) ||
+        bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
+      )
+        return null
       if (INLINE_SAFE.test(source) || VENDORED_LIBRARY.test(source) || GENERATED_REMOTE.test(source)) return null
       throw new DshxError('DSHX1202', `Client import ${JSON.stringify(source)} is neither a DSH baseline module nor a declared module request.`, {
         ...(importer === undefined ? {} : { file: importer }),

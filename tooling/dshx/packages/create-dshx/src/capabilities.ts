@@ -23,7 +23,7 @@ export const DSH_PACKAGES = {
   conversation: '@deepseek-ai/dsh-client-ui-conversation',
   layout: '@deepseek-ai/dsh-client-ui-layout',
   locale: '@deepseek-ai/dsh-client-locale',
-  remotes: '@deepseek-ai/dsh-api-remotes',
+  remotes: '@deepseek-ai/dsh-api-gateway',
   renderer: '@deepseek-ai/dsh-client-ui-renderer',
   slotContracts: '@deepseek-ai/dsh-client-ui-slots',
   sessionController: '@deepseek-ai/dsh-api-session-controller',

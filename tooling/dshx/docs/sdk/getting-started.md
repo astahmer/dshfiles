@@ -20,6 +20,20 @@ export default defineConfig({
 
 The list accepts bare package roots, not subpaths. Node built-ins and `@deepseek-ai/cordis` remain external; bundling another Cordis copy would split the Host's service identity.
 
+### Client package bundling
+
+Client faces also accept `bundleDependencies` for owned browser-safe package roots. This is used by Core Runtime to embed the local Session Controller when the replaced native row no longer publishes its Client factory. Import a library module, such as the Controller's `/client/module` export, rather than its already-wrapped ModuleLoader artifact.
+
+```ts
+export default defineConfig({
+  client: {
+    bundleDependencies: ['@deepseek-ai/dsh-api-session-controller'],
+  },
+})
+```
+
+Declared package roots are embedded instead of externalized. Platform modules, including Cordis and React, cannot be bundled; Node imports remain forbidden. Other runtime requests still belong in `dsh.client.external`.
+
 ## Create and develop
 
 Build the source fork's `create-dshx` and `@dshfiles/dshx` packages, then invoke its CLI:

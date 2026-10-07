@@ -102,6 +102,7 @@ function buildOptions(
             outDir: project.outDir,
             sourcemap: project.build.sourcemap,
             declarations: project.build.declarations ?? true,
+            bundleDependencies: project.clientBundleDependencies ?? [],
             ...(project.clientVitePlugins === undefined ? {} : { vite: { plugins: project.clientVitePlugins } }),
             external: clientManifestArray(project, 'external'),
             inject: clientManifestArray(project, 'inject'),

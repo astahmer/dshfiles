@@ -153,6 +153,17 @@ describe('resolveDshxConfig', () => {
     }
   })
 
+  it('normalizes Client bundles and rejects unsafe package identities', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/client.tsx')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { bundleDependencies: ['@test/local-client'] } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientBundleDependencies: ['@test/local-client'] })
+    for (const dependencies of ["['@test/local-client/subpath']", "['@test/local-client', '@test/local-client']", "['@deepseek-ai/cordis']"]) {
+      await writeFile(resolve(root, 'dshx.config.ts'), `export default { client: { bundleDependencies: ${dependencies} } }\n`)
+      await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({ code: 'DSHX4004' })
+    }
+  })
+
   it('resolves any independently enabled Host or Client entry', async () => {
     const hostProject = await temporaryProject({ name: '@test/host', type: 'module' })
     const hostEntry = await source(hostProject.root, 'src/host.ts')

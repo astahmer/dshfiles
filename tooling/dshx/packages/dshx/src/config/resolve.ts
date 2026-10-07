@@ -130,9 +130,9 @@ function validateConfig(value: unknown, file: string): DshxConfig {
         hint: `Replace the removed string shorthand with ${field}: { entry: "src/${field}.ts${field === 'client' ? 'x' : ''}" }.`,
       })
     }
-    rejectUnknownKeys(candidate, field === 'host' ? HOST_FACE_KEYS : FACE_KEYS, field, file)
+    rejectUnknownKeys(candidate, HOST_FACE_KEYS, field, file)
     optionalNonEmptyString(candidate.entry, `${field}.entry`, file)
-    if (field === 'host') optionalPackageNames(candidate.bundleDependencies, 'host.bundleDependencies', file)
+    optionalPackageNames(candidate.bundleDependencies, `${field}.bundleDependencies`, file)
     if (candidate.vite !== undefined) {
       if (!isObject(candidate.vite)) {
         throw new DshxError('DSHX4004', `${field}.vite must be an object.`, {
@@ -299,6 +299,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(hostEntry === undefined ? {} : { hostEntry }),
     ...(clientEntry === undefined ? {} : { clientEntry }),
     hostBundleDependencies,
+    clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
     ...(hostVitePlugins.length === 0 ? {} : { hostVitePlugins }),
     ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
     outDir: resolve(root, 'dist'),

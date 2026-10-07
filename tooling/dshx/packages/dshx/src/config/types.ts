@@ -9,12 +9,11 @@ export interface DshxViteExtensions {
 export interface DshxFaceConfig {
   readonly entry?: string
   readonly vite?: DshxViteExtensions
+  readonly bundleDependencies?: readonly string[]
 }
 
 /** Host package roots that DSHX should embed in its single Host artifact. */
-export interface DshxHostConfig extends DshxFaceConfig {
-  readonly bundleDependencies?: readonly string[]
-}
+export interface DshxHostConfig extends DshxFaceConfig {}
 
 /** User-authored DSHX project exceptions. */
 export interface DshxConfig {
@@ -51,6 +50,7 @@ export interface ResolvedDshxConfig {
   readonly clientEntry?: string
   readonly hostVitePlugins?: readonly PluginOption[]
   readonly hostBundleDependencies?: readonly string[]
+  readonly clientBundleDependencies?: readonly string[]
   readonly clientVitePlugins?: readonly PluginOption[]
   readonly outDir: string
   readonly profile: string

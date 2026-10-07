@@ -57,6 +57,7 @@ export interface BuildClientOptions {
   readonly sourcemap?: boolean
   readonly declarations?: boolean
   readonly vite?: ViteExtensionOptions
+  readonly bundleDependencies?: readonly string[]
   readonly external?: readonly string[]
   /** Package edges declared by dsh.client.inject. */
   readonly inject?: readonly string[]
@@ -346,7 +347,13 @@ async function resolveOptions(options: BuildClientOptions) {
 async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions, watch: boolean): Promise<InlineConfig> {
   const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
   const externals = new Set([...compatibility.client.platformModules, ...compatibility.client.preloadedExternals, ...(options.external ?? [])])
-  const external = (source: string): boolean => externals.has(source)
+  const bundleDependencies = options.bundleDependencies ?? []
+  const protectedModules = [...compatibility.client.platformModules, ...compatibility.client.preloadedExternals]
+  if (bundleDependencies.some(dependency => protectedModules.some(source => source === dependency || source.startsWith(`${dependency}/`)))) {
+    throw new DshxError('DSHX4004', 'Client bundleDependencies cannot replace platform module identities.')
+  }
+  const isBundled = (source: string): boolean => bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
+  const external = (source: string): boolean => externals.has(source) && !isBundled(source)
   const assetsInlineLimit = (): boolean => true
   const output = {
     format: 'cjs',
@@ -369,7 +376,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     plugins: [
       clientEntryPlugin(paths, options),
       ...(watch ? [clientSetupServiceGuardPlugin(paths, options)] : []),
-      clientGuardPlugin(externals, options.packageId),
+      clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
       artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
       clientCssPlugin(options.packageId, paths.outDir),
