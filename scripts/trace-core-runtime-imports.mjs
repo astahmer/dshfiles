@@ -3,6 +3,8 @@ import { registerHooks } from 'node:module'
 const isCoreRuntimeImport = (specifier, parentUrl) =>
   specifier === '@deepseek-ai/dsh-api-session-controller' ||
   specifier === '@deepseek-ai/dsh-session' ||
+  specifier === '@deepseek-ai/dsh-session-persistence-jsonl' ||
+  specifier === '@deepseek-ai/dsh-session-format-catalog' ||
   specifier === '@deepseek-ai/cordis' ||
   String(parentUrl).includes('/dsh-api-session-controller/')
 
