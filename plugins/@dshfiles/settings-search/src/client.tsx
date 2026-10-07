@@ -402,9 +402,7 @@ export default defineClient({
           label: () => translate('sectionLabel'),
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
-        ({ t }) => (
-          <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={t} />
-        ),
+        ({ t }) => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={t} />,
       ),
     )
   },
