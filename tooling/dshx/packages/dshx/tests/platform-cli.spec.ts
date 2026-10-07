@@ -56,6 +56,28 @@ describe('DSH platform CLI', () => {
     })
   })
 
+  it('updates Host-owned Session attention through the Session Remote contract', async () => {
+    let updateArgs: Parameters<DshPlatformTransport['rpc']>[2] | undefined
+    const client = clientWith(async (namespace, method, args) => {
+      expect(namespace).toBe('session')
+      expect(method).toBe('updateAttention')
+      updateArgs = args
+      return { lastPromptSeq: 8, readThroughSeq: 8, snoozed: true, unread: false }
+    })
+    const request: Parameters<DshPlatformClient['sessions']['updateAttention']>[0] = {
+      sessionId: 'session-1',
+      action: { type: 'set-snoozed', snoozed: true },
+    }
+
+    await expect(client.sessions.updateAttention(request)).resolves.toEqual({
+      lastPromptSeq: 8,
+      readThroughSeq: 8,
+      snoozed: true,
+      unread: false,
+    })
+    expect(updateArgs).toEqual({ request })
+  })
+
   it('parses platform command groups and scoped options', () => {
     expect(parseCliArgs(['sessions', 'history', 'session-1', '--max', '50', '--json'])).toMatchObject({
       command: 'sessions',

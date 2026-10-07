@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { isIPv4 } from 'node:net'
 import type { SessionRuntimeSelection } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import WebSocket, { type RawData } from 'ws'
@@ -17,11 +16,23 @@ const sessionAttentionSummarySchema = z.object({
   unread: z.boolean(),
 })
 export type SessionAttentionSummary = z.infer<typeof sessionAttentionSummarySchema>
-const sessionAttentionActionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('mark-read') }),
-  z.object({ type: z.literal('set-snoozed'), snoozed: z.boolean() }),
-])
-export type SessionAttentionAction = z.infer<typeof sessionAttentionActionSchema>
+
+export type SessionAttentionAction =
+  | { readonly type: 'mark-read' }
+  | { readonly type: 'set-snoozed'; readonly snoozed: boolean }
+
+export interface SessionAttentionUpdateRequest {
+  readonly sessionId: string
+  readonly action: SessionAttentionAction
+}
+
+const sessionAttentionUpdateRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  action: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('mark-read') }).strict(),
+    z.object({ type: z.literal('set-snoozed'), snoozed: z.boolean() }).strict(),
+  ]),
+})
 
 const sessionSummarySchema = z.object({
   agentAvailable: z.boolean(),
@@ -382,11 +393,7 @@ export interface DshPlatformTransport {
 export interface DshPlatformClient {
   readonly sessions: {
     list(): Promise<readonly SessionSummary[]>
-    updateAttention(
-      sessionId: string,
-      action: SessionAttentionAction,
-      signal?: AbortSignal,
-    ): Promise<SessionAttentionSummary>
+    updateAttention(request: SessionAttentionUpdateRequest): Promise<SessionAttentionSummary>
     search(query: string): Promise<{
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
@@ -468,7 +475,7 @@ function decodeJsonValue(value: unknown, context: string): JsonValue {
   return result.data
 }
 
-export function loopbackLaunchUrl(value: string): {
+function loopbackLaunchUrl(value: string): {
   readonly origin: string
   readonly token: string
 } {
@@ -478,9 +485,8 @@ export function loopbackLaunchUrl(value: string): {
   } catch {
     throw new DshPlatformError('invalid-url', 'Set DSHX_URL to the tokenized DSH launch URL printed by dsh.')
   }
-  const loopbackIpv4 = isIPv4(url.hostname) && url.hostname.split('.', 1)[0] === '127'
-  const loopbackHost = url.hostname === 'localhost' || url.hostname === '[::1]' || url.hostname === '::1' || loopbackIpv4
-  if (url.protocol !== 'http:' || !loopbackHost || url.username || url.password) {
+  const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+  if (url.protocol !== 'http:' || !loopbackHosts.has(url.hostname) || url.username || url.password) {
     throw new DshPlatformError('unsafe-url', 'DSHX currently accepts only an HTTP launch URL on localhost, 127.0.0.1, or ::1.')
   }
   const token = url.searchParams.get('token')
@@ -711,15 +717,10 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   return {
     sessions: {
       list: listSessions,
-      updateAttention: async (sessionId, action, signal) => {
-        const request = z
-          .object({
-            sessionId: z.string().min(1),
-            action: sessionAttentionActionSchema,
-          })
-          .parse({ sessionId, action })
+      updateAttention: async request => {
+        const parsedRequest = sessionAttentionUpdateRequestSchema.parse(request)
         return sessionAttentionSummarySchema.parse(
-          await transport.rpc('session', 'updateAttention', { request }, signal),
+          await transport.rpc('session', 'updateAttention', { request: parsedRequest }),
         )
       },
       search: async query => {
