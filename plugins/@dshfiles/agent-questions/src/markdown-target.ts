@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { workspaceMarkdownPathSchema } from './store.js'
+import { type MarkdownFeedbackAnchor, workspaceMarkdownPathSchema } from './store.js'
 
 const maximumDocumentBytes = 256_000
 const maximumExcerptLines = 200
@@ -79,7 +79,7 @@ const readBoundedMarkdown = async ({ workspacePath, path }: ReadMarkdownDocument
   }
 }
 
-export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput) => {
+export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput): Promise<MarkdownFeedbackAnchor> => {
   const path = workspaceMarkdownPathSchema.parse(input.path)
   if (!Number.isSafeInteger(input.startLine)
     || !Number.isSafeInteger(input.endLine)
@@ -96,7 +96,7 @@ export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput) =
   }
 
   return {
-    kind: 'markdown' as const,
+    kind: 'markdown',
     path,
     revision: document.revision,
     startLine: input.startLine,

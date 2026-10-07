@@ -200,6 +200,26 @@ describe('revisioned Markdown feedback', () => {
     expect(runtime.childMessages).toEqual([record.feedbackId])
   })
 
+  it('accepts batches of 20 and rejects larger batches before resolving any item', async () => {
+    const table = createMemoryTable()
+    const runtime = createRuntime()
+    runtime.setRevision(firstChild.id, 'docs/guide.md', firstRevision)
+    const service = makeService(table, runtime.runtime)
+    const records = await Promise.all(Array.from({ length: 21 }, (_, index) =>
+      submit(service, { operationId: `batch-${index}` })))
+    const responses = records.map(record => ({
+      feedbackId: record.feedbackId,
+      disposition: 'accepted',
+    } satisfies { feedbackId: string; disposition: 'accepted' }))
+
+    await expect(answerMany(service, root, responses)).rejects.toThrow()
+    expect(Array.from(table.entries()).every(([, record]) => record.status === 'pending')).toBe(true)
+
+    const results = await answerMany(service, root, responses.slice(0, 20))
+    expect(results).toHaveLength(20)
+    expect(results.every(result => result.status === 'resolved')).toBe(true)
+  })
+
   it('resolves after child shutdown and lets the reattached child retrieve the durable receipt', async () => {
     const table = createMemoryTable()
     const runtime = createRuntime()

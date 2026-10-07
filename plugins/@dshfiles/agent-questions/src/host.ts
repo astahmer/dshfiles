@@ -415,7 +415,7 @@ const setupHost = (context: Context): void => {
       sendToChild: async ({ parentSessionId, childSessionId, record, signal }) => {
         const parent: Agent | undefined = context.agents.get(SessionId(parentSessionId))
         if (parent === undefined) {
-          throw new Error('The direct child is unavailable; the resolution remains in durable storage.')
+          throw new Error('The direct parent is unavailable; the resolution remains in durable storage.')
         }
         await context.subagents.sendMessage(
           parent,

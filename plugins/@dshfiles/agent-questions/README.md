@@ -36,6 +36,9 @@ exact workspace-relative line excerpt; the Host records its whole-file SHA-256
 revision and rejects unsafe paths, symlinks, or excerpts that no longer match.
 The direct parent can resolve up to 20 items in one call. Each resolution has a
 durable receipt, and the child can retrieve it later after a one-way wakeup or
-Host restart. If the document changes or becomes unreadable before resolution
-or retrieval, the receipt is marked stale and the feedback must be re-anchored
-before the child acts. Element anchors still require a browser/evidence provider.
+Host restart, including after the child Agent stops. The native subagent message
+path may cold-resume the persisted direct child to deliver a notice; the durable
+receipt remains authoritative if that wake fails. If the document changes or
+becomes unreadable before resolution or retrieval, the receipt is marked stale
+and the feedback must be re-anchored before the child acts. Feedback is never
+applied automatically. Element anchors still require a browser/evidence provider.

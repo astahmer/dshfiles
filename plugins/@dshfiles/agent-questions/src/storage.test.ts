@@ -347,14 +347,22 @@ describe('parent question JSON storage', () => {
     const parentAgent: ParentFeedbackAgent = { id: 'feedback-parent' }
     const childAgent: ParentFeedbackAgent = { id: 'feedback-child' }
     const revision = 'c'.repeat(64)
+    const liveAgents = new Set([parentAgent, childAgent])
     const runtime: ParentFeedbackRuntime = {
-      isLive: agent => agent === parentAgent || agent === childAgent,
+      isLive: agent => liveAgents.has(agent),
       parentSessionId: childSessionId => childSessionId === childAgent.id ? parentAgent.id : undefined,
       isDirectChild: (childSessionId, parentSessionId) =>
-        childSessionId === childAgent.id && parentSessionId === parentAgent.id,
+        childSessionId === childAgent.id
+        && parentSessionId === parentAgent.id
+        && liveAgents.has(parentAgent)
+        && liveAgents.has(childAgent),
       currentRevision: async () => revision,
       sendToParent: async ({ record }) => `parent-message-${record.feedbackId}`,
-      sendToChild: async () => undefined,
+      sendToChild: async ({ parentSessionId, childSessionId }) => {
+        if (parentSessionId !== parentAgent.id || childSessionId !== childAgent.id || !liveAgents.has(parentAgent)) {
+          throw new Error('The direct child is unavailable.')
+        }
+      },
     }
     let first: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
     let second: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
@@ -383,17 +391,19 @@ describe('parent question JSON storage', () => {
       await first.domain.close()
       await first.context.fiber.dispose()
       first = undefined
+      liveAgents.delete(childAgent)
 
       const reopened = await openQuestionStorage(root)
       second = reopened
       secondService = createParentFeedbackService({ table: async () => reopened.feedbackTable, runtime })
-      expect((await secondService.read({ agent: childAgent, feedbackId: submitted.feedbackId })).status).toBe('pending')
-      await secondService.answerMany({
+      const results = await secondService.answerMany({
         agent: parentAgent,
         responses: [{ feedbackId: submitted.feedbackId, disposition: 'accepted', note: 'Agreed.' }],
         signal: new AbortController().signal,
       })
+      expect(results).toEqual([{ feedbackId: submitted.feedbackId, status: 'resolved', notified: true }])
 
+      liveAgents.add(childAgent)
       const recovered = await secondService.read({ agent: childAgent, feedbackId: submitted.feedbackId })
       expect(recovered).toMatchObject({
         status: 'resolved',
