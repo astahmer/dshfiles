@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
+import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 if (process.versions.node !== '22.23.3') {
@@ -22,14 +23,36 @@ if (dshOutput.status !== 0 || dshOutput.stdout.trim() !== '0.2.0-rc.2') {
 const helperPath = resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')
 const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = await import(pathToFileURL(helperPath).href)
 const packagePath = resolve(repoRoot, 'plugins/@dshfiles/ai-accounts')
+const probeTemporaryRoot = await mkdtemp(join(tmpdir(), 'ai-accounts-scheduler-probe-'))
+const probePackagePath = join(probeTemporaryRoot, '@dshfiles', 'ai-accounts-scheduler-probe')
+const probeResultPath = join(probeTemporaryRoot, 'scheduler-probe-result.json')
+await mkdir(dirname(probePackagePath), { recursive: true })
+await cp(resolve(packagePath, 'tests/fixtures/scheduler-probe'), probePackagePath, { recursive: true })
 const profileName = 'ai-accounts-quota'
-const scratch = await createScratchProfile({
-  profileName,
-  sourceProfileRoot: resolve(homedir(), '.dsh/profiles/web'),
-  bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@dshfiles/ai-accounts'],
-  excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
-  extraDependencies: { '@dshfiles/ai-accounts': `link:${packagePath}` },
-})
+let scratch
+try {
+  scratch = await createScratchProfile({
+    profileName,
+    sourceProfileRoot: resolve(homedir(), '.dsh/profiles/web'),
+    bundleIds: [
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      '@deepseek-ai/dsh-experimental-schedule-bundle',
+      '@dshfiles/ai-accounts',
+      '@dshfiles/ai-accounts-scheduler-probe',
+    ],
+    excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
+    extraDependencies: {
+      '@deepseek-ai/dsh-experimental-schedule-bundle': '0.2.0-rc.2',
+      '@deepseek-ai/dsh-schedule': '0.2.0-rc.2',
+      '@dshfiles/ai-accounts': `link:${packagePath}`,
+      '@dshfiles/ai-accounts-scheduler-probe': `link:${probePackagePath}`,
+    },
+  })
+} catch (error) {
+  await rm(probeTemporaryRoot, { recursive: true, force: true })
+  throw error
+}
 
 let host
 let hostExited
@@ -39,7 +62,7 @@ const startHost = async () => {
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const child = spawn('dsh', ['--profile', profileName, '--port', '0', '--no-open'], {
     cwd: repoRoot,
-    env: environment,
+    env: { ...environment, DSHX_SCHEDULE_PROBE_RESULT: probeResultPath },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   host = child
@@ -107,6 +130,27 @@ const stopHost = async () => {
   host = undefined
 }
 
+const waitForScheduleDelivery = async () => {
+  const deadline = Date.now() + 25_000
+  while (Date.now() < deadline) {
+    const resultText = await readFile(probeResultPath, 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return undefined
+      throw error
+    })
+    if (resultText !== undefined) {
+      const result = JSON.parse(resultText)
+      assert.equal(result.status, 'delivered', `Schedule probe failed: ${result.errorName ?? 'unknown error'}.`)
+      assert.ok(result.sessionId, 'Schedule probe omitted its original Session identity.')
+      assert.ok(result.scheduleId, 'Schedule probe omitted its durable task identity.')
+      assert.ok(result.messageId, 'Schedule probe omitted the delivery receipt identity.')
+      assert.ok(Number.isSafeInteger(result.messageSeq), 'Schedule probe omitted the delivered Session sequence.')
+      return result
+    }
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
+  }
+  throw new Error('Scratch Schedule Host did not persist a delivery receipt within 25 seconds.')
+}
+
 try {
   await scratch.install()
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
@@ -117,9 +161,19 @@ try {
   })
   assert.equal(dump.status, 0, `Scratch profile composition failed.\n${redactHostOutput(dump.stderr)}`)
   assert.ok(dump.stdout.includes('@dshfiles/ai-accounts'), 'Scratch composition omitted the AI Accounts bundle.')
+  assert.ok(dump.stdout.includes('@deepseek-ai/dsh-schedule'), 'Scratch composition omitted the DSH Scheduler service row.')
+  assert.ok(dump.stdout.includes('@dshfiles/ai-accounts-scheduler-probe'), 'Scratch composition omitted its test-only Scheduler probe.')
   await startHost()
-  process.stdout.write('PASS: AI Accounts composed and activated on a fresh DSH scratch Host with no activation failures.\n')
+  const delivery = await waitForScheduleDelivery()
+  process.stdout.write(`PASS: DSH Schedule delivered to scratch Session ${delivery.sessionId} and persisted receipt ${delivery.messageId}.\n`)
 } finally {
-  await stopHost()
-  await scratch.cleanup()
+  try {
+    await stopHost()
+  } finally {
+    try {
+      await scratch.cleanup()
+    } finally {
+      await rm(probeTemporaryRoot, { recursive: true, force: true })
+    }
+  }
 }

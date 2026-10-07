@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-ai-accounts-scheduler-probe
+      name: '@dshfiles/ai-accounts-scheduler-probe'
