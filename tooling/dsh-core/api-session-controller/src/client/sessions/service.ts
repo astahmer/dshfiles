@@ -5,7 +5,15 @@ import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
-import type { SessionAttentionSummary, SessionAttentionUpdateRequest } from '../../types.ts'
+import type {
+  SessionAttentionSummary,
+  SessionAttentionUpdateRequest,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
+} from '../../types.ts'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import {
   createSnapshotStore, notifySubscribers, type ObservableSnapshot, type SnapshotStore,
@@ -361,6 +369,27 @@ export class ClientSessions implements ISessions {
     signal?: AbortSignal,
   ): Promise<RemoteResult<SessionAttentionSummary>> {
     return this.manager.updateAttention(request, signal)
+  }
+
+  prepareWorkspaceRestore(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestorePreview>> {
+    return this.manager.prepareWorkspaceRestore(request, signal)
+  }
+
+  confirmWorkspaceRestore(
+    request: SessionWorkspaceRestoreConfirmRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt>> {
+    return this.manager.confirmWorkspaceRestore(request, signal)
+  }
+
+  workspaceRestoreStatus(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt | null>> {
+    return this.manager.workspaceRestoreStatus(request, signal)
   }
 
   /**

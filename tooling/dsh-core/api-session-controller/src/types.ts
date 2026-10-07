@@ -358,6 +358,61 @@ export interface SessionForkValue {
   readonly sessionId: SessionId
 }
 
+/** Requested Host-owned filesystem restore or explicit recovery action. */
+export interface SessionWorkspaceRestorePrepareRequest {
+  readonly sessionId: SessionId
+  readonly action: 'restore' | 'retry' | 'rollback'
+  /** Full commit id, required for a new restore and ignored for recovery actions. */
+  readonly targetCommitId?: string
+}
+
+/** One changed workspace path shown before the Host applies a restore. */
+export interface SessionWorkspaceRestoreChangedPath {
+  readonly path: string
+  readonly status: 'modified' | 'added' | 'removed' | 'copied' | 'renamed'
+}
+
+/** One short-lived, one-use confirmation bound to the current Session and JJ workspace state. */
+export interface SessionWorkspaceRestorePreview {
+  readonly previewId: string
+  readonly action: 'restore' | 'retry' | 'rollback'
+  readonly sessionId: SessionId
+  readonly workspaceId: WorkspaceId
+  readonly workspacePath: string
+  readonly currentCommitId: string
+  readonly savedCommitId: string
+  readonly targetCommitId: string
+  readonly changedPaths: readonly SessionWorkspaceRestoreChangedPath[]
+  readonly changedPathsTruncated: boolean
+  readonly expiresAt: number
+}
+
+/** One-use confirmation for the exact preview returned by the Host. */
+export interface SessionWorkspaceRestoreConfirmRequest {
+  readonly previewId: string
+}
+
+/** Read the latest durable filesystem restore receipt for one Session. */
+export interface SessionWorkspaceRestoreStatusRequest {
+  readonly sessionId: SessionId
+}
+
+/** Durable Host receipt; `partial` requires an explicit recovery action. */
+export interface SessionWorkspaceRestoreReceipt {
+  readonly operationId: string
+  readonly action: 'restore' | 'retry' | 'rollback'
+  readonly sessionId: SessionId
+  readonly workspaceId: WorkspaceId
+  readonly savedCommitId: string
+  readonly targetCommitId: string
+  readonly state: 'applying' | 'complete' | 'unchanged' | 'partial' | 'rollback-applying' | 'rolled-back' | 'uncertain'
+  readonly currentCommitId?: string
+  readonly failure?: 'cancelled' | 'command-failed' | 'timeout' | 'process-not-quiescent' | 'workspace-changed' | 'verification-failed'
+  readonly updatedAt: number
+  readonly canRetry: boolean
+  readonly canRollback: boolean
+}
+
 /** Session prompt request. */
 export interface SessionPromptRequest {
   /** Client-minted identity persisted on the exact accepted user message. */

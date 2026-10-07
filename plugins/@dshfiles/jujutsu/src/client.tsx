@@ -23,6 +23,7 @@ import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type 
 import { jujutsuApi } from './api.js'
 import { SessionForkPanel } from './session-fork-panel.js'
 import { WorkspaceProvisioner } from './workspace-provisioner.js'
+import { WorkspaceRestorePanel } from './workspace-restore-panel.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import styles from './jujutsu.module.css'
 
@@ -467,6 +468,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           onPreview={askForConfirmation}
           pickDirectory={props.pickDirectory}
           launchSession={props.launchSession}
+        />
+      )}
+      {!sidePanel && state !== undefined && (
+        <WorkspaceRestorePanel
+          sessions={props.sessions}
+          workspacePath={state.root}
+          targetCommitId={selectedRevision?.commitId ?? null}
+          onRestored={() => {
+            if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
+          }}
         />
       )}
 

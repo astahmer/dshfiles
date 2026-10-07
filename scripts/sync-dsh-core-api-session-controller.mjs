@@ -84,18 +84,26 @@ for (const [filename, generatedContents] of generatedFiles) {
   }
 }
 
-if (
-  generatedHost.remote?.dts.includes('updateAttention:') !== true
-  || generatedHost.remote.dts.includes("'session/updateAttention':") !== true
-) {
-  throw new Error('Generated Remote contract is missing one of the Session attention endpoints.')
+const requiredRemoteEndpoints = [
+  'updateAttention',
+  'prepareWorkspaceRestore',
+  'confirmWorkspaceRestore',
+  'workspaceRestoreStatus',
+]
+for (const endpoint of requiredRemoteEndpoints) {
+  if (
+    generatedHost.remote?.dts.includes(`${endpoint}:`) !== true
+    || generatedHost.remote.dts.includes(`'session/${endpoint}':`) !== true
+  ) {
+    throw new Error(`Generated Remote contract is missing the Session ${endpoint} endpoint.`)
+  }
 }
 
 for (const [filename, expectedText] of [
-  ['index.js', 'updateAttention'],
-  ['client.js', 'updateAttention'],
-  ['types/index.d.ts', 'SessionAttentionUpdateRequest'],
-  ['typert.remote-client.d.ts', 'updateAttention'],
+  ['index.js', 'workspaceRestoreStatus'],
+  ['client.js', 'workspaceRestoreStatus'],
+  ['types/index.d.ts', 'SessionWorkspaceRestorePrepareRequest'],
+  ['typert.remote-client.d.ts', 'workspaceRestoreStatus'],
 ]) {
   const contents = await readFile(join(upstreamLibRoot, filename), 'utf8')
   if (!contents.includes(expectedText)) throw new Error(`Pinned DSH output ${filename} is missing ${expectedText}.`)

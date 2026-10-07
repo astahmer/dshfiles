@@ -29,6 +29,14 @@ export { SessionCreateError, SessionForkError } from './sessions/service.ts'
 export type { SessionBinding, SessionListState, SessionSummary } from './sessions/service.ts'
 export type { SessionAttentionSummary, SessionAttentionAction, SessionAttentionUpdateRequest } from '../types.ts'
 export type {
+  SessionWorkspaceRestoreChangedPath,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
+} from '../types.ts'
+export type {
   SessionListPhase,
   SessionListSnapshot,
   SessionSearchResultItem,

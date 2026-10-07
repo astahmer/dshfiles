@@ -7,12 +7,17 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { LlmAttemptId } from '@deepseek-ai/dsh-llm'
 import { RemoteStreamCarrierError } from '@deepseek-ai/dsh-api-gateway/client'
 import { SESSION_FORMAT_VERSION, SessionSeq } from '@deepseek-ai/dsh-session/types'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { ok, streamHandle, type RemoteMock } from '@deepseek-ai/dsh-remote-mock'
 import { createClientTest, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { ClientSessions, SessionCreateError, SessionForkError } from '../src/client/sessions/service.ts'
 import { scopeOf } from '../src/client/scope.ts'
 import type {
-  SessionAssistantStreamBaseline, SessionFollowFrame, SessionFollowRequest,
+  SessionAssistantStreamBaseline,
+  SessionFollowFrame,
+  SessionFollowRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
 } from '../src/types.ts'
 import { FOLLOW, err, followScript, sessionWorld } from './remote/session.client.ts'
 
@@ -142,6 +147,55 @@ describe('search', () => {
     })
     expect(call.mock.calls.find(([, endpoint]) => endpoint === 'session/search')?.[3]).toBe(signal)
     expect(b.svc.list.getSnapshot()).toBe(before)
+  })
+})
+
+describe('workspace restore', () => {
+  it('delegates preview, confirmation, and status over their typed Host endpoints', async ({ bench }) => {
+    const b = bench()
+    const signal = new AbortController().signal
+    const prepareRequest = { sessionId: sid('s1'), action: 'restore' as const, targetCommitId: 'a'.repeat(40) }
+    const preview: SessionWorkspaceRestorePreview = {
+      previewId: 'restore-preview',
+      action: 'restore',
+      sessionId: sid('s1'),
+      workspaceId: WorkspaceId('workspace-1'),
+      workspacePath: '/repo',
+      currentCommitId: 'b'.repeat(40),
+      savedCommitId: 'b'.repeat(40),
+      targetCommitId: prepareRequest.targetCommitId,
+      changedPaths: [{ path: 'src/file.ts', status: 'modified' }],
+      changedPathsTruncated: false,
+      expiresAt: 100,
+    }
+    const receipt: SessionWorkspaceRestoreReceipt = {
+      operationId: 'restore-operation',
+      action: 'restore',
+      sessionId: sid('s1'),
+      workspaceId: WorkspaceId('workspace-1'),
+      savedCommitId: preview.savedCommitId,
+      targetCommitId: preview.targetCommitId,
+      state: 'complete',
+      currentCommitId: preview.targetCommitId,
+      updatedAt: 101,
+      canRetry: false,
+      canRollback: false,
+    }
+    b.mock.remote.session.prepareWorkspaceRestore.mockResolvedValue(ok(preview))
+    b.mock.remote.session.confirmWorkspaceRestore.mockResolvedValue(ok(receipt))
+    b.mock.remote.session.workspaceRestoreStatus.mockResolvedValue(ok(receipt))
+    const call = vi.spyOn(b.mock.rpc, 'call')
+
+    await expect(b.svc.prepareWorkspaceRestore(prepareRequest, signal)).resolves.toEqual(ok(preview))
+    await expect(b.svc.confirmWorkspaceRestore({ previewId: preview.previewId }, signal)).resolves.toEqual(ok(receipt))
+    await expect(b.svc.workspaceRestoreStatus({ sessionId: sid('s1') }, signal)).resolves.toEqual(ok(receipt))
+
+    expect(call.mock.calls.map(([, endpoint]) => endpoint)).toEqual([
+      'session/prepareWorkspaceRestore',
+      'session/confirmWorkspaceRestore',
+      'session/workspaceRestoreStatus',
+    ])
+    expect(call.mock.calls.every(callArgs => callArgs[3] === signal)).toBe(true)
   })
 })
 

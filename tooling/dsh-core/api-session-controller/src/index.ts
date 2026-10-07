@@ -4,6 +4,7 @@ import { hostname } from 'node:os'
 import { resolve } from 'node:path'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-subprocess'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { errorChain, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -29,6 +30,7 @@ import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
 import { ApiSessionAttention } from './attention-controller.ts'
+import { SessionWorkspaceRestoreController } from './workspace-restore-controller.ts'
 import type {
   ModelCatalog,
   SessionWorkspacePathApplication,
@@ -45,6 +47,11 @@ import type {
   SessionFollowRequest,
   SessionForkRequest,
   SessionForkValue,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
   SessionListRequest,
   SessionListValue,
   SessionOpenWorkspacePathRequest,
@@ -111,6 +118,7 @@ export class SessionController extends TypertRemoteService {
     'sessionProjections',
     'sessionQuery',
     'storageDomain',
+    'subprocess',
     'typert',
     'workspaceRegistry',
   ]
@@ -125,6 +133,7 @@ export class SessionController extends TypertRemoteService {
   private readonly history: SessionHistoryController
   private readonly listState: ApiSessionList
   private readonly attention: ApiSessionAttention
+  private readonly workspaceRestore: SessionWorkspaceRestoreController
   private readonly openPath: (path: string, signal: AbortSignal) => Promise<void>
   private readonly fileApplications: typeof nativeFileApplications
   private readonly openFileApplication: typeof openNativeFileApplication
@@ -140,13 +149,19 @@ export class SessionController extends TypertRemoteService {
   constructor(ctx: Context, config: Config, internals: SessionControllerInternals = {}) {
     super(ctx, 'sessionController', { namespace: 'session' })
     this.attention = new ApiSessionAttention(ctx)
+    this.workspaceRestore = new SessionWorkspaceRestoreController(ctx)
     installModelSelectionProjection(ctx)
     this.agents = new ApiSessionAgentController(ctx)
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
-      const result = await this.agents.resolveAgent(sessionId)
-      if ('error' in result) throw result.error
-      return result.agent
+      const release = this.workspaceRestore.beginSessionAccess(sessionId)
+      try {
+        const result = await this.agents.resolveAgent(sessionId)
+        if ('error' in result) throw result.error
+        return result.agent
+      } finally {
+        release()
+      }
     }), 'session-controller: file-upload Agent resolver')
     this.controlState = new SessionControlController(ctx)
     // Registered before history so reverse-order teardown closes every
@@ -209,15 +224,20 @@ export class SessionController extends TypertRemoteService {
   }
 
   async [Service.init](): Promise<void> {
-    await this.attention.ready
+    await Promise.all([this.attention.ready, this.workspaceRestore.ready])
   }
 
   private promote(observation: SessionObservation): void {
     const sessionId = observation.header.id
     const task = (async () => {
-      using ownedObservation = observation
-      const result = await this.agents.resolveObservedAgent(ownedObservation)
-      if ('error' in result) this.ctx.emit('api-session/error', sessionId, result.error.message)
+      const release = this.workspaceRestore.beginSessionAccess(sessionId)
+      try {
+        using ownedObservation = observation
+        const result = await this.agents.resolveObservedAgent(ownedObservation)
+        if ('error' in result) this.ctx.emit('api-session/error', sessionId, result.error.message)
+      } finally {
+        release()
+      }
     })().catch((error: unknown) => {
       this.ctx.logger.error(`session-controller: background activation for "${sessionId}" failed: ${errorChain(error)}`)
     })
@@ -230,8 +250,13 @@ export class SessionController extends TypertRemoteService {
    * @param sessionId - Session identity whose Agent owns the operation.
    * @returns the live Agent or the stable Session-domain failure.
    */
-  resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult> {
-    return this.agents.resolveAgent(sessionId)
+  async resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult> {
+    const release = this.workspaceRestore.beginSessionAccess(sessionId)
+    try {
+      return await this.agents.resolveAgent(sessionId)
+    } finally {
+      release()
+    }
   }
 
   /**
@@ -277,6 +302,33 @@ export class SessionController extends TypertRemoteService {
     return this.attention.update(request, signal)
   }
 
+  /** Prepare a one-use preview for an explicitly requested filesystem restore. */
+  @Remote('prepareWorkspaceRestore')
+  prepareWorkspaceRestore(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal: AbortSignal,
+  ): Promise<SessionWorkspaceRestorePreview> {
+    return this.workspaceRestore.prepare(request, signal)
+  }
+
+  /** Apply a confirmed restore and return its durable recovery receipt. */
+  @Remote('confirmWorkspaceRestore')
+  confirmWorkspaceRestore(
+    request: SessionWorkspaceRestoreConfirmRequest,
+    signal: AbortSignal,
+  ): Promise<SessionWorkspaceRestoreReceipt> {
+    return this.workspaceRestore.confirm(request, signal)
+  }
+
+  /** Reconcile and read the latest durable restore receipt for one Session. */
+  @Remote('workspaceRestoreStatus')
+  workspaceRestoreStatus(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal: AbortSignal,
+  ): Promise<SessionWorkspaceRestoreReceipt | null> {
+    return this.workspaceRestore.status(request, signal)
+  }
+
   /**
    * Search visible Session content without resuming an Agent.
    * @param request - literal message-content query.
@@ -294,8 +346,12 @@ export class SessionController extends TypertRemoteService {
    * @returns the Session identity and resolved preset when configured.
    */
   @Remote('create')
-  create(request: SessionCreateRequest): Promise<SessionCreateValue> {
-    return this.commands.create(request)
+  async create(request: SessionCreateRequest): Promise<SessionCreateValue> {
+    const release = this.workspaceRestore.beginWorkspaceAccess(request.workspaceId, request.cwd)
+    try {
+      return await this.commands.create(request)
+    } finally {
+      release()
   }
 
   /**
@@ -304,8 +360,12 @@ export class SessionController extends TypertRemoteService {
    * @returns the normalized selection installed for the Session, without waiting for default persistence.
    */
   @Remote('selectModel')
-  selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
-    return this.commands.selectModel(request)
+  async selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
+    const release = this.workspaceRestore.beginSessionAccess(request.sessionId)
+    try {
+      return await this.commands.selectModel(request)
+    } finally {
+      release()
   }
 
   /**
@@ -436,8 +496,12 @@ export class SessionController extends TypertRemoteService {
    * @returns the new Session identity.
    */
   @Remote('fork')
-  fork(request: SessionForkRequest): Promise<SessionForkValue> {
-    return this.commands.fork(request)
+  async fork(request: SessionForkRequest): Promise<SessionForkValue> {
+    const release = this.workspaceRestore.beginSessionAccess(request.sessionId)
+    try {
+      return await this.commands.fork(request)
+    } finally {
+      release()
   }
 
   /**
@@ -447,9 +511,13 @@ export class SessionController extends TypertRemoteService {
    * @returns acknowledgement that the Agent accepted the prompt.
    */
   @Remote('prompt')
-  prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue> {
+  async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue> {
     signal.throwIfAborted()
-    return this.commands.prompt(request)
+    const release = this.workspaceRestore.beginSessionAccess(request.sessionId)
+    try {
+      return await this.commands.prompt(request)
+    } finally {
+      release()
   }
 
   /**
@@ -468,8 +536,12 @@ export class SessionController extends TypertRemoteService {
    * @returns acknowledgement that the queue mutation was applied.
    */
   @Remote('updateQueue')
-  updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
-    return this.commands.updateQueue(request)
+  async updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
+    const release = this.workspaceRestore.beginSessionAccess(request.sessionId)
+    try {
+      return await this.commands.updateQueue(request)
+    } finally {
+      release()
   }
 
   /**

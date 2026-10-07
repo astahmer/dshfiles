@@ -12,6 +12,11 @@ import type {
   SessionProjectionHints,
   SessionRenameValue,
   SessionSummary,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
 } from '../../types.ts'
 import { mergeOrderedBaseline } from '../ordered-baseline.ts'
 import { isRemoteFailure } from '@deepseek-ai/dsh-api-gateway/client'
@@ -466,6 +471,27 @@ export class SessionManager {
     const result = await this.remote.session.updateAttention(request, signal)
     if (result.ok) this.handleSessionAttention(request.sessionId, result.value)
     return result
+  }
+
+  prepareWorkspaceRestore(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestorePreview>> {
+    return this.remote.session.prepareWorkspaceRestore(request, signal)
+  }
+
+  confirmWorkspaceRestore(
+    request: SessionWorkspaceRestoreConfirmRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt>> {
+    return this.remote.session.confirmWorkspaceRestore(request, signal)
+  }
+
+  workspaceRestoreStatus(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt | null>> {
+    return this.remote.session.workspaceRestoreStatus(request, signal)
   }
 
   /**

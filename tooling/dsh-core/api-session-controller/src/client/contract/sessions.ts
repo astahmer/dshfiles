@@ -9,7 +9,15 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import type { SessionAttentionSummary, SessionAttentionUpdateRequest } from '../../types.ts'
+import type {
+  SessionAttentionSummary,
+  SessionAttentionUpdateRequest,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
+} from '../../types.ts'
 import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type { SessionBinding, SessionListState } from '../sessions/service.ts'
@@ -55,6 +63,21 @@ export interface ISessions {
     request: SessionAttentionUpdateRequest,
     signal?: AbortSignal,
   ): Promise<RemoteResult<SessionAttentionSummary>>
+  /** Preview a Host-coordinated filesystem restore for the Session's Workspace. */
+  prepareWorkspaceRestore(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestorePreview>>
+  /** Apply one unexpired restore preview. Conversation history remains untouched. */
+  confirmWorkspaceRestore(
+    request: SessionWorkspaceRestoreConfirmRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt>>
+  /** Read and reconcile the latest durable filesystem restore receipt. */
+  workspaceRestoreStatus(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt | null>>
   /**
    * Retain an exact Client generation and start its shared initial history opening.
    * @param target - known identity or durable direct-parent address.

@@ -65,6 +65,11 @@ import type {
   SessionProjectionsRequest,
   SessionUpdateQueueRequest,
   SessionUpdateQueueValue,
+  SessionWorkspaceRestoreConfirmRequest,
+  SessionWorkspaceRestorePrepareRequest,
+  SessionWorkspaceRestorePreview,
+  SessionWorkspaceRestoreReceipt,
+  SessionWorkspaceRestoreStatusRequest,
 } from '../src/types.ts'
 
 /** Direct test face matching the generated `ctx.remote.session` unary methods. */
@@ -75,6 +80,18 @@ export interface TestSessionRemote {
   canOpenWorkspacePath(): Promise<RemoteResult<boolean>>
   list(request: SessionListRequest, signal?: AbortSignal): Promise<RemoteResult<SessionListValue>>
   updateAttention(request: SessionAttentionUpdateRequest, signal?: AbortSignal): Promise<RemoteResult<SessionAttentionSummary>>
+  prepareWorkspaceRestore(
+    request: SessionWorkspaceRestorePrepareRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestorePreview>>
+  confirmWorkspaceRestore(
+    request: SessionWorkspaceRestoreConfirmRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt>>
+  workspaceRestoreStatus(
+    request: SessionWorkspaceRestoreStatusRequest,
+    signal?: AbortSignal,
+  ): Promise<RemoteResult<SessionWorkspaceRestoreReceipt | null>>
   search(request: SessionSearchRequest, signal?: AbortSignal): Promise<RemoteResult<SessionSearchValue>>
   create(request: SessionCreateRequest): Promise<RemoteResult<SessionCreateValue>>
   selectModel(request: SessionSelectModelRequest): Promise<RemoteResult<SessionSelectModelValue>>
@@ -116,6 +133,7 @@ function provideTestStorageDomain(ctx: Context): void {
   ctx.provide('storageDomain', {
     open: async () => ({
       table: () => ({
+        entries: () => records.entries(),
         get: (key: string) => records.get(key),
         put: async (key: string, value: unknown) => { records.set(key, value) },
       }),
@@ -375,6 +393,18 @@ export function createSessionTestRemote(
     ),
     updateAttention: (request, signal = new AbortController().signal) => remoteResult(
       () => direct.updateAttention(request, signal),
+      signal,
+    ),
+    prepareWorkspaceRestore: (request, signal = new AbortController().signal) => remoteResult(
+      () => direct.prepareWorkspaceRestore(request, signal),
+      signal,
+    ),
+    confirmWorkspaceRestore: (request, signal = new AbortController().signal) => remoteResult(
+      () => direct.confirmWorkspaceRestore(request, signal),
+      signal,
+    ),
+    workspaceRestoreStatus: (request, signal = new AbortController().signal) => remoteResult(
+      () => direct.workspaceRestoreStatus(request, signal),
       signal,
     ),
     search: (request, signal = new AbortController().signal) => remoteResult(
