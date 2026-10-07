@@ -27,6 +27,20 @@ describe('create-dshx', () => {
     expect(Buffer.concat(chunks).toString()).toContain('--package-manager=<pnpm|yarn|npm>')
   })
 
+  it('keeps generated DSH defaults aligned with the core compatibility registry', () => {
+    expect(DEFAULT_DSH_RANGE).toBe(DEFAULT_COMPATIBILITY.dshRange)
+    expect(DEFAULT_DSH_VERSION).toBe(DEFAULT_COMPATIBILITY.verified.latest)
+  })
+
+  it('keeps the scope in generated Cordis loader ids', () => {
+    const patch = renderProjectTemplate(
+      {
+        packageId: '@dshfiles/shortcuts',
+        dshxVersion: packageVersion(),
+        dshVersion: DEFAULT_DSH_VERSION,
+        dshRange: DEFAULT_DSH_RANGE,
+      },
+      'starter',
       'none',
     ).find(file => file.path === 'cordis.patch.yml')?.contents
 
