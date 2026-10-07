@@ -1,6 +1,9 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -70,6 +73,51 @@ const persistentRoots = async (): Promise<{ attentionRoot: string; sessionRoot: 
   } catch (error: unknown) {
     await rm(attentionRoot, { recursive: true, force: true })
     throw error
+  }
+}
+
+const killAfterAttentionCommit = async (
+  attentionRoot: string,
+  sessionRoot: string,
+  sessionId: SessionId,
+): Promise<void> => {
+  const testDirectory = dirname(fileURLToPath(import.meta.url))
+  const repoRoot = resolve(testDirectory, '../../../..')
+  const worker = spawn(process.execPath, [
+    '--import', 'tsx',
+    resolve(testDirectory, 'session-attention-crash-worker.mjs'),
+  ], {
+    cwd: resolve(repoRoot, 'tooling/dsh-core/session-persistence-jsonl'),
+    env: {
+      ...process.env,
+      DSH_ATTENTION_ROOT: attentionRoot,
+      DSH_SESSION_ROOT: sessionRoot,
+      DSH_SESSION_ID: sessionId,
+    },
+  })
+  let output = ''
+  let errors = ''
+  let spawnError: Error | undefined
+  worker.stdout.on('data', chunk => { output += chunk.toString() })
+  worker.stderr.on('data', chunk => { errors += chunk.toString() })
+  worker.on('error', error => { spawnError = error })
+  const exited = once(worker, 'exit')
+  try {
+    await vi.waitFor(() => {
+      if (spawnError !== undefined) throw spawnError
+      if (worker.exitCode !== null || worker.signalCode !== null) {
+        throw new Error(`Crash worker exited before readiness: ${errors}`)
+      }
+      expect(output).toContain('ATTENTION_DURABLE')
+    }, { timeout: 10_000 })
+    expect(worker.kill('SIGKILL')).toBe(true)
+    const [, signal] = await exited
+    expect(signal).toBe('SIGKILL')
+  } finally {
+    if (worker.exitCode === null && worker.signalCode === null) {
+      worker.kill('SIGKILL')
+      await exited
+    }
   }
 }
 
@@ -247,4 +295,33 @@ describe('Host session attention', () => {
       ])
     }
   })
+
+  it('rewinds a sidecar committed before its Session batch across SIGKILL', async () => {
+    const sessionId = SessionId('attention-sigkill-session')
+    const { attentionRoot, sessionRoot } = await persistentRoots()
+    let verifier: Awaited<ReturnType<typeof persistentHarness>> | undefined
+    try {
+      await killAfterAttentionCommit(attentionRoot, sessionRoot, sessionId)
+
+      verifier = await persistentHarness(attentionRoot, sessionRoot)
+      expect(verifier.attention.summary(sessionId)).toEqual({
+        lastPromptSeq: 0,
+        readThroughSeq: -1,
+        snoozed: false,
+        unread: true,
+      })
+      await expect(verifier.attention.reconcile(sessionId)).resolves.toEqual({
+        lastPromptSeq: null,
+        readThroughSeq: -1,
+        snoozed: false,
+        unread: false,
+      })
+    } finally {
+      await verifier?.ctx.fiber.dispose()
+      await Promise.all([
+        rm(attentionRoot, { recursive: true, force: true }),
+        rm(sessionRoot, { recursive: true, force: true }),
+      ])
+    }
+  }, 15_000)
 })
