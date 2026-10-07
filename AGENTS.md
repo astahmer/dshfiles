@@ -144,6 +144,19 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `main`, and retain the source workspace until tree equality and status prove
   it safe to forget.
 
+### Required integration closeout
+
+Every completed consolidation must reduce its own JJ noise in the same task.
+Record completed work, exact remaining gates, source commit IDs, tree-preservation
+proof, and the recovery operation in `docs/unification-status-2026-10-07.md`.
+After moving `main` and making default an empty child, forget accounted-for,
+finished workspace registrations and delete temporary integration bookmarks.
+Retain physical source directories, one recovery bookmark per source tip, and
+an inventory of removed targets. Keep active writers and unrelated refs intact.
+Do not create a permanent bookmark for every attempted rewrite. Validation
+failures remain explicit in the ledger; history cleanup does not imply release
+or live-profile acceptance.
+
 ## Environment
 
 Node comes from **fnm**, pinned by `.node-version`, not from Nix.

@@ -24,7 +24,7 @@ A preserved implementation is not a production acceptance claim.
 - [x] Move main and default to the final documented local tip; default is verified as an empty child.
 - [x] Forget the completed integration workspace registration after default moves; retain its directory.
 
-Closeout topology: **162 described revisions beyond old main, zero conflicts, zero merges**.
+Closeout topology: **163 described revisions beyond old main, zero conflicts, zero merges**.
 Bookmark names: **544 → 24** (537 temporary names deleted after adding 17 bounded raw-source/old-main refs).
 Registered workspaces: **8 → 1**, default only. Physical source directories remain.
 
@@ -67,7 +67,7 @@ Logs: `/private/tmp/dsh-unify-20261007/`. These are local diagnostics; the resul
 | Root lint | Completed with warning-only antislop findings |
 | Root formatter | Final check passed on 612 files |
 | Project Checks | 2 files / 6 tests passed after source restoration |
-| Plugin tests excluding Settings Search and Thread Sidebar | Completed with two failing packages: Prompt Stash and Jujutsu; no full-suite pass claimed |
+| Plugin tests excluding Settings Search and Thread Sidebar | 18 packages reported totals: 367 passed, 2 failed (Prompt Stash and Jujutsu); Settings Search and Thread Sidebar excluded; no full-suite pass claimed |
 | Full combined profile / production | Not proven by this integration; blocked by native seams below. Live DSH was not restarted or changed |
 
 Known native Client declaration diagnostic: `sessions` is declared as both native `SessionStore` and Controller `ISessions` (TS2717). The generation script tolerates only that exact pinned diagnostic and rejects other errors. This is not a full native Client typecheck pass.
