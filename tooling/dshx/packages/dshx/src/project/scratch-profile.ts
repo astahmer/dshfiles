@@ -163,6 +163,9 @@ export const isolatedHostEnvironment = (home: string, profileRoot: string, sourc
   )
   return {
     ...environment,
+    ...(source.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1'
+      ? { DSHX_SCRATCH_TRACE_IMPORT_ERRORS: '1' }
+      : {}),
     HOME: home,
     DSH_HOME: home,
     DSHX_BOOT_PROFILE_ROOT: profileRoot,
