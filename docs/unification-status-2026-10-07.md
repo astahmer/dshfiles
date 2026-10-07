@@ -46,7 +46,7 @@ Registered workspaces: **8 → 1**, default only. Physical source directories re
 
 See [feature catalog](../README.md), [integration summary](branch-integration-summary-2026-10-07.md), and [software roadmap](../plans/software-additions-roadmap.md) for individual capabilities.
 
-## Current measured validation
+## Historical consolidation checkpoint
 
 Logs: `/private/tmp/dsh-unify-20261007/`. These are local diagnostics; the results here remain durable if those logs expire.
 
@@ -70,7 +70,7 @@ Logs: `/private/tmp/dsh-unify-20261007/`. These are local diagnostics; the resul
 | Plugin tests excluding Settings Search and Thread Sidebar | 18 packages reported totals: 367 passed, 2 failed (Prompt Stash and Jujutsu); Settings Search and Thread Sidebar excluded; no full-suite pass claimed |
 | Full combined profile / production | Not proven by this integration; blocked by native seams below. Live DSH was not restarted or changed |
 
-Known native Client declaration diagnostic: `sessions` is declared as both native `SessionStore` and Controller `ISessions` (TS2717). The generation script tolerates only that exact pinned diagnostic and rejects other errors. This is not a full native Client typecheck pass.
+The checkpoint above predates the repairs below. The TS2717 exception has since been removed; current source generation rejects every diagnostic.
 
 ## Integrated setup follow-through — current run
 
@@ -80,21 +80,41 @@ Logs: `/private/tmp/dsh-finish-20261007/`. Started from clean default `78e38a3c`
 - Prompt Stash reproduced: mixed image/text content rejected the whole message. Text projection now excludes attachments while preserving multiline text. Jujutsu reproduced: stale expected rows omitted exact-content SHA-256. Expectations and content-change/truncation checks reconciled. Selected tests: Prompt Stash 18/18, Jujutsu 22/22, Settings Search 10/10.
 - Settings Search chooses supported inline ConfigForm editing: rc.2 settings section owns only `close`; field navigation requires a native shell change. Removed dependency on absent navigation contract, retained existing in-place editor.
 - Native Agent shared `/types` had acquired Host-only Session/options/services. Restored identity-only Agent there; runtime-types already owns live augmentation. Controller sync overlays this source, regenerates Agent declarations, and rejects every Client diagnostic. Generated 166 outputs with no TS2717 exception; SHA-256 `8804be4cc5c9cf1c3c249a4ed29f40d18c06b6fd2b6bf72fd170a4e1affbd5ce`.
-- Plugin workspace overrides select one local Agent/Controller identity across native Client consumers. Combined graph validation and runtime composition still in progress.
-- Profile sync currently selects every owned bundle; bounded selection required before web promotion. No web profile writes or live restart performed.
+- Plugin workspace overrides select one local Agent/Controller identity across native Client consumers. Thread Sidebar build passes with the root-declared local Agent/Session/Controller graph. Combined workflow acceptance remains below.
+- Profile sync now supports repeatable `--bundle` selection and an explicit scratch `--home`, preserving unselected profile dependencies and bundles. No web profile writes or live restart performed.
+
+### Resumed combined-profile validation
+
+- Authenticated T3 browser reproduced Core Runtime import failure: disabling the native Controller removed its Client factory. DSHX now supports explicit Client `bundleDependencies`, preserving platform identities and Node-import refusal; configuration and actual compiler tests pass 69/69. Core Runtime embeds the local Controller `/client/module` source-generated library rather than importing the missing native factory.
+- Controller sync now emits local JavaScript alongside declarations before native bundling. Declaration-only generation could preserve copied upstream JavaScript. Fresh generation passes with 166 outputs, SHA-256 `8ed20fd0f0560629178c1f192d11a7f43cfb3025cf62877356c58023a49eda98`.
+- Combined scratch Client boots without a failure card and exposes Thread Sidebar, workspace/composer, Prompts and Drafts. Prompts create/save retains multiline text. More workflow checks remain in progress; no web promotion yet.
+- Agent Questions fresh scratch provider-fixture and cold-restart resolution acceptance pass. This is a synthetic provider fixture, not a credentialed real provider.
+- Core Host awaits persistence, SessionStore, AgentRegistry, AgentLoop and Controller fibres in order. Initial stdout still reports transient Controller-dependent pending rows; a scratch-only bounded readiness fixture now checks every enabled Loader row and records the settled state. Final combined Core candidate reports `inactive: []`; this does not claim warning-free initial stdout.
+- Default retains this thread's existing graph/selection changes. The newly registered `roadmap-continuation` workspace is another active writer and is left untouched.
+
+### Completed checks and bounded promotion
+
+- DSHX full suite: **538/538 tests in 52 files**; scaffold **22/22**; all **19 individual owned bundle boot smokes** passed. The integrated root command stopped at two Knip findings (unused Client Store dev dependency and undeclared system `jj` executable); both repaired, then dependency checks passed. Subsequent plugin integrated build/typecheck/test lane passed. Script typecheck, Cordis identity, local core identity (17 links across 7 roots), lint (warnings only), formatter (612 files) and production dependency audit passed. These are completed lanes, not a claim that the original root invocation exited zero.
+- Restored the canonical browser-safe Inbox projection to Agent `/types`; AgentLoop retains only its Host state projection. Agent and Queue builds pass; source-generated Controller JavaScript and declarations are coherent.
+- Core public CLI create/list/read, V4 migration, attention APIs, SIGKILL recovery, durable reconciliation and exactly one resumed synthetic Cursor prompt passed. Agent Questions fresh synthetic parent/child provider journey and cold-restart resolution passed. Project Checks trusted execution, current/stale/current receipt transitions, automatic verification and failed Codex hook attribution passed. Real provider credentials were not used.
+- Authenticated T3 browser on isolated `:3199`: combined Client boot; multiline Prompts save/insert and Drafts save; `/goto` opened the synthetic Cursor session; its actual reply appeared. Settings Search opened the inline Host editor, saved font size at revision 1, then restored inherited value. A synthetic native provider executed a real scratch filesystem tool through the native AgentLoop; its changed-file card opened review and Viewed progressed **0/1 → 1/1**. A native-runtime candidate without Core/Cursor also booted with no activation warnings and no Client failure card; browser Project Checks returned **Passed, exit 0**, with a working-copy receipt.
+- Registered in `web` through explicit bounded `profile:sync --bundle` selection: **@dshfiles/agent-questions, @dshfiles/diff-viewed, @dshfiles/project-checks, @dshfiles/prompt-stash, @dshfiles/sidebar-commands**. All previous dependencies/bundles and the entire configuration patch remain byte-preserved. Offline composition has **202 unique top-level Loader IDs**. Existing unmatched patches for `llm-openai-codex` and `preset-standard:tool-ask-user` remain unchanged. Backup/evidence: `/private/tmp/dsh-finish-20261007/web-backup/`, `web-promotion.log`, `web-composition-check.log`.
+- **Cursor Agent is not installed in web. Core Runtime remains scratch-only.** Official CLI Core candidate reproduces Thread Sidebar read/park failure before transport. Source-only graph coherence is not runtime coherence: installed native package resolution remains installation-owned, so the Client Remote namespace lacks local Controller extensions. Attempted mounting of canonical generated missing descriptors through `$mount` stalled Client service startup; that experiment was removed. No casts, local module augmentation, or durable-state workaround were retained. DSHX's Remote provider catalog was corrected from the obsolete API Remotes package to the actual rc.2 API Gateway owner.
+- Live `:3080` remains PID **61677**, untouched. The five new boot-composition registrations require the user to restart when convenient. No push.
+
+### Current run history closeout
+
+- Focused revisions: DSHX Client library bundling/provider catalog `9b64ded82a6d7f4802a5645b4b8217380158e45b`; native artifacts/Client graph `180fe45d3220d29d9d1e50e284c0e6f1a3bfa680`; bounded sync/settled activation `bcc50083f41368dac9cea330ef61f5ebb3598315`; formatter-only Settings Search `7926f00259a648e351aee165ba279afd507f6868`. Earlier engineering repair remains `a6c73c2c381ceb6c3f4f5aade84e9e262df794b9`.
+- Pre-split source tip `8cf2b6fe3e09c2e42a43684865f40b6f0d26d1e3`; preflight operation `ebdd1d7b19fb`. Full-tree diff against the focused chain was empty (zero files changed). A distinct recovery duplicate also has exact tree equality, preserved as `214ab228d02060b159e24f72f6c6cecfdbe160fa` at `recovery/finish-20261007/source`, avoiding a visible divergent source change ID.
+- No temporary integration bookmarks or own named workspace were created: removed-target inventory is empty. Existing recovery refs and the active `roadmap-continuation` workspace remain untouched. Main/default closeout contains the finished work; default is an empty child. Runtime failures above remain release gates despite clean history.
+- Installed Controller descriptor inspection (`installed-controller-extension-check.log`) confirms both `updateAttention` and `prepareWorkspaceRestore` absent in rc.2's installation-owned generated contribution. The repaired local source contribution contains them; profile links cannot override that installation scope.
 
 ## Remaining engineering gates — finite queue
 
-1. **Settings Search Host capability:** installed DSH 0.2.0-rc.2 runtime and declarations both lack `SettingsSectionOwnerProps.openSettingsTarget` and `SettingsNavigationTarget`. Add the real native seam or choose a supported product behavior. Do not use casts, module augmentation or state mutation to pretend it exists. Then build/typecheck and run an isolated browser navigation check.
-2. **Thread Sidebar contract coherence:** local Controller summaries include attention, but native Workspace UI/Client Store still expose the release summary without attention. Resolve the native client composition/type contract as one coherent graph, then build/typecheck and verify read/snooze/UI behavior. Merely linking one package does not update the native Workspace UI contract.
-3. **DSHX public API test:** `tests/api.spec.ts` rejects public `apiChannel`, which the current public module exports. Establish intended export contract and reconcile source/test; preserve real consumers.
-4. **DSHX contextual help tests:** six `tests/authoring-cli.spec.ts` cases expect the old global “add targets” sentence from target-specific help. Verify each intended command help contract and update implementation or expectations accordingly.
-5. **DSHX test CLI:** `tests/sdk-cli.spec.ts` expects project-local test exit 7 but gets usage exit 2 for `test --file`. Reproduce focused, repair command/flag routing, and retain exit propagation coverage.
-6. **Plugin tests:** final no-bail run excluding Settings Search and Thread Sidebar leaves two observed failures: Prompt Stash `src/recent-prompts.test.ts` drops the multiline first prompt; Jujutsu `src/core.test.ts` expects diff rows without the now-returned `contentDigest`. Reconcile intended contracts with focused regression checks. Project Checks now passes 6/6 after restoring the continuation’s fractional native hook-duration schema. Other selected package tests completed.
-7. **Native Client typing:** resolve the pinned TS2717 `sessions` augmentation collision rather than broadening the generator's diagnostic exception.
-8. **Fresh checkout generation/setup:** verify `install:all`, local dependency preparation, Controller source-overlay generation and build in a clean consumer checkout. Generated `lib/` is ignored; tree equality alone cannot prove it is current.
-9. **Combined isolated profile:** after native seam gates close, compose the complete profile, inspect offline IDs, capture stdout activation results, and run authenticated browser smoke on a second port/scratch home. Never restart live `:3080`.
-10. **Release gate:** complete root checks, dependency audit/Knip, combined boot and browser checks, then push/promote deliberately. No push or live-profile promotion happened here.
+1. **Native/local runtime graph:** close the reproduced official-CLI Client Remote ownership seam. Prove Thread Sidebar mark-read and park/unpark in the authenticated combined browser. Static TS2717, Settings Search, DSHX CLI/API and two plugin test failures are repaired; do not reopen those without new evidence.
+2. **Cursor promotion:** only after that runtime graph works, repeat the bounded combined candidate with the actual Cursor driver and recovery contract, then promote Cursor and only the required Core runtime dependency. Synthetic ACP evidence does not prove credentialed Cursor behavior. Keep Core scratch-only until this gate closes.
+3. **Clean consumer setup:** verify `install:all`, native source generation and build in a fresh consumer environment. Ignored generated `lib/` is not preserved by source-tree equality. Current overlay generation passed; fresh clone portability remains separate.
+4. **Live adoption:** user restart is required to load the five new profile registrations. No live restart/reload or credentialed provider acceptance was performed. Schedule composition and automatic account wake remain product acceptance gates; no automatic-wake claim is made.
 
 ## Remaining product acceptance
 
