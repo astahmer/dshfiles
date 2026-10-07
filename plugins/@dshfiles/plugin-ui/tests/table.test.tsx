@@ -11,7 +11,10 @@ interface Alias {
 
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel(), sortFns: { alphanumeric: sortFn_alphanumeric } })
 const helper = createColumnHelper<typeof features, Alias>()
-const columns = helper.columns([helper.accessor('name', { header: 'Name', sortFn: 'alphanumeric' }), helper.accessor('scope', { header: 'Scope', enableSorting: false })])
+const columns = helper.columns([
+  helper.accessor('name', { header: 'Name', sortFn: 'alphanumeric' }),
+  helper.accessor('scope', { header: 'Scope', enableSorting: false }),
+])
 
 const AliasTable = (props: { readonly data: readonly Alias[] }): JSX.Element => {
   const table = useTable({ features, columns, data: [...props.data] })

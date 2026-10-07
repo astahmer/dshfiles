@@ -4,14 +4,14 @@ Shared UI for dshfiles DSH plugins. See `plans/plugin-ui-library.md` for the why
 
 Three layers, each owned once:
 
-| Need | Import from | Notes |
-|------|-------------|-------|
-| Buttons, inputs, checkbox, switch, tags, pills, state dots, menus, tooltips, modal, segmented control, toasts, icons | `@deepseek-ai/dsh-client-ui-primitives` | Host platform module: always external, already themed. Never restyle these. |
-| Field wiring, textarea, select, notice, empty state, section, confirm dialog, visually hidden | `@dshfiles/plugin-ui` | CSS Modules on `--dsw-*` tokens. |
-| Async state | `@dshfiles/plugin-ui/query` | TanStack Query 5, re-exported, plus `PluginQueryProvider`. |
-| Tables | `@dshfiles/plugin-ui/table` | TanStack Table **v9**, re-exported, plus `DataTable`. |
-| Forms | `@dshfiles/plugin-ui/form` | TanStack Form 1, re-exported, plus `useAppForm` with bound field components. |
-| Charts | `@dshfiles/plugin-ui/chart` | TanStack Charts 1 (`Chart`, marks, compact scales, `tooltip`) plus `ChartFrame`. |
+| Need                                                                                                                 | Import from                             | Notes                                                                            |
+| -------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------- |
+| Buttons, inputs, checkbox, switch, tags, pills, state dots, menus, tooltips, modal, segmented control, toasts, icons | `@deepseek-ai/dsh-client-ui-primitives` | Host platform module: always external, already themed. Never restyle these.      |
+| Field wiring, textarea, select, notice, empty state, section, confirm dialog, visually hidden                        | `@dshfiles/plugin-ui`                   | CSS Modules on `--dsw-*` tokens.                                                 |
+| Async state                                                                                                          | `@dshfiles/plugin-ui/query`             | TanStack Query 5, re-exported, plus `PluginQueryProvider`.                       |
+| Tables                                                                                                               | `@dshfiles/plugin-ui/table`             | TanStack Table **v9**, re-exported, plus `DataTable`.                            |
+| Forms                                                                                                                | `@dshfiles/plugin-ui/form`              | TanStack Form 1, re-exported, plus `useAppForm` with bound field components.     |
+| Charts                                                                                                               | `@dshfiles/plugin-ui/chart`             | TanStack Charts 1 (`Chart`, marks, compact scales, `tooltip`) plus `ChartFrame`. |
 
 Depend on it with `"@dshfiles/plugin-ui": "link:../plugin-ui"`. Do not add TanStack packages to a plugin directly — the subpaths pin one version for the workspace.
 
@@ -56,7 +56,11 @@ import { ConfirmDialog, EmptyState, Field, Notice, Section, Select, TextArea, Vi
 import { PluginQueryProvider, errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 
 // Wrap each slot root once (inside the dshx `decorate(...)` so useApi still works):
-decorate(() => <PluginQueryProvider><Panel /></PluginQueryProvider>)
+decorate(() => (
+  <PluginQueryProvider>
+    <Panel />
+  </PluginQueryProvider>
+))
 
 const api = useApi(contract)
 const list = useQuery({ queryKey: ['secret-catalog', 'list', cwd], queryFn: ({ signal }) => api.list({ cwd }, { signal }) })

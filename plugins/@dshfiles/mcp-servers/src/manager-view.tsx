@@ -16,14 +16,7 @@ import type { McpServersTranslate } from './locales.js'
 import { ServerEditor } from './server-editor.js'
 import { blankServerForm, serverFormFromView, type ServerFormValues } from './server-form.js'
 import { useRegistrySearch, useServerActions, useServerSnapshot } from './server-queries.js'
-import {
-  credentialReferenceSummary,
-  isClientActive,
-  isConnectionToggleBlocked,
-  lifecycleDotState,
-  lifecycleText,
-  localProcessText,
-} from './server-status.js'
+import { credentialReferenceSummary, isClientActive, isConnectionToggleBlocked, lifecycleDotState, lifecycleText, localProcessText } from './server-status.js'
 import styles from './manager.module.css'
 
 const REGISTRY_URL = 'https://registry.modelcontextprotocol.io/'
@@ -155,7 +148,11 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
           {registryResults.map((entry, index) => (
             <CatalogCard
               action={
-                <Button onClick={() => openEditor(blankServerForm({ name: entry.title || entry.name, endpoint: entry.endpoint ?? '' }))} size="sm" variant="outline">
+                <Button
+                  onClick={() => openEditor(blankServerForm({ name: entry.title || entry.name, endpoint: entry.endpoint ?? '' }))}
+                  size="sm"
+                  variant="outline"
+                >
                   {t('addFromCatalog')}
                 </Button>
               }

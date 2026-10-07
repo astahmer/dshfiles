@@ -35,7 +35,8 @@ export const toDraft = (profile: AccountProfile): AccountDraft => ({
   modelOrder: profile.modelOrder,
 })
 
-const sameList = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((value, index) => value === right[index])
+const sameList = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index])
 
 const sameRecord = (left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean => {
   const keys = Object.keys(left)

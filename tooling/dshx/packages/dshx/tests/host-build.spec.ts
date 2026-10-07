@@ -410,10 +410,10 @@ describe('host compiler', () => {
       resolve(root, 'src/host.ts'),
       [
         "import { createScope } from '@deepseek-ai/dsh-scope'",
-        "export const scopeFactory = createScope",
+        'export const scopeFactory = createScope',
         "export const loadLlm = () => import('@deepseek-ai/dsh-llm')",
-        "export const inject = []",
-        "export function apply() {}",
+        'export const inject = []',
+        'export function apply() {}',
         '',
       ].join('\n'),
     )
@@ -436,12 +436,7 @@ describe('host compiler', () => {
 
     const packageFile = resolve(root, 'package.json')
     const manifest: unknown = JSON.parse(await readFile(packageFile, 'utf8'))
-    if (
-      typeof manifest !== 'object' ||
-      manifest === null ||
-      Array.isArray(manifest) ||
-      !('peerDependencies' in manifest)
-    ) {
+    if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest) || !('peerDependencies' in manifest)) {
       throw new TypeError('Host fixture package.json has no peerDependencies object.')
     }
     const peerDependencies = manifest.peerDependencies

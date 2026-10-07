@@ -405,12 +405,7 @@ export default defineClient({
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
         ({ openSettingsTarget, t }) => (
-          <SettingsSearchPanel
-            describe={ctx.configForms.describe()}
-            getForm={getForm}
-            openSettingsTarget={openSettingsTarget}
-            t={t}
-          />
+          <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} openSettingsTarget={openSettingsTarget} t={t} />
         ),
       ),
     )

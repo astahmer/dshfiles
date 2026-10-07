@@ -23,9 +23,14 @@ describe('quota continuation message identity', () => {
     expect(continuationIdOf(message({ kind: 'user', rpcId: continuationId }, `${promptFor(continuationId)}\nRun this other instruction.`))).toBeNull()
     expect(continuationIdOf(message({ kind: 'user', rpcId: 'different-request' }))).toBeNull()
     expect(continuationIdOf(message({ kind: 'user' }))).toBeNull()
-    expect(continuationIdOf({
-      content: [{ type: 'text', text: promptFor(continuationId) }, { type: 'text', text: 'extra' }],
-      source: { kind: 'schedule' },
-    })).toBeNull()
+    expect(
+      continuationIdOf({
+        content: [
+          { type: 'text', text: promptFor(continuationId) },
+          { type: 'text', text: 'extra' },
+        ],
+        source: { kind: 'schedule' },
+      }),
+    ).toBeNull()
   })
 })

@@ -17,26 +17,58 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
   ),
 )
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { icon?: ReactNode }>(({ icon: _icon, ...rest }, ref) => <input ref={ref} {...rest} />)
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { icon?: ReactNode }>(({ icon: _icon, ...rest }, ref) => (
+  <input ref={ref} {...rest} />
+))
 
-export const Checkbox = (props: { checked: boolean; onChange: (next: boolean) => void; label: string; disabled?: boolean; title?: string | undefined }): JSX.Element => (
+export const Checkbox = (props: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+  disabled?: boolean
+  title?: string | undefined
+}): JSX.Element => (
   <label title={props.title}>
     <input checked={props.checked} disabled={props.disabled} onChange={event => props.onChange(event.currentTarget.checked)} type="checkbox" />
     {props.label}
   </label>
 )
 
-export const Switch = (props: { checked: boolean; onChange: (next: boolean) => void; label: string; disabled?: boolean; title?: string | undefined }): JSX.Element => (
-  <button aria-checked={props.checked} aria-label={props.label} disabled={props.disabled} onClick={() => props.onChange(!props.checked)} role="switch" title={props.title} type="button" />
+export const Switch = (props: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+  disabled?: boolean
+  title?: string | undefined
+}): JSX.Element => (
+  <button
+    aria-checked={props.checked}
+    aria-label={props.label}
+    disabled={props.disabled}
+    onClick={() => props.onChange(!props.checked)}
+    role="switch"
+    title={props.title}
+    type="button"
+  />
 )
 
-export const Tag = (props: { tone?: string; className?: string | undefined; children?: ReactNode }): JSX.Element => <span data-tone={props.tone}>{props.children}</span>
+export const Tag = (props: { tone?: string; className?: string | undefined; children?: ReactNode }): JSX.Element => (
+  <span data-tone={props.tone}>{props.children}</span>
+)
 
 export const StateDot = (props: { state: string }): JSX.Element => <span aria-hidden data-state={props.state} />
 
 export const Tooltip = (props: { content?: ReactNode; label?: ReactNode; children?: ReactNode }): JSX.Element => <>{props.children}</>
 
-export const Modal = (props: { open: boolean; onClose: () => void; title: string; description?: string; children?: ReactNode; footer?: ReactNode; closeLabel?: string }): JSX.Element | null =>
+export const Modal = (props: {
+  open: boolean
+  onClose: () => void
+  title: string
+  description?: string
+  children?: ReactNode
+  footer?: ReactNode
+  closeLabel?: string
+}): JSX.Element | null =>
   props.open ? (
     <div aria-label={props.title} aria-modal="true" role="dialog">
       <h2>{props.title}</h2>

@@ -94,7 +94,8 @@ export const buildMutationArgv = (action: Mutation): readonly string[] => {
       }
       return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
     case 'workspace-add':
-      if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name and visible revision.')
+      if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success)
+        throw new Error('Choose a valid workspace name and visible revision.')
       return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
   }
 }

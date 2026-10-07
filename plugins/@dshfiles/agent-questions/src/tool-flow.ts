@@ -17,7 +17,7 @@ export const askParentQuestion = async (input: {
     agent: input.agent,
     operationId: input.operationId,
     question: input.question,
-    ...input.context === undefined ? {} : { context: input.context },
+    ...(input.context === undefined ? {} : { context: input.context }),
     options: input.options,
     recommendedOptionId: input.recommendedOptionId,
     expiryBehavior: input.expiryBehavior,
@@ -32,19 +32,21 @@ export const reattachParentQuestion = (input: {
   readonly agent: ParentQuestionAgent
   readonly questionId: string
   readonly signal: AbortSignal
-}): Promise<ParentQuestionOutcome> => input.service.wait({
-  agent: input.agent,
-  questionId: input.questionId,
-  signal: input.signal,
-})
+}): Promise<ParentQuestionOutcome> =>
+  input.service.wait({
+    agent: input.agent,
+    questionId: input.questionId,
+    signal: input.signal,
+  })
 
 export const answerParentQuestion = (input: {
   readonly service: ParentQuestionService
   readonly agent: ParentQuestionAgent
   readonly questionId: string
   readonly answer: string
-}): Promise<ParentQuestionOutcome> => input.service.answer({
-  agent: input.agent,
-  questionId: input.questionId,
-  answer: input.answer,
-})
+}): Promise<ParentQuestionOutcome> =>
+  input.service.answer({
+    agent: input.agent,
+    questionId: input.questionId,
+    answer: input.answer,
+  })

@@ -42,13 +42,7 @@ const createScheduleFixture = (now: () => number) => {
       const afterSeconds = request.after_seconds
       if (afterSeconds === undefined) throw new Error('Quota recovery must use a relative one-shot schedule.')
       requests.push(request)
-      const record = createAfterScheduleRecord(
-        ScheduleId(`quota-${++nextId}`),
-        request.prompt,
-        afterSeconds,
-        now(),
-        request.title,
-      )
+      const record = createAfterScheduleRecord(ScheduleId(`quota-${++nextId}`), request.prompt, afterSeconds, now(), request.title)
       rows.set(sessionId, [...(rows.get(sessionId) ?? []), record])
       return record
     },
@@ -117,13 +111,15 @@ describe('quota continuation service', () => {
       const recovered = await secondService.list()
       expect(recovered).toMatchObject({
         scheduleAvailable: true,
-        continuations: [{
-          continuationId: record.continuationId,
-          state: 'waiting',
-          resetAt,
-          snoozedUntil: now() + 3_600_000,
-          scheduled: true,
-        }],
+        continuations: [
+          {
+            continuationId: record.continuationId,
+            state: 'waiting',
+            resetAt,
+            snoozedUntil: now() + 3_600_000,
+            scheduled: true,
+          },
+        ],
       })
       expect(scheduler.requests).toHaveLength(3)
       expect(scheduler.requests[2]?.after_seconds).toBe(3_600)
@@ -197,11 +193,9 @@ describe('quota continuation service', () => {
     let service: ReturnType<typeof createQuotaContinuationService> | undefined
 
     try {
-      session.append(
-        'user/message',
-        createUserMessage({ content: [{ type: 'text', text: 'the request that hit quota' }], source: { kind: 'user' } }),
-        { surfaceOp: 'append' },
-      )
+      session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'the request that hit quota' }], source: { kind: 'user' } }), {
+        surfaceOp: 'append',
+      })
       context = await openContext(root)
       service = createQuotaContinuationService({
         context,
@@ -219,11 +213,9 @@ describe('quota continuation service', () => {
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')
 
-      session.append(
-        'user/message',
-        createUserMessage({ content: [{ type: 'text', text: 'a newer request' }], source: { kind: 'user' } }),
-        { surfaceOp: 'append' },
-      )
+      session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'a newer request' }], source: { kind: 'user' } }), {
+        surfaceOp: 'append',
+      })
 
       await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: false })
       expect(prompts).toHaveLength(0)

@@ -64,7 +64,11 @@ const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.El
             <strong>{window.percentRemaining}% left</strong>
           </div>
           <div className={styles.quotaTrack}>
-            <span className={styles.quotaFill} data-tone={quotaTone(window.percentRemaining)} style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }} />
+            <span
+              className={styles.quotaFill}
+              data-tone={quotaTone(window.percentRemaining)}
+              style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
+            />
           </div>
           {formatReset(window.resetsAt) === null ? null : <small>{formatReset(window.resetsAt)}</small>}
         </div>
@@ -80,7 +84,13 @@ const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.El
 }
 
 /** One numbered section, the shape the reference page numbers 01–05. */
-const NumberedSection = (props: { readonly index: string; readonly title: string; readonly description?: string; readonly actions?: ReactNode; readonly children: ReactNode }): JSX.Element => (
+const NumberedSection = (props: {
+  readonly index: string
+  readonly title: string
+  readonly description?: string
+  readonly actions?: ReactNode
+  readonly children: ReactNode
+}): JSX.Element => (
   <Section
     actions={props.actions}
     className={styles.section}
@@ -206,7 +216,8 @@ export const AccountEditor = (props: {
   }
 
   const kicker = draft.kind === 'opencode-go' ? 'OPENCODE SUBSCRIPTION' : draft.kind === 'commandcode' ? 'COMMAND CODE' : 'CHATGPT SUBSCRIPTION'
-  const launchCommand = draft.kind === 'codex' && draft.shadowHomePath.trim() !== '' ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex` : null
+  const launchCommand =
+    draft.kind === 'codex' && draft.shadowHomePath.trim() !== '' ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex` : null
   const enabled = persistEnabled.isPending ? persistEnabled.variables : draft.enabled
   const enabledLabel = enabled ? 'Enabled in model picker' : 'Hidden from model picker'
 
@@ -248,13 +259,18 @@ export const AccountEditor = (props: {
           >
             <div className={styles.fieldGrid}>
               <form.AppField name="instanceId">{field => <field.TextField description={ROUTE_SLUG_HINT} label="Route slug" required />}</form.AppField>
-              <form.AppField name="displayName">{field => <field.TextField label="Display name" placeholder={KIND_LABEL[draft.kind]} required />}</form.AppField>
+              <form.AppField name="displayName">
+                {field => <field.TextField label="Display name" placeholder={KIND_LABEL[draft.kind]} required />}
+              </form.AppField>
               <Field label="Signed-in identity">
                 {control => (
                   <Input
                     {...control}
                     readOnly
-                    value={props.account.identity ?? (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)}
+                    value={
+                      props.account.identity ??
+                      (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+                    }
                   />
                 )}
               </Field>
@@ -358,7 +374,14 @@ export const AccountEditor = (props: {
 
           <NumberedSection
             actions={
-              <Button disabled={catalog.isFetching} icon={<IconRefreshOutlineRegular />} onClick={() => void catalog.refetch()} size="sm" type="button" variant="outline">
+              <Button
+                disabled={catalog.isFetching}
+                icon={<IconRefreshOutlineRegular />}
+                onClick={() => void catalog.refetch()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
                 {catalog.isFetching ? 'Checking…' : 'Check now'}
               </Button>
             }
@@ -406,7 +429,13 @@ export const AccountEditor = (props: {
           <NumberedSection
             actions={
               props.account.signedIn ? undefined : (
-                <Button icon={<IconCopyOutlineRegular />} onClick={() => void copy(props.account.loginHint, 'Sign-in command copied.')} size="sm" type="button" variant="outline">
+                <Button
+                  icon={<IconCopyOutlineRegular />}
+                  onClick={() => void copy(props.account.loginHint, 'Sign-in command copied.')}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
                   Copy sign-in command
                 </Button>
               )

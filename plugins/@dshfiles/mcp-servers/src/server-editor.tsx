@@ -52,7 +52,9 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
           {([transport, localStart]) =>
             transport === 'streamable-http' ? (
               <>
-                <form.AppField name="url">{field => <field.TextField label={t('endpoint')} placeholder="https://example.com/mcp" required type="url" />}</form.AppField>
+                <form.AppField name="url">
+                  {field => <field.TextField label={t('endpoint')} placeholder="https://example.com/mcp" required type="url" />}
+                </form.AppField>
                 <div className={styles.wide}>
                   <form.AppField name="headerRefs">
                     {field => <field.TextAreaField label={t('headerRefs')} monospace placeholder={'{\n  "Authorization": "FIGMA_TOKEN"\n}'} />}

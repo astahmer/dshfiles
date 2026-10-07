@@ -49,7 +49,13 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
                 const direction = isSortable(column) ? column.getIsSorted() : false
                 const content = header.isPlaceholder ? null : <table.FlexRender header={header} />
                 return (
-                  <th aria-sort={ariaSort(direction)} className={joinClassNames(styles.headerCell, props.cellClassName?.(column.id))} colSpan={header.colSpan} key={header.id} scope="col">
+                  <th
+                    aria-sort={ariaSort(direction)}
+                    className={joinClassNames(styles.headerCell, props.cellClassName?.(column.id))}
+                    colSpan={header.colSpan}
+                    key={header.id}
+                    scope="col"
+                  >
                     {sortable && isSortable(column) ? (
                       <button className={styles.sortButton} onClick={column.getToggleSortingHandler()} type="button">
                         {content}

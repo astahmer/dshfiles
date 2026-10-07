@@ -15,7 +15,11 @@ describe('server editor form', () => {
   })
 
   it('builds the API draft of the active transport only', () => {
-    const values = { ...blankServerForm({ name: 'Remote', endpoint: 'https://example.com/mcp' }), commandLine: '', headerRefs: '{"Authorization":"REMOTE_TOKEN"}' }
+    const values = {
+      ...blankServerForm({ name: 'Remote', endpoint: 'https://example.com/mcp' }),
+      commandLine: '',
+      headerRefs: '{"Authorization":"REMOTE_TOKEN"}',
+    }
     expect(parseServerForm(values)).toEqual({
       success: true,
       draft: {
@@ -34,9 +38,16 @@ describe('server editor form', () => {
   })
 
   it('attributes invalid reference JSON and API schema failures to the field that caused them', () => {
-    const values = { ...blankServerForm({ name: 'Remote', endpoint: 'http://example.com/mcp' }), headerRefs: '{ not json', localStart: true, startCwd: 'relative' }
+    const values = {
+      ...blankServerForm({ name: 'Remote', endpoint: 'http://example.com/mcp' }),
+      headerRefs: '{ not json',
+      localStart: true,
+      startCwd: 'relative',
+    }
     expect(issueFields(values)).toEqual(expect.arrayContaining(['headerRefs', 'url', 'startCommandLine', 'startCwd']))
-    expect(issueFields({ ...blankServerForm({ name: 'Remote', endpoint: 'https://example.com/mcp' }), headerRefs: '{"Authorization": 42}' })).toEqual(['headerRefs'])
+    expect(issueFields({ ...blankServerForm({ name: 'Remote', endpoint: 'https://example.com/mcp' }), headerRefs: '{"Authorization": 42}' })).toEqual([
+      'headerRefs',
+    ])
     expect(serverFormSchema.safeParse(values).error?.issues.map(issue => issue.path[0])).toContain('headerRefs')
   })
 

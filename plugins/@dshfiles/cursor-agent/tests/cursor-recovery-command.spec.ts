@@ -89,10 +89,7 @@ describe('Cursor uncertain-prompt reconciliation command', () => {
 
   it('surfaces an uncertain provider-session creation and offers a fresh-session recovery path', async () => {
     const calls: string[] = []
-    const status = await executeCursorRecoveryCommand(
-      makeInput(`status ${creationReceipt.sessionId}`),
-      makeOperations(calls, creationReceipt),
-    )
+    const status = await executeCursorRecoveryCommand(makeInput(`status ${creationReceipt.sessionId}`), makeOperations(calls, creationReceipt))
     expect(status.kind).toBe('success')
     expect(status.text).toContain(creationReceipt.operationId)
     expect(status.text).toContain('create a new Cursor-bound Session')
@@ -103,18 +100,12 @@ describe('Cursor uncertain-prompt reconciliation command', () => {
     )
     expect(confirm.kind).toBe('error')
     expect(confirm.text).toContain('native session id is unavailable')
-    expect(calls).toEqual([
-      `read:${creationReceipt.sessionId}:unbound`,
-      `read:${creationReceipt.sessionId}:unbound`,
-    ])
+    expect(calls).toEqual([`read:${creationReceipt.sessionId}:unbound`, `read:${creationReceipt.sessionId}:unbound`])
   })
 
   it('reports a failed target Session receipt from a separate working Session', async () => {
     const calls: string[] = []
-    const result = await executeCursorRecoveryCommand(
-      makeInput(`status ${pendingReceipt.sessionId}`),
-      makeOperations(calls),
-    )
+    const result = await executeCursorRecoveryCommand(makeInput(`status ${pendingReceipt.sessionId}`), makeOperations(calls))
 
     expect(result.kind).toBe('success')
     expect(result.text).toContain(pendingReceipt.operation.id)
@@ -130,14 +121,20 @@ describe('Cursor uncertain-prompt reconciliation command', () => {
       kind: 'error',
     })
     await expect(
-      executeCursorRecoveryCommand(makeInput(`status ${pendingReceipt.sessionId}`, {
-        resolveTarget: () => ({ kind: 'initializing' }),
-      }), operations),
+      executeCursorRecoveryCommand(
+        makeInput(`status ${pendingReceipt.sessionId}`, {
+          resolveTarget: () => ({ kind: 'initializing' }),
+        }),
+        operations,
+      ),
     ).resolves.toMatchObject({ kind: 'error' })
     await expect(
-      executeCursorRecoveryCommand(makeInput(`status ${pendingReceipt.sessionId}`, {
-        resolveTarget: () => makeLiveTarget(calls, { driverKind: 'native', instanceId: 'work' }),
-      }), operations),
+      executeCursorRecoveryCommand(
+        makeInput(`status ${pendingReceipt.sessionId}`, {
+          resolveTarget: () => makeLiveTarget(calls, { driverKind: 'native', instanceId: 'work' }),
+        }),
+        operations,
+      ),
     ).resolves.toMatchObject({ kind: 'error' })
     expect(calls).toEqual([])
   })
@@ -191,10 +188,7 @@ describe('Cursor uncertain-prompt reconciliation command', () => {
   it('does not nest maintenance when the target is the invoking Session', async () => {
     const calls: string[] = []
     const target = { ...makeLiveTarget(calls), sessionId: 'working-session' }
-    const result = await executeCursorRecoveryCommand(
-      makeInput(`status ${target.sessionId}`, { resolveTarget: () => target }),
-      makeOperations(calls),
-    )
+    const result = await executeCursorRecoveryCommand(makeInput(`status ${target.sessionId}`, { resolveTarget: () => target }), makeOperations(calls))
 
     expect(result.kind).toBe('success')
     expect(calls).toEqual(['read:working-session:work'])
@@ -226,17 +220,19 @@ describe('Cursor uncertain-prompt reconciliation command', () => {
   it('does not reconcile after command cancellation during the source flush', async () => {
     const calls: string[] = []
     const controller = new AbortController()
-    await expect(executeCursorRecoveryCommand(
-      makeInput(`confirm ${pendingReceipt.sessionId} ${pendingReceipt.operation.id} verified`, {
-        commandSignal: controller.signal,
-        flushSourceSession: async () => {
-          calls.push('flush')
-          controller.abort()
-          return true
-        },
-      }),
-      makeOperations(calls),
-    )).rejects.toThrow()
+    await expect(
+      executeCursorRecoveryCommand(
+        makeInput(`confirm ${pendingReceipt.sessionId} ${pendingReceipt.operation.id} verified`, {
+          commandSignal: controller.signal,
+          flushSourceSession: async () => {
+            calls.push('flush')
+            controller.abort()
+            return true
+          },
+        }),
+        makeOperations(calls),
+      ),
+    ).rejects.toThrow()
 
     expect(calls).toEqual([`read:${pendingReceipt.sessionId}:unbound`, 'flush'])
   })

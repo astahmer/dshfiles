@@ -80,7 +80,15 @@ const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   const label = revealLabel(actions.revealed, row)
   return (
     <div className={styles.actions}>
-      <Button aria-label={`${label} ${row.alias}`} disabled={disabled} onClick={() => actions.onReveal(row)} size="sm" title={title} type="button" variant="outline">
+      <Button
+        aria-label={`${label} ${row.alias}`}
+        disabled={disabled}
+        onClick={() => actions.onReveal(row)}
+        size="sm"
+        title={title}
+        type="button"
+        variant="outline"
+      >
         {label}
       </Button>
       <Button aria-label={`Copy ${row.alias}`} disabled={disabled} onClick={() => actions.onCopy(row)} size="sm" title={title} type="button" variant="outline">

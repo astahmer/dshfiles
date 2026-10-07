@@ -7,16 +7,8 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { describe, expect, it } from 'vitest'
-import {
-  createParentQuestionService,
-  type ParentQuestionAgent,
-  type ParentQuestionRuntime,
-} from './service.js'
-import {
-  createParentFeedbackService,
-  type ParentFeedbackAgent,
-  type ParentFeedbackRuntime,
-} from './revisioned-feedback.js'
+import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
+import { createParentFeedbackService, type ParentFeedbackAgent, type ParentFeedbackRuntime } from './revisioned-feedback.js'
 import { parentQuestionDomain, parentQuestionRecordSchema } from './store.js'
 
 const parent: ParentQuestionAgent = { id: 'root-session' }
@@ -31,7 +23,7 @@ const createRuntime = () => {
   ])
   const runtime: ParentQuestionRuntime = {
     isLive: agent => liveAgents.get(agent.id) === agent,
-    parentSessionId: childId => childId === liveChild.id ? liveParent.id : undefined,
+    parentSessionId: childId => (childId === liveChild.id ? liveParent.id : undefined),
     isDirectChild: (childId, parentId) => childId === liveChild.id && parentId === liveParent.id,
     sendToParent: async ({ record, signal }) => {
       signal.throwIfAborted()
@@ -98,11 +90,8 @@ const openVersionTwoQuestionStorage = async (root: string) => {
   return { context, domain, table: domain.table('questions') }
 }
 
-const createService = (
-  table: Awaited<ReturnType<typeof openQuestionStorage>>['table'],
-  runtime: ParentQuestionRuntime,
-  now: () => number = Date.now,
-) => createParentQuestionService({ table: async () => table, runtime, now })
+const createService = (table: Awaited<ReturnType<typeof openQuestionStorage>>['table'], runtime: ParentQuestionRuntime, now: () => number = Date.now) =>
+  createParentQuestionService({ table: async () => table, runtime, now })
 
 describe('parent question JSON storage', () => {
   it('keeps a pending question answerable across Host shutdown and durable reopen', async () => {
@@ -140,8 +129,7 @@ describe('parent question JSON storage', () => {
       await setImmediate()
       await firstService.close()
       await expect(waiting).resolves.toEqual({ kind: 'interrupted', questionId: receipt.questionId })
-      expect([...first.table.entries()].find(([, record]) => record.questionId === receipt.questionId)?.[1].status)
-        .toBe('pending')
+      expect([...first.table.entries()].find(([, record]) => record.questionId === receipt.questionId)?.[1].status).toBe('pending')
       await first.domain.close()
       await first.context.fiber.dispose()
       first = undefined
@@ -265,10 +253,7 @@ describe('parent question JSON storage', () => {
 
       current = await openQuestionStorage(root)
       expect(current.feedbackTable.size).toBe(0)
-      expect([...current.table.entries()]).toMatchObject([[
-        'version-two-question',
-        { questionId: '00000000-0000-4000-8000-000000000002', status: 'pending' },
-      ]])
+      expect([...current.table.entries()]).toMatchObject([['version-two-question', { questionId: '00000000-0000-4000-8000-000000000002', status: 'pending' }]])
     } finally {
       await current?.domain.close()
       await current?.context.fiber.dispose()
@@ -350,12 +335,9 @@ describe('parent question JSON storage', () => {
     const liveAgents = new Set([parentAgent, childAgent])
     const runtime: ParentFeedbackRuntime = {
       isLive: agent => liveAgents.has(agent),
-      parentSessionId: childSessionId => childSessionId === childAgent.id ? parentAgent.id : undefined,
+      parentSessionId: childSessionId => (childSessionId === childAgent.id ? parentAgent.id : undefined),
       isDirectChild: (childSessionId, parentSessionId) =>
-        childSessionId === childAgent.id
-        && parentSessionId === parentAgent.id
-        && liveAgents.has(parentAgent)
-        && liveAgents.has(childAgent),
+        childSessionId === childAgent.id && parentSessionId === parentAgent.id && liveAgents.has(parentAgent) && liveAgents.has(childAgent),
       currentRevision: async () => revision,
       sendToParent: async ({ record }) => `parent-message-${record.feedbackId}`,
       sendToChild: async ({ parentSessionId, childSessionId }) => {

@@ -83,8 +83,7 @@ export const accountsHostApi = aiAccountsApi.host({
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
   resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
-  snoozeQuotaContinuation: async ({ input, ctx }) =>
-    quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
+  snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 
 /**

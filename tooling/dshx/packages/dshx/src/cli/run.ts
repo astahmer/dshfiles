@@ -1196,9 +1196,10 @@ async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project
     })
     return 1
   }
-  const activationMessage = result.failures.length > 0
-    ? `The Web UI booted with ${String(result.failures.length)} client entry/entries that failed to activate.`
-    : 'The Web UI did not confirm the expected Client entry as activated.'
+  const activationMessage =
+    result.failures.length > 0
+      ? `The Web UI booted with ${String(result.failures.length)} client entry/entries that failed to activate.`
+      : 'The Web UI did not confirm the expected Client entry as activated.'
   printDiagnostic(io, {
     code: 'DSHX4111',
     severity: 'error',

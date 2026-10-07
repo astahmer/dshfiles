@@ -37,12 +37,13 @@ export interface CursorRecoveryInput {
   readonly resolveTarget: (sessionId: string) => CursorRecoveryTarget
 }
 
-const receiptLine = (receipt: CursorRecoveryReceipt): string => receipt.kind === 'creation'
-  ? `Session ${receipt.sessionId} (instance ${receipt.instanceId}), uncertain provider-session creation, receipt ${receipt.operationId}`
-  : `Session ${receipt.sessionId} (instance ${receipt.instanceId}), turn ${receipt.operation.turn}, step ${receipt.operation.step}, receipt ${receipt.operation.id}`
+const receiptLine = (receipt: CursorRecoveryReceipt): string =>
+  receipt.kind === 'creation'
+    ? `Session ${receipt.sessionId} (instance ${receipt.instanceId}), uncertain provider-session creation, receipt ${receipt.operationId}`
+    : `Session ${receipt.sessionId} (instance ${receipt.instanceId}), turn ${receipt.operation.turn}, step ${receipt.operation.step}, receipt ${receipt.operation.id}`
 
 const listRecoveryReceipts = async (operations: CursorRecoveryOperations): Promise<CommandResult> => {
-  const receipts = [...await operations.recoveryReceipts()].sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+  const receipts = [...(await operations.recoveryReceipts())].sort((left, right) => left.sessionId.localeCompare(right.sessionId))
   if (receipts.length === 0) return { kind: 'success', text: 'No unsettled Cursor runtime receipts exist.' }
 
   const visible = receipts.slice(0, 20)
@@ -57,10 +58,7 @@ const listRecoveryReceipts = async (operations: CursorRecoveryOperations): Promi
   }
 }
 
-export const executeCursorRecoveryCommand = async (
-  input: CursorRecoveryInput,
-  operations: CursorRecoveryOperations,
-): Promise<CommandResult> => {
+export const executeCursorRecoveryCommand = async (input: CursorRecoveryInput, operations: CursorRecoveryOperations): Promise<CommandResult> => {
   const parsed = inputSchema.safeParse(input.rawInput.trim().split(/\s+/))
   if (!parsed.success) {
     return {
@@ -107,8 +105,14 @@ export const executeCursorRecoveryCommand = async (
 
     if (receipt.kind === 'creation') {
       return isConfirmation
-        ? { kind: 'error', text: 'This Cursor provider-session creation outcome cannot be confirmed safely because its native session id is unavailable. Leave the receipt unchanged and create a new Cursor-bound Session to continue.' }
-        : { kind: 'success', text: `${receiptLine(receipt)}. Its native session id is unavailable, so this Session cannot resume safely; create a new Cursor-bound Session to continue. The receipt remains unchanged.` }
+        ? {
+            kind: 'error',
+            text: 'This Cursor provider-session creation outcome cannot be confirmed safely because its native session id is unavailable. Leave the receipt unchanged and create a new Cursor-bound Session to continue.',
+          }
+        : {
+            kind: 'success',
+            text: `${receiptLine(receipt)}. Its native session id is unavailable, so this Session cannot resume safely; create a new Cursor-bound Session to continue. The receipt remains unchanged.`,
+          }
     }
 
     if (!isConfirmation) {

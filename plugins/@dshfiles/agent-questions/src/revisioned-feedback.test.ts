@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createParentFeedbackService,
-  type ParentFeedbackAgent,
-  type ParentFeedbackRuntime,
-} from './revisioned-feedback.js'
+import { createParentFeedbackService, type ParentFeedbackAgent, type ParentFeedbackRuntime } from './revisioned-feedback.js'
 import type { MarkdownFeedbackAnchor, RevisionedFeedbackRecord, RevisionedFeedbackTable } from './store.js'
 
 const root: ParentFeedbackAgent = { id: 'root-session' }
@@ -54,8 +50,7 @@ const createRuntime = () => {
   const runtime: ParentFeedbackRuntime = {
     isLive: agent => liveAgents.get(agent.id) === agent,
     parentSessionId: childId => parentByChild.get(childId),
-    isDirectChild: (childId, parentId) =>
-      liveAgents.has(childId) && liveAgents.has(parentId) && parentByChild.get(childId) === parentId,
+    isDirectChild: (childId, parentId) => liveAgents.has(childId) && liveAgents.has(parentId) && parentByChild.get(childId) === parentId,
     currentRevision: async ({ childSessionId, path }) => revisions.get(keyFor(childSessionId, path)) ?? null,
     sendToParent: async ({ record, signal }) => {
       signal.throwIfAborted()
@@ -94,18 +89,22 @@ const anchorFor = (revision = firstRevision): MarkdownFeedbackAnchor => ({
 const makeService = (table: RevisionedFeedbackTable, runtime: ParentFeedbackRuntime) =>
   createParentFeedbackService({ table: async () => table, runtime, now: () => 1_000 })
 
-const submit = (service: ReturnType<typeof makeService>, input: {
-  readonly agent?: ParentFeedbackAgent
-  readonly operationId?: string
-  readonly anchor?: MarkdownFeedbackAnchor
-  readonly comment?: string
-}) => service.submit({
-  agent: input.agent ?? firstChild,
-  operationId: input.operationId ?? 'call-1',
-  anchor: input.anchor ?? anchorFor(),
-  comment: input.comment ?? 'Clarify the recovery behavior.',
-  signal: new AbortController().signal,
-})
+const submit = (
+  service: ReturnType<typeof makeService>,
+  input: {
+    readonly agent?: ParentFeedbackAgent
+    readonly operationId?: string
+    readonly anchor?: MarkdownFeedbackAnchor
+    readonly comment?: string
+  },
+) =>
+  service.submit({
+    agent: input.agent ?? firstChild,
+    operationId: input.operationId ?? 'call-1',
+    anchor: input.anchor ?? anchorFor(),
+    comment: input.comment ?? 'Clarify the recovery behavior.',
+    signal: new AbortController().signal,
+  })
 
 const answerMany = (
   service: ReturnType<typeof makeService>,
@@ -141,8 +140,8 @@ describe('revisioned Markdown feedback', () => {
     runtime.setRevision(secondChild.id, 'docs/guide.md', changedRevision)
 
     const results = await answerMany(service, root, [
-        { feedbackId: current.feedbackId, disposition: 'accepted', note: 'Apply after review.' },
-        { feedbackId: stale.feedbackId, disposition: 'accepted', note: 'Apply after review.' },
+      { feedbackId: current.feedbackId, disposition: 'accepted', note: 'Apply after review.' },
+      { feedbackId: stale.feedbackId, disposition: 'accepted', note: 'Apply after review.' },
     ])
 
     expect(results).toEqual([
@@ -188,10 +187,7 @@ describe('revisioned Markdown feedback', () => {
     const record = await submit(service, {})
     const response = [{ feedbackId: record.feedbackId, disposition: 'accepted' as const }]
 
-    const results = await Promise.all([
-      answerMany(service, root, response),
-      answerMany(service, root, response),
-    ])
+    const results = await Promise.all([answerMany(service, root, response), answerMany(service, root, response)])
 
     expect(results.flat()).toEqual([
       { feedbackId: record.feedbackId, status: 'resolved', notified: true },
@@ -205,12 +201,14 @@ describe('revisioned Markdown feedback', () => {
     const runtime = createRuntime()
     runtime.setRevision(firstChild.id, 'docs/guide.md', firstRevision)
     const service = makeService(table, runtime.runtime)
-    const records = await Promise.all(Array.from({ length: 21 }, (_, index) =>
-      submit(service, { operationId: `batch-${index}` })))
-    const responses = records.map(record => ({
-      feedbackId: record.feedbackId,
-      disposition: 'accepted',
-    } satisfies { feedbackId: string; disposition: 'accepted' }))
+    const records = await Promise.all(Array.from({ length: 21 }, (_, index) => submit(service, { operationId: `batch-${index}` })))
+    const responses = records.map(
+      record =>
+        ({
+          feedbackId: record.feedbackId,
+          disposition: 'accepted',
+        }) satisfies { feedbackId: string; disposition: 'accepted' },
+    )
 
     await expect(answerMany(service, root, responses)).rejects.toThrow()
     expect(Array.from(table.entries()).every(([, record]) => record.status === 'pending')).toBe(true)
@@ -234,8 +232,11 @@ describe('revisioned Markdown feedback', () => {
 
     expect(result).toEqual([{ feedbackId: record.feedbackId, status: 'resolved', notified: true }])
     runtime.resumeAgent(firstChild)
-    expect((await resumedService.read({ agent: firstChild, feedbackId: record.feedbackId })).resolutionReceipt)
-      .toMatchObject({ disposition: 'deferred', baseRevision: firstRevision, observedRevision: firstRevision })
+    expect((await resumedService.read({ agent: firstChild, feedbackId: record.feedbackId })).resolutionReceipt).toMatchObject({
+      disposition: 'deferred',
+      baseRevision: firstRevision,
+      observedRevision: firstRevision,
+    })
   })
 
   it('rejects a changed document before admission and a conflicting late resolution', async () => {
@@ -260,14 +261,11 @@ describe('revisioned Markdown feedback', () => {
     const service = makeService(table, runtime.runtime)
     const record = await submit(service, {})
 
-    const unauthorized = await answerMany(service, unrelatedAgent, [
-      { feedbackId: record.feedbackId, disposition: 'accepted' },
-    ])
+    const unauthorized = await answerMany(service, unrelatedAgent, [{ feedbackId: record.feedbackId, disposition: 'accepted' }])
     expect(unauthorized).toEqual([{ feedbackId: record.feedbackId, status: 'rejected', notified: false }])
 
     const cancelled = await service.cancel({ agent: firstChild, feedbackId: record.feedbackId })
     expect(cancelled.status).toBe('cancelled')
-    expect((await answerMany(service, root, [{ feedbackId: record.feedbackId, disposition: 'accepted' }]))[0]?.status)
-      .toBe('rejected')
+    expect((await answerMany(service, root, [{ feedbackId: record.feedbackId, disposition: 'accepted' }]))[0]?.status).toBe('rejected')
   })
 })

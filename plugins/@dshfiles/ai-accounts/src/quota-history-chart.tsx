@@ -6,7 +6,8 @@ import { quotaHistoryRows } from './usage-history-analysis.js'
 
 const CHART_POINT_LIMIT = 500
 
-const formatAxisTime = (value: number): string => new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const formatAxisTime = (value: number): string =>
+  new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 /**
  * Remaining quota over time: one colour per provider window, broken into one
@@ -40,7 +41,12 @@ export const QuotaHistoryChart = (props: {
   if (props.points.length < 2 || rows.length === 0) return <EmptyState compact description={props.emptyMessage} />
   return (
     <ChartFrame className={props.className}>
-      <Chart ariaDescription={`Percent remaining per window: ${windows.join(', ')}.`} ariaLabel={props.ariaLabel} definition={definition} height={props.height} />
+      <Chart
+        ariaDescription={`Percent remaining per window: ${windows.join(', ')}.`}
+        ariaLabel={props.ariaLabel}
+        definition={definition}
+        height={props.height}
+      />
     </ChartFrame>
   )
 }

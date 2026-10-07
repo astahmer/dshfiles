@@ -62,20 +62,20 @@ const application = agent({ name: 'dsh-cursor-acp-fixture' })
     if (existsSync(responseGatePath)) recordEvent('response-gated')
     while (existsSync(responseGatePath)) await new Promise(resolveDelay => setTimeout(resolveDelay, 10))
     recordEvent('response-ready')
-    await client.notify(methods.client.session.update, {
-      sessionId: params.sessionId,
-      update: {
-        sessionUpdate: 'agent_message_chunk',
-        content: { type: 'text', text: `cursor-fixture-response-${promptIndex}` },
-      },
-    }).catch((error) => {
-      const message = error instanceof Error ? error.message.toLowerCase() : ''
-      const failure = message.includes('closed')
-        ? 'closed'
-        : message.includes('write') ? 'write-failed' : 'unknown'
-      recordEvent(`response-notification-failed:${failure}`)
-      throw new Error('Scratch Cursor fixture could not notify its client.')
-    })
+    await client
+      .notify(methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: {
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: `cursor-fixture-response-${promptIndex}` },
+        },
+      })
+      .catch(error => {
+        const message = error instanceof Error ? error.message.toLowerCase() : ''
+        const failure = message.includes('closed') ? 'closed' : message.includes('write') ? 'write-failed' : 'unknown'
+        recordEvent(`response-notification-failed:${failure}`)
+        throw new Error('Scratch Cursor fixture could not notify its client.')
+      })
     recordEvent('response-notified')
     recordEvent('response')
     return { stopReason: 'end_turn' }
@@ -84,8 +84,6 @@ const application = agent({ name: 'dsh-cursor-acp-fixture' })
     recordEvent('cancel')
   })
 
-const connection = application.connect(
-  ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin)),
-)
+const connection = application.connect(ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin)))
 
 await connection.closed

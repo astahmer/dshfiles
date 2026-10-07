@@ -11,7 +11,12 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-schedule'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-workspace'
-import { quotaContinuationDomain, type QuotaContinuationRecord, type QuotaContinuationSummary, type QuotaContinuationTable } from './quota-continuation-store.js'
+import {
+  quotaContinuationDomain,
+  type QuotaContinuationRecord,
+  type QuotaContinuationSummary,
+  type QuotaContinuationTable,
+} from './quota-continuation-store.js'
 import { continuationIdOf, promptFor, userActivityForMessage, type UserActivityIdentity } from './quota-continuation-message.js'
 
 const MAX_CONTINUATIONS = 500
@@ -67,8 +72,7 @@ declare module '@deepseek-ai/dsh-workspace/types' {
   }
 }
 
-const isReady = (record: QuotaContinuationRecord, now: number): boolean =>
-  record.resetAt !== null && Math.max(record.resetAt, record.snoozedUntil ?? 0) <= now
+const isReady = (record: QuotaContinuationRecord, now: number): boolean => record.resetAt !== null && Math.max(record.resetAt, record.snoozedUntil ?? 0) <= now
 
 const isActive = (record: QuotaContinuationRecord): boolean => record.state === 'waiting' || record.state === 'queued'
 
@@ -87,8 +91,7 @@ const collectUserActivities = <Event extends { readonly seq: number }>(
 const hasNewerUserWork = (record: QuotaContinuationRecord, activities: readonly SessionUserActivity[]): boolean =>
   activities.some(activity => activity.seq >= record.failedSeq && activity.continuationId !== record.continuationId)
 
-const snoozeUntil = (duration: SnoozeDuration, now: number): number | null =>
-  duration === 'unsnooze' ? null : now + SNOOZE_MS[duration]
+const snoozeUntil = (duration: SnoozeDuration, now: number): number | null => (duration === 'unsnooze' ? null : now + SNOOZE_MS[duration])
 
 const requestIdFor = (continuationId: string): SessionRequestId => {
   // SessionRequestId is a type-only opaque brand; the persisted UUID is its stable identity.
@@ -175,9 +178,7 @@ const createQuotaContinuationService = ({
       const matches = await scheduleMatches(record)
       const ids = new Set(matches.map(task => task.id))
       if (record.scheduleId !== null) ids.add(scheduleIdFor(record.scheduleId))
-      await Promise.all(
-        [...ids].map(id => scheduler.delete({ sessionId: SessionId(record.sessionId), id })),
-      )
+      await Promise.all([...ids].map(id => scheduler.delete({ sessionId: SessionId(record.sessionId), id })))
     } catch {
       context.logger.warn('ai-accounts: could not remove a stale quota recovery schedule')
     }
@@ -193,9 +194,7 @@ const createQuotaContinuationService = ({
       if (existing !== undefined) {
         await Promise.all(matches.slice(1).map(task => scheduler.delete({ sessionId: SessionId(record.sessionId), id: task.id })))
         const storage = await table()
-        await storage.update(record.continuationId, current =>
-          current.state === 'waiting' ? { ...current, scheduleId: existing.id } : current,
-        )
+        await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: existing.id } : current))
         return
       }
 
@@ -207,9 +206,7 @@ const createQuotaContinuationService = ({
         after_seconds: afterSeconds,
       })
       const storage = await table()
-      await storage.update(record.continuationId, current =>
-        current.state === 'waiting' ? { ...current, scheduleId: created.id } : current,
-      )
+      await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: created.id } : current))
       const current = storage.get(record.continuationId)
       if (current?.state !== 'waiting') await scheduler.delete({ sessionId: SessionId(record.sessionId), id: created.id })
     } catch {
@@ -249,9 +246,7 @@ const createQuotaContinuationService = ({
     await serialize(sessionId, async () => {
       const records = await activeForSession(sessionId)
       const events = agent.session.ownEvents()
-      const activities = collectUserActivities(events, event =>
-        event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
-      )
+      const activities = collectUserActivities(events, event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined))
       for (const record of records) {
         if (hasNewerUserWork(record, activities) || isQueuedExternalWork(agent)) {
           await invalidate(record)
@@ -261,22 +256,14 @@ const createQuotaContinuationService = ({
           continue
         }
 
-        const pending = [...agent.inbox.nextTurn, ...agent.inbox.nextStep].filter(
-          message => continuationIdOf(message) === record.continuationId,
-        )
+        const pending = [...agent.inbox.nextTurn, ...agent.inbox.nextStep].filter(message => continuationIdOf(message) === record.continuationId)
         for (const message of pending) {
           if (record.queueSource === 'manual' && String(message.source.kind) === 'schedule') agent.inbox.remove(message.id)
         }
-        const continuationInInbox = pending.some(
-          message => !(record.queueSource === 'manual' && String(message.source.kind) === 'schedule'),
-        )
-        const continuationInHistory = activities.find(
-          activity => activity.seq >= record.failedSeq && activity.continuationId === record.continuationId,
-        )
+        const continuationInInbox = pending.some(message => !(record.queueSource === 'manual' && String(message.source.kind) === 'schedule'))
+        const continuationInHistory = activities.find(activity => activity.seq >= record.failedSeq && activity.continuationId === record.continuationId)
         if (continuationInInbox) {
-          const queuedMessage = pending.find(
-            message => !(record.queueSource === 'manual' && String(message.source.kind) === 'schedule'),
-          )
+          const queuedMessage = pending.find(message => !(record.queueSource === 'manual' && String(message.source.kind) === 'schedule'))
           const storage = await table()
           await storage.update(record.continuationId, current =>
             isActive(current)
@@ -373,8 +360,7 @@ const createQuotaContinuationService = ({
     if (originalIds.size === 0) return decision
 
     const kept: AgentUserMessage[] = []
-    const competingWork =
-      isQueuedExternalWork(agent) || decision.messages.some(message => continuationIdOf(message) === null)
+    const competingWork = isQueuedExternalWork(agent) || decision.messages.some(message => continuationIdOf(message) === null)
     for (const message of decision.messages) {
       const continuationId = originalIds.get(message.id) ?? continuationIdOf(message)
       if (continuationId === null) {
@@ -444,9 +430,7 @@ const createQuotaContinuationService = ({
       await serialize(agent.id, async () => {
         const storage = await table()
         const nowAtFailure = now()
-        const oldRecords = [...storage.entries()]
-          .map(([, record]) => record)
-          .filter(record => record.sessionId === agent.id && isActive(record))
+        const oldRecords = [...storage.entries()].map(([, record]) => record).filter(record => record.sessionId === agent.id && isActive(record))
         for (const oldRecord of oldRecords) await invalidate(oldRecord)
 
         const records = await allRecords()
@@ -503,9 +487,7 @@ const createQuotaContinuationService = ({
 
       try {
         const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
-        const activities = collectUserActivities(inspected.events, event =>
-          event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
-        )
+        const activities = collectUserActivities(inspected.events, event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined))
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current)
           return { accepted: false }
@@ -609,7 +591,10 @@ const createQuotaContinuationService = ({
     const opening = domainOpening
     if (opening === undefined) return
     try {
-      await opening.then(opened => opened.close(), () => undefined)
+      await opening.then(
+        opened => opened.close(),
+        () => undefined,
+      )
     } finally {
       if (domainOpening === opening) domainOpening = undefined
     }

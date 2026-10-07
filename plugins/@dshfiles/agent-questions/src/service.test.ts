@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createParentQuestionService,
-  type ParentQuestionAgent,
-  type ParentQuestionRuntime,
-} from './service.js'
-import type {
-  ParentQuestionExpiryBehavior,
-  ParentQuestionRecord,
-  ParentQuestionTable,
-} from './store.js'
+import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
+import type { ParentQuestionExpiryBehavior, ParentQuestionRecord, ParentQuestionTable } from './store.js'
 import { answerParentQuestion, askParentQuestion, reattachParentQuestion } from './tool-flow.js'
 
 const createMemoryTable = (): ParentQuestionTable => {
@@ -108,36 +100,38 @@ describe('parent question Host contract', () => {
     const service = makeService(createMemoryTable())
     const input = requestInput({})
 
-    await expect(service.request({ ...input, recommendedOptionId: 'unknown' }))
-      .rejects.toThrow('The recommended option must exist in the question options.')
+    await expect(service.request({ ...input, recommendedOptionId: 'unknown' })).rejects.toThrow('The recommended option must exist in the question options.')
     await service.request(input)
-    await expect(service.request({ ...input, expiryBehavior: 'defer' }))
-      .rejects.toThrow('Question operation id was reused with different input.')
+    await expect(service.request({ ...input, expiryBehavior: 'defer' })).rejects.toThrow('Question operation id was reused with different input.')
     await service.close()
   })
 
   it('isolates concurrent child answers by question id', async () => {
     const service = makeService(createMemoryTable())
     const first = await service.request(requestInput({ operationId: 'call-a' }))
-    const second = await service.request(requestInput({
-      agent: secondChild,
-      operationId: 'call-b',
-      question: 'Which validation should I run?',
-    }))
+    const second = await service.request(
+      requestInput({
+        agent: secondChild,
+        operationId: 'call-b',
+        question: 'Which validation should I run?',
+      }),
+    )
     let secondSettled = false
     const firstWait = service.wait({
       agent: firstChild,
       questionId: first.questionId,
       signal: new AbortController().signal,
     })
-    const secondWait = service.wait({
-      agent: secondChild,
-      questionId: second.questionId,
-      signal: new AbortController().signal,
-    }).then(outcome => {
-      secondSettled = true
-      return outcome
-    })
+    const secondWait = service
+      .wait({
+        agent: secondChild,
+        questionId: second.questionId,
+        signal: new AbortController().signal,
+      })
+      .then(outcome => {
+        secondSettled = true
+        return outcome
+      })
 
     const firstAnswer = await service.answer({
       agent: root,
@@ -166,11 +160,13 @@ describe('parent question Host contract', () => {
     const service = makeService(createMemoryTable())
     const request = await service.request(requestInput({}))
 
-    await expect(service.answer({
-      agent: unrelatedAgent,
-      questionId: request.questionId,
-      answer: 'Unauthorized answer.',
-    })).rejects.toThrow('Only the direct parent can answer this question.')
+    await expect(
+      service.answer({
+        agent: unrelatedAgent,
+        questionId: request.questionId,
+        answer: 'Unauthorized answer.',
+      }),
+    ).rejects.toThrow('Only the direct parent can answer this question.')
 
     const answer = await service.answer({
       agent: root,
@@ -194,8 +190,7 @@ describe('parent question Host contract', () => {
 
     expect(fulfilled).toHaveLength(1)
     expect(rejected).toHaveLength(1)
-    expect(rejected[0]?.status === 'rejected' ? rejected[0].reason : undefined)
-      .toMatchObject({ message: 'Parent question already has a different answer.' })
+    expect(rejected[0]?.status === 'rejected' ? rejected[0].reason : undefined).toMatchObject({ message: 'Parent question already has a different answer.' })
     await service.close()
   })
 
@@ -271,11 +266,13 @@ describe('parent question Host contract', () => {
     controller.abort()
 
     expect(await waiting).toEqual({ kind: 'cancelled', questionId: request.questionId })
-    await expect(service.answer({
-      agent: root,
-      questionId: request.questionId,
-      answer: 'Too late.',
-    })).rejects.toThrow('Parent question is cancelled.')
+    await expect(
+      service.answer({
+        agent: root,
+        questionId: request.questionId,
+        answer: 'Too late.',
+      }),
+    ).rejects.toThrow('Parent question is cancelled.')
     await service.close()
   })
 
@@ -328,18 +325,21 @@ describe('parent question Host contract', () => {
     const filePath = 'questions/2026-10-06T10-00-00-000Z_migration.md'
     const recorded = await service.recordDeferredFile({ agent: firstChild, questionId: request.questionId, filePath })
     expect(recorded).toMatchObject({ kind: 'deferred', filePath })
-    await expect(service.recordDeferredFile({ agent: firstChild, questionId: request.questionId, filePath }))
-      .resolves.toEqual(recorded)
-    await expect(service.recordDeferredFile({
-      agent: firstChild,
-      questionId: request.questionId,
-      filePath: 'questions/other-question.md',
-    })).rejects.toThrow('Deferred question already has a different file path.')
-    await expect(service.recordDeferredFile({
-      agent: unrelatedAgent,
-      questionId: request.questionId,
-      filePath,
-    })).rejects.toThrow('Only the requesting direct child can read or cancel this question.')
+    await expect(service.recordDeferredFile({ agent: firstChild, questionId: request.questionId, filePath })).resolves.toEqual(recorded)
+    await expect(
+      service.recordDeferredFile({
+        agent: firstChild,
+        questionId: request.questionId,
+        filePath: 'questions/other-question.md',
+      }),
+    ).rejects.toThrow('Deferred question already has a different file path.')
+    await expect(
+      service.recordDeferredFile({
+        agent: unrelatedAgent,
+        questionId: request.questionId,
+        filePath,
+      }),
+    ).rejects.toThrow('Only the requesting direct child can read or cancel this question.')
     expect(table.entries().next().value?.[1].deferredFilePath).toBe(filePath)
     await service.close()
   })
@@ -347,8 +347,7 @@ describe('parent question Host contract', () => {
   it('rejects calls from an Agent with no live direct parent', async () => {
     const service = makeService(createMemoryTable())
 
-    await expect(service.request(requestInput({ agent: unrelatedAgent })))
-      .rejects.toThrow('A question can only be requested by a live direct subagent.')
+    await expect(service.request(requestInput({ agent: unrelatedAgent }))).rejects.toThrow('A question can only be requested by a live direct subagent.')
     await service.close()
   })
 })

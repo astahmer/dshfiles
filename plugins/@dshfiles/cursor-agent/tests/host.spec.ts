@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Config } from '../src/config.js'
-import {
-  cursorSessionRecordForHumanReconciliation,
-  cursorSessionRecordForResume,
-  cursorSessionRecordSchema,
-} from '../src/cursor-session-store.js'
+import { cursorSessionRecordForHumanReconciliation, cursorSessionRecordForResume, cursorSessionRecordSchema } from '../src/cursor-session-store.js'
 
 describe('Cursor Agent config and recovery records', () => {
   it('defaults to no runtime instances and validates explicit credential aliases', () => {
@@ -140,20 +136,12 @@ describe('Cursor Agent config and recovery records', () => {
     })
     const settled = cursorSessionRecordSchema.parse({ state: 'ready', instanceId: 'work', nativeSessionId: 'provider-owned-id' })
 
-    expect(() => cursorSessionRecordForHumanReconciliation(undefined, 'work', '2fd7516e-73dd-476b-90d6-6075786414db')).toThrow(
-      'record is missing',
-    )
-    expect(() => cursorSessionRecordForHumanReconciliation(record, 'other', operationId)).toThrow(
-      'different runtime instance',
-    )
-    expect(() => cursorSessionRecordForHumanReconciliation(record, 'work', '94548964-a521-1796-be71-7523f35ac5a4')).toThrow(
-      'changed',
-    )
+    expect(() => cursorSessionRecordForHumanReconciliation(undefined, 'work', '2fd7516e-73dd-476b-90d6-6075786414db')).toThrow('record is missing')
+    expect(() => cursorSessionRecordForHumanReconciliation(record, 'other', operationId)).toThrow('different runtime instance')
+    expect(() => cursorSessionRecordForHumanReconciliation(record, 'work', '94548964-a521-1796-be71-7523f35ac5a4')).toThrow('changed')
     expect(() => cursorSessionRecordForHumanReconciliation(creating, 'work', '2fd7516e-73dd-476b-90d6-6075786414db')).toThrow(
       'prompt reconciliation cannot resolve it',
     )
-    expect(() => cursorSessionRecordForHumanReconciliation(settled, 'work', '2fd7516e-73dd-476b-90d6-6075786414db')).toThrow(
-      'no uncertain prompt receipt',
-    )
+    expect(() => cursorSessionRecordForHumanReconciliation(settled, 'work', '2fd7516e-73dd-476b-90d6-6075786414db')).toThrow('no uncertain prompt receipt')
   })
 })

@@ -44,12 +44,7 @@ const safeErrorCode = (cause: unknown): string | null => {
   return code
 }
 
-const reportApiFailure = (
-  operation: ApiDiagnosticOperation,
-  diagnosticId: string,
-  stage: ReceiptStage,
-  cause: unknown,
-): void => {
+const reportApiFailure = (operation: ApiDiagnosticOperation, diagnosticId: string, stage: ReceiptStage, cause: unknown): void => {
   console.error('Project Checks API operation failed', {
     api: 'project-checks',
     operation,
@@ -127,7 +122,10 @@ const closeProjectChecksDomain = async (ctx: Context): Promise<void> => {
   const opening = storageDomains.get(ctx)
   if (opening === undefined) return
   try {
-    await opening.then(domain => domain.close(), () => undefined)
+    await opening.then(
+      domain => domain.close(),
+      () => undefined,
+    )
   } finally {
     if (storageDomains.get(ctx) === opening) storageDomains.delete(ctx)
   }

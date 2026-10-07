@@ -60,7 +60,9 @@ const formFieldForDraftPath = (path: readonly PropertyKey[]): ServerFormField | 
 
 const referencesForPrefix = (server: ServerView, prefix: string): string =>
   JSON.stringify(
-    Object.fromEntries(server.credentialReferences.filter(item => item.target.startsWith(prefix)).map(item => [item.target.slice(prefix.length), item.reference])),
+    Object.fromEntries(
+      server.credentialReferences.filter(item => item.target.startsWith(prefix)).map(item => [item.target.slice(prefix.length), item.reference]),
+    ),
     null,
     2,
   )

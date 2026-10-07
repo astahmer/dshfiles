@@ -81,11 +81,13 @@ const readBoundedMarkdown = async ({ workspacePath, path }: ReadMarkdownDocument
 
 export const captureMarkdownAnchor = async (input: CaptureMarkdownAnchorInput): Promise<MarkdownFeedbackAnchor> => {
   const path = workspaceMarkdownPathSchema.parse(input.path)
-  if (!Number.isSafeInteger(input.startLine)
-    || !Number.isSafeInteger(input.endLine)
-    || input.startLine < 1
-    || input.endLine < input.startLine
-    || input.endLine - input.startLine >= maximumExcerptLines) {
+  if (
+    !Number.isSafeInteger(input.startLine) ||
+    !Number.isSafeInteger(input.endLine) ||
+    input.startLine < 1 ||
+    input.endLine < input.startLine ||
+    input.endLine - input.startLine >= maximumExcerptLines
+  ) {
     throw new Error(`Markdown feedback anchors must cover at most ${maximumExcerptLines} ordered lines.`)
   }
 

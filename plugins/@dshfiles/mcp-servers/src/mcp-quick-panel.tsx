@@ -60,11 +60,7 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
               <span>{t('connectionUnknown')}</span>
             </div>
             <div className={styles.quickActions}>
-              <Button
-                disabled={actions.isPending || isConnectionToggleBlocked(server)}
-                onClick={() => actions.toggleConnection(server)}
-                size="sm"
-              >
+              <Button disabled={actions.isPending || isConnectionToggleBlocked(server)} onClick={() => actions.toggleConnection(server)} size="sm">
                 {isClientActive(server) ? t('disconnect') : t('connect')}
               </Button>
               <Button disabled={actions.isPending} onClick={() => actions.toggleEnabled(server)} size="sm">
@@ -76,7 +72,13 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
       )}
       {snapshot.isError || actions.failed ? <Notice tone="danger">{t('error')}</Notice> : null}
       <div className={styles.quickFooter}>
-        <Button aria-label={t('refresh')} disabled={snapshot.isFetching} icon={<IconRefreshOutlineRegular />} onClick={() => void snapshot.refetch()} size="sm" />
+        <Button
+          aria-label={t('refresh')}
+          disabled={snapshot.isFetching}
+          icon={<IconRefreshOutlineRegular />}
+          onClick={() => void snapshot.refetch()}
+          size="sm"
+        />
         <Button onClick={props.onManage} size="sm">
           {t('manage')}
         </Button>

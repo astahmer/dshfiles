@@ -96,52 +96,25 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                 </span>
                 <span className={styles.continuationMeta}>{resetStatus}</span>
                 <span className={styles.continuationMeta}>{scheduleStatus}</span>
-                {item.snoozedUntil === null ? null : (
-                  <span className={styles.continuationMeta}>Snoozed until {formatTime(item.snoozedUntil)}.</span>
-                )}
+                {item.snoozedUntil === null ? null : <span className={styles.continuationMeta}>Snoozed until {formatTime(item.snoozedUntil)}.</span>}
               </div>
               <div className={styles.continuationActions}>
                 {item.state === 'waiting' ? (
                   <>
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      disabled={busyId !== null}
-                      onClick={() => void resume(item.continuationId)}
-                    >
+                    <button type="button" className={styles.quiet} disabled={busyId !== null} onClick={() => void resume(item.continuationId)}>
                       {busy ? 'Queueing…' : 'Resume now'}
                     </button>
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      disabled={busyId !== null}
-                      onClick={() => void snooze(item.continuationId, 'one-hour')}
-                    >
+                    <button type="button" className={styles.quiet} disabled={busyId !== null} onClick={() => void snooze(item.continuationId, 'one-hour')}>
                       Snooze 1h
                     </button>
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      disabled={busyId !== null}
-                      onClick={() => void snooze(item.continuationId, 'four-hours')}
-                    >
+                    <button type="button" className={styles.quiet} disabled={busyId !== null} onClick={() => void snooze(item.continuationId, 'four-hours')}>
                       Snooze 4h
                     </button>
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      disabled={busyId !== null}
-                      onClick={() => void snooze(item.continuationId, 'one-day')}
-                    >
+                    <button type="button" className={styles.quiet} disabled={busyId !== null} onClick={() => void snooze(item.continuationId, 'one-day')}>
                       Snooze 1 day
                     </button>
                     {item.snoozedUntil === null ? null : (
-                      <button
-                        type="button"
-                        className={styles.quiet}
-                        disabled={busyId !== null}
-                        onClick={() => void snooze(item.continuationId, 'unsnooze')}
-                      >
+                      <button type="button" className={styles.quiet} disabled={busyId !== null} onClick={() => void snooze(item.continuationId, 'unsnooze')}>
                         Unsnooze
                       </button>
                     )}

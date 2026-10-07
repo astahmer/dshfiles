@@ -6,7 +6,8 @@ export const SETTINGS_SEARCH_LOCALE_NAMESPACE = 'dshfiles.settingsSearch'
 const en = {
   sectionLabel: 'Search',
   title: 'Settings Search',
-  searchSubtitle: 'Find a setting by name, description, entry, or section path. Supported entries open in their native Settings section; other results use the live Host-backed editor.',
+  searchSubtitle:
+    'Find a setting by name, description, entry, or section path. Supported entries open in their native Settings section; other results use the live Host-backed editor.',
   editorSubtitle: 'Open and edit the matching setting from its Host configuration entry.',
   searchSettings: 'Search settings',
   searchPlaceholder: 'Search settings…',

@@ -11,23 +11,26 @@ import {
   type ParentQuestionTable,
 } from './store.js'
 
-const requestInputSchema = z.object({
-  operationId: z.string().trim().min(1).max(256),
-  question: z.string().trim().min(1).max(4_000),
-  context: z.string().max(16_000).optional(),
-  options: parentQuestionOptionsSchema,
-  recommendedOptionId: z.string().trim().min(1).max(80),
-  expiryBehavior: parentQuestionExpiryBehaviorSchema,
-  timeoutMs: z.number().int().min(1_000).max(3_600_000),
-}).strict().superRefine((request, context) => {
-  if (!request.options.some(option => option.id === request.recommendedOptionId)) {
-    context.addIssue({
-      code: 'custom',
-      path: ['recommendedOptionId'],
-      message: 'The recommended option must exist in the question options.',
-    })
-  }
-})
+const requestInputSchema = z
+  .object({
+    operationId: z.string().trim().min(1).max(256),
+    question: z.string().trim().min(1).max(4_000),
+    context: z.string().max(16_000).optional(),
+    options: parentQuestionOptionsSchema,
+    recommendedOptionId: z.string().trim().min(1).max(80),
+    expiryBehavior: parentQuestionExpiryBehaviorSchema,
+    timeoutMs: z.number().int().min(1_000).max(3_600_000),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    if (!request.options.some(option => option.id === request.recommendedOptionId)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recommendedOptionId'],
+        message: 'The recommended option must exist in the question options.',
+      })
+    }
+  })
 
 const answerInputSchema = z.string().trim().min(1).max(4_000)
 
@@ -54,22 +57,22 @@ export interface ParentQuestionRuntime {
 export type ParentQuestionOutcome =
   | { readonly kind: 'answered'; readonly questionId: string; readonly answer: string }
   | {
-    readonly kind: 'recommended'
-    readonly questionId: string
-    readonly option: ParentQuestionRecord['options'][number]
-  }
+      readonly kind: 'recommended'
+      readonly questionId: string
+      readonly option: ParentQuestionRecord['options'][number]
+    }
   | {
-    readonly kind: 'deferred'
-    readonly questionId: string
-    readonly childSessionId: string
-    readonly question: string
-    readonly context?: string
-    readonly options: ParentQuestionRecord['options']
-    readonly recommendedOption: ParentQuestionRecord['options'][number]
-    readonly createdAt: number
-    readonly deferredAt: number
-    readonly filePath?: string
-  }
+      readonly kind: 'deferred'
+      readonly questionId: string
+      readonly childSessionId: string
+      readonly question: string
+      readonly context?: string
+      readonly options: ParentQuestionRecord['options']
+      readonly recommendedOption: ParentQuestionRecord['options'][number]
+      readonly createdAt: number
+      readonly deferredAt: number
+      readonly filePath?: string
+    }
   | { readonly kind: 'cancelled' | 'expired' | 'delivery-failed' | 'interrupted'; readonly questionId: string }
 
 export interface ParentQuestionReceipt {
@@ -90,25 +93,10 @@ export interface ParentQuestionService {
     readonly timeoutMs: number
     readonly signal: AbortSignal
   }): Promise<ParentQuestionReceipt>
-  answer(input: {
-    readonly agent: ParentQuestionAgent
-    readonly questionId: string
-    readonly answer: string
-  }): Promise<ParentQuestionOutcome>
-  wait(input: {
-    readonly agent: ParentQuestionAgent
-    readonly questionId: string
-    readonly signal: AbortSignal
-  }): Promise<ParentQuestionOutcome>
-  cancel(input: {
-    readonly agent: ParentQuestionAgent
-    readonly questionId: string
-  }): Promise<ParentQuestionOutcome>
-  recordDeferredFile(input: {
-    readonly agent: ParentQuestionAgent
-    readonly questionId: string
-    readonly filePath: string
-  }): Promise<ParentQuestionOutcome>
+  answer(input: { readonly agent: ParentQuestionAgent; readonly questionId: string; readonly answer: string }): Promise<ParentQuestionOutcome>
+  wait(input: { readonly agent: ParentQuestionAgent; readonly questionId: string; readonly signal: AbortSignal }): Promise<ParentQuestionOutcome>
+  cancel(input: { readonly agent: ParentQuestionAgent; readonly questionId: string }): Promise<ParentQuestionOutcome>
+  recordDeferredFile(input: { readonly agent: ParentQuestionAgent; readonly questionId: string; readonly filePath: string }): Promise<ParentQuestionOutcome>
   close(): Promise<void>
 }
 
@@ -138,7 +126,9 @@ const createDeferred = <Value>(): Deferred<Value> => {
 }
 
 const operationKeyFor = (parentSessionId: string, childSessionId: string, operationId: string): string =>
-  createHash('sha256').update(JSON.stringify([parentSessionId, childSessionId, operationId])).digest('hex')
+  createHash('sha256')
+    .update(JSON.stringify([parentSessionId, childSessionId, operationId]))
+    .digest('hex')
 
 const outcomeOf = (record: ParentQuestionRecord): ParentQuestionOutcome => {
   if (record.status === 'answered') {
@@ -159,12 +149,12 @@ const outcomeOf = (record: ParentQuestionRecord): ParentQuestionOutcome => {
       questionId: record.questionId,
       childSessionId: record.childSessionId,
       question: record.question,
-      ...record.context === undefined ? {} : { context: record.context },
+      ...(record.context === undefined ? {} : { context: record.context }),
       options: record.options,
       recommendedOption,
       createdAt: record.createdAt,
       deferredAt: record.updatedAt,
-      ...record.deferredFilePath === undefined ? {} : { filePath: record.deferredFilePath },
+      ...(record.deferredFilePath === undefined ? {} : { filePath: record.deferredFilePath }),
     }
   }
   if (record.status === 'pending') throw new Error('A pending question has no terminal outcome.')
@@ -177,11 +167,7 @@ const receiptOf = (record: ParentQuestionRecord): ParentQuestionReceipt => ({
   status: record.status,
 })
 
-const runWithLock = async <Value>(
-  locks: Map<string, Promise<void>>,
-  key: string,
-  operation: () => Promise<Value>,
-): Promise<Value> => {
+const runWithLock = async <Value>(locks: Map<string, Promise<void>>, key: string, operation: () => Promise<Value>): Promise<Value> => {
   const previous = locks.get(key) ?? Promise.resolve()
   const gate = createDeferred<void>()
   const current = previous.then(() => gate.promise)
@@ -215,10 +201,7 @@ export const createParentQuestionService = (input: {
     for (const waiter of waiters.get(record.questionId) ?? []) waiter.resolve(outcome)
   }
 
-  const findByQuestionId = (
-    table: ParentQuestionTable,
-    questionId: string,
-  ): { readonly key: string; readonly record: ParentQuestionRecord } | undefined => {
+  const findByQuestionId = (table: ParentQuestionTable, questionId: string): { readonly key: string; readonly record: ParentQuestionRecord } | undefined => {
     for (const [key, record] of table.entries()) {
       if (record.questionId === questionId) return { key, record }
     }
@@ -234,9 +217,7 @@ export const createParentQuestionService = (input: {
   ): Promise<ParentQuestionRecord> => {
     const updated = await table.update(key, current => {
       if (current.questionId !== questionId || current.status !== 'pending') return current
-      const next = status === 'answered'
-        ? { ...current, status, answer, updatedAt: now() }
-        : { ...current, status, updatedAt: now() }
+      const next = status === 'answered' ? { ...current, status, answer, updatedAt: now() } : { ...current, status, updatedAt: now() }
       return parentQuestionRecordSchema.parse(next)
     })
     if (updated.questionId !== questionId) throw new Error('Parent question identity changed during settlement.')
@@ -244,11 +225,7 @@ export const createParentQuestionService = (input: {
     return updated
   }
 
-  const settleExpired = async (
-    table: ParentQuestionTable,
-    key: string,
-    record: ParentQuestionRecord,
-  ): Promise<ParentQuestionRecord> => {
+  const settleExpired = async (table: ParentQuestionTable, key: string, record: ParentQuestionRecord): Promise<ParentQuestionRecord> => {
     if (record.expiryBehavior === 'recommended' && record.recommendedOptionId !== undefined) {
       return settle(table, key, record.questionId, 'recommended')
     }
@@ -267,9 +244,11 @@ export const createParentQuestionService = (input: {
     const found = findByQuestionId(table, questionId)
     if (found === undefined) throw new Error('Parent question was not found.')
     const parentSessionId = input.runtime.parentSessionId(agent.id)
-    if (found.record.childSessionId !== agent.id
-      || found.record.parentSessionId !== parentSessionId
-      || !input.runtime.isDirectChild(agent.id, found.record.parentSessionId)) {
+    if (
+      found.record.childSessionId !== agent.id ||
+      found.record.parentSessionId !== parentSessionId ||
+      !input.runtime.isDirectChild(agent.id, found.record.parentSessionId)
+    ) {
       throw new Error('Only the requesting direct child can read or cancel this question.')
     }
     return { table, ...found }
@@ -287,12 +266,7 @@ export const createParentQuestionService = (input: {
     }
   }
 
-  const sendQuestion = async (
-    table: ParentQuestionTable,
-    key: string,
-    record: ParentQuestionRecord,
-    signal: AbortSignal,
-  ): Promise<ParentQuestionRecord> => {
+  const sendQuestion = async (table: ParentQuestionTable, key: string, record: ParentQuestionRecord, signal: AbortSignal): Promise<ParentQuestionRecord> => {
     try {
       const notificationMessageId = await input.runtime.sendToParent({
         childSessionId: record.childSessionId,
@@ -301,9 +275,7 @@ export const createParentQuestionService = (input: {
         signal,
       })
       const updated = await table.update(key, current => {
-        if (current.questionId !== record.questionId
-          || current.status !== 'pending'
-          || current.notificationMessageId !== undefined) return current
+        if (current.questionId !== record.questionId || current.status !== 'pending' || current.notificationMessageId !== undefined) return current
         return parentQuestionRecordSchema.parse({
           ...current,
           notificationMessageId,
@@ -328,16 +300,14 @@ export const createParentQuestionService = (input: {
       const parsed = requestInputSchema.parse({
         operationId: request.operationId,
         question: request.question,
-        ...request.context === undefined ? {} : { context: request.context },
+        ...(request.context === undefined ? {} : { context: request.context }),
         options: request.options,
         recommendedOptionId: request.recommendedOptionId,
         expiryBehavior: request.expiryBehavior,
         timeoutMs: request.timeoutMs,
       })
       const parentSessionId = input.runtime.parentSessionId(request.agent.id)
-      if (!input.runtime.isLive(request.agent)
-        || parentSessionId === undefined
-        || !input.runtime.isDirectChild(request.agent.id, parentSessionId)) {
+      if (!input.runtime.isLive(request.agent) || parentSessionId === undefined || !input.runtime.isDirectChild(request.agent.id, parentSessionId)) {
         throw new Error('A question can only be requested by a live direct subagent.')
       }
       request.signal.throwIfAborted()
@@ -347,14 +317,15 @@ export const createParentQuestionService = (input: {
         const table = await input.table()
         let record = table.get(key)
         if (record !== undefined) {
-          if (record.parentSessionId !== parentSessionId
-            || record.childSessionId !== request.agent.id
-            || record.question !== parsed.question
-            || record.context !== parsed.context
-            || JSON.stringify(record.options) !== JSON.stringify(parsed.options)
-            || (record.recommendedOptionId !== undefined
-              && (record.recommendedOptionId !== parsed.recommendedOptionId
-                || record.expiryBehavior !== parsed.expiryBehavior))) {
+          if (
+            record.parentSessionId !== parentSessionId ||
+            record.childSessionId !== request.agent.id ||
+            record.question !== parsed.question ||
+            record.context !== parsed.context ||
+            JSON.stringify(record.options) !== JSON.stringify(parsed.options) ||
+            (record.recommendedOptionId !== undefined &&
+              (record.recommendedOptionId !== parsed.recommendedOptionId || record.expiryBehavior !== parsed.expiryBehavior))
+          ) {
             throw new Error('Question operation id was reused with different input.')
           }
           if (record.status !== 'pending' || record.notificationMessageId !== undefined) return receiptOf(record)
@@ -365,8 +336,7 @@ export const createParentQuestionService = (input: {
         const created = await runWithLock(operationLocks, 'question-admission', async () => {
           await expireDueQuestions(table)
           const rows = Array.from(table.entries())
-          const pendingForParent = rows.filter(([, row]) =>
-            row.parentSessionId === parentSessionId && row.status === 'pending').length
+          const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
           if (pendingForParent >= MAX_PENDING_PER_PARENT) {
             throw new Error('The parent has reached its pending question limit.')
           }
@@ -380,7 +350,7 @@ export const createParentQuestionService = (input: {
             childSessionId: request.agent.id,
             operationId: parsed.operationId,
             question: parsed.question,
-            ...parsed.context === undefined ? {} : { context: parsed.context },
+            ...(parsed.context === undefined ? {} : { context: parsed.context }),
             options: parsed.options,
             recommendedOptionId: parsed.recommendedOptionId,
             expiryBehavior: parsed.expiryBehavior,
@@ -439,9 +409,12 @@ export const createParentQuestionService = (input: {
       const questionWaiters = waiters.get(waitRequest.questionId) ?? new Set<QuestionWaiter>()
       questionWaiters.add(waiter)
       waiters.set(waitRequest.questionId, questionWaiters)
-      const timeout = setTimeout(() => {
-        void settleExpired(found.table, found.key, found.record).catch(waiter.reject)
-      }, Math.max(1, found.record.expiresAt - now()))
+      const timeout = setTimeout(
+        () => {
+          void settleExpired(found.table, found.key, found.record).catch(waiter.reject)
+        },
+        Math.max(1, found.record.expiresAt - now()),
+      )
       const onAbort = (): void => {
         void settle(found.table, found.key, waitRequest.questionId, 'cancelled').catch(waiter.reject)
       }

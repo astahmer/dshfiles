@@ -34,7 +34,6 @@ export const userActivityForMessage = (message: ContinuationMessage): UserActivi
   const continuationId = continuationIdOf(message)
   return {
     continuationId,
-    queueSource:
-      continuationId === null ? null : message.source.kind === 'schedule' ? 'schedule' : 'manual',
+    queueSource: continuationId === null ? null : message.source.kind === 'schedule' ? 'schedule' : 'manual',
   }
 }

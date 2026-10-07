@@ -491,7 +491,9 @@ export const MultiHostPanel = (): JSX.Element => {
           <runtimeForm.AppField name="name">{field => <field.TextField label="Runtime name" placeholder="Web profile" required />}</runtimeForm.AppField>
           {directory.hosts.find(host => host.id === runtimeHostId)?.connector.kind === 'local' ? (
             <runtimeForm.AppField name="launchUrl">
-              {field => <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />}
+              {field => (
+                <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />
+              )}
             </runtimeForm.AppField>
           ) : (
             <>

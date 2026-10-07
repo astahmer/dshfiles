@@ -51,8 +51,9 @@ describe('deferred question files', () => {
     try {
       await mkdir(outside)
       await symlink(outside, join(workspace, 'questions'))
-      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: question() }))
-        .rejects.toThrow('The workspace questions path must be a real directory')
+      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: question() })).rejects.toThrow(
+        'The workspace questions path must be a real directory',
+      )
       expect(await readdir(outside)).toEqual([])
     } finally {
       await rm(workspace, { recursive: true, force: true })
@@ -68,8 +69,9 @@ describe('deferred question files', () => {
       const editedContents = `Question ID: ${deferred.questionId}\nA human added a decision note.\n`
       await writeFile(file, editedContents, 'utf8')
 
-      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: deferred }))
-        .rejects.toThrow('The deferred-question file was edited; refusing to overwrite it.')
+      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: deferred })).rejects.toThrow(
+        'The deferred-question file was edited; refusing to overwrite it.',
+      )
       await expect(readFile(file, 'utf8')).resolves.toBe(editedContents)
     } finally {
       await rm(workspace, { recursive: true, force: true })
@@ -103,8 +105,9 @@ describe('deferred question files', () => {
       const candidate = join(questions, '2026-10-06T10-00-00-000Z_should-i-keep-the-current-api.md')
       await symlink(outside, candidate)
 
-      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: question() }))
-        .rejects.toThrow('The existing deferred-question path must be a small regular file, not a symlink.')
+      await expect(writeDeferredQuestionFile({ workspacePath: workspace, question: question() })).rejects.toThrow(
+        'The existing deferred-question path must be a small regular file, not a symlink.',
+      )
       await expect(readFile(outside, 'utf8')).resolves.toBe('keep this file unchanged')
     } finally {
       await rm(workspace, { recursive: true, force: true })

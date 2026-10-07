@@ -123,14 +123,20 @@ export default defineClient({
             unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
             pinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.pinSession(sessionId),
             unpinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unpinSession(sessionId),
-            markRead: async (sessionId: SessionSummary['id']) => (await ctx.sessions.updateAttention({
-              sessionId,
-              action: { type: 'mark-read' },
-            })).ok,
-            setSnoozed: async (sessionId: SessionSummary['id'], snoozed: boolean) => (await ctx.sessions.updateAttention({
-              sessionId,
-              action: { type: 'set-snoozed', snoozed },
-            })).ok,
+            markRead: async (sessionId: SessionSummary['id']) =>
+              (
+                await ctx.sessions.updateAttention({
+                  sessionId,
+                  action: { type: 'mark-read' },
+                })
+              ).ok,
+            setSnoozed: async (sessionId: SessionSummary['id'], snoozed: boolean) =>
+              (
+                await ctx.sessions.updateAttention({
+                  sessionId,
+                  action: { type: 'set-snoozed', snoozed },
+                })
+              ).ok,
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
           }),
         },

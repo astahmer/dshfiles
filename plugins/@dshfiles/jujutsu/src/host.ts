@@ -436,8 +436,13 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
         title: 'Create isolated workspace',
         summary: 'Add ' + action.name + ' at ' + revision.shortestChangeId,
         detail:
-          'Destination: ' + workspacePath +
-          '\nBase: ' + revision.shortestChangeId + ' (' + revision.commitId + ')' +
+          'Destination: ' +
+          workspacePath +
+          '\nBase: ' +
+          revision.shortestChangeId +
+          ' (' +
+          revision.commitId +
+          ')' +
           '\nThe current workspace and its working files remain in place.',
       }
     }

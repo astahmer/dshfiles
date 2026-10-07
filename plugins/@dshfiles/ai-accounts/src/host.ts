@@ -135,17 +135,13 @@ export default definePlugin({
       )
     }
 
-    const buildReasoningDefaults = (
-      sourceFile: ReturnType<typeof readAccountFileSync>,
-    ): Map<string, Readonly<Record<string, string>>> =>
+    const buildReasoningDefaults = (sourceFile: ReturnType<typeof readAccountFileSync>): Map<string, Readonly<Record<string, string>>> =>
       new Map(
         sourceFile.accounts.map(
           account =>
             [
               account.instanceId,
-              typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null
-                ? (account.reasoningDefaults as Record<string, string>)
-                : {},
+              typeof account.reasoningDefaults === 'object' && account.reasoningDefaults !== null ? (account.reasoningDefaults as Record<string, string>) : {},
             ] as const,
         ),
       )

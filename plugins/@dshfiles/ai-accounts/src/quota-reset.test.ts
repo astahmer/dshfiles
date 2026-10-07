@@ -47,11 +47,6 @@ describe('knownQuotaResetAt', () => {
 
   it('keeps non-exhausted and non-successful readings manual', () => {
     expect(knownQuotaResetAt(usage({ windows: [{ label: 'short', percentRemaining: 35, resetsAt: 4_000 }] }), 1_000)).toBeNull()
-    expect(
-      knownQuotaResetAt(
-        usage({ status: 'rate-limited', windows: [{ label: 'short', percentRemaining: 0, resetsAt: 4_000 }] }),
-        1_000,
-      ),
-    ).toBeNull()
+    expect(knownQuotaResetAt(usage({ status: 'rate-limited', windows: [{ label: 'short', percentRemaining: 0, resetsAt: 4_000 }] }), 1_000)).toBeNull()
   })
 })

@@ -48,27 +48,33 @@ describe('Markdown feedback anchors', () => {
     await symlink(outsidePath, join(workspacePath, 'linked.md'))
     await writeFile(join(workspacePath, 'guide.md'), '# Guide\n')
 
-    await expect(captureMarkdownAnchor({
-      workspacePath,
-      path: '../outside.md',
-      startLine: 1,
-      endLine: 1,
-      selectedText: 'private',
-    })).rejects.toThrow()
-    await expect(captureMarkdownAnchor({
-      workspacePath,
-      path: 'linked.md',
-      startLine: 1,
-      endLine: 1,
-      selectedText: 'private',
-    })).rejects.toThrow(/symlinks/)
-    await expect(captureMarkdownAnchor({
-      workspacePath,
-      path: 'guide.md',
-      startLine: 1,
-      endLine: 1,
-      selectedText: 'changed text',
-    })).rejects.toThrow(/does not match/)
+    await expect(
+      captureMarkdownAnchor({
+        workspacePath,
+        path: '../outside.md',
+        startLine: 1,
+        endLine: 1,
+        selectedText: 'private',
+      }),
+    ).rejects.toThrow()
+    await expect(
+      captureMarkdownAnchor({
+        workspacePath,
+        path: 'linked.md',
+        startLine: 1,
+        endLine: 1,
+        selectedText: 'private',
+      }),
+    ).rejects.toThrow(/symlinks/)
+    await expect(
+      captureMarkdownAnchor({
+        workspacePath,
+        path: 'guide.md',
+        startLine: 1,
+        endLine: 1,
+        selectedText: 'changed text',
+      }),
+    ).rejects.toThrow(/does not match/)
   })
 
   it('returns no revision after the document is removed or becomes unsafe', async () => {

@@ -90,13 +90,19 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
       </div>
       {props.provisionedPath !== null && (
         <div className={styles.sessionToolAction}>
-          <span className={styles.sessionPath} title={props.provisionedPath}>Created: {props.provisionedPath}</span>
+          <span className={styles.sessionPath} title={props.provisionedPath}>
+            Created: {props.provisionedPath}
+          </span>
           <button type="button" className={styles.secondary} disabled={launching} onClick={() => void createSession()}>
             {launching ? 'Opening…' : 'Open a DSH Session here'}
           </button>
         </div>
       )}
-      {error !== null && <p className={styles.sessionToolError} role="alert">{error}</p>}
+      {error !== null && (
+        <p className={styles.sessionToolError} role="alert">
+          {error}
+        </p>
+      )}
     </section>
   )
 }

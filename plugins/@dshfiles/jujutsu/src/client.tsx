@@ -164,12 +164,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     enabled: repoId !== null && selectedRevision !== undefined,
   })
   const details = detailsQuery.data
-  const selectedReviewProgress = reviewProgress(
-    reviewStore,
-    state?.root ?? '',
-    selectedRevision?.commitId ?? '',
-    details?.files ?? [],
-  )
+  const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
 
   const workingDiffQuery = useQuery({
     queryKey: jujutsuKeys.workingDiff(repoId ?? ''),
@@ -521,98 +516,94 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   {selectedRevision !== undefined && (
                     <>
                       <div className={styles.titleRow}>
-                    <h2>Revision {selectedRevision.shortestChangeId}</h2>
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() => setSelection(null)}
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <p>{selectedRevision.description || '(no description)'}</p>
-                  <div className={styles.detailMeta}>
-                    {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
-                  </div>
-                  {details ? (
-                    <>
-                      <div className={styles.counts}>
-                        {details.files.length} files · +{details.additions} −{details.deletions}
-                        <span>
-                          {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
-                        </span>
-                        {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
+                        <h2>Revision {selectedRevision.shortestChangeId}</h2>
+                        <button type="button" className={styles.secondary} onClick={() => setSelection(null)}>
+                          Close
+                        </button>
                       </div>
-                      <label className={styles.reviewFilter}>
-                        <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
-                        Hide reviewed files
-                      </label>
-                      {reviewNotice.length > 0 && (
-                        <p role="status" className={styles.muted}>
-                          {reviewNotice}
-                        </p>
+                      <p>{selectedRevision.description || '(no description)'}</p>
+                      <div className={styles.detailMeta}>
+                        {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
+                      </div>
+                      {details ? (
+                        <>
+                          <div className={styles.counts}>
+                            {details.files.length} files · +{details.additions} −{details.deletions}
+                            <span>
+                              {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
+                            </span>
+                            {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
+                          </div>
+                          <label className={styles.reviewFilter}>
+                            <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
+                            Hide reviewed files
+                          </label>
+                          {reviewNotice.length > 0 && (
+                            <p role="status" className={styles.muted}>
+                              {reviewNotice}
+                            </p>
+                          )}
+                          <ul className={styles.fileList}>
+                            {details.files
+                              .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file))
+                              .map(file => {
+                                const reviewed = isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)
+                                return (
+                                  <li className={styles.reviewRow} key={file.path}>
+                                    <span className={styles.reviewPath}>{file.path}</span>
+                                    <span>
+                                      +{file.additions} −{file.deletions}
+                                    </span>
+                                    <label className={styles.reviewControl}>
+                                      <input
+                                        type="checkbox"
+                                        aria-label={`Mark ${file.path} reviewed`}
+                                        checked={reviewed}
+                                        disabled={file.contentDigest === null}
+                                        onChange={event => updateFileReview(file, event.target.checked)}
+                                      />
+                                      Reviewed
+                                    </label>
+                                  </li>
+                                )
+                              })}
+                          </ul>
+                          {hideReviewedFiles &&
+                            details.files.length > 0 &&
+                            details.files.every(file => isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)) && (
+                              <p className={styles.muted}>All reviewable files are hidden.</p>
+                            )}
+                          <details>
+                            <summary>Change evolution</summary>
+                            <pre>{details.evolution}</pre>
+                          </details>
+                          <details open>
+                            <summary>Diff</summary>
+                            <pre className={styles.diff}>{details.patch}</pre>
+                          </details>
+                        </>
+                      ) : (
+                        <p className={styles.muted}>Loading revision details…</p>
                       )}
-                      <ul className={styles.fileList}>
-                        {details.files
-                          .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file))
-                          .map(file => {
-                            const reviewed = isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)
-                            return (
-                              <li className={styles.reviewRow} key={file.path}>
-                                <span className={styles.reviewPath}>{file.path}</span>
-                                <span>
-                                  +{file.additions} −{file.deletions}
-                                </span>
-                                <label className={styles.reviewControl}>
-                                  <input
-                                    type="checkbox"
-                                    aria-label={`Mark ${file.path} reviewed`}
-                                    checked={reviewed}
-                                    disabled={file.contentDigest === null}
-                                    onChange={event => updateFileReview(file, event.target.checked)}
-                                  />
-                                  Reviewed
-                                </label>
-                              </li>
-                            )
-                          })}
-                      </ul>
-                      {hideReviewedFiles &&
-                        details.files.length > 0 &&
-                        details.files.every(file => isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)) && (
-                          <p className={styles.muted}>All reviewable files are hidden.</p>
-                        )}
-                      <details>
-                        <summary>Change evolution</summary>
-                        <pre>{details.evolution}</pre>
-                      </details>
-                      <details open>
-                        <summary>Diff</summary>
-                        <pre className={styles.diff}>{details.patch}</pre>
-                      </details>
-                    </>
-                  ) : (
-                    <p className={styles.muted}>Loading revision details…</p>
-                  )}
-                  {!selectedRevision.immutable && (
-                    <div className={styles.actionBox}>
-                      <label>
-                        New description
-                        <textarea
-                          value={selectedDescribeText}
-                          onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
-                          rows={3}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={!selectedDescribeChanged}
-                        onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
-                      >
-                        Preview describe
-                      </button>
-                    </div>
-                  )}
+                      {!selectedRevision.immutable && (
+                        <div className={styles.actionBox}>
+                          <label>
+                            New description
+                            <textarea
+                              value={selectedDescribeText}
+                              onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
+                              rows={3}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            disabled={!selectedDescribeChanged}
+                            onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
+                          >
+                            Preview describe
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </>
@@ -670,7 +661,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       <>
                         <div className={styles.counts}>
                           {details.files.length} files · +{details.additions} −{details.deletions}
-                          <span>{selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed</span>
+                          <span>
+                            {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
+                          </span>
                           {details.truncated && <Tag tone="warning">diff truncated; counts partial</Tag>}
                         </div>
                         <label className={styles.reviewFilter}>
@@ -707,11 +700,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                               )
                             })}
                         </ul>
-                        {hideReviewedFiles &&
-                          selectedReviewProgress.total > 0 &&
-                          selectedReviewProgress.reviewed === selectedReviewProgress.total && (
-                            <p className={styles.muted}>All reviewable files are hidden.</p>
-                          )}
+                        {hideReviewedFiles && selectedReviewProgress.total > 0 && selectedReviewProgress.reviewed === selectedReviewProgress.total && (
+                          <p className={styles.muted}>All reviewable files are hidden.</p>
+                        )}
                         <details className={styles.disclosure}>
                           <summary>Change evolution</summary>
                           <pre className={styles.code}>{details.evolution}</pre>

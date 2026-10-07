@@ -4,8 +4,7 @@ import type { Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import { containsPrivateDshxImport } from '../private-imports.js'
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const dshPackageName = (specifier: string): string | undefined => {
   const [scope, name] = specifier.split('/')
@@ -14,11 +13,7 @@ const dshPackageName = (specifier: string): string | undefined => {
 }
 
 /** Lazy DSHX runtime integrations load only when the composition opts into them. */
-const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set([
-  '@deepseek-ai/dsh-client-connection',
-  '@deepseek-ai/dsh-cordis-host-runner',
-  '@deepseek-ai/dsh-tool-cordis',
-])
+const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set(['@deepseek-ai/dsh-client-connection', '@deepseek-ai/dsh-cordis-host-runner', '@deepseek-ai/dsh-tool-cordis'])
 
 /** Keep external DSH Host imports on the Host installation's module identity. */
 export function hostPeerDependencyPlugin(root: string): Plugin {
@@ -64,14 +59,10 @@ export function hostPeerDependencyPlugin(root: string): Plugin {
         }
         const missingPackages = [...missing].sort()
         if (missingPackages.length === 0) return
-        throw new DshxError(
-          'DSHX4005',
-          'Host artifact imports @deepseek-ai packages missing from peerDependencies: ' + missingPackages.join(', ') + '.',
-          {
-            file: packageFile,
-            hint: 'Declare each external DSH package as a peer so linked Host bundles resolve the Host installation copy. Mark optional runtime integrations in peerDependenciesMeta.',
-          },
-        )
+        throw new DshxError('DSHX4005', 'Host artifact imports @deepseek-ai packages missing from peerDependencies: ' + missingPackages.join(', ') + '.', {
+          file: packageFile,
+          hint: 'Declare each external DSH package as a peer so linked Host bundles resolve the Host installation copy. Mark optional runtime integrations in peerDependenciesMeta.',
+        })
       },
     },
   }

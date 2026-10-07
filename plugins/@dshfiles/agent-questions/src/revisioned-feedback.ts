@@ -9,19 +9,24 @@ import {
   type RevisionedFeedbackTable,
 } from './store.js'
 
-const requestInputSchema = z.object({
-  operationId: z.string().trim().min(1).max(256),
-  anchor: markdownFeedbackAnchorSchema,
-  comment: z.string().trim().min(1).max(4_000),
-}).strict()
+const requestInputSchema = z
+  .object({
+    operationId: z.string().trim().min(1).max(256),
+    anchor: markdownFeedbackAnchorSchema,
+    comment: z.string().trim().min(1).max(4_000),
+  })
+  .strict()
 
-const answerInputSchema = z.object({
-  feedbackId: z.string().uuid(),
-  disposition: z.enum(['accepted', 'rejected', 'deferred']),
-  note: z.string().trim().min(1).max(4_000).optional(),
-}).strict()
+const answerInputSchema = z
+  .object({
+    feedbackId: z.string().uuid(),
+    disposition: z.enum(['accepted', 'rejected', 'deferred']),
+    note: z.string().trim().min(1).max(4_000).optional(),
+  })
+  .strict()
 
-const answerBatchSchema = z.array(answerInputSchema)
+const answerBatchSchema = z
+  .array(answerInputSchema)
   .min(1)
   .max(20)
   .refine(answers => new Set(answers.map(answer => answer.feedbackId)).size === answers.length)
@@ -72,19 +77,15 @@ export interface ParentFeedbackService {
     readonly responses: readonly z.input<typeof answerInputSchema>[]
     readonly signal: AbortSignal
   }): Promise<readonly ParentFeedbackResolutionResult[]>
-  read(input: {
-    readonly agent: ParentFeedbackAgent
-    readonly feedbackId: string
-  }): Promise<RevisionedFeedbackRecord>
-  cancel(input: {
-    readonly agent: ParentFeedbackAgent
-    readonly feedbackId: string
-  }): Promise<RevisionedFeedbackRecord>
+  read(input: { readonly agent: ParentFeedbackAgent; readonly feedbackId: string }): Promise<RevisionedFeedbackRecord>
+  cancel(input: { readonly agent: ParentFeedbackAgent; readonly feedbackId: string }): Promise<RevisionedFeedbackRecord>
   close(): Promise<void>
 }
 
 const operationKeyFor = (parentSessionId: string, childSessionId: string, operationId: string): string =>
-  createHash('sha256').update(JSON.stringify([parentSessionId, childSessionId, operationId])).digest('hex')
+  createHash('sha256')
+    .update(JSON.stringify([parentSessionId, childSessionId, operationId]))
+    .digest('hex')
 
 const createDeferred = <Value>() => {
   let resolvePromise: (value: Value | PromiseLike<Value>) => void = () => undefined
@@ -94,11 +95,7 @@ const createDeferred = <Value>() => {
   return { promise, resolve: resolvePromise }
 }
 
-const runWithLock = async <Value>(
-  locks: Map<string, Promise<void>>,
-  key: string,
-  operation: () => Promise<Value>,
-): Promise<Value> => {
+const runWithLock = async <Value>(locks: Map<string, Promise<void>>, key: string, operation: () => Promise<Value>): Promise<Value> => {
   const prior = locks.get(key)
   const gate = createDeferred<void>()
   locks.set(key, gate.promise)
@@ -121,11 +118,8 @@ const findByFeedbackId = (
   return undefined
 }
 
-const sameResolution = (
-  record: RevisionedFeedbackRecord,
-  answer: z.infer<typeof answerInputSchema>,
-): boolean => record.resolutionReceipt?.disposition === answer.disposition
-  && record.resolutionReceipt.note === answer.note
+const sameResolution = (record: RevisionedFeedbackRecord, answer: z.infer<typeof answerInputSchema>): boolean =>
+  record.resolutionReceipt?.disposition === answer.disposition && record.resolutionReceipt.note === answer.note
 
 export const createParentFeedbackService = (input: {
   readonly table: () => Promise<RevisionedFeedbackTable>
@@ -164,10 +158,12 @@ export const createParentFeedbackService = (input: {
     const found = findByFeedbackId(table, feedbackId)
     if (found === undefined) throw new Error('Parent feedback was not found.')
     const parentSessionId = input.runtime.parentSessionId(agent.id)
-    if (found.record.childSessionId !== agent.id
-      || found.record.parentSessionId !== parentSessionId
-      || parentSessionId === undefined
-      || !input.runtime.isDirectChild(agent.id, parentSessionId)) {
+    if (
+      found.record.childSessionId !== agent.id ||
+      found.record.parentSessionId !== parentSessionId ||
+      parentSessionId === undefined ||
+      !input.runtime.isDirectChild(agent.id, parentSessionId)
+    ) {
       throw new Error('Only the requesting direct child can read or cancel this feedback.')
     }
     return { table, ...found }
@@ -180,11 +176,7 @@ export const createParentFeedbackService = (input: {
     }
   }
 
-  const refreshStaleness = async (
-    table: RevisionedFeedbackTable,
-    key: string,
-    record: RevisionedFeedbackRecord,
-  ): Promise<RevisionedFeedbackRecord> => {
+  const refreshStaleness = async (table: RevisionedFeedbackTable, key: string, record: RevisionedFeedbackRecord): Promise<RevisionedFeedbackRecord> => {
     if (record.status !== 'resolved' || record.resolutionReceipt === undefined) return record
     const observedRevision = await input.runtime.currentRevision({
       childSessionId: record.childSessionId,
@@ -216,8 +208,7 @@ export const createParentFeedbackService = (input: {
   }): Promise<ParentFeedbackResolutionResult> => {
     assertOpen()
     const found = findByFeedbackId(resolution.table, resolution.answer.feedbackId)
-    if (found === undefined
-      || !belongsToParent(found.record, resolution.agent.id)) {
+    if (found === undefined || !belongsToParent(found.record, resolution.agent.id)) {
       return { feedbackId: resolution.answer.feedbackId, status: 'rejected', notified: false }
     }
     if (found.record.status === 'resolved' || found.record.status === 'stale') {
@@ -241,14 +232,13 @@ export const createParentFeedbackService = (input: {
       path: found.record.anchor.path,
     })
     resolution.signal.throwIfAborted()
-    if (!input.runtime.isLive(resolution.agent)
-      || !belongsToParent(found.record, resolution.agent.id)) {
+    if (!input.runtime.isLive(resolution.agent) || !belongsToParent(found.record, resolution.agent.id)) {
       return { feedbackId: resolution.answer.feedbackId, status: 'rejected', notified: false }
     }
     const status = observedRevision === found.record.anchor.revision ? 'resolved' : 'stale'
     const resolutionReceipt = feedbackResolutionReceiptSchema.parse({
       disposition: resolution.answer.disposition,
-      ...resolution.answer.note === undefined ? {} : { note: resolution.answer.note },
+      ...(resolution.answer.note === undefined ? {} : { note: resolution.answer.note }),
       baseRevision: found.record.anchor.revision,
       observedRevision,
       checkedAt: now(),
@@ -300,10 +290,12 @@ export const createParentFeedbackService = (input: {
         const table = await input.table()
         let record = table.get(key)
         if (record !== undefined) {
-          if (record.parentSessionId !== parentSessionId
-            || record.childSessionId !== request.agent.id
-            || record.comment !== parsed.comment
-            || JSON.stringify(record.anchor) !== JSON.stringify(parsed.anchor)) {
+          if (
+            record.parentSessionId !== parentSessionId ||
+            record.childSessionId !== request.agent.id ||
+            record.comment !== parsed.comment ||
+            JSON.stringify(record.anchor) !== JSON.stringify(parsed.anchor)
+          ) {
             throw new Error('Feedback operation id was reused with different input.')
           }
           return record
@@ -319,8 +311,7 @@ export const createParentFeedbackService = (input: {
 
         await pruneTerminalFeedback(table)
         const rows = Array.from(table.entries())
-        const pendingForParent = rows.filter(([, row]) =>
-          row.parentSessionId === parentSessionId && row.status === 'pending').length
+        const pendingForParent = rows.filter(([, row]) => row.parentSessionId === parentSessionId && row.status === 'pending').length
         if (pendingForParent >= maximumPendingPerParent) {
           throw new Error('The parent has reached its pending feedback limit.')
         }
@@ -357,9 +348,9 @@ export const createParentFeedbackService = (input: {
         } catch (error: unknown) {
           const found = table.get(key)
           if (found === undefined || found.feedbackId !== record.feedbackId) throw error
-          record = await table.update(key, current => current.status === 'pending'
-            ? revisionedFeedbackRecordSchema.parse({ ...current, status: 'delivery-failed', updatedAt: now() })
-            : current)
+          record = await table.update(key, current =>
+            current.status === 'pending' ? revisionedFeedbackRecordSchema.parse({ ...current, status: 'delivery-failed', updatedAt: now() }) : current,
+          )
         }
         return record
       })
@@ -380,7 +371,8 @@ export const createParentFeedbackService = (input: {
             agent: answerRequest.agent,
             answer,
             signal: answerRequest.signal,
-          }))
+          }),
+        )
         results.push(result)
       }
       return results

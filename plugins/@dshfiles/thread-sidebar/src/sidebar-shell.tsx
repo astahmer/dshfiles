@@ -142,9 +142,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         splitter: splitterRef.current,
       })
       if (bounds === null) return
-      setSplitBounds(current =>
-        current.value === bounds.value && current.minimum === bounds.minimum && current.maximum === bounds.maximum ? current : bounds,
-      )
+      setSplitBounds(current => (current.value === bounds.value && current.minimum === bounds.minimum && current.maximum === bounds.maximum ? current : bounds))
     }
     measure()
     window.addEventListener('resize', measure)
@@ -451,64 +449,63 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         style={wide && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px` } : undefined}
       >
         <div className={styles.brandRow}>
-        <button
-          className={styles.brandButton}
-          type="button"
-          aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
-          onClick={props.toggleSidebar}
-        >
-          {props.renderSlot('sidebar.brand.mark', { size: 24 }) ?? <span aria-hidden="true">◈</span>}
-        </button>
-        {wide ? <span className={styles.brandName}>{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span> : null}
-        {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
-      </div>
-
-      <nav className={compactHeader ? styles.headerCompact : styles.headerExpanded} aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
-        {visibleHeaderEntries.map(entry => {
-          const active = entry.kind === 'panel' && activePanelId === entry.panelId
-          return (
-            <Tooltip key={entry.id} label={entry.label} side={props.collapsed ? 'right' : 'bottom'} delayMs={500} disabled={!compactHeader} portal>
-              <button
-                type="button"
-                className={active ? styles.selectedLink : styles.headerLink}
-                aria-label={entry.label}
-                aria-current={active ? 'page' : undefined}
-                onClick={() => activateHeaderEntry(entry)}
-              >
-                {headerIconFor(entry, 22)}
-                {!compactHeader ? <span>{entry.label}</span> : null}
-              </button>
-            </Tooltip>
-          )
-        })}
-      </nav>
-
-      {wide ? (
-        <div className={styles.headerTools}>
-          {searchOpen ? (
-            <Input
-              ref={searchInput}
-              className={styles.searchInput}
-              icon={<IconSearchOutlineRegular size={16} />}
-              type="search"
-              aria-label={text(props.t, 'threadSidebarSearch')}
-              placeholder={text(props.t, 'threadSidebarSearchPlaceholder')}
-              value={threadQuery}
-              onChange={event => setThreadQuery(event.currentTarget.value)}
-              onKeyDown={event => {
-                if (event.key === 'Escape') {
-                  setThreadQuery('')
-                  setSearchOpen(false)
-                }
-              }}
-            />
-          ) : null}
-          <Button variant="outline" size="sm" aria-expanded={customizeOpen} onClick={() => setCustomizeOpen(value => !value)}>
-            {text(props.t, 'threadSidebarCustomize')}
-          </Button>
+          <button
+            className={styles.brandButton}
+            type="button"
+            aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
+            onClick={props.toggleSidebar}
+          >
+            {props.renderSlot('sidebar.brand.mark', { size: 24 }) ?? <span aria-hidden="true">◈</span>}
+          </button>
+          {wide ? <span className={styles.brandName}>{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span> : null}
+          {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
-      ) : null}
 
+        <nav className={compactHeader ? styles.headerCompact : styles.headerExpanded} aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
+          {visibleHeaderEntries.map(entry => {
+            const active = entry.kind === 'panel' && activePanelId === entry.panelId
+            return (
+              <Tooltip key={entry.id} label={entry.label} side={props.collapsed ? 'right' : 'bottom'} delayMs={500} disabled={!compactHeader} portal>
+                <button
+                  type="button"
+                  className={active ? styles.selectedLink : styles.headerLink}
+                  aria-label={entry.label}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => activateHeaderEntry(entry)}
+                >
+                  {headerIconFor(entry, 22)}
+                  {!compactHeader ? <span>{entry.label}</span> : null}
+                </button>
+              </Tooltip>
+            )
+          })}
+        </nav>
+
+        {wide ? (
+          <div className={styles.headerTools}>
+            {searchOpen ? (
+              <Input
+                ref={searchInput}
+                className={styles.searchInput}
+                icon={<IconSearchOutlineRegular size={16} />}
+                type="search"
+                aria-label={text(props.t, 'threadSidebarSearch')}
+                placeholder={text(props.t, 'threadSidebarSearchPlaceholder')}
+                value={threadQuery}
+                onChange={event => setThreadQuery(event.currentTarget.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') {
+                    setThreadQuery('')
+                    setSearchOpen(false)
+                  }
+                }}
+              />
+            ) : null}
+            <Button variant="outline" size="sm" aria-expanded={customizeOpen} onClick={() => setCustomizeOpen(value => !value)}>
+              {text(props.t, 'threadSidebarCustomize')}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {customizeOpen && wide ? (

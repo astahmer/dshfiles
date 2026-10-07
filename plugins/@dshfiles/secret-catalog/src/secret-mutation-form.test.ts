@@ -10,8 +10,10 @@ import {
   toSecretUpdateInput,
 } from './secret-mutation-form.js'
 
-const issuePaths = (result: { readonly success: boolean; readonly error?: { readonly issues: readonly { readonly path: readonly PropertyKey[] }[] } }): readonly string[] =>
-  result.error?.issues.map(issue => issue.path.join('.')) ?? []
+const issuePaths = (result: {
+  readonly success: boolean
+  readonly error?: { readonly issues: readonly { readonly path: readonly PropertyKey[] }[] }
+}): readonly string[] => result.error?.issues.map(issue => issue.path.join('.')) ?? []
 
 describe('Secret Catalog create form', () => {
   it('rejects an invalid alias and a manual value that was never entered', () => {
@@ -30,7 +32,15 @@ describe('Secret Catalog create form', () => {
 
   it('keeps a generated value out of the request and omits blank metadata', () => {
     const input = toSecretCreateInput({ ...secretCreateFormDefaults('project'), alias: 'SYNTHETIC', value: 'stale', name: 'Synthetic item' })
-    expect(input).toEqual({ alias: 'SYNTHETIC', scope: 'project', environment: 'prod', valueMode: 'generate', value: null, type: 'login', name: 'Synthetic item' })
+    expect(input).toEqual({
+      alias: 'SYNTHETIC',
+      scope: 'project',
+      environment: 'prod',
+      valueMode: 'generate',
+      value: null,
+      type: 'login',
+      name: 'Synthetic item',
+    })
   })
 
   it('passes a manual value through unchanged', () => {

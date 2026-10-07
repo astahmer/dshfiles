@@ -40,14 +40,16 @@ describe('quota continuation storage', () => {
       const firstResult = await firstService.list()
       expect(firstResult).toMatchObject({
         scheduleAvailable: false,
-        continuations: [{
-          sessionId,
-          accountId: 'codex_work',
-          resetAt: null,
-          state: 'waiting',
-          scheduled: false,
-          ready: false,
-        }],
+        continuations: [
+          {
+            sessionId,
+            accountId: 'codex_work',
+            resetAt: null,
+            state: 'waiting',
+            scheduled: false,
+            ready: false,
+          },
+        ],
       })
       const [stored] = firstResult.continuations
       expect(stored).toBeDefined()
@@ -61,15 +63,17 @@ describe('quota continuation storage', () => {
       secondService = createQuotaContinuationService({ context: secondContext, readResetAt: async () => null })
       await expect(secondService.list()).resolves.toMatchObject({
         scheduleAvailable: false,
-        continuations: [{
-          continuationId: stored?.continuationId,
-          sessionId,
-          accountId: 'codex_work',
-          resetAt: null,
-          state: 'waiting',
-          scheduled: false,
-          ready: false,
-        }],
+        continuations: [
+          {
+            continuationId: stored?.continuationId,
+            sessionId,
+            accountId: 'codex_work',
+            resetAt: null,
+            state: 'waiting',
+            scheduled: false,
+            ready: false,
+          },
+        ],
       })
     } finally {
       await secondService?.close()

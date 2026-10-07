@@ -104,7 +104,7 @@ export const quotaHistoryCycles = (points: readonly UsageHistoryPoint[], label: 
   return [...cycles.values()]
 }
 
-const downsample = <T,>(values: readonly T[], limit: number): readonly T[] => {
+const downsample = <T>(values: readonly T[], limit: number): readonly T[] => {
   if (values.length <= limit) return values
   if (limit < 2) return values.slice(-limit)
   const last = values.length - 1
