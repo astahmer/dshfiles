@@ -274,11 +274,6 @@ body[data-ds-dark-theme] .rowTimeRunning {
   white-space: nowrap;
 }
 
-/*
- * The run state rides on the title as a leading dot rather than as a third
- * line: a row is the title plus one dimmer context line, which is what the
- * reference shows and what keeps the row at its reference height.
- */
 .runningDot {
   display: inline-flex;
   margin-right: 0.35em;
