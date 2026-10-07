@@ -17,6 +17,82 @@ export type ParentQuestionExpiryBehavior = z.infer<typeof parentQuestionExpiryBe
 export const deferredFilePathSchema = z.string()
   .regex(/^questions\/[A-Za-z0-9][A-Za-z0-9._-]*\.md$/)
 
+const isWorkspaceMarkdownPath = (path: string): boolean =>
+  path.endsWith('.md')
+  && !path.startsWith('/')
+  && !path.includes('\\')
+  && !path.includes('\0')
+  && path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..')
+
+export const workspaceMarkdownPathSchema = z.string()
+  .min(1)
+  .max(512)
+  .refine(isWorkspaceMarkdownPath)
+
+const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
+
+export const markdownFeedbackAnchorSchema = z.object({
+  kind: z.literal('markdown'),
+  path: workspaceMarkdownPathSchema,
+  revision: sha256Schema,
+  startLine: z.number().int().positive(),
+  endLine: z.number().int().positive(),
+  excerpt: z.string().min(1).max(4_000),
+}).strict().superRefine((anchor, context) => {
+  if (anchor.endLine < anchor.startLine || anchor.endLine - anchor.startLine >= 200) {
+    context.addIssue({
+      code: 'custom',
+      path: ['endLine'],
+      message: 'Markdown feedback anchors must cover at most 200 ordered lines.',
+    })
+  }
+})
+
+export const feedbackResolutionReceiptSchema = z.object({
+  disposition: z.enum(['accepted', 'rejected', 'deferred']),
+  note: z.string().trim().min(1).max(4_000).optional(),
+  baseRevision: sha256Schema,
+  observedRevision: sha256Schema.nullable(),
+  checkedAt: z.number().int().nonnegative(),
+}).strict()
+
+export const revisionedFeedbackRecordSchema = z.object({
+  feedbackId: z.string().uuid(),
+  parentSessionId: z.string().trim().min(1).max(256),
+  childSessionId: z.string().trim().min(1).max(256),
+  operationId: z.string().trim().min(1).max(256),
+  anchor: markdownFeedbackAnchorSchema,
+  comment: z.string().trim().min(1).max(4_000),
+  status: z.enum(['pending', 'resolved', 'stale', 'cancelled', 'delivery-failed']),
+  notificationMessageId: z.string().trim().min(1).max(256).optional(),
+  resolutionReceipt: feedbackResolutionReceiptSchema.optional(),
+  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+}).strict().superRefine((record, context) => {
+  if ((record.status === 'resolved' || record.status === 'stale') !== (record.resolutionReceipt !== undefined)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['resolutionReceipt'],
+      message: 'Resolved and stale feedback require a resolution receipt.',
+    })
+  }
+  if (record.status === 'resolved' && record.resolutionReceipt?.observedRevision !== record.anchor.revision) {
+    context.addIssue({
+      code: 'custom',
+      path: ['resolutionReceipt', 'observedRevision'],
+      message: 'Resolved feedback must match the anchored document revision.',
+    })
+  }
+  if (record.status === 'stale'
+    && record.resolutionReceipt?.observedRevision === record.anchor.revision) {
+    context.addIssue({
+      code: 'custom',
+      path: ['resolutionReceipt', 'observedRevision'],
+      message: 'Stale feedback cannot match the anchored document revision.',
+    })
+  }
+})
+
 export const parentQuestionRecordSchema = z.object({
   questionId: z.string().uuid(),
   parentSessionId: z.string().trim().min(1).max(256),
@@ -90,16 +166,24 @@ export const parentQuestionRecordSchema = z.object({
 export type ParentQuestionOption = z.infer<typeof parentQuestionOptionSchema>
 export type ParentQuestionRecord = z.infer<typeof parentQuestionRecordSchema>
 export type ParentQuestionTable = KvTable<string, ParentQuestionRecord>
+export type MarkdownFeedbackAnchor = z.infer<typeof markdownFeedbackAnchorSchema>
+export type FeedbackResolutionReceipt = z.infer<typeof feedbackResolutionReceiptSchema>
+export type RevisionedFeedbackRecord = z.infer<typeof revisionedFeedbackRecordSchema>
+export type RevisionedFeedbackTable = KvTable<string, RevisionedFeedbackRecord>
 
 export const parentQuestionDomain = defineDomain({
   name: 'dshfiles_agent_questions',
-  version: 2,
-  compatibleVersions: [1],
+  version: 3,
+  compatibleVersions: [1, 2],
   layout: 'per-record',
   tables: {
     questions: {
       valueSchema: parentQuestionRecordSchema,
       __key: 'questions',
+    },
+    feedback: {
+      valueSchema: revisionedFeedbackRecordSchema,
+      __key: 'feedback',
     },
   },
 })

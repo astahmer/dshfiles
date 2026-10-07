@@ -12,6 +12,11 @@ import {
   type ParentQuestionAgent,
   type ParentQuestionRuntime,
 } from './service.js'
+import {
+  createParentFeedbackService,
+  type ParentFeedbackAgent,
+  type ParentFeedbackRuntime,
+} from './revisioned-feedback.js'
 import { parentQuestionDomain, parentQuestionRecordSchema } from './store.js'
 
 const parent: ParentQuestionAgent = { id: 'root-session' }
@@ -42,12 +47,30 @@ const openQuestionStorage = async (root: string) => {
   await context.plugin(StorageJson, { root })
   await context.plugin(StorageDomain, { backend: 'json' })
   const domain = await context.storageDomain.open(parentQuestionDomain)
-  return { context, domain, table: domain.table('questions') }
+  return {
+    context,
+    domain,
+    table: domain.table('questions'),
+    feedbackTable: domain.table('feedback'),
+  }
 }
 
 const legacyQuestionDomain = StorageDomain.defineDomain({
   name: parentQuestionDomain.name,
   version: 1,
+  layout: 'per-record',
+  tables: {
+    questions: {
+      valueSchema: parentQuestionRecordSchema,
+      __key: 'questions',
+    },
+  },
+})
+
+const versionTwoQuestionDomain = StorageDomain.defineDomain({
+  name: parentQuestionDomain.name,
+  version: 2,
+  compatibleVersions: [1],
   layout: 'per-record',
   tables: {
     questions: {
@@ -63,6 +86,15 @@ const openLegacyQuestionStorage = async (root: string) => {
   await context.plugin(StorageJson, { root })
   await context.plugin(StorageDomain, { backend: 'json' })
   const domain = await context.storageDomain.open(legacyQuestionDomain)
+  return { context, domain, table: domain.table('questions') }
+}
+
+const openVersionTwoQuestionStorage = async (root: string) => {
+  const context = new Context()
+  await context.plugin(Storage)
+  await context.plugin(StorageJson, { root })
+  await context.plugin(StorageDomain, { backend: 'json' })
+  const domain = await context.storageDomain.open(versionTwoQuestionDomain)
   return { context, domain, table: domain.table('questions') }
 }
 
@@ -205,6 +237,47 @@ describe('parent question JSON storage', () => {
     }
   })
 
+  it('opens version 2 question storage with the new feedback table', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-agent-questions-v2-'))
+    let versionTwo: Awaited<ReturnType<typeof openVersionTwoQuestionStorage>> | undefined
+    let current: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+
+    try {
+      versionTwo = await openVersionTwoQuestionStorage(root)
+      await versionTwo.table.put('version-two-question', {
+        questionId: '00000000-0000-4000-8000-000000000002',
+        parentSessionId: parent.id,
+        childSessionId: child.id,
+        operationId: 'version-two-operation',
+        question: 'Keep this question during the storage upgrade?',
+        options: [
+          { id: 'keep', label: 'Keep' },
+          { id: 'remove', label: 'Remove' },
+        ],
+        status: 'pending',
+        createdAt: 1_000,
+        expiresAt: 2_000,
+        updatedAt: 1_000,
+      })
+      await versionTwo.domain.close()
+      await versionTwo.context.fiber.dispose()
+      versionTwo = undefined
+
+      current = await openQuestionStorage(root)
+      expect(current.feedbackTable.size).toBe(0)
+      expect([...current.table.entries()]).toMatchObject([[
+        'version-two-question',
+        { questionId: '00000000-0000-4000-8000-000000000002', status: 'pending' },
+      ]])
+    } finally {
+      await current?.domain.close()
+      await current?.context.fiber.dispose()
+      await versionTwo?.domain.close()
+      await versionTwo?.context.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reattaches to a deferred outcome and file path after JSON domain reopen', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-agent-questions-deferred-'))
     let first: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
@@ -258,6 +331,75 @@ describe('parent question JSON storage', () => {
 
       expect(attached).toMatchObject({ kind: 'deferred', filePath: 'questions/2026-10-06T10-00-00-000Z_release-plan.md' })
       expect(recovered).toEqual(attached)
+    } finally {
+      await firstService?.close()
+      await first?.domain.close()
+      await first?.context.fiber.dispose()
+      await secondService?.close()
+      await second?.domain.close()
+      await second?.context.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves anchored feedback and late resolution receipts across JSON domain reopen', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-agent-feedback-'))
+    const parentAgent: ParentFeedbackAgent = { id: 'feedback-parent' }
+    const childAgent: ParentFeedbackAgent = { id: 'feedback-child' }
+    const revision = 'c'.repeat(64)
+    const runtime: ParentFeedbackRuntime = {
+      isLive: agent => agent === parentAgent || agent === childAgent,
+      parentSessionId: childSessionId => childSessionId === childAgent.id ? parentAgent.id : undefined,
+      isDirectChild: (childSessionId, parentSessionId) =>
+        childSessionId === childAgent.id && parentSessionId === parentAgent.id,
+      currentRevision: async () => revision,
+      sendToParent: async ({ record }) => `parent-message-${record.feedbackId}`,
+      sendToChild: async () => undefined,
+    }
+    let first: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+    let second: Awaited<ReturnType<typeof openQuestionStorage>> | undefined
+    let firstService: ReturnType<typeof createParentFeedbackService> | undefined
+    let secondService: ReturnType<typeof createParentFeedbackService> | undefined
+
+    try {
+      const opened = await openQuestionStorage(root)
+      first = opened
+      firstService = createParentFeedbackService({ table: async () => opened.feedbackTable, runtime })
+      const submitted = await firstService.submit({
+        agent: childAgent,
+        operationId: 'feedback-call-1',
+        anchor: {
+          kind: 'markdown',
+          path: 'docs/guide.md',
+          revision,
+          startLine: 4,
+          endLine: 4,
+          excerpt: 'Preserve this behavior.',
+        },
+        comment: 'Keep the existing recovery guarantee.',
+        signal: new AbortController().signal,
+      })
+      await firstService.close()
+      await first.domain.close()
+      await first.context.fiber.dispose()
+      first = undefined
+
+      const reopened = await openQuestionStorage(root)
+      second = reopened
+      secondService = createParentFeedbackService({ table: async () => reopened.feedbackTable, runtime })
+      expect((await secondService.read({ agent: childAgent, feedbackId: submitted.feedbackId })).status).toBe('pending')
+      await secondService.answerMany({
+        agent: parentAgent,
+        responses: [{ feedbackId: submitted.feedbackId, disposition: 'accepted', note: 'Agreed.' }],
+        signal: new AbortController().signal,
+      })
+
+      const recovered = await secondService.read({ agent: childAgent, feedbackId: submitted.feedbackId })
+      expect(recovered).toMatchObject({
+        status: 'resolved',
+        anchor: { path: 'docs/guide.md', revision },
+        resolutionReceipt: { disposition: 'accepted', observedRevision: revision },
+      })
     } finally {
       await firstService?.close()
       await first?.domain.close()

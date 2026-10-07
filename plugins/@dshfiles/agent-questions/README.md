@@ -30,3 +30,12 @@ durable pending rows.
 The child tool waits up to three minutes. On expiry, it either returns the
 selected recommendation or writes and records the deferred file before the
 child continues.
+
+The same Host bundle supports revisioned Markdown feedback. A child submits an
+exact workspace-relative line excerpt; the Host records its whole-file SHA-256
+revision and rejects unsafe paths, symlinks, or excerpts that no longer match.
+The direct parent can resolve up to 20 items in one call. Each resolution has a
+durable receipt, and the child can retrieve it later after a one-way wakeup or
+Host restart. If the document changes or becomes unreadable before resolution
+or retrieval, the receipt is marked stale and the feedback must be re-anchored
+before the child acts. Element anchors still require a browser/evidence provider.

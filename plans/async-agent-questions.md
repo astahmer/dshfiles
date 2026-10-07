@@ -375,8 +375,9 @@ resolution, and retrieval; changed or unreadable documents produce a durable
 stale receipt and are never applied automatically. JSON Storage Domain v3
 remains compatible with version 1 and 2 question data. Service and JSON-backend
 tests cover service/domain reopen, child shutdown, the 20-item limit, stale
-targets, and later retrieval. They do not prove an actual provider-backed child
-cold-resume. Element anchors remain gated on an accepted browser/evidence
+targets, and later retrieval. Scratch Host tests with a local synthetic LLM adapter prove provider-backed child
+cold-resume across Host restart and durable receipt retrieval; this remains synthetic
+evidence, not real-provider acceptance. Element anchors remain gated on an accepted browser/evidence
 provider; no browser or human-answer acceptance is claimed by scratch Host boot.
 
 ## Open questions
