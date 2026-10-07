@@ -25,7 +25,7 @@ import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
-import { COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute } from './provider-routes.js'
+import { COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute, type Route } from './provider-routes.js'
 export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND } from './provider-routes.js'
 
 /**
