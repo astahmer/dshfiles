@@ -10,6 +10,9 @@
 - id: agent-loop
   name: '@deepseek-ai/dsh-agent-loop'
   disabled: true
+- id: session-controller
+  name: '@deepseek-ai/dsh-api-session-controller'
+  disabled: true
 - insert:
     - id: dshfiles-core-runtime
       name: '@dshfiles/dsh-core-runtime'
