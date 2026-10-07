@@ -1029,6 +1029,31 @@ describe('fork', () => {
     expect(b.mock.remote.session.fork).toHaveBeenCalledExactlyOnceWith({ sessionId: 'source', atSeq: 41 })
   })
 
+  it('forwards an explicit provider target to the Host fork boundary', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'source', cwd: '/work' }])
+    b.mock.remote.session.fork.mockResolvedValue(ok({ sessionId: sid('child') }))
+    const runtimeBinding = { driverKind: 'cursor-agent', instanceId: 'work-account' }
+
+    await expect(b.svc.fork({ sessionId: sid('source'), runtimeBinding })).resolves.toBe('child')
+
+    expect(b.mock.remote.session.fork).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'source', runtimeBinding,
+    })
+  })
+
+  it('forwards an explicit native runtime target without confusing it with omission', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'source', cwd: '/work' }])
+    b.mock.remote.session.fork.mockResolvedValue(ok({ sessionId: sid('child') }))
+
+    await expect(b.svc.fork({ sessionId: sid('source'), runtimeBinding: null })).resolves.toBe('child')
+
+    expect(b.mock.remote.session.fork).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'source', runtimeBinding: null,
+    })
+  })
+
   it('does not rename without the title policy or a durable source title', async ({ bench }) => {
     const b = bench()
     await feedList(b, [{ id: 'source', cwd: '/work' }])

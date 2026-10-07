@@ -300,4 +300,95 @@ describe('Session fork failures', () => {
     expect(options.meta?.runtimeBinding).toEqual(runtimeBinding)
     await ctx.fiber.dispose()
   })
+
+  it('uses an explicit runtime selection for the forked child', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const sourceBinding = { driverKind: 'source-cli', instanceId: 'old-account' }
+    const targetBinding = { driverKind: 'cursor-agent', instanceId: 'new-account' }
+    const source = completedSession(ctx, 'runtime-target-source', '/workspace', {
+      runtimeBinding: sourceBinding,
+    })
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await controller.fork({ sessionId: source.id, runtimeBinding: targetBinding })
+
+    const options = create.mock.calls[0]?.[0]
+    if (options === undefined) throw new Error('Agent creation was not attempted')
+    expect(options.meta?.runtimeBinding).toEqual(targetBinding)
+    expect(source.header.runtimeBinding).toEqual(sourceBinding)
+    await ctx.fiber.dispose()
+  })
+
+  it('clears an inherited runtime selection when native DSH is requested', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'native-runtime-source', '/workspace', {
+      runtimeBinding: { driverKind: 'cursor-agent', instanceId: 'external-account' },
+    })
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await controller.fork({ sessionId: source.id, runtimeBinding: null })
+
+    const options = create.mock.calls[0]?.[0]
+    if (options === undefined) throw new Error('Agent creation was not attempted')
+    expect(options.meta).not.toHaveProperty('runtimeBinding')
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects malformed runtime selections before creating a child', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'invalid-runtime-source')
+    const create = vi.spyOn(ctx.agents, 'create')
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await expectFailure(controller.fork({
+      sessionId: source.id,
+      runtimeBinding: { driverKind: 'bad_driver', instanceId: 'bad/id' },
+    }), 'gateway/bad-request')
+
+    expect(create).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('lets AgentRegistry reject a target that cannot replay fork history', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    ctx.agents.registerRuntimeDriver({
+      descriptor: {
+        id: 'history-limited',
+        title: 'History limited',
+        protocolVersion: 1,
+        capabilities: {
+          create: true,
+          resume: true,
+          fork: false,
+          historyReplay: false,
+          steering: false,
+          rollback: false,
+        },
+      },
+      create: () => Promise.reject(new Error('unused runtime create')),
+      resume: () => Promise.reject(new Error('unused runtime resume')),
+      status: () => Promise.resolve({ availability: 'available', authentication: 'unknown' }),
+    })
+    const source = completedSession(ctx, 'limited-runtime-source')
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await expect(controller.fork({
+      sessionId: source.id,
+      runtimeBinding: { driverKind: 'history-limited', instanceId: 'instance-1' },
+    })).rejects.toMatchObject({
+      code: 'gateway/internal',
+      message: expect.stringContaining('runtime driver does not support fork: history-limited'),
+    })
+    await ctx.fiber.dispose()
+  })
 })

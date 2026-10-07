@@ -242,6 +242,14 @@ export class SessionCommandController {
     } catch {
       throw new RemoteError('gateway/bad-request', 'atSeq must be a non-negative safe integer', {})
     }
+    let runtimeSelection: SessionForkRequest['runtimeBinding']
+    try {
+      runtimeSelection = request.runtimeBinding === undefined || request.runtimeBinding === null
+        ? request.runtimeBinding
+        : sessionRuntimeSelectionSchema.parse(request.runtimeBinding)
+    } catch {
+      throw new RemoteError('gateway/bad-request', 'session.fork runtimeBinding is invalid', {})
+    }
     let observed: SessionObservation
     try {
       observed = await this.ctx.sessionQuery.observeSession(request.sessionId)
@@ -259,6 +267,9 @@ export class SessionCommandController {
       )
     }
     using source = observed
+    const runtimeBinding = runtimeSelection === undefined
+      ? source.header.runtimeBinding
+      : runtimeSelection ?? undefined
     const boundary = atSeq ?? latestCompletedPrefixBoundary(source.events)
     if (boundary === undefined || source.events[boundary]?.seq !== boundary) {
       throw new RemoteError(
@@ -295,12 +306,12 @@ export class SessionCommandController {
           ...(composition.agentPreset === undefined
             ? {}
             : { agentPreset: composition.agentPreset }),
-          ...(source.header.runtimeBinding === undefined
+          ...(runtimeBinding === undefined
             ? {}
             : {
               runtimeBinding: {
-                driverKind: source.header.runtimeBinding.driverKind,
-                instanceId: source.header.runtimeBinding.instanceId,
+                driverKind: runtimeBinding.driverKind,
+                instanceId: runtimeBinding.instanceId,
               },
             }),
         },

@@ -6,7 +6,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionId, SessionRuntimeSelection } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type {
@@ -161,6 +161,8 @@ export interface ISessions {
   fork(opts: {
     sessionId: SessionId
     atSeq?: number
+    /** Child runtime selection; omission inherits the source, and null selects the native DSH runtime. */
+    runtimeBinding?: SessionRuntimeSelection | null
     increaseTitle?: boolean
     onCreated?: (childId: SessionId) => void
   }): Promise<SessionId>

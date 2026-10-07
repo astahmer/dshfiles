@@ -1,7 +1,9 @@
 /** Host catalog, durable projection caches, and explicitly retained Client instances. */
 
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
-import { SessionSeq, type SessionId, type SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
+import {
+  SessionSeq, type SessionId, type SessionRuntimeSelection, type SessionSeqCursor,
+} from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type {
@@ -568,12 +570,17 @@ export class SessionManager {
    * @returns the fork result (the child session id).
    */
   async fork(
-    opts: { sessionId: SessionId; atSeq?: SessionSeq },
+    opts: {
+      sessionId: SessionId
+      atSeq?: SessionSeq
+      runtimeBinding?: SessionRuntimeSelection | null
+    },
   ): Promise<RemoteResult<{ sessionId: SessionId }>> {
     const source = this.summaries.find(s => s.sessionId === opts.sessionId)
     const result = await this.remote.session.fork({
       sessionId: opts.sessionId,
       ...opts.atSeq === undefined ? {} : { atSeq: opts.atSeq },
+      ...opts.runtimeBinding === undefined ? {} : { runtimeBinding: opts.runtimeBinding },
     })
     const childId = result.ok
       ? result.value.sessionId

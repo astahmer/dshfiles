@@ -351,6 +351,8 @@ export interface SessionForkRequest {
   readonly sessionId: SessionId
   /** Exact inclusive source event seq; omission selects the latest completed-turn prefix. */
   readonly atSeq?: number
+  /** Child runtime selection; omission inherits the source, and null selects the native DSH runtime. */
+  readonly runtimeBinding?: SessionRuntimeSelection | null
 }
 
 /** Identity of a newly forked Session. */
