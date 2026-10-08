@@ -11,6 +11,7 @@ import { KIND_GROUPS, KIND_LABEL, STATE_LABEL } from './account-labels.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
+import { NativeProvidersList } from './native-providers-list.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { usePreferences } from './use-preferences.js'
 
@@ -203,6 +204,10 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
         })}
       </ul>
       {file !== null && file.accounts.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">No accounts yet.</p> : null}
+      <div className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-1.5">
+        <h4 className="dshx:text-xs dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">Native providers</h4>
+        <NativeProvidersList />
+      </div>
     </section>
   )
 }

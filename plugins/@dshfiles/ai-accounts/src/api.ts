@@ -188,6 +188,33 @@ export const accountsCatalogSchema = z.object({
   ),
 })
 
+export const nativeProvidersSchema = z.object({
+  /** False when this Host has no profile patch to write (no profile context or Loader). */
+  available: z.boolean(),
+  /** Whether a patch edit applies live (HMR watches the patch) or only after a restart. */
+  liveReload: z.boolean(),
+  reason: z.string().max(300).nullable(),
+  providers: z
+    .array(
+      z.object({
+        /** The Loader row id, e.g. `llm-deepseek`. */
+        entryId: z.string().min(1).max(128),
+        label: z.string().max(200),
+        /** Model routes the row serves while it runs. */
+        routes: z.array(z.string().max(128)).max(64),
+        /** What the profile patch asks for. */
+        enabled: z.boolean(),
+        /** What the running Host currently has; differs from `enabled` until reload or restart. */
+        running: z.boolean(),
+        /** Set when the row is disabled by a patch this plugin did not write, so the switch cannot undo it. */
+        lockedReason: z.string().max(300).nullable(),
+      }),
+    )
+    .max(64),
+})
+
+export type NativeProviders = z.infer<typeof nativeProvidersSchema>
+
 export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
@@ -291,6 +318,16 @@ export const aiAccountsApi = defineApi({
      * card rather than the panel. Concurrent surfaces share one cached sweep.
      */
     usage: method({ input: z.void(), output: accountsUsageSchema }),
+    /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */
+    nativeProviders: method({ input: z.void(), output: nativeProvidersSchema }),
+    /**
+     * Switch one native provider row off or back on in the profile patch. Only
+     * the row's `disabled` flag changes; its config and credentials stay.
+     */
+    setNativeProviderEnabled: method({
+      input: z.object({ entryId: z.string().min(1).max(128), enabled: z.boolean() }),
+      output: nativeProvidersSchema,
+    }),
     /** Bypass the shared short-lived sweep cache, for an explicit refresh. */
     refreshUsage: method({ input: z.void(), output: accountsUsageSchema }),
 

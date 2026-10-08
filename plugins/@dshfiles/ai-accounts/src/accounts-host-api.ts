@@ -7,6 +7,7 @@ import { buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount,
 import { readAccountUsage } from './account-usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
+import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -68,6 +69,8 @@ export const accountsHostApi = aiAccountsApi.host({
     )
     return { instanceId: input.instanceId, models: resolved }
   },
+  nativeProviders: async ({ ctx }) => readNativeProviders(ctx),
+  setNativeProviderEnabled: async ({ input, ctx }) => setNativeProviderEnabled(ctx, input),
   usage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx),
   refreshUsage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx),
   history: async ({ input, ctx }) => ({

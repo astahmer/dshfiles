@@ -4,6 +4,7 @@ import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { AccountGroup } from './account-group.js'
 import { KIND_ACCENT, KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsFile } from './api.js'
+import { NativeProvidersList } from './native-providers-list.js'
 import { ProviderMark } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
@@ -42,6 +43,10 @@ export const AccountRail = (props: { readonly state: AccountsPanelState; readonl
         selectedId={props.state.selectedId}
       />
     ))}
+    <section className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pt-3">
+      <h2 className="dshx:px-2 dshx:pb-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">Native providers</h2>
+      <NativeProvidersList compact />
+    </section>
     <p className="dshx:mt-auto dshx:px-2 dshx:pt-3.5 dshx:text-xs dshx:text-muted-foreground">
       Credentials stay in each provider&apos;s own account directory.
     </p>
