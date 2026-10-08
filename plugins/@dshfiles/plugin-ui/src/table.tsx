@@ -1,7 +1,8 @@
 import type { Column, ReactTable, RowData, SortDirection, TableFeatures } from '@tanstack/react-table'
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { joinClassNames } from './field.js'
-import styles from './table.module.css'
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
+import { cn } from './lib/utils'
 
 export * from '@tanstack/react-table'
 
@@ -16,8 +17,6 @@ const isSortable = (column: object): column is SortableColumn => 'getCanSort' in
 const ariaSort = (direction: false | SortDirection): 'ascending' | 'descending' | undefined =>
   direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : undefined
 
-const SORT_GLYPH: Record<SortDirection, string> = { asc: '▲', desc: '▼' }
-
 export interface DataTableProps<TFeatures extends TableFeatures, TData extends RowData> {
   readonly table: ReactTable<TFeatures, TData, unknown>
   readonly caption?: ReactNode
@@ -29,68 +28,70 @@ export interface DataTableProps<TFeatures extends TableFeatures, TData extends R
 }
 
 /**
- * Semantic `<table>` for any TanStack Table v9 instance. Headers become sort
- * buttons with `aria-sort` when the table registers `rowSortingFeature`.
+ * shadcn `Table` in a bordered card (BB Secret Catalog) for any TanStack Table v9 instance.
+ * Headers become sort buttons with `aria-sort` when the table registers `rowSortingFeature`.
  */
 export const DataTable = <TFeatures extends TableFeatures, TData extends RowData>(props: DataTableProps<TFeatures, TData>): JSX.Element => {
   const { table } = props
   const rows = table.getRowModel().rows
   const columnCount = table.getAllLeafColumns().length
   return (
-    <div className={joinClassNames(styles.wrap, props.className)}>
-      <table className={styles.table}>
-        {props.caption !== undefined && <caption className={styles.caption}>{props.caption}</caption>}
-        <thead>
+    <div className={cn('dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card', props.className)}>
+      <Table>
+        {props.caption !== undefined && <TableCaption>{props.caption}</TableCaption>}
+        <TableHeader className="dshx:bg-muted/60">
           {table.getHeaderGroups().map(group => (
-            <tr key={group.id}>
+            <TableRow className="dshx:hover:bg-transparent" key={group.id}>
               {group.headers.map(header => {
                 const column: Column<TFeatures, TData, unknown> = header.column
                 const sortable = isSortable(column) && column.getCanSort()
                 const direction = isSortable(column) ? column.getIsSorted() : false
                 const content = header.isPlaceholder ? null : <table.FlexRender header={header} />
+                const SortIcon = direction === 'asc' ? ArrowUpIcon : direction === 'desc' ? ArrowDownIcon : ArrowUpDownIcon
                 return (
-                  <th
+                  <TableHead
                     aria-sort={ariaSort(direction)}
-                    className={joinClassNames(styles.headerCell, props.cellClassName?.(column.id))}
+                    className={cn(
+                      'dshx:h-9 dshx:px-4 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase',
+                      props.cellClassName?.(column.id),
+                    )}
                     colSpan={header.colSpan}
                     key={header.id}
                     scope="col"
                   >
                     {sortable && isSortable(column) ? (
-                      <button className={styles.sortButton} onClick={column.getToggleSortingHandler()} type="button">
+                      <button className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:uppercase dshx:hover:text-foreground" onClick={column.getToggleSortingHandler()} type="button">
                         {content}
-                        <span aria-hidden className={styles.sortIndicator}>
-                          {direction === false ? '↕' : SORT_GLYPH[direction]}
-                        </span>
+                        <SortIcon aria-hidden className="dshx:size-3" />
                       </button>
                     ) : (
                       content
                     )}
-                  </th>
+                  </TableHead>
                 )
               })}
-            </tr>
+            </TableRow>
           ))}
-        </thead>
-        <tbody>
+        </TableHeader>
+        <TableBody>
           {rows.map(row => (
-            <tr className={joinClassNames(styles.row, props.rowClassName?.(row.original))} key={row.id}>
+            <TableRow className={props.rowClassName?.(row.original)} key={row.id}>
               {row.getAllCells().map(cell => (
-                <td className={joinClassNames(styles.cell, props.cellClassName?.(cell.column.id))} key={cell.id}>
+                <TableCell className={cn('dshx:px-4 dshx:py-3', props.cellClassName?.(cell.column.id))} key={cell.id}>
                   <table.FlexRender cell={cell} />
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
           {rows.length === 0 && props.empty !== undefined && (
-            <tr>
-              <td className={styles.emptyCell} colSpan={columnCount}>
+            <TableRow className="dshx:hover:bg-transparent">
+              <TableCell className="dshx:py-8 dshx:text-center dshx:text-muted-foreground" colSpan={columnCount}>
                 {props.empty}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

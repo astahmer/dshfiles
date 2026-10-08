@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": "dshx"
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@dshfiles/plugin-ui/components",
+    "utils": "@dshfiles/plugin-ui/lib/utils",
+    "ui": "@dshfiles/plugin-ui/components/ui",
+    "lib": "@dshfiles/plugin-ui/lib",
+    "hooks": "@dshfiles/plugin-ui/hooks"
+  }
+}

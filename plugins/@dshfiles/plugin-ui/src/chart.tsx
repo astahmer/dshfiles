@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import { joinClassNames } from './field.js'
-import styles from './chart.module.css'
+import { cn } from './lib/utils'
 
 export * from '@tanstack/charts'
 export { Chart } from '@tanstack/charts/react'
@@ -23,11 +22,18 @@ export interface ChartFrameProps {
  * follows the active theme without rebuilding its definition.
  */
 export const ChartFrame = (props: ChartFrameProps): JSX.Element => (
-  <figure className={joinClassNames(styles.frame, props.className)}>
+  <figure
+    className={cn(
+      'dshx:m-0 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground',
+      'dshx:[--ts-chart-1:var(--dsw-alias-state-business-primary)] dshx:[--ts-chart-2:var(--dsw-alias-state-success-primary)] dshx:[--ts-chart-3:var(--dsw-alias-state-warn-primary)]',
+      'dshx:[--ts-chart-4:var(--dsw-alias-state-error-primary)] dshx:[--ts-chart-5:var(--dsw-alias-brand-primary)] dshx:[--ts-chart-6:var(--dsw-alias-label-tertiary)]',
+      props.className,
+    )}
+  >
     {(props.title !== undefined || props.description !== undefined) && (
-      <figcaption className={styles.caption}>
-        {props.title !== undefined && <span className={styles.title}>{props.title}</span>}
-        {props.description !== undefined && <span className={styles.description}>{props.description}</span>}
+      <figcaption className="dshx:flex dshx:flex-col dshx:gap-0.5">
+        {props.title !== undefined && <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{props.title}</span>}
+        {props.description !== undefined && <span className="dshx:text-xs">{props.description}</span>}
       </figcaption>
     )}
     {props.children}

@@ -1,7 +1,13 @@
-import { Button, Checkbox, Input, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createFormHook, createFormHookContexts } from '@tanstack/react-form'
-import type { ReactNode } from 'react'
-import { Field, Select, TextArea, type SelectOption } from './field.js'
+import { useId, type ReactNode } from 'react'
+import { Button } from './components/ui/button'
+import { Checkbox } from './components/ui/checkbox'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from './components/ui/field'
+import { Input } from './components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Switch } from './components/ui/switch'
+import { Textarea } from './components/ui/textarea'
+import { cn } from './lib/utils'
 
 export * from '@tanstack/react-form'
 
@@ -25,80 +31,140 @@ interface LabelledFieldProps {
   readonly label: ReactNode
   readonly description?: ReactNode
   readonly required?: boolean
+  readonly className?: string
 }
 
-const labelledProps = (props: LabelledFieldProps): LabelledFieldProps => ({
-  label: props.label,
-  ...(props.description === undefined ? {} : { description: props.description }),
-  ...(props.required === undefined ? {} : { required: props.required }),
-})
+/** Label, description and error wired to one control by id (`aria-describedby`, `aria-invalid`). */
+const LabelledField = (props: LabelledFieldProps & { readonly children: (control: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: true }) => ReactNode }): JSX.Element => {
+  const id = useId()
+  const errors = useVisibleErrors()
+  const descriptionId = `${id}-description`
+  const errorId = `${id}-error`
+  const describedBy = [props.description === undefined ? undefined : descriptionId, errors.length === 0 ? undefined : errorId].filter(Boolean).join(' ')
+  return (
+    <Field className={props.className} data-invalid={errors.length > 0 || undefined}>
+      <FieldLabel htmlFor={id}>
+        {props.label}
+        {props.required === true && (
+          <span aria-hidden className="dshx:text-destructive">
+            *
+          </span>
+        )}
+      </FieldLabel>
+      {props.children({
+        id,
+        ...(describedBy.length === 0 ? {} : { 'aria-describedby': describedBy }),
+        ...(errors.length === 0 ? {} : { 'aria-invalid': true as const }),
+      })}
+      {props.description !== undefined && <FieldDescription id={descriptionId}>{props.description}</FieldDescription>}
+      <FieldError errors={errors.map(message => ({ message }))} id={errorId} />
+    </Field>
+  )
+}
 
 const TextField = (
   props: LabelledFieldProps & {
     readonly placeholder?: string
     readonly type?: 'text' | 'url' | 'email' | 'password' | 'number'
     readonly autoComplete?: string
+    readonly monospace?: boolean
   },
 ): JSX.Element => {
   const field = useFieldContext<string>()
   return (
-    <Field {...labelledProps(props)} error={useVisibleErrors()}>
+    <LabelledField {...props}>
       {control => (
         <Input
           {...control}
           autoComplete={props.autoComplete ?? 'off'}
+          className={cn(props.monospace === true && 'dshx:font-mono')}
           name={field.name}
           onBlur={field.handleBlur}
           onChange={event => field.handleChange(event.currentTarget.value)}
           placeholder={props.placeholder}
+          required={props.required}
           type={props.type ?? 'text'}
           value={field.state.value}
         />
       )}
-    </Field>
+    </LabelledField>
   )
 }
 
 const TextAreaField = (props: LabelledFieldProps & { readonly placeholder?: string; readonly rows?: number; readonly monospace?: boolean }): JSX.Element => {
   const field = useFieldContext<string>()
   return (
-    <Field {...labelledProps(props)} error={useVisibleErrors()}>
+    <LabelledField {...props}>
       {control => (
-        <TextArea
+        <Textarea
           {...control}
-          monospace={props.monospace}
+          className={cn(props.monospace === true && 'dshx:font-mono dshx:text-xs')}
           name={field.name}
           onBlur={field.handleBlur}
           onChange={event => field.handleChange(event.currentTarget.value)}
           placeholder={props.placeholder}
+          required={props.required}
           rows={props.rows}
           value={field.state.value}
         />
       )}
-    </Field>
+    </LabelledField>
   )
 }
 
-const SelectField = <Value extends string>(props: LabelledFieldProps & { readonly options: readonly SelectOption<Value>[] }): JSX.Element => {
+export interface SelectOption<Value extends string> {
+  readonly value: Value
+  readonly label: string
+  readonly disabled?: boolean
+}
+
+const SelectField = <Value extends string>(props: LabelledFieldProps & { readonly options: readonly SelectOption<Value>[]; readonly placeholder?: string }): JSX.Element => {
   const field = useFieldContext<Value>()
   return (
-    <Field {...labelledProps(props)} error={useVisibleErrors()}>
+    <LabelledField {...props}>
       {control => (
-        <Select {...control} name={field.name} onBlur={field.handleBlur} onValueChange={field.handleChange} options={props.options} value={field.state.value} />
+        <Select
+          name={field.name}
+          onValueChange={value => {
+            const next = props.options.find(option => option.value === value)
+            if (next !== undefined) field.handleChange(next.value)
+          }}
+          value={field.state.value}
+        >
+          <SelectTrigger {...control} className="dshx:w-full" onBlur={field.handleBlur}>
+            <SelectValue placeholder={props.placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {props.options.map(option => (
+              <SelectItem disabled={option.disabled} key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
+    </LabelledField>
+  )
+}
+
+const ToggleField = (props: { readonly label: ReactNode; readonly description?: ReactNode; readonly kind: 'checkbox' | 'switch' }): JSX.Element => {
+  const field = useFieldContext<boolean>()
+  const id = useId()
+  const Control = props.kind === 'checkbox' ? Checkbox : Switch
+  return (
+    <Field orientation="horizontal">
+      <Control checked={field.state.value} id={id} name={field.name} onBlur={field.handleBlur} onCheckedChange={checked => field.handleChange(checked === true)} />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
+        {props.description !== undefined && <FieldDescription>{props.description}</FieldDescription>}
+      </FieldContent>
     </Field>
   )
 }
 
-const CheckboxField = (props: { readonly label: string; readonly title?: string }): JSX.Element => {
-  const field = useFieldContext<boolean>()
-  return <Checkbox checked={field.state.value} label={props.label} onChange={field.handleChange} title={props.title} />
-}
+const CheckboxField = (props: { readonly label: ReactNode; readonly description?: ReactNode }): JSX.Element => <ToggleField {...props} kind="checkbox" />
 
-const SwitchField = (props: { readonly label: string; readonly title?: string }): JSX.Element => {
-  const field = useFieldContext<boolean>()
-  return <Switch checked={field.state.value} label={props.label} onChange={field.handleChange} title={props.title} />
-}
+const SwitchField = (props: { readonly label: ReactNode; readonly description?: ReactNode }): JSX.Element => <ToggleField {...props} kind="switch" />
 
 /** Submit button that disables itself while the form is invalid or submitting. */
 const SubmitButton = (props: { readonly children: ReactNode; readonly className?: string; readonly disabled?: boolean }): JSX.Element => {
@@ -106,7 +172,7 @@ const SubmitButton = (props: { readonly children: ReactNode; readonly className?
   return (
     <form.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
       {([canSubmit, isSubmitting]) => (
-        <Button className={props.className} disabled={props.disabled === true || !canSubmit || isSubmitting} type="submit" variant="primary">
+        <Button className={props.className} disabled={props.disabled === true || !canSubmit || isSubmitting} type="submit">
           {props.children}
         </Button>
       )}

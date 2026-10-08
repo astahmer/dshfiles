@@ -1,0 +1,114 @@
+/*
+ * shadcn on Tailwind v4 for DSH plugins: `dshx:` prefix, no global Preflight (dshx contract).
+ * shadcn's semantic colors resolve straight to the Host `--dsw-*` theme, so light/dark follow DSH.
+ * Each plugin's client stylesheet imports this file and adds `@source` for its own sources.
+ */
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme) prefix(dshx);
+@import 'tailwindcss/utilities.css' layer(utilities) source('./') prefix(dshx);
+@import 'tw-animate-css' prefix(dshx);
+
+@custom-variant dark (&:where(body[data-ds-dark-theme] *));
+
+@theme inline {
+  --font-sans: var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.45;
+
+  --color-background: var(--dsw-alias-bg-base);
+  --color-foreground: var(--dsw-alias-label-primary);
+  --color-card: var(--dsw-alias-bg-layer-1);
+  --color-card-foreground: var(--dsw-alias-label-primary);
+  --color-popover: var(--dsw-alias-bg-layer-2);
+  --color-popover-foreground: var(--dsw-alias-label-primary);
+  --color-primary: var(--dsw-alias-brand-primary);
+  --color-primary-foreground: var(--dsw-alias-label-primary-foreground);
+  --color-secondary: var(--dsw-alias-bg-module-platform);
+  --color-secondary-foreground: var(--dsw-alias-label-primary);
+  --color-muted: var(--dsw-alias-bg-module-platform);
+  --color-muted-foreground: var(--dsw-alias-label-secondary);
+  --color-accent: var(--dsw-alias-interactive-bg-hover);
+  --color-accent-foreground: var(--dsw-alias-label-primary);
+  --color-destructive: var(--dsw-alias-state-error-primary);
+  --color-border: var(--dsw-alias-border-l2);
+  --color-input: var(--dsw-alias-border-l3);
+  --color-ring: var(--dsw-alias-state-business-primary);
+  --color-info: var(--dsw-alias-state-business-primary);
+  --color-success: var(--dsw-alias-state-success-primary);
+  --color-warning: var(--dsw-alias-state-warn-primary);
+  --color-chart-1: var(--dsw-alias-state-business-primary);
+  --color-chart-2: var(--dsw-alias-state-success-primary);
+  --color-chart-3: var(--dsw-alias-state-warn-primary);
+  --color-chart-4: var(--dsw-alias-state-error-primary);
+  --color-chart-5: var(--dsw-alias-label-tertiary);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+/* Preflight, scoped to plugin roots and shadcn parts (their portals carry `data-slot`). */
+@layer base {
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *),
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *)::before,
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *)::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid var(--dsw-alias-border-l2);
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(button, input, select, textarea, optgroup) {
+    font: inherit;
+    font-feature-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(button, [role='button'], select, summary) {
+    cursor: pointer;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(button, input, select, textarea):disabled {
+    cursor: not-allowed;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(h1, h2, h3, h4, h5, h6) {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(ol, ul, menu) {
+    list-style: none;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(a) {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *):is(table) {
+    border-collapse: collapse;
+    text-indent: 0;
+  }
+
+  :where(.dshx-root, .dshx-root *, [data-slot], [data-slot] *)::placeholder {
+    color: var(--dsw-alias-label-tertiary);
+    opacity: 1;
+  }
+
+  .dshx-root {
+    color: var(--dsw-alias-label-primary);
+    font: 0.8125rem/1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+  }
+}
