@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "zod": "^4.4.3"
   },
   "devDependencies": {

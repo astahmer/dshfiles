@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { JujutsuPanel } from './client.js'
+import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
 const RIGHT_PANE_ID = '@dshfiles/jujutsu/revision-graph'

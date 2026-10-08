@@ -13,6 +13,7 @@ import { ThreadSidebar } from './client.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
+import './client.css'
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',

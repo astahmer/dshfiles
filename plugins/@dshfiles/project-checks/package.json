@@ -22,6 +22,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "zod": "^4.4.3"
   },
   "devDependencies": {

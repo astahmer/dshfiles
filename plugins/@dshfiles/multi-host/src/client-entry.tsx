@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { MultiHostPanel } from './client.js'
+import './client.css'
 
 const panelId = 'dshfiles-multi-host'
 

@@ -7,6 +7,7 @@ import { QuotaFooter } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
+import './client.css'
 
 /**
  * The accounts page is a main panel with its own sidebar row, the same shape the

@@ -5,6 +5,7 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { type DockProps, DraggableQueueDock } from './client.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
+import './client.css'
 
 /**
  * Replaces the shipped `queue` dock with a draggable one.

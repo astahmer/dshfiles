@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import PromptLibraryAction from './prompt-stash-action.js'
 import { PromptStashAction as PromptDraftsAction } from './prompt-stash.js'
+import './client.css'
 
 export default defineClientPlugin({
   id: 'prompt-stash',

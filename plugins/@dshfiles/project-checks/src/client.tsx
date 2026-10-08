@@ -5,6 +5,7 @@ import { defineClient, useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { projectChecksApi, type ProjectActionView, type ProjectCheckReceipt, type ProjectHookEvent } from './api.js'
 import styles from './project-checks.module.css'
+import './client.css'
 
 type Listener = () => void
 

@@ -23,6 +23,7 @@ import {
 } from './settings-index.js'
 import { SETTINGS_SEARCH_LOCALE_NAMESPACE, settingsSearchLocale, type SettingsSearchTranslate } from './locales.js'
 import styles from './settings-search.module.css'
+import './client.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
 const MAX_QUERY_LENGTH = 200
