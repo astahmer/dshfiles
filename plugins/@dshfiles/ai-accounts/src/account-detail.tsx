@@ -62,30 +62,40 @@ export const AccountDetail = (props: {
         <AccountIdentitySection draft={draft} state={props.state} />
         <RuntimePathsSection draft={draft} state={props.state} />
         {routedKind(draft.kind) ? (
-        <NumberedSection
-          actions={
-            <Button
-              disabled={refreshingCatalog}
-              onClick={() => {
-                if (draft.instanceId === '') return
-                void refreshCatalog(draft.instanceId)
-              }}
-              size="xs"
-              type="button"
-              variant="outline"
-            >
-              <RefreshCwIcon />
-              {refreshingCatalog ? 'Checking…' : 'Check now'}
-            </Button>
-          }
-          index="03"
-          title="Models"
-        >
-          <p className="dshx:text-xs dshx:text-muted-foreground">
-            Show or hide models in the picker, star the ones you reach for, and pin a default reasoning effort per model.
-          </p>
-          <ModelCuration account={draft} catalog={catalog?.models ?? []} onChange={next => setDraft({ ...draft, ...next })} />
-        </NumberedSection>
+          <NumberedSection
+            actions={
+              <Button
+                disabled={refreshingCatalog || selected?.instanceId !== draft.instanceId}
+                onClick={() => {
+                  if (draft.instanceId === '') return
+                  void refreshCatalog(draft.instanceId)
+                }}
+                size="xs"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCwIcon />
+                {refreshingCatalog ? 'Checking…' : 'Check now'}
+              </Button>
+            }
+            index="03"
+            title="Models"
+          >
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              Show or hide models in the picker, star the ones you reach for, and pin a default reasoning effort per model.
+            </p>
+            {catalog?.instanceId === draft.instanceId && catalog.warning !== undefined ? (
+              <p className="dshx:text-xs dshx:text-warning" role="status">
+                {catalog.warning}
+              </p>
+            ) : null}
+            <ModelCuration
+              key={draft.instanceId}
+              account={draft}
+              catalog={catalog?.instanceId === draft.instanceId ? catalog.models : []}
+              onChange={next => setDraft({ ...draft, ...next })}
+            />
+          </NumberedSection>
         ) : null}
         <QuotaSection state={props.state} />
         <SessionSection draft={draft} file={props.file} state={props.state} />
@@ -102,14 +112,21 @@ export const AccountDetail = (props: {
             </Button>
           </>
         ) : (
-          <AutoSaveIndicator dirty={dirty} onRetry={props.state.retryAutoSave} problem={problem} renamePending={selected !== null && draft.instanceId !== selected.instanceId} status={props.state.autoSave} />
+          <AutoSaveIndicator
+            dirty={dirty}
+            onRetry={props.state.retryAutoSave}
+            problem={problem}
+            renamePending={selected !== null && draft.instanceId !== selected.instanceId}
+            status={props.state.autoSave}
+          />
         )}
         <Button onClick={props.onOpenUsageHistory} size="sm" type="button" variant="ghost">
           <ArrowUpRightIcon />
           Usage history
         </Button>
         <span className="dshx:min-w-40 dshx:flex-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-          {notice ?? (props.state.saveMode === 'manual' && dirty ? (problem ?? 'Unsaved changes.') : 'Provider and account are separate entries in the model picker.')}
+          {notice ??
+            (props.state.saveMode === 'manual' && dirty ? (problem ?? 'Unsaved changes.') : 'Provider and account are separate entries in the model picker.')}
         </span>
         <Button
           className="dshx:text-destructive dshx:hover:text-destructive"

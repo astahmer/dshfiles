@@ -186,6 +186,7 @@ export const accountsCatalogSchema = z.object({
       defaultEffort: z.string().max(32).nullable(),
     }),
   ),
+  warning: z.string().max(200).optional(),
 })
 
 export const nativeProvidersSchema = z.object({

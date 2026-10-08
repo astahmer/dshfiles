@@ -3,17 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
 import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
-import {
-  aiAccountsApi,
-  type AccountDraft,
-  type AccountProfile,
-  type AccountsCatalog,
-  type AccountsFile,
-  type UsageHistoryPoint,
-} from './api.js'
+import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsCatalog, type AccountsFile, type UsageHistoryPoint } from './api.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
-
+import { createCatalogRequestGuard } from './catalog-request.js'
 
 export const useAccountsPanelState = () => {
   const accounts = useApi(aiAccountsApi)
@@ -26,6 +19,9 @@ export const useAccountsPanelState = () => {
   const [historyDays, setHistoryDays] = useState(7)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedIdRef = useRef(selectedId)
+  selectedIdRef.current = selectedId
+  const catalogRequestGuard = useRef(createCatalogRequestGuard())
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -40,16 +36,20 @@ export const useAccountsPanelState = () => {
     void load().catch(() => setNotice('The account host did not answer.'))
   }, [load])
 
-  // The catalog is per account and only changes when the account does.
+  // Request ownership prevents a slow response from the previous account replacing this catalog.
   const refreshCatalog = useCallback(
     async (instanceId: string): Promise<void> => {
+      const requestId = catalogRequestGuard.current.start()
       setRefreshingCatalog(true)
       try {
-        setCatalog(await accounts.catalog({ instanceId }))
+        const next = await accounts.catalog({ instanceId })
+        if (!catalogRequestGuard.current.isLatest(requestId) || selectedIdRef.current !== instanceId) return
+        setCatalog(next)
       } catch {
+        if (!catalogRequestGuard.current.isLatest(requestId) || selectedIdRef.current !== instanceId) return
         setCatalog(null)
       } finally {
-        setRefreshingCatalog(false)
+        if (catalogRequestGuard.current.isLatest(requestId)) setRefreshingCatalog(false)
       }
     },
     [accounts],
@@ -57,9 +57,12 @@ export const useAccountsPanelState = () => {
 
   useEffect(() => {
     if (selectedId === null) {
+      catalogRequestGuard.current.invalidate()
       setCatalog(null)
+      setRefreshingCatalog(false)
       return
     }
+    setCatalog(null)
     void refreshCatalog(selectedId)
   }, [selectedId, refreshCatalog])
 

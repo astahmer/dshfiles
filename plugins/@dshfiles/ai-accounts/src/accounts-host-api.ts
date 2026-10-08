@@ -50,8 +50,15 @@ export const accountsHostApi = aiAccountsApi.host({
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
   catalog: async ({ input, ctx }) => {
+    await refreshRoutes(ctx)
     const llm = ctx.get('llm')
     if (llm === undefined) return { instanceId: input.instanceId, models: [] }
+    let warning: string | undefined
+    try {
+      await accountRuntime(ctx)?.refreshModelCatalog?.(input.instanceId)
+    } catch {
+      warning = 'Live catalog refresh failed; showing the last-known model list.'
+    }
     const models = await llm.listModels(input.instanceId)
     const resolved = await Promise.all(
       models.map(async model => {
@@ -67,7 +74,9 @@ export const accountsHostApi = aiAccountsApi.host({
         }
       }),
     )
-    return { instanceId: input.instanceId, models: resolved }
+    const catalog = { instanceId: input.instanceId, models: resolved }
+    if (warning === undefined) return catalog
+    return { ...catalog, warning }
   },
   nativeProviders: async ({ ctx }) => readNativeProviders(ctx),
   setNativeProviderEnabled: async ({ input, ctx }) => setNativeProviderEnabled(ctx, input),

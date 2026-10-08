@@ -1,13 +1,16 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
-import { ChevronDownIcon, ChevronUpIcon, StarIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useState } from 'react'
 import type { AccountDraft, AccountsCatalog } from './api.js'
+import { catalogForCuration, parseAdditionalModelId } from './model-curation-model.js'
 
 type CatalogModel = AccountsCatalog['models'][number]
 
-export type CurationPatch = Partial<Pick<AccountDraft, 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults'>>
+export type CurationPatch = Partial<Pick<AccountDraft, 'additionalModelIds' | 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults'>>
 
 /** Radix Select reserves the empty string, so "no pinned effort" travels under its own value. */
 const PROVIDER_DEFAULT = '__provider-default__'
@@ -24,11 +27,16 @@ export const ModelCuration = (props: {
   readonly catalog: readonly CatalogModel[]
   readonly onChange: (patch: CurationPatch) => void
 }): JSX.Element => {
-  const { hiddenModelIds, favoriteModelIds, modelOrder, reasoningDefaults } = props.account
-  const listed = modelOrder.filter(id => props.catalog.some(model => model.id === id))
+  const { additionalModelIds, hiddenModelIds, favoriteModelIds, modelOrder, reasoningDefaults } = props.account
+  const [modelIdInput, setModelIdInput] = useState({ instanceId: props.account.instanceId, value: '' })
+  const modelIdValue = modelIdInput.instanceId === props.account.instanceId ? modelIdInput.value : ''
+  const catalog = catalogForCuration({ catalog: props.catalog, additionalModelIds, hiddenModelIds })
+  const customModelId = parseAdditionalModelId(modelIdValue, props.account)
+  const duplicateModelId = customModelId !== null && catalog.some(model => model.id === customModelId)
+  const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
   const ordered = [
-    ...listed.map(id => props.catalog.find(model => model.id === id)).filter(model => model !== undefined),
-    ...props.catalog.filter(model => !listed.includes(model.id)),
+    ...listed.map(id => catalog.find(model => model.id === id)).filter(model => model !== undefined),
+    ...catalog.filter(model => !listed.includes(model.id)),
   ]
   const hidden = new Set(hiddenModelIds)
   const favorites = new Set(favoriteModelIds)
@@ -36,6 +44,12 @@ export const ModelCuration = (props: {
   const availableModels = ordered.filter(model => !hidden.has(model.id) && !favorites.has(model.id))
   const hiddenModels = ordered.filter(model => hidden.has(model.id))
   const allHidden = ordered.length > 0 && ordered.every(model => hidden.has(model.id))
+
+  const addModel = (): void => {
+    if (customModelId === null || duplicateModelId) return
+    props.onChange({ additionalModelIds: [...new Set([...additionalModelIds, customModelId])] })
+    setModelIdInput({ instanceId: props.account.instanceId, value: '' })
+  }
 
   const move = (id: string, delta: number): void => {
     const next = ordered.map(model => model.id)
@@ -73,7 +87,7 @@ export const ModelCuration = (props: {
 
   const toggleAll = (): void => {
     if (allHidden) {
-      props.onChange({ hiddenModelIds: hiddenModelIds.filter(id => !props.catalog.some(model => model.id === id)) })
+      props.onChange({ hiddenModelIds: hiddenModelIds.filter(id => !catalog.some(model => model.id === id)) })
       return
     }
     props.onChange({ hiddenModelIds: [...new Set([...hiddenModelIds, ...ordered.map(model => model.id)])] })
@@ -167,6 +181,29 @@ export const ModelCuration = (props: {
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-2">
+      <form
+        className="dshx:flex dshx:gap-2"
+        onSubmit={event => {
+          event.preventDefault()
+          addModel()
+        }}
+      >
+        <Input
+          aria-label="Additional model ID"
+          className="dshx:h-8 dshx:flex-1 dshx:font-mono dshx:text-xs"
+          maxLength={120}
+          onChange={event => setModelIdInput({ instanceId: props.account.instanceId, value: event.target.value })}
+          placeholder={props.account.kind === 'opencode-go' ? 'opencode-go/step-5-preview-free' : 'provider/model-id'}
+          value={modelIdValue}
+        />
+        <Button disabled={customModelId === null || duplicateModelId} size="sm" type="submit" variant="outline">
+          <PlusIcon />
+          Add model
+        </Button>
+      </form>
+      <p className="dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground">
+        Add an ID the provider catalog does not return. The account/provider prefix is optional.
+      </p>
       <div className="dshx:flex dshx:items-center dshx:gap-2.5 dshx:px-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">
         <span className="dshx:flex-1">
           {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden

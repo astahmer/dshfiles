@@ -10,6 +10,7 @@ interface AccountRuntime {
   scheduler?: UsageHistoryScheduler
   quotaContinuations?: QuotaContinuationService
   refreshRoutes?: () => Promise<void>
+  refreshModelCatalog?: (instanceId: string) => Promise<void>
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; invalidate(): void }
 }
 

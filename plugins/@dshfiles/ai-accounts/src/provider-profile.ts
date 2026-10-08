@@ -31,23 +31,26 @@ export const buildProfile = (params: {
     // the provider's own order, so adding a model never reshuffles the rest.
     return order.length + (favorites.has(id) ? 0 : 1)
   }
-  const models = params.upstream
-    .getModels()
-    .filter(model => !hidden.has(model.id))
-    .map(model => ({ ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }))
-    .sort((left, right) => rank(left.id) - rank(right.id))
-  const template = models.find(model => model.id.startsWith('gpt-'))
-  for (const id of params.additionalModelIds) {
-    if (template === undefined || models.some(model => model.id === id)) continue
-    models.push({ ...template, id, provider: params.provider })
+  const upstreamModels = params.upstream.getModels()
+  const models = upstreamModels.map(model => ({ ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }))
+  for (const id of new Set(params.additionalModelIds)) {
+    if (models.some(model => model.id === id)) continue
+    const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
+    const template =
+      (id.startsWith('gpt-') ? upstreamModels.find(model => model.id.startsWith('gpt-')) : undefined) ??
+      upstreamModels.find(model => model.api === api) ??
+      upstreamModels[0]
+    if (template === undefined) continue
+    models.push({ ...template, id, provider: params.provider, name: accountModelName(params.provider, id) })
   }
+  const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
   // A pinned effort is offered as an override on the model it belongs to, which
   // is the seam the adapter materializes a default through: an explicit caller
   // choice still wins, and an unpinned model keeps the provider's own default.
   const pins = params.reasoningDefaults ?? {}
   const modelOverrides = Object.fromEntries(
     Object.entries(pins).flatMap(([modelId, effortId]) => {
-      const model = models.find(candidate => candidate.id === modelId)
+      const model = offeredModels.find(candidate => candidate.id === modelId)
       if (model === undefined) return []
       const levels = (model as { thinkingLevelMap?: Record<string, string | null> }).thinkingLevelMap
       if (levels !== undefined && levels[effortId] === null) return []
@@ -78,7 +81,7 @@ export const buildProfile = (params: {
       ...params.upstream,
       id: params.provider,
       name: params.displayName,
-      getModels: () => models,
+      getModels: () => offeredModels,
     },
   }
 }

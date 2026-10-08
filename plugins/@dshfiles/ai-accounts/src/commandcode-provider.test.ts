@@ -4,10 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CommandCodeConfigError, createCommandCodeProvider, fetchCommandCodeCatalog } from './commandcode-provider.js'
 
 const received: IncomingHttpHeaders[] = []
+type CatalogPayload = { readonly data: readonly { readonly id: string | number }[] }
+let catalogPayload: CatalogPayload = { data: [{ id: 'anthropic/claude-test' }, { id: 'openai/gpt-test' }] }
 const server = createServer((request, response) => {
   received.push(request.headers)
   response.setHeader('content-type', 'application/json')
-  response.end(JSON.stringify({ data: [{ id: 'anthropic/claude-test' }, { id: 'openai/gpt-test' }] }))
+  response.end(JSON.stringify(catalogPayload))
 })
 let baseUrl = ''
 
@@ -28,6 +30,16 @@ describe('fetchCommandCodeCatalog', () => {
       { id: 'anthropic/claude-test', api: 'anthropic-messages' },
       { id: 'openai/gpt-test', api: 'openai-completions' },
     ])
+  })
+
+  it('uses the fallback catalog when the response shape is invalid', async () => {
+    catalogPayload = { data: [{ id: 42 }] }
+    try {
+      const entries = await fetchCommandCodeCatalog({ baseUrl, apiKey: 'typed-key' })
+      expect(entries).toContainEqual({ id: 'openai/gpt-5.1', api: 'openai-completions' })
+    } finally {
+      catalogPayload = { data: [{ id: 'anthropic/claude-test' }, { id: 'openai/gpt-test' }] }
+    }
   })
 
   it('refuses a base outside Command Code before any request', async () => {

@@ -14,6 +14,7 @@ import { aiAccountsTool } from './accounts-tool.js'
 import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
+import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -30,7 +31,17 @@ import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
-import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute, type Route } from './provider-routes.js'
+import {
+  CLAUDE_KIND,
+  COMMANDCODE_KIND,
+  CODEX_KIND,
+  OPENCODE_KIND,
+  buildRoutes,
+  keyEnvFor,
+  normalizeInstanceId,
+  type KeyedRoute,
+  type Route,
+} from './provider-routes.js'
 export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
@@ -90,6 +101,15 @@ export default definePlugin({
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
     const claudeUpstream = anthropicProvider()
+    const discoveredModelIds = new Map<string, { readonly route: KeyedRoute; readonly modelIds: readonly string[] }>()
+    const modelCatalogRefreshes = new Map<string, { readonly route: KeyedRoute; readonly controller: AbortController }>()
+    const sameKeyedRoute = (candidate: Route | undefined, expected: KeyedRoute): boolean => {
+      if (candidate === undefined || !candidate.enabled) return false
+      if (expected.kind === COMMANDCODE_KIND) {
+        return candidate.kind === COMMANDCODE_KIND && candidate.apiBaseUrl === expected.apiBaseUrl && candidate.apiKeyEnv === expected.apiKeyEnv
+      }
+      return candidate.kind === OPENCODE_KIND && candidate.apiBaseUrl === expected.apiBaseUrl && candidate.apiKeyEnv === expected.apiKeyEnv
+    }
     // Each keyed provider is built with its own base and key variable, so two
     // Command Code accounts can point at different deployments.
     const keyedUpstream = (route: KeyedRoute) =>
@@ -110,7 +130,6 @@ export default definePlugin({
     // Curation comes from the same file, so a hidden model cannot outlive the
     // account that hid it.
     const buildProfiles = (
-      nextConfig: typeof config,
       nextRoutes: ReadonlyMap<string, Route>,
       sourceFile: ReturnType<typeof readAccountFileSync>,
     ): Map<string, ResolvedPiAiProviderProfile> => {
@@ -143,10 +162,10 @@ export default definePlugin({
             displayName: route.displayName,
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
             ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
-            additionalModelIds:
-              route.kind === CODEX_KIND
-                ? (nextConfig.codexAccounts.find(account => normalizeInstanceId(account.instanceId, CODEX_KIND) === id)?.additionalModelIds ?? [])
-                : [],
+            additionalModelIds: [
+              ...(sourceFile.accounts.find(account => normalizeInstanceId(account.instanceId, account.kind) === id)?.additionalModelIds ?? []),
+              ...(discoveredModelIds.get(id)?.modelIds ?? []),
+            ],
           }),
         ]),
       )
@@ -163,7 +182,7 @@ export default definePlugin({
         ),
       )
 
-    let profiles = buildProfiles(config, routes, initialFile)
+    let profiles = buildProfiles(routes, initialFile)
     const reasoningDefaults = buildReasoningDefaults(initialFile)
 
     const pool = createAccountPool({
@@ -243,15 +262,22 @@ export default definePlugin({
     let directoryRegistration: DirectoryRegistrationHandle | undefined
     const modelDiscoveries = new Map<string, { readonly route: KeyedRoute; readonly dispose: () => void }>()
 
-    const registerCommandCodeDiscovery = (id: string, route: KeyedRoute): void => {
-      const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async request => {
-        const entries = await fetchCommandCodeCatalog(discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: route.apiKeyEnv }))
-        return entries.map(entry => ({
-          id: entry.id,
-          contextWindow: 128_000,
-          maxTokens: 8_192,
-          inputModalities: ['text'],
-        }))
+    const registerKeyedDiscovery = (id: string, route: KeyedRoute): void => {
+      const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
+        if (route.kind === COMMANDCODE_KIND) {
+          const entries = await fetchCommandCodeCatalog({
+            ...discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }),
+            signal,
+          })
+          return entries.map(entry => ({
+            id: entry.id,
+            contextWindow: 128_000,
+            maxTokens: 8_192,
+            inputModalities: ['text'],
+          }))
+        }
+        const modelIds = await fetchOpenCodeGoCatalog(signal)
+        return modelIds.map(id => ({ id }))
       })
       modelDiscoveries.set(id, { route, dispose })
     }
@@ -281,28 +307,29 @@ export default definePlugin({
       }
 
       for (const [id, registration] of modelDiscoveries) {
-        const nextRoute = nextRoutes.get(id)
-        if (
-          nextRoute?.kind === COMMANDCODE_KIND &&
-          nextRoute.enabled &&
-          registration.route.apiBaseUrl === nextRoute.apiBaseUrl &&
-          registration.route.apiKeyEnv === nextRoute.apiKeyEnv
-        ) {
-          continue
-        }
+        if (sameKeyedRoute(nextRoutes.get(id), registration.route)) continue
         registration.dispose()
         modelDiscoveries.delete(id)
       }
+      for (const [id, refresh] of modelCatalogRefreshes) {
+        if (sameKeyedRoute(nextRoutes.get(id), refresh.route)) continue
+        refresh.controller.abort()
+        modelCatalogRefreshes.delete(id)
+      }
+      for (const [id, catalog] of discoveredModelIds) {
+        if (sameKeyedRoute(nextRoutes.get(id), catalog.route)) continue
+        discoveredModelIds.delete(id)
+      }
       for (const [id, route] of enabled) {
-        if (route.kind !== COMMANDCODE_KIND || modelDiscoveries.has(id)) continue
-        registerCommandCodeDiscovery(id, route)
+        if ((route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND) || modelDiscoveries.has(id)) continue
+        registerKeyedDiscovery(id, route)
       }
 
       pool.replace([...nextRoutes].map(([id, route]) => ({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })))
       pool.setDistribution(nextConfig.distribution)
       config = nextConfig
       routes = nextRoutes
-      profiles = buildProfiles(nextConfig, nextRoutes, sourceFile)
+      profiles = buildProfiles(nextRoutes, sourceFile)
       reasoningDefaults.clear()
       for (const [id, pins] of buildReasoningDefaults(sourceFile)) reasoningDefaults.set(id, pins)
       runtime.accounts = { config, pool }
@@ -318,6 +345,25 @@ export default definePlugin({
       return next
     }
     runtime.refreshRoutes = refreshRoutes
+    const refreshModelCatalog = async (instanceId: string): Promise<void> => {
+      const route = routes.get(instanceId)
+      if (route === undefined || !route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) return
+      modelCatalogRefreshes.get(instanceId)?.controller.abort()
+      const refresh = { route, controller: new AbortController() }
+      modelCatalogRefreshes.set(instanceId, refresh)
+      try {
+        const settingsNs = `ai-accounts.${route.kind}.${instanceId}`
+        const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
+        const signal = AbortSignal.any([refresh.controller.signal, AbortSignal.timeout(15_000)])
+        const discovered = await llm.discoverModels(settingsNs, discoveryRequest, signal)
+        if (modelCatalogRefreshes.get(instanceId) !== refresh || !sameKeyedRoute(routes.get(instanceId), route)) return
+        discoveredModelIds.set(instanceId, { route, modelIds: discovered.map(model => model.id) })
+        await refreshRoutes()
+      } finally {
+        if (modelCatalogRefreshes.get(instanceId) === refresh) modelCatalogRefreshes.delete(instanceId)
+      }
+    }
+    runtime.refreshModelCatalog = refreshModelCatalog
 
     const disposers: Array<() => void> = []
 
@@ -382,6 +428,10 @@ export default definePlugin({
 
       return () => {
         if (runtime.refreshRoutes === refreshRoutes) delete runtime.refreshRoutes
+        if (runtime.refreshModelCatalog === refreshModelCatalog) delete runtime.refreshModelCatalog
+        for (const refresh of modelCatalogRefreshes.values()) refresh.controller.abort()
+        modelCatalogRefreshes.clear()
+        discoveredModelIds.clear()
         for (const registration of modelDiscoveries.values()) registration.dispose()
         modelDiscoveries.clear()
         for (const dispose of disposers) dispose()

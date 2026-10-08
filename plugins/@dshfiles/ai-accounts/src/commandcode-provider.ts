@@ -2,6 +2,7 @@ import { createProvider, type Model } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
 import { LlmError } from '@deepseek-ai/dsh-llm'
+import { z } from 'zod'
 import { isAllowedCommandCodeBase, isKeyEnvName } from './api.js'
 import { readKeyFromEnv } from './credentials.js'
 import { describeEmptyResponse, EMPTY_RESPONSE_CODE, isEmptyCompletion } from './empty-response.js'
@@ -38,6 +39,7 @@ export interface CommandCodeCatalogOptions {
   readonly baseUrl?: string
   /** The key itself, already resolved for exactly this base. */
   readonly apiKey: string
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -51,6 +53,10 @@ const FALLBACK: readonly CatalogEntry[] = [
   { id: 'google/gemini-3-pro', api: 'openai-completions' },
   { id: 'deepseek/deepseek-v3.2', api: 'openai-completions' },
 ]
+
+const commandCodeCatalogResponseSchema = z.object({
+  data: z.array(z.object({ id: z.string().trim().min(1).max(200) })).max(500),
+})
 
 export class CommandCodeConfigError extends Error {}
 
@@ -84,15 +90,15 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
   if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
     headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },
+    signal: options.signal,
   })
   if (!response.ok) return FALLBACK
-  const body = (await response.json()) as { data?: readonly { id?: string }[] }
-  const entries = (body.data ?? [])
-    .flatMap(entry => (typeof entry.id === 'string' && entry.id.length > 0 ? [entry.id] : []))
-    .map(id => ({
-      id,
-      api: id.startsWith('anthropic/') ? ('anthropic-messages' as const) : ('openai-completions' as const),
-    }))
+  const parsed = commandCodeCatalogResponseSchema.safeParse(await response.json())
+  if (!parsed.success) return FALLBACK
+  const entries: CatalogEntry[] = parsed.data.data.map(({ id }) => ({
+    id,
+    api: id.startsWith('anthropic/') ? 'anthropic-messages' : 'openai-completions',
+  }))
   return entries.length === 0 ? FALLBACK : entries
 }
 
