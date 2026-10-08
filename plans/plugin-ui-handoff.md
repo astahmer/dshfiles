@@ -29,9 +29,9 @@ AI accounts usage popover).
 | jujutsu (+ project-folder-picker) | round 2 committed: drag rebase/bookmarks, full diff, Flat/Tree, revision actions, jj-view Source Control, repo palette, DSH Settings. Graph verified live; Source Control / full diff / drag not yet clicked through |
 | thread-sidebar / shortcuts / sidebar-commands | round 2 committed (header row + ⋮ menu, ⌘P thread palette, ⌘K palette, footer overflow, DSH Settings with old-host fallback). Verified live: ⋮ menu, ⌘P palette, no console errors |
 | secret-catalog | round 2 committed |
-| mcp-servers | round 2 committed (OAuth, catalog browser, settings, old-snapshot decode). Sign in/out needs DSH restart |
+| mcp-servers | round 2 committed (OAuth, catalog browser, old-snapshot decode). Its 4 preferences use defaults: dshx forbids native Config + Settings on one Host (see dsh-host-gaps.md) |
 | ai-accounts | round 2 committed: auto/manual save, Claude/Command Code/Cursor usage, recorder + quota bug fixes, BB footer usage popover (verified live), Settings › Models block. Claude/Cursor readers untested against real accounts |
-| plugin-marketplace | committed (catalog fixed; recommendation: remove in favour of dshmarket — awaiting user) |
+| plugin-marketplace | being removed (user approved): dropped from the Nix web profile (nixfiles `7f220526`); delete `plugins/@dshfiles/plugin-marketplace` only AFTER `nixapply` + DSH restart, since the live profile serves from that directory |
 | settings-search, diff-viewed, prompt-stash, multi-host, queue-reorder | committed |
 
 ## Open items / needs user
@@ -39,7 +39,7 @@ AI accounts usage popover).
 1. Restart DSH to pick up host/settings changes (jujutsu, thread-sidebar, secret-catalog, mcp-servers,
    settings-search, queue-reorder, plugin-marketplace, ai-accounts).
 2. Decide: remove our plugin-marketplace (dshmarket covers it)?
-3. Not possible without DSH Host changes: BB link-existing-thread / auto-handoff-parent (no parent API),
+3. Host-blocked features are tracked in [dsh-host-gaps.md](dsh-host-gaps.md). Summary: BB link-existing-thread / auto-handoff-parent (no parent API),
    settings-search jump-to-section, collapse viewed files in DSH review tab, MCP live health, legacy SSE.
 4. BB plugins without DSH counterpart: memory-watch, sidebar-resize (fold into thread-sidebar),
    tokitoki-usage (merge into ai-accounts popover).
