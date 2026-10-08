@@ -59,7 +59,7 @@ const fieldVariants = cva(
   {
     variants: {
       orientation: {
-        vertical: ["dshx:flex-col dshx:[&>*]:w-full dshx:[&>.sr-only]:w-auto"],
+        vertical: ["flex-col [&>*]:w-full [&>.sr-only]:w-auto"],
         horizontal: [
           "dshx:flex-row dshx:items-center",
           "dshx:[&>[data-slot=field-label]]:flex-auto",
