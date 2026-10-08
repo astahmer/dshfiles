@@ -1,22 +1,15 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import {
-  IconCheckOutlineRegular,
-  IconChevronDownOutlineRegular,
-  IconChevronUpOutlineRegular,
-  IconCloseOutlineRegular,
-  IconEditOutlineRegular,
-  IconQueueOutlineRegular,
-  IconSendOutlineRegular,
-  IconTrashOutlineRegular,
-  Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation } from '@dshfiles/plugin-ui/query'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
-import styles from './queue.module.css'
 
 /**
  * The shipped queue dock, with reordering added.
@@ -97,6 +90,23 @@ const previewOf = (content: readonly TextBlock[]): string => {
 }
 
 const PREVIEW_CHARS = 200
+
+const RowAction = (props: {
+  readonly label: string
+  readonly tooltip: string
+  readonly disabled: boolean
+  readonly onClick: () => void
+  readonly children: ReactNode
+}): JSX.Element => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <Button type="button" variant="ghost" size="icon-xs" className="dshx:text-muted-foreground dshx:hover:text-foreground" aria-label={props.label} disabled={props.disabled} onClick={props.onClick}>
+        {props.children}
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent side="bottom">{props.tooltip}</TooltipContent>
+  </Tooltip>
+)
 
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
@@ -192,185 +202,149 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   // message is always visible rather than hidden behind a collapsed panel.
   const listVisible = rowCount === 1 || expanded
 
+  const dragEnabled = queueMutable && editing === null && busy === null
+
   return (
-    <div className={styles.dock} data-queue-dock="">
-      <div className={styles.panel}>
-        {rowCount > 1 ? (
-          <button
-            type="button"
-            className={styles.header}
-            aria-controls={listId}
-            aria-expanded={expanded}
-            disabled={interactionActive}
-            onClick={() => setCollapsed(value => !value)}
-          >
-            <span className={styles.lead} aria-hidden>
-              <IconQueueOutlineRegular />
-            </span>
-            <span className={styles.count}>{rowCount} queued</span>
-            <span className={styles.hint}>top runs first</span>
-            <span className={styles.chevron} aria-hidden>
-              {expanded ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
-            </span>
-          </button>
-        ) : null}
-        <ul className={styles.list} id={listId} hidden={!listVisible}>
-          {listVisible
-            ? rows.map((row, index) => {
-                const text = textOf(row.content)
-                const files = attachmentsOf(row.content)
-                const isEditing = editing === row.id
-                const isBusy = busy === row.id
-                return (
-                  <li
-                    className={dragId === row.id ? `${styles.row} ${styles.rowDragging}` : dropIndex === index ? `${styles.row} ${styles.rowDrop}` : styles.row}
-                    key={row.id}
-                    onDragOver={event => {
-                      if (dragId === null || dragId === row.id) return
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                      setDropIndex(index)
-                    }}
-                    onDragLeave={() => setDropIndex(current => (current === index ? null : current))}
-                    onDrop={event => {
-                      event.preventDefault()
-                      const sourceId = dragId ?? event.dataTransfer.getData('text/plain')
-                      setDragId(null)
-                      setDropIndex(null)
-                      if (sourceId.length > 0 && sourceId !== row.id) void moveTowards(MessageId(sourceId), index)
-                    }}
-                    onDragEnd={() => {
-                      setDragId(null)
-                      setDropIndex(null)
-                    }}
-                  >
-                    <span
-                      className={styles.grip}
-                      draggable={queueMutable && editing === null && busy === null}
-                      aria-hidden
-                      onDragStart={event => {
-                        setDragId(row.id)
-                        event.dataTransfer.setData('text/plain', row.id)
-                        event.dataTransfer.effectAllowed = 'move'
+    <TooltipProvider delayDuration={500}>
+      <div className="dshx-root dshx:w-full dshx:flex-none" data-queue-dock="">
+        <div className="dshx:w-full dshx:overflow-hidden dshx:rounded-t-lg dshx:border dshx:border-b-0 dshx:bg-popover dshx:py-0.5 dshx:text-popover-foreground">
+          {rowCount > 1 ? (
+            <button
+              type="button"
+              className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-3 dshx:text-left dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default dshx:disabled:hover:bg-transparent"
+              aria-controls={listId}
+              aria-expanded={expanded}
+              disabled={interactionActive}
+              onClick={() => setCollapsed(value => !value)}
+            >
+              <span className="dshx:grid dshx:place-items-center dshx:text-muted-foreground" aria-hidden>
+                <ListOrderedIcon className="dshx:size-3.5" />
+              </span>
+              <span className="dshx:text-sm dshx:font-medium">{rowCount} queued</span>
+              <span className="dshx:text-xs dshx:text-muted-foreground">top runs first</span>
+              <span className="dshx:ml-auto dshx:grid dshx:place-items-center dshx:text-muted-foreground" aria-hidden>
+                {expanded ? <ChevronUpIcon className="dshx:size-3.5" /> : <ChevronDownIcon className="dshx:size-3.5" />}
+              </span>
+            </button>
+          ) : null}
+          <ul className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-px dshx:overflow-y-auto dshx:px-1 dshx:pb-0.5" id={listId} hidden={!listVisible}>
+            {listVisible
+              ? rows.map((row, index) => {
+                  const text = textOf(row.content)
+                  const files = attachmentsOf(row.content)
+                  const isEditing = editing === row.id
+                  const isBusy = busy === row.id
+                  return (
+                    <li
+                      className={cn(
+                        'dshx:group/row dshx:flex dshx:min-h-8 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1 dshx:py-0.5 dshx:hover:bg-accent/50',
+                        isEditing && 'dshx:items-start dshx:bg-accent/40 dshx:py-1.5',
+                        dragId === row.id && 'dshx:opacity-50',
+                        dropIndex === index && dragId !== row.id && 'dshx:bg-accent dshx:shadow-[inset_0_2px_0_var(--color-primary)]',
+                      )}
+                      key={row.id}
+                      onDragOver={event => {
+                        if (dragId === null || dragId === row.id) return
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = 'move'
+                        setDropIndex(index)
+                      }}
+                      onDragLeave={() => setDropIndex(current => (current === index ? null : current))}
+                      onDrop={event => {
+                        event.preventDefault()
+                        const sourceId = dragId ?? event.dataTransfer.getData('text/plain')
+                        setDragId(null)
+                        setDropIndex(null)
+                        if (sourceId.length > 0 && sourceId !== row.id) void moveTowards(MessageId(sourceId), index)
                       }}
                       onDragEnd={() => {
                         setDragId(null)
                         setDropIndex(null)
                       }}
-                    />
-                    <span className={styles.body}>
-                      {isEditing ? (
-                        <textarea
-                          ref={editorRef}
-                          className={styles.editor}
-                          value={draft}
-                          onChange={event => setDraft(event.target.value)}
-                          onKeyDown={event => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault()
-                              saveEdit()
-                            }
-                            if (event.key === 'Escape') setEditing(null)
-                          }}
-                        />
-                      ) : (
-                        <span className={styles.preview}>{previewOf(row.content) || files || '—'}</span>
-                      )}
-                    </span>
-                    {queueMutable ? (
-                      <span className={styles.actions}>
-                        {isEditing ? (
-                          <>
-                            <Tooltip portal label="Save" side="bottom" delayMs={500}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label="Save queued message"
-                                disabled={busy !== null || draft.trim().length === 0}
-                                onClick={saveEdit}
-                              >
-                                <IconCheckOutlineRegular size={14} />
-                              </button>
-                            </Tooltip>
-                            <Tooltip portal label="Cancel" side="bottom" delayMs={500}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label="Cancel editing"
-                                disabled={busy !== null}
-                                onClick={() => setEditing(null)}
-                              >
-                                <IconCloseOutlineRegular />
-                              </button>
-                            </Tooltip>
-                          </>
-                        ) : (
-                          <>
-                            <Tooltip portal label="Move up" side="bottom" delayMs={500} disabled={index === 0}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label={`Move queued message ${index + 1} up`}
-                                disabled={index === 0 || busy !== null}
-                                onClick={() => void move(row.id, 'up')}
-                              >
-                                <IconChevronUpOutlineRegular />
-                              </button>
-                            </Tooltip>
-                            <Tooltip portal label="Move down" side="bottom" delayMs={500} disabled={index === rowCount - 1}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label={`Move queued message ${index + 1} down`}
-                                disabled={index === rowCount - 1 || busy !== null}
-                                onClick={() => void move(row.id, 'down')}
-                              >
-                                <IconChevronDownOutlineRegular />
-                              </button>
-                            </Tooltip>
-                            <Tooltip portal label="Edit" side="bottom" delayMs={500} disabled={text === null}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label="Edit queued message"
-                                disabled={busy !== null || text === null}
-                                onClick={() => setEditing(row.id)}
-                              >
-                                <IconEditOutlineRegular size={14} />
-                              </button>
-                            </Tooltip>
-                            <Tooltip portal label="Remove" side="bottom" delayMs={500}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label="Remove queued message"
-                                disabled={isBusy}
-                                onClick={() => applyAction(row.id, { kind: 'remove' })}
-                              >
-                                <IconTrashOutlineRegular size={14} />
-                              </button>
-                            </Tooltip>
-                            <Tooltip portal label="Steer" side="bottom" delayMs={500} disabled={!running}>
-                              <button
-                                type="button"
-                                className={styles.action}
-                                aria-label="Steer with queued message"
-                                disabled={busy !== null || !running}
-                                onClick={() => applyAction(row.id, { kind: 'steer' })}
-                              >
-                                <IconSendOutlineRegular />
-                              </button>
-                            </Tooltip>
-                          </>
+                    >
+                      <span
+                        className={cn(
+                          'dshx:grid dshx:h-6 dshx:w-4 dshx:flex-none dshx:place-items-center dshx:rounded-sm dshx:text-muted-foreground/60',
+                          dragEnabled ? 'dshx:cursor-grab dshx:hover:text-foreground dshx:active:cursor-grabbing' : 'dshx:opacity-40',
                         )}
+                        draggable={dragEnabled}
+                        aria-hidden
+                        onDragStart={event => {
+                          setDragId(row.id)
+                          event.dataTransfer.setData('text/plain', row.id)
+                          event.dataTransfer.effectAllowed = 'move'
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null)
+                          setDropIndex(null)
+                        }}
+                      >
+                        <GripVerticalIcon className="dshx:size-3.5" />
                       </span>
-                    ) : null}
-                  </li>
-                )
-              })
-            : null}
-        </ul>
+                      {isEditing ? (
+                        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1.5">
+                          <Textarea
+                            ref={editorRef}
+                            aria-label="Queued message"
+                            className="dshx:max-h-40 dshx:min-h-14 dshx:resize-none dshx:bg-background dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:md:text-sm"
+                            value={draft}
+                            onChange={event => setDraft(event.target.value)}
+                            onKeyDown={event => {
+                              if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault()
+                                saveEdit()
+                              }
+                              if (event.key === 'Escape') setEditing(null)
+                            }}
+                          />
+                          <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
+                            <span className="dshx:mr-auto dshx:text-xs dshx:text-muted-foreground">Enter to save · Esc to cancel</span>
+                            <Button type="button" variant="ghost" size="xs" aria-label="Cancel editing" disabled={busy !== null} onClick={() => setEditing(null)}>
+                              <XIcon />
+                              Cancel
+                            </Button>
+                            <Button type="button" size="xs" aria-label="Save queued message" disabled={busy !== null || draft.trim().length === 0} onClick={saveEdit}>
+                              <CheckIcon />
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content) || undefined}>
+                          {previewOf(row.content) || files || '—'}
+                        </span>
+                      )}
+                      {queueMutable && !isEditing ? (
+                        <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+                          <RowAction label={`Move queued message ${index + 1} up`} tooltip="Move up" disabled={index === 0 || busy !== null} onClick={() => void move(row.id, 'up')}>
+                            <ChevronUpIcon />
+                          </RowAction>
+                          <RowAction
+                            label={`Move queued message ${index + 1} down`}
+                            tooltip="Move down"
+                            disabled={index === rowCount - 1 || busy !== null}
+                            onClick={() => void move(row.id, 'down')}
+                          >
+                            <ChevronDownIcon />
+                          </RowAction>
+                          <RowAction label="Edit queued message" tooltip="Edit" disabled={busy !== null || text === null} onClick={() => setEditing(row.id)}>
+                            <PencilIcon />
+                          </RowAction>
+                          <RowAction label="Remove queued message" tooltip="Remove" disabled={isBusy} onClick={() => applyAction(row.id, { kind: 'remove' })}>
+                            <Trash2Icon />
+                          </RowAction>
+                          <RowAction label="Steer with queued message" tooltip="Steer" disabled={busy !== null || !running} onClick={() => applyAction(row.id, { kind: 'steer' })}>
+                            <SendIcon />
+                          </RowAction>
+                        </span>
+                      ) : null}
+                    </li>
+                  )
+                })
+              : null}
+          </ul>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
