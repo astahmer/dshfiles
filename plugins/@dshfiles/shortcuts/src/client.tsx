@@ -23,6 +23,10 @@ type Layout = ILayout
  *
  * It is a plugin rather than desktop-only code so the same chords work in the
  * browser, in an installed PWA, and in the desktop shell.
+ *
+ * The command palette (⌘K) and thread search (⌘P) chords belong to
+ * @dshfiles/thread-sidebar, which owns the palette and lets users rebind them in
+ * Settings › Plugins › Thread sidebar; claiming them here too would race it.
  */
 export default defineClient({
   name: '@dshfiles/shortcuts',
@@ -57,16 +61,6 @@ export default defineClient({
         },
       },
       {
-        id: 'shortcuts.commandPalette',
-        key: 'KeyK',
-        modifier: 'primary',
-        allowInEditable: true,
-        label: 'Focus composer',
-        run: () => {
-          focusComposer()
-        },
-      },
-      {
         id: 'shortcuts.settings',
         key: 'Comma',
         modifier: 'primary',
@@ -97,28 +91,4 @@ const requireLayout = (resolve: () => Layout | undefined): Layout => {
     )
   }
   return layout
-}
-
-/**
- * Put the caret in the composer.
- *
- * It is matched by role rather than by tag: the Host renders the composer as a
- * `contenteditable` div and ships no textarea at all, so a `textarea` query finds
- * nothing and the chord appears to do nothing.
- */
-const focusComposer = (): void => {
-  const composer = document.querySelector<HTMLElement>('[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])')
-  if (composer === null) return
-  composer.focus()
-  // A text field has a caret to place; a contenteditable div has a selection.
-  if (composer instanceof HTMLInputElement || composer instanceof HTMLTextAreaElement) {
-    composer.setSelectionRange(composer.value.length, composer.value.length)
-    return
-  }
-  const range = document.createRange()
-  range.selectNodeContents(composer)
-  range.collapse(false)
-  const selection = window.getSelection()
-  selection?.removeAllRanges()
-  selection?.addRange(range)
 }
