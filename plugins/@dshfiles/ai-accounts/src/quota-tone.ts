@@ -1,5 +1,4 @@
-import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { AccountsUsage, UsageCard } from './api.js'
+import type { UsageCard } from './api.js'
 
 export interface TightestWindow {
   readonly percent: number
@@ -16,18 +15,26 @@ export const tightestWindow = (card: UsageCard): TightestWindow | undefined => {
   }, undefined)
 }
 
-/** One row per account that reports quota, for the compact surfaces. */
-export const tightestRows = (usage: AccountsUsage | undefined): readonly { readonly instanceId: string; readonly tightest: TightestWindow }[] =>
-  (usage?.cards ?? []).flatMap(card => {
-    const tightest = tightestWindow(card.usage)
-    return tightest === undefined ? [] : [{ instanceId: card.instanceId, tightest }]
-  })
-
 export type QuotaTone = 'ok' | 'low' | 'critical'
 
 /** Coloured by how much is left rather than by provider. */
 export const quotaTone = (percent: number): QuotaTone => (percent <= 10 ? 'critical' : percent <= 30 ? 'low' : 'ok')
 
-const STATE_FOR_TONE: Record<QuotaTone, StateDotState> = { ok: 'done', low: 'warning', critical: 'error' }
+export const QUOTA_TONE_TEXT = {
+  ok: 'dshx:text-success',
+  low: 'dshx:text-warning',
+  critical: 'dshx:text-destructive',
+} satisfies Record<QuotaTone, string>
 
-export const quotaState = (percent: number): StateDotState => STATE_FOR_TONE[quotaTone(percent)]
+export const QUOTA_TONE_FILL = {
+  ok: 'dshx:bg-success',
+  low: 'dshx:bg-warning',
+  critical: 'dshx:bg-destructive',
+} satisfies Record<QuotaTone, string>
+
+/** Tints the shadcn Progress indicator, whose own fill is always the brand colour. */
+export const QUOTA_TONE_PROGRESS = {
+  ok: 'dshx:*:data-[slot=progress-indicator]:bg-success',
+  low: 'dshx:*:data-[slot=progress-indicator]:bg-warning',
+  critical: 'dshx:*:data-[slot=progress-indicator]:bg-destructive',
+} satisfies Record<QuotaTone, string>

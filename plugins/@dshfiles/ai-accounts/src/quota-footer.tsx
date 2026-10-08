@@ -1,7 +1,11 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useState } from 'react'
 import { aiAccountsApi, type AccountsUsage } from './api.js'
-import styles from './accounts.module.css'
+import { QUOTA_TONE_FILL, QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 
 /**
  * Quota in the sidebar foot.
@@ -55,37 +59,41 @@ export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsag
   if (!props.wide) {
     // Rail: a dot per account and a compact, labelled history action.
     return (
-      <div className={styles.footerRail} aria-label="Account quota">
+      <div aria-label="Account quota" className="dshx-root dshx:flex dshx:items-center dshx:gap-2" role="group">
         {rows.map(row => (
-          <span key={row.instanceId} className={toneFor(row.tightest?.percent ?? 0)} title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`} />
+          <span
+            className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', QUOTA_TONE_FILL[quotaTone(row.tightest?.percent ?? 0)])}
+            key={row.instanceId}
+            title={`${row.instanceId}: ${String(row.tightest?.percent ?? 0)}% left`}
+          />
         ))}
-        <button
-          type="button"
-          className={styles.footerHistoryIcon}
-          aria-label="Open usage history"
-          title="Open usage history"
-          onClick={props.onOpenUsageHistory}
-        >
-          ↗
-        </button>
+        <Button aria-label="Open usage history" onClick={props.onOpenUsageHistory} size="icon-xs" title="Open usage history" type="button" variant="ghost">
+          <ArrowUpRightIcon />
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className={styles.footerWide} title="Tightest window per account.">
-      {rows.map(row => (
-        <div className={styles.footerRow} key={row.instanceId}>
-          <span className={styles.footerName}>{row.instanceId}</span>
-          <span className={`${styles.footerBar} ${toneFor(row.tightest?.percent ?? 0)}`} />
-          <span className={styles.footerPercent}>{String(row.tightest?.percent ?? 0)}%</span>
-        </div>
-      ))}
-      <button type="button" className={styles.footerHistoryLink} onClick={props.onOpenUsageHistory}>
+    <div className="dshx-root dshx:flex dshx:max-w-full dshx:items-center dshx:gap-3 dshx:overflow-x-auto dshx:text-xs" title="Tightest window per account.">
+      {rows.map(row => {
+        const percent = row.tightest?.percent ?? 0
+        const tone = quotaTone(percent)
+        return (
+          <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-2" key={row.instanceId}>
+            <span className="dshx:max-w-28 dshx:truncate dshx:text-muted-foreground">{row.instanceId}</span>
+            <Progress
+              aria-label={`${row.instanceId} remaining`}
+              className={cn('dshx:h-1 dshx:w-12 dshx:bg-muted', QUOTA_TONE_PROGRESS[tone])}
+              value={Math.max(0, Math.min(100, percent))}
+            />
+            <span className={cn('dshx:font-medium dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{String(percent)}%</span>
+          </div>
+        )
+      })}
+      <Button className="dshx:h-auto dshx:flex-none dshx:px-0" onClick={props.onOpenUsageHistory} size="xs" type="button" variant="link">
         Open usage history
-      </button>
+      </Button>
     </div>
   )
 }
-
-const toneFor = (percent: number): string => (percent <= 10 ? String(styles.stateCritical) : percent <= 30 ? String(styles.stateWarn) : String(styles.stateOk))

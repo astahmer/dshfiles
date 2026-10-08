@@ -1,9 +1,14 @@
 import { z } from 'zod'
 import { useApi } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { aiAccountsApi, type AccountsUsage, type UsageCard } from './api.js'
-import styles from './accounts.module.css'
+import { aiAccountsApi, type AccountsUsage } from './api.js'
+import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone, tightestWindow } from './quota-tone.js'
 
 /**
  * Draggable edge usage overlay.
@@ -26,6 +31,16 @@ interface EdgePosition {
   readonly y: number
 }
 
+/** The tab hugs its edge: no border and square corners on the side touching the viewport. */
+const EDGE_SHAPE = {
+  left: 'dshx:rounded-r-lg dshx:border-l-0',
+  right: 'dshx:rounded-l-lg dshx:border-r-0',
+  top: 'dshx:rounded-b-lg dshx:border-t-0',
+  bottom: 'dshx:rounded-t-lg dshx:border-b-0',
+} satisfies Record<Edge, string>
+
+const POPOVER_SIDE = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' } as const satisfies Record<Edge, 'left' | 'right' | 'top' | 'bottom'>
+
 const positionSchema = z.object({ edge: z.enum(['left', 'right', 'top', 'bottom']), x: z.number(), y: z.number() })
 
 const clamp = (position: EdgePosition, viewport: { readonly innerWidth: number; readonly innerHeight: number }): EdgePosition => ({
@@ -43,7 +58,7 @@ const readPosition = (): EdgePosition => {
   } catch {
     // Corrupt or absent state falls through to the default edge.
   }
-  return { edge: 'right', x: window.innerWidth - 44, y: Math.round(window.innerHeight / 2) }
+  return { edge: 'right', x: window.innerWidth - 40, y: Math.round(window.innerHeight / 2) }
 }
 
 const nearestEdge = (rect: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }): Edge => {
@@ -56,23 +71,12 @@ const nearestEdge = (rect: { readonly left: number; readonly right: number; read
   return distances.sort((left, right) => left[1] - right[1])[0]?.[0] ?? 'right'
 }
 
-/** Tightest window (the smallest percent) an account currently reports. */
-const tightestWindow = (card: UsageCard): { readonly percent: number; readonly label: string; readonly resetsAt: number | null } | undefined => {
-  if (card.status !== 'ok' || card.windows.length === 0) return undefined
-  return card.windows.reduce<{ readonly percent: number; readonly label: string; readonly resetsAt: number | null } | undefined>((current, window) => {
-    if (current !== undefined && current.percent <= window.percentRemaining) return current
-    return { percent: window.percentRemaining, label: window.label, resetsAt: window.resetsAt }
-  }, undefined)
-}
-
 export const formatReset = (resetsAt: number | null): string | undefined => {
   if (resetsAt === null) return undefined
   const minutes = Math.round((resetsAt - Date.now()) / 60_000)
   if (minutes < 60) return `${minutes}m`
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`
 }
-
-const toneFor = (percent: number): string => (percent <= 10 ? String(styles.stateCritical) : percent <= 30 ? String(styles.stateWarn) : String(styles.stateOk))
 
 export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
@@ -179,69 +183,89 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     setOpen(current => !current)
   }
 
-  const overlayStyle = (() => {
-    const rect = triggerRef.current?.getBoundingClientRect()
-    const triggerWidth = rect?.width ?? 40
-    const triggerHeight = rect?.height ?? 40
-    const width = Math.min(420, window.innerWidth - 16)
-    const height = Math.min(560, window.innerHeight * 0.7)
-    const centeredLeft = Math.min(Math.max(8, position.x + triggerWidth / 2 - width / 2), Math.max(8, window.innerWidth - width - 8))
-    const centeredTop = Math.min(Math.max(8, position.y + triggerHeight / 2), Math.max(8, window.innerHeight - height - 8))
-    if (position.edge === 'left') return { left: position.x + triggerWidth + 8, top: centeredTop, transform: 'translateY(-50%)' }
-    if (position.edge === 'right') return { right: window.innerWidth - position.x + 8, top: centeredTop, transform: 'translateY(-50%)' }
-    if (position.edge === 'top') return { left: centeredLeft, top: position.y + triggerHeight + 8 }
-    return { left: centeredLeft, bottom: window.innerHeight - position.y + 8 }
-  })()
+  const primaryTone = quotaTone(primary ?? 100)
+  const vertical = position.edge === 'left' || position.edge === 'right'
 
   // Portal to the body: the sidebar foot has transformed ancestors, and a fixed
-  // backdrop inside one anchors to that ancestor instead of the viewport.
+  // trigger inside one anchors to that ancestor instead of the viewport.
   return createPortal(
-    <aside className={styles.edgeOverlay} aria-label="AI Accounts usage">
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.edgeTrigger}
-        aria-expanded={open}
-        aria-label={primary === undefined ? 'Open AI Accounts usage' : `${Math.round(primary)}% left on the tightest account`}
-        title="Drag to move · click to view AI accounts usage"
-        style={{ left: position.x, top: position.y }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onClick={handleToggle}
-      >
-        <span className={styles.edgeTriggerMark}>AI</span>
-        <span className={toneFor(primary ?? 100)}>{primary === undefined ? '·' : String(Math.round(primary))}</span>
-      </button>
-      {open ? (
-        <div className={styles.edgePopover} style={overlayStyle} role="dialog" aria-label="Account quota">
-          <header className={styles.edgePopoverHead}>
-            <span className={styles.footerName}>Tightest window per account</span>
-            <button
-              type="button"
-              className={styles.quiet}
+    <aside aria-label="AI Accounts usage" className="dshx-root">
+      <Popover onOpenChange={setOpen} open={open}>
+        <PopoverAnchor asChild>
+          <button
+            aria-expanded={open}
+            aria-label={primary === undefined ? 'Open AI Accounts usage' : `${Math.round(primary)}% left on the tightest account`}
+            className={cn(
+              'dshx-root dshx:fixed dshx:z-[10000] dshx:flex dshx:cursor-grab dshx:touch-none dshx:items-center dshx:justify-center dshx:border dshx:bg-background/90 dshx:text-foreground dshx:shadow-md dshx:backdrop-blur-md dshx:select-none dshx:hover:bg-secondary dshx:active:cursor-grabbing',
+              vertical ? 'dshx:min-h-16 dshx:w-10 dshx:flex-col dshx:gap-1 dshx:py-2' : 'dshx:h-10 dshx:w-[76px] dshx:gap-1.5',
+              EDGE_SHAPE[position.edge],
+              open && 'dshx:bg-secondary',
+            )}
+            onClick={handleToggle}
+            onPointerCancel={handlePointerUp}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            ref={triggerRef}
+            style={{ left: position.x, top: position.y }}
+            title="Drag to move · click to view AI accounts usage"
+            type="button"
+          >
+            <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
+            <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', QUOTA_TONE_TEXT[primaryTone])}>
+              {primary === undefined ? '·' : String(Math.round(primary))}
+            </span>
+          </button>
+        </PopoverAnchor>
+        <PopoverContent
+          aria-label="Account quota"
+          className="dshx-root dshx:z-[10001] dshx:flex dshx:max-h-[70vh] dshx:w-[min(420px,calc(100vw-16px))] dshx:flex-col dshx:p-0"
+          collisionPadding={8}
+          onInteractOutside={event => {
+            if (event.target instanceof Node && triggerRef.current?.contains(event.target)) event.preventDefault()
+          }}
+          side={POPOVER_SIDE[position.edge]}
+          sideOffset={8}
+        >
+          <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2">
+            <span className="dshx:text-xs dshx:text-muted-foreground">Tightest window per account</span>
+            <Button
               aria-label="Open usage history"
               onClick={() => {
                 setOpen(false)
                 props.onOpenUsageHistory()
               }}
+              size="xs"
+              type="button"
+              variant="ghost"
             >
-              ↗ history
-            </button>
+              <ArrowUpRightIcon />
+              History
+            </Button>
           </header>
-          {enabledRows.length === 0 ? <p className={styles.edgeEmpty}>No account reports quota yet.</p> : null}
-          <ul className={styles.edgeRows}>
-            {enabledRows.map(row => (
-              <li className={styles.edgeRow} key={row.card.instanceId}>
-                <span className={styles.footerName}>{row.card.instanceId}</span>
-                <span className={styles.edgeReset}>{formatReset(row.tightest?.resetsAt ?? null) ?? ''}</span>
-                <span className={`${styles.footerPercent} ${toneFor(row.tightest?.percent ?? 100)}`}>{String(Math.round(row.tightest?.percent ?? 100))}%</span>
-              </li>
-            ))}
+          {enabledRows.length === 0 ? <p className="dshx:px-3 dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No account reports quota yet.</p> : null}
+          <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:p-1.5">
+            {enabledRows.map(row => {
+              const percent = row.tightest?.percent ?? 100
+              const tone = quotaTone(percent)
+              return (
+                <li className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:py-2 dshx:hover:bg-accent/50" key={row.card.instanceId}>
+                  <div className="dshx:flex dshx:items-baseline dshx:gap-2">
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{row.card.instanceId}</span>
+                    <span className="dshx:text-xs dshx:text-muted-foreground">{formatReset(row.tightest?.resetsAt ?? null) ?? ''}</span>
+                    <span className={cn('dshx:text-sm dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{String(Math.round(percent))}%</span>
+                  </div>
+                  <Progress
+                    aria-label={`${row.card.instanceId} remaining`}
+                    className={cn('dshx:h-1.5 dshx:bg-muted', QUOTA_TONE_PROGRESS[tone])}
+                    value={Math.max(0, Math.min(100, percent))}
+                  />
+                </li>
+              )
+            })}
           </ul>
-        </div>
-      ) : null}
+        </PopoverContent>
+      </Popover>
     </aside>,
     document.body,
   )

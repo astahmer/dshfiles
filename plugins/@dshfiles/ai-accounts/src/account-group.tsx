@@ -1,7 +1,10 @@
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { badgeFromName } from './account-draft.js'
 import { KIND_LABEL, STATE_LABEL } from './account-labels.js'
 import type { AccountProfile } from './api.js'
-import styles from './accounts.module.css'
+import { ProviderMark } from './panel-primitives.js'
 
 /** One group of the rail: a provider heading and the accounts under it. */
 export const AccountGroup = (props: {
@@ -13,40 +16,43 @@ export const AccountGroup = (props: {
 }): JSX.Element | null => {
   if (props.accounts.length === 0) return null
   return (
-    <section className={styles.group}>
-      <h2>{KIND_LABEL[props.kind].toUpperCase()}</h2>
-      {props.accounts.map(profile => (
-        <div
-          className={profile.instanceId === props.selectedId ? `${styles.accountRow} ${styles.accountRowSelected}` : styles.accountRow}
-          key={profile.instanceId}
-        >
-          <button
-            type="button"
-            className={styles.accountSelect}
-            aria-current={profile.instanceId === props.selectedId ? 'true' : undefined}
-            onClick={() => props.onSelect(profile.instanceId)}
-          >
-            <span className={styles.mark} style={{ background: profile.accentColor === '' ? undefined : profile.accentColor }} aria-hidden>
-              {profile.badge === '' ? badgeFromName(profile.displayName).slice(0, 2) : profile.badge}
-            </span>
-            <span className={styles.accountCopy}>
-              <strong>{profile.displayName}</strong>
-              <small>{profile.identity ?? STATE_LABEL[profile.state]}</small>
-            </span>
-          </button>
-          <label className={styles.accountToggle} title={profile.enabled ? 'Hide from the model picker' : 'Show in the model picker'}>
-            <input
-              type="checkbox"
-              aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
-              checked={profile.enabled}
-              onChange={() => props.onToggle(profile)}
-            />
-            <span className={styles.switchTrack}>
-              <span className={profile.enabled ? styles.knobOn : styles.knobOff} />
-            </span>
-          </label>
-        </div>
-      ))}
+    <section className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pt-2">
+      <h2 className="dshx:px-2 dshx:pb-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">
+        {KIND_LABEL[props.kind]}
+      </h2>
+      <ItemGroup className="dshx:gap-0.5">
+        {props.accounts.map(profile => {
+          const isSelected = profile.instanceId === props.selectedId
+          return (
+            <Item
+              className={cn('dshx:flex-nowrap dshx:gap-1 dshx:px-1 dshx:py-0.5 dshx:hover:bg-accent/50', isSelected && 'dshx:border-border dshx:bg-accent')}
+              key={profile.instanceId}
+              role="listitem"
+              size="sm"
+            >
+              <button
+                aria-current={isSelected ? 'true' : undefined}
+                className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-0.5 dshx:py-1 dshx:text-left dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
+                onClick={() => props.onSelect(profile.instanceId)}
+                type="button"
+              >
+                <ProviderMark badge={profile.badge === '' ? badgeFromName(profile.displayName).slice(0, 2) : profile.badge} color={profile.accentColor} />
+                <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
+                  <ItemTitle className="dshx:block dshx:w-full dshx:truncate dshx:text-sm">{profile.displayName}</ItemTitle>
+                  <ItemDescription className="dshx:line-clamp-1 dshx:text-xs">{profile.identity ?? STATE_LABEL[profile.state]}</ItemDescription>
+                </ItemContent>
+              </button>
+              <Switch
+                aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
+                checked={profile.enabled}
+                onCheckedChange={() => props.onToggle(profile)}
+                size="sm"
+                title={profile.enabled ? 'Hide from the model picker' : 'Show in the model picker'}
+              />
+            </Item>
+          )
+        })}
+      </ItemGroup>
     </section>
   )
 }

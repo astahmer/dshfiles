@@ -1,8 +1,11 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { badgeFromName } from './account-draft.js'
 import { KIND_LABEL } from './account-labels.js'
 import { PROVIDER_ICONS, type AccountDraft } from './api.js'
-import styles from './accounts.module.css'
-import { Field, Section } from './panel-primitives.js'
+import { LabelledControl, NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
 /** The section a route slug is valid under, so the field explains its own rule. */
@@ -12,13 +15,9 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
   const draft = props.draft
   const { accounts, selected, selectedId, setDraft, setNotice, load } = props.state
   return (
-    <Section
-      index="01"
-      title="Account identity"
-      action={
-        <button
-          type="button"
-          className={styles.quiet}
+    <NumberedSection
+      actions={
+        <Button
           disabled={draft.kind !== 'codex' || selectedId === null}
           onClick={() => {
             if (selectedId === null) return
@@ -30,60 +29,83 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
               })
               .catch(() => setNotice('Could not read the Codex account identity.'))
           }}
+          size="xs"
+          type="button"
+          variant="outline"
         >
-          ↻ Refresh
-        </button>
+          <RefreshCwIcon />
+          Refresh
+        </Button>
       }
+      index="01"
+      title="Account identity"
     >
-      <div className={styles.fieldGrid}>
-        <Field label="Route slug" hint={SLUG_HINT}>
-          <input className={styles.input} value={draft.instanceId} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} />
-        </Field>
-        <Field label="Display name">
-          <input
-            className={styles.input}
-            value={draft.displayName}
-            placeholder={KIND_LABEL[draft.kind]}
-            onChange={event => setDraft({ ...draft, displayName: event.target.value })}
-          />
-        </Field>
-        <Field label="Signed-in identity">
-          <input
-            className={styles.input}
-            readOnly
-            value={
-              selected?.identity ??
-              (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
-            }
-          />
-        </Field>
-        <Field label="Picker tag" hint="Up to 3 characters, shown on the provider mark.">
-          <input
-            className={styles.input}
-            value={draft.badge}
-            maxLength={3}
-            placeholder={badgeFromName(draft.displayName)}
-            onChange={event => setDraft({ ...draft, badge: event.target.value.toUpperCase() })}
-          />
-        </Field>
-        <Field label="Tag color">
-          <input
-            className={styles.colorInput}
-            type="color"
-            value={draft.accentColor}
-            onChange={event => setDraft({ ...draft, accentColor: event.target.value })}
-          />
-        </Field>
-        <Field label="Picker icon">
-          <select className={styles.input} value={draft.providerIcon} onChange={event => setDraft({ ...draft, providerIcon: event.target.value })}>
-            {PROVIDER_ICONS.map(icon => (
-              <option key={icon} value={icon}>
-                {icon}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className="dshx:grid dshx:grid-cols-1 dshx:gap-x-3 dshx:gap-y-2.5 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">
+        <LabelledControl hint={SLUG_HINT} label="Route slug">
+          {id => <Input id={id} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} value={draft.instanceId} />}
+        </LabelledControl>
+        <LabelledControl label="Display name">
+          {id => (
+            <Input
+              id={id}
+              onChange={event => setDraft({ ...draft, displayName: event.target.value })}
+              placeholder={KIND_LABEL[draft.kind]}
+              value={draft.displayName}
+            />
+          )}
+        </LabelledControl>
+        <LabelledControl label="Signed-in identity">
+          {id => (
+            <Input
+              className="dshx:text-muted-foreground"
+              id={id}
+              readOnly
+              value={
+                selected?.identity ??
+                (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+              }
+            />
+          )}
+        </LabelledControl>
+        <LabelledControl hint="Up to 3 characters, shown on the provider mark." label="Picker tag">
+          {id => (
+            <Input
+              id={id}
+              maxLength={3}
+              onChange={event => setDraft({ ...draft, badge: event.target.value.toUpperCase() })}
+              placeholder={badgeFromName(draft.displayName)}
+              value={draft.badge}
+            />
+          )}
+        </LabelledControl>
+        <LabelledControl label="Tag color">
+          {id => (
+            <Input
+              className="dshx:w-14! dshx:cursor-pointer dshx:p-1"
+              id={id}
+              onChange={event => setDraft({ ...draft, accentColor: event.target.value })}
+              type="color"
+              value={draft.accentColor}
+            />
+          )}
+        </LabelledControl>
+        <LabelledControl label="Picker icon">
+          {id => (
+            <Select onValueChange={providerIcon => setDraft({ ...draft, providerIcon })} value={draft.providerIcon}>
+              <SelectTrigger className="dshx:w-full" id={id}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROVIDER_ICONS.map(icon => (
+                  <SelectItem key={icon} value={icon}>
+                    {icon}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </LabelledControl>
       </div>
-    </Section>
+    </NumberedSection>
   )
 }

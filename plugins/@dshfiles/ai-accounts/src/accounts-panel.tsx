@@ -1,10 +1,10 @@
-// Supplies the CSS-module declaration this file's stylesheet import needs.
-import type {} from '@dshfiles/dshx/client'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { UsersIcon } from '@dshfiles/plugin-ui/icons'
 import { AccountDetail } from './account-detail.js'
 import { AccountRail } from './account-rail.js'
 import { AccountsToolbar } from './accounts-toolbar.js'
 import { QuotaContinuations } from './quota-continuations.js'
-import styles from './accounts.module.css'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
 
 /**
@@ -21,28 +21,35 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
   const state = useAccountsPanelState()
 
   if (state.file === null) {
-    return <div className={styles.notice}>{state.notice ?? 'Loading accounts…'}</div>
+    return (
+      <div className="dshx-root dshx:flex dshx:items-center dshx:gap-2 dshx:p-6 dshx:text-muted-foreground" role="status">
+        {state.notice === null ? <Spinner /> : null}
+        {state.notice ?? 'Loading accounts…'}
+      </div>
+    )
   }
 
   return (
-    <div className={styles.page}>
-      <AccountsToolbar state={state} file={state.file} />
+    <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-hidden dshx:px-6 dshx:py-3.5">
+      <AccountsToolbar file={state.file} state={state} />
 
       <QuotaContinuations accountId={state.selectedId} />
 
-      <div className={styles.layout}>
-        <AccountRail state={state} file={state.file} />
+      <div className="dshx:mx-auto dshx:grid dshx:min-h-0 dshx:w-full dshx:max-w-[1600px] dshx:flex-1 dshx:grid-cols-[minmax(220px,250px)_minmax(0,1fr)] dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:bg-card">
+        <AccountRail file={state.file} state={state} />
 
         {state.draft !== null ? (
-          <AccountDetail state={state} draft={state.draft} file={state.file} onOpenUsageHistory={props.onOpenUsageHistory} />
+          <AccountDetail draft={state.draft} file={state.file} onOpenUsageHistory={props.onOpenUsageHistory} state={state} />
         ) : (
-          <section className={styles.welcome}>
-            <span className={styles.welcomeMark} aria-hidden>
-              ✳
-            </span>
-            <h2>Your accounts, side by side.</h2>
-            <p>Create a Codex, OpenCode Go, or Command Code profile. Each one becomes its own route in the model picker.</p>
-          </section>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UsersIcon />
+              </EmptyMedia>
+              <EmptyTitle className="dshx:text-base">Your accounts, side by side.</EmptyTitle>
+              <EmptyDescription>Create a Codex, OpenCode Go, or Command Code profile. Each one becomes its own route in the model picker.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </div>

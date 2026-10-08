@@ -1,5 +1,6 @@
-import { EmptyState } from '@dshfiles/plugin-ui'
 import { Chart, ChartFrame, colorLegend, defineChart, lineY, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
+import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo } from 'react'
 import type { UsageHistoryPoint } from './api.js'
 import { quotaHistoryRows } from './usage-history-analysis.js'
@@ -38,9 +39,15 @@ export const QuotaHistoryChart = (props: {
       }),
     [rows, windows],
   )
-  if (props.points.length < 2 || rows.length === 0) return <EmptyState compact description={props.emptyMessage} />
+  if (props.points.length < 2 || rows.length === 0) {
+    return (
+      <Empty className="dshx:flex-none dshx:gap-2 dshx:border dshx:p-4 dshx:md:p-4">
+        <EmptyDescription className="dshx:text-xs">{props.emptyMessage}</EmptyDescription>
+      </Empty>
+    )
+  }
   return (
-    <ChartFrame className={props.className}>
+    <ChartFrame className={cn('dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3', props.className)}>
       <Chart
         ariaDescription={`Percent remaining per window: ${windows.join(', ')}.`}
         ariaLabel={props.ariaLabel}

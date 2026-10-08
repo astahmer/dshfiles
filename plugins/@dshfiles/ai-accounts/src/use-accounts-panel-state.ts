@@ -10,6 +10,7 @@ import {
   type AccountsFile,
   type AccountsUsage,
   type OverlaySettings,
+  type UsageHistoryPoint,
 } from './api.js'
 
 const DEFAULT_OVERLAYS: OverlaySettings = { edgeWidget: true, footerQuota: true }
@@ -19,7 +20,7 @@ export const useAccountsPanelState = () => {
   const [usage, setUsage] = useState<AccountsUsage | null>(null)
   const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
   const [refreshingCatalog, setRefreshingCatalog] = useState(false)
-  const [history, setHistory] = useState<readonly { at: number; windows: Record<string, number> }[]>([])
+  const [history, setHistory] = useState<readonly UsageHistoryPoint[]>([])
   const [historyDays, setHistoryDays] = useState(7)
   const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)

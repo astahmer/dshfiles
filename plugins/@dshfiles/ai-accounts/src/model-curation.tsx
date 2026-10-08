@@ -1,22 +1,16 @@
-import {
-  Button,
-  IconChevronDownOutlineRegular,
-  IconChevronUpOutlineRegular,
-  IconPinFillRegular,
-  IconPinOutlineRegular,
-} from '@deepseek-ai/dsh-client-ui-primitives'
-import { EmptyState, Select, type SelectOption } from '@dshfiles/plugin-ui'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { ChevronDownIcon, ChevronUpIcon, StarIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AccountDraft, AccountsCatalog } from './api.js'
-import styles from './accounts.module.css'
 
 type CatalogModel = AccountsCatalog['models'][number]
 
 export type CurationPatch = Partial<Pick<AccountDraft, 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults'>>
 
-const effortOptions = (model: CatalogModel, pinned: string | undefined): readonly SelectOption<string>[] => [
-  ...(model.defaultEffort === null || pinned !== undefined ? [] : [{ value: '', label: 'Provider default' }]),
-  ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
-]
+/** Radix Select reserves the empty string, so "no pinned effort" travels under its own value. */
+const PROVIDER_DEFAULT = '__provider-default__'
 
 /**
  * Model curation: favorite, hide, and reorder an account's models.
@@ -72,7 +66,7 @@ export const ModelCuration = (props: {
 
   const setEffort = (modelId: string, effortId: string): void => {
     const next = { ...reasoningDefaults }
-    if (effortId === '') delete next[modelId]
+    if (effortId === PROVIDER_DEFAULT) delete next[modelId]
     else next[modelId] = effortId
     props.onChange({ reasoningDefaults: next })
   }
@@ -89,52 +83,74 @@ export const ModelCuration = (props: {
     models.map((model, groupIndex) => {
       const isFavorite = favorites.has(model.id)
       const isHidden = hidden.has(model.id)
+      const pinned = reasoningDefaults[model.id]
       return (
-        <li className={isHidden ? `${styles.modelRow} ${styles.modelRowHidden}` : styles.modelRow} key={model.id}>
+        <li
+          className={cn(
+            'dshx:flex dshx:min-h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent/50',
+            isHidden && 'dshx:opacity-50',
+          )}
+          key={model.id}
+        >
           <Button
             aria-label={isFavorite ? `Unstar ${model.name}` : `Star ${model.name}`}
             aria-pressed={isFavorite}
-            icon={isFavorite ? <IconPinFillRegular /> : <IconPinOutlineRegular />}
+            className={cn(isFavorite ? 'dshx:text-warning' : 'dshx:text-muted-foreground')}
             onClick={() => toggleFavorite(model.id)}
-            size="sm"
+            size="icon-xs"
             type="button"
-          />
-          <span className={styles.modelName} title={model.id}>
-            <strong>{model.name}</strong>
-            <small>{model.id}</small>
+            variant="ghost"
+          >
+            <StarIcon className={cn(isFavorite && 'dshx:fill-current')} />
+          </Button>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-2" title={model.id}>
+            <strong className="dshx:truncate dshx:text-sm dshx:font-medium">{model.name}</strong>
+            <small className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{model.id}</small>
           </span>
-          <span className={styles.modelActions}>
+          <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
             {model.efforts.length === 0 ? null : (
-              <Select
-                aria-label={`Default reasoning effort for ${model.name}`}
-                className={styles.compactSelect}
-                onValueChange={effortId => setEffort(model.id, effortId)}
-                options={effortOptions(model, reasoningDefaults[model.id])}
-                value={reasoningDefaults[model.id] ?? model.defaultEffort ?? ''}
-              />
+              <Select onValueChange={effortId => setEffort(model.id, effortId)} value={pinned ?? model.defaultEffort ?? PROVIDER_DEFAULT}>
+                <SelectTrigger aria-label={`Default reasoning effort for ${model.name}`} className="dshx:h-6 dshx:min-w-24 dshx:text-xs" size="sm">
+                  <SelectValue placeholder="Provider default" />
+                </SelectTrigger>
+                <SelectContent>
+                  {model.defaultEffort === null || pinned !== undefined ? null : <SelectItem value={PROVIDER_DEFAULT}>Provider default</SelectItem>}
+                  {model.efforts.map(effort => (
+                    <SelectItem key={effort.id} value={effort.id}>
+                      {effort.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             <Button
               aria-label={`Move ${model.name} up`}
               disabled={groupIndex === 0}
-              icon={<IconChevronUpOutlineRegular />}
               onClick={() => move(model.id, -1)}
-              size="sm"
+              size="icon-xs"
               type="button"
-            />
+              variant="ghost"
+            >
+              <ChevronUpIcon />
+            </Button>
             <Button
               aria-label={`Move ${model.name} down`}
               disabled={groupIndex === models.length - 1}
-              icon={<IconChevronDownOutlineRegular />}
               onClick={() => move(model.id, 1)}
-              size="sm"
+              size="icon-xs"
               type="button"
-            />
+              variant="ghost"
+            >
+              <ChevronDownIcon />
+            </Button>
             <Button
               aria-label={isHidden ? `Show ${model.name} in the picker` : `Hide ${model.name} from the picker`}
               aria-pressed={!isHidden}
+              className="dshx:w-12"
               onClick={() => toggleHidden(model.id)}
-              size="sm"
+              size="xs"
               type="button"
+              variant="outline"
             >
               {isHidden ? 'Show' : 'Hide'}
             </Button>
@@ -150,21 +166,25 @@ export const ModelCuration = (props: {
   ]
 
   return (
-    <div className={styles.inset}>
-      <div className={styles.modelToolbar}>
-        <span>
+    <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-2">
+      <div className="dshx:flex dshx:items-center dshx:gap-2.5 dshx:px-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">
+        <span className="dshx:flex-1">
           {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden
         </span>
-        <Button onClick={toggleAll} size="sm" type="button" variant="outline">
+        <Button onClick={toggleAll} size="xs" type="button" variant="outline">
           {allHidden ? 'Enable all' : 'Disable all'}
         </Button>
       </div>
-      {ordered.length === 0 ? <EmptyState compact description="No models returned yet. Sign in, then refresh the provider catalog." /> : null}
+      {ordered.length === 0 ? (
+        <Empty className="dshx:gap-2 dshx:p-4 dshx:md:p-4">
+          <EmptyDescription className="dshx:text-xs">No models returned yet. Sign in, then refresh the provider catalog.</EmptyDescription>
+        </Empty>
+      ) : null}
       {groups.map(group =>
         group.models.length === 0 ? null : (
           <section key={group.title}>
-            <h4 className={styles.modelGroup}>{group.title}</h4>
-            <ul className={styles.modelList}>{rows(group.models)}</ul>
+            <h4 className="dshx:px-1.5 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{group.title}</h4>
+            <ul>{rows(group.models)}</ul>
           </section>
         ),
       )}

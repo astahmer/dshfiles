@@ -1,7 +1,33 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { CopyIcon } from '@dshfiles/plugin-ui/icons'
 import type { AccountDraft } from './api.js'
-import styles from './accounts.module.css'
-import { Section } from './panel-primitives.js'
+import { NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+
+const PathField = (props: {
+  readonly label: string
+  readonly hint: string
+  readonly ariaLabel: string
+  readonly value: string
+  readonly placeholder: string
+  readonly onChange: (value: string) => void
+}): JSX.Element => (
+  <div className="dshx:grid dshx:grid-cols-1 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-[minmax(170px,0.48fr)_minmax(0,1fr)] dshx:md:gap-3.5">
+    <span className="dshx:flex dshx:flex-col dshx:gap-1">
+      <span className="dshx:text-sm dshx:font-medium">{props.label}</span>
+      <small className="dshx:text-xs dshx:text-muted-foreground">{props.hint}</small>
+    </span>
+    <Input
+      aria-label={props.ariaLabel}
+      className="dshx:font-mono! dshx:text-xs"
+      onChange={event => props.onChange(event.target.value)}
+      placeholder={props.placeholder}
+      spellCheck={false}
+      value={props.value}
+    />
+  </div>
+)
 
 export const RuntimePathsSection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft }): JSX.Element => {
   const draft = props.draft
@@ -9,68 +35,52 @@ export const RuntimePathsSection = (props: { readonly state: AccountsPanelState;
   const launchCommand =
     draft.kind === 'codex' && draft.shadowHomePath.trim() !== '' ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex` : null
   return (
-    <Section
-      index="02"
-      title="Runtime paths"
-      muted="Absolute path on this host"
-      action={
+    <NumberedSection
+      actions={
         launchCommand === null ? null : (
-          <button
-            type="button"
-            className={styles.quiet}
+          <Button
             onClick={() => void copy(launchCommand, 'Launch command copied. Run it in a terminal to open interactive Codex for this account.')}
+            size="xs"
+            type="button"
+            variant="outline"
           >
+            <CopyIcon />
             Copy launch command
-          </button>
+          </Button>
         )
       }
+      description="Absolute path on this host"
+      index="02"
+      title="Runtime paths"
     >
-      <div className={styles.pathField}>
-        <span>
-          {draft.kind === 'codex' ? 'CODEX_HOME' : 'API KEY'}
-          <small>{draft.kind === 'codex' ? 'Shared sessions, skills and plugins.' : 'Named, never valued: the key stays in the environment.'}</small>
-        </span>
-        <input
-          className={styles.input}
-          aria-label={draft.kind === 'codex' ? 'CODEX_HOME' : 'API key environment variable'}
-          spellCheck={false}
-          value={draft.kind === 'codex' ? draft.homePath : draft.apiKeyEnv}
-          placeholder={draft.kind === 'codex' ? '~/.codex' : 'OPENCODE_API_KEY'}
-          onChange={event => setDraft(draft.kind === 'codex' ? { ...draft, homePath: event.target.value } : { ...draft, apiKeyEnv: event.target.value })}
-        />
-      </div>
+      <PathField
+        ariaLabel={draft.kind === 'codex' ? 'CODEX_HOME' : 'API key environment variable'}
+        hint={draft.kind === 'codex' ? 'Shared sessions, skills and plugins.' : 'Named, never valued: the key stays in the environment.'}
+        label={draft.kind === 'codex' ? 'CODEX_HOME' : 'API KEY'}
+        onChange={value => setDraft(draft.kind === 'codex' ? { ...draft, homePath: value } : { ...draft, apiKeyEnv: value })}
+        placeholder={draft.kind === 'codex' ? '~/.codex' : 'OPENCODE_API_KEY'}
+        value={draft.kind === 'codex' ? draft.homePath : draft.apiKeyEnv}
+      />
       {draft.kind === 'codex' ? (
-        <div className={styles.pathField}>
-          <span>
-            Shadow home
-            <small>Per-account home keeping auth.json separate while sharing state.</small>
-          </span>
-          <input
-            className={styles.input}
-            aria-label="Shadow home path"
-            spellCheck={false}
-            value={draft.shadowHomePath}
-            placeholder="Leave empty for one under the shadow root"
-            onChange={event => setDraft({ ...draft, shadowHomePath: event.target.value })}
-          />
-        </div>
+        <PathField
+          ariaLabel="Shadow home path"
+          hint="Per-account home keeping auth.json separate while sharing state."
+          label="Shadow home"
+          onChange={value => setDraft({ ...draft, shadowHomePath: value })}
+          placeholder="Leave empty for one under the shadow root"
+          value={draft.shadowHomePath}
+        />
       ) : null}
       {draft.kind === 'commandcode' ? (
-        <div className={styles.pathField}>
-          <span>
-            API base URL
-            <small>Leave empty for Command Code&apos;s own deployment.</small>
-          </span>
-          <input
-            className={styles.input}
-            aria-label="API base URL"
-            spellCheck={false}
-            value={draft.apiBaseUrl}
-            placeholder="https://api.commandcode.ai"
-            onChange={event => setDraft({ ...draft, apiBaseUrl: event.target.value })}
-          />
-        </div>
+        <PathField
+          ariaLabel="API base URL"
+          hint="Leave empty for Command Code's own deployment."
+          label="API base URL"
+          onChange={value => setDraft({ ...draft, apiBaseUrl: value })}
+          placeholder="https://api.commandcode.ai"
+          value={draft.apiBaseUrl}
+        />
       ) : null}
-    </Section>
+    </NumberedSection>
   )
 }

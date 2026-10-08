@@ -1,8 +1,5 @@
 import type { UsageCard } from './api.js'
-import styles from './accounts.module.css'
-
-/** Percent remaining, coloured by how much is left rather than by provider. */
-const remainingTone = (percent: number): string => (percent <= 10 ? String(styles.barCritical) : percent <= 30 ? String(styles.barLow) : String(styles.barOk))
+import { QuotaMeter } from './panel-primitives.js'
 
 const formatReset = (resetsAt: number | null): string | null => {
   if (resetsAt === null || Number.isNaN(resetsAt)) return null
@@ -16,32 +13,17 @@ const formatReset = (resetsAt: number | null): string | null => {
 export const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
   const usage = props.usage
   if (usage === undefined || usage.status !== 'ok' || usage.windows.length === 0) return null
+  const earliestExpiry = usage.bankedResetExpiries.filter((expiresAt): expiresAt is number => expiresAt !== null).sort((left, right) => left - right)[0]
   return (
-    <div className={styles.usageCard}>
+    <div className="dshx:grid dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">
       {usage.windows.map(window => (
-        <div className={styles.usageWindow} key={window.label}>
-          <div className={styles.usageRow}>
-            <span className={styles.usageLabel}>{window.label}</span>
-            <span className={styles.usagePercent}>{window.percentRemaining}% left</span>
-          </div>
-          <div className={styles.usageTrack}>
-            <div
-              className={`${styles.usageBar} ${remainingTone(window.percentRemaining)}`}
-              style={{ width: `${String(Math.max(0, Math.min(100, window.percentRemaining)))}%` }}
-            />
-          </div>
-          {formatReset(window.resetsAt) === null ? null : <div className={styles.usageReset}>{formatReset(window.resetsAt)}</div>}
-        </div>
+        <QuotaMeter detail={formatReset(window.resetsAt)} key={window.label} label={window.label} percent={window.percentRemaining} />
       ))}
       {usage.bankedResets > 0 ? (
-        <div className={styles.usageBanked}>
+        <p className="dshx:text-xs dshx:text-info dshx:md:col-span-2">
           {String(usage.bankedResets)} banked reset{usage.bankedResets === 1 ? '' : 's'}
-          {usage.bankedResetExpiries
-            .filter((expiresAt): expiresAt is number => expiresAt !== null)
-            .sort((left, right) => left - right)
-            .map(expiresAt => ` · earliest expires ${new Date(expiresAt).toLocaleDateString()}`)
-            .join('')}
-        </div>
+          {earliestExpiry === undefined ? '' : ` · earliest expires ${new Date(earliestExpiry).toLocaleDateString()}`}
+        </p>
       ) : null}
     </div>
   )

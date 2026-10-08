@@ -1,32 +1,31 @@
-import styles from './accounts.module.css'
-import { Section } from './panel-primitives.js'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { NumberedSection } from './panel-primitives.js'
+import { QuotaHistoryChart } from './quota-history-chart.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import { UsageCardView } from './usage-card-view.js'
-import { UsageHistoryChart } from './usage-history-chart.js'
+
+const HISTORY_RANGES = [1, 3, 7, 14, 30] as const
 
 export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX.Element => {
   const { accounts, selected, selectedId, usage, history, setHistory, historyDays, setHistoryDays, setNotice } = props.state
   return (
-    <Section
-      index="04"
-      title="Quota"
-      action={
-        <span className={styles.sectionActions}>
-          <select
-            className={styles.rangeSelect}
-            value={String(historyDays)}
-            aria-label="History range"
-            onChange={event => setHistoryDays(Number(event.target.value))}
-          >
-            {[1, 3, 7, 14, 30].map(days => (
-              <option key={days} value={String(days)}>
-                {days}d
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className={styles.quiet}
+    <NumberedSection
+      actions={
+        <>
+          <Select onValueChange={days => setHistoryDays(Number(days))} value={String(historyDays)}>
+            <SelectTrigger aria-label="History range" className="dshx:h-6 dshx:text-xs" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {HISTORY_RANGES.map(days => (
+                <SelectItem key={days} value={String(days)}>
+                  {days}d
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
             onClick={() => {
               if (selectedId === null) return
               void accounts
@@ -35,14 +34,24 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
                 .then(result => setHistory(result.points))
                 .catch(() => setNotice('Could not record usage right now.'))
             }}
+            size="xs"
+            type="button"
+            variant="outline"
           >
             Record now
-          </button>
-        </span>
+          </Button>
+        </>
       }
+      index="04"
+      title="Quota"
     >
       <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
-      <UsageHistoryChart points={history} days={historyDays} />
-    </Section>
+      <QuotaHistoryChart
+        ariaLabel={`Remaining quota over the last ${String(historyDays)} days`}
+        emptyMessage="Not enough history yet. Quota is recorded on an interval; check back shortly."
+        height={160}
+        points={history}
+      />
+    </NumberedSection>
   )
 }
