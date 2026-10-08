@@ -15,6 +15,8 @@ export const REVISION_TEMPLATE =
   '\',"mine":\' ++ self.mine() ++ ' +
   '\',"immutable":\' ++ self.immutable() ++ ' +
   '\',"divergent":\' ++ self.divergent() ++ ' +
+  '\',"empty":\' ++ self.empty() ++ ' +
+  '\',"conflict":\' ++ self.conflict() ++ ' +
   '\',"evolved":false}\' ++ "\\n"'
 
 export const OPERATION_TEMPLATE =
@@ -25,3 +27,11 @@ export const OPERATION_TEMPLATE =
 export const EVOLUTION_TEMPLATE =
   '\'{"commitId":\' ++ self.commit().commit_id().short(64).escape_json() ++ ' +
   '\',"predecessors":[\' ++ self.predecessors().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'
+
+export const FILE_STATS_TEMPLATE =
+  '\'{"commitId":\' ++ self.commit_id().short(64).escape_json() ++ ' +
+  '\',"files":[\' ++ self.diff().stat().files().map(|f| ' +
+  '\'{"path":\' ++ f.path().display().escape_json() ++ ' +
+  '\',"status":\' ++ f.status().escape_json() ++ ' +
+  '\',"additions":\' ++ f.lines_added() ++ ' +
+  '\',"deletions":\' ++ f.lines_removed() ++ \'}\').join(",") ++ \']}\' ++ "\\n"'

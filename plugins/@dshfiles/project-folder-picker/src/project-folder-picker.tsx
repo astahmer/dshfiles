@@ -4,10 +4,10 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { FolderIcon, FolderOpenIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { filterRegisteredProjects, folderSelection, movePickerSelection, workspaceSelection } from './project-folder-picker-model.js'
+import { folderSelection, movePickerSelection, pickerEntries, pickerEntrySelection, type PickerEntry } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -46,6 +46,10 @@ export interface ProjectFolderPickerProps {
    * caller that knows it rather than read here.
    */
   readonly machineName?: string
+  /** Previously chosen folders offered after the registered projects; selecting one yields a directory selection. */
+  readonly recentFolders?: readonly string[]
+  /** Accessible list label and placeholder override for callers whose list is not only projects. */
+  readonly placeholder?: string
 }
 
 const projectGlyphTones = [
@@ -83,9 +87,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const generation = useRef(0)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const pathMode = query.startsWith('/')
-  const matchingProjects = useMemo(() => filterRegisteredProjects(props.projects, query), [props.projects, query])
+  const recentFolders = props.recentFolders
+  const entries = useMemo(() => pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
   const folderEntries = pathMode ? (listing?.entries ?? []) : []
-  const itemCount = pathMode ? folderEntries.length : matchingProjects.length
+  const itemCount = pathMode ? folderEntries.length : entries.length
 
   useEffect(
     () => () => {
@@ -178,16 +183,16 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       if (entry !== undefined) void browse(entry.path)
       return
     }
-    const project = matchingProjects[selectedIndex]
-    if (project !== undefined) props.onSelect(workspaceSelection(project))
+    const entry = entries[selectedIndex]
+    if (entry !== undefined) props.onSelect(pickerEntrySelection(entry))
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key) && !pathMode) {
-      const project = matchingProjects[Number(event.key) - 1]
-      if (project !== undefined) {
+      const entry = entries[Number(event.key) - 1]
+      if (entry !== undefined) {
         event.preventDefault()
-        props.onSelect(workspaceSelection(project))
+        props.onSelect(pickerEntrySelection(entry))
       }
       return
     }
@@ -243,7 +248,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 setError(null)
               }}
               onKeyDown={onKeyDown}
-              placeholder="Search projects or type / for a folder…"
+              placeholder={props.placeholder ?? 'Search projects or type / for a folder…'}
               ref={searchInput}
               value={query}
             />
@@ -255,7 +260,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
         </div>
         {pathMode ? (
           <>
-            {listing !== null && <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>}
+            {listing !== null && (
+              <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>
+            )}
             <div aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
               {folderEntries.map((entry, index) => (
                 <button
@@ -304,53 +311,30 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     Create folder
                   </Button>
                 </form>
-                {listing.truncated && (
-                  <Badge variant="warning">
-                    Folder list is truncated.
-                  </Badge>
-                )}
+                {listing.truncated && <Badge variant="warning">Folder list is truncated.</Badge>}
               </div>
             )}
           </>
         ) : (
           <>
-            <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Projects</p>
-            <div aria-label="Registered projects" className={listClassName} role="listbox">
-              {matchingProjects.map((project, index) => (
-                <button
-                  aria-selected={index === selectedIndex}
-                  className={optionClassName(index === selectedIndex)}
-                  key={project.workspaceId}
-                  onClick={() => props.onSelect(workspaceSelection(project))}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  role="option"
-                  type="button"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
-                      projectGlyphTone(project.title),
-                    )}
-                  >
-                    {project.title.slice(0, 2).toLocaleUpperCase()}
-                  </span>
-                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                    <span className="dshx:truncate dshx:text-sm dshx:font-medium">{project.title}</span>
-                    <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-                      {props.machineName === undefined ? null : `${props.machineName} · `}
-                      <span className="dshx:font-mono">{project.canonicalPath}</span>
-                    </span>
-                  </span>
-                  {index < 9 && (
-                    <KbdGroup>
-                      <Kbd>⌘</Kbd>
-                      <Kbd>{index + 1}</Kbd>
-                    </KbdGroup>
-                  )}
-                </button>
-              ))}
-              {matchingProjects.length === 0 && <p className={emptyClassName}>No registered projects match.</p>}
+            <div aria-label="Projects and recent folders" className={cn(listClassName, 'dshx:pt-2')} role="listbox">
+              {entries.map((entry, index) => {
+                const previous = entries[index - 1]
+                const heading = previous === undefined || previous.kind !== entry.kind ? (entry.kind === 'project' ? 'Projects' : 'Recent folders') : null
+                return (
+                  <PickerEntryRow
+                    active={index === selectedIndex}
+                    entry={entry}
+                    heading={heading}
+                    index={index}
+                    key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
+                    machineName={props.machineName}
+                    onHover={() => setSelectedIndex(index)}
+                    onSelect={() => props.onSelect(pickerEntrySelection(entry))}
+                  />
+                )
+              })}
+              {entries.length === 0 && <p className={emptyClassName}>No registered projects match.</p>}
             </div>
           </>
         )}
@@ -380,5 +364,65 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
         </footer>
       </DialogContent>
     </Dialog>
+  )
+}
+
+interface PickerEntryRowProps {
+  readonly entry: PickerEntry
+  readonly heading: string | null
+  readonly index: number
+  readonly active: boolean
+  readonly machineName: string | undefined
+  readonly onHover: () => void
+  readonly onSelect: () => void
+}
+
+const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
+  const title = props.entry.kind === 'project' ? props.entry.project.title : (props.entry.path.split('/').filter(Boolean).at(-1) ?? props.entry.path)
+  const path = props.entry.kind === 'project' ? props.entry.project.canonicalPath : props.entry.path
+  return (
+    <>
+      {props.heading !== null && <p className="dshx:px-2 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.heading}</p>}
+      <button
+        aria-selected={props.active}
+        className={optionClassName(props.active)}
+        onClick={props.onSelect}
+        onMouseEnter={props.onHover}
+        role="option"
+        type="button"
+      >
+        {props.entry.kind === 'project' ? (
+          <span
+            aria-hidden
+            className={cn(
+              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+              projectGlyphTone(title),
+            )}
+          >
+            {title.slice(0, 2).toLocaleUpperCase()}
+          </span>
+        ) : (
+          <span
+            aria-hidden
+            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
+          >
+            <HistoryIcon className="dshx:size-3.5" />
+          </span>
+        )}
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+          <span className="dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+            {props.machineName === undefined ? null : `${props.machineName} · `}
+            <span className="dshx:font-mono">{path}</span>
+          </span>
+        </span>
+        {props.index < 9 && (
+          <KbdGroup>
+            <Kbd>⌘</Kbd>
+            <Kbd>{props.index + 1}</Kbd>
+          </KbdGroup>
+        )}
+      </button>
+    </>
   )
 }

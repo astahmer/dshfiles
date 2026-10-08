@@ -199,3 +199,37 @@ test('prepared mutations are one-use, expire, and bind to unchanged repo state',
   assert.deepEqual(store.take('preview-5', '/tmp/repo', 'device:inode', 'state-1', 2000), entry)
   assert.equal(store.take('preview-5', '/tmp/repo', 'device:inode', 'state-1', 2001), undefined)
 })
+
+test('revision actions build fixed argv with literal file filesets', () => {
+  assert.deepEqual(buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId }), [
+    'squash',
+    '--from',
+    id,
+    '--into',
+    otherId,
+    '--use-destination-message',
+  ])
+  assert.deepEqual(buildMutationArgv({ kind: 'squash', sourceId: id, destinationId: otherId, paths: ['a b.ts'] }), [
+    'squash',
+    '--from',
+    id,
+    '--into',
+    otherId,
+    '--use-destination-message',
+    'root-file:"a b.ts"',
+  ])
+  assert.deepEqual(buildMutationArgv({ kind: 'restore', commitId: id, paths: ['src/x.ts'] }), ['restore', '--changes-in', id, 'root-file:"src/x.ts"'])
+  assert.deepEqual(buildMutationArgv({ kind: 'abandon', commitIds: [id, id, otherId] }), ['abandon', id, otherId])
+  assert.deepEqual(buildMutationArgv({ kind: 'revert', commitId: id, destinationId: otherId }), ['revert', '--revision', id, '--onto', otherId])
+  assert.deepEqual(buildMutationArgv({ kind: 'commit', commitId: id, message: 'ship it' }), ['commit', '--message', 'ship it'])
+  assert.deepEqual(buildMutationArgv({ kind: 'bookmark-create', bookmark: 'feature/x', destinationId: id }), [
+    'bookmark',
+    'create',
+    '--revision',
+    id,
+    'feature/x',
+  ])
+  assert.throws(() => buildMutationArgv({ kind: 'restore', commitId: id, paths: ['../escape'] }), /workspace-relative/)
+  assert.throws(() => buildMutationArgv({ kind: 'bookmark-delete', bookmark: '-r' }), /bookmark/)
+  assert.throws(() => buildMutationArgv({ kind: 'edit', commitId: '@' }), /revision id/)
+})

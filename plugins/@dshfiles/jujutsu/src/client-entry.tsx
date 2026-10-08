@@ -1,4 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -6,6 +8,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { JujutsuPanel } from './client.js'
 import './client.css'
 
@@ -16,15 +20,27 @@ const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 export default defineClient({
   name: '@dshfiles/jujutsu',
   // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
-  inject: ['slots', 'sidebarRightTabs', 'sessions', 'uiWorkspace'],
+  inject: ['slots', 'sidebarRightTabs', 'sessions', 'uiWorkspace', 'workspaces'],
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
+    const directoryPicker: DirectoryPickerPort = {
+      pick: () => ctx.uiWorkspace.pickDirectory(),
+      list: (path, signal) => ctx.uiWorkspace.listDirectory(path, signal),
+      createDirectory: (path, name) => ctx.uiWorkspace.createDirectory(path, name),
+    }
+    const registerWorkspace = async (canonicalPath: string): Promise<RegisteredProject> => {
+      const workspace = await ctx.workspaces.create({ path: canonicalPath })
+      return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
+    }
     const panelForSurface = (surface: 'main' | 'side-panel') =>
       decorate(() => (
         <PluginQueryProvider>
-          <JujutsuPanel
+          <ProjectsBoundPanel
+            workspaces={ctx.workspaces}
             surface={surface}
+            directoryPicker={directoryPicker}
+            registerWorkspace={registerWorkspace}
             sessions={ctx.sessions}
             openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
             pickDirectory={() => ctx.uiWorkspace.pickDirectory()}
@@ -58,6 +74,25 @@ export default defineClient({
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))
   },
 })
+
+const noProjects = (): null => null
+
+/** Follow the Host workspace registry so the repository picker lists every registered project. */
+const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly RegisteredProject[] => {
+  const source = workspaces?.list
+  const subscribe = useCallback((listener: () => void) => source?.subscribe(listener) ?? (() => undefined), [source])
+  const getSnapshot = useCallback(() => source?.getSnapshot() ?? null, [source])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, noProjects)
+  return useMemo(
+    () => snapshot?.items.map(workspace => ({ workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path })) ?? [],
+    [snapshot],
+  )
+}
+
+const ProjectsBoundPanel = (props: Omit<Parameters<typeof JujutsuPanel>[0], 'projects'> & { readonly workspaces: IWorkspaces | undefined }): JSX.Element => {
+  const { workspaces, ...panelProps } = props
+  return <JujutsuPanel {...panelProps} projects={useRegisteredProjects(workspaces)} />
+}
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg

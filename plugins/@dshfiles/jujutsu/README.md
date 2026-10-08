@@ -7,16 +7,29 @@ contracts.
 ## What it provides
 
 - A revision graph with change IDs, author and relative time, bookmarks, tags,
-  workspace labels, working-copy marker, immutable/evolved flags, day groups,
-  and author-name, text, mine, immutable, and date filters.
-- Revision detail with changed files, added/deleted line counts, full diff, and
-  evolution history.
-- A Source Control view with status, full working-copy diff, configurable
-  `@-1` ancestor groups, describe, split by selected files, and squash into an
-  ancestor.
-- Repository path selection/history, refresh, remote fetch, and bookmark push.
-- Dragging a local bookmark or revision onto a revision prepares a move/rebase
-  preview. Every mutation, fetch, and push needs a second explicit confirmation.
+  workspace labels, working-copy marker, immutable (diamond), empty (hollow),
+  conflict, divergent, and evolved markers, collapsible day groups, and
+  author-name, text, mine, immutable, and date filters.
+- Expanded revisions show the description, Describe / Full diff / Edit This
+  Change / Squash into parent, and changed files as a Flat or Tree list with
+  M/A/D status, +/- counts, folder counts, and per-file review marks.
+- Full diff opens every file of a revision with numbered rows and collapsed
+  "N unmodified lines" separators, rendered from `jj diff --git`.
+- Right-click a revision for full diff, describe, edit, new change, squash,
+  duplicate, revert onto @, rebase onto main, create bookmark, copy IDs, and
+  abandon; right-click a local bookmark to push or delete it.
+- A Source Control view modelled on jj-view: a message box that describes or
+  commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
+  discard (`jj restore`), move to parent/child (`jj squash` with literal
+  filesets), split by selected files, and group describe/new/edit/squash.
+- Repository selection through the shared project/folder command palette
+  (registered DSH projects, recent repositories, `/` folder browsing).
+- Dragging a local bookmark or revision onto a revision (main page and side
+  panel) prepares a move/rebase preview while the moving branch is dimmed.
+  Every mutation, fetch, and push needs a second explicit confirmation.
+- View settings (default tab, ancestor groups, file layout, raw patch expanded,
+  day grouping, hide immutable, mine only, revisions loaded) are saved in this
+  browser and shared live by the main page and side panel.
 - Create an isolated JJ workspace at a listed revision, then explicitly open a
   DSH Session in that directory.
 - Browse durable event sequence boundaries for a listed Session, load older

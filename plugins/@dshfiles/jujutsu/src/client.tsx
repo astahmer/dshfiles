@@ -18,37 +18,68 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CalendarIcon, ChevronRightIcon, EllipsisVerticalIcon, RefreshCwIcon, SearchIcon, UserIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArrowDownIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  EllipsisVerticalIcon,
+  FolderGit2Icon,
+  GripVerticalIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  Settings2Icon,
+  UserIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
+import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { Mutation, Revision } from './api.js'
+import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
+import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
+import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
+import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
+import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
+import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisioner } from './workspace-provisioner.js'
 import { WorkspaceRestorePanel } from './workspace-restore-panel.js'
-import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 
 type View = 'graph' | 'source'
 
@@ -57,9 +88,18 @@ interface RevisionSelection {
   readonly changeId: string
 }
 
+interface FullDiffTarget {
+  readonly commitId: string
+  readonly title: string
+  readonly focusPath: string | null
+}
+
 interface JujutsuPanelProps {
   readonly surface?: 'main' | 'side-panel'
   readonly sessions: ISessions
+  readonly projects: readonly RegisteredProject[]
+  readonly directoryPicker: DirectoryPickerPort
+  readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
   readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly pickDirectory: () => Promise<string | null>
   readonly launchSession: (cwd: string) => Promise<void>
@@ -68,14 +108,14 @@ interface JujutsuPanelProps {
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
 const SELECTED_REPO_KEY = 'dshfiles.jujutsu.selected'
 const REVIEW_PROGRESS_KEY = 'dshfiles.jujutsu.review-progress.v1'
+const REVISION_MIME = 'application/x-jujutsu-revision'
+const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
 const REPO_HISTORY_LIMIT = 12
-const ANCESTOR_LIMIT_OPTIONS = ['1', '2', '3', '4', '5', '8', '10']
 const LANE_GAP = 10
 const LANE_OFFSET = 8
 const LANE_STROKES = ['dshx:stroke-chart-1', 'dshx:stroke-chart-2', 'dshx:stroke-chart-3', 'dshx:stroke-chart-4', 'dshx:stroke-chart-5'] as const
+const LANE_FILLS = ['dshx:fill-chart-1', 'dshx:fill-chart-2', 'dshx:fill-chart-3', 'dshx:fill-chart-4', 'dshx:fill-chart-5'] as const
 
-const SECTION_HEADING = 'dshx:flex dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-3 dshx:pb-1.5 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground'
-const COMPACT_TEXTAREA = 'dshx:min-h-12 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:md:text-xs'
 const CODE_BLOCK =
   'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-snug dshx:whitespace-pre'
 const DISCLOSURE_TRIGGER =
@@ -86,9 +126,8 @@ const repoHistorySchema = z.array(z.string()).catch([])
 
 const jujutsuKeys = {
   repository: (repoId: string) => ['jujutsu', repoId] as const,
-  state: (repoId: string) => ['jujutsu', repoId, 'state'] as const,
+  state: (repoId: string, limit: number) => ['jujutsu', repoId, 'state', limit] as const,
   details: (repoId: string, commitId: string) => ['jujutsu', repoId, 'details', commitId] as const,
-  workingDiff: (repoId: string) => ['jujutsu', repoId, 'working-diff'] as const,
 }
 
 const readStorage = (key: string): string | null => {
@@ -96,6 +135,14 @@ const readStorage = (key: string): string | null => {
     return localStorage.getItem(key)
   } catch {
     return null
+  }
+}
+
+const writeStorage = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Storage can be disabled; the panel still works for this session.
   }
 }
 
@@ -125,16 +172,8 @@ const dayLabel = (value: string): string => {
     : 'Date unavailable'
 }
 
-const safeSplitPath = (path: string): boolean =>
-  path.length > 0 &&
-  path.length <= 1024 &&
-  !path.includes('\0') &&
-  !path.includes('\n') &&
-  !path.includes('\r') &&
-  !path.startsWith('/') &&
-  path.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
-
-const groupRows = (revisions: readonly Revision[]): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
+const groupRows = (revisions: readonly Revision[], byDay: boolean): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
+  if (!byDay) return [{ day: '', rows: revisions }]
   const groups = new Map<string, Revision[]>()
   for (const revision of revisions) {
     const key = dayLabel(revision.authorTime)
@@ -153,41 +192,48 @@ const laneCenter = (lane: number): number => LANE_OFFSET + lane * LANE_GAP
 
 const laneStroke = (lane: number): string => LANE_STROKES[lane % LANE_STROKES.length] ?? LANE_STROKES[0]
 
+const repositoryName = (root: string): string => root.split('/').filter(Boolean).at(-1) ?? root
+
+const hasDragType = (event: DragEvent, type: string): boolean => [...event.dataTransfer.types].includes(type)
+
 export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const sidePanel = props.surface === 'side-panel'
   const api = useApi(jujutsuApi)
   const queryClient = useQueryClient()
+  const [preferences, setPreference] = usePreferences()
   const autoRegisterPath = useRef<string | null>(null)
   const [path, setPath] = useState(() => readStorage(SELECTED_REPO_KEY) ?? '')
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(readRepoHistory)
-  const [view, setView] = useState<View>('graph')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [chosenView, setView] = useState<View | null>(null)
+  const view = chosenView ?? preferences.defaultView
   const [authorFilter, setAuthorFilter] = useState('')
   const [textFilter, setTextFilter] = useState('')
-  const [mineOnly, setMineOnly] = useState(false)
-  const [hideImmutable, setHideImmutable] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [showSearch, setShowSearch] = useState(!sidePanel)
   const [showDates, setShowDates] = useState(false)
+  const [collapsedDays, setCollapsedDays] = useState<ReadonlySet<string>>(() => new Set())
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
+  const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const [reviewStore, setReviewStore] = useState<ReviewStore>(() => readReviewStore(readStorage(REVIEW_PROGRESS_KEY)))
   const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
   const [reviewNotice, setReviewNotice] = useState('')
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
-  const [ancestorLimit, setAncestorLimit] = useState(5)
-  const [splitPaths, setSplitPaths] = useState<readonly string[]>([])
-  const [splitText, setSplitText] = useState('')
-  const [squashText, setSquashText] = useState('')
-  const [squashTarget, setSquashTarget] = useState('')
-  const [showWorkingDiff, setShowWorkingDiff] = useState(false)
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
+  const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
+  const [dragSource, setDragSource] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
+  const mineOnly = preferences.mineOnly
+  const hideImmutable = preferences.hideImmutable
 
   const stateQuery = useQuery({
-    queryKey: jujutsuKeys.state(repoId ?? ''),
-    queryFn: ({ signal }) => api.load({ repoId: repoId ?? '', limit: 300 }, { signal }),
+    queryKey: jujutsuKeys.state(repoId ?? '', preferences.revisionLimit),
+    queryFn: ({ signal }) => api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal }),
     enabled: repoId !== null,
   })
   const state = stateQuery.data
@@ -205,10 +251,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const details = detailsQuery.data
   const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
 
-  const workingDiffQuery = useQuery({
-    queryKey: jujutsuKeys.workingDiff(repoId ?? ''),
-    queryFn: ({ signal }) => api.workingDiff({ repoId: repoId ?? '' }, { signal }),
-    enabled: repoId !== null && showWorkingDiff,
+  const fullDiffQuery = useQuery({
+    queryKey: jujutsuKeys.details(repoId ?? '', fullDiff?.commitId ?? ''),
+    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal }),
+    enabled: repoId !== null && fullDiff !== null,
   })
 
   const prepareMutation = useMutation({
@@ -233,21 +279,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setPath(registered.root)
       setSelection(null)
       setDescribeDrafts({})
-      setShowWorkingDiff(false)
+      setFullDiff(null)
       const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
       setRepoHistory(nextHistory)
-      localStorage.setItem(REPO_HISTORY_KEY, JSON.stringify(nextHistory))
-      localStorage.setItem(SELECTED_REPO_KEY, registered.root)
+      writeStorage(REPO_HISTORY_KEY, JSON.stringify(nextHistory))
+      writeStorage(SELECTED_REPO_KEY, registered.root)
       void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(registered.repoId) })
     },
   })
 
   useEffect(() => {
     const selectedPath = path.trim()
-    if (!sidePanel || repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
+    if (repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
     autoRegisterPath.current = selectedPath
     registerMutation.mutate(selectedPath)
-  }, [sidePanel, path, repoId, registerMutation.mutate])
+  }, [path, repoId, registerMutation.mutate])
 
   useEffect(() => {
     if (state === undefined) return
@@ -255,8 +301,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
   }, [state])
 
-  const busy = registerMutation.isPending || stateQuery.isFetching || confirmMutation.isPending
-  const loadingRepository = repoId !== null && state === undefined && stateQuery.isFetching
+  const busy = registerMutation.isPending || stateQuery.isFetching || confirmMutation.isPending || prepareMutation.isPending
+  const loadingRepository = registerMutation.isPending || (repoId !== null && state === undefined && stateQuery.isFetching)
 
   const remoteNames = state?.remoteNames ?? []
   const selectedRemote = remoteNames.includes(remote) ? remote : (remoteNames[0] ?? '')
@@ -264,11 +310,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
   const defaultBookmark = workingCopy?.localBookmarks[0] ?? localBookmarkNames[0] ?? ''
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
+  const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
 
   const visibleRevisions = useMemo(() => {
     if (state === undefined) return []
     return state.revisions.filter(revision => {
-      if (mineOnly && !revision.mine) return false
+      if (mineOnly && !revision.mine && !revision.workingCopy) return false
       if (hideImmutable && revision.immutable) return false
       if (authorFilter && !revision.author.toLocaleLowerCase().includes(authorFilter.toLocaleLowerCase())) return false
       const timestamp = Date.parse(revision.authorTime)
@@ -287,32 +334,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
   const graphLaneCount = graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1)
   const graphWidth = laneCenter(graphLaneCount - 1) + LANE_OFFSET
-  const groups = useMemo(() => groupRows(visibleRevisions), [visibleRevisions])
-  const selectedDescribeText =
-    selectedRevision === undefined ? '' : (describeDrafts[selectedRevision.commitId] ?? editableDescription(selectedRevision.description))
-  const workingDescribeText = workingCopy === undefined ? '' : (describeDrafts[workingCopy.commitId] ?? editableDescription(workingCopy.description))
-  const selectedDescribeChanged = selectedRevision !== undefined && describeDraftChanged(selectedDescribeText, selectedRevision.description)
-  const workingDescribeChanged = workingCopy !== undefined && describeDraftChanged(workingDescribeText, workingCopy.description)
-
-  const ancestors = useMemo(() => {
-    if (workingCopy === undefined) return []
-    const result: { readonly depth: number; readonly revision: Revision }[] = []
-    let cursor = workingCopy
-    for (let depth = 1; depth <= ancestorLimit; depth += 1) {
-      const parentId = cursor.parents[0]
-      if (parentId === undefined) break
-      const parent = revisionsByCommitId.get(parentId)
-      if (parent === undefined) break
-      result.push({ depth, revision: parent })
-      cursor = parent
-    }
-    return result
-  }, [revisionsByCommitId, workingCopy, ancestorLimit])
+  const groups = useMemo(() => groupRows(visibleRevisions, preferences.dateHeadings), [visibleRevisions, preferences.dateHeadings])
+  const movingBranch = useMemo(
+    () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
+    [dragSource, state],
+  )
+  const emptyAncestors = useMemo(() => emptyAncestorCandidates(state?.revisions ?? []), [state])
 
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
     detailsQuery.error && errorMessage(detailsQuery.error, 'Could not load revision details.'),
-    workingDiffQuery.error && errorMessage(workingDiffQuery.error, 'Could not load the working-copy diff.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
     prepareMutation.error && errorMessage(prepareMutation.error, 'Could not prepare this action.'),
     confirmMutation.error && errorMessage(confirmMutation.error, 'Action was not completed.'),
@@ -337,40 +368,61 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
   }
 
-  const updateFileReview = (file: ReviewFile, reviewed: boolean): void => {
-    if (state === undefined || selectedRevision === undefined || file.contentDigest === null) return
-    const next = toggleFileReview(
+  const openFullDiff = (revision: Revision, focusPath: string | null): void =>
+    setFullDiff({ commitId: revision.commitId, title: firstLine(revision.description) + ' · ' + revision.shortestChangeId, focusPath })
+
+  const updateFileReviews = (changes: readonly { readonly file: ReviewFile; readonly reviewed: boolean }[]): void => {
+    if (state === undefined || selectedRevision === undefined) return
+    const reviewedAt = new Date().toISOString()
+    const next = changes.reduce(
+      (store, change) =>
+        change.file.contentDigest === null
+          ? store
+          : toggleFileReview(
+              store,
+              { repositoryRoot: state.root, commitId: selectedRevision.commitId, path: change.file.path, contentDigest: change.file.contentDigest, reviewedAt },
+              change.reviewed,
+            ),
       reviewStore,
-      {
-        repositoryRoot: state.root,
-        commitId: selectedRevision.commitId,
-        path: file.path,
-        contentDigest: file.contentDigest,
-        reviewedAt: new Date().toISOString(),
-      },
-      reviewed,
     )
     try {
       localStorage.setItem(REVIEW_PROGRESS_KEY, JSON.stringify(next))
       setReviewStore(next)
-      setReviewNotice(reviewed ? 'Review progress saved in this browser.' : 'Review mark cleared.')
+      setReviewNotice(changes.some(change => change.reviewed) ? 'Review progress saved in this browser.' : 'Review mark cleared.')
     } catch {
       setReviewNotice('Browser storage is unavailable. Review progress was not changed.')
     }
   }
 
-  const dropOn = (event: DragEvent, revision: Revision): void => {
-    event.preventDefault()
-    const draggedBookmark = event.dataTransfer.getData('application/x-jujutsu-bookmark')
-    const draggedRevision = event.dataTransfer.getData('application/x-jujutsu-revision')
-    if (draggedBookmark) askForConfirmation({ kind: 'bookmark-move', bookmark: draggedBookmark, destinationId: revision.commitId })
-    else if (draggedRevision) askForConfirmation({ kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId })
+  const endDrag = (): void => {
+    setDragSource(null)
+    setDropTarget(null)
   }
 
-  const toggleRevision = (revision: Revision): void =>
-    setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
+  const dropOn = (event: DragEvent, revision: Revision): void => {
+    event.preventDefault()
+    const draggedBookmark = event.dataTransfer.getData(BOOKMARK_MIME)
+    const draggedRevision = event.dataTransfer.getData(REVISION_MIME)
+    endDrag()
+    if (draggedBookmark) {
+      if (!revision.localBookmarks.includes(draggedBookmark))
+        askForConfirmation({ kind: 'bookmark-move', bookmark: draggedBookmark, destinationId: revision.commitId })
+      return
+    }
+    if (draggedRevision && draggedRevision !== revision.commitId && !descendantCommitIds(state?.revisions ?? [], draggedRevision).has(revision.commitId)) {
+      askForConfirmation({ kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId })
+    }
+  }
 
-  const pathMatchesLoadedRepository = state !== undefined && path.trim() === state.root
+  const toggleRevision = (revision: Revision): void => {
+    setEditingDescription(null)
+    setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
+  }
+
+  const copyText = (value: string): void => {
+    void navigator.clipboard?.writeText(value).catch(() => undefined)
+  }
+
   const lastPushLabel =
     state === undefined
       ? ''
@@ -380,12 +432,85 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           ? 'not found before the operation-history limit'
           : 'not found in the latest 1,000 operations'
 
+  const revisionMenu = (revision: Revision): ReactNode => {
+    const parent = revisionsByCommitId.get(revision.parents[0] ?? '')
+    return (
+      <ContextMenuContent className="dshx-root dshx:w-56">
+        <ContextMenuLabel className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+          {revision.shortestChangeId} · {firstLine(revision.description)}
+        </ContextMenuLabel>
+        <ContextMenuItem onSelect={() => openFullDiff(revision, null)}>Show full diff</ContextMenuItem>
+        {!revision.immutable && (
+          <ContextMenuItem
+            onSelect={() => {
+              setSelection({ commitId: revision.commitId, changeId: revision.changeId })
+              setEditingDescription(revision.commitId)
+            }}
+          >
+            Describe…
+          </ContextMenuItem>
+        )}
+        {!revision.workingCopy && !revision.immutable && (
+          <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'edit', commitId: revision.commitId })}>Edit this change</ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'new', commitId: revision.commitId })}>New change here</ContextMenuItem>
+        <ContextMenuSeparator />
+        {!revision.immutable && parent !== undefined && !parent.immutable && (
+          <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'squash', sourceId: revision.commitId, destinationId: parent.commitId })}>
+            Squash into parent
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'duplicate', commitId: revision.commitId })}>Duplicate</ContextMenuItem>
+        {workingCopy !== undefined && workingCopy.commitId !== revision.commitId && (
+          <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'revert', commitId: revision.commitId, destinationId: workingCopy.commitId })}>
+            Revert onto @
+          </ContextMenuItem>
+        )}
+        {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
+          <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
+            Rebase onto main
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Create bookmark…</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => copyText(revision.changeId)}>Copy change ID</ContextMenuItem>
+        <ContextMenuItem onSelect={() => copyText(revision.commitId)}>Copy commit ID</ContextMenuItem>
+        {!revision.immutable && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'abandon', commitIds: [revision.commitId] })} variant="destructive">
+              Abandon…
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    )
+  }
+
+  const bookmarkMenu = (name: string, local: boolean): ReactNode => (
+    <ContextMenuContent className="dshx-root dshx:w-52">
+      <ContextMenuLabel className="dshx:truncate dshx:font-mono dshx:text-xs">{name}</ContextMenuLabel>
+      <ContextMenuItem disabled={!local || selectedRemote === ''} onSelect={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: name })}>
+        Push to {selectedRemote || 'remote'}
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => copyText(name)}>Copy name</ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem disabled={!local} onSelect={() => askForConfirmation({ kind: 'bookmark-delete', bookmark: name })} variant="destructive">
+        Delete bookmark…
+      </ContextMenuItem>
+    </ContextMenuContent>
+  )
+
   const revisionDetails = (revision: Revision): ReactNode => {
     const repositoryRoot = state?.root ?? ''
+    const parent = revisionsByCommitId.get(revision.parents[0] ?? '')
     const visibleFiles = details?.files.filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)) ?? []
+    const describeText = describeDrafts[revision.commitId] ?? editableDescription(revision.description)
+    const describeChanged = describeDraftChanged(describeText, revision.description)
+    const editing = editingDescription === revision.commitId && !revision.immutable
     return (
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-2 dshx:pr-3 dshx:text-xs">
-        {revision.description.includes('\n') && (
+        {revision.description.trim().length > 0 && !editing && (
           <p className="dshx:whitespace-pre-wrap dshx:text-muted-foreground">{editableDescription(revision.description)}</p>
         )}
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
@@ -393,35 +518,77 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <span aria-hidden>·</span>
           <time dateTime={revision.authorTime}>{new Date(revision.authorTime).toLocaleString()}</time>
           <span aria-hidden>·</span>
-          <span className="dshx:font-mono" title={revision.commitId}>
+          <button
+            className="dshx:font-mono dshx:hover:text-foreground"
+            onClick={() => copyText(revision.commitId)}
+            title={`Copy ${revision.commitId}`}
+            type="button"
+          >
             {revision.commitId.slice(0, 12)}
-          </span>
+          </button>
           {revision.immutable && (
             <Badge className={COMPACT_BADGE} variant="outline">
               immutable
             </Badge>
           )}
+          {revision.conflict && (
+            <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:text-destructive')} variant="outline">
+              conflict
+            </Badge>
+          )}
         </div>
-        {!revision.immutable && (
-          <div className="dshx:flex dshx:items-start dshx:gap-1.5">
+        {editing && (
+          <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
             <Textarea
               aria-label="New description"
-              className={COMPACT_TEXTAREA}
+              autoFocus
+              className="dshx:max-h-28 dshx:min-h-12 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:md:text-xs"
               onChange={event => setDescribeDrafts(current => ({ ...current, [revision.commitId]: event.target.value }))}
-              rows={2}
-              value={selectedDescribeText}
+              rows={Math.min(5, Math.max(2, describeText.split('\n').length))}
+              value={describeText}
             />
+            <div className="dshx:flex dshx:gap-1.5">
+              <Button
+                disabled={!describeChanged || busy}
+                onClick={() => askForConfirmation({ kind: 'describe', commitId: revision.commitId, message: describeText })}
+                size="xs"
+                type="button"
+              >
+                Preview describe
+              </Button>
+              <Button onClick={() => setEditingDescription(null)} size="xs" type="button" variant="ghost">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+          {!revision.immutable && !editing && (
+            <Button onClick={() => setEditingDescription(revision.commitId)} size="xs" type="button" variant="outline">
+              Describe
+            </Button>
+          )}
+          <Button onClick={() => openFullDiff(revision, null)} size="xs" type="button" variant="outline">
+            Full diff
+          </Button>
+          {!revision.workingCopy && !revision.immutable && (
+            <Button disabled={busy} onClick={() => askForConfirmation({ kind: 'edit', commitId: revision.commitId })} size="xs" type="button" variant="outline">
+              Edit This Change
+            </Button>
+          )}
+          {!revision.immutable && parent !== undefined && !parent.immutable && (
             <Button
-              disabled={!selectedDescribeChanged}
-              onClick={() => askForConfirmation({ kind: 'describe', commitId: revision.commitId, message: selectedDescribeText })}
+              disabled={busy}
+              onClick={() => askForConfirmation({ kind: 'squash', sourceId: revision.commitId, destinationId: parent.commitId })}
               size="xs"
               type="button"
               variant="outline"
             >
-              Preview describe
+              <ArrowDownIcon />
+              Squash into parent
             </Button>
-          </div>
-        )}
+          )}
+        </div>
         {details === undefined ? (
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
             <Spinner className="dshx:size-3" />
@@ -430,46 +597,45 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         ) : (
           <>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
-              <span className="dshx:font-semibold dshx:uppercase dshx:tracking-wide">Files</span>
+              <span className="dshx:font-semibold dshx:uppercase dshx:tracking-wide">Changed files</span>
               <span className="dshx:font-mono">{details.files.length}</span>
-              <span className="dshx:font-mono dshx:text-success">+{details.additions}</span>
-              <span className="dshx:font-mono dshx:text-destructive">−{details.deletions}</span>
-              <span>
-                {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
+              <FileViewToggle onChange={value => setPreference('fileView', value)} value={preferences.fileView} />
+              <span title="Files marked reviewed in this browser">
+                {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} reviewed
               </span>
               {details.truncated && (
                 <Badge className={COMPACT_BADGE} variant="warning">
                   diff truncated; counts partial
                 </Badge>
               )}
-              <Label className="dshx:ml-auto dshx:gap-1.5 dshx:text-[11px] dshx:font-normal">
-                <Checkbox checked={hideReviewedFiles} className="dshx:size-3.5" onCheckedChange={checked => setHideReviewedFiles(checked === true)} />
-                Hide reviewed files
-              </Label>
+              <LineCounts additions={details.additions} className="dshx:ml-auto" deletions={details.deletions} />
             </div>
+            <Label className="dshx:gap-1.5 dshx:self-start dshx:text-[11px] dshx:font-normal dshx:text-muted-foreground">
+              <Checkbox checked={hideReviewedFiles} className="dshx:size-3.5" onCheckedChange={checked => setHideReviewedFiles(checked === true)} />
+              Hide reviewed files
+            </Label>
             {reviewNotice.length > 0 && (
               <p className="dshx:text-muted-foreground" role="status">
                 {reviewNotice}
               </p>
             )}
-            <ul className="dshx:ml-1 dshx:flex dshx:flex-col dshx:border-l dshx:pl-2">
-              {visibleFiles.map(file => (
-                <li className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-1 dshx:hover:bg-accent" key={file.path}>
-                  <Checkbox
-                    aria-label={`Mark ${file.path} reviewed`}
-                    checked={isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)}
-                    className="dshx:size-3.5"
-                    disabled={file.contentDigest === null}
-                    onCheckedChange={checked => updateFileReview(file, checked === true)}
-                  />
-                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-[11px]" title={file.path}>
-                    {file.path}
-                  </span>
-                  <span className="dshx:font-mono dshx:text-[11px] dshx:text-success">+{file.additions}</span>
-                  <span className="dshx:font-mono dshx:text-[11px] dshx:text-destructive">−{file.deletions}</span>
-                </li>
-              ))}
-            </ul>
+            <ChangedFiles
+              className="dshx:ml-1 dshx:border-l dshx:pl-1"
+              files={visibleFiles}
+              onOpen={filePath => openFullDiff(revision, filePath)}
+              onSelectionChange={paths => {
+                const selected = new Set(paths)
+                updateFileReviews(
+                  details.files
+                    .filter(file => selected.has(file.path) !== isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file))
+                    .map(file => ({ file, reviewed: selected.has(file.path) })),
+                )
+              }}
+              selectedPaths={details.files.filter(file => isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)).map(file => file.path)}
+              selectionLabel="Mark reviewed"
+              view={preferences.fileView}
+            />
+            {details.files.length === 0 && <p className="dshx:text-muted-foreground">No file changes in this revision.</p>}
             {hideReviewedFiles && details.files.length > 0 && visibleFiles.length === 0 && (
               <p className="dshx:text-muted-foreground">All reviewable files are hidden.</p>
             )}
@@ -482,10 +648,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <pre className={CODE_BLOCK}>{details.evolution}</pre>
               </CollapsibleContent>
             </Collapsible>
-            <Collapsible defaultOpen={!sidePanel}>
+            <Collapsible defaultOpen={preferences.diffExpanded}>
               <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
                 <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
-                Diff
+                Raw patch
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <pre className={CODE_BLOCK}>{details.patch}</pre>
@@ -504,7 +670,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1">
             <Toggle
               className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
-              onPressedChange={setMineOnly}
+              onPressedChange={pressed => setPreference('mineOnly', pressed)}
               pressed={mineOnly}
               size="sm"
             >
@@ -512,7 +678,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               Mine
             </Toggle>
             <Label className="dshx:gap-1.5 dshx:px-1.5 dshx:font-mono dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-              <Checkbox checked={hideImmutable} onCheckedChange={checked => setHideImmutable(checked === true)} />
+              <Checkbox checked={hideImmutable} onCheckedChange={checked => setPreference('hideImmutable', checked === true)} />
               Hide immutable
             </Label>
             <Button
@@ -584,49 +750,74 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
         </div>
-        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain dshx:pb-4">
+        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain dshx:pb-4" onDragEnd={endDrag}>
           {groups.map(group => {
             const firstLayout = group.rows.map(revision => graphRowsByCommitId.get(revision.commitId)).find(layout => layout !== undefined)
+            const dayCollapsed = collapsedDays.has(group.day)
             return (
-              <section aria-label={group.day} key={group.day}>
-                <div className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:h-[18px] dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
-                  <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
-                    {firstLayout !== undefined &&
-                      [...firstLayout.topLanes, ...(firstLayout.incoming ? [firstLayout.commitLane] : [])].map(lane => (
-                        <line
-                          className={laneStroke(lane)}
-                          key={lane}
-                          strokeOpacity={0.8}
-                          strokeWidth={1.25}
-                          x1={laneCenter(lane)}
-                          x2={laneCenter(lane)}
-                          y1={0}
-                          y2={18}
-                        />
-                      ))}
-                  </svg>
-                  <span className="dshx:truncate">{group.day}</span>
-                  <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{group.rows.length}</span>
-                </div>
-                {group.rows.map(revision => {
-                  const graphLayout = graphRowsByCommitId.get(revision.commitId)
-                  if (graphLayout === undefined) return null
-                  const expanded = selectedRevision?.commitId === revision.commitId
-                  return (
-                    <RevisionRow
-                      expanded={expanded}
-                      graphLayout={graphLayout}
-                      graphWidth={graphWidth}
-                      key={revision.commitId}
-                      onDrop={event => dropOn(event, revision)}
-                      onToggle={() => toggleRevision(revision)}
-                      revision={revision}
-                      sidePanel={sidePanel}
-                    >
-                      {expanded && revisionDetails(revision)}
-                    </RevisionRow>
-                  )
-                })}
+              <section aria-label={group.day || 'Revisions'} key={group.day}>
+                {group.day.length > 0 && (
+                  <button
+                    aria-expanded={!dayCollapsed}
+                    className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground dshx:hover:text-foreground"
+                    onClick={() =>
+                      setCollapsedDays(current => {
+                        const next = new Set(current)
+                        if (next.has(group.day)) next.delete(group.day)
+                        else next.add(group.day)
+                        return next
+                      })
+                    }
+                    type="button"
+                  >
+                    <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
+                      {firstLayout !== undefined &&
+                        [...firstLayout.topLanes, ...(firstLayout.incoming ? [firstLayout.commitLane] : [])].map(lane => (
+                          <line
+                            className={laneStroke(lane)}
+                            key={lane}
+                            strokeOpacity={0.8}
+                            strokeWidth={1.25}
+                            x1={laneCenter(lane)}
+                            x2={laneCenter(lane)}
+                            y1={0}
+                            y2={18}
+                          />
+                        ))}
+                    </svg>
+                    <ChevronDownIcon className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', dayCollapsed && 'dshx:-rotate-90')} />
+                    <span className="dshx:truncate">{group.day}</span>
+                    <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{group.rows.length}</span>
+                  </button>
+                )}
+                {!dayCollapsed &&
+                  group.rows.map(revision => {
+                    const graphLayout = graphRowsByCommitId.get(revision.commitId)
+                    if (graphLayout === undefined) return null
+                    const expanded = selectedRevision?.commitId === revision.commitId
+                    return (
+                      <RevisionRow
+                        bookmarkMenu={bookmarkMenu}
+                        dimmed={movingBranch?.has(revision.commitId) === true}
+                        dropTarget={dropTarget === revision.commitId}
+                        expanded={expanded}
+                        graphLayout={graphLayout}
+                        graphWidth={graphWidth}
+                        key={revision.commitId}
+                        menu={revisionMenu(revision)}
+                        onDragEnter={event => {
+                          if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) setDropTarget(revision.commitId)
+                        }}
+                        onDragStart={() => setDragSource(revision.commitId)}
+                        onDrop={event => dropOn(event, revision)}
+                        onToggle={() => toggleRevision(revision)}
+                        revision={revision}
+                        sidePanel={sidePanel}
+                      >
+                        {expanded && revisionDetails(revision)}
+                      </RevisionRow>
+                    )
+                  })}
               </section>
             )
           })}
@@ -641,188 +832,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       </>
     )
 
-  const sourceView =
-    state === undefined ? null : (
-      <div className={cn('dshx:grid dshx:content-start dshx:pb-4', !sidePanel && 'dshx:md:grid-cols-2 dshx:md:divide-x')}>
-        <section aria-labelledby="jj-working-copy-heading" className="dshx:flex dshx:min-w-0 dshx:flex-col">
-          <h2 className={SECTION_HEADING} id="jj-working-copy-heading">
-            Working copy
-            <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-[10px] dshx:font-normal">{state.changedPaths.length}</span>
-            <Button
-              className="dshx:ml-auto dshx:normal-case dshx:tracking-normal"
-              onClick={() => {
-                if (showWorkingDiff) void workingDiffQuery.refetch()
-                else setShowWorkingDiff(true)
-              }}
-              size="xs"
-              type="button"
-              variant="ghost"
-            >
-              Show full diff
-            </Button>
-          </h2>
-          {state.changedPaths.length === 0 ? (
-            <p className="dshx:px-3 dshx:text-xs dshx:text-muted-foreground">Clean working copy.</p>
-          ) : (
-            <ul aria-label="Split selected files from @" className="dshx:flex dshx:flex-col dshx:px-2">
-              {state.changedPaths.map(file => {
-                const selectable = safeSplitPath(file)
-                return (
-                  <li key={file}>
-                    <Label
-                      className={cn(
-                        'dshx:h-6 dshx:gap-2 dshx:rounded-sm dshx:px-1 dshx:text-xs dshx:font-normal dshx:hover:bg-accent',
-                        !selectable && 'dshx:text-muted-foreground',
-                      )}
-                    >
-                      <Checkbox
-                        checked={splitPaths.includes(file)}
-                        className="dshx:size-3.5"
-                        disabled={!selectable}
-                        onCheckedChange={checked => setSplitPaths(current => (checked === true ? [...current, file] : current.filter(item => item !== file)))}
-                      />
-                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-[11px]" title={file}>
-                        {selectable ? file : `${file} — unsafe path format unavailable`}
-                      </span>
-                    </Label>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-1">
-            <Collapsible>
-              <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
-                <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
-                jj status
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <pre className={CODE_BLOCK}>{state.status || 'Clean working copy.'}</pre>
-              </CollapsibleContent>
-            </Collapsible>
-            {workingDiffQuery.data !== undefined && (
-              <Collapsible defaultOpen>
-                <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
-                  <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
-                  Working-copy diff
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <pre className={CODE_BLOCK}>{workingDiffQuery.data.patch}</pre>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-          </div>
-          <h3 className={SECTION_HEADING}>Describe working copy</h3>
-          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
-            <Textarea
-              aria-label="Working copy description"
-              className={COMPACT_TEXTAREA}
-              onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))}
-              rows={2}
-              value={workingDescribeText}
-            />
-            {workingCopy && (
-              <Button
-                disabled={!workingDescribeChanged}
-                onClick={() => askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}
-                size="xs"
-                type="button"
-              >
-                Preview describe
-              </Button>
-            )}
-          </div>
-          <h3 className={SECTION_HEADING}>Split selected files from @</h3>
-          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
-            <Textarea
-              aria-label="Split description"
-              className={COMPACT_TEXTAREA}
-              onChange={event => setSplitText(event.target.value)}
-              placeholder="Description for selected changes"
-              rows={2}
-              value={splitText}
-            />
-            {workingCopy && (
-              <Button
-                disabled={splitPaths.length === 0 || splitText.trim().length === 0}
-                onClick={() => askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}
-                size="xs"
-                type="button"
-              >
-                Preview split{splitPaths.length > 0 ? ` (${splitPaths.length})` : ''}
-              </Button>
-            )}
-          </div>
-        </section>
-        <section aria-labelledby="jj-ancestor-heading" className="dshx:flex dshx:min-w-0 dshx:flex-col">
-          <h2 className={SECTION_HEADING} id="jj-ancestor-heading">
-            Ancestor groups
-            <Select onValueChange={value => setAncestorLimit(Number(value))} value={String(ancestorLimit)}>
-              <SelectTrigger aria-label="Ancestor groups" className="dshx:ml-auto dshx:h-6 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal" size="sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ANCESTOR_LIMIT_OPTIONS.map(option => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </h2>
-          <div className="dshx:flex dshx:flex-col dshx:px-2">
-            {ancestors.map(({ depth, revision }) => (
-              <button
-                aria-pressed={squashTarget === revision.commitId}
-                className="dshx:flex dshx:h-7 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-1.5 dshx:text-left dshx:text-sm dshx:hover:bg-accent dshx:aria-pressed:bg-accent"
-                key={revision.commitId}
-                onClick={() => setSquashTarget(revision.commitId)}
-                type="button"
-              >
-                <span className="dshx:w-8 dshx:flex-none dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">@-{depth}</span>
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{firstLine(revision.description)}</span>
-                <span className="dshx:font-mono! dshx:text-xs dshx:font-semibold dshx:text-info">{revision.shortestChangeId}</span>
-              </button>
-            ))}
-            {ancestors.length === 0 && <p className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">No visible @-1 ancestors in this graph window.</p>}
-          </div>
-          <h3 className={SECTION_HEADING}>Squash working copy into ancestor</h3>
-          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
-            <Select onValueChange={setSquashTarget} value={squashTarget}>
-              <SelectTrigger aria-label="Squash destination" className="dshx:w-full dshx:text-xs" size="sm">
-                <SelectValue placeholder="Choose an ancestor" />
-              </SelectTrigger>
-              <SelectContent>
-                {ancestors.map(({ depth, revision }) => (
-                  <SelectItem key={revision.commitId} value={revision.commitId}>
-                    @-{depth} · {revision.shortestChangeId}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Textarea
-              aria-label="Squash description"
-              className={COMPACT_TEXTAREA}
-              onChange={event => setSquashText(event.target.value)}
-              placeholder="Resulting description"
-              rows={2}
-              value={squashText}
-            />
-            {workingCopy && (
-              <Button
-                disabled={!squashTarget || squashText.trim().length === 0}
-                onClick={() => askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}
-                size="xs"
-                type="button"
-              >
-                Preview squash
-              </Button>
-            )}
-          </div>
-        </section>
-      </div>
-    )
-
   const emptyState =
     state === undefined ? (
       <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
@@ -833,19 +842,39 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </EmptyMedia>
           )}
           <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
-            {loadingRepository ? 'Loading repository…' : 'Choose a repository path above to open its revision graph.'}
+            {loadingRepository ? 'Loading repository…' : 'Choose a repository to open its revision graph.'}
           </EmptyTitle>
+          {!loadingRepository && (
+            <Button className="dshx:mt-2" onClick={() => setPickerOpen(true)} size="sm" type="button" variant="outline">
+              <FolderGit2Icon />
+              Choose repository…
+            </Button>
+          )}
         </EmptyHeader>
       </Empty>
     ) : null
 
   const tabsContent = (
     <>
-      <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-col" value="graph">
+      <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="graph">
         {emptyState ?? graphView}
       </TabsContent>
-      <TabsContent className="dshx:min-h-0 dshx:overflow-auto" value="source">
-        {emptyState ?? sourceView}
+      <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="source">
+        {emptyState ??
+          (state !== undefined && repoId !== null && (
+            <SourceControlView
+              ancestorCount={preferences.ancestorCount}
+              busy={busy}
+              fileView={preferences.fileView}
+              onAction={askForConfirmation}
+              onAncestorCountChange={count => setPreference('ancestorCount', count)}
+              onFileViewChange={value => setPreference('fileView', value)}
+              onOpenDiff={openFullDiff}
+              onRefresh={refreshRepository}
+              repoId={repoId}
+              revisions={state.revisions}
+            />
+          ))}
       </TabsContent>
     </>
   )
@@ -878,76 +907,87 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   Source Control
                 </TabsTrigger>
               </TabsList>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button aria-label="Repository actions" className="dshx:ml-auto" size="icon-sm" type="button" variant="outline">
-                    <EllipsisVerticalIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="dshx-root dshx:w-64">
-                  <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Remote</DropdownMenuLabel>
-                  {remoteNames.length === 0 ? (
-                    <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No remotes configured.</p>
-                  ) : (
-                    <DropdownMenuRadioGroup onValueChange={setRemote} value={selectedRemote}>
-                      {remoteNames.map(name => (
-                        <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
-                          {name}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Bookmark to push</DropdownMenuLabel>
-                  {localBookmarkNames.length === 0 ? (
-                    <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No local bookmarks.</p>
-                  ) : (
-                    <DropdownMenuRadioGroup onValueChange={setBookmark} value={selectedBookmark}>
-                      {localBookmarkNames.map(name => (
-                        <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
-                          {name}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  )}
-                  {state !== undefined && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-                        <span title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>Last recorded JJ push command: {lastPushLabel}</span>
-                        {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
-                      </div>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+                <PreferencesMenu />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button aria-label="Repository actions" size="icon-sm" type="button" variant="outline">
+                      <EllipsisVerticalIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="dshx-root dshx:w-64">
+                    <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Remote</DropdownMenuLabel>
+                    {remoteNames.length === 0 ? (
+                      <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No remotes configured.</p>
+                    ) : (
+                      <DropdownMenuRadioGroup onValueChange={setRemote} value={selectedRemote}>
+                        {remoteNames.map(name => (
+                          <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                            {name}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Bookmark to push</DropdownMenuLabel>
+                    {localBookmarkNames.length === 0 ? (
+                      <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No local bookmarks.</p>
+                    ) : (
+                      <DropdownMenuRadioGroup onValueChange={setBookmark} value={selectedBookmark}>
+                        {localBookmarkNames.map(name => (
+                          <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                            {name}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    )}
+                    {state !== undefined && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="dshx:text-xs"
+                          disabled={emptyAncestors.length === 0 || busy}
+                          onSelect={() => askForConfirmation({ kind: 'abandon', commitIds: emptyAncestors.map(revision => revision.commitId) })}
+                        >
+                          Clear empty ancestors ({emptyAncestors.length})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+                          <span title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
+                            Last recorded JJ push command: {lastPushLabel}
+                          </span>
+                          {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
+                        </div>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-            <form
-              className="dshx:flex dshx:items-center dshx:gap-1.5"
-              onSubmit={event => {
-                event.preventDefault()
-                const selectedPath = path.trim()
-                if (selectedPath.length === 0) return
-                if (pathMatchesLoadedRepository) refreshRepository()
-                else registerMutation.mutate(selectedPath)
-              }}
-            >
-              <Input
-                aria-label="Repository path"
-                className="dshx:min-w-0 dshx:flex-1"
-                list="jj-repositories"
-                onChange={event => setPath(event.target.value)}
-                placeholder="/path/to/repository"
-                value={path}
-              />
-              <datalist id="jj-repositories">
-                {repoHistory.map(item => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
+            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <Button
+                aria-label="Choose repository"
+                className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
+                onClick={() => setPickerOpen(true)}
+                title={state?.root ?? (path || 'Choose repository')}
+                type="button"
+                variant="outline"
+              >
+                <FolderGit2Icon className="dshx:text-muted-foreground" />
+                {state !== undefined || path.length > 0 ? (
+                  <>
+                    <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
+                  </>
+                ) : (
+                  <span className="dshx:text-muted-foreground">Choose repository…</span>
+                )}
+                <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
+              </Button>
               <Button
                 disabled={repoId === null || selectedRemote === '' || busy}
                 onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
+                size="sm"
                 title={selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}
                 type="button"
                 variant="outline"
@@ -957,6 +997,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <Button
                 disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
                 onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
+                size="sm"
                 title={selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
                 type="button"
                 variant="outline"
@@ -965,11 +1006,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               </Button>
               <Button
                 aria-busy={busy}
-                aria-label={pathMatchesLoadedRepository ? 'Refresh' : 'Open repository'}
-                disabled={busy || path.trim().length === 0}
-                size="icon"
-                title={pathMatchesLoadedRepository ? 'Refresh' : 'Open repository'}
-                type="submit"
+                aria-label="Refresh"
+                disabled={busy || repoId === null}
+                onClick={refreshRepository}
+                size="icon-sm"
+                title="Refresh"
+                type="button"
                 variant="outline"
               >
                 {busy ? <Spinner /> : <RefreshCwIcon />}
@@ -979,11 +1021,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   Working…
                 </span>
               )}
-            </form>
+            </div>
           </header>
 
           {(errorMessages.length > 0 || (confirmMutation.data !== undefined && confirmMutation.data.output.length > 0)) && (
-            <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-2">
+            <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => (
                 <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                   <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
@@ -1031,6 +1073,75 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           )}
         </Tabs>
 
+        {pickerOpen && (
+          <ProjectFolderPicker
+            directoryPicker={props.directoryPicker}
+            onClose={() => setPickerOpen(false)}
+            onRegisterWorkspace={props.registerWorkspace}
+            onSelect={selected => {
+              setPickerOpen(false)
+              autoRegisterPath.current = selected.canonicalPath
+              setPath(selected.canonicalPath)
+              registerMutation.mutate(selected.canonicalPath)
+            }}
+            projects={props.projects}
+            recentFolders={repoHistory}
+            title="Choose a Jujutsu repository"
+          />
+        )}
+
+        {fullDiff !== null && (
+          <FullDiffDialog
+            error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
+            focusPath={fullDiff.focusPath}
+            onClose={() => setFullDiff(null)}
+            patch={fullDiffQuery.data?.patch}
+            title={fullDiff.title}
+            truncated={fullDiffQuery.data?.truncated ?? false}
+          />
+        )}
+
+        <Dialog
+          onOpenChange={open => {
+            if (!open) setBookmarkDraft(null)
+          }}
+          open={bookmarkDraft !== null}
+        >
+          {bookmarkDraft !== null && (
+            <DialogContent className="dshx-root dshx:sm:max-w-sm">
+              <form
+                className="dshx:flex dshx:flex-col dshx:gap-3"
+                onSubmit={event => {
+                  event.preventDefault()
+                  const name = bookmarkDraft.name.trim()
+                  if (name.length === 0) return
+                  setBookmarkDraft(null)
+                  askForConfirmation({ kind: 'bookmark-create', bookmark: name, destinationId: bookmarkDraft.commitId })
+                }}
+              >
+                <DialogHeader>
+                  <DialogTitle className="dshx:text-base">Create bookmark</DialogTitle>
+                  <DialogDescription>At {revisionsByCommitId.get(bookmarkDraft.commitId)?.shortestChangeId ?? 'the selected revision'}.</DialogDescription>
+                </DialogHeader>
+                <Input
+                  aria-label="Bookmark name"
+                  autoFocus
+                  className="dshx:font-mono!"
+                  onChange={event => setBookmarkDraft({ commitId: bookmarkDraft.commitId, name: event.target.value })}
+                  pattern="[A-Za-z0-9][A-Za-z0-9._/+:\-]*"
+                  placeholder="feature/name"
+                  value={bookmarkDraft.name}
+                />
+                <DialogFooter>
+                  <Button disabled={bookmarkDraft.name.trim().length === 0} size="sm" type="submit">
+                    Preview
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          )}
+        </Dialog>
+
         <AlertDialog
           onOpenChange={open => {
             if (!open) prepareMutation.reset()
@@ -1046,7 +1157,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <pre className={cn(CODE_BLOCK, 'dshx:whitespace-pre-wrap')}>{preview.detail}</pre>
               <AlertDialogFooter>
                 <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
-                <AlertDialogAction disabled={confirmMutation.isPending} onClick={confirmPreview} size="sm">
+                <AlertDialogAction
+                  disabled={confirmMutation.isPending}
+                  onClick={confirmPreview}
+                  size="sm"
+                  variant={preview.kind === 'abandon' || preview.kind === 'restore' || preview.kind === 'bookmark-delete' ? 'destructive' : 'default'}
+                >
                   Confirm and run
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -1055,6 +1171,94 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         </AlertDialog>
       </TooltipProvider>
     </main>
+  )
+}
+
+const PreferencesMenu = (): JSX.Element => {
+  const [preferences, setPreference] = usePreferences()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button aria-label="Jujutsu view settings" size="icon-sm" title="View settings" type="button" variant="ghost">
+          <Settings2Icon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="dshx-root dshx:w-60">
+        <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Saved in this browser</DropdownMenuLabel>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Default tab</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup
+              onValueChange={value => setPreference('defaultView', value === 'source' ? 'source' : 'graph')}
+              value={preferences.defaultView}
+            >
+              <DropdownMenuRadioItem className="dshx:text-xs" value="graph">
+                Revision graph
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="source">
+                Source Control
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Ancestor groups (@-{preferences.ancestorCount})</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup onValueChange={value => setPreference('ancestorCount', Number(value))} value={String(preferences.ancestorCount)}>
+              {ANCESTOR_COUNT_OPTIONS.map(option => (
+                <DropdownMenuRadioItem className="dshx:text-xs" key={option} value={String(option)}>
+                  {option}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Revisions loaded ({preferences.revisionLimit})</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup onValueChange={value => setPreference('revisionLimit', Number(value))} value={String(preferences.revisionLimit)}>
+              {REVISION_LIMIT_OPTIONS.map(option => (
+                <DropdownMenuRadioItem className="dshx:text-xs" key={option} value={String(option)}>
+                  {option}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={preferences.fileView === 'tree'}
+          className="dshx:text-xs"
+          onCheckedChange={checked => setPreference('fileView', checked ? 'tree' : 'flat')}
+        >
+          Changed files as tree
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={preferences.diffExpanded}
+          className="dshx:text-xs"
+          onCheckedChange={checked => setPreference('diffExpanded', checked)}
+        >
+          Expand raw patch by default
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={preferences.dateHeadings}
+          className="dshx:text-xs"
+          onCheckedChange={checked => setPreference('dateHeadings', checked)}
+        >
+          Group revisions by day
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={preferences.hideImmutable}
+          className="dshx:text-xs"
+          onCheckedChange={checked => setPreference('hideImmutable', checked)}
+        >
+          Hide immutable revisions
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem checked={preferences.mineOnly} className="dshx:text-xs" onCheckedChange={checked => setPreference('mineOnly', checked)}>
+          Show only my revisions
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -1068,12 +1272,10 @@ interface RevisionGraphCellProps {
 const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
   const middle = props.height / 2
   const commitX = laneCenter(props.layout.commitLane)
+  const stroke = props.revision.divergent || props.revision.conflict ? 'dshx:stroke-destructive' : laneStroke(props.layout.commitLane)
   const nodeClass = props.revision.workingCopy
     ? 'dshx:fill-primary dshx:stroke-primary'
-    : cn(
-        'dshx:fill-background',
-        props.revision.divergent ? 'dshx:stroke-destructive' : props.revision.immutable ? 'dshx:stroke-muted-foreground' : laneStroke(props.layout.commitLane),
-      )
+    : cn(props.revision.empty ? 'dshx:fill-background' : (LANE_FILLS[props.layout.commitLane % LANE_FILLS.length] ?? LANE_FILLS[0]), stroke)
   return (
     <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={props.height} viewBox={`0 0 ${props.width} ${props.height}`} width={props.width}>
       <g fill="none" strokeOpacity={0.8} strokeWidth={1.25}>
@@ -1100,7 +1302,15 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
           )
         })}
       </g>
-      <circle className={nodeClass} cx={commitX} cy={middle} r={props.revision.workingCopy ? 4.5 : 3.75} strokeWidth={1.5} />
+      {props.revision.immutable && !props.revision.workingCopy ? (
+        <path
+          className={cn('dshx:fill-background', stroke)}
+          d={`M ${commitX} ${middle - 4.5} L ${commitX + 4.5} ${middle} L ${commitX} ${middle + 4.5} L ${commitX - 4.5} ${middle} Z`}
+          strokeWidth={1.5}
+        />
+      ) : (
+        <circle className={nodeClass} cx={commitX} cy={middle} r={props.revision.workingCopy ? 4.5 : 3.75} strokeWidth={1.5} />
+      )}
     </svg>
   )
 }
@@ -1108,10 +1318,16 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
 interface RevisionRowProps {
   readonly revision: Revision
   readonly expanded: boolean
+  readonly dimmed: boolean
+  readonly dropTarget: boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
   readonly sidePanel: boolean
+  readonly menu: ReactNode
+  readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly onToggle: () => void
+  readonly onDragStart: () => void
+  readonly onDragEnter: (event: DragEvent) => void
   readonly onDrop: (event: DragEvent) => void
   readonly children: ReactNode
 }
@@ -1120,92 +1336,133 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const revision = props.revision
   const rowHeight = props.sidePanel ? 26 : 30
   const continuingLanes = [...new Set([...props.graphLayout.bottomLanes, ...props.graphLayout.edges.map(edge => edge.toLane)])]
+  const draggable = !revision.immutable
   return (
     <article
-      className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]')}
-      onDragOver={event => event.preventDefault()}
+      className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]', props.dimmed && 'dshx:opacity-40')}
+      onDragEnter={props.onDragEnter}
+      onDragOver={event => {
+        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) {
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'move'
+        }
+      }}
       onDrop={props.onDrop}
     >
-      <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:pr-3 dshx:hover:bg-accent" style={{ height: rowHeight }}>
-        <RevisionGraphCell height={rowHeight} layout={props.graphLayout} revision={revision} width={props.graphWidth} />
-        <button
-          aria-expanded={props.expanded}
-          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-          onClick={props.onToggle}
-          type="button"
-        >
-          <ChevronRightIcon className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', props.expanded && 'dshx:rotate-90')} />
-          {revision.workingCopy && <Badge className="dshx:h-[18px] dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:text-[11px] dshx:font-semibold">Editing</Badge>}
-          <span
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
             className={cn(
-              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
-              revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
-              revision.description.trim().length === 0 && 'dshx:font-normal dshx:text-muted-foreground dshx:italic',
+              'dshx:flex dshx:items-center dshx:gap-1 dshx:pr-3 dshx:hover:bg-accent',
+              props.dropTarget && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary dshx:ring-inset',
             )}
-          >
-            {firstLine(revision.description)}
-          </span>
-          {revision.bookmarks.map(name => {
-            const local = revision.localBookmarks.includes(name)
-            return (
-              <Badge
-                className={cn(
-                  COMPACT_BADGE,
-                  local ? 'dshx:cursor-grab dshx:border-warning/40 dshx:bg-warning/10 dshx:text-foreground' : 'dshx:text-muted-foreground',
-                )}
-                draggable={local}
-                key={name}
-                onDragStart={event => {
-                  event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
-                  event.dataTransfer.effectAllowed = 'move'
-                }}
-                variant="outline"
-              >
-                {name}
-              </Badge>
-            )
-          })}
-          {revision.tags.map(name => (
-            <Badge className={COMPACT_BADGE} key={name} variant="outline">
-              tag {name}
-            </Badge>
-          ))}
-          {revision.workspaces.map(workspace => (
-            <Badge className={COMPACT_BADGE} key={workspace} variant="success">
-              {workspace}
-            </Badge>
-          ))}
-          {revision.evolved && <span aria-label="evolved" className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-violet-500" role="img" title="Evolved: rewritten from an earlier commit" />}
-          {revision.divergent && (
-            <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
-              divergent
-            </Badge>
-          )}
-        </button>
-        <time className="dshx:flex-none dshx:pl-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground" dateTime={revision.authorTime}>
-          {relativeTime(revision.authorTime)}
-        </time>
-        <span className="dshx:min-w-[2ch] dshx:flex-none dshx:text-right dshx:font-mono dshx:text-xs dshx:font-semibold dshx:text-info" title={revision.changeId}>
-          {revision.shortestChangeId}
-        </span>
-        {!props.sidePanel && (
-          <Button
-            aria-label="Drag revision to rebase after preview"
-            className="dshx:cursor-grab dshx:text-muted-foreground dshx:opacity-0 dshx:group-hover/row:opacity-100 dshx:focus-visible:opacity-100"
-            draggable
+            draggable={draggable}
             onDragStart={event => {
-              event.dataTransfer.setData('application/x-jujutsu-revision', revision.commitId)
+              event.dataTransfer.setData(REVISION_MIME, revision.commitId)
               event.dataTransfer.effectAllowed = 'move'
+              props.onDragStart()
             }}
-            size="icon-xs"
-            title="Drag revision to rebase after preview"
-            type="button"
-            variant="ghost"
+            style={{ height: rowHeight }}
+            title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
           >
-            <span aria-hidden>⠿</span>
-          </Button>
-        )}
-      </div>
+            <RevisionGraphCell height={rowHeight} layout={props.graphLayout} revision={revision} width={props.graphWidth} />
+            <button
+              aria-expanded={props.expanded}
+              className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              onClick={props.onToggle}
+              type="button"
+            >
+              <ChevronRightIcon
+                className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', props.expanded && 'dshx:rotate-90')}
+              />
+              {revision.workingCopy && (
+                <Badge className="dshx:h-[18px] dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:text-[11px] dshx:font-semibold">Editing</Badge>
+              )}
+              {revision.bookmarks.map(name => {
+                const local = revision.localBookmarks.includes(name)
+                return (
+                  <ContextMenu key={name}>
+                    <ContextMenuTrigger asChild>
+                      <span
+                        className={cn('dshx:flex dshx:flex-none', local && 'dshx:cursor-grab')}
+                        draggable={local}
+                        onContextMenu={event => event.stopPropagation()}
+                        onDragStart={event => {
+                          event.stopPropagation()
+                          event.dataTransfer.setData(BOOKMARK_MIME, name)
+                          event.dataTransfer.effectAllowed = 'move'
+                        }}
+                        title={local ? 'Drag onto a revision to move · right-click for actions' : 'Remote bookmark'}
+                      >
+                        <Badge
+                          className={cn(COMPACT_BADGE, local ? 'dshx:border-warning/40 dshx:bg-warning/10 dshx:text-foreground' : 'dshx:text-muted-foreground')}
+                          variant="outline"
+                        >
+                          {name}
+                        </Badge>
+                      </span>
+                    </ContextMenuTrigger>
+                    {props.bookmarkMenu(name, local)}
+                  </ContextMenu>
+                )
+              })}
+              <span
+                className={cn(
+                  'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
+                  revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
+                  revision.description.trim().length === 0 && 'dshx:font-normal dshx:text-muted-foreground dshx:italic',
+                )}
+              >
+                {firstLine(revision.description)}
+              </span>
+              {revision.tags.map(name => (
+                <Badge className={COMPACT_BADGE} key={name} variant="outline">
+                  tag {name}
+                </Badge>
+              ))}
+              {revision.workspaces.map(workspace => (
+                <Badge className={COMPACT_BADGE} key={workspace} variant="success">
+                  {workspace}
+                </Badge>
+              ))}
+              {revision.evolved && (
+                <span
+                  aria-label="evolved"
+                  className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-chart-4"
+                  role="img"
+                  title="Evolved: rewritten from an earlier commit"
+                />
+              )}
+              {revision.conflict && (
+                <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
+                  conflict
+                </Badge>
+              )}
+              {revision.divergent && (
+                <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
+                  divergent
+                </Badge>
+              )}
+            </button>
+            <time className="dshx:flex-none dshx:pl-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground" dateTime={revision.authorTime}>
+              {relativeTime(revision.authorTime)}
+            </time>
+            <span
+              className="dshx:min-w-[2ch] dshx:flex-none dshx:text-right dshx:font-mono dshx:text-xs dshx:font-semibold dshx:text-info"
+              title={revision.changeId}
+            >
+              {revision.shortestChangeId}
+            </span>
+            {draggable && (
+              <GripVerticalIcon
+                aria-hidden
+                className="dshx:size-3.5 dshx:flex-none dshx:cursor-grab dshx:text-muted-foreground dshx:opacity-0 dshx:group-hover/row:opacity-100"
+              />
+            )}
+          </div>
+        </ContextMenuTrigger>
+        {props.menu}
+      </ContextMenu>
       {props.expanded && (
         <div className="dshx:relative" style={{ paddingLeft: props.graphWidth + 18 }}>
           <svg aria-hidden className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:h-full" width={props.graphWidth}>

@@ -16,6 +16,10 @@ port, and a workspace registration callback.
 />
 ```
 
+Optional props: `title`, `machineName`, `placeholder`, and `recentFolders`
+(previously chosen paths listed after the projects; selecting one yields a
+`directory` selection).
+
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:
 

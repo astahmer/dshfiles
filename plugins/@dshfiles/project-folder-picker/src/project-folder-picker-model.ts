@@ -27,3 +27,18 @@ export const folderSelection = (canonicalPath: string): ProjectFolderSelection =
   canonicalPath,
   title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath,
 })
+
+export type PickerEntry = { readonly kind: 'project'; readonly project: RegisteredProject } | { readonly kind: 'recent'; readonly path: string }
+
+/** Matching projects first, then recent folders that are not already registered projects. */
+export const pickerEntries = (projects: readonly RegisteredProject[], recentFolders: readonly string[], query: string): readonly PickerEntry[] => {
+  const matchingProjects = filterRegisteredProjects(projects, query)
+  if (query.startsWith('/')) return []
+  const search = query.trim().toLocaleLowerCase()
+  const projectPaths = new Set(projects.map(project => project.canonicalPath))
+  const recent = [...new Set(recentFolders)].filter(path => !projectPaths.has(path) && path.toLocaleLowerCase().includes(search))
+  return [...matchingProjects.map((project): PickerEntry => ({ kind: 'project', project })), ...recent.map((path): PickerEntry => ({ kind: 'recent', path }))]
+}
+
+export const pickerEntrySelection = (entry: PickerEntry): ProjectFolderSelection =>
+  entry.kind === 'project' ? workspaceSelection(entry.project) : folderSelection(entry.path)

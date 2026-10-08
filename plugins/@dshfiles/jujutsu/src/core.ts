@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isAbsolute, join, normalize, parse } from 'node:path'
-import { workspaceNameSchema, type Mutation } from './api.js'
+import { workspaceNameSchema, type FileStatus, type Mutation } from './api.js'
 
 export interface FileChange {
   readonly path: string
@@ -45,7 +45,7 @@ export const isSafeSplitPath = (value: string): boolean => {
 
 /** Quote one exact workspace-relative file with JJ's root-file fileset form. */
 export const rootFileFileset = (value: string): string => {
-  if (!isSafeSplitPath(value)) throw new Error('Split paths must be listed workspace-relative file names without traversal or null bytes.')
+  if (!isSafeSplitPath(value)) throw new Error(SPLIT_PATH_ERROR)
   const quoted = value
     .replaceAll('\\', '\\\\')
     .replaceAll('"', '\\"')
@@ -58,7 +58,7 @@ export const rootFileFileset = (value: string): string => {
 
 /** Construct a fixed JJ command. Every user value remains one argv element. */
 export const buildMutationArgv = (action: Mutation): readonly string[] => {
-  if ('message' in action && (action.message.includes('\0') || action.message.length > 4000)) {
+  if ('message' in action && action.message !== undefined && (action.message.includes('\0') || action.message.length > 4000)) {
     throw new Error('Descriptions must fit the supported message limit and cannot contain null bytes.')
   }
   switch (action.kind) {
@@ -66,30 +66,34 @@ export const buildMutationArgv = (action: Mutation): readonly string[] => {
       if (!isCommitId(action.commitId)) throw new Error('Invalid revision id.')
       return ['describe', action.commitId, '--message', action.message]
     case 'split':
-      if (!isCommitId(action.commitId) || action.paths.length === 0 || !action.paths.every(isSafeSplitPath)) {
-        throw new Error('Split paths must be listed workspace-relative file names without traversal or null bytes.')
-      }
-      return ['split', '--revision', action.commitId, '--message', action.message, ...action.paths.map(rootFileFileset)]
-    case 'squash':
+      if (!isCommitId(action.commitId) || action.paths.length === 0) throw new Error(SPLIT_PATH_ERROR)
+      return ['split', '--revision', action.commitId, '--message', action.message, ...literalFilesets(action.paths)]
+    case 'squash': {
       if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) {
         throw new Error('Choose two different visible revisions to squash.')
       }
-      return ['squash', '--from', action.sourceId, '--into', action.destinationId, '--message', action.message]
+      const messageArgs = action.message === undefined ? ['--use-destination-message'] : ['--message', action.message]
+      return ['squash', '--from', action.sourceId, '--into', action.destinationId, ...messageArgs, ...literalFilesets(action.paths ?? [])]
+    }
     case 'rebase':
       if (!isCommitId(action.sourceId) || !isCommitId(action.destinationId) || action.sourceId === action.destinationId) {
         throw new Error('Choose two different visible revisions to rebase.')
       }
       return ['rebase', '--source', action.sourceId, '--destination', action.destinationId]
     case 'bookmark-move':
-      if (!/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/.test(action.bookmark) || !isCommitId(action.destinationId)) {
-        throw new Error('Invalid bookmark move.')
-      }
+      if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark move.')
       return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
+    case 'bookmark-create':
+      if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark name.')
+      return ['bookmark', 'create', '--revision', action.destinationId, action.bookmark]
+    case 'bookmark-delete':
+      if (!isBookmarkName(action.bookmark)) throw new Error('Invalid bookmark name.')
+      return ['bookmark', 'delete', action.bookmark]
     case 'fetch':
       if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(action.remote)) throw new Error('Invalid remote name.')
       return ['git', 'fetch', '--remote', action.remote]
     case 'push':
-      if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(action.remote) || !/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/.test(action.bookmark)) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(action.remote) || !isBookmarkName(action.bookmark)) {
         throw new Error('Invalid push target.')
       }
       return ['git', 'push', '--remote', action.remote, '--bookmark', action.bookmark]
@@ -97,8 +101,51 @@ export const buildMutationArgv = (action: Mutation): readonly string[] => {
       if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success)
         throw new Error('Choose a valid workspace name and visible revision.')
       return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
+    case 'edit':
+      return ['edit', checkedCommitId(action.commitId)]
+    case 'new':
+      return ['new', checkedCommitId(action.commitId)]
+    case 'commit':
+      checkedCommitId(action.commitId)
+      return ['commit', '--message', action.message]
+    case 'duplicate':
+      return ['duplicate', checkedCommitId(action.commitId)]
+    case 'abandon':
+      if (action.commitIds.length === 0) throw new Error('Choose at least one revision to abandon.')
+      return ['abandon', ...new Set(action.commitIds.map(checkedCommitId))]
+    case 'revert':
+      if (checkedCommitId(action.commitId) === checkedCommitId(action.destinationId)) throw new Error('Choose a different revision to revert onto.')
+      return ['revert', '--revision', action.commitId, '--onto', action.destinationId]
+    case 'restore':
+      if (action.paths.length === 0) throw new Error(SPLIT_PATH_ERROR)
+      return ['restore', '--changes-in', checkedCommitId(action.commitId), ...literalFilesets(action.paths)]
   }
 }
+
+const SPLIT_PATH_ERROR = 'Split paths must be listed workspace-relative file names without traversal or null bytes.'
+
+const isBookmarkName = (value: string): boolean => /^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/.test(value)
+
+const checkedCommitId = (value: string): string => {
+  if (!isCommitId(value)) throw new Error('Invalid revision id.')
+  return value
+}
+
+const literalFilesets = (paths: readonly string[]): string[] => {
+  if (!paths.every(isSafeSplitPath)) throw new Error(SPLIT_PATH_ERROR)
+  return paths.map(rootFileFileset)
+}
+
+const FILE_STATUS_LETTERS = new Map<string, FileStatus>([
+  ['modified', 'M'],
+  ['added', 'A'],
+  ['removed', 'D'],
+  ['renamed', 'R'],
+  ['copied', 'C'],
+])
+
+/** Map JJ's template status word to the single-letter Source Control marker. */
+export const fileStatusLetter = (status: string): FileStatus => FILE_STATUS_LETTERS.get(status) ?? 'M'
 
 /** Decode one JSON record per line; malformed or oversized rows fail closed. */
 export const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): T[] => {

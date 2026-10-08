@@ -4,9 +4,10 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import { buildMutationArgv, parseJsonLines, parsePatchStats, rootFileFileset } from './core.ts'
+import { z } from 'zod'
+import { buildMutationArgv, fileStatusLetter, parseJsonLines, parsePatchStats, rootFileFileset } from './core.ts'
 import { revisionSchema, type Mutation } from './api.ts'
-import { EVOLUTION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
+import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
 import { describeDraftChanged } from './graph.ts'
 
 const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
@@ -123,4 +124,36 @@ test('workspace-add creates a sibling at the chosen revision and preserves dirty
   assert.match(runJj(repo, home, ['status']), /draft\.txt/)
   assert.match(runJj(repo, home, ['workspace', 'list']), /review-at-base/)
   assert.match(sourceStatus, /draft\.txt/)
+})
+
+test('file stats template, file moves, and restore act on exact listed files', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-moves-'))
+  const repo = join(home, 'repo')
+  await mkdir(repo)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+  runJj(repo, home, ['git', 'init', '--no-colocate'])
+  runJj(repo, home, ['config', 'set', '--repo', 'user.name', 'Move Test'])
+  runJj(repo, home, ['config', 'set', '--repo', 'user.email', 'move@example.invalid'])
+  await writeFile(join(repo, 'keep.txt'), 'base\n')
+  runJj(repo, home, ['commit', '--message', 'base'])
+  await writeFile(join(repo, 'keep.txt'), 'base\nchanged\n')
+  await writeFile(join(repo, 'moved file.txt'), 'new\n')
+  await writeFile(join(repo, 'discard.txt'), 'scratch\n')
+  runJj(repo, home, ['status'])
+  const ids = (revset: string): string => runJj(repo, home, ['log', '--no-graph', '--revisions', revset, '--template', 'self.commit_id().short(64)']).trim()
+
+  const stats = parseJsonLines(runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', FILE_STATS_TEMPLATE]), value => {
+    const row = z.object({ files: z.array(z.object({ path: z.string(), status: z.string(), additions: z.number(), deletions: z.number() })) }).parse(value)
+    return row.files.map(file => ({ ...file, status: fileStatusLetter(file.status) }))
+  })[0]
+  assert.deepEqual(stats, [
+    { path: 'discard.txt', status: 'A', additions: 1, deletions: 0 },
+    { path: 'keep.txt', status: 'M', additions: 1, deletions: 0 },
+    { path: 'moved file.txt', status: 'A', additions: 1, deletions: 0 },
+  ])
+
+  runJj(repo, home, buildMutationArgv({ kind: 'squash', sourceId: ids('@'), destinationId: ids('@-'), paths: ['moved file.txt'] }))
+  assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@-', '--name-only'])), ['keep.txt', 'moved file.txt'])
+  runJj(repo, home, buildMutationArgv({ kind: 'restore', commitId: ids('@'), paths: ['discard.txt'] }))
+  assert.deepEqual(lines(runJj(repo, home, ['diff', '--revisions', '@', '--name-only'])), ['keep.txt'])
 })

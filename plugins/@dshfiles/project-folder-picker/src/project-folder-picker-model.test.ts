@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { filterRegisteredProjects, folderSelection, movePickerSelection, workspaceSelection } from './project-folder-picker-model.js'
+import {
+  filterRegisteredProjects,
+  folderSelection,
+  movePickerSelection,
+  pickerEntries,
+  pickerEntrySelection,
+  workspaceSelection,
+} from './project-folder-picker-model.js'
 import type { RegisteredProject } from './project-folder-picker.js'
 
 const dshfilesProject: RegisteredProject = { workspaceId: 'ws-1', title: 'dshfiles', canonicalPath: '/Users/me/dev/dshfiles' }
@@ -28,6 +35,19 @@ describe('project and folder selection', () => {
       kind: 'directory',
       canonicalPath: '/Users/me/dev',
       title: 'dev',
+    })
+  })
+
+  it('offers unregistered recent folders after matching projects', () => {
+    const entries = pickerEntries(projects, ['/Users/me/dev/dshfiles', '/Users/me/dev/bb-plugins', '/Users/me/dev/bb-plugins'], 'dev')
+    expect(entries.map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))).toEqual(['dshfiles', 'emisoup', '/Users/me/dev/bb-plugins'])
+    expect(pickerEntries(projects, ['/Users/me/dev/bb-plugins'], 'emi').map(entry => entry.kind)).toEqual(['project'])
+    expect(pickerEntries(projects, ['/Users/me/dev/bb-plugins'], '/Users')).toEqual([])
+    const recent = entries[2]
+    expect(recent === undefined ? null : pickerEntrySelection(recent)).toEqual({
+      kind: 'directory',
+      canonicalPath: '/Users/me/dev/bb-plugins',
+      title: 'bb-plugins',
     })
   })
 })

@@ -291,7 +291,11 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
                 </p>
                 <p>Conversation history remains unchanged. An interrupted JJ restore may need explicit recovery.</p>
               </div>
-              {preview.changedPaths.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">This restore has no tracked file changes.</p> : changedPathList}
+              {preview.changedPaths.length === 0 ? (
+                <p className="dshx:text-xs dshx:text-muted-foreground">This restore has no tracked file changes.</p>
+              ) : (
+                changedPathList
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
                 <AlertDialogAction

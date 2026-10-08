@@ -5,9 +5,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
 import { defineHost } from '@dshfiles/dshx/host'
-import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
+import { z } from 'zod'
+import { jujutsuApi, revisionSchema, type FileStat, type JujutsuState, type Mutation, type Revision } from './api.js'
 import {
   buildMutationArgv,
+  fileStatusLetter,
   isCommitId,
   isRecordedJjGitPush,
   isSafeSplitPath,
@@ -18,7 +20,8 @@ import {
   validatedRepositoryPath,
   type PreparedMutation,
 } from './core.js'
-import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
 const MAX_OUTPUT = 1_160_000
@@ -260,6 +263,51 @@ const readPaths = async (ctx: Context, repo: RegisteredRepo, revision: string, s
     .slice(0, 1000)
 }
 
+const fileStatsRowSchema = z.object({
+  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
+  files: z
+    .array(
+      z.object({
+        path: z.string().max(2048),
+        status: z.string().max(32),
+        additions: z.number().int().min(0),
+        deletions: z.number().int().min(0),
+      }),
+    )
+    .max(20_000),
+})
+
+const readFileStats = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  commitIds: readonly string[],
+  signal: AbortSignal | undefined,
+): Promise<{ readonly revisions: { readonly commitId: string; readonly files: FileStat[] }[]; readonly truncated: boolean }> => {
+  const result = await runAt(
+    ctx,
+    repo.root,
+    repo.identity,
+    ['log', '--no-graph', '--revisions', commitIds.join('|'), '--template', FILE_STATS_TEMPLATE],
+    signal,
+    {
+      outputLimit: 1_000_000,
+    },
+  )
+  const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
+  const rows = parseJsonLines(completeOutput, value => fileStatsRowSchema.parse(value))
+  let truncated = result.truncated
+  const revisions = rows.map(row => {
+    if (row.files.length > 2000) truncated = true
+    return {
+      commitId: row.commitId,
+      files: row.files
+        .slice(0, 2000)
+        .map(file => ({ path: file.path, status: fileStatusLetter(file.status), additions: file.additions, deletions: file.deletions })),
+    }
+  })
+  return { revisions, truncated }
+}
+
 const readRemotes = async (
   ctx: Context,
   repo: RegisteredRepo,
@@ -370,9 +418,7 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
     case 'split': {
       const revision = findRevision(revisions, action.commitId)
       if (revision.immutable) throw new Error('Jujutsu marks this revision immutable.')
-      if (!action.paths.every(path => isSafeSplitPath(path) && selectedPaths.includes(path))) {
-        throw new Error('Split files must be selected from this revision and use safe literal paths.')
-      }
+      assertListedPaths(action.paths, selectedPaths)
       return {
         title: 'Split revision',
         summary: 'Split ' + revision.shortestChangeId + ' by selected files',
@@ -383,16 +429,21 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
       const source = findRevision(revisions, action.sourceId)
       const destination = findRevision(revisions, action.destinationId)
       if (source.immutable || destination.immutable) throw new Error('Jujutsu marks a selected revision immutable.')
+      if (action.paths !== undefined) assertListedPaths(action.paths, selectedPaths)
       return {
-        title: 'Squash changes',
-        summary: 'Move ' + source.shortestChangeId + ' into ' + destination.shortestChangeId,
+        title: action.paths === undefined ? 'Squash changes' : 'Move files',
+        summary:
+          (action.paths === undefined ? 'Move ' + source.shortestChangeId : 'Move ' + action.paths.length + ' file(s) from ' + source.shortestChangeId) +
+          ' into ' +
+          destination.shortestChangeId,
         detail:
+          (action.paths === undefined ? '' : 'Files:\n' + action.paths.join('\n') + '\n\n') +
           'Source: ' +
-          (source.description || '(empty)') +
+          firstLine(source.description) +
           '\nDestination: ' +
-          (destination.description || '(empty)') +
+          firstLine(destination.description) +
           '\n\nResulting description:\n' +
-          action.message,
+          (action.message ?? (destination.description || '(empty)') + '\n(destination description kept)'),
       }
     }
     case 'rebase': {
@@ -446,6 +497,96 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
           '\nThe current workspace and its working files remain in place.',
       }
     }
+    case 'bookmark-create': {
+      const destination = findRevision(revisions, action.destinationId)
+      if (revisions.some(revision => revision.localBookmarks.includes(action.bookmark))) throw new Error('Bookmark already exists. Drag it to move it instead.')
+      return {
+        title: 'Create bookmark',
+        summary: 'Create ' + action.bookmark + ' at ' + destination.shortestChangeId,
+        detail: firstLine(destination.description),
+      }
+    }
+    case 'bookmark-delete': {
+      const current = revisions.find(revision => revision.localBookmarks.includes(action.bookmark))
+      if (current === undefined) throw new Error('Bookmark is no longer present. Refresh and try again.')
+      return {
+        title: 'Delete bookmark',
+        summary: 'Delete ' + action.bookmark + ' from ' + current.shortestChangeId,
+        detail: 'The local bookmark is deleted; the next push propagates the deletion to tracked remotes.',
+      }
+    }
+    case 'edit': {
+      const revision = mutableRevision(revisions, action.commitId)
+      if (revision.workingCopy) throw new Error('This revision is already the working copy.')
+      return {
+        title: 'Edit change',
+        summary: 'Edit ' + revision.shortestChangeId + ' in the working copy',
+        detail: firstLine(revision.description) + '\n\nThe working copy moves to this revision; later file edits amend it directly.',
+      }
+    }
+    case 'new': {
+      const revision = findRevision(revisions, action.commitId)
+      return {
+        title: 'New change',
+        summary: 'Create an empty change on top of ' + revision.shortestChangeId,
+        detail: 'Parent: ' + firstLine(revision.description) + '\n\nThe working copy moves to the new change.',
+      }
+    }
+    case 'commit': {
+      const revision = mutableRevision(revisions, action.commitId)
+      if (!revision.workingCopy) throw new Error('Only the working-copy revision can be committed.')
+      return {
+        title: 'Commit working copy',
+        summary: 'Describe ' + revision.shortestChangeId + ' and start a new change',
+        detail: 'Description:\n' + action.message,
+      }
+    }
+    case 'duplicate': {
+      const revision = findRevision(revisions, action.commitId)
+      return { title: 'Duplicate change', summary: 'Duplicate ' + revision.shortestChangeId, detail: firstLine(revision.description) }
+    }
+    case 'abandon': {
+      const targets = action.commitIds.map(commitId => mutableRevision(revisions, commitId))
+      return {
+        title: targets.length === 1 ? 'Abandon change' : 'Abandon changes',
+        summary: 'Abandon ' + targets.map(revision => revision.shortestChangeId).join(', '),
+        detail:
+          targets.map(revision => revision.shortestChangeId + '  ' + firstLine(revision.description)).join('\n') +
+          '\n\nDescendants are rebased onto the abandoned changes\u2019 parents. Undo with jj undo.',
+      }
+    }
+    case 'revert': {
+      const revision = findRevision(revisions, action.commitId)
+      const destination = findRevision(revisions, action.destinationId)
+      return {
+        title: 'Revert change',
+        summary: 'Revert ' + revision.shortestChangeId + ' onto ' + destination.shortestChangeId,
+        detail: 'A new change that undoes ' + firstLine(revision.description) + ' is created on top of ' + destination.shortestChangeId + '.',
+      }
+    }
+    case 'restore': {
+      const revision = mutableRevision(revisions, action.commitId)
+      assertListedPaths(action.paths, selectedPaths)
+      return {
+        title: 'Discard file changes',
+        summary: 'Restore ' + action.paths.length + ' file(s) in ' + revision.shortestChangeId + ' from its parent',
+        detail: 'Files:\n' + action.paths.join('\n') + '\n\nThe changes these files carry in this revision are discarded.',
+      }
+    }
+  }
+}
+
+const firstLine = (description: string): string => description.split('\n')[0] || '(no description)'
+
+const mutableRevision = (revisions: readonly Revision[], commitId: string): Revision => {
+  const revision = findRevision(revisions, commitId)
+  if (revision.immutable) throw new Error('Jujutsu marks this revision immutable.')
+  return revision
+}
+
+const assertListedPaths = (paths: readonly string[], listed: readonly string[]): void => {
+  if (!paths.every(path => isSafeSplitPath(path) && listed.includes(path))) {
+    throw new Error('Selected files must be listed in this revision and use safe literal paths.')
   }
 }
 
@@ -465,7 +606,13 @@ const prepareMutation = async (
     workspacePath = destination.path
     workspaceParentIdentity = destination.parentIdentity
   }
-  const paths = preparedAction.kind === 'split' ? await readPaths(ctx, repo, preparedAction.commitId, signal) : current.state.changedPaths
+  const pathsRevision =
+    preparedAction.kind === 'split' || preparedAction.kind === 'restore'
+      ? preparedAction.commitId
+      : preparedAction.kind === 'squash' && preparedAction.paths !== undefined
+        ? preparedAction.sourceId
+        : undefined
+  const paths = pathsRevision === undefined ? current.state.changedPaths : await readPaths(ctx, repo, pathsRevision, signal)
   const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
   const argv = buildMutationArgv(preparedAction)
   let detail = preview.detail
@@ -524,7 +671,12 @@ const jujutsuHostApi = jujutsuApi.host({
     const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, {
       outputLimit: 118_000,
     })
-    const files = parsePatchStats(patch.stdout, paths, patch.truncated)
+    const stats = await readFileStats(ctx, repo, [input.commitId], signal)
+    const statusByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file.status]) ?? [])
+    const files = parsePatchStats(patch.stdout, paths, patch.truncated).map(file => ({
+      ...file,
+      status: statusByPath.get(file.path) ?? fileStatusLetter('modified'),
+    }))
     return {
       files,
       additions: files.reduce((sum, file) => sum + file.additions, 0),
@@ -533,6 +685,10 @@ const jujutsuHostApi = jujutsuApi.host({
       truncated: patch.truncated,
       evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
     }
+  },
+  revisionFiles: async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    return readFileStats(ctx, repo, [...new Set(input.commitIds)], signal)
   },
   workingDiff: async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
@@ -584,4 +740,5 @@ export default defineHost({
   name: '@dshfiles/jujutsu',
   inject: ['subprocess', 'webServer'],
   apis: [jujutsuHostApi],
+  settings: [jujutsuSettings],
 })
