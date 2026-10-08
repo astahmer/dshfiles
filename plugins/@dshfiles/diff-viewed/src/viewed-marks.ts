@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const STORAGE_KEY = 'dshfiles.diffViewed.v1'
+export const VIEWED_MARKS_STORAGE_KEY = 'dshfiles.diffViewed.v1'
 const MAX_MARKS = 2000
 
 interface MarkStorage {
@@ -35,7 +35,7 @@ const storedMarksSchema = z
 export const viewedKey = (file: ViewedFile): string => JSON.stringify([file.sessionId, file.seq, file.path])
 
 const readMarks = (storage: MarkStorage): readonly string[] => {
-  const parsed = storedMarksSchema.safeParse(storage.getItem(STORAGE_KEY))
+  const parsed = storedMarksSchema.safeParse(storage.getItem(VIEWED_MARKS_STORAGE_KEY))
   return parsed.success ? parsed.data : []
 }
 
@@ -48,13 +48,20 @@ export const createViewedMarks = (options: { readonly storage: MarkStorage }) =>
     const next = [...snapshot].filter(mark => mark !== key)
     if (!snapshot.has(key)) next.push(key)
     const kept = next.slice(-MAX_MARKS)
-    options.storage.setItem(STORAGE_KEY, JSON.stringify(kept))
+    options.storage.setItem(VIEWED_MARKS_STORAGE_KEY, JSON.stringify(kept))
     snapshot = new Set(kept)
+    for (const listener of listeners) listener()
+  }
+
+  /** Another window wrote the marks: adopt its list so this one stops showing stale state. */
+  const reload = (): void => {
+    snapshot = new Set(readMarks(options.storage))
     for (const listener of listeners) listener()
   }
 
   return {
     getSnapshot: (): ReadonlySet<string> => snapshot,
+    reload,
     subscribe: (listener: () => void): (() => void) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

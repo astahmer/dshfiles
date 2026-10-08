@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-deliverables/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, defineSlot } from '@dshfiles/dshx/client'
 import { diffViewedLocale } from './locales.js'
-import { createViewedMarks } from './viewed-marks.js'
+import { createViewedMarks, VIEWED_MARKS_STORAGE_KEY } from './viewed-marks.js'
 import { ViewedToggle } from './viewed-toggle.js'
 import './client.css'
 
@@ -20,4 +20,13 @@ export default defineClient({
   name: '@dshfiles/diff-viewed',
   locales: [diffViewedLocale],
   slots: [reviewFileAction],
+  setup(ctx) {
+    ctx.effect(() => {
+      const onStorage = (event: StorageEvent): void => {
+        if (event.key === VIEWED_MARKS_STORAGE_KEY) marks.reload()
+      }
+      window.addEventListener('storage', onStorage)
+      return () => window.removeEventListener('storage', onStorage)
+    }, 'diff-viewed cross-window marks')
+  },
 })

@@ -27,6 +27,28 @@ const useSummaryFiles = (summaryUrl: string | undefined): ChangesSummaryFiles | 
   return loaded?.url === summaryUrl ? loaded?.files : undefined
 }
 
+const RING_RADIUS = 5
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+const ProgressRing = (props: { readonly viewed: number; readonly total: number }): JSX.Element => {
+  const ratio = props.total === 0 ? 0 : props.viewed / props.total
+  return (
+    <svg aria-hidden className="dshx:size-3.5 dshx:-rotate-90" viewBox="0 0 14 14">
+      <circle className="dshx:fill-none dshx:stroke-border" cx="7" cy="7" r={RING_RADIUS} strokeWidth="2" />
+      <circle
+        className="dshx:fill-none dshx:stroke-success dshx:transition-[stroke-dashoffset]"
+        cx="7"
+        cy="7"
+        r={RING_RADIUS}
+        strokeDasharray={RING_CIRCUMFERENCE}
+        strokeDashoffset={RING_CIRCUMFERENCE * (1 - ratio)}
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  )
+}
+
 /** The review tab's file-action entry: a viewed toggle for the selected file and the turn's progress. */
 export const ViewedToggle = (props: ViewedToggleProps): JSX.Element | null => {
   const coordinates = parseReviewCoordinates(props.actionUrl)
@@ -40,7 +62,8 @@ export const ViewedToggle = (props: ViewedToggleProps): JSX.Element | null => {
   const label = props.t(isViewed ? 'markUnviewed' : 'markViewed', { name: file.display })
   return (
     <span className="dshx-root dshx:ms-1 dshx:inline-flex dshx:items-center dshx:gap-2">
-      <span className="dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums" data-diff-viewed="progress">
+      <span className="dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums" data-diff-viewed="progress">
+        <ProgressRing total={files.length} viewed={viewedCount} />
         {props.t('progress', { viewed: viewedCount, total: files.length })}
       </span>
       <label className="dshx:inline-flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:px-2 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:hover:bg-accent dshx:has-[[data-state=checked]]:text-foreground">

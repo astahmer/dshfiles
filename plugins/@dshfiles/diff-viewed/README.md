@@ -1,6 +1,6 @@
 # Diff Viewed
 
-Adds a **Viewed** toggle and a `2/9 viewed` progress count to the toolbar of the
+Adds a **Viewed** toggle and a `2/9 viewed` progress ring and count to the toolbar of the
 native changed-files review tab, so you can track which files of a turn you have
 already read.
 
@@ -14,7 +14,8 @@ and the turn's file count.
 A mark is keyed on Session, sequence and path. A turn's summary never changes
 while its Session lives, so a mark cannot outlive the diff it reviewed: a later
 turn that edits the file again is a new review and reads as not viewed. Marks
-live in this browser's `localStorage`, capped at the 2,000 most recent. The
+live in this browser's `localStorage`, capped at the 2,000 most recent, and
+other open windows of the same browser pick up a change as it is written. The
 Host forgets summaries when a Session is disposed or the Host restarts, so a
 mark is only useful as long as the review it belongs to.
 
