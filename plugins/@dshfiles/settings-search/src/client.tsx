@@ -22,12 +22,25 @@ import {
   type SettingsSearchResult,
 } from './settings-index.js'
 import { SETTINGS_SEARCH_LOCALE_NAMESPACE, settingsSearchLocale, type SettingsSearchTranslate } from './locales.js'
-import styles from './settings-search.module.css'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { ChevronLeftIcon, ChevronRightIcon, InfoIcon, RefreshCwIcon, SearchIcon, SearchXIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import './client.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
 const MAX_QUERY_LENGTH = 200
 const MAX_RESULTS = 60
+const SETTINGS_SEARCH_VALUE_ID = 'settings-search-value'
+
+const scrollActiveIntoView = (element: HTMLButtonElement | null): void => {
+  element?.scrollIntoView({ block: 'nearest' })
+}
 
 interface SettingsSearchPanelProps {
   readonly describe: SettingsDescribeFace
@@ -130,77 +143,109 @@ const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
   }
 
   return (
-    <section aria-labelledby="settings-search-editor-title" className={styles.editor}>
-      <button className={styles.backButton} onClick={props.onBack} type="button">
+    <section aria-labelledby="settings-search-editor-title" className="dshx:flex dshx:flex-col dshx:gap-4">
+      <Button className="dshx:-ml-2 dshx:self-start" onClick={props.onBack} size="sm" type="button" variant="ghost">
+        <ChevronLeftIcon />
         {t('backToResults')}
-      </button>
-      <p className={styles.contextNote}>{props.result.context}</p>
-      <h2 id="settings-search-editor-title">{props.result.title}</h2>
-      {props.result.description.length > 0 && <p className={styles.description}>{props.result.description}</p>}
-      <code className={styles.path}>
-        {props.result.target.entryId} · {path.join(' · ')}
-      </code>
-      {snapshot.status === 'loading' && <p role="status">{t('loadingSetting')}</p>}
-      {snapshot.status === 'unavailable' && <p role="status">{t('settingUnavailable')}</p>}
+      </Button>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1">
+        <p className="dshx:text-xs dshx:text-muted-foreground">{props.result.context}</p>
+        <h2 className="dshx:text-sm dshx:font-semibold" id="settings-search-editor-title">
+          {props.result.title}
+        </h2>
+        {props.result.description.length > 0 && <p className="dshx:text-sm dshx:text-muted-foreground">{props.result.description}</p>}
+        <code className="dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">
+          {props.result.target.entryId} · {path.join(' · ')}
+        </code>
+      </div>
+      {snapshot.status === 'loading' && (
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
+          <Spinner aria-hidden="true" role="presentation" />
+          {t('loadingSetting')}
+        </p>
+      )}
+      {snapshot.status === 'unavailable' && (
+        <Alert role="status" variant="info">
+          <InfoIcon />
+          <AlertDescription>{t('settingUnavailable')}</AlertDescription>
+        </Alert>
+      )}
       {snapshot.status === 'ready' && (
-        <>
-          <label className={styles.valueField}>
-            <span>{t('currentValue')}</span>
+        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
+          <Field className="dshx:flex-col dshx:gap-2">
+            <FieldLabel htmlFor={SETTINGS_SEARCH_VALUE_ID}>{t('currentValue')}</FieldLabel>
             {kind === 'boolean' || kind === 'choice' ? (
-              <select autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} value={draft}>
-                {kind === 'choice' ? (
-                  <>
-                    <option value="">{t('chooseOption')}</option>
-                    {choices.map((choice, index) => (
-                      <option key={String(index)} value={String(index)}>
+              <Select disabled={!canWrite} name="settings-search-value" onValueChange={updateDraft} value={draft}>
+                <SelectTrigger autoFocus className="dshx:w-full dshx:max-w-sm" id={SETTINGS_SEARCH_VALUE_ID}>
+                  <SelectValue placeholder={t('chooseOption')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {kind === 'choice' ? (
+                    choices.map((choice, index) => (
+                      <SelectItem key={String(index)} value={String(index)}>
                         {choice.label}
-                      </option>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </>
-                )}
-              </select>
-            ) : kind === 'string' ? (
-              <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={4} value={draft} />
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="true">true</SelectItem>
+                      <SelectItem value="false">false</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             ) : (
-              <textarea autoComplete="off" autoFocus disabled={!canWrite} onChange={event => updateDraft(event.currentTarget.value)} rows={6} value={draft} />
+              <Textarea
+                autoComplete="off"
+                autoFocus
+                className={kind === 'string' ? 'dshx:min-h-20' : 'dshx:min-h-28 dshx:font-mono! dshx:text-xs'}
+                disabled={!canWrite}
+                id={SETTINGS_SEARCH_VALUE_ID}
+                onChange={event => updateDraft(event.currentTarget.value)}
+                rows={kind === 'string' ? 4 : 6}
+                value={draft}
+              />
             )}
-          </label>
-          <p className={styles.formHint}>
-            {snapshot.writable ? t('hostDocumentRevision', { revision: snapshot.revision ?? t('revisionPending') }) : t('readOnly')}
-            {` · ${overridden ? t('customValue') : t('inheritedValue')}`}
-          </p>
-          {message !== null && <p role="status">{message}</p>}
-          {conflict && (
-            <button disabled={pending} onClick={reloadLatest} type="button">
-              {t('reloadLatest')}
-            </button>
+            <FieldDescription className="dshx:text-xs">
+              {snapshot.writable ? t('hostDocumentRevision', { revision: snapshot.revision ?? t('revisionPending') }) : t('readOnly')}
+              {` · ${overridden ? t('customValue') : t('inheritedValue')}`}
+            </FieldDescription>
+          </Field>
+          {message !== null && (
+            <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
+              {message}
+            </p>
           )}
-          <footer className={styles.editorActions}>
-            <button
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <Button
               disabled={!canWrite || !dirty || !parsed.ok}
               onClick={() => {
                 void save()
               }}
+              size="sm"
               type="button"
             >
               {pending ? t('saving') : t('saveSetting')}
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={!canWrite || !overridden}
               onClick={() => {
                 void reset()
               }}
+              size="sm"
               type="button"
+              variant="outline"
             >
               {t('restoreInherited')}
-            </button>
-          </footer>
-        </>
+            </Button>
+            {conflict && (
+              <Button disabled={pending} onClick={reloadLatest} size="sm" type="button" variant="ghost">
+                <RefreshCwIcon />
+                {t('reloadLatest')}
+              </Button>
+            )}
+          </div>
+        </div>
       )}
     </section>
   )
@@ -270,23 +315,30 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
     }
   }
 
+  const header = (
+    <header className="dshx:flex dshx:flex-col dshx:gap-1">
+      <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
+      <p className="dshx:text-sm dshx:text-muted-foreground">{selected === null ? t('searchSubtitle') : t('editorSubtitle')}</p>
+    </header>
+  )
+
   if (selected !== null) {
     if (selectedNamespace === undefined || selectedTarget === undefined) {
       return (
-        <section className={styles.page}>
-          <p role="status">{t('entryUnavailable')}</p>
-          <button onClick={() => setSelected(null)} type="button">
+        <section className="dshx-root dshx:flex dshx:max-w-3xl dshx:flex-col dshx:gap-3 dshx:p-5">
+          <Alert role="status" variant="info">
+            <InfoIcon />
+            <AlertDescription>{t('entryUnavailable')}</AlertDescription>
+          </Alert>
+          <Button className="dshx:self-start" onClick={() => setSelected(null)} size="sm" type="button" variant="outline">
             {t('backToSearch')}
-          </button>
+          </Button>
         </section>
       )
     }
     return (
-      <div className={styles.page}>
-        <header>
-          <h1>{t('title')}</h1>
-          <p>{t('editorSubtitle')}</p>
-        </header>
+      <div className="dshx-root dshx:flex dshx:max-w-3xl dshx:flex-col dshx:gap-5 dshx:p-5">
+        {header}
         <SettingsFieldEditor
           key={selectedTarget.id}
           form={props.getForm(selectedTarget.target.entryId)}
@@ -300,38 +352,65 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   }
 
   return (
-    <main className={styles.page}>
-      <header>
-        <h1>{t('title')}</h1>
-        <p>{t('searchSubtitle')}</p>
-      </header>
-      <label className={styles.searchLabel}>
-        <span className={styles.srOnly}>{t('searchSettings')}</span>
-        <input
-          autoFocus
-          autoComplete="off"
-          maxLength={MAX_QUERY_LENGTH}
-          onChange={event => {
-            setQuery(event.currentTarget.value)
-            setActiveIndex(0)
-          }}
-          onKeyDown={navigateResults}
-          placeholder={t('searchPlaceholder')}
-          type="search"
-          value={query}
-        />
-      </label>
-      {mirror.status === 'loading' && <p role="status">{t('loadingDescriptors')}</p>}
-      {mirror.error !== null && <p role="alert">{t('readFailed', { error: mirror.error })}</p>}
-      {trimmedQuery.length > 0 && (
-        <p className={styles.resultCount}>{t(matched.length === 1 ? 'matchCountOne' : 'matchCountOther', { count: matched.length })}</p>
+    <main className="dshx-root dshx:flex dshx:max-w-3xl dshx:flex-col dshx:gap-4 dshx:p-5">
+      {header}
+      <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label={t('searchSettings')}
+            autoComplete="off"
+            autoFocus
+            maxLength={MAX_QUERY_LENGTH}
+            onChange={event => {
+              setQuery(event.currentTarget.value)
+              setActiveIndex(0)
+            }}
+            onKeyDown={navigateResults}
+            placeholder={t('searchPlaceholder')}
+            type="search"
+            value={query}
+          />
+          {query.length > 0 && (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                aria-label={t('clearSearch')}
+                onClick={() => {
+                  setQuery('')
+                  setActiveIndex(0)
+                }}
+                size="icon-xs"
+              >
+                <XIcon />
+              </InputGroupButton>
+            </InputGroupAddon>
+          )}
+        </InputGroup>
+        {trimmedQuery.length > 0 && (
+          <p className="dshx:px-0.5 dshx:text-xs dshx:text-muted-foreground">
+            {t(matched.length === 1 ? 'matchCountOne' : 'matchCountOther', { count: matched.length })}
+          </p>
+        )}
+      </div>
+      {mirror.status === 'loading' && (
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
+          <Spinner aria-hidden="true" role="presentation" />
+          {t('loadingDescriptors')}
+        </p>
+      )}
+      {mirror.error !== null && (
+        <Alert variant="destructive">
+          <AlertDescription>{t('readFailed', { error: mirror.error })}</AlertDescription>
+        </Alert>
       )}
       {trimmedQuery.length === 0 && browseEntryId === null && (
-        <section aria-label={t('settingsEntries')} className={styles.namespaceList}>
-          <h2>{t('categoriesHeading')}</h2>
+        <section aria-label={t('settingsEntries')} className="dshx:flex dshx:flex-col dshx:gap-1">
+          <h2 className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('categoriesHeading')}</h2>
           {namespaceGroups.map(({ namespace, title, count }) => (
             <button
-              className={styles.namespaceButton}
+              className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:transition-colors dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:bg-accent dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default dshx:disabled:opacity-50 dshx:disabled:hover:bg-transparent"
               disabled={count === 0}
               key={namespace.ns}
               onClick={() => {
@@ -340,49 +419,71 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
               }}
               type="button"
             >
-              <strong>{title}</strong>
-              <span>
-                {namespace.ns} · {t(count === 1 ? 'searchableSettingCountOne' : 'searchableSettingCountOther', { count })}
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                <span className="dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+                <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                  <span className="dshx:font-mono">{namespace.ns}</span> ·{' '}
+                  {t(count === 1 ? 'searchableSettingCountOne' : 'searchableSettingCountOther', { count })}
+                </span>
               </span>
+              <ChevronRightIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
             </button>
           ))}
-          {namespaceGroups.length === 0 && mirror.status === 'ready' && <p>{t('noEntries')}</p>}
+          {namespaceGroups.length === 0 && mirror.status === 'ready' && (
+            <p className="dshx:px-2 dshx:text-sm dshx:text-muted-foreground">{t('noEntries')}</p>
+          )}
         </section>
       )}
       {trimmedQuery.length === 0 && browseEntryId !== null && (
-        <button className={styles.backButton} onClick={() => setBrowseEntryId(null)} type="button">
+        <Button className="dshx:-ml-2 dshx:self-start" onClick={() => setBrowseEntryId(null)} size="sm" type="button" variant="ghost">
+          <ChevronLeftIcon />
           {t('allCategories')}
-        </button>
+        </Button>
       )}
       {visibleResults.length > 0 && (
-        <section aria-label={t('matchingSettings')} className={styles.results}>
+        <section
+          aria-label={t('matchingSettings')}
+          className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card"
+        >
           {visibleResults.map((result, index) => (
             <button
               aria-current={index === boundedActiveIndex ? 'true' : undefined}
-              className={styles.result}
+              className="dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:border-b dshx:px-3 dshx:py-2 dshx:text-left dshx:transition-colors dshx:outline-none dshx:last:border-b-0 dshx:hover:bg-accent dshx:focus-visible:bg-accent dshx:aria-[current=true]:bg-accent"
               key={result.id}
               onClick={() => selectResult(result)}
+              ref={index === boundedActiveIndex ? scrollActiveIntoView : undefined}
               type="button"
             >
-              <strong>{result.title}</strong>
-              <small>{result.context}</small>
-              {result.description.length > 0 && <p>{result.description}</p>}
+              <span className="dshx:truncate dshx:text-sm dshx:font-medium">{result.title}</span>
+              <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{result.context}</span>
+              {result.description.length > 0 && (
+                <span className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">{result.description}</span>
+              )}
               {result.options.length > 0 && (
-                <small className={styles.optionLabels}>
+                <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
                   {t('optionsLabel')}{' '}
                   {result.options
                     .slice(0, 8)
                     .map(option => option.label)
                     .join(', ')}
                   {result.options.length > 8 ? t('moreOptions', { count: result.options.length - 8 }) : ''}
-                </small>
+                </span>
               )}
             </button>
           ))}
         </section>
       )}
-      {trimmedQuery.length > 0 && matched.length === 0 && mirror.status === 'ready' && <p>{t('noMatches')}</p>}
-      <p className={styles.keyboardHint}>{t('keyboardHint')}</p>
+      {trimmedQuery.length > 0 && matched.length === 0 && mirror.status === 'ready' && (
+        <Empty className="dshx:border dshx:p-6 dshx:md:p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchXIcon />
+            </EmptyMedia>
+            <EmptyTitle className="dshx:text-sm">{t('noMatches')}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+      )}
+      <p className="dshx:text-xs dshx:text-muted-foreground">{t('keyboardHint')}</p>
     </main>
   )
 }
