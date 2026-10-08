@@ -3,15 +3,32 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-settings'
+import Schema from '@deepseek-ai/schemastery'
 import { apply as nativeMcpClient, type Config as NativeMcpConfig } from '@deepseek-ai/dsh-mcp-client'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { definePlugin } from '@dshfiles/dshx/host'
-import { randomUUID } from 'node:crypto'
+import { credentialKey, credentialRef, type CredentialKey } from '@deepseek-ai/dsh-credentials'
+import { defineHost } from '@dshfiles/dshx/host'
+import { createHash, randomUUID } from 'node:crypto'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { mcpServersApi, serverDraftSchema, storedServerSchema, type ManagerSnapshot, type ServerDraft, type ServerView, type StoredServer } from './api.js'
 import { PROVIDERS, searchOfficialRegistry } from './catalog.js'
 import { hasInlineCredential, parseCommandLine } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
+import {
+  authorizationUrl,
+  callbackRedirectUri,
+  createPkcePair,
+  createState,
+  discoverOAuth,
+  exchangeCode,
+  needsRefresh,
+  oauthGrantSchema,
+  refreshGrant,
+  registerClient,
+  type OAuthGrant,
+  type PendingAuthorization,
+} from './oauth.js'
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
 import { publicServerView, removeServer, saveServer, setServerEnabled } from './server-state.js'
@@ -19,8 +36,41 @@ import { publicServerView, removeServer, saveServer, setServerEnabled } from './
 const ENTRY_ID = 'mcp-servers'
 const PACKAGE_NAME = '@dshfiles/mcp-servers'
 const MAX_SERVERS = 64
+const CREDENTIAL_SCOPE = 'mcp-servers'
+const OAUTH_CALLBACK_PATH = '/api/dshfiles-mcp-servers/oauth/callback'
+const OAUTH_PENDING_TTL_MS = 600_000 // 10 minutes to finish a provider sign-in
+const TOKEN_REFRESH_INTERVAL_MS = 300_000 // 5 minutes
 
-export const Config = z.object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]) }).superRefine((value, context) => {
+/** Loader row: `servers` is validated by `StoredConfig`; the other fields are live settings on the DSH Settings page. */
+export const Config = Schema.object({
+  servers: Schema.array(Schema.any()).default([]).hidden(),
+  connectOnStartup: Schema.boolean().default(true).description('Connect enabled servers when DSH starts. Off leaves them disconnected until you connect one.').volatile(),
+  toolCallTimeoutSeconds: Schema.natural()
+    .min(5)
+    .max(600)
+    .default(30)
+    .description('Seconds an MCP tool call may run before it is cancelled. Applies when a server (re)connects.')
+    .volatile(),
+  registrySearch: Schema.boolean()
+    .default(true)
+    .description('Search the public MCP Registry (registry.modelcontextprotocol.io) from the catalog.')
+    .volatile(),
+  oauthClientName: Schema.string()
+    .default('DSH MCP servers')
+    .description('Client name shown on provider consent screens during OAuth sign-in.')
+    .volatile(),
+})
+
+const settingsSchema = z.object({
+  connectOnStartup: z.boolean().catch(true),
+  toolCallTimeoutSeconds: z.number().int().min(5).max(600).catch(30),
+  registrySearch: z.boolean().catch(true),
+  oauthClientName: z.string().trim().min(1).max(120).catch('DSH MCP servers'),
+})
+
+type ManagerSettings = z.infer<typeof settingsSchema>
+
+const StoredConfig = z.object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]) }).superRefine((value, context) => {
   value.servers.forEach((server, index) => {
     if (server.transport === 'stdio' && hasInlineCredential([server.command, ...server.args])) {
       context.addIssue({ code: 'custom', path: ['servers', index], message: 'Use credential references instead of inline command credentials.' })
@@ -58,13 +108,60 @@ const currentContext = (ctx: Context): Context => {
 }
 
 const parseStoredConfig = (value: unknown): StoredServer[] => {
-  const result = Config.safeParse(value ?? {})
+  const result = StoredConfig.safeParse(value ?? {})
   if (!result.success) throw new Error('MCP manager configuration is invalid.')
   return result.data.servers
 }
 
 const serversFor = (ctx: Context): StoredServer[] => {
   return parseStoredConfig(entryFor(ctx).options.config)
+}
+
+const settingsFor = (ctx: Context): ManagerSettings => {
+  const raw = entryFor(ctx).options.config
+  return settingsSchema.parse(typeof raw === 'object' && raw !== null ? raw : {})
+}
+
+const grantKey = (server: StoredServer): CredentialKey =>
+  credentialKey(CREDENTIAL_SCOPE, `oauth-${createHash('sha256').update(server.id).digest('hex').slice(0, 24)}`)
+
+type HttpServer = Extract<StoredServer, { transport: 'streamable-http' }>
+
+const usesOAuth = (server: StoredServer): server is HttpServer =>
+  server.transport === 'streamable-http' && server.auth === 'oauth'
+
+const readGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant | undefined> => {
+  try {
+    const record = await ctx.credentials.readRecord(grantKey(server))
+    if (record?.kind !== 'grant') return undefined
+    const parsed = oauthGrantSchema.safeParse(record.payload)
+    return parsed.success ? parsed.data : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Current grant, refreshed under the credential record lock when it is about to expire. */
+const liveGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant | undefined> => {
+  const grant = await readGrant(ctx, server)
+  if (grant === undefined || !needsRefresh(grant)) return grant
+  let refreshed: OAuthGrant | undefined
+  try {
+    await ctx.credentials.modifyRecord(grantKey(server), async current => {
+      const parsed = current?.kind === 'grant' ? oauthGrantSchema.safeParse(current.payload) : undefined
+      const stored = parsed?.success === true ? parsed.data : undefined
+      if (stored === undefined) return current
+      if (!needsRefresh(stored)) {
+        refreshed = stored
+        return current
+      }
+      refreshed = await refreshGrant(stored)
+      return refreshed === undefined ? current : { kind: 'grant', payload: refreshed }
+    })
+  } catch {
+    return undefined
+  }
+  return refreshed
 }
 
 const referenceBindings = (server: StoredServer): Array<[string, string]> => {
@@ -74,6 +171,7 @@ const referenceBindings = (server: StoredServer): Array<[string, string]> => {
 }
 
 const projectServer = async (ctx: Context, server: StoredServer, localProcess: LocalProcessStatus): Promise<ServerView> => {
+  const signedIn = usesOAuth(server) ? (await readGrant(ctx, server)) !== undefined : false
   const refs = [...new Set(referenceBindings(server).map(([, reference]) => reference))]
   const availability = new Map(
     await Promise.all(
@@ -87,7 +185,7 @@ const projectServer = async (ctx: Context, server: StoredServer, localProcess: L
       }),
     ),
   )
-  return publicServerView(server, availability, 'inactive', 0, localProcess)
+  return publicServerView(server, availability, 'inactive', 0, localProcess, signedIn)
 }
 
 const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: ManagerRuntime): Promise<ManagerSnapshot> => {
@@ -103,7 +201,7 @@ const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: Manag
       return { ...projected, clientLifecycle, registeredToolCount }
     }),
   )
-  return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported' }
+  return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported', registrySearch: settingsFor(ctx).registrySearch }
 }
 
 const resolveReferences = async (ctx: Context, refs: Record<string, string>): Promise<Record<string, string> | undefined> => {
@@ -121,9 +219,11 @@ const resolveReferences = async (ctx: Context, refs: Record<string, string>): Pr
 }
 
 const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boolean): Promise<NativeTarget> => {
+  const toolCallTimeoutMs = settingsFor(ctx).toolCallTimeoutSeconds * 1000
   let config: NativeMcpConfig
   let ready: boolean
   let redactions: readonly string[]
+  let grantVersion: number | undefined
   if (server.transport === 'stdio') {
     const env = await resolveReferences(ctx, server.envRefs)
     config = {
@@ -133,20 +233,24 @@ const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boole
       args: server.args,
       cwd: server.cwd,
       env: env ?? {},
-      toolCallTimeoutMs: 30_000,
+      toolCallTimeoutMs,
       failOnStartupError: false,
     }
     ready = env !== undefined
     redactions = Object.values(env ?? {})
   } else {
-    const headers = await resolveReferences(ctx, server.headerRefs)
+    const referencedHeaders = await resolveReferences(ctx, server.headerRefs)
+    const grant = usesOAuth(server) ? await liveGrant(ctx, server) : undefined
+    const oauthReady = !usesOAuth(server) || grant !== undefined
+    const headers = referencedHeaders === undefined || !oauthReady ? undefined : grant === undefined ? referencedHeaders : { ...referencedHeaders, Authorization: `Bearer ${grant.accessToken}` }
+    grantVersion = grant?.issuedAt
     const localEnv = server.startCommand === undefined ? undefined : await resolveReferences(ctx, server.startCommand.envRefs)
     config = {
       transport: 'streamable-http',
       serverName: server.serverName,
       url: server.url,
       headers: headers ?? {},
-      toolCallTimeoutMs: 30_000,
+      toolCallTimeoutMs,
       failOnStartupError: false,
     }
     ready = headers !== undefined && (server.startCommand === undefined || localEnv !== undefined)
@@ -157,7 +261,7 @@ const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boole
         enabled: server.enabled,
         ready,
         suspended,
-        fingerprint: JSON.stringify(server),
+        fingerprint: JSON.stringify({ server, grantVersion }),
         config,
         redactions,
         localCommand: { ...server.startCommand, env: localEnv },
@@ -169,9 +273,10 @@ const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boole
     enabled: server.enabled,
     ready,
     suspended,
-    // Hash only the persisted, reference-only row. Secret values never enter
-    // fingerprints, errors, snapshots, or manager-owned logs.
-    fingerprint: JSON.stringify(server),
+    // Hash only the persisted, reference-only row and the grant issue time, so a
+    // refreshed token reconnects. Secret values never enter fingerprints, errors,
+    // snapshots, or manager-owned logs.
+    fingerprint: JSON.stringify({ server, grantVersion }),
     config,
     redactions,
   }
@@ -194,6 +299,7 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
         transport: 'streamable-http',
         url: draft.url,
         headerRefs: draft.headerRefs,
+        ...(draft.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
       }
     }
     const [command, ...args] = parseCommandLine(localStart.commandLine)
@@ -207,6 +313,7 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
       transport: 'streamable-http',
       url: draft.url,
       headerRefs: draft.headerRefs,
+      ...(draft.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
       startCommand: { command, args, cwd: localStart.cwd, envRefs: localStart.envRefs },
     }
   }
@@ -343,11 +450,63 @@ const currentSnapshot = async (ctx: Context, servers?: StoredServer[]): Promise<
 const persist = async (ctx: Context, servers: StoredServer[]): Promise<ManagerSnapshot> => {
   if (servers.length > MAX_SERVERS) throw new Error(`At most ${MAX_SERVERS} servers can be configured.`)
   const entry = entryFor(ctx)
-  await ctx.configEditor.edit(entry, () => ({ servers }))
+  await ctx.configEditor.edit(entry, current => ({ ...current, servers }))
   const live = currentContext(ctx)
   const runtime = runtimes.get(live)
   if (runtime !== undefined) await runtime.reconcile(servers)
   return currentSnapshot(ctx, servers)
+}
+
+const pendingAuthorizations = new Map<string, PendingAuthorization>()
+
+const takePending = (state: string): PendingAuthorization | undefined => {
+  const now = Date.now()
+  for (const [key, pending] of pendingAuthorizations) if (now - pending.createdAt > OAUTH_PENDING_TTL_MS) pendingAuthorizations.delete(key)
+  const pending = pendingAuthorizations.get(state)
+  pendingAuthorizations.delete(state)
+  return pending
+}
+
+const oauthServer = (ctx: Context, id: string): HttpServer => {
+  const server = serversFor(ctx).find(candidate => candidate.id === id)
+  if (server === undefined) throw new Error('MCP server was not found.')
+  if (!usesOAuth(server)) throw new Error('This server does not use OAuth sign-in.')
+  return server
+}
+
+const reconnect = async (ctx: Context, id: string): Promise<void> => {
+  const live = currentContext(ctx)
+  const runtime = runtimes.get(live)
+  if (runtime === undefined) return
+  runtime.manuallyDisconnected.delete(id)
+  await runtime.reconcile(serversFor(live), [id])
+}
+
+const callbackPage = (response: ServerResponse, status: number, message: string): void => {
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" })
+  response.end(
+    `<!doctype html><meta charset="utf-8"><title>MCP sign-in</title><body style="font:14px system-ui;padding:32px;color:#ddd;background:#1b1b1b"><p>${message}</p><p>You can close this tab and return to DSH.</p>${status === 200 ? '<script>setTimeout(()=>window.close(),800)</script>' : ''}</body>`,
+  )
+}
+
+const handleOAuthCallback = async (ctx: Context, request: IncomingMessage, response: ServerResponse): Promise<void> => {
+  const url = new URL(request.url ?? '/', 'http://callback.invalid')
+  const state = url.searchParams.get('state') ?? ''
+  const pending = takePending(state)
+  if (pending === undefined) return callbackPage(response, 400, 'This sign-in link has expired or was already used.')
+  if (url.searchParams.has('error')) return callbackPage(response, 400, 'The provider did not authorize DSH.')
+  const code = url.searchParams.get('code')
+  if (code === null || code.length === 0 || code.length > 4096) return callbackPage(response, 400, 'The provider returned no authorization code.')
+  try {
+    const server = oauthServer(ctx, pending.serverId)
+    const grant = await exchangeCode(pending, code)
+    await ctx.credentials.modifyRecord(grantKey(server), async () => ({ kind: 'grant', payload: grant }))
+    await reconnect(ctx, server.id)
+    callbackPage(response, 200, 'Signed in. The MCP server is reconnecting.')
+  } catch {
+    ctx.logger.warn('MCP server %s: OAuth code exchange failed.', pending.serverId)
+    callbackPage(response, 502, 'Signing in failed while exchanging the authorization code.')
+  }
 }
 
 const hostApi = mcpServersApi.host({
@@ -377,38 +536,91 @@ const hostApi = mcpServersApi.host({
   },
   remove: async ({ ctx, input }) => {
     const servers = serversFor(ctx)
-    return persist(ctx, removeServer(servers, input.id))
+    const removed = servers.find(server => server.id === input.id)
+    const next = await persist(ctx, removeServer(servers, input.id))
+    if (removed !== undefined && usesOAuth(removed)) await ctx.credentials.deleteRecord(grantKey(removed)).catch(() => undefined)
+    return next
   },
-  searchRegistry: async ({ input }) => searchOfficialRegistry(input.query),
+  authorize: async ({ ctx, input }) => {
+    const server = oauthServer(ctx, input.id)
+    const redirectUri = callbackRedirectUri(input.origin, OAUTH_CALLBACK_PATH)
+    const endpoints = await discoverOAuth(server.url)
+    if (endpoints.registrationEndpoint === undefined) {
+      throw new Error('This provider requires a pre-registered OAuth client. Store its token as a credential reference header instead.')
+    }
+    const client = await registerClient({ registrationEndpoint: endpoints.registrationEndpoint, redirectUri, clientName: settingsFor(ctx).oauthClientName })
+    const pkce = createPkcePair()
+    const state = createState()
+    pendingAuthorizations.set(state, {
+      serverId: server.id,
+      verifier: pkce.verifier,
+      redirectUri,
+      clientId: client.clientId,
+      clientSecret: client.clientSecret,
+      tokenEndpoint: endpoints.tokenEndpoint,
+      resource: endpoints.resource,
+      createdAt: Date.now(),
+    })
+    return { authorizationUrl: authorizationUrl({ endpoints, clientId: client.clientId, redirectUri, challenge: pkce.challenge, state }) }
+  },
+  signOut: async ({ ctx, input }) => {
+    const server = oauthServer(ctx, input.id)
+    await ctx.credentials.deleteRecord(grantKey(server))
+    await runtimes.get(currentContext(ctx))?.reconcile()
+    return currentSnapshot(ctx)
+  },
+  searchRegistry: async ({ ctx, input }) => {
+    if (!settingsFor(ctx).registrySearch) throw new Error('Public MCP Registry search is turned off in Settings.')
+    return searchOfficialRegistry(input.query)
+  },
 })
 
-const hostPlugin = definePlugin({
-  id: 'mcp-servers',
+export default defineHost({
   name: PACKAGE_NAME,
   Config,
-  inject: ['connection', 'webServer', 'configEditor', 'credentials', 'tools', 'subprocess'],
+  inject: ['connection', 'webServer', 'configEditor', 'credentials', 'tools', 'subprocess', 'settings'],
   apis: [hostApi],
-  setup: api => {
-    const ctx = api.raw.ctx
+  setup: (ctx, config) => {
     const root = ctx.root ?? ctx
+    const servers = parseStoredConfig(config)
     let manuallyDisconnected = disconnectionsByRoot.get(root)
     if (manuallyDisconnected === undefined) {
-      manuallyDisconnected = new Set()
+      manuallyDisconnected = new Set(settingsFor(ctx).connectOnStartup ? [] : servers.map(server => server.id))
       disconnectionsByRoot.set(root, manuallyDisconnected)
     }
     const runtime = new ManagerRuntime(ctx, manuallyDisconnected)
     runtimes.set(ctx, runtime)
-    void runtime.reconcile(Config.parse(api.config).servers).catch(() => {
+    void runtime.reconcile(servers).catch(() => {
       ctx.logger.warn('MCP manager could not reconcile a server configuration.')
     })
 
+    ctx.effect(() => ctx.settings.configure({ auto: true }), 'MCP servers settings page')
+    ctx.effect(
+      () =>
+        ctx.webServer.register({
+          kind: 'exact',
+          path: OAUTH_CALLBACK_PATH,
+          handler: (request, response) => handleOAuthCallback(ctx, request, response),
+        }),
+      'MCP servers OAuth callback',
+    )
+    ctx.effect(() => {
+      const timer = setInterval(() => {
+        if (!serversFor(ctx).some(usesOAuth)) return
+        void runtime.reconcile().catch(() => {
+          ctx.logger.warn('MCP manager could not refresh OAuth tokens.')
+        })
+      }, TOKEN_REFRESH_INTERVAL_MS)
+      return () => clearInterval(timer)
+    }, 'MCP servers OAuth refresh')
+
     ctx.on('credentials/reference-updated', ref => {
-      const servers = serversFor(ctx)
-      const affected = servers.filter(server => referenceBindings(server).some(([, reference]) => reference === ref))
+      const current = serversFor(ctx)
+      const affected = current.filter(server => referenceBindings(server).some(([, reference]) => reference === ref))
       if (affected.length > 0) {
         void runtime
           .reconcile(
-            servers,
+            current,
             affected.map(server => server.id),
           )
           .catch(() => {
@@ -422,5 +634,3 @@ const hostPlugin = definePlugin({
     })
   },
 })
-
-export default hostPlugin

@@ -31,6 +31,7 @@ export const publicServerView = (
   clientLifecycle: ClientLifecycle = 'inactive',
   registeredToolCount = 0,
   localProcess: LocalProcessStatus = 'not-configured',
+  signedIn = false,
 ): ServerView => {
   const bindings =
     server.transport === 'stdio'
@@ -44,7 +45,8 @@ export const publicServerView = (
     reference,
     configured: availability.get(reference) ?? false,
   }))
-  const ready = credentialReferences.every(item => item.configured)
+  const usesOAuth = server.transport === 'streamable-http' && server.auth === 'oauth'
+  const ready = credentialReferences.every(item => item.configured) && (!usesOAuth || signedIn)
   const common = {
     id: server.id,
     name: server.name,
@@ -56,6 +58,7 @@ export const publicServerView = (
     localProcess,
     connectionHealth: 'not-reported' as const,
     registeredToolCount,
+    oauth: usesOAuth ? (signedIn ? ('signed-in' as const) : ('needs-sign-in' as const)) : ('not-used' as const),
   }
   if (server.transport === 'stdio') {
     return { ...common, transport: 'stdio', commandLine: formatCommandLine([server.command, ...server.args]), cwd: server.cwd }

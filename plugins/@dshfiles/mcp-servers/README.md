@@ -58,21 +58,43 @@ rejected. Common inline secret arguments such as `--token` and `--api-key` are
 also rejected; use credential references in stdio/local-process environment
 bindings or HTTP headers.
 Resolved values are redacted from strings, errors, and plain objects passed to
-the native client's scoped Cordis logger. This manager does not create or edit
-credentials. The installed credential service supports protected references
-and generic records, but neither it nor `dsh-mcp-client@0.2.0-rc.2` supplies an
-OAuth authorization/discovery, PKCE, or token-refresh flow. Remote sign-in
-must be handled by a credential provider outside this bundle; the native client
-accepts the resulting value through configured headers.
+the native client's scoped Cordis logger.
 
-Provider cards are documentation-first: `Configure` opens a manual server
-form because provider endpoints and sign-in requirements vary. Registry search
-lists name matches and pre-fills only safe HTTPS Streamable HTTP URLs. It does
-not translate package-based stdio entries, SSE endpoints, or URL-template
-variables into runnable configs; use the custom editor for stdio or to fill
-those details. OAuth sign-in and credential creation are also outside this
-bundle, so remote authentication must use references already available through
-the configured DSH credential provider.
+## OAuth sign-in
+
+`dsh-mcp-client@0.2.0-rc.2` accepts only static headers, so this bundle runs
+the MCP OAuth client flow on the Host and hands the native client an
+`Authorization: Bearer` header. An HTTP server marked **Sign in with OAuth**
+uses RFC 9728 protected-resource metadata, RFC 8414 (or OpenID) authorization
+server metadata, RFC 7591 dynamic client registration as a public client, and
+PKCE S256 with the `resource` indicator. **Sign in** opens the provider in a
+new tab; the provider redirects to `/api/dshfiles-mcp-servers/oauth/callback`
+on the origin the browser used for DSH. The callback accepts only an unexpired
+single-use `state`, exchanges the code with the verifier, and stores the grant
+as an opaque `mcp-servers/oauth-…` credential record through
+`ctx.credentials.modifyRecord`. Tokens refresh under that record's lock when
+they near expiry (checked on connect, Refresh, and every five minutes), and a
+refreshed token reconnects the client. **Sign out** and removing the server
+delete the record. Providers without dynamic client registration (GitHub) need
+a token stored as a DSH credential and referenced as a header.
+
+## Catalog, composer panel, and settings
+
+**Browse MCPs** (page header, or **Add MCP** in the composer panel) lists the
+hosted provider endpoints with their brand marks and docs links. **Add** saves
+the endpoint in one step and, for OAuth providers, starts sign-in. Typing two
+or more characters also searches the public MCP Registry by name for directly
+connectable HTTPS Streamable HTTP endpoints, skipping ones the catalog already
+lists; entries that are already registered show **Added**. **Custom MCP**
+opens the editor in a dialog.
+
+The composer **+** menu (and `/mcp-servers`) opens the quick panel through
+`ctx.commandUi.register()`; **Manage** selects this sidebar page through
+`ctx.layout.selectPanel`.
+
+The Host `Config` is a Schemastery object whose `servers` list stays hidden and
+whose live fields render on the DSH Settings page: connect on startup, tool
+call timeout, public Registry search, and the OAuth client name.
 
 ## Adoption audit
 

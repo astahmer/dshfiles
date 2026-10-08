@@ -1,6 +1,8 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import { PlugIcon } from '@dshfiles/plugin-ui/icons'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
@@ -36,7 +38,7 @@ export default defineClientPlugin({
   id: 'dshfiles-mcp-servers',
   name: 'MCP servers',
   uses: ['ui'],
-  inject: ['commandUi'],
+  inject: ['commandUi', 'layout'],
   locales: [mcpServersLocale],
   setup(api) {
     const ctx = api.raw.ctx
@@ -47,9 +49,10 @@ export default defineClientPlugin({
         <ManagerView t={translate} />
       </PluginQueryProvider>
     )
+    const openManager = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
     const RootQuickPanel = ({ panel }: { readonly panel: QuickPanelState }): JSX.Element => (
       <PluginQueryProvider>
-        <McpQuickPanel panel={panel} t={translate} />
+        <McpQuickPanel onManage={openManager} panel={panel} t={translate} />
       </PluginQueryProvider>
     )
 
@@ -66,6 +69,7 @@ export default defineClientPlugin({
       RootQuickPanel,
     )
 
-    ctx.effect(() => ctx.commandUi.register(createQuickPanelContribution(panels, translate)), 'MCP quick panel command')
+    const MenuIcon = (props: IconProps): JSX.Element => <PlugIcon aria-hidden className={props.className} size={props.size ?? 16} />
+    ctx.effect(() => ctx.commandUi.register(createQuickPanelContribution(panels, translate, MenuIcon)), 'MCP quick panel command')
   },
 })

@@ -11,6 +11,7 @@ const serverFormValuesSchema = z.object({
   transport: z.enum(serverTransports),
   url: z.string(),
   headerRefs: z.string(),
+  oauth: z.boolean(),
   localStart: z.boolean(),
   startCommandLine: z.string(),
   startCwd: z.string(),
@@ -67,21 +68,35 @@ const referencesForPrefix = (server: ServerView, prefix: string): string =>
     2,
   )
 
-const slug = (value: string): string =>
+export const serverNameFromTitle = (value: string): string =>
   value
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 32) || 'mcp-server'
 
-export const blankServerForm = (input: { readonly name?: string; readonly endpoint?: string } = {}): ServerFormValues => ({
+/** A tool namespace derived from the title that no other configured server uses. */
+export const uniqueServerName = (title: string, taken: readonly string[]): string => {
+  const base = serverNameFromTitle(title)
+  if (!taken.includes(base)) return base
+  for (let index = 2; ; index += 1) {
+    const suffix = `-${index}`
+    const candidate = `${base.slice(0, 32 - suffix.length)}${suffix}`
+    if (!taken.includes(candidate)) return candidate
+  }
+}
+
+export const blankServerForm = (
+  input: { readonly name?: string; readonly endpoint?: string; readonly oauth?: boolean; readonly headerRefs?: Record<string, string> } = {},
+): ServerFormValues => ({
   id: '',
   name: input.name ?? '',
-  serverName: slug(input.name ?? ''),
+  serverName: serverNameFromTitle(input.name ?? ''),
   enabled: true,
   transport: 'streamable-http',
   url: input.endpoint ?? '',
-  headerRefs: '{}',
+  headerRefs: input.headerRefs === undefined ? '{}' : JSON.stringify(input.headerRefs, null, 2),
+  oauth: input.oauth ?? false,
   localStart: false,
   startCommandLine: '',
   startCwd: '',
@@ -101,6 +116,7 @@ export const serverFormFromView = (server: ServerView): ServerFormValues => {
     ...base,
     url: server.url,
     headerRefs: referencesForPrefix(server, 'header:'),
+    oauth: server.oauth !== 'not-used',
     localStart: server.startCommand !== undefined,
     startCommandLine: server.startCommand?.commandLine ?? '',
     startCwd: server.startCommand?.cwd ?? '',
@@ -126,6 +142,7 @@ export const parseServerForm = (values: ServerFormValues): ParsedServerForm => {
           transport: values.transport,
           url: values.url,
           headerRefs: parseReferences('headerRefs'),
+          auth: values.oauth ? ('oauth' as const) : ('none' as const),
           startCommand: values.localStart ? { commandLine: values.startCommandLine, cwd: values.startCwd, envRefs: parseReferences('startEnvRefs') } : null,
         }
   const result = serverDraftSchema.safeParse(candidate)
@@ -138,4 +155,17 @@ export const serverFormSchema = serverFormValuesSchema.superRefine((values, cont
   const parsed = parseServerForm(values)
   if (parsed.success) return
   for (const issue of parsed.issues) context.addIssue({ code: 'custom', message: issue.message, path: issue.field === undefined ? [] : [issue.field] })
+})
+
+/** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
+export const catalogServerDraft = (input: { readonly name: string; readonly url: string; readonly oauth: boolean; readonly taken: readonly string[] }): ServerDraft => ({
+  id: '',
+  name: input.name,
+  serverName: uniqueServerName(input.name, input.taken),
+  enabled: true,
+  transport: 'streamable-http',
+  url: input.url,
+  headerRefs: {},
+  auth: input.oauth ? 'oauth' : 'none',
+  startCommand: null,
 })

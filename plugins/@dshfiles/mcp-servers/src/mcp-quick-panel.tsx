@@ -5,38 +5,88 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-u
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { CatalogBrowser, SignInNotice, type CustomServerRequest } from './catalog-browser.js'
 import type { McpServersTranslate } from './locales.js'
-import { ManagerDialog } from './manager-view.js'
 import type { QuickPanelState } from './quick-panel.js'
-import { useServerActions, useServerSnapshot } from './server-queries.js'
+import { ServerEditorDialog } from './server-editor.js'
+import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
 import { isClientActive, isConnectionToggleBlocked, lifecycleDotClassName, lifecycleText, localProcessText, matchesServerSearch } from './server-status.js'
 
-export const McpQuickPanel = ({ t, panel }: { readonly t: McpServersTranslate; readonly panel: QuickPanelState }): JSX.Element => {
-  const open = useSyncExternalStore(panel.subscribe, panel.getSnapshot)
-  const [manage, setManage] = useState(false)
-  const openManager = (): void => {
-    setManage(true)
-    panel.close()
-  }
+export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly panel: QuickPanelState; readonly onManage: () => void }): JSX.Element => {
+  const t = props.t
+  const open = useSyncExternalStore(props.panel.subscribe, props.panel.getSnapshot)
+  const snapshot = useServerSnapshot()
+  const actions = useServerActions()
+  const [browsing, setBrowsing] = useState(false)
+  const [custom, setCustom] = useState<(CustomServerRequest & { readonly key: number }) | null>(null)
   return (
     <>
-      {open ? <QuickPanelContent onClose={() => panel.close()} onManage={openManager} t={t} /> : null}
-      <ManagerDialog onClose={() => setManage(false)} open={manage} t={t} />
+      {open ? (
+        <QuickPanelContent
+          actions={actions}
+          onBrowse={() => {
+            props.panel.close()
+            setBrowsing(true)
+          }}
+          onClose={() => props.panel.close()}
+          onManage={() => {
+            props.panel.close()
+            props.onManage()
+          }}
+          t={t}
+        />
+      ) : null}
+      <CatalogBrowser
+        actions={actions}
+        onClose={() => setBrowsing(false)}
+        onCustom={request => {
+          setBrowsing(false)
+          setCustom(current => ({ ...request, key: (current?.key ?? 0) + 1 }))
+        }}
+        open={browsing}
+        snapshot={snapshot.data}
+        t={t}
+      />
+      {custom === null ? null : (
+        <ServerEditorDialog
+          hint={custom.hint}
+          key={custom.key}
+          onClose={() => setCustom(null)}
+          onSave={async draft => {
+            if (await actions.save(draft)) setCustom(null)
+          }}
+          open
+          t={t}
+          values={custom.values}
+        />
+      )}
     </>
   )
 }
 
 interface QuickPanelContentProps {
   readonly t: McpServersTranslate
+  readonly actions: ServerActions
   readonly onClose: () => void
   readonly onManage: () => void
+  readonly onBrowse: () => void
 }
 
-const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element => {
+const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JSX.Element => {
   const snapshot = useServerSnapshot()
-  const actions = useServerActions()
+  const sectionRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState('')
+  const onClose = props.onClose
+
+  useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent): void => {
+      if (event.target instanceof Node && sectionRef.current?.contains(event.target) === true) return
+      onClose()
+    }
+    window.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => window.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [onClose])
   const servers = snapshot.data?.servers ?? []
   const enabledCount = servers.filter(server => server.enabled).length
   const matchingServers = servers.filter(server => matchesServerSearch(server, search))
@@ -49,6 +99,7 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
       onKeyDown={event => {
         if (event.key === 'Escape') props.onClose()
       }}
+      ref={sectionRef}
       role="dialog"
     >
       <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-b dshx:px-4 dshx:py-2.5">
@@ -78,6 +129,7 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
             <AlertDescription>{t('error')}</AlertDescription>
           </Alert>
         ) : null}
+        <SignInNotice actions={actions} className="dshx:mx-3 dshx:mt-2 dshx:w-auto" t={t} />
         {snapshot.isPending ? (
           <div className="dshx:flex dshx:justify-center dshx:py-6 dshx:text-muted-foreground">
             <Spinner />
@@ -98,20 +150,25 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
                     <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
                       <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', lifecycleDotClassName(server))} />
                       <span className="dshx:truncate">
-                        {lifecycleText(server, t)} · {server.registeredToolCount} {t('registeredTools')}
+                        {server.oauth === 'needs-sign-in' ? t('signInRequired') : `${lifecycleText(server, t)} · ${server.registeredToolCount} ${t('registeredTools')}`}
                       </span>
                     </p>
                     {processText ? <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{processText}</p> : null}
-                    <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{t('connectionUnknown')}</p>
                   </div>
-                  <Button
-                    disabled={actions.isPending || isConnectionToggleBlocked(server)}
-                    onClick={() => actions.toggleConnection(server)}
-                    size="sm"
-                    variant={isClientActive(server) ? 'ghost' : 'outline'}
-                  >
-                    {isClientActive(server) ? t('disconnect') : t('connect')}
-                  </Button>
+                  {server.oauth === 'needs-sign-in' ? (
+                    <Button disabled={actions.isPending || !server.enabled} onClick={() => actions.signIn(server)} size="sm" variant="outline">
+                      {t('signIn')}
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={actions.isPending || isConnectionToggleBlocked(server)}
+                      onClick={() => actions.toggleConnection(server)}
+                      size="sm"
+                      variant={isClientActive(server) ? 'ghost' : 'outline'}
+                    >
+                      {isClientActive(server) ? t('disconnect') : t('connect')}
+                    </Button>
+                  )}
                   <Switch
                     aria-label={`${server.enabled ? t('disable') : t('enable')} ${server.name}`}
                     checked={server.enabled}
@@ -131,11 +188,11 @@ const QuickPanelContent = ({ t, ...props }: QuickPanelContentProps): JSX.Element
         <div className="dshx:flex dshx:items-center dshx:gap-1">
           <Button onClick={props.onManage} size="sm" variant="ghost">
             <SettingsIcon className="dshx:size-3.5" />
-            {t('manage')}
+            {t('manageShort')}
           </Button>
-          <Button onClick={props.onManage} size="sm">
+          <Button onClick={props.onBrowse} size="sm">
             <PlusIcon className="dshx:size-3.5" />
-            {t('add')}
+            {t('addMcp')}
           </Button>
         </div>
       </footer>

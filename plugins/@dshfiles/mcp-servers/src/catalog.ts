@@ -6,48 +6,62 @@ export const PROVIDERS = [
     name: 'Figma',
     category: 'Design',
     description: 'Read design context and work with Figma files.',
-    docsUrl: 'https://developers.figma.com/docs/figma-mcp-server/',
+    url: 'https://mcp.figma.com/mcp',
+    auth: 'oauth',
+    docsUrl: 'https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server',
   },
   {
     id: 'github',
     name: 'GitHub',
     category: 'Developer tools',
-    description: 'Work with repositories, issues, pull requests, and code.',
+    description: 'Work with repositories, issues, and pull requests.',
+    url: 'https://api.githubcopilot.com/mcp/',
+    auth: 'token',
     docsUrl: 'https://github.com/github/github-mcp-server',
   },
   {
     id: 'linear',
     name: 'Linear',
     category: 'Project management',
-    description: 'Search and manage Linear issues, projects, and comments.',
+    description: 'Search and manage issues, projects, and comments.',
+    url: 'https://mcp.linear.app/mcp',
+    auth: 'oauth',
     docsUrl: 'https://linear.app/docs/mcp',
   },
   {
     id: 'notion',
     name: 'Notion',
     category: 'Knowledge',
-    description: 'Search, read, and update a Notion workspace.',
+    description: 'Search, read, and update your Notion workspace.',
+    url: 'https://mcp.notion.com/mcp',
+    auth: 'oauth',
     docsUrl: 'https://developers.notion.com/docs/mcp',
   },
   {
     id: 'cloudflare',
     name: 'Cloudflare',
     category: 'Developer tools',
-    description: 'Use Cloudflare services through the provider MCP server.',
-    docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/',
+    description: 'Manage Cloudflare services through its hosted MCP server.',
+    url: 'https://mcp.cloudflare.com/mcp',
+    auth: 'oauth',
+    docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/',
   },
   {
     id: 'cloudflare-docs',
     name: 'Cloudflare Docs',
     category: 'Documentation',
     description: 'Search current Cloudflare developer documentation.',
-    docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/',
+    url: 'https://docs.mcp.cloudflare.com/mcp',
+    auth: 'none',
+    docsUrl: 'https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/',
   },
   {
     id: 'sentry',
     name: 'Sentry',
     category: 'Monitoring',
-    description: 'Investigate errors, performance, and Sentry projects.',
+    description: 'Investigate errors, performance, and projects in Sentry.',
+    url: 'https://mcp.sentry.dev/mcp',
+    auth: 'oauth',
     docsUrl: 'https://docs.sentry.io/product/sentry-mcp/',
   },
   {
@@ -55,9 +69,29 @@ export const PROVIDERS = [
     name: 'Vercel',
     category: 'Deployment',
     description: 'Search Vercel docs and manage projects and deployments.',
+    url: 'https://mcp.vercel.com',
+    auth: 'oauth',
     docsUrl: 'https://vercel.com/docs/mcp',
   },
-] as const
+] as const satisfies readonly {
+  readonly id: string
+  readonly name: string
+  readonly category: string
+  readonly description: string
+  readonly url: string
+  readonly auth: 'oauth' | 'none' | 'token'
+  readonly docsUrl: string
+}[]
+
+/** Endpoint identity for duplicate detection: host plus path without a trailing slash. */
+export const endpointKey = (value: string): string => {
+  try {
+    const url = new URL(value)
+    return `${url.host.toLocaleLowerCase()}${url.pathname.replace(/\/+$/, '')}`
+  } catch {
+    return value.trim().toLocaleLowerCase()
+  }
+}
 
 export const filterProviders = <T extends { name: string; category: string; description: string }>(rows: readonly T[], query: string): T[] => {
   const needle = query.trim().toLocaleLowerCase()

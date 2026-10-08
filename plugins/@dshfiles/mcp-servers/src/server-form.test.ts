@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blankServerForm, parseServerForm, serverFormFromView, serverFormSchema } from './server-form.js'
+import { blankServerForm, catalogServerDraft, parseServerForm, serverFormFromView, serverFormSchema, uniqueServerName } from './server-form.js'
 import { publicServerView } from './server-state.js'
 
 const issueFields = (values: Parameters<typeof parseServerForm>[0]): readonly (string | undefined)[] => {
@@ -30,6 +30,7 @@ describe('server editor form', () => {
         transport: 'streamable-http',
         url: 'https://example.com/mcp',
         headerRefs: { Authorization: 'REMOTE_TOKEN' },
+        auth: 'none',
         startCommand: null,
       },
     })
@@ -74,5 +75,48 @@ describe('server editor form', () => {
     expect(JSON.parse(values.headerRefs)).toEqual({ Authorization: 'REMOTE_TOKEN' })
     expect(JSON.parse(values.startEnvRefs)).toEqual({ ACCESS_TOKEN: 'PROXY_TOKEN' })
     expect(JSON.stringify(values)).not.toContain(secret)
+  })
+})
+
+describe('catalog drafts and OAuth', () => {
+  it('derives a tool namespace that no configured server uses', () => {
+    expect(uniqueServerName('Linear', [])).toBe('linear')
+    expect(uniqueServerName('Linear', ['linear', 'linear-2'])).toBe('linear-3')
+    expect(uniqueServerName('A'.repeat(40), ['a'.repeat(32)])).toBe(`${'a'.repeat(30)}-2`)
+  })
+
+  it('adds a hosted provider as an OAuth HTTP server in one step', () => {
+    expect(catalogServerDraft({ name: 'Notion', url: 'https://mcp.notion.com/mcp', oauth: true, taken: ['notion'] })).toEqual({
+      id: '',
+      name: 'Notion',
+      serverName: 'notion-2',
+      enabled: true,
+      transport: 'streamable-http',
+      url: 'https://mcp.notion.com/mcp',
+      headerRefs: {},
+      auth: 'oauth',
+      startCommand: null,
+    })
+  })
+
+  it('round-trips OAuth sign-in through the editor and reports the sign-in state', () => {
+    const stored = {
+      id: 'remote',
+      name: 'Remote',
+      serverName: 'remote',
+      enabled: true,
+      transport: 'streamable-http' as const,
+      url: 'https://example.com/mcp',
+      headerRefs: {},
+      auth: 'oauth' as const,
+    }
+    const pending = publicServerView(stored, new Map(), 'inactive', 0, 'not-configured', false)
+    expect(pending.oauth).toBe('needs-sign-in')
+    expect(pending.configuration).toBe('needs-credentials')
+    expect(publicServerView(stored, new Map(), 'loaded', 2, 'not-configured', true)).toMatchObject({ oauth: 'signed-in', configuration: 'ready' })
+    const values = serverFormFromView(pending)
+    expect(values.oauth).toBe(true)
+    const parsed = parseServerForm(values)
+    expect(parsed.success && parsed.draft.transport === 'streamable-http' ? parsed.draft.auth : undefined).toBe('oauth')
   })
 })

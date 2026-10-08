@@ -1,4 +1,6 @@
 import type { CommandContribution } from '@deepseek-ai/dsh-client-ui-commands/client'
+import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ComponentType } from 'react'
 
 type Listener = () => void
 
@@ -55,9 +57,10 @@ export class SessionQuickPanels {
 }
 
 /** Native plus/slash menu action that opens the session-addressed quick panel. */
-export const createQuickPanelContribution = (panels: SessionQuickPanels, translate: TranslateQuickPanel): CommandContribution => {
+export const createQuickPanelContribution = (panels: SessionQuickPanels, translate: TranslateQuickPanel, icon?: ComponentType<IconProps>): CommandContribution => {
   return {
     name: 'mcp-servers',
+    ...(icon === undefined ? {} : { icon }),
     label: () => translate('title'),
     description: () => translate('quickPanelHint'),
     available: () => true,

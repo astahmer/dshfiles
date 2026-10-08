@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { PROVIDERS } from './catalog.js'
 
 export const referenceNameSchema = z
   .string()
@@ -53,6 +54,8 @@ const endpointSchema = z
     }
   }, 'Use an HTTPS endpoint without embedded credentials.')
 
+const authSchema = z.enum(['none', 'oauth'])
+
 const baseDraft = {
   id: z.string().max(80),
   name: z.string().trim().min(1).max(120),
@@ -77,6 +80,7 @@ export const storedServerSchema = z.discriminatedUnion('transport', [
       transport: z.literal('streamable-http'),
       url: endpointSchema,
       headerRefs: refsSchema(headerNameSchema),
+      auth: authSchema.optional(),
       startCommand: localStartSchema.optional(),
     })
     .strict(),
@@ -100,10 +104,13 @@ export const serverDraftSchema = z.discriminatedUnion('transport', [
       transport: z.literal('streamable-http'),
       url: endpointSchema,
       headerRefs: refsSchema(headerNameSchema),
+      auth: authSchema.optional(),
       startCommand: localStartDraftSchema.nullable().optional(),
     })
     .strict(),
 ])
+
+const oauthStateSchema = z.enum(['not-used', 'signed-in', 'needs-sign-in'])
 
 export const serverViewSchema = z.discriminatedUnion('transport', [
   z.object({
@@ -120,6 +127,7 @@ export const serverViewSchema = z.discriminatedUnion('transport', [
     localProcess: z.enum(['not-configured', 'starting', 'running', 'exited', 'stopping', 'stopped', 'stop-unconfirmed']),
     connectionHealth: z.literal('not-reported'),
     registeredToolCount: z.number().int().nonnegative(),
+    oauth: oauthStateSchema.default('not-used'),
   }),
   z.object({
     id: z.string(),
@@ -135,6 +143,7 @@ export const serverViewSchema = z.discriminatedUnion('transport', [
     startCommand: z.object({ commandLine: z.string(), cwd: z.string() }).optional(),
     connectionHealth: z.literal('not-reported'),
     registeredToolCount: z.number().int().nonnegative(),
+    oauth: oauthStateSchema.default('not-used'),
   }),
 ])
 
@@ -143,6 +152,8 @@ export const providerSchema = z.object({
   name: z.string(),
   category: z.string(),
   description: z.string(),
+  url: endpointSchema,
+  auth: z.enum(['oauth', 'none', 'token']),
   docsUrl: z.string().url(),
 })
 
@@ -160,7 +171,22 @@ export const snapshotSchema = z.object({
   servers: z.array(serverViewSchema),
   providers: z.array(providerSchema),
   connectionHealth: z.literal('not-reported'),
+  registrySearch: z.boolean(),
 })
+
+/**
+ * Client boundary decode. A Host that predates a field (the live DSH keeps the
+ * old Host until restart) still yields a complete snapshot: missing fields take
+ * defaults, and a provider list without endpoints falls back to the bundled catalog.
+ */
+const compatibleSnapshotSchema = z.object({
+  servers: z.array(serverViewSchema).catch([]),
+  providers: z.array(providerSchema).catch(() => [...PROVIDERS]),
+  connectionHealth: z.literal('not-reported').catch('not-reported'),
+  registrySearch: z.boolean().catch(true),
+})
+
+export const decodeSnapshot = (raw: unknown): ManagerSnapshot => compatibleSnapshotSchema.parse(raw ?? {})
 
 export type StoredServer = z.infer<typeof storedServerSchema>
 export type ServerDraft = z.infer<typeof serverDraftSchema>
@@ -178,6 +204,11 @@ export const mcpServersApi = defineApi({
     setEnabled: method({ input: z.object({ id: z.string().min(1).max(80), enabled: z.boolean() }), output: snapshotSchema }),
     setConnection: method({ input: z.object({ id: z.string().min(1).max(80), connected: z.boolean() }), output: snapshotSchema }),
     remove: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
+    authorize: method({
+      input: z.object({ id: z.string().min(1).max(80), origin: z.string().url().max(2048) }),
+      output: z.object({ authorizationUrl: z.string().url() }),
+    }),
+    signOut: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
     searchRegistry: method({ input: z.object({ query: z.string().trim().min(1).max(80) }), output: z.array(registryEntrySchema).max(20) }),
   },
 })
