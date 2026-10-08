@@ -8,7 +8,7 @@ import { execaNode } from 'execa'
 import { satisfies, valid, validRange } from 'semver'
 import { z } from 'zod'
 import type { MarketplaceInstallOutput, MarketplaceListInput, MarketplaceListOutput } from './api.js'
-import { getMarketplaceSettings, normalizeHubBaseUrl } from './settings.js'
+import { DEFAULT_HUB_BASE_URL, normalizeHubBaseUrl } from './settings.js'
 
 const PAGE_SIZE = 24
 const HUB_TIMEOUT_MS = 15_000
@@ -44,6 +44,10 @@ const hubCardSchema = z.object({
   badge: z.enum(['official', 'verified', 'community']),
   glyph: z.string().min(1).max(4),
   iconUrl: z.string().nullable(),
+  author: z.string().max(120).nullable().optional(),
+  stars: z.number().int().nonnegative().nullable().optional(),
+  updated: z.string().max(40).nullable().optional(),
+  publisher: z.object({ avatarUrl: z.string().max(2_048).nullable().optional() }).nullable().optional(),
 })
 
 export const hubListResponseSchema = z.object({
@@ -51,6 +55,7 @@ export const hubListResponseSchema = z.object({
   nextCursor: z.string().max(1000).nullable(),
   // Older Framework Hub deployments remain readable during a rolling update.
   categories: z.array(hubCategorySchema).max(100).optional().default([]),
+  total: z.number().int().nonnegative().optional(),
 })
 
 const installTargetSchema = z.object({
@@ -116,7 +121,7 @@ const defaultDependencies: MarketplaceHostDependencies = {
   readProfileManifest,
   resolveDshCli,
   runCli: runDshCli,
-  settings: getMarketplaceSettings,
+  settings: () => ({ hubBaseUrl: DEFAULT_HUB_BASE_URL }),
   logError(message, error) {
     console.error(HOST_LOG_PREFIX, message, error)
   },
@@ -246,6 +251,16 @@ function absoluteIconUrl(baseUrl: string, iconUrl: string | null): string | null
   if (iconUrl === null) return null
   try {
     return new URL(iconUrl, `${normalizeHubBaseUrl(baseUrl)}/`).href
+  } catch {
+    return null
+  }
+}
+
+function httpsAvatarUrl(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url.href : null
   } catch {
     return null
   }
@@ -427,11 +442,12 @@ export class MarketplaceHostService {
       const settings = this.dependencies.settings()
       const query = new URLSearchParams({
         locale: input.locale,
-        sort: 'latest',
+        sort: input.sort ?? 'latest',
         limit: String(PAGE_SIZE),
       })
       if (input.category !== undefined) query.set('category', input.category)
       if (input.cursor !== undefined) query.set('cursor', input.cursor)
+      if (input.query !== undefined) query.set('q', input.query)
       const page = await this.listPage(settings.hubBaseUrl, query, signal)
       const installed = new Set(profile.bundles)
       return {
@@ -450,9 +466,14 @@ export class MarketplaceHostService {
           badge: item.badge === 'official' ? 'official' : 'community',
           glyph: item.glyph,
           iconUrl: absoluteIconUrl(settings.hubBaseUrl, item.iconUrl),
+          author: item.author === undefined || item.author === null || item.author.length === 0 ? null : item.author,
+          avatarUrl: httpsAvatarUrl(item.publisher?.avatarUrl),
+          stars: item.stars ?? null,
+          updated: item.updated ?? null,
           installed: installed.has(item.scope),
         })),
         nextCursor: page.nextCursor,
+        total: page.total ?? null,
       }
     } catch (error) {
       this.dependencies.logError('Failed to list Framework Hub plugins.', error)

@@ -6,7 +6,7 @@ import { MarketplaceTab, type MarketplaceTabProps } from './MarketplaceTab.js'
 import { marketplaceLocale, MARKETPLACE_LOCALE_NAMESPACE } from './locales.js'
 import './client.css'
 
-let tabLabel = (): string => 'Plugin marketplace'
+let tabLabel = (): string => 'Framework Hub'
 
 const MarketplaceSlot = (props: MarketplaceTabProps): ReactNode => (
   <PluginQueryProvider>

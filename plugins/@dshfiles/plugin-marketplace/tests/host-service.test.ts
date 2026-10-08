@@ -172,6 +172,28 @@ describe('MarketplaceHostService.list', () => {
     })
   })
 
+  it('forwards search and sort and exposes author, avatar, stars, update date and total', async () => {
+    const fixture = await serviceFixture({
+      fetchValue: {
+        items: [
+          card({ author: 'octo', stars: 42, updated: '2026-10-01', publisher: { login: 'octo', avatarUrl: 'https://avatars.example.test/u/1' } }),
+          card({ slug: 'plain', scope: '@fixture/plain', publisher: { avatarUrl: 'http://avatars.example.test/u/2' } }),
+        ],
+        nextCursor: null,
+        total: 442,
+      },
+    })
+    const result = await fixture.service.list({ locale: 'en', query: 'sidebar', sort: 'stars' }, fixture.ctx, new AbortController().signal)
+    const url = new URL(String(fixture.fetchMock.mock.calls[0]?.[0]))
+    expect(url.searchParams.get('q')).toBe('sidebar')
+    expect(url.searchParams.get('sort')).toBe('stars')
+    expect(result.total).toBe(442)
+    expect(result.items.map(item => [item.author, item.avatarUrl, item.stars, item.updated])).toStrictEqual([
+      ['octo', 'https://avatars.example.test/u/1', 42, '2026-10-01'],
+      [null, null, null, null],
+    ])
+  })
+
   it('distinguishes an unknown range from a valid unsatisfied range on the dedicated API', async () => {
     const fixture = await serviceFixture({
       fetchValue: {

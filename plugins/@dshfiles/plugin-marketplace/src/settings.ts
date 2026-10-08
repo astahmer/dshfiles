@@ -1,18 +1,12 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 export const DEFAULT_HUB_BASE_URL = 'https://dshx.io'
 
-export interface MarketplaceSettings {
-  readonly hubBaseUrl: string
-}
+const isLoopbackHost = (hostname: string): boolean =>
+  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
 
-function isLoopbackHost(hostname: string): boolean {
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
-}
-
-export function validateHubBaseUrl(value: string): URL {
+export const validateHubBaseUrl = (value: string): URL => {
   const url = new URL(value)
   if (url.username !== '' || url.password !== '') throw new Error('Framework Hub URL must not contain credentials.')
   if (url.search !== '' || url.hash !== '') throw new Error('Framework Hub URL must not contain a query or fragment.')
@@ -22,33 +16,20 @@ export function validateHubBaseUrl(value: string): URL {
   return url
 }
 
-export function normalizeHubBaseUrl(value: string): string {
+export const normalizeHubBaseUrl = (value: string): string => {
   const url = validateHubBaseUrl(value)
   url.pathname = url.pathname.replace(/\/+$/, '') || '/'
   return url.href.replace(/\/$/, '')
 }
 
-let activeSettings: SettingsScope<MarketplaceSettings> | undefined
-
-export function getMarketplaceSettings(): MarketplaceSettings {
-  return activeSettings?.get() ?? { hubBaseUrl: DEFAULT_HUB_BASE_URL }
-}
-
 export const marketplaceSettings = defineSettings({
   namespace: 'dshx-plugin-marketplace',
   schema: Schema.object({
-    hubBaseUrl: Schema.string().default(DEFAULT_HUB_BASE_URL),
+    hubBaseUrl: Schema.string()
+      .default(DEFAULT_HUB_BASE_URL)
+      .description('Framework Hub serving the catalog. HTTPS only; loopback HTTP is accepted for local development.'),
+    defaultSort: Schema.union(['latest', 'stars']).default('latest').description('Order the catalog opens with.'),
+    hideIncompatible: Schema.boolean().default(false).description('Hide plugins whose DSH range excludes the running DSH version.'),
   }),
   applies: 'live',
-})
-
-// The URL is validated where it is used (normalizeHubBaseUrl), since DSH 0.2
-// Settings take no validate callback.
-export const marketplaceSettingsHost = marketplaceSettings.host({
-  setup(scope) {
-    activeSettings = scope
-    return () => {
-      if (activeSettings === scope) activeSettings = undefined
-    }
-  },
 })

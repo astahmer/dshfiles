@@ -4,6 +4,7 @@ import { z } from 'zod'
 export const marketplaceLocaleSchema = z.enum(['en', 'zh'])
 export const marketplaceBadgeSchema = z.enum(['official', 'community'])
 export const marketplaceCompatibilitySchema = z.enum(['compatible', 'incompatible', 'unknown'])
+export const marketplaceSortSchema = z.enum(['latest', 'stars'])
 
 export const marketplaceCategorySchema = z.object({
   slug: z.string().min(1).max(80),
@@ -22,6 +23,10 @@ export const marketplaceCardSchema = z.object({
   badge: marketplaceBadgeSchema,
   glyph: z.string().min(1).max(4),
   iconUrl: z.string().url().nullable(),
+  author: z.string().min(1).max(120).nullable(),
+  avatarUrl: z.string().url().nullable(),
+  stars: z.number().int().nonnegative().nullable(),
+  updated: z.string().max(40).nullable(),
   installed: z.boolean(),
 })
 
@@ -29,12 +34,15 @@ export const marketplaceListInputSchema = z.object({
   locale: marketplaceLocaleSchema,
   category: z.string().min(1).max(80).optional(),
   cursor: z.string().min(1).max(1000).optional(),
+  query: z.string().trim().min(1).max(64).optional(),
+  sort: marketplaceSortSchema.optional(),
 })
 
 export const marketplaceListOutputSchema = z.object({
   categories: z.array(marketplaceCategorySchema).max(100),
   items: z.array(marketplaceCardSchema).max(24),
   nextCursor: z.string().max(1000).nullable(),
+  total: z.number().int().nonnegative().nullable(),
 })
 
 export const installFailureCodeSchema = z.enum([
@@ -67,6 +75,7 @@ export const marketplaceInstallOutputSchema = z.union([installSuccessSchema, ins
 
 export type MarketplaceLocale = z.infer<typeof marketplaceLocaleSchema>
 export type MarketplaceBadge = z.infer<typeof marketplaceBadgeSchema>
+export type MarketplaceSort = z.infer<typeof marketplaceSortSchema>
 export type MarketplaceCategory = z.infer<typeof marketplaceCategorySchema>
 export type MarketplaceCard = z.infer<typeof marketplaceCardSchema>
 export type MarketplaceListInput = z.infer<typeof marketplaceListInputSchema>

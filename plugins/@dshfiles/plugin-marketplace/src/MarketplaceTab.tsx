@@ -1,5 +1,5 @@
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { useApi, type PropsLocaleOf } from '@dshfiles/dshx/client'
+import { useApi, useSettings, type PropsLocaleOf } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -8,12 +8,29 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@dshfiles/plug
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
-import { CheckIcon, CircleCheckIcon, DownloadIcon, Loader2Icon, PackageSearchIcon, SearchIcon, TriangleAlertIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import {
+  CheckIcon,
+  CircleCheckIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  Loader2Icon,
+  PackageSearchIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  ShieldCheckIcon,
+  StarIcon,
+  StoreIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
-import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale } from './api.js'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale, MarketplaceSort } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
 import { marketplaceLocale, type MarketplaceLocaleKey } from './locales.js'
+import { DEFAULT_HUB_BASE_URL, marketplaceSettings } from './settings.js'
 
 export type MarketplaceTabProps = PropsRuntime<'settings.plugins.tab'> & PropsLocaleOf<typeof marketplaceLocale>
 
@@ -29,6 +46,8 @@ type ModalState =
     }
 
 const CATALOG_QUERY_KEY = ['plugin-marketplace', 'list'] as const
+const SEARCH_DEBOUNCE_MS = 300
+const MAX_QUERY_LENGTH = 64
 
 const FAILURE_COPY = {
   busy: 'busy',
@@ -64,8 +83,13 @@ const uniqueCards = (pages: readonly MarketplaceListOutput[]): readonly Marketpl
   return [...bySlug.values()]
 }
 
-const matchesSearch = (plugin: MarketplaceCard, query: string): boolean =>
-  `${plugin.name} ${plugin.description} ${plugin.packageName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+const hubHost = (hubBaseUrl: string): string => {
+  try {
+    return new URL(hubBaseUrl).host
+  } catch {
+    return hubBaseUrl
+  }
+}
 
 const markInstalled = (catalog: InfiniteData<MarketplaceListOutput> | undefined, slug: string): InfiniteData<MarketplaceListOutput> | undefined =>
   catalog === undefined
@@ -81,14 +105,14 @@ const PluginIcon = ({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode
     return (
       <span
         aria-hidden="true"
-        className="dshx:flex dshx:size-10 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border dshx:bg-muted dshx:text-sm dshx:font-semibold dshx:text-muted-foreground"
+        className="dshx:flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border dshx:bg-muted dshx:text-sm dshx:font-semibold dshx:text-muted-foreground"
       >
         {plugin.glyph}
       </span>
     )
   }
   return (
-    <span aria-hidden="true" className="dshx:flex dshx:size-10 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-md dshx:border dshx:bg-background">
+    <span aria-hidden="true" className="dshx:flex dshx:size-8 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-md dshx:border dshx:bg-background">
       <img
         alt=""
         className="dshx:size-full dshx:object-contain"
@@ -98,6 +122,23 @@ const PluginIcon = ({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode
         src={plugin.iconUrl}
       />
     </span>
+  )
+}
+
+const AuthorAvatar = ({ url }: { readonly url: string }): ReactNode => {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  return (
+    <img
+      alt=""
+      aria-hidden="true"
+      className="dshx:size-3.5 dshx:shrink-0 dshx:rounded-full dshx:bg-muted"
+      loading="lazy"
+      onError={() => {
+        setFailed(true)
+      }}
+      src={url}
+    />
   )
 }
 
@@ -235,11 +276,13 @@ const InstallDialog = ({
   )
 }
 
+
 const PluginCard = ({
   plugin,
   installing,
   installBusy,
   failed,
+  starFormat,
   t,
   onDownload,
 }: {
@@ -247,89 +290,139 @@ const PluginCard = ({
   readonly installing: boolean
   readonly installBusy: boolean
   readonly failed: boolean
+  readonly starFormat: Intl.NumberFormat
   readonly t: Translate
   readonly onDownload: () => void
 }): ReactNode => {
-  const label = plugin.installed
-    ? t('installed')
-    : plugin.compatibility === 'unknown'
-      ? `${t('download')} · ${t('compatibilityUnknown')}`
-      : plugin.compatibility === 'incompatible'
-        ? `${t('download')} · ${t('incompatible')}`
-        : installing
-          ? t('downloading')
-          : failed
-            ? t('retry')
-            : t('download')
+  const label = plugin.installed ? t('installed') : installing ? t('downloading') : failed ? t('retry') : t('download')
   const accessibleLabel = plugin.installed ? `${plugin.name}: ${label}` : interpolate(t(failed ? 'retryPlugin' : 'downloadPlugin'), { name: plugin.name })
 
   return (
-    <li className="dshx:flex dshx:min-w-0 dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3 dshx:text-card-foreground">
-      <PluginIcon plugin={plugin} />
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <h3 className="dshx:truncate dshx:text-sm dshx:font-semibold">{plugin.name}</h3>
-          <Badge variant={plugin.badge === 'official' ? 'info' : 'muted'}>{t(plugin.badge)}</Badge>
-        </div>
-        <p className="dshx:line-clamp-2 dshx:text-sm dshx:text-muted-foreground">{plugin.description}</p>
-        <div className="dshx:mt-auto dshx:flex dshx:items-end dshx:justify-between dshx:gap-3 dshx:pt-2">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:text-xs dshx:text-muted-foreground">
-            <code className="dshx:truncate dshx:font-mono" title={plugin.packageName}>
-              {plugin.packageName}
-            </code>
-            <span aria-label={`${t('versionLabel')} ${plugin.version}`}>v{plugin.version}</span>
+    <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3 dshx:text-card-foreground dshx:transition-colors dshx:hover:border-input">
+      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-2.5">
+        <PluginIcon plugin={plugin} />
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+            <h4 className="dshx:truncate dshx:text-sm dshx:font-semibold" title={plugin.name}>
+              {plugin.name}
+            </h4>
+            <Badge className="dshx:shrink-0" variant={plugin.badge === 'official' ? 'info' : 'muted'}>
+              {t(plugin.badge)}
+            </Badge>
           </div>
-          <Button
-            aria-label={accessibleLabel}
-            className="dshx:shrink-0"
-            disabled={plugin.installed || installBusy}
-            onClick={onDownload}
-            size="sm"
-            type="button"
-            variant={plugin.installed ? 'outline' : 'default'}
-          >
-            {installing ? (
-              <InstallSpinner />
-            ) : plugin.installed ? (
-              <CheckIcon />
-            ) : (
-              <DownloadIcon />
-            )}
-            {label}
-          </Button>
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+            {plugin.avatarUrl !== null ? <AuthorAvatar url={plugin.avatarUrl} /> : null}
+            {plugin.author !== null ? <span className="dshx:truncate">{plugin.author}</span> : null}
+            <span aria-label={`${t('versionLabel')} ${plugin.version}`} className="dshx:shrink-0">
+              v{plugin.version}
+            </span>
+            {plugin.stars !== null ? (
+              <span aria-label={interpolate(t('starsLabel'), { count: String(plugin.stars) })} className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5">
+                <StarIcon aria-hidden="true" className="dshx:size-3" />
+                {starFormat.format(plugin.stars)}
+              </span>
+            ) : null}
+            {plugin.updated !== null ? (
+              <span className="dshx:hidden dshx:shrink-0 dshx:@md:inline" title={interpolate(t('updatedLabel'), { date: plugin.updated })}>
+                {plugin.updated}
+              </span>
+            ) : null}
+          </div>
         </div>
+      </div>
+      <p className="dshx:line-clamp-2 dshx:min-h-[2lh] dshx:text-xs dshx:text-muted-foreground" title={plugin.description}>
+        {plugin.description}
+      </p>
+      <div className="dshx:mt-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+          <code className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={plugin.packageName}>
+            {plugin.packageName}
+          </code>
+          {!plugin.installed && plugin.compatibility !== 'compatible' ? (
+            <Badge className="dshx:shrink-0" title={plugin.compatibilityRange} variant={plugin.compatibility === 'incompatible' ? 'warning' : 'muted'}>
+              {t(plugin.compatibility === 'incompatible' ? 'incompatible' : 'compatibilityUnknown')}
+            </Badge>
+          ) : null}
+        </div>
+        <Button
+          aria-label={accessibleLabel}
+          className="dshx:shrink-0"
+          disabled={plugin.installed || installBusy}
+          onClick={onDownload}
+          size="xs"
+          type="button"
+          variant={plugin.installed ? 'ghost' : 'outline'}
+        >
+          {installing ? <InstallSpinner /> : plugin.installed ? <CheckIcon /> : <DownloadIcon />}
+          {label}
+        </Button>
       </div>
     </li>
   )
 }
 
 const CardSkeleton = (): ReactNode => (
-  <div className="dshx:flex dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3">
-    <Skeleton className="dshx:size-10 dshx:shrink-0" />
-    <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-2">
-      <Skeleton className="dshx:h-4 dshx:w-1/2" />
-      <Skeleton className="dshx:h-3 dshx:w-full" />
-      <Skeleton className="dshx:h-3 dshx:w-3/4" />
-      <div className="dshx:flex dshx:justify-between dshx:pt-1">
+  <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3">
+    <div className="dshx:flex dshx:gap-2.5">
+      <Skeleton className="dshx:size-8 dshx:shrink-0" />
+      <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1.5">
+        <Skeleton className="dshx:h-3.5 dshx:w-1/2" />
         <Skeleton className="dshx:h-3 dshx:w-1/3" />
-        <Skeleton className="dshx:h-7 dshx:w-20" />
       </div>
+    </div>
+    <Skeleton className="dshx:h-3 dshx:w-full" />
+    <Skeleton className="dshx:h-3 dshx:w-3/4" />
+    <div className="dshx:flex dshx:justify-between dshx:pt-1">
+      <Skeleton className="dshx:h-3 dshx:w-1/3" />
+      <Skeleton className="dshx:h-6 dshx:w-20" />
     </div>
   </div>
 )
 
+const GRID_CLASS = 'dshx:grid dshx:grid-cols-1 dshx:gap-2 dshx:@xl:grid-cols-2 dshx:@5xl:grid-cols-3'
+
 /** Settings tab for browsing and installing Framework Hub plugins. */
 export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const api = useApi(pluginMarketplaceApi)
+  const settings = useSettings(marketplaceSettings)
   const queryClient = useQueryClient()
   const locale = currentLocale()
   const [category, setCategory] = useState<string | undefined>()
   const [search, setSearch] = useState('')
+  const [query, setQuery] = useState<string | undefined>()
+  const [sortOverride, setSortOverride] = useState<MarketplaceSort | undefined>()
+  const [compatibleOverride, setCompatibleOverride] = useState<boolean | undefined>()
   const [failedSlugs, setFailedSlugs] = useState<ReadonlySet<string>>(() => new Set())
   const [modal, setModal] = useState<ModalState | null>(null)
+  const sort = sortOverride ?? settings.value?.defaultSort ?? 'latest'
+  const compatibleOnly = compatibleOverride ?? settings.value?.hideIncompatible ?? false
+  const hubBaseUrl = settings.value?.hubBaseUrl ?? DEFAULT_HUB_BASE_URL
+  const starFormat = useMemo(() => new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en', { notation: 'compact' }), [locale])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = search.trim().slice(0, MAX_QUERY_LENGTH)
+      setQuery(trimmed.length === 0 ? undefined : trimmed)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [search])
+
   const catalog = useInfiniteQuery({
-    queryKey: [...CATALOG_QUERY_KEY, locale, category ?? null],
-    queryFn: ({ pageParam, signal }) => api.list({ locale, category, cursor: pageParam ?? undefined }, { signal }),
+    queryKey: [...CATALOG_QUERY_KEY, locale, category ?? null, query ?? null, sort],
+    // The API rejects keys holding `undefined`, so optional fields are omitted rather than set.
+    queryFn: ({ pageParam, signal }) =>
+      api.list(
+        {
+          locale,
+          ...(sort === 'latest' ? {} : { sort }),
+          ...(category === undefined ? {} : { category }),
+          ...(query === undefined ? {} : { query }),
+          ...(pageParam === null ? {} : { cursor: pageParam }),
+        },
+        { signal },
+      ),
     initialPageParam: null,
     getNextPageParam: (lastPage: MarketplaceListOutput): string | null => lastPage.nextCursor,
     placeholderData: keepPreviousData,
@@ -354,61 +447,128 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
     },
   })
 
-  const showingPreviousCategory = catalog.isPlaceholderData
-  const items = useMemo(() => (showingPreviousCategory ? [] : uniqueCards(catalog.data?.pages ?? [])), [catalog.data, showingPreviousCategory])
+  const showingPrevious = catalog.isPlaceholderData
+  const items = useMemo(() => (showingPrevious ? [] : uniqueCards(catalog.data?.pages ?? [])), [catalog.data, showingPrevious])
   const categories = catalog.data?.pages[0]?.categories ?? []
+  const total = showingPrevious ? null : (catalog.data?.pages[0]?.total ?? null)
   const initialLoading = catalog.isPending || (catalog.isFetching && items.length === 0)
   const listFailed = catalog.isError && !catalog.isFetchNextPageError && items.length === 0
-  const trimmedSearch = search.trim()
-  const visibleItems = useMemo(() => (trimmedSearch.length === 0 ? items : items.filter(item => matchesSearch(item, trimmedSearch))), [items, trimmedSearch])
+  const visibleItems = useMemo(() => (compatibleOnly ? items.filter(item => item.compatibility !== 'incompatible') : items), [items, compatibleOnly])
+  const hiddenCount = items.length - visibleItems.length
   const installingSlug = install.isPending ? (install.variables?.slug ?? null) : null
 
   return (
-    <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-4">
-      <div className="dshx:flex dshx:flex-col dshx:gap-3">
-        <InputGroup className="dshx:@2xl:max-w-sm">
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label={t('searchLabel')}
-            autoComplete="off"
-            onChange={event => {
-              setSearch(event.currentTarget.value)
-            }}
-            placeholder={t('searchPlaceholder')}
-            type="search"
-            value={search}
-          />
-          {search.length > 0 ? (
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton
-                aria-label={t('clearSearch')}
-                onClick={() => {
-                  setSearch('')
-                }}
-                size="icon-xs"
-              >
-                <XIcon />
-              </InputGroupButton>
+    <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
+      <header className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:bg-background dshx:pt-1 dshx:pb-2.5">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+            <h3 className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-semibold">
+              <StoreIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+              <span className="dshx:truncate">{t('title')}</span>
+              {total !== null ? (
+                <Badge className="dshx:shrink-0" variant="muted">
+                  {interpolate(t('resultCount'), { count: String(total) })}
+                </Badge>
+              ) : null}
+            </h3>
+            <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{interpolate(t('subtitle'), { host: hubHost(hubBaseUrl) })}</p>
+          </div>
+          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5">
+            <Button
+              aria-label={t('refresh')}
+              disabled={catalog.isFetching}
+              onClick={() => {
+                void catalog.refetch()
+              }}
+              size="icon-sm"
+              title={t('refresh')}
+              type="button"
+              variant="ghost"
+            >
+              <RefreshCwIcon className={cn(catalog.isFetching && 'dshx:animate-spin')} />
+            </Button>
+            <Button asChild size="icon-sm" title={t('openHub')} variant="ghost">
+              <a aria-label={t('openHub')} href={hubBaseUrl} rel="noreferrer" target="_blank">
+                <ExternalLinkIcon />
+              </a>
+            </Button>
+          </div>
+        </div>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <InputGroup className="dshx:h-7 dshx:min-w-48 dshx:flex-1">
+            <InputGroupAddon>
+              <SearchIcon />
             </InputGroupAddon>
-          ) : null}
-        </InputGroup>
-        <nav aria-label={t('categoriesLabel')} className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+            <InputGroupInput
+              aria-label={t('searchLabel')}
+              autoComplete="off"
+              maxLength={MAX_QUERY_LENGTH}
+              onChange={event => {
+                setSearch(event.currentTarget.value)
+              }}
+              placeholder={t('searchPlaceholder')}
+              type="search"
+              value={search}
+            />
+            {search.length > 0 ? (
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  aria-label={t('clearSearch')}
+                  onClick={() => {
+                    setSearch('')
+                  }}
+                  size="icon-xs"
+                >
+                  <XIcon />
+                </InputGroupButton>
+              </InputGroupAddon>
+            ) : null}
+          </InputGroup>
+          <ToggleGroup
+            aria-label={t('sortLabel')}
+            onValueChange={value => {
+              if (value === 'latest' || value === 'stars') setSortOverride(value)
+            }}
+            size="sm"
+            type="single"
+            value={sort}
+            variant="outline"
+          >
+            <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="latest">
+              {t('sortLatest')}
+            </ToggleGroupItem>
+            <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="stars">
+              {t('sortStars')}
+            </ToggleGroupItem>
+          </ToggleGroup>
           <Toggle
+            className="dshx:px-2.5 dshx:text-xs"
+            onPressedChange={pressed => {
+              setCompatibleOverride(pressed)
+            }}
+            pressed={compatibleOnly}
+            size="sm"
+            variant="outline"
+          >
+            <ShieldCheckIcon />
+            {t('compatibleOnly')}
+          </Toggle>
+        </div>
+        <nav aria-label={t('categoriesLabel')} className="dshx:-mb-1 dshx:flex dshx:gap-1.5 dshx:overflow-x-auto dshx:pb-1">
+          <Toggle
+            className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
             onPressedChange={() => {
               setCategory(undefined)
             }}
             pressed={category === undefined}
             size="sm"
             variant="outline"
-            className="dshx:px-2.5 dshx:text-xs"
           >
             {t('all')}
           </Toggle>
           {categories.map(item => (
             <Toggle
-              className="dshx:px-2.5 dshx:text-xs"
+              className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
               key={item.slug}
               onPressedChange={() => {
                 setCategory(item.slug)
@@ -421,10 +581,10 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
             </Toggle>
           ))}
         </nav>
-      </div>
+      </header>
 
       {initialLoading ? (
-        <div aria-label={t('loading')} className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:@xl:grid-cols-2 dshx:@5xl:grid-cols-3" role="status">
+        <div aria-label={t('loading')} className={GRID_CLASS} role="status">
           <CardSkeleton />
           <CardSkeleton />
           <CardSkeleton />
@@ -447,19 +607,21 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
           </Button>
         </Alert>
       ) : null}
-      {!initialLoading && catalog.isSuccess && (items.length === 0 || visibleItems.length === 0) ? (
+      {!initialLoading && catalog.isSuccess && visibleItems.length === 0 ? (
         <Empty className="dshx:border dshx:p-6 dshx:md:p-8">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <PackageSearchIcon />
             </EmptyMedia>
-            <EmptyDescription>{items.length === 0 ? t('empty') : t('noSearchMatches')}</EmptyDescription>
+            <EmptyDescription>
+              {hiddenCount > 0 ? interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) }) : query !== undefined ? t('noSearchMatches') : t('empty')}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : null}
 
       {visibleItems.length > 0 ? (
-        <ul aria-label={t('pluginsLabel')} className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:@xl:grid-cols-2 dshx:@5xl:grid-cols-3">
+        <ul aria-label={t('pluginsLabel')} className={GRID_CLASS}>
           {visibleItems.map(plugin => (
             <PluginCard
               failed={failedSlugs.has(plugin.slug)}
@@ -470,14 +632,19 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
                 setModal({ kind: 'confirm', plugin })
               }}
               plugin={plugin}
+              starFormat={starFormat}
               t={t}
             />
           ))}
         </ul>
       ) : null}
 
-      {catalog.hasNextPage && !showingPreviousCategory ? (
-        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2">
+      {visibleItems.length > 0 && hiddenCount > 0 ? (
+        <p className="dshx:text-center dshx:text-xs dshx:text-muted-foreground">{interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) })}</p>
+      ) : null}
+
+      {catalog.hasNextPage && !showingPrevious ? (
+        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:pb-2">
           {catalog.isFetchNextPageError ? (
             <Alert variant="destructive">
               <AlertDescription>{t('unavailable')}</AlertDescription>

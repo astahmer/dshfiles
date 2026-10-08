@@ -9,11 +9,13 @@ import { zh } from '../src/locales.js'
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   install: vi.fn(),
+  settings: { value: undefined as { hubBaseUrl: string; defaultSort: 'latest' | 'stars'; hideIncompatible: boolean } | undefined },
 }))
 
 vi.mock('@dshfiles/dshx/client', () => ({
   defineLocale: (namespace: string, dictionaries: unknown) => ({ namespace, dictionaries }),
   useApi: () => ({ list: mocks.list, install: mocks.install }),
+  useSettings: () => mocks.settings,
 }))
 
 import { MarketplaceTab, type MarketplaceTabProps } from '../src/MarketplaceTab.js'
@@ -31,6 +33,10 @@ function plugin(overrides: Partial<MarketplaceCard> = {}): MarketplaceCard {
     badge: 'community',
     glyph: '测',
     iconUrl: null,
+    author: 'fixture-author',
+    avatarUrl: null,
+    stars: 1200,
+    updated: '2026-10-01',
     installed: false,
     ...overrides,
   }
@@ -52,6 +58,7 @@ function page(overrides: Partial<MarketplaceListOutput> = {}): MarketplaceListOu
       }),
     ],
     nextCursor: null,
+    total: 2,
     ...overrides,
   }
 }
@@ -85,9 +92,42 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  mocks.settings.value = undefined
 })
 
+const listInputs = (): unknown[] => mocks.list.mock.calls.map(call => call[0])
+
 describe('MarketplaceTab', () => {
+  it('sends list inputs without undefined keys, which the dshx API transport rejects', async () => {
+    mocks.list.mockResolvedValueOnce(page({ nextCursor: 'cursor-two' }))
+    renderTab()
+    fireEvent.click(await screen.findByRole('button', { name: '加载更多' }))
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2))
+    expect(listInputs()).toStrictEqual([{ locale: 'zh' }, { locale: 'zh', cursor: 'cursor-two' }])
+  })
+
+  it('searches the Hub server-side after a debounce and sorts by stars', async () => {
+    renderTab()
+    await screen.findByText('测试插件')
+    fireEvent.change(screen.getByRole('searchbox', { name: zh.searchLabel }), { target: { value: '  sidebar  ' } })
+    await waitFor(() => expect(listInputs().at(-1)).toStrictEqual({ locale: 'zh', query: 'sidebar' }))
+    fireEvent.click(screen.getByRole('radio', { name: zh.sortStars }))
+    await waitFor(() => expect(listInputs().at(-1)).toStrictEqual({ locale: 'zh', sort: 'stars', query: 'sidebar' }))
+  })
+
+  it('applies the configured default sort and hides incompatible plugins until toggled off', async () => {
+    mocks.settings.value = { hubBaseUrl: 'https://hub.example.test', defaultSort: 'stars', hideIncompatible: true }
+    mocks.list.mockResolvedValue(page({ items: [plugin(), plugin({ slug: 'future', name: '未来插件', compatibility: 'incompatible' })] }))
+    renderTab()
+    expect(await screen.findByText('测试插件')).toBeTruthy()
+    expect(listInputs()[0]).toStrictEqual({ locale: 'zh', sort: 'stars' })
+    expect(screen.queryByText('未来插件')).toBeNull()
+    expect(screen.getByText('已隐藏 1 个不兼容插件')).toBeTruthy()
+    expect(screen.getByText('浏览并安装 hub.example.test 上发布的插件。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh.compatibleOnly }))
+    expect(screen.getByText('未来插件')).toBeTruthy()
+  })
+
   it('switches categories through a fresh first-page query and exposes semantic category state', async () => {
     renderTab()
     const tools = await screen.findByRole('button', { name: '工具' })
@@ -137,7 +177,7 @@ describe('MarketplaceTab', () => {
     expect(button('下载 待验证插件').disabled).toBe(false)
     expect(button('下载 未来插件').disabled).toBe(false)
     expect(button('下载 可下载插件').disabled).toBe(false)
-    expect(screen.queryByRole('link')).toBeNull()
+    expect(within(list).queryByRole('link')).toBeNull()
   })
 
   it('requires two confirmations with the fixed risk statement before every download', async () => {

@@ -1,6 +1,6 @@
 # DSHX Plugin Marketplace
 
-`@dshfiles/plugin-marketplace` started as upstream DSHX's self-hosting reference plugin and now lives with our other owned bundles; its MIT license is kept in `LICENSE`. It adds **Settings → Plugins → Marketplace** to a DSH Web Profile and reads Framework Hub's installable marketplace catalog.
+`@dshfiles/plugin-marketplace` started as upstream DSHX's self-hosting reference plugin and now lives with our other owned bundles; its MIT license is kept in `LICENSE`. It adds a **Settings → Built-in plugins → Framework Hub** tab to a DSH Web Profile and reads Framework Hub's installable marketplace catalog.
 
 The package exercises the complete plugin authoring path produced by `create-dshx`: `defineHost`, `defineSettings`, `defineApi`, `defineClient`, `defineLocale`, `defineSlot`, Standard Schema validation, and `useApiQuery`. It is built and installed as an ordinary DSH bundle; no Harness or DSHX core patch is required.
 
@@ -32,11 +32,13 @@ The settings namespace is `dshx-plugin-marketplace`:
 ```yaml
 dshx-plugin-marketplace:
   hubBaseUrl: https://dshx.io
+  defaultSort: latest # or stars
+  hideIncompatible: false
 ```
 
-The default points at upstream's public hub. The value updates live. Production endpoints must use HTTPS; loopback HTTP is accepted only for local development and smoke tests.
+The default points at upstream's public hub. Values update live; `defaultSort` and `hideIncompatible` only set the initial state of the tab's own controls. Production endpoints must use HTTPS; loopback HTTP is accepted only for local development and smoke tests.
 
-The Host reads `GET /api/marketplace/plugins` and `GET /api/marketplace/plugins/:slug`. Those endpoints are separate from Hub's discovery/SEO catalog. An install always re-fetches the exact detail and accepts only one active primary target whose package and version match the published catalog entry. The client does not submit a package name, version, or command.
+The Host reads `GET /api/marketplace/plugins` (forwarding `q`, `sort`, `category`, `cursor`) and `GET /api/marketplace/plugins/:slug`. Those endpoints are separate from Hub's discovery/SEO catalog. An install always re-fetches the exact detail and accepts only one active primary target whose package and version match the published catalog entry. The client does not submit a package name, version, or command.
 
 ## Security boundary
 
@@ -46,4 +48,4 @@ The Host reads `GET /api/marketplace/plugins` and `GET /api/marketplace/plugins/
 - Host responses are validated before display. Local paths and raw terminal output remain in Host logs.
 - Community plugins display an additional third-party code warning before installation.
 
-This version contains categories, compact cards, pagination, installation, and restart guidance. It does not contain search, sorting controls, ratings, details, uninstall, update, hot loading, or automatic restart. Installation works only from a loopback DSH Web session because the typed Host API is intentionally loopback-only.
+This version contains server-side search, newest/most-stars sorting, categories, a compatible-only filter, compact cards (author, stars, update date), pagination, installation, and restart guidance. It does not contain details, uninstall, update, hot loading, or automatic restart. Installation works only from a loopback DSH Web session because the typed Host API is intentionally loopback-only.
