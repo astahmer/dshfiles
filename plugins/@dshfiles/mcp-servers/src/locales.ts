@@ -71,6 +71,15 @@ const en = {
   quickPanelSearch: 'MCP server actions…',
   quickPanelEmpty: 'No MCP server actions are available.',
   quickPanelNoResults: 'No matching MCP server actions.',
+  pageTitle: 'Global MCP servers',
+  enabledCount: 'enabled',
+  enabledGlobally: 'enabled globally',
+  advancedHeaders: 'Advanced: request headers',
+  advancedEnvironment: 'Advanced: working directory and environment',
+  optionalLocalStart: 'Optional: local start command',
+  addServer: 'Add server',
+  allCategories: 'All',
+  customDescription: 'Add your own MCP server',
 }
 
 const zh = {
@@ -141,6 +150,15 @@ const zh = {
   quickPanelSearch: 'MCP 服务器操作…',
   quickPanelEmpty: '没有可用的 MCP 服务器操作。',
   quickPanelNoResults: '没有匹配的 MCP 服务器操作。',
+  pageTitle: '全局 MCP 服务器',
+  enabledCount: '个已启用',
+  enabledGlobally: '个全局启用',
+  advancedHeaders: '高级：请求头',
+  advancedEnvironment: '高级：工作目录和环境变量',
+  optionalLocalStart: '可选：本地启动命令',
+  addServer: '添加服务器',
+  allCategories: '全部',
+  customDescription: '添加你自己的 MCP 服务器',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

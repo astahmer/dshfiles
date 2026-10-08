@@ -1,4 +1,3 @@
-import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 
@@ -21,17 +20,17 @@ const lifecycleCopy = {
   inactive: 'clientStopped',
 } as const satisfies Record<ServerView['clientLifecycle'], string>
 
-const lifecycleDotStates = {
-  loaded: 'done',
-  starting: 'ongoing',
-  'start-failed': 'error',
-  'manually-disconnected': 'idle',
-  inactive: 'idle',
-} as const satisfies Record<ServerView['clientLifecycle'], StateDotState>
+const lifecycleDotClassNames = {
+  loaded: 'dshx:bg-success',
+  starting: 'dshx:bg-info dshx:animate-pulse',
+  'start-failed': 'dshx:bg-destructive',
+  'manually-disconnected': 'dshx:bg-muted-foreground/50',
+  inactive: 'dshx:bg-muted-foreground/50',
+} as const satisfies Record<ServerView['clientLifecycle'], string>
 
 export const lifecycleText = (server: ServerView, t: McpServersTranslate): string => t(lifecycleCopy[server.clientLifecycle])
 
-export const lifecycleDotState = (server: ServerView): StateDotState => lifecycleDotStates[server.clientLifecycle]
+export const lifecycleDotClassName = (server: ServerView): string => lifecycleDotClassNames[server.clientLifecycle]
 
 export const localProcessText = (server: ServerView, t: McpServersTranslate): string | undefined =>
   server.localProcess === 'not-configured' ? undefined : `${t('localProcess')}: ${t(localProcessCopy[server.localProcess])}`
