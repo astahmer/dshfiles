@@ -1,3 +1,11 @@
+import { BookmarkIcon } from '@dshfiles/plugin-ui/icons'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
+import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, MAX_RECENT_SCAN_NODES, projectRecentPrompts } from './recent-prompts.js'
@@ -13,7 +21,6 @@ import {
   type PromptLibraryRead,
   type SavedPrompt,
 } from './library.js'
-import styles from './prompt-stash.module.css'
 
 type LibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
@@ -69,7 +76,6 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     return projectRecentPrompts(newestFirstNodes)
   }, areRecentPromptsEqual)
   const triggerId = useId()
-  const regionId = useId()
   const titleId = useId()
   const textId = useId()
 
@@ -128,15 +134,6 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   }
 
   const openLibrary = (): void => {
-    if (isOpen) {
-      insertionSpan.current = null
-      setIsOpen(false)
-      setEditor(null)
-      setDeleteConfirmation(null)
-      setNotice('')
-      return
-    }
-
     insertionSpan.current = props.inputActions.captureInsertion()
     setActiveSource('saved')
     setHasInserted(false)
@@ -298,192 +295,194 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     setEditor(current => (current === null ? null : { ...current, [field]: value }))
   }
 
+  const isConfirmingDelete = (prompt: SavedPrompt): boolean => deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision
+
+  const emptyLine = (text: string): JSX.Element => <p className="dshx:px-3 dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{text}</p>
+
   return (
-    <>
-      <button
-        type="button"
-        className={styles.trigger}
-        id={triggerId}
-        aria-controls={regionId}
-        aria-expanded={isOpen}
-        onMouseDown={event => event.preventDefault()}
-        onClick={openLibrary}
-      >
-        Prompts
-      </button>
-      {isOpen ? (
-        <section
-          className={styles.panel}
-          id={regionId}
-          role="region"
-          aria-labelledby={triggerId}
-          onKeyDown={event => {
-            if (event.key !== 'Escape') return
-            event.preventDefault()
-            closeLibrary()
-          }}
+    <Popover open={isOpen} onOpenChange={next => (next ? openLibrary() : closeLibrary())}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
+          id={triggerId}
+          onMouseDown={event => event.preventDefault()}
         >
-          <div className={styles.header}>
-            <div>
-              <h2 className={styles.heading}>{activeSource === 'recent' ? 'Recent messages' : 'Saved prompts'}</h2>
-              <p className={styles.description}>
+          <BookmarkIcon />
+          Prompts
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="top" className="dshx-root dshx:flex dshx:w-[26rem] dshx:flex-col dshx:p-0" aria-labelledby={triggerId}>
+        <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' ? 'recent' : 'saved')} className="dshx:gap-0">
+          <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3 dshx:px-3 dshx:pt-3">
+            <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+              <h2 className="dshx:text-sm dshx:font-semibold">{activeSource === 'recent' ? 'Recent messages' : 'Saved prompts'}</h2>
+              <p className="dshx:text-xs dshx:text-muted-foreground">
                 {activeSource === 'recent'
                   ? 'Recent text from this conversation only. Attachments are not included.'
                   : 'Saved text stays in this browser. Files and attachments are not included.'}
               </p>
             </div>
-            <button type="button" className={styles.quietButton} onClick={closeLibrary}>
+            <Button type="button" variant="ghost" size="xs" onClick={closeLibrary}>
               Done
-            </button>
+            </Button>
+          </div>
+          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3">
+            <TabsList variant="line" aria-label="Prompt source" className="dshx:h-8 dshx:gap-3 dshx:p-0">
+              <TabsTrigger value="saved" className="dshx:flex-none dshx:px-0 dshx:text-xs">
+                Saved
+              </TabsTrigger>
+              <TabsTrigger value="recent" className="dshx:flex-none dshx:px-0 dshx:text-xs">
+                Recent here ({Math.min(recentPrompts.length, MAX_RECENT_PROMPTS)})
+              </TabsTrigger>
+            </TabsList>
+            {activeSource === 'saved' && libraryState === 'ready' && editor === null ? (
+              <div className="dshx:flex dshx:items-center dshx:gap-2">
+                <span className="dshx:text-xs dshx:text-muted-foreground">
+                  {prompts.length} of {MAX_PROMPTS} prompts
+                </span>
+                <Button type="button" variant="outline" size="xs" disabled={prompts.length >= MAX_PROMPTS} onClick={beginNewPrompt}>
+                  New prompt
+                </Button>
+              </div>
+            ) : null}
           </div>
 
-          <p className={styles.notice} aria-live="polite">
+          <p className="dshx:px-3 dshx:text-xs dshx:text-muted-foreground dshx:empty:hidden dshx:not-empty:py-2 dshx:not-empty:border-b" aria-live="polite">
             {notice}
           </p>
 
-          <div className={styles.listHeader} role="group" aria-label="Prompt source">
-            <button
-              type="button"
-              className={activeSource === 'saved' ? styles.primaryButton : styles.quietButton}
-              aria-pressed={activeSource === 'saved'}
-              onClick={() => setActiveSource('saved')}
-            >
-              Saved
-            </button>
-            <button
-              type="button"
-              className={activeSource === 'recent' ? styles.primaryButton : styles.quietButton}
-              aria-pressed={activeSource === 'recent'}
-              onClick={() => setActiveSource('recent')}
-            >
-              Recent here ({Math.min(recentPrompts.length, MAX_RECENT_PROMPTS)})
-            </button>
-          </div>
-
-          {activeSource === 'recent' ? (
-            <>
-              {recentPrompts.length === 0 ? (
-                <p className={styles.empty}>No sent text prompts are loaded from this conversation.</p>
-              ) : (
-                <ul className={styles.list}>
+          <TabsContent value="recent" className="dshx:mt-0">
+            {recentPrompts.length === 0 ? (
+              emptyLine('No sent text prompts are loaded from this conversation.')
+            ) : (
+              <Command className="dshx:rounded-none dshx:bg-transparent">
+                <CommandInput placeholder="Search recent messages" />
+                <CommandList className="dshx:max-h-80 dshx:p-1">
+                  <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
                   {recentPrompts.map(prompt => (
-                    <li className={styles.item} key={prompt.id}>
-                      <div className={styles.copy}>
-                        <h3 className={styles.title}>Sent message · {new Date(prompt.time).toLocaleString()}</h3>
-                        <p className={styles.preview}>{prompt.text.slice(0, 180)}</p>
-                      </div>
-                      <div className={styles.actions}>
-                        <button type="button" className={styles.primaryButton} disabled={hasInserted} onClick={() => insertRecentPrompt(prompt.id)}>
-                          Insert
-                        </button>
-                      </div>
-                    </li>
+                    <CommandItem key={prompt.id} value={`${prompt.id} ${prompt.text}`} disabled={hasInserted} onSelect={() => insertRecentPrompt(prompt.id)} className="dshx:flex-col dshx:items-start dshx:gap-0.5">
+                      <span className="dshx:text-xs dshx:text-muted-foreground">Sent message · {new Date(prompt.time).toLocaleString()}</span>
+                      <span className="dshx:line-clamp-2 dshx:w-full dshx:text-sm">{prompt.text.slice(0, 180)}</span>
+                    </CommandItem>
                   ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <>
-              {libraryState === 'loading' ? <p className={styles.empty}>Loading saved prompts…</p> : null}
-              {libraryState === 'invalid' ? <p className={styles.empty}>Saved data is unreadable and was left untouched.</p> : null}
-              {libraryState === 'unavailable' ? <p className={styles.empty}>Browser storage is unavailable. Prompts cannot be saved.</p> : null}
-              {libraryState === 'ready' ? (
-                <>
-                  {editor === null ? (
-                    <>
-                      <div className={styles.listHeader}>
-                        <span>
-                          {prompts.length} of {MAX_PROMPTS} prompts
-                        </span>
-                        <button type="button" className={styles.primaryButton} disabled={prompts.length >= MAX_PROMPTS} onClick={beginNewPrompt}>
-                          New prompt
-                        </button>
-                      </div>
-                      {prompts.length === 0 ? <p className={styles.empty}>Save a text prompt to reuse it later.</p> : null}
-                      <ul className={styles.list}>
-                        {prompts.map(prompt => {
-                          return (
-                            <li className={styles.item} key={prompt.id}>
-                              <div className={styles.copy}>
-                                <h3 className={styles.title}>{prompt.title}</h3>
-                                <p className={styles.preview}>{prompt.text.slice(0, 180)}</p>
-                              </div>
-                              <div className={styles.actions}>
-                                <button type="button" className={styles.primaryButton} disabled={hasInserted} onClick={() => insertPrompt(prompt)}>
-                                  Insert
-                                </button>
-                                <button type="button" className={styles.quietButton} onClick={() => beginEdit(prompt)}>
-                                  Edit
-                                </button>
-                                <button type="button" className={styles.dangerButton} onClick={() => requestDelete(prompt)}>
-                                  {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? 'Confirm delete' : 'Delete'}
-                                </button>
-                                {deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision ? (
-                                  <button type="button" className={styles.quietButton} onClick={() => setDeleteConfirmation(null)}>
-                                    Keep
-                                  </button>
-                                ) : null}
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </>
-                  ) : (
-                    <form
-                      className={styles.editor}
-                      onSubmit={event => {
-                        event.preventDefault()
-                        saveEditor(false)
-                      }}
-                    >
-                      <label className={styles.field}>
-                        <span>Title</span>
-                        <input
-                          id={titleId}
-                          maxLength={MAX_PROMPT_TITLE_LENGTH}
-                          required
-                          value={editor.title}
-                          onChange={event => updateEditor('title', event.currentTarget.value)}
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>Prompt text</span>
-                        <textarea
-                          id={textId}
-                          maxLength={MAX_PROMPT_TEXT_LENGTH}
-                          required
-                          rows={8}
-                          value={editor.text}
-                          onChange={event => updateEditor('text', event.currentTarget.value)}
-                        />
-                      </label>
-                      <p className={styles.counter}>
-                        {editor.text.length} of {MAX_PROMPT_TEXT_LENGTH} characters
-                      </p>
-                      {editor.stale ? <p className={styles.conflict}>The saved version changed elsewhere. Your edits remain here.</p> : null}
-                      <div className={styles.actions}>
-                        <button type="submit" className={styles.primaryButton} disabled={editor.stale}>
-                          Save prompt
-                        </button>
-                        {editor.stale ? (
-                          <button type="button" className={styles.primaryButton} onClick={() => saveEditor(true)}>
-                            Save as new copy
-                          </button>
-                        ) : null}
-                        <button type="button" className={styles.quietButton} onClick={() => setEditor(null)}>
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </>
-              ) : null}
-            </>
-          )}
-        </section>
-      ) : null}
-    </>
+                </CommandList>
+              </Command>
+            )}
+          </TabsContent>
+
+          <TabsContent value="saved" className="dshx:mt-0">
+            {libraryState === 'loading' ? emptyLine('Loading saved prompts…') : null}
+            {libraryState === 'invalid' ? emptyLine('Saved data is unreadable and was left untouched.') : null}
+            {libraryState === 'unavailable' ? emptyLine('Browser storage is unavailable. Prompts cannot be saved.') : null}
+            {libraryState === 'ready' && editor === null ? (
+              prompts.length === 0 ? (
+                emptyLine('Save a text prompt to reuse it later.')
+              ) : (
+                <Command className="dshx:rounded-none dshx:bg-transparent">
+                  <CommandInput placeholder="Search saved prompts" />
+                  <CommandList className="dshx:max-h-80 dshx:p-1">
+                    <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
+                    {prompts.map(prompt => (
+                      <CommandItem
+                        key={prompt.id}
+                        value={`${prompt.id} ${prompt.title} ${prompt.text}`}
+                        onSelect={() => insertPrompt(prompt)}
+                        className="dshx:group/prompt dshx:items-start"
+                      >
+                        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+                          <span className="dshx:truncate dshx:font-medium">{prompt.title}</span>
+                          <span className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{prompt.text.slice(0, 180)}</span>
+                        </div>
+                        <div
+                          className={
+                            isConfirmingDelete(prompt)
+                              ? 'dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5'
+                              : 'dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-0 dshx:group-hover/prompt:opacity-100 dshx:group-data-[selected=true]/prompt:opacity-100 dshx:focus-within:opacity-100'
+                          }
+                          onKeyDown={event => event.stopPropagation()}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <Button type="button" variant="ghost" size="xs" className="dshx:text-muted-foreground dshx:hover:text-foreground" onClick={() => beginEdit(prompt)}>
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={isConfirmingDelete(prompt) ? 'destructive' : 'ghost'}
+                            size="xs"
+                            className={isConfirmingDelete(prompt) ? undefined : 'dshx:text-muted-foreground dshx:hover:text-destructive'}
+                            onClick={() => requestDelete(prompt)}
+                          >
+                            {isConfirmingDelete(prompt) ? 'Confirm delete' : 'Delete'}
+                          </Button>
+                          {isConfirmingDelete(prompt) ? (
+                            <Button type="button" variant="ghost" size="xs" onClick={() => setDeleteConfirmation(null)}>
+                              Keep
+                            </Button>
+                          ) : null}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+              )
+            ) : null}
+            {libraryState === 'ready' && editor !== null ? (
+              <form
+                className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3"
+                onSubmit={event => {
+                  event.preventDefault()
+                  saveEditor(false)
+                }}
+              >
+                <Field className="dshx:gap-1.5">
+                  <FieldLabel htmlFor={titleId}>Title</FieldLabel>
+                  <Input
+                    id={titleId}
+                    className="dshx:h-7 dshx:text-sm dshx:md:text-sm"
+                    maxLength={MAX_PROMPT_TITLE_LENGTH}
+                    required
+                    value={editor.title}
+                    onChange={event => updateEditor('title', event.currentTarget.value)}
+                  />
+                </Field>
+                <Field className="dshx:gap-1.5">
+                  <FieldLabel htmlFor={textId}>Prompt text</FieldLabel>
+                  <Textarea
+                    id={textId}
+                    className="dshx:max-h-64 dshx:min-h-32 dshx:text-sm dshx:md:text-sm"
+                    maxLength={MAX_PROMPT_TEXT_LENGTH}
+                    required
+                    rows={8}
+                    value={editor.text}
+                    onChange={event => updateEditor('text', event.currentTarget.value)}
+                  />
+                  <FieldDescription className="dshx:text-right dshx:text-xs">
+                    {editor.text.length} of {MAX_PROMPT_TEXT_LENGTH} characters
+                  </FieldDescription>
+                </Field>
+                {editor.stale ? <p className="dshx:rounded-md dshx:bg-warning/15 dshx:px-2 dshx:py-1.5 dshx:text-xs">The saved version changed elsewhere. Your edits remain here.</p> : null}
+                <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditor(null)}>
+                    Cancel
+                  </Button>
+                  {editor.stale ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => saveEditor(true)}>
+                      Save as new copy
+                    </Button>
+                  ) : null}
+                  <Button type="submit" size="sm" disabled={editor.stale}>
+                    Save prompt
+                  </Button>
+                </div>
+              </form>
+            ) : null}
+          </TabsContent>
+        </Tabs>
+      </PopoverContent>
+    </Popover>
   )
 }
 

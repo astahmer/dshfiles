@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { NotebookPenIcon } from '@dshfiles/plugin-ui/icons'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { useMemo, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import {
@@ -13,7 +18,6 @@ import {
   type SavedDraft,
   type SentPrompt,
 } from './draft-store.js'
-import styles from './prompt-drafts.module.css'
 
 const STORE_KEY = 'dshfiles.prompt-stash.v1'
 
@@ -56,18 +60,9 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     [chatNodes, chatOrder],
   )
 
-  useEffect(() => {
-    if (!isOpen) return
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [isOpen])
-
-  const open = (): void => {
+  const changeOpen = (next: boolean): void => {
     setMessage('')
-    setIsOpen(value => !value)
+    setIsOpen(next)
   }
 
   const captureInsertion = (): void => setInsertionSpan(props.inputActions.captureInsertion())
@@ -146,88 +141,94 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   }
 
   return (
-    <div className={styles.root}>
-      <button
-        type="button"
-        className={styles.trigger}
-        aria-expanded={isOpen}
-        aria-controls="prompt-stash-drafts-panel"
-        aria-label="Saved drafts"
-        onPointerDownCapture={captureInsertion}
-        onKeyDownCapture={event => {
-          if (event.key === 'Enter' || event.key === ' ') captureInsertion()
-        }}
-        onClick={open}
-      >
-        Drafts
-      </button>
-      {isOpen ? (
-        <section id="prompt-stash-drafts-panel" className={styles.panel} role="dialog" aria-label="Saved prompt drafts">
-          <div className={styles.heading}>
-            <h2>Saved drafts</h2>
-            <button type="button" className={styles.button} onClick={() => setIsOpen(false)} aria-label="Close saved drafts">
-              Close
-            </button>
-          </div>
-          <p className={styles.note}>Stored in this browser only. Text drafts only; references and files stay in the composer.</p>
-          <div className={styles.actions}>
-            <input
-              className={styles.titleInput}
-              aria-label="Draft title"
-              maxLength={120}
-              placeholder={defaultDraftTitle(input.draft)}
-              value={title}
-              onChange={event => setTitle(event.currentTarget.value)}
-            />
-            <button type="button" className={styles.button} disabled={block !== null} onClick={saveCurrent}>
-              Save current
-            </button>
-          </div>
-          {store.drafts.length === 0 ? (
-            <p className={styles.empty}>No saved drafts yet.</p>
-          ) : (
-            <ul className={styles.list}>
+    <Popover open={isOpen} onOpenChange={changeOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
+          aria-label="Saved drafts"
+          onPointerDownCapture={captureInsertion}
+          onKeyDownCapture={event => {
+            if (event.key === 'Enter' || event.key === ' ') captureInsertion()
+          }}
+        >
+          <NotebookPenIcon />
+          Drafts
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="dshx-root dshx:flex dshx:w-96 dshx:flex-col dshx:gap-0 dshx:p-0" aria-label="Saved prompt drafts">
+        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3 dshx:pb-2">
+          <h2 className="dshx:text-sm dshx:font-semibold">Saved drafts</h2>
+          <p className="dshx:text-xs dshx:text-muted-foreground">Stored in this browser only. Text drafts only; references and files stay in the composer.</p>
+        </div>
+        <div className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-3 dshx:pb-2">
+          <Input
+            className="dshx:h-7 dshx:text-sm dshx:md:text-sm"
+            aria-label="Draft title"
+            maxLength={120}
+            placeholder={defaultDraftTitle(input.draft)}
+            value={title}
+            onChange={event => setTitle(event.currentTarget.value)}
+          />
+          <Button type="button" size="sm" disabled={block !== null} onClick={saveCurrent}>
+            Save current
+          </Button>
+        </div>
+        <Command className="dshx:rounded-none dshx:border-t dshx:bg-transparent">
+          <CommandInput placeholder="Search drafts and sent prompts" />
+          <CommandList className="dshx:max-h-72">
+            <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
+            <CommandGroup heading="Drafts">
+              {store.drafts.length === 0 ? <p className="dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">No saved drafts yet.</p> : null}
               {store.drafts.map(draft => (
-                <li className={styles.item} key={draft.id}>
-                  <span className={styles.itemTitle}>{draft.title}</span>
-                  <span className={styles.preview}>{previewText(draft.text)}</span>
-                  <div className={styles.actions}>
-                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSaved(draft)}>
-                      Insert
-                    </button>
-                    <button type="button" className={styles.button} onClick={() => deleteSaved(draft.id)}>
-                      Remove
-                    </button>
+                <CommandItem
+                  key={draft.id}
+                  value={`draft-${draft.id} ${draft.title} ${draft.text}`}
+                  onSelect={() => insertSaved(draft)}
+                  className="dshx:group/draft dshx:items-start"
+                >
+                  <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                    <span className="dshx:truncate dshx:font-medium">{draft.title}</span>
+                    <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{previewText(draft.text)}</span>
                   </div>
-                </li>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="dshx:text-muted-foreground dshx:opacity-0 dshx:group-hover/draft:opacity-100 dshx:group-data-[selected=true]/draft:opacity-100 dshx:hover:text-destructive dshx:focus-visible:opacity-100"
+                    aria-label={`Remove ${draft.title}`}
+                    onKeyDown={event => event.stopPropagation()}
+                    onClick={event => {
+                      event.stopPropagation()
+                      deleteSaved(draft.id)
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </CommandItem>
               ))}
-            </ul>
-          )}
-          <section className={styles.history} aria-label="Sent prompt history">
-            <h3>Sent prompts in this session</h3>
-            <p className={styles.note}>Text-only user messages from the loaded conversation. File and reference messages stay in the transcript.</p>
-            {sentPrompts.length === 0 ? (
-              <p className={styles.empty}>No sent text prompts are loaded for this session.</p>
-            ) : (
-              <ul className={styles.list}>
-                {sentPrompts.map(prompt => (
-                  <li className={styles.item} key={prompt.id}>
-                    <span className={styles.preview}>{previewText(prompt.text)}</span>
-                    <button type="button" className={styles.button} disabled={input.phase !== 'plain'} onClick={() => insertSentPrompt(prompt)}>
-                      Insert
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          {message.length > 0 ? (
-            <p className={styles.message} role="status">
-              {message}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-    </div>
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup heading="Sent prompts in this session" aria-label="Sent prompt history">
+              {sentPrompts.length === 0 ? (
+                <p className="dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">No sent text prompts are loaded for this session.</p>
+              ) : null}
+              {sentPrompts.map(prompt => (
+                <CommandItem key={prompt.id} value={`sent-${prompt.id} ${prompt.text}`} disabled={input.phase !== 'plain'} onSelect={() => insertSentPrompt(prompt)}>
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{previewText(prompt.text)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+        {message.length > 0 ? (
+          <p className="dshx:border-t dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground" role="status">
+            {message}
+          </p>
+        ) : null}
+      </PopoverContent>
+    </Popover>
   )
 }
