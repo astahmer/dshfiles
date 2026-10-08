@@ -8,7 +8,17 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals", "@dshfiles/dshx/client/env"]
+    "types": [
+      "node",
+      "vitest/globals",
+      "@dshfiles/dshx/client/env"
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "dshx.config.ts"
+  ]
 }
