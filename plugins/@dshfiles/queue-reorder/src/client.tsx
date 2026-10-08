@@ -1,7 +1,8 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -10,6 +11,7 @@ import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
+import { queueReorderSettings } from './settings.js'
 
 /**
  * The shipped queue dock, with reordering added.
@@ -78,7 +80,7 @@ const attachmentsOf = (content: readonly TextBlock[]): string | null => {
 }
 
 /** One-line preview, truncated the way the shipped dock truncates. */
-const previewOf = (content: readonly TextBlock[]): string => {
+const previewOf = (content: readonly TextBlock[], limit: number): string => {
   const flat = content
     .filter(block => block.type !== 'image' && block.type !== 'file')
     .map(block => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`))
@@ -86,10 +88,8 @@ const previewOf = (content: readonly TextBlock[]): string => {
     .replace(/\s+/gu, ' ')
     .trim()
   const chars = Array.from(flat)
-  return chars.length > PREVIEW_CHARS ? `${chars.slice(0, PREVIEW_CHARS).join('')}…` : flat
+  return chars.length > limit ? `${chars.slice(0, limit).join('')}…` : flat
 }
-
-const PREVIEW_CHARS = 200
 
 const RowAction = (props: {
   readonly label: string
@@ -123,6 +123,9 @@ export type DockProps = ComposedProps<'conversation.input.dock', string, never, 
 export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const inbox = props.useProjection('inbox')
   const queue = useApi(queueApi)
+  const preferences = useSettings(queueReorderSettings)
+  const expandByDefault = preferences.value?.expandByDefault ?? true
+  const previewLength = preferences.value?.previewLength ?? 200
   const rows = useMemo(
     () =>
       (inbox?.['next-turn'] ?? []).flatMap(row => {
@@ -140,9 +143,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const [draft, setDraft] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  // Open by default: the list is the point of the dock, and a collapsed dock
-  // hides the very rows a user queues in order to act on.
-  const [collapsed, setCollapsed] = useState(false)
+  // Open by default (the `expandByDefault` setting): the list is the point of the
+  // dock, and a collapsed dock hides the very rows a user queues to act on.
+  const [collapsed, setCollapsed] = useState(!expandByDefault)
   const previousRowCount = useRef(rowCount)
   const listId = useId()
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
@@ -152,10 +155,10 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     // otherwise the second queued message appears already collapsed, even though
     // nothing asked for that.
     if (rowCount === 0) setCollapsed(true)
-    else if (previousRowCount.current === 0) setCollapsed(false)
+    else if (previousRowCount.current === 0) setCollapsed(!expandByDefault)
     previousRowCount.current = rowCount
     if (editing !== null && (!queueMutable || !rows.some(row => row.id === editing))) setEditing(null)
-  }, [editing, queueMutable, rowCount, rows])
+  }, [editing, expandByDefault, queueMutable, rowCount, rows])
 
   useEffect(() => {
     if (editing === null) return
@@ -310,8 +313,8 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           </div>
                         </div>
                       ) : (
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content) || undefined}>
-                          {previewOf(row.content) || files || '—'}
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
+                          {previewOf(row.content, previewLength) || files || '—'}
                         </span>
                       )}
                       {queueMutable && !isEditing ? (

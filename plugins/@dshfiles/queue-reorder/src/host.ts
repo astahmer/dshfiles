@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { queueApi } from './api.js'
+import { queueReorderSettings } from './settings.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describeInbox, isDirection, moveWithinInbox, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
 import '@deepseek-ai/dsh-agent'
@@ -114,6 +115,7 @@ export default defineHost({
   apis: [queueHostApi],
   inject: ['agents'],
   tools: [moveTool],
+  settings: [queueReorderSettings],
   setup: (ctx: Context) => {
     hostContext = ctx
     ctx.provide('queueOrder', {
