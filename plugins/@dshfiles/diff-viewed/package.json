@@ -22,7 +22,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@dshfiles/plugin-ui": "link:../plugin-ui"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
