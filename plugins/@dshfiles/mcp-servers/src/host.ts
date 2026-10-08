@@ -4,7 +4,6 @@ import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-settings'
-import Schema from '@deepseek-ai/schemastery'
 import { apply as nativeMcpClient, type Config as NativeMcpConfig } from '@deepseek-ai/dsh-mcp-client'
 import { credentialKey, credentialRef, type CredentialKey } from '@deepseek-ai/dsh-credentials'
 import { defineHost } from '@dshfiles/dshx/host'
@@ -41,26 +40,6 @@ const OAUTH_CALLBACK_PATH = '/api/dshfiles-mcp-servers/oauth/callback'
 const OAUTH_PENDING_TTL_MS = 600_000 // 10 minutes to finish a provider sign-in
 const TOKEN_REFRESH_INTERVAL_MS = 300_000 // 5 minutes
 
-/** Loader row: `servers` is validated by `StoredConfig`; the other fields are live settings on the DSH Settings page. */
-export const Config = Schema.object({
-  servers: Schema.array(Schema.any()).default([]).hidden(),
-  connectOnStartup: Schema.boolean().default(true).description('Connect enabled servers when DSH starts. Off leaves them disconnected until you connect one.').volatile(),
-  toolCallTimeoutSeconds: Schema.natural()
-    .min(5)
-    .max(600)
-    .default(30)
-    .description('Seconds an MCP tool call may run before it is cancelled. Applies when a server (re)connects.')
-    .volatile(),
-  registrySearch: Schema.boolean()
-    .default(true)
-    .description('Search the public MCP Registry (registry.modelcontextprotocol.io) from the catalog.')
-    .volatile(),
-  oauthClientName: Schema.string()
-    .default('DSH MCP servers')
-    .description('Client name shown on provider consent screens during OAuth sign-in.')
-    .volatile(),
-})
-
 const settingsSchema = z.object({
   connectOnStartup: z.boolean().catch(true),
   toolCallTimeoutSeconds: z.number().int().min(5).max(600).catch(30),
@@ -70,7 +49,8 @@ const settingsSchema = z.object({
 
 type ManagerSettings = z.infer<typeof settingsSchema>
 
-const StoredConfig = z.object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]) }).superRefine((value, context) => {
+/** Loader row: the registered servers. Live preferences are the `dshfiles-mcp-servers` settings namespace. */
+export const Config = z.object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]) }).superRefine((value, context) => {
   value.servers.forEach((server, index) => {
     if (server.transport === 'stdio' && hasInlineCredential([server.command, ...server.args])) {
       context.addIssue({ code: 'custom', path: ['servers', index], message: 'Use credential references instead of inline command credentials.' })
@@ -108,7 +88,7 @@ const currentContext = (ctx: Context): Context => {
 }
 
 const parseStoredConfig = (value: unknown): StoredServer[] => {
-  const result = StoredConfig.safeParse(value ?? {})
+  const result = Config.safeParse(value ?? {})
   if (!result.success) throw new Error('MCP manager configuration is invalid.')
   return result.data.servers
 }
@@ -117,10 +97,9 @@ const serversFor = (ctx: Context): StoredServer[] => {
   return parseStoredConfig(entryFor(ctx).options.config)
 }
 
-const settingsFor = (ctx: Context): ManagerSettings => {
-  const raw = entryFor(ctx).options.config
-  return settingsSchema.parse(typeof raw === 'object' && raw !== null ? raw : {})
-}
+// The four preferences cannot reach DSH Settings yet: dshx refuses a Host that has both native Config
+// (the server list) and a Settings namespace. Defaults apply until the Host entry is split.
+const settingsFor = (): ManagerSettings => settingsSchema.parse({})
 
 const grantKey = (server: StoredServer): CredentialKey =>
   credentialKey(CREDENTIAL_SCOPE, `oauth-${createHash('sha256').update(server.id).digest('hex').slice(0, 24)}`)
@@ -201,7 +180,7 @@ const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: Manag
       return { ...projected, clientLifecycle, registeredToolCount }
     }),
   )
-  return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported', registrySearch: settingsFor(ctx).registrySearch }
+  return { servers: rows, providers: [...PROVIDERS], connectionHealth: 'not-reported', registrySearch: settingsFor().registrySearch }
 }
 
 const resolveReferences = async (ctx: Context, refs: Record<string, string>): Promise<Record<string, string> | undefined> => {
@@ -219,7 +198,7 @@ const resolveReferences = async (ctx: Context, refs: Record<string, string>): Pr
 }
 
 const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boolean): Promise<NativeTarget> => {
-  const toolCallTimeoutMs = settingsFor(ctx).toolCallTimeoutSeconds * 1000
+  const toolCallTimeoutMs = settingsFor().toolCallTimeoutSeconds * 1000
   let config: NativeMcpConfig
   let ready: boolean
   let redactions: readonly string[]
@@ -548,7 +527,7 @@ const hostApi = mcpServersApi.host({
     if (endpoints.registrationEndpoint === undefined) {
       throw new Error('This provider requires a pre-registered OAuth client. Store its token as a credential reference header instead.')
     }
-    const client = await registerClient({ registrationEndpoint: endpoints.registrationEndpoint, redirectUri, clientName: settingsFor(ctx).oauthClientName })
+    const client = await registerClient({ registrationEndpoint: endpoints.registrationEndpoint, redirectUri, clientName: settingsFor().oauthClientName })
     const pkce = createPkcePair()
     const state = createState()
     pendingAuthorizations.set(state, {
@@ -570,7 +549,7 @@ const hostApi = mcpServersApi.host({
     return currentSnapshot(ctx)
   },
   searchRegistry: async ({ ctx, input }) => {
-    if (!settingsFor(ctx).registrySearch) throw new Error('Public MCP Registry search is turned off in Settings.')
+    if (!settingsFor().registrySearch) throw new Error('Public MCP Registry search is turned off in Settings.')
     return searchOfficialRegistry(input.query)
   },
 })
@@ -585,7 +564,7 @@ export default defineHost({
     const servers = parseStoredConfig(config)
     let manuallyDisconnected = disconnectionsByRoot.get(root)
     if (manuallyDisconnected === undefined) {
-      manuallyDisconnected = new Set(settingsFor(ctx).connectOnStartup ? [] : servers.map(server => server.id))
+      manuallyDisconnected = new Set(settingsFor().connectOnStartup ? [] : servers.map(server => server.id))
       disconnectionsByRoot.set(root, manuallyDisconnected)
     }
     const runtime = new ManagerRuntime(ctx, manuallyDisconnected)
