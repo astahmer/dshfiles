@@ -34,6 +34,9 @@ const librarySchema = z
     }
   })
 
+/** Drafts once wrote this key too; that payload holds no prompts and must not lock the library as unreadable. */
+const legacyDraftsSchema = z.object({ schemaVersion: z.literal(1), drafts: z.array(z.unknown()) })
+
 export type SavedPrompt = z.infer<typeof promptSchema>
 
 export type PromptLibraryRead = { readonly ok: true; readonly prompts: readonly SavedPrompt[] } | { readonly ok: false }
@@ -53,7 +56,7 @@ export const readPromptLibrary = (serialized: string | null): PromptLibraryRead 
   }
 
   const parsed = librarySchema.safeParse(value)
-  if (!parsed.success) return { ok: false }
+  if (!parsed.success) return legacyDraftsSchema.safeParse(value).success ? { ok: true, prompts: [] } : { ok: false }
 
   return { ok: true, prompts: parsed.data.prompts }
 }

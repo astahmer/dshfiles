@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+/** Drafts once shared the prompt library's key, so each save overwrote the library; they now have their own. */
+export const DRAFT_STORE_KEY = 'dshfiles.prompt-stash.drafts.v1'
+export const LEGACY_DRAFT_STORE_KEY = 'dshfiles.prompt-stash.v1'
+
 export const MAX_SAVED_DRAFTS = 20
 export const MAX_DRAFT_TEXT_CHARS = 24_000
 export const MAX_DRAFT_TITLE_CHARS = 120
@@ -82,6 +86,18 @@ export const readDraftStore = (source: string | null): DraftStore => {
   } catch {
     return emptyDraftStore()
   }
+}
+
+/**
+ * Reads the drafts key. Drafts left under the key they once shared with the prompt library move to their own key
+ * on first read, so a later library save cannot overwrite them.
+ */
+export const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
+  const current = storage.getItem(DRAFT_STORE_KEY)
+  if (current !== null) return readDraftStore(current)
+  const legacy = readDraftStore(storage.getItem(LEGACY_DRAFT_STORE_KEY))
+  if (legacy.drafts.length > 0) storage.setItem(DRAFT_STORE_KEY, JSON.stringify(legacy))
+  return legacy
 }
 
 export const defaultDraftTitle = (text: string): string => {

@@ -314,7 +314,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           Prompts
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" side="top" className="dshx-root dshx:flex dshx:w-[26rem] dshx:flex-col dshx:p-0" aria-labelledby={triggerId}>
+      <PopoverContent align="end" side="top" className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0" aria-labelledby={triggerId}>
         <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' ? 'recent' : 'saved')} className="dshx:gap-0">
           <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3 dshx:px-3 dshx:pt-3">
             <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">

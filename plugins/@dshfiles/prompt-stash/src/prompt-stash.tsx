@@ -7,10 +7,11 @@ import { useMemo, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import {
+  DRAFT_STORE_KEY,
   MAX_SENT_PROMPTS,
   defaultDraftTitle,
   draftSaveBlock,
-  readDraftStore,
+  readStoredDrafts,
   removeDraft,
   saveDraft,
   sentPromptFromNode,
@@ -19,11 +20,9 @@ import {
   type SentPrompt,
 } from './draft-store.js'
 
-const STORE_KEY = 'dshfiles.prompt-stash.v1'
-
 const readStore = (): DraftStore => {
   try {
-    return readDraftStore(window.localStorage.getItem(STORE_KEY))
+    return readStoredDrafts(window.localStorage)
   } catch {
     return { schemaVersion: 1, drafts: [] }
   }
@@ -69,7 +68,7 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
 
   const persistStore = (nextStore: DraftStore, serialized: string): boolean => {
     try {
-      window.localStorage.setItem(STORE_KEY, serialized)
+      window.localStorage.setItem(DRAFT_STORE_KEY, serialized)
       setStore(nextStore)
       return true
     } catch {
@@ -132,7 +131,7 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const deleteSaved = (draftId: string): void => {
     const nextStore = removeDraft(store, draftId)
     try {
-      window.localStorage.setItem(STORE_KEY, JSON.stringify(nextStore))
+      window.localStorage.setItem(DRAFT_STORE_KEY, JSON.stringify(nextStore))
       setStore(nextStore)
       setMessage('Saved draft removed.')
     } catch {
@@ -158,7 +157,7 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           Drafts
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" side="top" className="dshx-root dshx:flex dshx:w-96 dshx:flex-col dshx:gap-0 dshx:p-0" aria-label="Saved prompt drafts">
+      <PopoverContent align="start" side="top" className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-96 dshx:flex-col dshx:gap-0 dshx:overflow-y-auto dshx:p-0" aria-label="Saved prompt drafts">
         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3 dshx:pb-2">
           <h2 className="dshx:text-sm dshx:font-semibold">Saved drafts</h2>
           <p className="dshx:text-xs dshx:text-muted-foreground">Stored in this browser only. Text drafts only; references and files stay in the composer.</p>

@@ -54,4 +54,10 @@ describe('saved prompt library', () => {
       prompts: [next, firstPrompt],
     })
   })
+
+  it('reads a drafts payload left under the shared key as an empty library', () => {
+    const drafts = JSON.stringify({ schemaVersion: 1, drafts: [{ id: 'x' }] })
+    expect(readPromptLibrary(drafts)).toEqual({ ok: true, prompts: [] })
+    expect(readPromptLibrary(JSON.stringify({ schemaVersion: 2 }))).toEqual({ ok: false })
+  })
 })

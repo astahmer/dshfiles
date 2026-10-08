@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DRAFT_STORE_KEY,
+  LEGACY_DRAFT_STORE_KEY,
   defaultDraftTitle,
   draftSaveBlock,
   MAX_SAVED_DRAFTS,
   readDraftStore,
+  readStoredDrafts,
   removeDraft,
   saveDraft,
   sentPromptFromNode,
@@ -91,5 +94,35 @@ describe('sent prompt history', () => {
     expect(sentPromptFromNode({ kind: 'user', seq: 7, content: [{ type: 'text', text: 'prompt' }, { type: 'file' }] })).toBeNull()
     expect(sentPromptFromNode({ kind: 'user', seq: 8, content: [{ type: 'text', text: 'x'.repeat(24_001) }] })).toBeNull()
     expect(sentPromptFromNode({ kind: 'user', seq: -1, content: [{ type: 'text', text: 'invalid' }] })).toBeNull()
+  })
+})
+
+describe('draft storage key', () => {
+  const storageOf = (initial: Record<string, string>) => {
+    const values = new Map(Object.entries(initial))
+    return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => void values.set(key, value), values }
+  }
+  const stored: DraftStore = {
+    schemaVersion: 1,
+    drafts: [{ id: draft(1).id, title: draft(1).title, text: draft(1).text, createdAt: draft(1).now, updatedAt: draft(1).now }],
+  }
+  const library = JSON.stringify({ version: 1, prompts: [] })
+
+  it('keeps drafts apart from the prompt library key', () => {
+    const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: library, [DRAFT_STORE_KEY]: JSON.stringify(stored) })
+    expect(readStoredDrafts(storage)).toEqual(stored)
+    expect(storage.values.get(LEGACY_DRAFT_STORE_KEY)).toBe(library)
+  })
+
+  it('moves drafts saved under the shared legacy key to their own key', () => {
+    const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: JSON.stringify(stored) })
+    expect(readStoredDrafts(storage)).toEqual(stored)
+    expect(readDraftStore(storage.values.get(DRAFT_STORE_KEY) ?? null)).toEqual(stored)
+  })
+
+  it('reads an empty store when the legacy key holds the prompt library', () => {
+    const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: library })
+    expect(readStoredDrafts(storage).drafts).toEqual([])
+    expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
   })
 })
