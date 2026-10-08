@@ -253,12 +253,23 @@ export const describeSettingsTargets = (namespaces: readonly SettingsSearchNames
   return results
 }
 
+const searchRank = (result: SettingsSearchResult, term: string): number => {
+  const title = normalizeSearchText(result.title)
+  if (title === term) return 0
+  if (title.startsWith(term)) return 1
+  if (title.includes(term)) return 2
+  if (normalizeSearchText(result.context).includes(term)) return 3
+  const rest = normalizeSearchText(`${result.description} ${result.options.map(option => `${option.label} ${String(option.value)}`).join(' ')}`)
+  return rest.includes(term) ? 4 : -1
+}
+
+/** Title matches outrank section and description matches, as in the BB settings search. */
 export const searchSettingsTargets = (results: readonly SettingsSearchResult[], query: string): readonly SettingsSearchResult[] => {
   const term = normalizeSearchText(query.trim())
   if (term.length === 0) return []
-  return results.filter(result =>
-    normalizeSearchText(
-      `${result.title} ${result.description} ${result.context} ${result.options.map(option => `${option.label} ${String(option.value)}`).join(' ')}`,
-    ).includes(term),
-  )
+  return results
+    .map(result => ({ result, rank: searchRank(result, term) }))
+    .filter(entry => entry.rank >= 0)
+    .sort((left, right) => left.rank - right.rank)
+    .map(entry => entry.result)
 }

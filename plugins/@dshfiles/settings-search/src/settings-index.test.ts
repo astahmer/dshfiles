@@ -48,6 +48,30 @@ describe('settings descriptor search', () => {
     expect(searchSettingsTargets(results, 'threads').length).toBeGreaterThan(0)
   })
 
+  it('ranks title matches ahead of section and description matches', () => {
+    const results = describeSettingsTargets([
+      {
+        ns: 'ranking',
+        schema: envelope(9, {
+          0: { type: 'boolean', meta: { label: 'Auto save', description: 'Queue writes in the background.' } },
+          1: { type: 'boolean', meta: { label: 'Queue limit' } },
+          2: { type: 'boolean', meta: { label: 'Steer the queue' } },
+          3: { type: 'object', meta: { label: 'Queue' }, dict: { nested: 4 } },
+          4: { type: 'boolean', meta: { label: 'Nested toggle' } },
+          9: { type: 'object', meta: {}, dict: { autosave: 0, limit: 1, steer: 2, group: 3 } },
+        }),
+      },
+    ])
+
+    expect(searchSettingsTargets(results, 'queue').map(result => result.title)).toEqual([
+      'Queue',
+      'Queue limit',
+      'Steer the queue',
+      'Nested toggle',
+      'Auto save',
+    ])
+  })
+
   it('keeps empty-query browsing explicit and removes secret paths and descendants', () => {
     const results = describeSettingsTargets(namespaces)
 

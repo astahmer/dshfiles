@@ -1,42 +1,24 @@
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type { ConfigForm, ConfigFormSnapshot, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import type { ConfigForm, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
-import {
-  formatSettingsDraft,
-  hasSettingsPath,
-  parseSettingsDraft,
-  readSettingsPath,
-  schemaNodeAtPath,
-  setOperationForSettingsTarget,
-  settingsEditorKind,
-  unsetOperationForSettingsTarget,
-} from './settings-editor-model.js'
-import {
-  describeSettingsTargets,
-  searchSettingsTargets,
-  settingsChoiceOptions,
-  settingsNamespaceTitle,
-  type SettingsSearchNamespace,
-  type SettingsSearchResult,
-} from './settings-index.js'
+import { searchSettingsTargets, settingsNamespaceTitle, type SettingsSearchResult } from './settings-index.js'
 import { SETTINGS_SEARCH_LOCALE_NAMESPACE, settingsSearchLocale, type SettingsSearchTranslate } from './locales.js'
+import { SettingsFieldEditor } from './settings-field-editor.js'
+import { SettingsNavigationSearch } from './navigation-search.js'
+import { useSettingsMirror } from './use-settings-mirror.js'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
-import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
-import { ChevronLeftIcon, ChevronRightIcon, InfoIcon, RefreshCwIcon, SearchIcon, SearchXIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronLeftIcon, ChevronRightIcon, InfoIcon, SearchIcon, SearchXIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import './client.css'
 
 const SETTINGS_SEARCH_ID = 'dshfiles-settings-search'
 const MAX_QUERY_LENGTH = 200
 const MAX_RESULTS = 60
-const SETTINGS_SEARCH_VALUE_ID = 'settings-search-value'
 
 const scrollActiveIntoView = (element: HTMLButtonElement | null): void => {
   element?.scrollIntoView({ block: 'nearest' })
@@ -48,228 +30,15 @@ interface SettingsSearchPanelProps {
   readonly t: SettingsSearchTranslate
 }
 
-interface SettingsFieldEditorProps {
-  readonly result: SettingsSearchResult
-  readonly namespace: SettingsSearchNamespace
-  readonly form: ConfigForm<unknown>
-  readonly onBack: () => void
-  readonly t: SettingsSearchTranslate
-}
-
-const snapshotFor = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> => form.getSnapshot()
-
-const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
-  const form = props.form
-  const t = props.t
-  const snapshot = useSyncExternalStore(
-    useCallback(listener => form.subscribe(listener), [form]),
-    useCallback(() => snapshotFor(form), [form]),
-    useCallback(() => snapshotFor(form), [form]),
-  )
-  const path = props.result.target.fieldPath
-  const schema = schemaNodeAtPath(props.namespace.schema, path)
-  const choices = useMemo(
-    () => settingsChoiceOptions(schemaNodeAtPath(props.namespace.schema, props.result.target.fieldPath)),
-    [props.namespace.schema, props.result.id],
-  )
-  const value = readSettingsPath(snapshot.value, path)
-  const kind = settingsEditorKind(schema, value, choices)
-  const overridden = hasSettingsPath(snapshot.user, path)
-  const [draft, setDraft] = useState(() => formatSettingsDraft(value, kind, choices))
-  const [draftRevision, setDraftRevision] = useState(snapshot.revision)
-  const [dirty, setDirty] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [conflict, setConflict] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const canWrite = snapshot.status === 'ready' && snapshot.writable && snapshot.revision !== undefined && !pending
-  const parsed = parseSettingsDraft(draft, kind, choices)
-
-  useEffect(() => {
-    if (!dirty) {
-      setDraft(formatSettingsDraft(value, kind, choices))
-      setDraftRevision(snapshot.revision)
-    }
-  }, [choices, dirty, kind, snapshot.revision, value])
-
-  const save = async (): Promise<void> => {
-    if (!canWrite || draftRevision === undefined) return
-    if (!parsed.ok) {
-      setMessage(t(parsed.messageKey))
-      return
-    }
-    setPending(true)
-    setMessage(null)
-    try {
-      const accepted = await form.mutate(setOperationForSettingsTarget(props.result.target, parsed.value), draftRevision)
-      setMessage(accepted ? t('saved') : t('hostRefusedKeepDraft'))
-      setConflict(!accepted)
-      if (accepted) setDirty(false)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t('saveFailed'))
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const reset = async (): Promise<void> => {
-    if (!canWrite || !overridden) return
-    setPending(true)
-    setMessage(null)
-    try {
-      const accepted = await form.mutate(unsetOperationForSettingsTarget(props.result.target), snapshot.revision)
-      setMessage(accepted ? t('restored') : t('hostRefused'))
-      setConflict(!accepted)
-      if (accepted) setDirty(false)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t('resetFailed'))
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const updateDraft = (next: string): void => {
-    if (!dirty) setDraftRevision(snapshot.revision)
-    setDraft(next)
-    setDirty(true)
-    setMessage(null)
-  }
-
-  const reloadLatest = (): void => {
-    setDraft(formatSettingsDraft(value, kind, choices))
-    setDraftRevision(snapshot.revision)
-    setDirty(false)
-    setConflict(false)
-    setMessage(null)
-  }
-
-  return (
-    <section aria-labelledby="settings-search-editor-title" className="dshx:flex dshx:flex-col dshx:gap-4">
-      <Button className="dshx:-ml-2 dshx:self-start" onClick={props.onBack} size="sm" type="button" variant="ghost">
-        <ChevronLeftIcon />
-        {t('backToResults')}
-      </Button>
-      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-        <p className="dshx:text-xs dshx:text-muted-foreground">{props.result.context}</p>
-        <h2 className="dshx:text-sm dshx:font-semibold" id="settings-search-editor-title">
-          {props.result.title}
-        </h2>
-        {props.result.description.length > 0 && <p className="dshx:text-sm dshx:text-muted-foreground">{props.result.description}</p>}
-        <code className="dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">
-          {props.result.target.entryId} · {path.join(' · ')}
-        </code>
-      </div>
-      {snapshot.status === 'loading' && (
-        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
-          <Spinner aria-hidden="true" role="presentation" />
-          {t('loadingSetting')}
-        </p>
-      )}
-      {snapshot.status === 'unavailable' && (
-        <Alert role="status" variant="info">
-          <InfoIcon />
-          <AlertDescription>{t('settingUnavailable')}</AlertDescription>
-        </Alert>
-      )}
-      {snapshot.status === 'ready' && (
-        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
-          <Field className="dshx:flex-col dshx:gap-2">
-            <FieldLabel htmlFor={SETTINGS_SEARCH_VALUE_ID}>{t('currentValue')}</FieldLabel>
-            {kind === 'boolean' || kind === 'choice' ? (
-              <Select disabled={!canWrite} name="settings-search-value" onValueChange={updateDraft} value={draft}>
-                <SelectTrigger autoFocus className="dshx:w-full dshx:max-w-sm" id={SETTINGS_SEARCH_VALUE_ID}>
-                  <SelectValue placeholder={t('chooseOption')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {kind === 'choice' ? (
-                    choices.map((choice, index) => (
-                      <SelectItem key={String(index)} value={String(index)}>
-                        {choice.label}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <>
-                      <SelectItem value="true">true</SelectItem>
-                      <SelectItem value="false">false</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Textarea
-                autoComplete="off"
-                autoFocus
-                className={kind === 'string' ? 'dshx:min-h-20' : 'dshx:min-h-28 dshx:font-mono! dshx:text-xs'}
-                disabled={!canWrite}
-                id={SETTINGS_SEARCH_VALUE_ID}
-                onChange={event => updateDraft(event.currentTarget.value)}
-                rows={kind === 'string' ? 4 : 6}
-                value={draft}
-              />
-            )}
-            <FieldDescription className="dshx:text-xs">
-              {snapshot.writable ? t('hostDocumentRevision', { revision: snapshot.revision ?? t('revisionPending') }) : t('readOnly')}
-              {` · ${overridden ? t('customValue') : t('inheritedValue')}`}
-            </FieldDescription>
-          </Field>
-          {message !== null && (
-            <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
-              {message}
-            </p>
-          )}
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <Button
-              disabled={!canWrite || !dirty || !parsed.ok}
-              onClick={() => {
-                void save()
-              }}
-              size="sm"
-              type="button"
-            >
-              {pending ? t('saving') : t('saveSetting')}
-            </Button>
-            <Button
-              disabled={!canWrite || !overridden}
-              onClick={() => {
-                void reset()
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {t('restoreInherited')}
-            </Button>
-            {conflict && (
-              <Button disabled={pending} onClick={reloadLatest} size="sm" type="button" variant="ghost">
-                <RefreshCwIcon />
-                {t('reloadLatest')}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
 const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const describe = props.describe
   const t = props.t
-  const mirror = useSyncExternalStore(
-    useCallback(listener => describe.subscribe(listener), [describe]),
-    useCallback(() => describe.getSnapshot(), [describe]),
-    useCallback(() => describe.getSnapshot(), [describe]),
-  )
+  const { mirror, namespaces, results: allResults } = useSettingsMirror(describe)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [browseEntryId, setBrowseEntryId] = useState<string | null>(null)
   const [selected, setSelected] = useState<SettingsSearchResult | null>(null)
 
-  useEffect(() => {
-    void describe.ensure()
-  }, [describe])
-
-  const namespaces = mirror.view?.namespaces ?? []
-  const allResults = useMemo(() => describeSettingsTargets(namespaces), [namespaces])
   const namespaceGroups = useMemo(
     () =>
       namespaces.map(namespace => ({
@@ -492,7 +261,7 @@ export default defineClient({
   name: '@dshfiles/settings-search',
   locales: [settingsSearchLocale],
   inject: ['slots', 'configForms'],
-  setup(ctx) {
+  setup(ctx, decorate) {
     const getForm = (entryId: string): ConfigForm<unknown> => ctx.configForms.get<unknown>(entryId)
     const translate = ctx.locale.bind(SETTINGS_SEARCH_LOCALE_NAMESPACE)
     ctx.slots.inject('settings.section', () =>
@@ -505,6 +274,15 @@ export default defineClient({
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
         ({ t }) => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={t} />,
+      ),
+    )
+    // The shell's title seat is a single cell; priority -1 shadows its plain title so the search sits above the nav.
+    ctx.slots.inject('settings.header', () =>
+      ctx.slots.register(
+        { name: 'settings.header', priority: -1, locale: SETTINGS_SEARCH_LOCALE_NAMESPACE },
+        decorate(({ t }: { readonly t: SettingsSearchTranslate }) => (
+          <SettingsNavigationSearch describe={ctx.configForms.describe()} getForm={getForm} t={t} />
+        )),
       ),
     )
   },

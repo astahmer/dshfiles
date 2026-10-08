@@ -4,6 +4,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const SETTINGS_SEARCH_LOCALE_NAMESPACE = 'dshfiles.settingsSearch'
 
 const en = {
+  navigationTitle: 'Settings',
   sectionLabel: 'Search',
   title: 'Settings Search',
   searchSubtitle:
@@ -57,6 +58,7 @@ const en = {
 }
 
 const zh = {
+  navigationTitle: '设置',
   sectionLabel: '搜索',
   title: '设置搜索',
   searchSubtitle: '按名称、描述、条目或分区路径查找设置。支持的条目会在其原生设置分区中打开；其他结果使用 Host 实时编辑器。',

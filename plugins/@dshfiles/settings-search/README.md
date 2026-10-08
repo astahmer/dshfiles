@@ -18,6 +18,17 @@ editor opens. It edits the real settings entry instead of creating a second
 stored form. The native settings shell remains in charge of categories,
 onboarding, launchers, and shortcuts.
 
+## Navigation search
+
+The plugin also occupies the Settings title seat (`settings.header`, shadowed at
+priority -1) with a compact search field above the section navigation. Results
+are ranked (title, then section, then description and options), listed inline
+under the field, and focus on open. Choosing a result opens the same live
+editor over the content column, because the title seat has no way to switch the
+shell's active section. The **settings-search** Settings entry controls whether
+the field shows, whether it takes focus when Settings opens, and how many
+results it lists.
+
 ## Host navigation boundary
 
 The Host Settings contract routes a field target `{ entryId, fieldPath }` to a
