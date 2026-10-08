@@ -2,11 +2,11 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "../../lib/utils"
+import { cn } from "../../lib/utils.js"
 
-import { Button } from "./button"
-import { Input } from "./input"
-import { Textarea } from "./textarea"
+import { Button } from "./button.js"
+import { Input } from "./input.js"
+import { Textarea } from "./textarea.js"
 
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -128,12 +128,13 @@ function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   )
 }
 
-function InputGroupInput({
-  className,
-  ...props
-}: React.ComponentProps<"input">) {
+const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentPropsWithoutRef<"input">>(function InputGroupInput(
+  { className, ...props },
+  ref
+) {
   return (
     <Input
+      ref={ref}
       data-slot="input-group-control"
       className={cn(
         "dshx:flex-1 dshx:rounded-none dshx:border-0 dshx:bg-transparent dshx:shadow-none dshx:focus-visible:ring-0 dshx:dark:bg-transparent",
@@ -142,7 +143,7 @@ function InputGroupInput({
       {...props}
     />
   )
-}
+})
 
 function InputGroupTextarea({
   className,

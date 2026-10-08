@@ -2,10 +2,10 @@
 
 import { useMemo } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "../../lib/utils"
+import { cn } from "../../lib/utils.js"
 
-import { Label } from "./label"
-import { Separator } from "./separator"
+import { Label } from "./label.js"
+import { Separator } from "./separator.js"
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -59,16 +59,16 @@ const fieldVariants = cva(
   {
     variants: {
       orientation: {
-        vertical: ["flex-col [&>*]:w-full [&>.sr-only]:w-auto"],
+        vertical: ["dshx:flex-col dshx:[&>*]:w-full dshx:[&>.sr-only]:w-auto"],
         horizontal: [
-          "flex-row items-center",
-          "[&>[data-slot=field-label]]:flex-auto",
-          "has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+          "dshx:flex-row dshx:items-center",
+          "dshx:[&>[data-slot=field-label]]:flex-auto",
+          "dshx:has-[>[data-slot=field-content]]:items-start dshx:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
         ],
         responsive: [
-          "flex-col @md/field-group:flex-row @md/field-group:items-center [&>*]:w-full @md/field-group:[&>*]:w-auto [&>.sr-only]:w-auto",
-          "@md/field-group:[&>[data-slot=field-label]]:flex-auto",
-          "@md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+          "dshx:flex-col dshx:@md/field-group:flex-row dshx:@md/field-group:items-center dshx:[&>*]:w-full dshx:@md/field-group:[&>*]:w-auto dshx:[&>.sr-only]:w-auto",
+          "dshx:@md/field-group:[&>[data-slot=field-label]]:flex-auto",
+          "dshx:@md/field-group:has-[>[data-slot=field-content]]:items-start dshx:@md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
         ],
       },
     },

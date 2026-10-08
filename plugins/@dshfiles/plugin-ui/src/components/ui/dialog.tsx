@@ -1,9 +1,9 @@
 import * as React from "react"
-import { cn } from "../../lib/utils"
+import { cn } from "../../lib/utils.js"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
-import { Button } from "./button"
+import { Button } from "./button.js"
 
 function Dialog({
   ...props
@@ -49,9 +49,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel = "Close",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Localized accessible name of the corner close button. */
+  closeLabel?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -71,7 +74,7 @@ function DialogContent({
             className="dshx:absolute dshx:top-4 dshx:right-4 dshx:rounded-xs dshx:opacity-70 dshx:ring-offset-background dshx:transition-opacity dshx:hover:opacity-100 dshx:focus:ring-2 dshx:focus:ring-ring dshx:focus:ring-offset-2 dshx:focus:outline-hidden dshx:disabled:pointer-events-none dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-muted-foreground dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4"
           >
             <XIcon />
-            <span className="dshx:sr-only">Close</span>
+            <span className="dshx:sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>

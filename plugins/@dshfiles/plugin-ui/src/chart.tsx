@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { cn } from './lib/utils'
+import { cn } from './lib/utils.js'
 
 export * from '@tanstack/charts'
 export { Chart } from '@tanstack/charts/react'

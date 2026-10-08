@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "../../lib/utils"
+import { cn } from "../../lib/utils.js"
 import { Slot } from "radix-ui"
 
 const badgeVariants = cva(
@@ -17,6 +17,10 @@ const badgeVariants = cva(
           "dshx:border-border dshx:text-foreground dshx:[a&]:hover:bg-accent dshx:[a&]:hover:text-accent-foreground",
         ghost: "dshx:[a&]:hover:bg-accent dshx:[a&]:hover:text-accent-foreground",
         link: "dshx:text-primary dshx:underline-offset-4 dshx:[a&]:hover:underline",
+        info: "dshx:bg-info/15 dshx:text-info",
+        success: "dshx:bg-success/15 dshx:text-success",
+        warning: "dshx:bg-warning/15 dshx:text-warning",
+        muted: "dshx:bg-muted dshx:text-muted-foreground",
       },
     },
     defaultVariants: {

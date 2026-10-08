@@ -58,15 +58,15 @@ flowchart LR
 
 | Choice | Decision | Rationale |
 |--------|----------|-----------|
-| Atoms | `@deepseek-ai/dsh-client-ui-primitives` | Host-shared, already themed and accessible, zero bundle cost (platform module). |
+| Atoms | ~~`@deepseek-ai/dsh-client-ui-primitives`~~ → **shadcn/ui** in `@dshfiles/plugin-ui` (2026-10-08) | The Host atoms gave plugins the DSH look, not the BB look the product brief asks for; shadcn is BB's own vocabulary. Host icons stay available. |
 | Gap components | Local `@dshfiles/plugin-ui` source package | Follows the `project-folder-picker` link pattern; one source of truth. |
 | Server/async state | **TanStack Query 5** (`@tanstack/react-query`, React `^18 \|\| ^19`) | Cache, dedupe, mutations, invalidation, cancellation. Replaces hand-rolled `useEffect` loaders. |
 | Tables | **TanStack Table 9** (`@tanstack/react-table`, React `>=18`) | Headless; markup and CSS stay ours. v9 API (`useTable`, `tableFeatures`), not v8. |
 | Forms | **TanStack Form 1** (`@tanstack/react-form`, React `^17 \|\| ^18 \|\| ^19`) | Typed field state, Standard Schema validators (zod 4 already in the workspace). Used where a form has validation or more than a couple of fields; one-input forms stay `useState`. |
 | Charts | **TanStack Charts 1** (`@tanstack/charts`, React adapter `@tanstack/charts/react`) | Typed grammar, accessible names/keyboard focus, CSS palette tokens map onto DSH variables. 1.0.0 shipped 2026-10-03, so it is pinned exactly and confined to `ai-accounts` until it has proven stable. No other ready chart library beats it on fit; Recharts/visx bring their own styling assumptions. |
 | Virtualization | TanStack Virtual — deferred | No current list is long enough to need it; add with the first consumer. |
-| shadcn/registries | Reviewed source and patterns only | Host primitives + TanStack cover the first cut; vendor an individual item only for a concrete gap (see research below). |
-| Tailwind | Not used | Global stylesheet output and Host style leakage risk. |
+| shadcn/registries | **Adopted** via the shadcn CLI into `plugin-ui/src/components/ui` (2026-10-08) | Registry items install as owned source with the `dshx` prefix; see the package README for the add procedure. |
+| Tailwind | **Tailwind v4, `dshx:` prefix, no global Preflight** (2026-10-08) | dshx already supports it; the prefix and scoped Preflight (`.dshx-root`, `[data-slot]`) keep Host DOM untouched; shadcn colors map inline onto `--dsw-*`. |
 
 ### Architecture
 
@@ -262,3 +262,4 @@ Total before the MultiHost migration: ~7.0k lines removed, ~5.3k added (plugin-u
 | 2026-10-06 | Add MultiHost to the shared UI migration and record Jujutsu side-panel/review progress | These completed plugin revisions join the mainline library adoption; runtime/browser evidence remains explicit. |
 | 2026-10-06 | Defer automated browser coverage to Playwright BDD | User preference; retain the key plugin scenarios as a follow-up instead of introducing component-test infrastructure now. |
 | 2026-10-06 | Boot MultiHost and Jujutsu in isolated browser checks | Node 22.23.3, scratch DSH homes, and ephemeral ports; both expected client entries mounted with no missing-entry or slot failures. |
+| 2026-10-08 | Replace Host atoms and CSS-Module gap components with shadcn/ui on Tailwind v4 (`dshx:` prefix, scoped Preflight); rebuild every plugin UI on it instead of migrating the old markup | User direction: plugin UIs looked nothing like BB; match BB by using the same shadcn styles and registry components. Supersedes the 2026-10-05 atom and Tailwind decisions. |

@@ -1,138 +1,85 @@
 # @dshfiles/plugin-ui
 
-Shared UI for dshfiles DSH plugins. See `plans/plugin-ui-library.md` for the why.
+shadcn/ui for dshfiles DSH plugins, plus TanStack Query, Table, Form, and Charts bindings. See `plans/plugin-ui-library.md` for the why.
 
-Three layers, each owned once:
+- **Tailwind v4, `dshx:` prefix, no global Preflight** — the dshx client-CSS contract. A scoped Preflight applies under `.dshx-root` and to every shadcn part (`[data-slot]`, portals included).
+- **shadcn semantic colors are the DSH theme.** `src/styles.css` maps `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`, `info`, `success`, `warning`, `chart-1..5` inline onto `--dsw-*`, so light/dark follow the Host. `dark:` matches `body[data-ds-dark-theme]`.
+- **BB density.** `text-sm` is 13px, controls are 32px (`sm` 28px, `xs` 24px), radius 6px.
 
-| Need                                                                                                                 | Import from                             | Notes                                                                            |
-| -------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------- |
-| Buttons, inputs, checkbox, switch, tags, pills, state dots, menus, tooltips, modal, segmented control, toasts, icons | `@deepseek-ai/dsh-client-ui-primitives` | Host platform module: always external, already themed. Never restyle these.      |
-| Field wiring, textarea, select, notice, empty state, section, confirm dialog, visually hidden                        | `@dshfiles/plugin-ui`                   | CSS Modules on `--dsw-*` tokens.                                                 |
-| Async state                                                                                                          | `@dshfiles/plugin-ui/query`             | TanStack Query 5, re-exported, plus `PluginQueryProvider`.                       |
-| Tables                                                                                                               | `@dshfiles/plugin-ui/table`             | TanStack Table **v9**, re-exported, plus `DataTable`.                            |
-| Forms                                                                                                                | `@dshfiles/plugin-ui/form`              | TanStack Form 1, re-exported, plus `useAppForm` with bound field components.     |
-| Charts                                                                                                               | `@dshfiles/plugin-ui/chart`             | TanStack Charts 1 (`Chart`, marks, compact scales, `tooltip`) plus `ChartFrame`. |
+## Wire a plugin
 
-Depend on it with `"@dshfiles/plugin-ui": "link:../plugin-ui"`. Do not add TanStack packages to a plugin directly — the subpaths pin one version for the workspace.
-
-## Host primitives cheat sheet
-
-```tsx
-import { Button, Checkbox, Input, Modal, Pill, SegmentedControl, StateDot, Switch, Tag, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-
-<Button variant="primary" | "ghost" | "outline" | "toolbar" size="md" | "sm" icon={<IconX />}>Save</Button>
-<Input icon={<IconSearch />} value={query} onChange={…} aria-label="Filter" />
-<Checkbox checked={value} onChange={setValue} label="Clear tags" />
-<Switch checked={value} onChange={setValue} label="Enabled" />
-<Tag tone="outline" | "solid" | "neutral" | "quiet" | "success" | "info" | "warning" | "danger">Healthy</Tag>
-<Pill active={selected} onClick={…}>project</Pill>       // filter chips
-<StateDot state="done" | "warning" | "ongoing" | "error" | "idle" />   // aria-hidden: pair with text
-<Modal open title="…" closeLabel="Close" onClose={…} footer={…}>…</Modal>   // mark first field with data-modal-autofocus
+```ts
+// dshx.config.ts
+import { pluginUiVite } from '@dshfiles/plugin-ui/vite'
+export default defineConfig({ client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } } })
 ```
 
-Read the full contracts in `node_modules/@deepseek-ai/dsh-client-ui-primitives/lib/types/*.d.ts`.
-
-## Gap components
-
-```tsx
-import { ConfirmDialog, EmptyState, Field, Notice, Section, Select, TextArea, VisuallyHidden } from '@dshfiles/plugin-ui'
-
-<Field label="Alias" description="Letters, digits, dash" error={error} required>
-  {control => <Input {...control} value={alias} onChange={…} />}
-</Field>
-<Select value={mode} options={[{ value: 'a', label: 'A' }]} onValueChange={setMode} aria-label="Mode" />
-<Notice tone="info" | "success" | "warning" | "danger" title="…" actions={…}>…</Notice>
-<EmptyState title="No aliases" description="…" action={<Button>Add</Button>} compact />
-<Section title="Servers" description="…" actions={<Button>Add</Button>}>…</Section>
-<ConfirmDialog open title="Delete alias?" confirmLabel="Delete" cancelLabel="Cancel" closeLabel="Close"
-  tone="danger" busy={mutation.isPending} onConfirm={…} onCancel={…}>optional body</ConfirmDialog>
+```css
+/* src/client.css — imported once from the client entry: import './client.css' */
+@import '@dshfiles/plugin-ui/styles.css';
+@source './';
 ```
 
-`fieldControlClassName` styles a plain `<input>` the Host `Input` cannot express (`type="color"`, a bare number input).
+Depend on `"@dshfiles/plugin-ui": "link:../plugin-ui"`. Do not add Tailwind, Radix, or TanStack packages to a plugin directly — this package pins them.
+
+## Use
+
+```tsx
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+
+<section className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-6">
+  <Button variant="outline" size="sm"><RefreshCwIcon /> Refresh</Button>
+  <Badge variant="secondary">6 secrets</Badge>
+</section>
+```
+
+- Put `dshx-root` on each surface root you render. Prefix every utility (`dshx:hover:bg-accent`), write complete static class strings, merge with `cn`.
+- Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, separator, skeleton, toggle, toggle-group, collapsible, alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area). Wrap tooltips in `TooltipProvider`.
+- Icons: `import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'` (lucide-react re-exported, so plugins need no extra dependency); Host `Icon*` from `@deepseek-ai/dsh-client-ui-primitives` where a DSH-native glyph matters.
+
+### Adding a registry component
+
+```sh
+cd plugins/@dshfiles/plugin-ui
+pnpm dlx shadcn@4.21.4 add <name-or-registry-url>
+```
+
+`components.json` sets the `dshx` prefix and self-referencing aliases. After adding, rewrite `@dshfiles/plugin-ui/...` and `cn` imports in the new file to relative `.js` paths (`../../lib/utils.js`, `./button.js`, so NodeNext consumers typecheck) — the CLI resolves them inconsistently — check it did not add stray dependencies, and use `React.forwardRef` on any part a Radix `asChild` trigger wraps (React 18 drops `ref` on function components).
 
 ## Query
 
 ```tsx
 import { PluginQueryProvider, errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-
-// Wrap each slot root once (inside the dshx `decorate(...)` so useApi still works):
-decorate(() => (
-  <PluginQueryProvider>
-    <Panel />
-  </PluginQueryProvider>
-))
-
-const api = useApi(contract)
-const list = useQuery({ queryKey: ['secret-catalog', 'list', cwd], queryFn: ({ signal }) => api.list({ cwd }, { signal }) })
-const queryClient = useQueryClient()
-const create = useMutation({
-  mutationFn: (input: CreateInput) => api.create(input),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] }),
-})
 ```
 
-- Prefix every key with the plugin id. Forward `signal` to the dshx client.
-- One client per plugin bundle (`pluginQueryClient()`), shared by all of that plugin's slots.
-- Imperative, security-sensitive, or timer-driven flows (secret reveal, drag reorder) may stay local; say why in a comment only if it is not obvious.
-- Prefer TanStack Query over dshx `useApiQuery` in owned plugins.
+Wrap each slot root once (inside dshx `decorate(...)`). Prefix every key with the plugin id, forward `signal` to the dshx client, invalidate by key after mutations. One client per plugin bundle.
 
-## Table (v9 API — not v8)
+## Table (TanStack Table v9)
 
 ```tsx
-import { DataTable, createColumnHelper, createSortedRowModel, rowSortingFeature, sortFn_alphanumeric, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
-
-const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel(), sortFns: { alphanumeric: sortFn_alphanumeric } })
-const helper = createColumnHelper<typeof features, Row>()
-const columns = helper.columns([helper.accessor('name', { header: 'Name', sortFn: 'alphanumeric' }), helper.display({ id: 'actions', header: 'Actions', cell: ctx => … })])
-
-const table = useTable({ features, columns, data })   // keep features/columns stable (module scope or useMemo)
-<DataTable table={table} empty="No rows" caption="…" />
+import { DataTable, createColumnHelper, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
+<DataTable table={table} empty="No rows" />   // shadcn Table in a bordered card, uppercase headers, aria-sort
 ```
 
-Without `rowSortingFeature` headers are plain. Use `tableFeatures({})` for a static table.
-
-## Form
+## Form (TanStack Form)
 
 ```tsx
 import { useAppForm } from '@dshfiles/plugin-ui/form'
-
-const form = useAppForm({ defaultValues, validators: { onChange: zodSchema }, onSubmit: ({ value }) => mutation.mutateAsync(value) })
-<form onSubmit={event => { event.preventDefault(); void form.handleSubmit() }}>
-  <form.AppField name="alias">{field => <field.TextField label="Alias" required />}</form.AppField>
-  <form.AppField name="scope">{field => <field.SelectField label="Scope" options={…} />}</form.AppField>
-  <form.AppField name="enabled">{field => <field.SwitchField label="Enabled" />}</form.AppField>
-  <form.AppForm><form.SubmitButton>Save</form.SubmitButton></form.AppForm>
-</form>
+<form.AppField name="alias">{field => <field.TextField label="Alias" required />}</form.AppField>
 ```
 
-Field components: `TextField`, `TextAreaField`, `SelectField`, `CheckboxField`, `SwitchField`. Errors show after a field is touched or a submit is attempted. Use the form for multi-field or validated input; a single search box stays `useState`.
+Field components: `TextField`, `TextAreaField`, `SelectField` (shadcn Select), `CheckboxField`, `SwitchField`; `form.SubmitButton`. Validators are Standard Schema (zod 4).
 
 ## Chart
 
-```tsx
-import { Chart, ChartFrame, defineChart, lineY, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
-
-const definition = useMemo(() => defineChart({ marks: [lineY(rows, { x: 'at', y: 'percent' })], scales: { x: { scale: scaleLinear }, y: { scale: scaleLinear } }, tooltip }), [rows])
-<ChartFrame title="Quota"><Chart definition={definition} height={160} ariaLabel="Quota over time" /></ChartFrame>
-```
-
-`ChartFrame` maps `currentColor` and `--ts-chart-1..6` to DSH tokens. Docs ship in the package: `node_modules/@tanstack/charts/llms.txt`. TanStack Charts 1.0.0 is pinned exactly.
+`@dshfiles/plugin-ui/chart` re-exports TanStack Charts 1.0.0 and `ChartFrame`, which maps `--ts-chart-*` onto DSH tokens.
 
 ## Tests
 
-The Host primitives cannot be imported under Node. Alias them to the shared double in the plugin's `vitest.config.ts`:
+Radix parts run in jsdom. A Radix `Select` renders a hidden native `<select name=…>`; drive it with `fireEvent.change`. Host primitives still cannot be imported under Node — alias them to `./testing/host-primitives.tsx` in `vitest.config.ts` when a plugin keeps any.
 
-```ts
-import { fileURLToPath } from 'node:url'
-export default defineConfig({
-  resolve: { alias: { '@deepseek-ai/dsh-client-ui-primitives': fileURLToPath(new URL('../plugin-ui/testing/host-primitives.tsx', import.meta.url)) } },
-})
-```
+## Host CSS caveat
 
-If a plugin uses icons the double lacks, add them to `testing/host-primitives.tsx`.
-
-## Rules
-
-- No global selectors, resets, or unscoped element rules. Plugin CSS keeps layout and genuinely domain-specific visuals only.
-- No new hard-coded colors; use `--dsw-*` tokens.
-- Keep accessible names on icon-only buttons (`aria-label`).
+The Host ships one unlayered `button, input, select, textarea { font-family: inherit }`. Unlayered rules beat Tailwind's layered utilities, so a monospace control needs the important form: `dshx:font-mono!`.

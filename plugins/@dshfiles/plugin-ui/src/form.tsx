@@ -1,13 +1,13 @@
 import { createFormHook, createFormHookContexts } from '@tanstack/react-form'
 import { useId, type ReactNode } from 'react'
-import { Button } from './components/ui/button'
-import { Checkbox } from './components/ui/checkbox'
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from './components/ui/field'
-import { Input } from './components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
-import { Switch } from './components/ui/switch'
-import { Textarea } from './components/ui/textarea'
-import { cn } from './lib/utils'
+import { Button } from './components/ui/button.js'
+import { Checkbox } from './components/ui/checkbox.js'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from './components/ui/field.js'
+import { Input } from './components/ui/input.js'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select.js'
+import { Switch } from './components/ui/switch.js'
+import { Textarea } from './components/ui/textarea.js'
+import { cn } from './lib/utils.js'
 
 export * from '@tanstack/react-form'
 
@@ -77,7 +77,7 @@ const TextField = (
         <Input
           {...control}
           autoComplete={props.autoComplete ?? 'off'}
-          className={cn(props.monospace === true && 'dshx:font-mono')}
+          className={cn(props.monospace === true && 'dshx:font-mono!')}
           name={field.name}
           onBlur={field.handleBlur}
           onChange={event => field.handleChange(event.currentTarget.value)}
@@ -98,7 +98,7 @@ const TextAreaField = (props: LabelledFieldProps & { readonly placeholder?: stri
       {control => (
         <Textarea
           {...control}
-          className={cn(props.monospace === true && 'dshx:font-mono dshx:text-xs')}
+          className={cn(props.monospace === true && 'dshx:font-mono! dshx:text-xs')}
           name={field.name}
           onBlur={field.handleBlur}
           onChange={event => field.handleChange(event.currentTarget.value)}

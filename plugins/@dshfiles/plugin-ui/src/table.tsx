@@ -1,8 +1,8 @@
 import type { Column, ReactTable, RowData, SortDirection, TableFeatures } from '@tanstack/react-table'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
-import { cn } from './lib/utils'
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table.js'
+import { cn } from './lib/utils.js'
 
 export * from '@tanstack/react-table'
 
