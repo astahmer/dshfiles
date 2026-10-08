@@ -1,6 +1,11 @@
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { useEffect, useState } from 'react'
 import { workspaceNameSchema, type Mutation, type Revision } from './api.js'
-import styles from './jujutsu.module.css'
 
 interface WorkspaceProvisionerProps {
   readonly revisions: readonly Revision[]
@@ -56,53 +61,80 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
   const canPreview = parentPath.length > 0 && validName && baseCommitId.length > 0
 
   return (
-    <section className={styles.sessionTools} aria-labelledby="jj-workspace-provision-title">
-      <h2 id="jj-workspace-provision-title">Provision an isolated workspace</h2>
-      <p className={styles.muted}>JJ adds a sibling workspace at the chosen revision. This repository’s current working files stay in place.</p>
-      <div className={styles.sessionToolGrid}>
-        <label>
-          Base revision
-          <select aria-label="Workspace base revision" value={baseCommitId} onChange={event => setBaseCommitId(event.target.value)}>
-            {props.revisions.map(revision => (
-              <option key={revision.commitId} value={revision.commitId}>
-                {revision.shortestChangeId} · {revision.description.split('\n')[0] || '(no description)'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Workspace name
-          <input aria-label="Workspace name" value={name} onChange={event => setName(event.target.value)} placeholder="review-feature" />
-        </label>
-        <button type="button" className={styles.secondary} onClick={() => void chooseParent()}>
-          Choose parent directory
-        </button>
-        <span className={styles.sessionPath} title={parentPath || undefined}>
-          {parentPath || 'No parent directory selected'}
-        </span>
-        <button
-          type="button"
+    <Card aria-labelledby="jj-workspace-provision-title" className="dshx:gap-3" role="region">
+      <CardHeader>
+        <CardTitle className="dshx:text-sm" id="jj-workspace-provision-title">
+          Provision an isolated workspace
+        </CardTitle>
+        <CardDescription className="dshx:text-xs">
+          JJ adds a sibling workspace at the chosen revision. This repository’s current working files stay in place.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="dshx:flex dshx:flex-col dshx:gap-2.5">
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label className="dshx:text-xs dshx:text-muted-foreground">Base revision</Label>
+          <Select onValueChange={setBaseCommitId} value={baseCommitId}>
+            <SelectTrigger aria-label="Workspace base revision" className="dshx:w-full dshx:text-xs" size="sm">
+              <SelectValue placeholder="No revisions" />
+            </SelectTrigger>
+            <SelectContent>
+              {props.revisions.map(revision => (
+                <SelectItem key={revision.commitId} value={revision.commitId}>
+                  <span className="dshx:font-mono dshx:text-info">{revision.shortestChangeId}</span> {revision.description.split('\n')[0] || '(no description)'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label className="dshx:text-xs dshx:text-muted-foreground" htmlFor="jj-workspace-name">
+            Workspace name
+          </Label>
+          <Input
+            aria-invalid={name.length > 0 && !validName}
+            aria-label="Workspace name"
+            className="dshx:h-7 dshx:font-mono! dshx:text-xs dshx:md:text-xs"
+            id="jj-workspace-name"
+            onChange={event => setName(event.target.value)}
+            placeholder="review-feature"
+            value={name}
+          />
+        </div>
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+          <Button onClick={() => void chooseParent()} size="sm" type="button" variant="outline">
+            Choose parent directory
+          </Button>
+          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={parentPath || undefined}>
+            {parentPath || 'No parent directory selected'}
+          </span>
+        </div>
+        <Button
+          className="dshx:self-start"
           disabled={!canPreview || props.revisions.length === 0}
-          onClick={() => void props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: baseCommitId })}
+          onClick={() => props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: baseCommitId })}
+          size="sm"
+          type="button"
         >
           Preview workspace setup
-        </button>
-      </div>
-      {props.provisionedPath !== null && (
-        <div className={styles.sessionToolAction}>
-          <span className={styles.sessionPath} title={props.provisionedPath}>
-            Created: {props.provisionedPath}
-          </span>
-          <button type="button" className={styles.secondary} disabled={launching} onClick={() => void createSession()}>
-            {launching ? 'Opening…' : 'Open a DSH Session here'}
-          </button>
-        </div>
-      )}
-      {error !== null && (
-        <p className={styles.sessionToolError} role="alert">
-          {error}
-        </p>
-      )}
-    </section>
+        </Button>
+        {props.provisionedPath !== null && (
+          <Alert className="dshx:px-3 dshx:py-2" variant="success">
+            <AlertDescription className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-xs">
+              <span className="dshx:w-full dshx:truncate dshx:font-mono dshx:text-foreground" title={props.provisionedPath}>
+                Created: {props.provisionedPath}
+              </span>
+              <Button disabled={launching} onClick={() => void createSession()} size="xs" type="button" variant="outline">
+                {launching ? 'Opening…' : 'Open a DSH Session here'}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {error !== null && (
+          <Alert className="dshx:px-3 dshx:py-2" role="alert" variant="destructive">
+            <AlertDescription className="dshx:text-xs">{error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -12,6 +12,7 @@ export interface GraphLaneEdge {
 export interface RevisionGraphRow {
   readonly commitId: string
   readonly commitLane: number
+  readonly incoming: boolean
   readonly laneCount: number
   readonly topLanes: readonly number[]
   readonly bottomLanes: readonly number[]
@@ -94,6 +95,7 @@ export const layoutRevisionGraph = (
 
   for (const revision of revisions) {
     let commitLane = lanes.indexOf(revision.commitId)
+    const incoming = commitLane >= 0
     if (commitLane < 0) {
       const rightmostActiveLane = lanes.reduce((rightmost, commitId, lane) => (commitId === null ? rightmost : lane), -1)
       commitLane = firstOpenLane(lanes, rightmostActiveLane < 0 ? 0 : rightmostActiveLane + 1)
@@ -118,6 +120,7 @@ export const layoutRevisionGraph = (
     rows.push({
       commitId: revision.commitId,
       commitLane,
+      incoming,
       laneCount: Math.max(lanes.length, nextLanes.length, commitLane + 1),
       topLanes,
       bottomLanes,

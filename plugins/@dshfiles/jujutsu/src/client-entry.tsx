@@ -67,12 +67,12 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.8"
+    strokeWidth="1.5"
     strokeLinecap="round"
   >
-    <path d="M6 4v16M6 7h7m-7 5h9m-9 5h7" />
-    <circle cx="6" cy="4" r="2" fill="currentColor" />
-    <circle cx="6" cy="12" r="2" fill="currentColor" />
-    <circle cx="6" cy="20" r="2" fill="currentColor" />
+    <path d="M7 7.5v9M7 12.5c0-2.5 2-4 5-4h1.5" />
+    <circle cx="7" cy="5" r="2.5" fill="currentColor" />
+    <circle cx="7" cy="19" r="2.5" />
+    <circle cx="16.5" cy="8.5" r="2.5" />
   </svg>
 )

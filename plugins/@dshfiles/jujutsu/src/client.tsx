@@ -2,21 +2,45 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
-  Button,
-  Checkbox,
-  IconCloseOutlineRegular,
-  IconRefreshOutlineRegular,
-  IconSearchOutlineRegular,
-  Input,
-  SegmentedTabs,
-  Tag,
-  Tooltip,
-} from '@deepseek-ai/dsh-client-ui-primitives'
-import { ConfirmDialog, EmptyState, Field, Notice, Select, TextArea } from '@dshfiles/plugin-ui'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { CalendarIcon, ChevronRightIcon, EllipsisVerticalIcon, RefreshCwIcon, SearchIcon, UserIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { Mutation, Revision } from './api.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
@@ -25,7 +49,6 @@ import { SessionForkPanel } from './session-fork-panel.js'
 import { WorkspaceProvisioner } from './workspace-provisioner.js'
 import { WorkspaceRestorePanel } from './workspace-restore-panel.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
-import styles from './jujutsu.module.css'
 
 type View = 'graph' | 'source'
 
@@ -46,7 +69,18 @@ const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
 const SELECTED_REPO_KEY = 'dshfiles.jujutsu.selected'
 const REVIEW_PROGRESS_KEY = 'dshfiles.jujutsu.review-progress.v1'
 const REPO_HISTORY_LIMIT = 12
-const ANCESTOR_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 8, 10].map(count => ({ value: String(count), label: String(count) }))
+const ANCESTOR_LIMIT_OPTIONS = ['1', '2', '3', '4', '5', '8', '10']
+const LANE_GAP = 10
+const LANE_OFFSET = 8
+const LANE_STROKES = ['dshx:stroke-chart-1', 'dshx:stroke-chart-2', 'dshx:stroke-chart-3', 'dshx:stroke-chart-4', 'dshx:stroke-chart-5'] as const
+
+const SECTION_HEADING = 'dshx:flex dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-3 dshx:pb-1.5 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground'
+const COMPACT_TEXTAREA = 'dshx:min-h-12 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:md:text-xs'
+const CODE_BLOCK =
+  'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-snug dshx:whitespace-pre'
+const DISCLOSURE_TRIGGER =
+  'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground dshx:hover:text-foreground'
+const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
 
 const repoHistorySchema = z.array(z.string()).catch([])
 
@@ -115,11 +149,14 @@ const firstLine = (description: string): string => description.split('\n')[0] ||
 
 const editableDescription = (description: string): string => description.replace(/\n+$/, '')
 
+const laneCenter = (lane: number): number => LANE_OFFSET + lane * LANE_GAP
+
+const laneStroke = (lane: number): string => LANE_STROKES[lane % LANE_STROKES.length] ?? LANE_STROKES[0]
+
 export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const sidePanel = props.surface === 'side-panel'
   const api = useApi(jujutsuApi)
   const queryClient = useQueryClient()
-  const viewIdPrefix = useId()
   const autoRegisterPath = useRef<string | null>(null)
   const [path, setPath] = useState(() => readStorage(SELECTED_REPO_KEY) ?? '')
   const [repoId, setRepoId] = useState<string | null>(null)
@@ -131,6 +168,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [hideImmutable, setHideImmutable] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [showSearch, setShowSearch] = useState(!sidePanel)
+  const [showDates, setShowDates] = useState(false)
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
   const [reviewStore, setReviewStore] = useState<ReviewStore>(() => readReviewStore(readStorage(REVIEW_PROGRESS_KEY)))
   const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
@@ -247,7 +286,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state, revisionsByCommitId, hideImmutable])
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
   const graphLaneCount = graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1)
-  const graphWidth = graphLaneCount * 14
+  const graphWidth = laneCenter(graphLaneCount - 1) + LANE_OFFSET
   const groups = useMemo(() => groupRows(visibleRevisions), [visibleRevisions])
   const selectedDescribeText =
     selectedRevision === undefined ? '' : (describeDrafts[selectedRevision.commitId] ?? editableDescription(selectedRevision.description))
@@ -294,6 +333,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     confirmMutation.mutate({ repoId, previewId })
   }
 
+  const refreshRepository = (): void => {
+    if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
+  }
+
   const updateFileReview = (file: ReviewFile, reviewed: boolean): void => {
     if (state === undefined || selectedRevision === undefined || file.contentDigest === null) return
     const next = toggleFileReview(
@@ -324,683 +367,864 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     else if (draggedRevision) askForConfirmation({ kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId })
   }
 
-  const selectRevision = (revision: Revision | null): void =>
-    setSelection(revision === null ? null : { commitId: revision.commitId, changeId: revision.changeId })
+  const toggleRevision = (revision: Revision): void =>
+    setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
 
-  const views = [
-    { value: 'graph', label: 'Revision graph', id: `${viewIdPrefix}-graph`, panelId: `${viewIdPrefix}-graph-panel` },
-    { value: 'source', label: 'Source Control', id: `${viewIdPrefix}-source`, panelId: `${viewIdPrefix}-source-panel` },
-  ] as const
-  const activeView = views.find(item => item.value === view) ?? views[0]
+  const pathMatchesLoadedRepository = state !== undefined && path.trim() === state.root
+  const lastPushLabel =
+    state === undefined
+      ? ''
+      : state.lastPushAt
+        ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
+        : state.lastPushHistoryTruncated
+          ? 'not found before the operation-history limit'
+          : 'not found in the latest 1,000 operations'
 
-  return (
-    <main className={sidePanel ? `${styles.panel} ${styles.sidePanel}` : styles.panel}>
-      <header className={styles.header}>
-        <div className={styles.titleRow}>
-          <div>
-            <h1 className={styles.title}>Jujutsu</h1>
-            <div className={styles.muted}>{state?.root ?? 'Select a repository to inspect its revision graph.'}</div>
-          </div>
-          <Button
-            disabled={busy || repoId === null}
-            icon={<IconRefreshOutlineRegular />}
-            onClick={() => {
-              if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
-            }}
-            size={sidePanel ? 'sm' : undefined}
-            type="button"
-            variant="outline"
-          >
-            Refresh
-          </Button>
+  const revisionDetails = (revision: Revision): ReactNode => {
+    const repositoryRoot = state?.root ?? ''
+    const visibleFiles = details?.files.filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)) ?? []
+    return (
+      <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-2 dshx:pr-3 dshx:text-xs">
+        {revision.description.includes('\n') && (
+          <p className="dshx:whitespace-pre-wrap dshx:text-muted-foreground">{editableDescription(revision.description)}</p>
+        )}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
+          <span>{revision.author || 'Unknown author'}</span>
+          <span aria-hidden>·</span>
+          <time dateTime={revision.authorTime}>{new Date(revision.authorTime).toLocaleString()}</time>
+          <span aria-hidden>·</span>
+          <span className="dshx:font-mono" title={revision.commitId}>
+            {revision.commitId.slice(0, 12)}
+          </span>
+          {revision.immutable && (
+            <Badge className={COMPACT_BADGE} variant="outline">
+              immutable
+            </Badge>
+          )}
         </div>
-        {sidePanel && <SegmentedTabs className={styles.tabs} items={views} label="Jujutsu views" onChange={setView} value={view} />}
-        <form
-          className={styles.repoForm}
-          onSubmit={event => {
-            event.preventDefault()
-            if (path.trim().length > 0) registerMutation.mutate(path.trim())
-          }}
-        >
-          <div className={styles.repoPathControls}>
-            <Input
-              aria-label="Repository path"
-              className={styles.repoPath}
-              list="jj-repositories"
-              onChange={event => setPath(event.target.value)}
-              placeholder="/path/to/repository"
-              value={path}
-            />
-            <datalist id="jj-repositories">
-              {repoHistory.map(item => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-            <Button
-              disabled={busy || path.trim().length === 0}
-              size={sidePanel ? 'sm' : undefined}
-              type="submit"
-              variant={repoId === null ? 'primary' : 'outline'}
-            >
-              {repoId === null ? 'Open repository' : 'Select repository'}
-            </Button>
-          </div>
-          <div className={styles.repoActionGroup}>
-            <Select
-              aria-label="Remote"
-              disabled={remoteNames.length === 0}
-              onValueChange={setRemote}
-              options={remoteNames.map(name => ({ value: name, label: name }))}
-              value={selectedRemote}
+        {!revision.immutable && (
+          <div className="dshx:flex dshx:items-start dshx:gap-1.5">
+            <Textarea
+              aria-label="New description"
+              className={COMPACT_TEXTAREA}
+              onChange={event => setDescribeDrafts(current => ({ ...current, [revision.commitId]: event.target.value }))}
+              rows={2}
+              value={selectedDescribeText}
             />
             <Button
-              disabled={repoId === null || selectedRemote === '' || busy}
-              onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
-              size={sidePanel ? 'sm' : undefined}
+              disabled={!selectedDescribeChanged}
+              onClick={() => askForConfirmation({ kind: 'describe', commitId: revision.commitId, message: selectedDescribeText })}
+              size="xs"
               type="button"
               variant="outline"
             >
-              Fetch
+              Preview describe
             </Button>
           </div>
-          <div className={styles.repoActionGroup}>
-            <Select
-              aria-label="Bookmark to push"
-              disabled={selectedBookmark === ''}
-              onValueChange={setBookmark}
-              options={localBookmarkNames.map(name => ({ value: name, label: name }))}
-              value={selectedBookmark}
-            />
-            <Button
-              disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
-              onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
-              size={sidePanel ? 'sm' : undefined}
-              type="button"
-              variant="outline"
-            >
-              Push
-            </Button>
+        )}
+        {details === undefined ? (
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
+            <Spinner className="dshx:size-3" />
+            Loading revision details…
           </div>
-        </form>
-        {state !== undefined && (
+        ) : (
           <>
-            <Tooltip label={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'} side="bottom">
-              <div className={styles.statusLine}>
-                Last recorded JJ push command:{' '}
-                {state.lastPushAt
-                  ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
-                  : state.lastPushHistoryTruncated
-                    ? 'not found before the operation-history limit'
-                    : 'not found in the latest 1,000 operations'}
-              </div>
-            </Tooltip>
-            {state.evolutionHistoryTruncated && <div className={styles.statusLine}>Evolution scan limited; some evolved markers may be missing.</div>}
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground">
+              <span className="dshx:font-semibold dshx:uppercase dshx:tracking-wide">Files</span>
+              <span className="dshx:font-mono">{details.files.length}</span>
+              <span className="dshx:font-mono dshx:text-success">+{details.additions}</span>
+              <span className="dshx:font-mono dshx:text-destructive">−{details.deletions}</span>
+              <span>
+                {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
+              </span>
+              {details.truncated && (
+                <Badge className={COMPACT_BADGE} variant="warning">
+                  diff truncated; counts partial
+                </Badge>
+              )}
+              <Label className="dshx:ml-auto dshx:gap-1.5 dshx:text-[11px] dshx:font-normal">
+                <Checkbox checked={hideReviewedFiles} className="dshx:size-3.5" onCheckedChange={checked => setHideReviewedFiles(checked === true)} />
+                Hide reviewed files
+              </Label>
+            </div>
+            {reviewNotice.length > 0 && (
+              <p className="dshx:text-muted-foreground" role="status">
+                {reviewNotice}
+              </p>
+            )}
+            <ul className="dshx:ml-1 dshx:flex dshx:flex-col dshx:border-l dshx:pl-2">
+              {visibleFiles.map(file => (
+                <li className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-1 dshx:hover:bg-accent" key={file.path}>
+                  <Checkbox
+                    aria-label={`Mark ${file.path} reviewed`}
+                    checked={isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)}
+                    className="dshx:size-3.5"
+                    disabled={file.contentDigest === null}
+                    onCheckedChange={checked => updateFileReview(file, checked === true)}
+                  />
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-[11px]" title={file.path}>
+                    {file.path}
+                  </span>
+                  <span className="dshx:font-mono dshx:text-[11px] dshx:text-success">+{file.additions}</span>
+                  <span className="dshx:font-mono dshx:text-[11px] dshx:text-destructive">−{file.deletions}</span>
+                </li>
+              ))}
+            </ul>
+            {hideReviewedFiles && details.files.length > 0 && visibleFiles.length === 0 && (
+              <p className="dshx:text-muted-foreground">All reviewable files are hidden.</p>
+            )}
+            <Collapsible>
+              <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
+                <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
+                Change evolution
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className={CODE_BLOCK}>{details.evolution}</pre>
+              </CollapsibleContent>
+            </Collapsible>
+            <Collapsible defaultOpen={!sidePanel}>
+              <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
+                <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
+                Diff
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className={CODE_BLOCK}>{details.patch}</pre>
+              </CollapsibleContent>
+            </Collapsible>
           </>
         )}
-        {!sidePanel && <SegmentedTabs className={styles.tabs} items={views} label="Jujutsu views" onChange={setView} value={view} />}
-      </header>
-
-      <div className={styles.messages}>
-        {errorMessages.map(message => (
-          <Notice key={message} tone="danger">
-            {message}
-          </Notice>
-        ))}
-        {confirmMutation.data !== undefined && confirmMutation.data.output.length > 0 && (
-          <Notice tone="success">
-            <pre className={styles.code}>{confirmMutation.data.output}</pre>
-          </Notice>
-        )}
-        {busy && !loadingRepository && <Notice tone="info">Working…</Notice>}
       </div>
+    )
+  }
 
-      {!sidePanel && <SessionForkPanel sessions={props.sessions} openSession={props.openSession} />}
-      {!sidePanel && state !== undefined && (
-        <WorkspaceProvisioner
-          revisions={state.revisions}
-          selectedCommitId={selectedRevision?.commitId ?? null}
-          provisionedPath={provisionedPath}
-          onPreview={askForConfirmation}
-          pickDirectory={props.pickDirectory}
-          launchSession={props.launchSession}
-        />
-      )}
-      {!sidePanel && state !== undefined && (
-        <WorkspaceRestorePanel
-          sessions={props.sessions}
-          workspacePath={state.root}
-          targetCommitId={selectedRevision?.commitId ?? null}
-          onRestored={() => {
-            if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
-          }}
-        />
-      )}
-
-      <section aria-labelledby={activeView.id} className={view === 'graph' ? undefined : styles.sourceView} id={activeView.panelId} role="tabpanel">
-        {state === undefined ? (
-          loadingRepository ? (
-            <EmptyState compact title="Loading repository…" />
-          ) : (
-            <EmptyState compact title="Choose a repository path above to open its revision graph." />
-          )
-        ) : view === 'graph' ? (
-          <>
-            <div className={styles.filters}>
+  const graphView =
+    state === undefined ? null : (
+      <>
+        <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5">
+          <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1">
+            <Toggle
+              className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
+              onPressedChange={setMineOnly}
+              pressed={mineOnly}
+              size="sm"
+            >
+              <UserIcon className="dshx:size-3.5" />
+              Mine
+            </Toggle>
+            <Label className="dshx:gap-1.5 dshx:px-1.5 dshx:font-mono dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+              <Checkbox checked={hideImmutable} onCheckedChange={checked => setHideImmutable(checked === true)} />
+              Hide immutable
+            </Label>
+            <Button
+              aria-label="Filter by date"
+              aria-pressed={showDates}
+              className={cn('dshx:text-muted-foreground', (showDates || fromDate || toDate) && 'dshx:bg-accent dshx:text-foreground')}
+              onClick={() => setShowDates(current => !current)}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <CalendarIcon />
+            </Button>
+            <Button
+              aria-label="Show search"
+              aria-pressed={showSearch}
+              className={cn('dshx:text-muted-foreground', (showSearch || textFilter || authorFilter) && 'dshx:bg-accent dshx:text-foreground')}
+              onClick={() => setShowSearch(current => !current)}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <SearchIcon />
+            </Button>
+          </div>
+          {showSearch && (
+            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
+              <InputGroup className="dshx:h-7 dshx:flex-1">
+                <InputGroupInput
+                  aria-label="Search revisions"
+                  autoFocus={sidePanel}
+                  className="dshx:text-xs dshx:md:text-xs"
+                  onChange={event => setTextFilter(event.target.value)}
+                  placeholder={sidePanel ? 'Search revisions…' : 'Search descriptions, IDs, bookmarks, tags, workspaces'}
+                  value={textFilter}
+                />
+                <InputGroupAddon>
+                  <SearchIcon className="dshx:size-3.5" />
+                </InputGroupAddon>
+              </InputGroup>
               {!sidePanel && (
                 <Input
                   aria-label="Filter author"
-                  className={styles.filterInput}
+                  className="dshx:h-7 dshx:w-48 dshx:text-xs dshx:md:text-xs"
                   onChange={event => setAuthorFilter(event.target.value)}
                   placeholder="Author"
                   value={authorFilter}
                 />
               )}
+            </div>
+          )}
+          {showDates && (
+            <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
               <Input
-                aria-label="Search revisions"
-                className={styles.filterInput}
-                icon={<IconSearchOutlineRegular />}
-                onChange={event => setTextFilter(event.target.value)}
-                placeholder={sidePanel ? 'Search revisions…' : 'Search descriptions, IDs, bookmarks, tags, workspaces'}
-                value={textFilter}
+                aria-label="From date"
+                className="dshx:h-7 dshx:w-auto dshx:text-xs dshx:md:text-xs"
+                onChange={event => setFromDate(event.target.value)}
+                type="date"
+                value={fromDate}
               />
-              <Checkbox checked={mineOnly} label="Mine" onChange={setMineOnly} />
-              <Checkbox checked={hideImmutable} label="Hide immutable" onChange={setHideImmutable} />
-              {!sidePanel && (
-                <>
-                  <Field className={styles.dateField} label="From">
-                    {control => <Input {...control} onChange={event => setFromDate(event.target.value)} type="date" value={fromDate} />}
-                  </Field>
-                  <Field className={styles.dateField} label="To">
-                    {control => <Input {...control} onChange={event => setToDate(event.target.value)} type="date" value={toDate} />}
-                  </Field>
-                  {selectedRevision !== undefined && (
-                    <>
-                      <div className={styles.titleRow}>
-                        <h2>Revision {selectedRevision.shortestChangeId}</h2>
-                        <button type="button" className={styles.secondary} onClick={() => setSelection(null)}>
-                          Close
-                        </button>
-                      </div>
-                      <p>{selectedRevision.description || '(no description)'}</p>
-                      <div className={styles.detailMeta}>
-                        {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
-                      </div>
-                      {details ? (
-                        <>
-                          <div className={styles.counts}>
-                            {details.files.length} files · +{details.additions} −{details.deletions}
-                            <span>
-                              {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
-                            </span>
-                            {details.truncated && <span className={styles.tag}>diff truncated; counts partial</span>}
-                          </div>
-                          <label className={styles.reviewFilter}>
-                            <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
-                            Hide reviewed files
-                          </label>
-                          {reviewNotice.length > 0 && (
-                            <p role="status" className={styles.muted}>
-                              {reviewNotice}
-                            </p>
-                          )}
-                          <ul className={styles.fileList}>
-                            {details.files
-                              .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file))
-                              .map(file => {
-                                const reviewed = isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)
-                                return (
-                                  <li className={styles.reviewRow} key={file.path}>
-                                    <span className={styles.reviewPath}>{file.path}</span>
-                                    <span>
-                                      +{file.additions} −{file.deletions}
-                                    </span>
-                                    <label className={styles.reviewControl}>
-                                      <input
-                                        type="checkbox"
-                                        aria-label={`Mark ${file.path} reviewed`}
-                                        checked={reviewed}
-                                        disabled={file.contentDigest === null}
-                                        onChange={event => updateFileReview(file, event.target.checked)}
-                                      />
-                                      Reviewed
-                                    </label>
-                                  </li>
-                                )
-                              })}
-                          </ul>
-                          {hideReviewedFiles &&
-                            details.files.length > 0 &&
-                            details.files.every(file => isFileReviewed(reviewStore, state.root, selectedRevision.commitId, file)) && (
-                              <p className={styles.muted}>All reviewable files are hidden.</p>
-                            )}
-                          <details>
-                            <summary>Change evolution</summary>
-                            <pre>{details.evolution}</pre>
-                          </details>
-                          <details open>
-                            <summary>Diff</summary>
-                            <pre className={styles.diff}>{details.patch}</pre>
-                          </details>
-                        </>
-                      ) : (
-                        <p className={styles.muted}>Loading revision details…</p>
-                      )}
-                      {!selectedRevision.immutable && (
-                        <div className={styles.actionBox}>
-                          <label>
-                            New description
-                            <textarea
-                              value={selectedDescribeText}
-                              onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
-                              rows={3}
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            disabled={!selectedDescribeChanged}
-                            onClick={() => void askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
-                          >
-                            Preview describe
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
+              <span aria-hidden>→</span>
+              <Input
+                aria-label="To date"
+                className="dshx:h-7 dshx:w-auto dshx:text-xs dshx:md:text-xs"
+                onChange={event => setToDate(event.target.value)}
+                type="date"
+                value={toDate}
+              />
             </div>
-            <div
-              className={
-                sidePanel && selectedRevision !== undefined
-                  ? `${styles.graphColumns} ${styles.sideDetailsOpen}`
-                  : !sidePanel && selectedRevision === undefined
-                    ? `${styles.graphColumns} ${styles.graphOnly}`
-                    : styles.graphColumns
-              }
-            >
-              <div className={styles.revisionList}>
-                {groups.map(group => (
-                  <div className={styles.dayGroup} key={group.day}>
-                    <div className={styles.dayHeading}>{group.day}</div>
-                    {group.rows.map(revision => {
-                      const graphLayout = graphRowsByCommitId.get(revision.commitId)
-                      if (graphLayout === undefined) return null
-                      return (
-                        <RevisionRow
-                          graphLayout={graphLayout}
-                          graphWidth={graphWidth}
-                          key={revision.commitId}
-                          onDrop={event => dropOn(event, revision)}
-                          onSelect={() => selectRevision(revision)}
-                          revision={revision}
-                          selected={selectedRevision?.commitId === revision.commitId}
-                          sidePanel={sidePanel}
+          )}
+        </div>
+        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain dshx:pb-4">
+          {groups.map(group => {
+            const firstLayout = group.rows.map(revision => graphRowsByCommitId.get(revision.commitId)).find(layout => layout !== undefined)
+            return (
+              <section aria-label={group.day} key={group.day}>
+                <div className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:h-[18px] dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
+                  <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
+                    {firstLayout !== undefined &&
+                      [...firstLayout.topLanes, ...(firstLayout.incoming ? [firstLayout.commitLane] : [])].map(lane => (
+                        <line
+                          className={laneStroke(lane)}
+                          key={lane}
+                          strokeOpacity={0.8}
+                          strokeWidth={1.25}
+                          x1={laneCenter(lane)}
+                          x2={laneCenter(lane)}
+                          y1={0}
+                          y2={18}
                         />
-                      )
-                    })}
-                  </div>
-                ))}
-                {visibleRevisions.length === 0 && <EmptyState compact title="No revisions match these filters." />}
-              </div>
-              {sidePanel && selectedRevision !== undefined && (
-                <aside className={styles.details}>
-                  <>
-                    <div className={styles.titleRow}>
-                      <h2 className={styles.heading}>Revision {selectedRevision.shortestChangeId}</h2>
-                      <Button icon={<IconCloseOutlineRegular />} onClick={() => selectRevision(null)} size="sm" type="button" variant="ghost">
-                        Close
-                      </Button>
-                    </div>
-                    <p className={styles.fullDescription}>{selectedRevision.description || '(no description)'}</p>
-                    <div className={styles.muted}>
-                      {selectedRevision.author} · {new Date(selectedRevision.authorTime).toLocaleString()}
-                    </div>
-                    {details === undefined ? (
-                      <EmptyState compact title="Loading revision details…" />
-                    ) : (
-                      <>
-                        <div className={styles.counts}>
-                          {details.files.length} files · +{details.additions} −{details.deletions}
-                          <span>
-                            {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} files reviewed
-                          </span>
-                          {details.truncated && <Tag tone="warning">diff truncated; counts partial</Tag>}
-                        </div>
-                        <label className={styles.reviewFilter}>
-                          <input type="checkbox" checked={hideReviewedFiles} onChange={event => setHideReviewedFiles(event.target.checked)} />
-                          Hide reviewed files
-                        </label>
-                        {reviewNotice.length > 0 && (
-                          <p role="status" className={styles.muted}>
-                            {reviewNotice}
-                          </p>
-                        )}
-                        <ul className={styles.fileList}>
-                          {details.files
-                            .filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, state?.root ?? '', selectedRevision.commitId, file))
-                            .map(file => {
-                              const reviewed = isFileReviewed(reviewStore, state?.root ?? '', selectedRevision.commitId, file)
-                              return (
-                                <li className={styles.reviewRow} key={file.path}>
-                                  <span className={styles.reviewPath}>{file.path}</span>
-                                  <span>
-                                    +{file.additions} −{file.deletions}
-                                  </span>
-                                  <label className={styles.reviewControl}>
-                                    <input
-                                      type="checkbox"
-                                      aria-label={`Mark ${file.path} reviewed`}
-                                      checked={reviewed}
-                                      disabled={file.contentDigest === null}
-                                      onChange={event => updateFileReview(file, event.target.checked)}
-                                    />
-                                    Reviewed
-                                  </label>
-                                </li>
-                              )
-                            })}
-                        </ul>
-                        {hideReviewedFiles && selectedReviewProgress.total > 0 && selectedReviewProgress.reviewed === selectedReviewProgress.total && (
-                          <p className={styles.muted}>All reviewable files are hidden.</p>
-                        )}
-                        <details className={styles.disclosure}>
-                          <summary>Change evolution</summary>
-                          <pre className={styles.code}>{details.evolution}</pre>
-                        </details>
-                        <details className={styles.disclosure} open>
-                          <summary>Diff</summary>
-                          <pre className={styles.code}>{details.patch}</pre>
-                        </details>
-                      </>
-                    )}
-                    {!selectedRevision.immutable && (
-                      <div className={styles.actionBox}>
-                        <Field label="New description">
-                          {control => (
-                            <TextArea
-                              {...control}
-                              onChange={event => setDescribeDrafts(current => ({ ...current, [selectedRevision.commitId]: event.target.value }))}
-                              rows={3}
-                              value={selectedDescribeText}
-                            />
-                          )}
-                        </Field>
-                        <Button
-                          disabled={!selectedDescribeChanged}
-                          onClick={() => askForConfirmation({ kind: 'describe', commitId: selectedRevision.commitId, message: selectedDescribeText })}
-                          type="button"
-                          variant="primary"
-                        >
-                          Preview describe
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                </aside>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className={styles.sourceSummary}>
-              <div>
-                <h2 className={styles.heading}>Working copy</h2>
-                <pre className={styles.workingStatus}>{state.status || 'Clean working copy.'}</pre>
-              </div>
-              <div className={styles.sourceActions}>
-                <Button
-                  onClick={() => {
-                    if (showWorkingDiff) void workingDiffQuery.refetch()
-                    else setShowWorkingDiff(true)
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Show full diff
-                </Button>
-                <Field label="Ancestor groups">
-                  {control => (
-                    <Select
-                      {...control}
-                      onValueChange={value => setAncestorLimit(Number(value))}
-                      options={ANCESTOR_LIMIT_OPTIONS}
-                      value={String(ancestorLimit)}
-                    />
-                  )}
-                </Field>
-              </div>
-            </div>
-            {workingDiffQuery.data !== undefined && (
-              <details className={styles.disclosure} open>
-                <summary>Working-copy diff</summary>
-                <pre className={styles.code}>{workingDiffQuery.data.patch}</pre>
-              </details>
-            )}
-            <div className={styles.sourceColumns}>
-              <div className={styles.ancestorList}>
-                <h3 className={styles.subheading}>Ancestor groups</h3>
-                {ancestors.map(({ depth, revision }) => (
-                  <button className={styles.ancestor} key={revision.commitId} onClick={() => setSquashTarget(revision.commitId)} type="button">
-                    <span>@-{depth}</span>
-                    <span className={styles.ancestorTitle}>{firstLine(revision.description)}</span>
-                    <code className={styles.changeId}>{revision.shortestChangeId}</code>
-                  </button>
-                ))}
-                {ancestors.length === 0 && <EmptyState compact title="No visible @-1 ancestors in this graph window." />}
-              </div>
-              <div className={styles.sourceActions}>
-                <h3 className={styles.subheading}>Describe working copy</h3>
-                <TextArea
-                  aria-label="Working copy description"
-                  onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))}
-                  rows={3}
-                  value={workingDescribeText}
-                />
-                {workingCopy && (
-                  <Button
-                    disabled={!workingDescribeChanged}
-                    onClick={() => askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}
-                    type="button"
-                    variant="primary"
-                  >
-                    Preview describe
-                  </Button>
-                )}
-                <h3 className={styles.subheading}>Split selected files from @</h3>
-                <div className={styles.fileChoices}>
-                  {state.changedPaths.map(file => {
-                    const selectable = safeSplitPath(file)
-                    return (
+                      ))}
+                  </svg>
+                  <span className="dshx:truncate">{group.day}</span>
+                  <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{group.rows.length}</span>
+                </div>
+                {group.rows.map(revision => {
+                  const graphLayout = graphRowsByCommitId.get(revision.commitId)
+                  if (graphLayout === undefined) return null
+                  const expanded = selectedRevision?.commitId === revision.commitId
+                  return (
+                    <RevisionRow
+                      expanded={expanded}
+                      graphLayout={graphLayout}
+                      graphWidth={graphWidth}
+                      key={revision.commitId}
+                      onDrop={event => dropOn(event, revision)}
+                      onToggle={() => toggleRevision(revision)}
+                      revision={revision}
+                      sidePanel={sidePanel}
+                    >
+                      {expanded && revisionDetails(revision)}
+                    </RevisionRow>
+                  )
+                })}
+              </section>
+            )
+          })}
+          {visibleRevisions.length === 0 && (
+            <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
+              <EmptyHeader>
+                <EmptyTitle className="dshx:text-sm">No revisions match these filters.</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </div>
+      </>
+    )
+
+  const sourceView =
+    state === undefined ? null : (
+      <div className={cn('dshx:grid dshx:content-start dshx:pb-4', !sidePanel && 'dshx:md:grid-cols-2 dshx:md:divide-x')}>
+        <section aria-labelledby="jj-working-copy-heading" className="dshx:flex dshx:min-w-0 dshx:flex-col">
+          <h2 className={SECTION_HEADING} id="jj-working-copy-heading">
+            Working copy
+            <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-[10px] dshx:font-normal">{state.changedPaths.length}</span>
+            <Button
+              className="dshx:ml-auto dshx:normal-case dshx:tracking-normal"
+              onClick={() => {
+                if (showWorkingDiff) void workingDiffQuery.refetch()
+                else setShowWorkingDiff(true)
+              }}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              Show full diff
+            </Button>
+          </h2>
+          {state.changedPaths.length === 0 ? (
+            <p className="dshx:px-3 dshx:text-xs dshx:text-muted-foreground">Clean working copy.</p>
+          ) : (
+            <ul aria-label="Split selected files from @" className="dshx:flex dshx:flex-col dshx:px-2">
+              {state.changedPaths.map(file => {
+                const selectable = safeSplitPath(file)
+                return (
+                  <li key={file}>
+                    <Label
+                      className={cn(
+                        'dshx:h-6 dshx:gap-2 dshx:rounded-sm dshx:px-1 dshx:text-xs dshx:font-normal dshx:hover:bg-accent',
+                        !selectable && 'dshx:text-muted-foreground',
+                      )}
+                    >
                       <Checkbox
                         checked={splitPaths.includes(file)}
+                        className="dshx:size-3.5"
                         disabled={!selectable}
-                        key={file}
-                        label={selectable ? file : `${file} — unsafe path format unavailable`}
-                        onChange={checked => setSplitPaths(current => (checked ? [...current, file] : current.filter(item => item !== file)))}
+                        onCheckedChange={checked => setSplitPaths(current => (checked === true ? [...current, file] : current.filter(item => item !== file)))}
                       />
-                    )
-                  })}
-                </div>
-                <TextArea
-                  aria-label="Split description"
-                  onChange={event => setSplitText(event.target.value)}
-                  placeholder="Description for selected changes"
-                  rows={2}
-                  value={splitText}
-                />
-                {workingCopy && (
-                  <Button
-                    disabled={splitPaths.length === 0 || splitText.trim().length === 0}
-                    onClick={() => askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}
-                    type="button"
-                    variant="primary"
-                  >
-                    Preview split
-                  </Button>
-                )}
-                <h3 className={styles.subheading}>Squash working copy into ancestor</h3>
-                <Select
-                  aria-label="Squash destination"
-                  onValueChange={setSquashTarget}
-                  options={[
-                    { value: '', label: 'Choose an ancestor' },
-                    ...ancestors.map(({ depth, revision }) => ({ value: revision.commitId, label: `@-${depth} · ${revision.shortestChangeId}` })),
-                  ]}
-                  value={squashTarget}
-                />
-                <TextArea
-                  aria-label="Squash description"
-                  onChange={event => setSquashText(event.target.value)}
-                  placeholder="Resulting description"
-                  rows={2}
-                  value={squashText}
-                />
-                {workingCopy && (
-                  <Button
-                    disabled={!squashTarget || squashText.trim().length === 0}
-                    onClick={() => askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}
-                    type="button"
-                    variant="primary"
-                  >
-                    Preview squash
-                  </Button>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </section>
+                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-[11px]" title={file}>
+                        {selectable ? file : `${file} — unsafe path format unavailable`}
+                      </span>
+                    </Label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-1">
+            <Collapsible>
+              <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
+                <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
+                jj status
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className={CODE_BLOCK}>{state.status || 'Clean working copy.'}</pre>
+              </CollapsibleContent>
+            </Collapsible>
+            {workingDiffQuery.data !== undefined && (
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
+                  <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
+                  Working-copy diff
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <pre className={CODE_BLOCK}>{workingDiffQuery.data.patch}</pre>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </div>
+          <h3 className={SECTION_HEADING}>Describe working copy</h3>
+          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
+            <Textarea
+              aria-label="Working copy description"
+              className={COMPACT_TEXTAREA}
+              onChange={event => workingCopy && setDescribeDrafts(current => ({ ...current, [workingCopy.commitId]: event.target.value }))}
+              rows={2}
+              value={workingDescribeText}
+            />
+            {workingCopy && (
+              <Button
+                disabled={!workingDescribeChanged}
+                onClick={() => askForConfirmation({ kind: 'describe', commitId: workingCopy.commitId, message: workingDescribeText })}
+                size="xs"
+                type="button"
+              >
+                Preview describe
+              </Button>
+            )}
+          </div>
+          <h3 className={SECTION_HEADING}>Split selected files from @</h3>
+          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
+            <Textarea
+              aria-label="Split description"
+              className={COMPACT_TEXTAREA}
+              onChange={event => setSplitText(event.target.value)}
+              placeholder="Description for selected changes"
+              rows={2}
+              value={splitText}
+            />
+            {workingCopy && (
+              <Button
+                disabled={splitPaths.length === 0 || splitText.trim().length === 0}
+                onClick={() => askForConfirmation({ kind: 'split', commitId: workingCopy.commitId, paths: [...splitPaths], message: splitText })}
+                size="xs"
+                type="button"
+              >
+                Preview split{splitPaths.length > 0 ? ` (${splitPaths.length})` : ''}
+              </Button>
+            )}
+          </div>
+        </section>
+        <section aria-labelledby="jj-ancestor-heading" className="dshx:flex dshx:min-w-0 dshx:flex-col">
+          <h2 className={SECTION_HEADING} id="jj-ancestor-heading">
+            Ancestor groups
+            <Select onValueChange={value => setAncestorLimit(Number(value))} value={String(ancestorLimit)}>
+              <SelectTrigger aria-label="Ancestor groups" className="dshx:ml-auto dshx:h-6 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ANCESTOR_LIMIT_OPTIONS.map(option => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </h2>
+          <div className="dshx:flex dshx:flex-col dshx:px-2">
+            {ancestors.map(({ depth, revision }) => (
+              <button
+                aria-pressed={squashTarget === revision.commitId}
+                className="dshx:flex dshx:h-7 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-1.5 dshx:text-left dshx:text-sm dshx:hover:bg-accent dshx:aria-pressed:bg-accent"
+                key={revision.commitId}
+                onClick={() => setSquashTarget(revision.commitId)}
+                type="button"
+              >
+                <span className="dshx:w-8 dshx:flex-none dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">@-{depth}</span>
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{firstLine(revision.description)}</span>
+                <span className="dshx:font-mono! dshx:text-xs dshx:font-semibold dshx:text-info">{revision.shortestChangeId}</span>
+              </button>
+            ))}
+            {ancestors.length === 0 && <p className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">No visible @-1 ancestors in this graph window.</p>}
+          </div>
+          <h3 className={SECTION_HEADING}>Squash working copy into ancestor</h3>
+          <div className="dshx:flex dshx:flex-col dshx:items-end dshx:gap-1.5 dshx:px-3">
+            <Select onValueChange={setSquashTarget} value={squashTarget}>
+              <SelectTrigger aria-label="Squash destination" className="dshx:w-full dshx:text-xs" size="sm">
+                <SelectValue placeholder="Choose an ancestor" />
+              </SelectTrigger>
+              <SelectContent>
+                {ancestors.map(({ depth, revision }) => (
+                  <SelectItem key={revision.commitId} value={revision.commitId}>
+                    @-{depth} · {revision.shortestChangeId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              aria-label="Squash description"
+              className={COMPACT_TEXTAREA}
+              onChange={event => setSquashText(event.target.value)}
+              placeholder="Resulting description"
+              rows={2}
+              value={squashText}
+            />
+            {workingCopy && (
+              <Button
+                disabled={!squashTarget || squashText.trim().length === 0}
+                onClick={() => askForConfirmation({ kind: 'squash', sourceId: workingCopy.commitId, destinationId: squashTarget, message: squashText })}
+                size="xs"
+                type="button"
+              >
+                Preview squash
+              </Button>
+            )}
+          </div>
+        </section>
+      </div>
+    )
 
-      {preview !== undefined && (
-        <ConfirmDialog
-          busy={confirmMutation.isPending}
-          cancelLabel="Cancel"
-          closeLabel="Close"
-          confirmLabel="Confirm and run"
-          onCancel={() => prepareMutation.reset()}
-          onConfirm={confirmPreview}
-          open
-          title={`Confirm ${preview.title.toLocaleLowerCase()}`}
+  const emptyState =
+    state === undefined ? (
+      <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
+        <EmptyHeader>
+          {loadingRepository && (
+            <EmptyMedia>
+              <Spinner />
+            </EmptyMedia>
+          )}
+          <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
+            {loadingRepository ? 'Loading repository…' : 'Choose a repository path above to open its revision graph.'}
+          </EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    ) : null
+
+  const tabsContent = (
+    <>
+      <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-col" value="graph">
+        {emptyState ?? graphView}
+      </TabsContent>
+      <TabsContent className="dshx:min-h-0 dshx:overflow-auto" value="source">
+        {emptyState ?? sourceView}
+      </TabsContent>
+    </>
+  )
+
+  return (
+    <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground">
+      <TooltipProvider>
+        <Tabs className="dshx:min-h-0 dshx:flex-1 dshx:gap-0" onValueChange={value => setView(value === 'source' ? 'source' : 'graph')} value={view}>
+          <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
+            {!sidePanel && (
+              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:pt-1">
+                <h1 className="dshx:text-xl dshx:font-semibold">Jujutsu</h1>
+                <p className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+                  {state?.root ?? 'Select a repository to inspect its revision graph.'}
+                </p>
+              </div>
+            )}
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
+              <TabsList aria-label="Jujutsu views" className="dshx:h-9 dshx:gap-4 dshx:rounded-none dshx:border-b dshx:p-0" variant="line">
+                <TabsTrigger
+                  className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
+                  value="graph"
+                >
+                  Revision graph
+                </TabsTrigger>
+                <TabsTrigger
+                  className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
+                  value="source"
+                >
+                  Source Control
+                </TabsTrigger>
+              </TabsList>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button aria-label="Repository actions" className="dshx:ml-auto" size="icon-sm" type="button" variant="outline">
+                    <EllipsisVerticalIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="dshx-root dshx:w-64">
+                  <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Remote</DropdownMenuLabel>
+                  {remoteNames.length === 0 ? (
+                    <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No remotes configured.</p>
+                  ) : (
+                    <DropdownMenuRadioGroup onValueChange={setRemote} value={selectedRemote}>
+                      {remoteNames.map(name => (
+                        <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                          {name}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Bookmark to push</DropdownMenuLabel>
+                  {localBookmarkNames.length === 0 ? (
+                    <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No local bookmarks.</p>
+                  ) : (
+                    <DropdownMenuRadioGroup onValueChange={setBookmark} value={selectedBookmark}>
+                      {localBookmarkNames.map(name => (
+                        <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                          {name}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  )}
+                  {state !== undefined && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+                        <span title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>Last recorded JJ push command: {lastPushLabel}</span>
+                        {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
+                      </div>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <form
+              className="dshx:flex dshx:items-center dshx:gap-1.5"
+              onSubmit={event => {
+                event.preventDefault()
+                const selectedPath = path.trim()
+                if (selectedPath.length === 0) return
+                if (pathMatchesLoadedRepository) refreshRepository()
+                else registerMutation.mutate(selectedPath)
+              }}
+            >
+              <Input
+                aria-label="Repository path"
+                className="dshx:min-w-0 dshx:flex-1"
+                list="jj-repositories"
+                onChange={event => setPath(event.target.value)}
+                placeholder="/path/to/repository"
+                value={path}
+              />
+              <datalist id="jj-repositories">
+                {repoHistory.map(item => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+              <Button
+                disabled={repoId === null || selectedRemote === '' || busy}
+                onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
+                title={selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}
+                type="button"
+                variant="outline"
+              >
+                Fetch
+              </Button>
+              <Button
+                disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
+                onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
+                title={selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
+                type="button"
+                variant="outline"
+              >
+                Push
+              </Button>
+              <Button
+                aria-busy={busy}
+                aria-label={pathMatchesLoadedRepository ? 'Refresh' : 'Open repository'}
+                disabled={busy || path.trim().length === 0}
+                size="icon"
+                title={pathMatchesLoadedRepository ? 'Refresh' : 'Open repository'}
+                type="submit"
+                variant="outline"
+              >
+                {busy ? <Spinner /> : <RefreshCwIcon />}
+              </Button>
+              {busy && !loadingRepository && (
+                <span className="dshx:sr-only" role="status">
+                  Working…
+                </span>
+              )}
+            </form>
+          </header>
+
+          {(errorMessages.length > 0 || (confirmMutation.data !== undefined && confirmMutation.data.output.length > 0)) && (
+            <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-2">
+              {errorMessages.map(message => (
+                <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
+                  <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
+                </Alert>
+              ))}
+              {confirmMutation.data !== undefined && confirmMutation.data.output.length > 0 && (
+                <Alert className="dshx:px-3 dshx:py-2">
+                  <AlertDescription>
+                    <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-[11px] dshx:whitespace-pre-wrap dshx:text-foreground">
+                      {confirmMutation.data.output}
+                    </pre>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          {sidePanel ? (
+            tabsContent
+          ) : (
+            <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:lg:grid-cols-[minmax(0,1fr)_22rem] dshx:lg:overflow-hidden">
+              <div className="dshx:flex dshx:min-h-[24rem] dshx:min-w-0 dshx:flex-col dshx:lg:min-h-0">{tabsContent}</div>
+              <aside className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-t dshx:bg-muted/30 dshx:p-3 dshx:lg:overflow-auto dshx:lg:border-t-0 dshx:lg:border-l">
+                <SessionForkPanel sessions={props.sessions} openSession={props.openSession} />
+                {state !== undefined && (
+                  <WorkspaceProvisioner
+                    revisions={state.revisions}
+                    selectedCommitId={selectedRevision?.commitId ?? null}
+                    provisionedPath={provisionedPath}
+                    onPreview={askForConfirmation}
+                    pickDirectory={props.pickDirectory}
+                    launchSession={props.launchSession}
+                  />
+                )}
+                {state !== undefined && (
+                  <WorkspaceRestorePanel
+                    sessions={props.sessions}
+                    workspacePath={state.root}
+                    targetCommitId={selectedRevision?.commitId ?? null}
+                    onRestored={refreshRepository}
+                  />
+                )}
+              </aside>
+            </div>
+          )}
+        </Tabs>
+
+        <AlertDialog
+          onOpenChange={open => {
+            if (!open) prepareMutation.reset()
+          }}
+          open={preview !== undefined}
         >
-          <strong className={styles.previewSummary}>{preview.summary}</strong>
-          <pre className={styles.previewDetail}>{preview.detail}</pre>
-        </ConfirmDialog>
-      )}
+          {preview !== undefined && (
+            <AlertDialogContent className="dshx-root">
+              <AlertDialogHeader className="dshx:place-items-start dshx:text-left">
+                <AlertDialogTitle className="dshx:text-base">Confirm {preview.title.toLocaleLowerCase()}</AlertDialogTitle>
+                <AlertDialogDescription className="dshx:font-medium dshx:text-foreground">{preview.summary}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <pre className={cn(CODE_BLOCK, 'dshx:whitespace-pre-wrap')}>{preview.detail}</pre>
+              <AlertDialogFooter>
+                <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
+                <AlertDialogAction disabled={confirmMutation.isPending} onClick={confirmPreview} size="sm">
+                  Confirm and run
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          )}
+        </AlertDialog>
+      </TooltipProvider>
     </main>
+  )
+}
+
+interface RevisionGraphCellProps {
+  readonly revision: Revision
+  readonly layout: RevisionGraphRow
+  readonly width: number
+  readonly height: number
+}
+
+const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
+  const middle = props.height / 2
+  const commitX = laneCenter(props.layout.commitLane)
+  const nodeClass = props.revision.workingCopy
+    ? 'dshx:fill-primary dshx:stroke-primary'
+    : cn(
+        'dshx:fill-background',
+        props.revision.divergent ? 'dshx:stroke-destructive' : props.revision.immutable ? 'dshx:stroke-muted-foreground' : laneStroke(props.layout.commitLane),
+      )
+  return (
+    <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={props.height} viewBox={`0 0 ${props.width} ${props.height}`} width={props.width}>
+      <g fill="none" strokeOpacity={0.8} strokeWidth={1.25}>
+        {props.layout.topLanes.map(lane => (
+          <line className={laneStroke(lane)} key={`top-${lane}`} x1={laneCenter(lane)} x2={laneCenter(lane)} y1={0} y2={middle} />
+        ))}
+        {props.layout.incoming && <line className={laneStroke(props.layout.commitLane)} x1={commitX} x2={commitX} y1={0} y2={middle} />}
+        {props.layout.bottomLanes.map(lane => (
+          <line className={laneStroke(lane)} key={`bottom-${lane}`} x1={laneCenter(lane)} x2={laneCenter(lane)} y1={middle} y2={props.height} />
+        ))}
+        {props.layout.edges.map((edge, index) => {
+          const toX = laneCenter(edge.toLane)
+          return (
+            <path
+              className={laneStroke(edge.toLane)}
+              d={
+                commitX === toX
+                  ? `M ${commitX} ${middle} V ${props.height}`
+                  : `M ${commitX} ${middle} C ${commitX} ${middle + 6}, ${toX} ${middle + 4}, ${toX} ${props.height}`
+              }
+              key={`${edge.fromLane}-${edge.toLane}-${index}`}
+              strokeDasharray={edge.dashed ? '2 3' : undefined}
+            />
+          )
+        })}
+      </g>
+      <circle className={nodeClass} cx={commitX} cy={middle} r={props.revision.workingCopy ? 4.5 : 3.75} strokeWidth={1.5} />
+    </svg>
   )
 }
 
 interface RevisionRowProps {
   readonly revision: Revision
-  readonly selected: boolean
+  readonly expanded: boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
   readonly sidePanel: boolean
-  readonly onSelect: () => void
+  readonly onToggle: () => void
   readonly onDrop: (event: DragEvent) => void
+  readonly children: ReactNode
 }
 
 const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const revision = props.revision
   const rowHeight = props.sidePanel ? 26 : 30
-  const graphCenter = Math.floor(rowHeight / 2)
-  const laneCenter = (lane: number): number => lane * 14 + 7
+  const continuingLanes = [...new Set([...props.graphLayout.bottomLanes, ...props.graphLayout.edges.map(edge => edge.toLane)])]
   return (
-    <article className={props.selected ? styles.revisionSelected : styles.revision} onDragOver={event => event.preventDefault()} onDrop={props.onDrop}>
-      <svg aria-hidden="true" className={styles.graphSvg} height={rowHeight} viewBox={`0 0 ${props.graphWidth} ${rowHeight}`} width={props.graphWidth}>
-        {props.graphLayout.topLanes.map(lane => (
-          <path className={styles.graphPath} d={`M ${laneCenter(lane)} 0 V ${graphCenter}`} data-lane={lane % 5} key={`top-${lane}`} />
-        ))}
-        {props.graphLayout.bottomLanes.map(lane => (
-          <path className={styles.graphPath} d={`M ${laneCenter(lane)} ${graphCenter} V ${rowHeight}`} data-lane={lane % 5} key={`bottom-${lane}`} />
-        ))}
-        {props.graphLayout.edges.map((edge, index) => {
-          const fromX = laneCenter(edge.fromLane)
-          const toX = laneCenter(edge.toLane)
-          const path =
-            fromX === toX
-              ? `M ${fromX} ${graphCenter} V ${rowHeight}`
-              : `M ${fromX} ${graphCenter} C ${fromX} ${graphCenter + 5}, ${toX} ${graphCenter + 5}, ${toX} ${rowHeight}`
-          return (
-            <path
-              className={styles.graphPath}
-              d={path}
-              data-lane={edge.toLane % 5}
-              key={`${edge.fromLane}-${edge.toLane}-${index}`}
-              strokeDasharray={edge.dashed ? '3 3' : undefined}
-            />
-          )
-        })}
-        <circle
-          className={revision.workingCopy ? styles.graphNodeCurrent : styles.graphNode}
-          cx={laneCenter(props.graphLayout.commitLane)}
-          cy={graphCenter}
-          data-lane={props.graphLayout.commitLane % 5}
-          r={revision.workingCopy ? 4.1 : 3.2}
-        />
-      </svg>
-      <button className={styles.revisionBody} onClick={props.onSelect} type="button">
-        <div className={styles.revisionTitle}>
-          {revision.workingCopy && <Tag tone="solid">Editing</Tag>}
-          <span className={styles.revisionSummary}>{firstLine(revision.description)}</span>
-          <span className={styles.labels}>
-            {revision.bookmarks.map(name => {
-              const local = revision.localBookmarks.includes(name)
-              return (
-                <span
-                  className={local ? styles.draggableBookmark : undefined}
-                  draggable={local}
-                  key={name}
-                  onDragStart={event => {
-                    event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
-                    event.dataTransfer.effectAllowed = 'move'
-                  }}
-                >
-                  <Tag tone={local ? 'info' : 'quiet'}>{name}</Tag>
-                </span>
-              )
-            })}
-            {revision.tags.map(name => (
-              <Tag key={name} tone="neutral">
-                tag {name}
-              </Tag>
-            ))}
-          </span>
-        </div>
-        <div className={styles.revisionMeta}>
-          <span>{revision.author || 'Unknown author'}</span>
-          {revision.workspaces.map(workspace => (
-            <Tag key={workspace} tone="outline">
-              {workspace}
-            </Tag>
-          ))}
-          {revision.immutable && <Tag tone="warning">immutable</Tag>}
-          {revision.evolved && <Tag tone="info">evolved</Tag>}
-          {revision.divergent && <Tag tone="danger">divergent</Tag>}
-        </div>
-      </button>
-      <time className={styles.relative} dateTime={revision.authorTime}>
-        {relativeTime(revision.authorTime)}
-      </time>
-      <span className={styles.changeId} title={revision.changeId}>
-        {revision.shortestChangeId}
-      </span>
-      <Tooltip label="Drag revision to rebase after preview" portal side="top">
-        <Button
-          aria-label="Drag revision to rebase after preview"
-          className={styles.dragHandle}
-          draggable
-          onDragStart={event => {
-            event.dataTransfer.setData('application/x-jujutsu-revision', revision.commitId)
-            event.dataTransfer.effectAllowed = 'move'
-          }}
-          size="sm"
+    <article
+      className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]')}
+      onDragOver={event => event.preventDefault()}
+      onDrop={props.onDrop}
+    >
+      <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:pr-3 dshx:hover:bg-accent" style={{ height: rowHeight }}>
+        <RevisionGraphCell height={rowHeight} layout={props.graphLayout} revision={revision} width={props.graphWidth} />
+        <button
+          aria-expanded={props.expanded}
+          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+          onClick={props.onToggle}
           type="button"
-          variant="ghost"
         >
-          <span aria-hidden>⠿</span>
-        </Button>
-      </Tooltip>
+          <ChevronRightIcon className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', props.expanded && 'dshx:rotate-90')} />
+          {revision.workingCopy && <Badge className="dshx:h-[18px] dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:text-[11px] dshx:font-semibold">Editing</Badge>}
+          <span
+            className={cn(
+              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
+              revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
+              revision.description.trim().length === 0 && 'dshx:font-normal dshx:text-muted-foreground dshx:italic',
+            )}
+          >
+            {firstLine(revision.description)}
+          </span>
+          {revision.bookmarks.map(name => {
+            const local = revision.localBookmarks.includes(name)
+            return (
+              <Badge
+                className={cn(
+                  COMPACT_BADGE,
+                  local ? 'dshx:cursor-grab dshx:border-warning/40 dshx:bg-warning/10 dshx:text-foreground' : 'dshx:text-muted-foreground',
+                )}
+                draggable={local}
+                key={name}
+                onDragStart={event => {
+                  event.dataTransfer.setData('application/x-jujutsu-bookmark', name)
+                  event.dataTransfer.effectAllowed = 'move'
+                }}
+                variant="outline"
+              >
+                {name}
+              </Badge>
+            )
+          })}
+          {revision.tags.map(name => (
+            <Badge className={COMPACT_BADGE} key={name} variant="outline">
+              tag {name}
+            </Badge>
+          ))}
+          {revision.workspaces.map(workspace => (
+            <Badge className={COMPACT_BADGE} key={workspace} variant="success">
+              {workspace}
+            </Badge>
+          ))}
+          {revision.evolved && <span aria-label="evolved" className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-violet-500" role="img" title="Evolved: rewritten from an earlier commit" />}
+          {revision.divergent && (
+            <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
+              divergent
+            </Badge>
+          )}
+        </button>
+        <time className="dshx:flex-none dshx:pl-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground" dateTime={revision.authorTime}>
+          {relativeTime(revision.authorTime)}
+        </time>
+        <span className="dshx:min-w-[2ch] dshx:flex-none dshx:text-right dshx:font-mono dshx:text-xs dshx:font-semibold dshx:text-info" title={revision.changeId}>
+          {revision.shortestChangeId}
+        </span>
+        {!props.sidePanel && (
+          <Button
+            aria-label="Drag revision to rebase after preview"
+            className="dshx:cursor-grab dshx:text-muted-foreground dshx:opacity-0 dshx:group-hover/row:opacity-100 dshx:focus-visible:opacity-100"
+            draggable
+            onDragStart={event => {
+              event.dataTransfer.setData('application/x-jujutsu-revision', revision.commitId)
+              event.dataTransfer.effectAllowed = 'move'
+            }}
+            size="icon-xs"
+            title="Drag revision to rebase after preview"
+            type="button"
+            variant="ghost"
+          >
+            <span aria-hidden>⠿</span>
+          </Button>
+        )}
+      </div>
+      {props.expanded && (
+        <div className="dshx:relative" style={{ paddingLeft: props.graphWidth + 18 }}>
+          <svg aria-hidden className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:h-full" width={props.graphWidth}>
+            {continuingLanes.map(lane => (
+              <line
+                className={laneStroke(lane)}
+                key={lane}
+                strokeOpacity={0.8}
+                strokeWidth={1.25}
+                x1={laneCenter(lane)}
+                x2={laneCenter(lane)}
+                y1="0"
+                y2="100%"
+              />
+            ))}
+          </svg>
+          {props.children}
+        </div>
+      )}
     </article>
   )
 }

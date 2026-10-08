@@ -1,7 +1,11 @@
 import type { ISessions, SessionEventWindow, SessionReference, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { durableForkBoundaries } from './fork-boundaries.js'
-import styles from './jujutsu.module.css'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -117,90 +121,98 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
   }
 
   return (
-    <section className={styles.sessionTools} aria-labelledby="jj-session-fork-title">
-      <h2 id="jj-session-fork-title">Fork a Session at a history boundary</h2>
-      <p className={styles.muted}>
-        Choose a listed Session and a durable event sequence. Message contents and transient stream chunks stay out of this history control.
-      </p>
-      <div className={styles.sessionToolGrid}>
-        <label>
-          Session
-          <select
-            aria-label="Session to fork"
-            value={selectedSessionId}
-            onChange={event => setSelectedSessionId(sessionList.ids.find(id => id === event.target.value) ?? '')}
-          >
-            <option value="">Choose a Session</option>
-            {sessionList.ids.map(id => {
-              const summary = sessionList.byId[id]
-              return summary === undefined ? null : (
-                <option key={summary.id} value={summary.id}>
-                  {summary.displayTitle} — {summary.cwd ?? 'no working directory'}
-                </option>
-              )
-            })}
-          </select>
-        </label>
-        <label>
-          Durable boundary
-          <select
-            aria-label="Fork boundary sequence"
-            value={selectedBoundarySeq ?? ''}
-            onChange={event => {
-              const next = boundaries.find(boundary => String(boundary.seq) === event.target.value)
+    <Card aria-labelledby="jj-session-fork-title" className="dshx:gap-3" role="region">
+      <CardHeader>
+        <CardTitle className="dshx:text-sm" id="jj-session-fork-title">
+          Fork a Session at a history boundary
+        </CardTitle>
+        <CardDescription className="dshx:text-xs">
+          Choose a listed Session and a durable event sequence. Message contents and transient stream chunks stay out of this history control.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="dshx:flex dshx:flex-col dshx:gap-2.5">
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label className="dshx:text-xs dshx:text-muted-foreground">Session</Label>
+          <Select onValueChange={value => setSelectedSessionId(sessionList.ids.find(id => id === value) ?? '')} value={selectedSessionId}>
+            <SelectTrigger aria-label="Session to fork" className="dshx:w-full dshx:text-xs" size="sm">
+              <SelectValue placeholder="Choose a Session" />
+            </SelectTrigger>
+            <SelectContent>
+              {sessionList.ids.map(id => {
+                const summary = sessionList.byId[id]
+                return summary === undefined ? null : (
+                  <SelectItem key={summary.id} value={summary.id}>
+                    {summary.displayTitle} — {summary.cwd ?? 'no working directory'}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label className="dshx:text-xs dshx:text-muted-foreground">Durable boundary</Label>
+          <Select
+            disabled={boundaries.length === 0}
+            onValueChange={value => {
+              const next = boundaries.find(boundary => String(boundary.seq) === value)
               if (next !== undefined && selectedSessionId !== '') setSelectedBoundary({ sessionId: selectedSessionId, seq: next.seq })
             }}
-            disabled={boundaries.length === 0}
+            value={selectedBoundarySeq === undefined ? '' : String(selectedBoundarySeq)}
           >
-            {boundaries.length === 0 && <option value="">No loaded durable events</option>}
-            {boundaries.map(boundary => (
-              <option key={boundary.seq} value={boundary.seq}>
-                {boundary.seq} · {boundary.eventType}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className={styles.secondary}
-          disabled={selectedSessionId === '' || selectedBoundarySeq === undefined || forkingSessionId !== null}
-          onClick={() => void forkAtBoundary()}
-        >
-          {forkingSessionId === selectedSessionId ? 'Forking…' : 'Fork and open'}
-        </button>
-      </div>
-      {selectedSession !== undefined && activeStatus !== null && (
-        <div className={styles.statusLine}>
-          {activeStatus.openState === 'open'
-            ? `${boundaries.length} durable boundaries loaded${activeWindow?.hasMore ? ' · older history available' : ''}`
-            : `Session history ${activeStatus.openState}`}
+            <SelectTrigger aria-label="Fork boundary sequence" className="dshx:w-full dshx:font-mono! dshx:text-xs" size="sm">
+              <SelectValue placeholder="No loaded durable events" />
+            </SelectTrigger>
+            <SelectContent>
+              {boundaries.map(boundary => (
+                <SelectItem className="dshx:font-mono dshx:text-xs" key={boundary.seq} value={String(boundary.seq)}>
+                  {boundary.seq} · {boundary.eventType}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
-      {activeWindow?.hasMore && (
-        <button
-          type="button"
-          className={styles.secondary}
-          disabled={activeReference === null || loadingOlderSessionId === selectedSessionId}
-          onClick={() => void loadOlder()}
-        >
-          {loadingOlderSessionId === selectedSessionId ? 'Loading older history…' : 'Load older boundaries'}
-        </button>
-      )}
-      {activeError !== null && (
-        <p className={styles.sessionToolError} role="alert">
-          {activeError}
+        {selectedSession !== undefined && activeStatus !== null && (
+          <p className="dshx:text-xs dshx:text-muted-foreground">
+            {activeStatus.openState === 'open'
+              ? `${boundaries.length} durable boundaries loaded${activeWindow?.hasMore ? ' · older history available' : ''}`
+              : `Session history ${activeStatus.openState}`}
+          </p>
+        )}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+          <Button
+            disabled={selectedSessionId === '' || selectedBoundarySeq === undefined || forkingSessionId !== null}
+            onClick={() => void forkAtBoundary()}
+            size="sm"
+            type="button"
+          >
+            {forkingSessionId === selectedSessionId ? 'Forking…' : 'Fork and open'}
+          </Button>
+          {activeWindow?.hasMore && (
+            <Button
+              disabled={activeReference === null || loadingOlderSessionId === selectedSessionId}
+              onClick={() => void loadOlder()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {loadingOlderSessionId === selectedSessionId ? 'Loading older history…' : 'Load older boundaries'}
+            </Button>
+          )}
+        </div>
+        {[activeError, forkError].map(
+          message =>
+            message !== null && (
+              <Alert className="dshx:px-3 dshx:py-2" key={message} role="alert" variant="destructive">
+                <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
+              </Alert>
+            ),
+        )}
+        {forkedSessionId !== null && <p className="dshx:text-xs dshx:text-muted-foreground">Fork created and opened: {forkedSessionId}</p>}
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          The Host balances a cut inside an open turn. The fork keeps its source history lineage; choosing it grants no added authority over parent or sibling
+          Sessions.
         </p>
-      )}
-      {forkError !== null && (
-        <p className={styles.sessionToolError} role="alert">
-          {forkError}
-        </p>
-      )}
-      {forkedSessionId !== null && <p className={styles.statusLine}>Fork created and opened: {forkedSessionId}</p>}
-      <p className={styles.muted}>
-        The Host balances a cut inside an open turn. The fork keeps its source history lineage; choosing it grants no added authority over parent or sibling
-        Sessions.
-      </p>
-    </section>
+      </CardContent>
+    </Card>
   )
 }
