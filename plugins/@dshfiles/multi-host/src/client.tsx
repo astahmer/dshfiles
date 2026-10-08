@@ -417,389 +417,391 @@ export const MultiHostPanel = (): JSX.Element => {
   const statusLabel = status === null ? (runtimeStatusQuery.isFetching ? 'Checking' : 'Unavailable') : status.ok ? 'Online' : 'Stale'
 
   return (
-    <main className="dshx-root dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-5xl dshx:flex-col dshx:gap-6 dshx:p-6 dshx:md:p-8">
-      <header className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <h1 className="dshx:text-xl dshx:font-semibold">Hosts and runtimes</h1>
-          <p className="dshx:text-sm dshx:text-muted-foreground">
-            Connect to full DSH runtimes. Sessions, workspaces, tools, and providers stay owned by each runtime, with browser storage scoped per runtime.
-          </p>
-        </div>
-        <Button disabled={loading} onClick={() => void refresh()} type="button" variant="outline">
-          {loading ? <Spinner /> : <RefreshCwIcon />}
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </Button>
-      </header>
+    <div className="dshx-root dshx:h-full dshx:min-h-0 dshx:w-full dshx:overflow-y-auto dshx:bg-background">
+      <main className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-5xl dshx:flex-col dshx:gap-6 dshx:p-6 dshx:md:p-8">
+        <header className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
+            <h1 className="dshx:text-xl dshx:font-semibold">Hosts and runtimes</h1>
+            <p className="dshx:text-sm dshx:text-muted-foreground">
+              Connect to full DSH runtimes. Sessions, workspaces, tools, and providers stay owned by each runtime, with browser storage scoped per runtime.
+            </p>
+          </div>
+          <Button disabled={loading} onClick={() => void refresh()} type="button" variant="outline">
+            {loading ? <Spinner /> : <RefreshCwIcon />}
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </header>
 
-      {visibleError !== null && (
-        <Alert variant="destructive">
-          <CircleAlertIcon />
-          <AlertDescription className="dshx:text-destructive">{visibleError}</AlertDescription>
-        </Alert>
-      )}
-      {notice !== null && (
-        <Alert variant="success">
-          <CircleCheckIcon />
-          <AlertDescription className="dshx:text-foreground">{notice}</AlertDescription>
-        </Alert>
-      )}
+        {visibleError !== null && (
+          <Alert variant="destructive">
+            <CircleAlertIcon />
+            <AlertDescription className="dshx:text-destructive">{visibleError}</AlertDescription>
+          </Alert>
+        )}
+        {notice !== null && (
+          <Alert variant="success">
+            <CircleCheckIcon />
+            <AlertDescription className="dshx:text-foreground">{notice}</AlertDescription>
+          </Alert>
+        )}
 
-      <section aria-label="Add execution host and runtime" className="dshx:grid dshx:gap-4 dshx:md:grid-cols-2">
-        <Card>
-          <CardHeader className="dshx:gap-1">
-            <CardTitle className="dshx:text-sm">Add host</CardTitle>
-            <CardDescription className="dshx:text-xs">Record a local machine or SSH host, then attach DSH runtimes to it.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form
-              aria-label="Add host"
-              className="dshx:flex dshx:flex-col dshx:gap-4"
-              noValidate
-              onSubmit={event => {
-                event.preventDefault()
-                void hostForm.handleSubmit()
-              }}
-            >
-              <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
-                <hostForm.AppField name="id">
-                  {field => <field.TextField description="Letters, numbers, dots, underscores, and hyphens." label="Host id" monospace placeholder="workstation" required />}
-                </hostForm.AppField>
-                <hostForm.AppField name="name">{field => <field.TextField label="Display name" placeholder="Workstation" required />}</hostForm.AppField>
-              </div>
-              <hostForm.AppField name="kind">
-                {field => (
-                  <field.SelectField
-                    label="Connection"
-                    options={[
-                      { value: 'local', label: 'Local machine' },
-                      { value: 'ssh', label: 'SSH host' },
-                    ]}
-                  />
-                )}
-              </hostForm.AppField>
-              <hostForm.Subscribe selector={state => state.values.kind}>
-                {kind =>
-                  kind === 'ssh' ? (
-                    <hostForm.AppField name="sshTarget">
-                      {field => <field.TextField label="SSH target" monospace placeholder="deploy@host.example" required />}
-                    </hostForm.AppField>
-                  ) : null
-                }
-              </hostForm.Subscribe>
-              <div className="dshx:flex dshx:justify-end">
-                <hostForm.AppForm>
-                  <hostForm.SubmitButton disabled={saving}>{saving ? 'Saving…' : 'Record host'}</hostForm.SubmitButton>
-                </hostForm.AppForm>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="dshx:gap-1">
-            <CardTitle className="dshx:text-sm">Attach runtime</CardTitle>
-            <CardDescription className="dshx:text-xs">Authenticate a DSH runtime on a recorded host and pin its identity.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form
-              aria-label="Attach runtime"
-              className="dshx:flex dshx:flex-col dshx:gap-4"
-              noValidate
-              onSubmit={event => {
-                event.preventDefault()
-                void runtimeForm.handleSubmit()
-              }}
-            >
-              <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
-                <runtimeForm.AppField name="hostId">
+        <section aria-label="Add execution host and runtime" className="dshx:grid dshx:gap-4 dshx:md:grid-cols-2">
+          <Card>
+            <CardHeader className="dshx:gap-1">
+              <CardTitle className="dshx:text-sm">Add host</CardTitle>
+              <CardDescription className="dshx:text-xs">Record a local machine or SSH host, then attach DSH runtimes to it.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                aria-label="Add host"
+                className="dshx:flex dshx:flex-col dshx:gap-4"
+                noValidate
+                onSubmit={event => {
+                  event.preventDefault()
+                  void hostForm.handleSubmit()
+                }}
+              >
+                <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
+                  <hostForm.AppField name="id">
+                    {field => <field.TextField description="Letters, numbers, dots, underscores, and hyphens." label="Host id" monospace placeholder="workstation" required />}
+                  </hostForm.AppField>
+                  <hostForm.AppField name="name">{field => <field.TextField label="Display name" placeholder="Workstation" required />}</hostForm.AppField>
+                </div>
+                <hostForm.AppField name="kind">
                   {field => (
                     <field.SelectField
-                      label="Host"
-                      options={directory.hosts.map(host => ({ value: host.id, label: `${host.name} · ${host.connector.kind}` }))}
-                      placeholder="Choose a host"
-                      required
+                      label="Connection"
+                      options={[
+                        { value: 'local', label: 'Local machine' },
+                        { value: 'ssh', label: 'SSH host' },
+                      ]}
                     />
                   )}
-                </runtimeForm.AppField>
-                <runtimeForm.AppField name="name">{field => <field.TextField label="Runtime name" placeholder="Web profile" required />}</runtimeForm.AppField>
-              </div>
-              {runtimeHostKind === 'local' && (
-                <runtimeForm.AppField name="launchUrl">
-                  {field => <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />}
-                </runtimeForm.AppField>
-              )}
-              {runtimeHostKind === 'ssh' && (
+                </hostForm.AppField>
+                <hostForm.Subscribe selector={state => state.values.kind}>
+                  {kind =>
+                    kind === 'ssh' ? (
+                      <hostForm.AppField name="sshTarget">
+                        {field => <field.TextField label="SSH target" monospace placeholder="deploy@host.example" required />}
+                      </hostForm.AppField>
+                    ) : null
+                  }
+                </hostForm.Subscribe>
+                <div className="dshx:flex dshx:justify-end">
+                  <hostForm.AppForm>
+                    <hostForm.SubmitButton disabled={saving}>{saving ? 'Saving…' : 'Record host'}</hostForm.SubmitButton>
+                  </hostForm.AppForm>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="dshx:gap-1">
+              <CardTitle className="dshx:text-sm">Attach runtime</CardTitle>
+              <CardDescription className="dshx:text-xs">Authenticate a DSH runtime on a recorded host and pin its identity.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                aria-label="Attach runtime"
+                className="dshx:flex dshx:flex-col dshx:gap-4"
+                noValidate
+                onSubmit={event => {
+                  event.preventDefault()
+                  void runtimeForm.handleSubmit()
+                }}
+              >
                 <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
-                  <runtimeForm.AppField name="unit">
+                  <runtimeForm.AppField name="hostId">
                     {field => (
-                      <field.TextField
-                        description="Letters, numbers, dots, underscores, @, and hyphens."
-                        label="systemd user unit"
-                        monospace
-                        placeholder="dsh-runtime"
+                      <field.SelectField
+                        label="Host"
+                        options={directory.hosts.map(host => ({ value: host.id, label: `${host.name} · ${host.connector.kind}` }))}
+                        placeholder="Choose a host"
                         required
                       />
                     )}
                   </runtimeForm.AppField>
-                  <runtimeForm.AppField name="remoteHome">
-                    {field => <field.TextField label="Remote DSH_HOME" monospace placeholder="/home/user/.dsh/runtime" required />}
-                  </runtimeForm.AppField>
+                  <runtimeForm.AppField name="name">{field => <field.TextField label="Runtime name" placeholder="Web profile" required />}</runtimeForm.AppField>
                 </div>
-              )}
-              <div className="dshx:flex dshx:justify-end">
-                <runtimeForm.AppForm>
-                  <runtimeForm.SubmitButton disabled={saving}>{saving ? 'Connecting…' : 'Authenticate and pin identity'}</runtimeForm.SubmitButton>
-                </runtimeForm.AppForm>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section aria-labelledby="host-list-title" className="dshx:flex dshx:flex-col dshx:gap-3">
-        <SectionHeading id="host-list-title" meta={plural(directory.hosts.length, 'host')} title="Host directory" />
-        {directory.hosts.length === 0 ? (
-          <EmptyBlock description="Record a local machine or SSH host to start attaching DSH runtimes." title="No hosts recorded yet" />
-        ) : (
-          <BorderedList label="Hosts">
-            {directory.hosts.map((host, index) => (
-              <Fragment key={host.id}>
-                {index > 0 && <ItemSeparator />}
-                <Item role="listitem" size="sm">
-                  <ItemMedia variant="icon">{host.connector.kind === 'local' ? <MonitorIcon /> : <ServerIcon />}</ItemMedia>
-                  <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                    <ItemTitle>
-                      {host.name}
-                      <Badge variant="outline">{host.connector.kind === 'local' ? 'Local' : 'SSH'}</Badge>
-                    </ItemTitle>
-                    <ItemDescription className="dshx:font-mono dshx:text-xs">
-                      {host.id}
-                      {host.connector.kind === 'ssh' ? ` · ${host.connector.sshTarget}` : ''}
-                    </ItemDescription>
-                    <ItemDescription className="dshx:text-xs">{plural(host.runtimeCount, 'runtime')}</ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <Button
-                      aria-label={`Remove ${host.name}`}
-                      disabled={saving}
-                      onClick={() => setRemovingHost(host)}
-                      size="icon-sm"
-                      title={`Remove ${host.name}`}
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </ItemActions>
-                </Item>
-              </Fragment>
-            ))}
-          </BorderedList>
-        )}
-      </section>
-
-      <section aria-labelledby="runtime-title" className="dshx:flex dshx:flex-col dshx:gap-3">
-        <SectionHeading id="runtime-title" meta={plural(directory.runtimes.length, 'runtime')} title="Registered runtimes" />
-        {directory.runtimes.length === 0 ? (
-          <EmptyBlock description="Attach a runtime to enable remote workspace and Session placement." title="No runtimes registered" />
-        ) : (
-          <div className="dshx:grid dshx:items-start dshx:gap-4 dshx:md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
-            <nav aria-label="Runtimes" className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-1">
-              {directory.runtimes.map(item => {
-                const selected = selectedRuntimeId === item.id
-                const online = status?.ok === true && status.runtime.id === item.id
-                return (
-                  <Item
-                    asChild
-                    className={cn('dshx:cursor-pointer dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent/60', selected && 'dshx:bg-accent')}
-                    key={item.id}
-                    size="sm"
-                  >
-                    <button aria-current={selected ? 'true' : undefined} onClick={() => setPreferredRuntimeId(item.id)} type="button">
-                      <ItemMedia>
-                        <span aria-hidden className={cn('dshx:size-2 dshx:rounded-full', online ? 'dshx:bg-success' : 'dshx:bg-muted-foreground/40')} />
-                      </ItemMedia>
-                      <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                        <ItemTitle className="dshx:w-full dshx:truncate">{item.name}</ItemTitle>
-                        <ItemDescription className="dshx:truncate dshx:text-xs">
-                          {item.identity?.profile ?? 'Identity not pinned'} · {item.hostId}
-                        </ItemDescription>
-                      </ItemContent>
-                    </button>
-                  </Item>
-                )
-              })}
-            </nav>
-
-            {selectedRuntime === undefined ? (
-              <EmptyBlock title="Choose a runtime" />
-            ) : (
-              <Card>
-                <CardHeader className="dshx:gap-1">
-                  <span className="dshx:text-xs dshx:text-muted-foreground">{selectedHost?.name ?? selectedRuntime.hostId}</span>
-                  <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
-                    <h3 className="dshx:text-base dshx:font-semibold">{selectedRuntime.name}</h3>
-                    <Badge variant={status === null ? 'muted' : status.ok ? 'success' : 'warning'}>
-                      {statusLabel}
-                    </Badge>
+                {runtimeHostKind === 'local' && (
+                  <runtimeForm.AppField name="launchUrl">
+                    {field => <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />}
+                  </runtimeForm.AppField>
+                )}
+                {runtimeHostKind === 'ssh' && (
+                  <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
+                    <runtimeForm.AppField name="unit">
+                      {field => (
+                        <field.TextField
+                          description="Letters, numbers, dots, underscores, @, and hyphens."
+                          label="systemd user unit"
+                          monospace
+                          placeholder="dsh-runtime"
+                          required
+                        />
+                      )}
+                    </runtimeForm.AppField>
+                    <runtimeForm.AppField name="remoteHome">
+                      {field => <field.TextField label="Remote DSH_HOME" monospace placeholder="/home/user/.dsh/runtime" required />}
+                    </runtimeForm.AppField>
                   </div>
-                  <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{selectedRuntime.id}</span>
-                </CardHeader>
-                <CardContent className="dshx:flex dshx:flex-col dshx:gap-5">
-                  {status?.ok === true ? (
-                    <>
-                      <dl className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:rounded-md dshx:bg-muted/50 dshx:px-3 dshx:py-2">
-                        {[
-                          { label: 'Profile', value: status.identity.profile },
-                          { label: 'DSH', value: status.identity.dshVersion },
-                          { label: 'Home', value: status.identity.homeLeaf },
-                        ].map(fact => (
-                          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5" key={fact.label}>
-                            <dt className="dshx:text-xs dshx:text-muted-foreground">{fact.label}</dt>
-                            <dd className="dshx:truncate dshx:font-mono dshx:text-xs">{fact.value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-                        <Button disabled={openViewRuntimeIds.has(selectedRuntime.id)} onClick={() => void openRuntimeView()} type="button">
-                          {openViewRuntimeIds.has(selectedRuntime.id) ? 'Runtime view open' : 'Open native runtime view'}
-                        </Button>
-                        <Button disabled={openViewRuntimeIds.size === 0} onClick={() => void closeRuntimeViews()} type="button" variant="outline">
-                          Close runtime views
-                        </Button>
-                      </div>
-                      <form
-                        aria-label="Open workspace"
-                        className="dshx:flex dshx:items-end dshx:gap-2"
-                        noValidate
-                        onSubmit={event => {
-                          event.preventDefault()
-                          void workspaceForm.handleSubmit()
-                        }}
-                      >
-                        <workspaceForm.AppField name="path">
-                          {field => <field.TextField className="dshx:flex-1" label="Open workspace path" monospace placeholder="/absolute/path/on/runtime" required />}
-                        </workspaceForm.AppField>
-                        <workspaceForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
-                          {([canSubmit, isSubmitting]) => (
-                            <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
-                              Open workspace
-                            </Button>
-                          )}
-                        </workspaceForm.Subscribe>
-                      </form>
-                      <form
-                        aria-label="Create Session"
-                        className="dshx:flex dshx:items-end dshx:gap-2"
-                        noValidate
-                        onSubmit={event => {
-                          event.preventDefault()
-                          void sessionForm.handleSubmit()
-                        }}
-                      >
-                        <sessionForm.AppField name="cwd">
-                          {field => <field.TextField className="dshx:flex-1" label="New Session working directory" monospace placeholder="Optional runtime-local path" />}
-                        </sessionForm.AppField>
-                        <sessionForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
-                          {([canSubmit, isSubmitting]) => (
-                            <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
-                              Create Session here
-                            </Button>
-                          )}
-                        </sessionForm.Subscribe>
-                      </form>
-                      <div className="dshx:grid dshx:gap-4 dshx:lg:grid-cols-2">
-                        <section aria-labelledby="runtime-workspaces-title" className="dshx:flex dshx:flex-col dshx:gap-2">
-                          <SectionHeading id="runtime-workspaces-title" meta={String(status.workspaces.length)} title="Workspaces" />
-                          {status.workspaces.length === 0 ? (
-                            <EmptyBlock title="No workspaces reported" />
-                          ) : (
-                            <BorderedList>
-                              {status.workspaces.map((workspace, index) => (
-                                <Fragment key={workspace.workspaceId}>
-                                  {index > 0 && <ItemSeparator />}
-                                  <Item asChild className="dshx:cursor-pointer dshx:text-left dshx:hover:bg-accent/50" role="listitem" size="sm">
-                                    <button onClick={() => sessionForm.setFieldValue('cwd', workspace.path)} title="Use as Session working directory" type="button">
-                                      <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                                        <ItemTitle className="dshx:w-full dshx:truncate">{workspace.title}</ItemTitle>
-                                        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{workspace.path}</ItemDescription>
-                                      </ItemContent>
-                                    </button>
-                                  </Item>
-                                </Fragment>
-                              ))}
-                            </BorderedList>
-                          )}
-                        </section>
-                        <section aria-labelledby="runtime-sessions-title" className="dshx:flex dshx:flex-col dshx:gap-2">
-                          <SectionHeading id="runtime-sessions-title" meta={String(status.sessions.length)} title="Sessions" />
-                          {status.sessions.length === 0 ? (
-                            <EmptyBlock title="No sessions reported" />
-                          ) : (
-                            <BorderedList>
-                              {status.sessions.map((session, index) => (
-                                <Fragment key={session.sessionId}>
-                                  {index > 0 && <ItemSeparator />}
-                                  <Item role="listitem" size="sm">
-                                    <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
-                                      <ItemTitle className="dshx:w-full dshx:truncate dshx:font-mono dshx:text-xs">{session.sessionId}</ItemTitle>
-                                      <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{session.cwd ?? 'No working directory'}</ItemDescription>
-                                    </ItemContent>
-                                    <ItemActions>
-                                      <Badge variant={session.running ? 'info' : 'outline'}>
-                                        {session.running ? 'running' : session.blank ? 'blank' : 'idle'}
-                                      </Badge>
-                                    </ItemActions>
-                                  </Item>
-                                </Fragment>
-                              ))}
-                            </BorderedList>
-                          )}
-                        </section>
-                      </div>
-                    </>
-                  ) : (
-                    <Alert variant="warning">
-                      {status === null ? <Spinner /> : <TriangleAlertIcon />}
-                      <AlertTitle>{status === null ? 'Checking runtime identity…' : status.message}</AlertTitle>
-                      <AlertDescription>
-                        {status?.lastSeenAt === undefined ? 'No successful connection yet.' : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-      </section>
+                )}
+                <div className="dshx:flex dshx:justify-end">
+                  <runtimeForm.AppForm>
+                    <runtimeForm.SubmitButton disabled={saving}>{saving ? 'Connecting…' : 'Authenticate and pin identity'}</runtimeForm.SubmitButton>
+                  </runtimeForm.AppForm>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </section>
 
-      <AlertDialog
-        onOpenChange={open => {
-          if (!open && !saving) setRemovingHost(null)
-        }}
-        open={removingHost !== null}
-      >
-        <AlertDialogContent className="dshx-root">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{removingHost === null ? 'Remove host?' : `Remove ${removingHost.name}?`}</AlertDialogTitle>
-            <AlertDialogDescription>This removes the host and its local directory references. Remote runtime data stays intact.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Keep host</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={saving}
-              onClick={event => {
-                event.preventDefault()
-                void removeHost()
-              }}
-              variant="destructive"
-            >
-              {saving ? 'Removing…' : 'Remove host'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </main>
+        <section aria-labelledby="host-list-title" className="dshx:flex dshx:flex-col dshx:gap-3">
+          <SectionHeading id="host-list-title" meta={plural(directory.hosts.length, 'host')} title="Host directory" />
+          {directory.hosts.length === 0 ? (
+            <EmptyBlock description="Record a local machine or SSH host to start attaching DSH runtimes." title="No hosts recorded yet" />
+          ) : (
+            <BorderedList label="Hosts">
+              {directory.hosts.map((host, index) => (
+                <Fragment key={host.id}>
+                  {index > 0 && <ItemSeparator />}
+                  <Item role="listitem" size="sm">
+                    <ItemMedia variant="icon">{host.connector.kind === 'local' ? <MonitorIcon /> : <ServerIcon />}</ItemMedia>
+                    <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
+                      <ItemTitle>
+                        {host.name}
+                        <Badge variant="outline">{host.connector.kind === 'local' ? 'Local' : 'SSH'}</Badge>
+                      </ItemTitle>
+                      <ItemDescription className="dshx:font-mono dshx:text-xs">
+                        {host.id}
+                        {host.connector.kind === 'ssh' ? ` · ${host.connector.sshTarget}` : ''}
+                      </ItemDescription>
+                      <ItemDescription className="dshx:text-xs">{plural(host.runtimeCount, 'runtime')}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <Button
+                        aria-label={`Remove ${host.name}`}
+                        disabled={saving}
+                        onClick={() => setRemovingHost(host)}
+                        size="icon-sm"
+                        title={`Remove ${host.name}`}
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2Icon />
+                      </Button>
+                    </ItemActions>
+                  </Item>
+                </Fragment>
+              ))}
+            </BorderedList>
+          )}
+        </section>
+
+        <section aria-labelledby="runtime-title" className="dshx:flex dshx:flex-col dshx:gap-3">
+          <SectionHeading id="runtime-title" meta={plural(directory.runtimes.length, 'runtime')} title="Registered runtimes" />
+          {directory.runtimes.length === 0 ? (
+            <EmptyBlock description="Attach a runtime to enable remote workspace and Session placement." title="No runtimes registered" />
+          ) : (
+            <div className="dshx:grid dshx:items-start dshx:gap-4 dshx:md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+              <nav aria-label="Runtimes" className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-1">
+                {directory.runtimes.map(item => {
+                  const selected = selectedRuntimeId === item.id
+                  const online = status?.ok === true && status.runtime.id === item.id
+                  return (
+                    <Item
+                      asChild
+                      className={cn('dshx:cursor-pointer dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent/60', selected && 'dshx:bg-accent')}
+                      key={item.id}
+                      size="sm"
+                    >
+                      <button aria-current={selected ? 'true' : undefined} onClick={() => setPreferredRuntimeId(item.id)} type="button">
+                        <ItemMedia>
+                          <span aria-hidden className={cn('dshx:size-2 dshx:rounded-full', online ? 'dshx:bg-success' : 'dshx:bg-muted-foreground/40')} />
+                        </ItemMedia>
+                        <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
+                          <ItemTitle className="dshx:w-full dshx:truncate">{item.name}</ItemTitle>
+                          <ItemDescription className="dshx:truncate dshx:text-xs">
+                            {item.identity?.profile ?? 'Identity not pinned'} · {item.hostId}
+                          </ItemDescription>
+                        </ItemContent>
+                      </button>
+                    </Item>
+                  )
+                })}
+              </nav>
+
+              {selectedRuntime === undefined ? (
+                <EmptyBlock title="Choose a runtime" />
+              ) : (
+                <Card>
+                  <CardHeader className="dshx:gap-1">
+                    <span className="dshx:text-xs dshx:text-muted-foreground">{selectedHost?.name ?? selectedRuntime.hostId}</span>
+                    <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
+                      <h3 className="dshx:text-base dshx:font-semibold">{selectedRuntime.name}</h3>
+                      <Badge variant={status === null ? 'muted' : status.ok ? 'success' : 'warning'}>
+                        {statusLabel}
+                      </Badge>
+                    </div>
+                    <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{selectedRuntime.id}</span>
+                  </CardHeader>
+                  <CardContent className="dshx:flex dshx:flex-col dshx:gap-5">
+                    {status?.ok === true ? (
+                      <>
+                        <dl className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:rounded-md dshx:bg-muted/50 dshx:px-3 dshx:py-2">
+                          {[
+                            { label: 'Profile', value: status.identity.profile },
+                            { label: 'DSH', value: status.identity.dshVersion },
+                            { label: 'Home', value: status.identity.homeLeaf },
+                          ].map(fact => (
+                            <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5" key={fact.label}>
+                              <dt className="dshx:text-xs dshx:text-muted-foreground">{fact.label}</dt>
+                              <dd className="dshx:truncate dshx:font-mono dshx:text-xs">{fact.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
+                          <Button disabled={openViewRuntimeIds.has(selectedRuntime.id)} onClick={() => void openRuntimeView()} type="button">
+                            {openViewRuntimeIds.has(selectedRuntime.id) ? 'Runtime view open' : 'Open native runtime view'}
+                          </Button>
+                          <Button disabled={openViewRuntimeIds.size === 0} onClick={() => void closeRuntimeViews()} type="button" variant="outline">
+                            Close runtime views
+                          </Button>
+                        </div>
+                        <form
+                          aria-label="Open workspace"
+                          className="dshx:flex dshx:items-end dshx:gap-2"
+                          noValidate
+                          onSubmit={event => {
+                            event.preventDefault()
+                            void workspaceForm.handleSubmit()
+                          }}
+                        >
+                          <workspaceForm.AppField name="path">
+                            {field => <field.TextField className="dshx:flex-1" label="Open workspace path" monospace placeholder="/absolute/path/on/runtime" required />}
+                          </workspaceForm.AppField>
+                          <workspaceForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
+                            {([canSubmit, isSubmitting]) => (
+                              <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
+                                Open workspace
+                              </Button>
+                            )}
+                          </workspaceForm.Subscribe>
+                        </form>
+                        <form
+                          aria-label="Create Session"
+                          className="dshx:flex dshx:items-end dshx:gap-2"
+                          noValidate
+                          onSubmit={event => {
+                            event.preventDefault()
+                            void sessionForm.handleSubmit()
+                          }}
+                        >
+                          <sessionForm.AppField name="cwd">
+                            {field => <field.TextField className="dshx:flex-1" label="New Session working directory" monospace placeholder="Optional runtime-local path" />}
+                          </sessionForm.AppField>
+                          <sessionForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
+                            {([canSubmit, isSubmitting]) => (
+                              <Button disabled={!canSubmit || isSubmitting || saving} type="submit" variant="outline">
+                                Create Session here
+                              </Button>
+                            )}
+                          </sessionForm.Subscribe>
+                        </form>
+                        <div className="dshx:grid dshx:gap-4 dshx:lg:grid-cols-2">
+                          <section aria-labelledby="runtime-workspaces-title" className="dshx:flex dshx:flex-col dshx:gap-2">
+                            <SectionHeading id="runtime-workspaces-title" meta={String(status.workspaces.length)} title="Workspaces" />
+                            {status.workspaces.length === 0 ? (
+                              <EmptyBlock title="No workspaces reported" />
+                            ) : (
+                              <BorderedList>
+                                {status.workspaces.map((workspace, index) => (
+                                  <Fragment key={workspace.workspaceId}>
+                                    {index > 0 && <ItemSeparator />}
+                                    <Item asChild className="dshx:cursor-pointer dshx:text-left dshx:hover:bg-accent/50" role="listitem" size="sm">
+                                      <button onClick={() => sessionForm.setFieldValue('cwd', workspace.path)} title="Use as Session working directory" type="button">
+                                        <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
+                                          <ItemTitle className="dshx:w-full dshx:truncate">{workspace.title}</ItemTitle>
+                                          <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{workspace.path}</ItemDescription>
+                                        </ItemContent>
+                                      </button>
+                                    </Item>
+                                  </Fragment>
+                                ))}
+                              </BorderedList>
+                            )}
+                          </section>
+                          <section aria-labelledby="runtime-sessions-title" className="dshx:flex dshx:flex-col dshx:gap-2">
+                            <SectionHeading id="runtime-sessions-title" meta={String(status.sessions.length)} title="Sessions" />
+                            {status.sessions.length === 0 ? (
+                              <EmptyBlock title="No sessions reported" />
+                            ) : (
+                              <BorderedList>
+                                {status.sessions.map((session, index) => (
+                                  <Fragment key={session.sessionId}>
+                                    {index > 0 && <ItemSeparator />}
+                                    <Item role="listitem" size="sm">
+                                      <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
+                                        <ItemTitle className="dshx:w-full dshx:truncate dshx:font-mono dshx:text-xs">{session.sessionId}</ItemTitle>
+                                        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{session.cwd ?? 'No working directory'}</ItemDescription>
+                                      </ItemContent>
+                                      <ItemActions>
+                                        <Badge variant={session.running ? 'info' : 'outline'}>
+                                          {session.running ? 'running' : session.blank ? 'blank' : 'idle'}
+                                        </Badge>
+                                      </ItemActions>
+                                    </Item>
+                                  </Fragment>
+                                ))}
+                              </BorderedList>
+                            )}
+                          </section>
+                        </div>
+                      </>
+                    ) : (
+                      <Alert variant="warning">
+                        {status === null ? <Spinner /> : <TriangleAlertIcon />}
+                        <AlertTitle>{status === null ? 'Checking runtime identity…' : status.message}</AlertTitle>
+                        <AlertDescription>
+                          {status?.lastSeenAt === undefined ? 'No successful connection yet.' : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </section>
+
+        <AlertDialog
+          onOpenChange={open => {
+            if (!open && !saving) setRemovingHost(null)
+          }}
+          open={removingHost !== null}
+        >
+          <AlertDialogContent className="dshx-root">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{removingHost === null ? 'Remove host?' : `Remove ${removingHost.name}?`}</AlertDialogTitle>
+              <AlertDialogDescription>This removes the host and its local directory references. Remote runtime data stays intact.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Keep host</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={saving}
+                onClick={event => {
+                  event.preventDefault()
+                  void removeHost()
+                }}
+                variant="destructive"
+              >
+                {saving ? 'Removing…' : 'Remove host'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </div>
   )
 }
