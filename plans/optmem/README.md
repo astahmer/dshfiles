@@ -1,14 +1,14 @@
 # OptMem — progress
 
 Requirements: [task.md](task.md). Research: [research-optmem.md](research-optmem.md), [research-dsh.md](research-dsh.md).
-Design: [design.md](design.md) (NOT WRITTEN YET — next step).
+Design: [design.md](design.md).
 
 ## Status (2026-10-09, paused at 91% of the 5h usage window)
 
 | Stage | State | Notes |
 |---|---|---|
-| 1 Research + design | research done, design pending | Gist: no licence → clean-room only. DSH: no per-request message-replace hook; compat mode needs no fork; full mode = fork waterfall `agent/request-messages` (preferred) or durable `agent/pre-step` replace |
-| 2 Core engine | not started | |
+| 1 Research + design | done | Gist: no licence → clean-room only. DSH: no per-request message-replace hook; compat mode needs no fork; full mode = fork waterfall `agent/request-messages` (preferred) or durable `agent/pre-step` replace |
+| 2 Core engine | in progress | optmem-core + optmem-sqlite per design §3–4, §8 |
 | 3 DSH compatibility adapter | not started | |
 | 4 Full mode | not started | |
 | 5 Evaluation + hardening | not started | |
