@@ -47,6 +47,10 @@ export const zh = {
   categoriesLabel: '插件分类',
   pluginsLabel: '插件列表',
   downloadPlugin: '下载 {name}',
+  searchLabel: '搜索插件',
+  searchPlaceholder: '搜索已加载的插件…',
+  clearSearch: '清除搜索',
+  noSearchMatches: '没有与此搜索匹配的插件。',
   retryPlugin: '重试下载 {name}',
 } as const
 
@@ -98,6 +102,10 @@ export const en = {
   categoriesLabel: 'Plugin categories',
   pluginsLabel: 'Plugin list',
   downloadPlugin: 'Download {name}',
+  searchLabel: 'Search plugins',
+  searchPlaceholder: 'Search loaded plugins…',
+  clearSearch: 'Clear search',
+  noSearchMatches: 'No plugins match this search.',
   retryPlugin: 'Retry download {name}',
 } satisfies Record<MarketplaceLocaleKey, string>
 

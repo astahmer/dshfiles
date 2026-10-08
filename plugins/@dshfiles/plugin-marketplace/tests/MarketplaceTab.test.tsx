@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -159,7 +157,7 @@ describe('MarketplaceTab', () => {
     expect((await screen.findByRole('dialog', { name: '插件已安装' })).textContent).toContain('重启当前 Profile')
     await waitFor(() => {
       expect(mocks.list).toHaveBeenCalledTimes(2)
-      expect(screen.getByRole('button', { name: '社区插件: 已安装' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '社区插件: 已安装', hidden: true })).toBeTruthy()
     })
   })
 
@@ -175,7 +173,7 @@ describe('MarketplaceTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '确认下载并安装' }))
     const failure = await screen.findByRole('dialog', { name: '安装失败' })
     expect(failure.textContent).toContain(zh.installFailed)
-    expect(screen.getByRole('button', { name: '重试下载 测试插件' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '重试下载 测试插件', hidden: true })).toBeTruthy()
     fireEvent.click(within(failure).getByRole('button', { name: '重试' }))
     expect(screen.getByRole('dialog', { name: '安装插件' })).toBeTruthy()
     expect(mocks.install).toHaveBeenCalledTimes(1)
@@ -207,12 +205,5 @@ describe('MarketplaceTab', () => {
       expect(screen.getByText('第三个插件')).toBeTruthy()
     })
     expect(screen.queryByRole('button', { name: '加载更多' })).toBeNull()
-  })
-
-  it('keeps the 760px two-column layout and collapses to one column on small screens', async () => {
-    const css = await readFile(resolve(process.cwd(), 'src/MarketplaceTab.module.css'), 'utf8')
-    expect(css).toContain('max-width: 760px')
-    expect(css).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
-    expect(css).toMatch(/@media \(max-width: 680px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\)/)
   })
 })

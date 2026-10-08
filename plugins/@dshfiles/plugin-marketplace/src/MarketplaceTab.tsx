@@ -1,13 +1,19 @@
-import { Button, IconDownloadOutlineMedium, IconLoadingOutlineMedium, Modal, Pill, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { useApi, type PropsLocaleOf } from '@dshfiles/dshx/client'
-import { EmptyState, Notice } from '@dshfiles/plugin-ui'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@dshfiles/plugin-ui/components/ui/empty'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
+import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
+import { CheckIcon, CircleCheckIcon, DownloadIcon, Loader2Icon, PackageSearchIcon, SearchIcon, TriangleAlertIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
 import { marketplaceLocale, type MarketplaceLocaleKey } from './locales.js'
-import styles from './MarketplaceTab.module.css'
 
 export type MarketplaceTabProps = PropsRuntime<'settings.plugins.tab'> & PropsLocaleOf<typeof marketplaceLocale>
 
@@ -58,6 +64,9 @@ const uniqueCards = (pages: readonly MarketplaceListOutput[]): readonly Marketpl
   return [...bySlug.values()]
 }
 
+const matchesSearch = (plugin: MarketplaceCard, query: string): boolean =>
+  `${plugin.name} ${plugin.description} ${plugin.packageName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+
 const markInstalled = (catalog: InfiniteData<MarketplaceListOutput> | undefined, slug: string): InfiniteData<MarketplaceListOutput> | undefined =>
   catalog === undefined
     ? undefined
@@ -70,25 +79,29 @@ const PluginIcon = ({ plugin }: { readonly plugin: MarketplaceCard }): ReactNode
   const [failed, setFailed] = useState(false)
   if (plugin.iconUrl === null || failed) {
     return (
-      <span className={styles.glyph} aria-hidden="true">
+      <span
+        aria-hidden="true"
+        className="dshx:flex dshx:size-10 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border dshx:bg-muted dshx:text-sm dshx:font-semibold dshx:text-muted-foreground"
+      >
         {plugin.glyph}
       </span>
     )
   }
   return (
-    <span className={styles.icon} aria-hidden="true">
+    <span aria-hidden="true" className="dshx:flex dshx:size-10 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-md dshx:border dshx:bg-background">
       <img
-        src={plugin.iconUrl}
         alt=""
+        className="dshx:size-full dshx:object-contain"
         onError={() => {
           setFailed(true)
         }}
+        src={plugin.iconUrl}
       />
     </span>
   )
 }
 
-const InstallSpinner = (): ReactNode => <IconLoadingOutlineMedium className={styles.spinner} />
+const InstallSpinner = (): ReactNode => <Loader2Icon className="dshx:size-3.5 dshx:animate-spin" />
 
 const InstallDialog = ({
   state,
@@ -109,85 +122,116 @@ const InstallDialog = ({
 }): ReactNode => {
   const confirm = state.kind === 'confirm'
   const risk = state.kind === 'risk'
-
-  const footer =
-    confirm || risk ? (
-      <>
-        <Button variant="outline" disabled={installing} onClick={onClose}>
-          {t('cancel')}
-        </Button>
-        <Button
-          variant="primary"
-          disabled={installing}
-          icon={installing ? <InstallSpinner /> : risk ? <IconDownloadOutlineMedium /> : undefined}
-          data-modal-autofocus
-          onClick={() => {
-            if (confirm) onContinue(state.plugin)
-            else onInstall(state.plugin)
-          }}
-        >
-          {installing ? t('downloading') : risk ? t('finalConfirmInstall') : t('continueInstall')}
-        </Button>
-      </>
-    ) : state.kind === 'failure' ? (
-      <>
-        <Button variant="outline" onClick={onClose}>
-          {t('cancel')}
-        </Button>
-        <Button
-          variant="primary"
-          data-modal-autofocus
-          onClick={() => {
-            onRetry(state.plugin)
-          }}
-        >
-          {t('retryInstall')}
-        </Button>
-      </>
-    ) : (
-      <Button variant="primary" data-modal-autofocus onClick={onClose}>
-        {t('close')}
-      </Button>
-    )
+  const primaryRef = useRef<HTMLButtonElement>(null)
 
   return (
-    <Modal
+    <Dialog
       open
-      title={t(MODAL_TITLE[state.kind])}
-      description={state.plugin.name}
-      closeLabel={t('closeDialog')}
-      footer={footer}
-      onClose={() => {
-        if (!installing) onClose()
+      onOpenChange={open => {
+        if (!open && !installing) onClose()
       }}
     >
-      <div className={styles.dialogBody}>
-        {confirm ? (
-          <>
-            <p className={styles.dialogMessage}>{t('installToProfile')}</p>
-            <dl className={styles.installFacts}>
-              <div>
-                <dt>{t('packageLabel')}</dt>
-                <dd>
-                  <code>{state.plugin.packageName}</code>
+      <DialogContent
+        className="dshx-root dshx:gap-4 dshx:p-5 dshx:sm:max-w-md"
+        onOpenAutoFocus={event => {
+          event.preventDefault()
+          primaryRef.current?.focus()
+        }}
+        showCloseButton={false}
+      >
+        <DialogHeader className="dshx:gap-1 dshx:pr-8">
+          <DialogTitle className="dshx:text-base">{t(MODAL_TITLE[state.kind])}</DialogTitle>
+          <DialogDescription>{state.plugin.name}</DialogDescription>
+        </DialogHeader>
+        <Button
+          aria-label={t('closeDialog')}
+          className="dshx:absolute dshx:top-3 dshx:right-3"
+          disabled={installing}
+          onClick={onClose}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <XIcon />
+        </Button>
+        <div className="dshx:flex dshx:flex-col dshx:gap-3">
+          {confirm ? (
+            <>
+              <p className="dshx:text-sm">{t('installToProfile')}</p>
+              <dl className="dshx:grid dshx:grid-cols-[auto_1fr] dshx:gap-x-4 dshx:gap-y-1.5 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-3 dshx:text-sm">
+                <dt className="dshx:text-muted-foreground">{t('packageLabel')}</dt>
+                <dd className="dshx:min-w-0 dshx:break-all">
+                  <code className="dshx:font-mono dshx:text-xs">{state.plugin.packageName}</code>
                 </dd>
-              </div>
-              <div>
-                <dt>{t('versionLabel')}</dt>
+                <dt className="dshx:text-muted-foreground">{t('versionLabel')}</dt>
                 <dd>{state.plugin.version}</dd>
-              </div>
-              <div>
-                <dt>{t('sourceLabel')}</dt>
+                <dt className="dshx:text-muted-foreground">{t('sourceLabel')}</dt>
                 <dd>{t(state.plugin.badge)}</dd>
-              </div>
-            </dl>
-          </>
-        ) : null}
-        {confirm || risk ? <Notice tone="warning">{t('riskWarning')}</Notice> : null}
-        {state.kind === 'success' ? <Notice tone="success">{t('installSuccess')}</Notice> : null}
-        {state.kind === 'failure' ? <Notice tone="danger">{t(FAILURE_COPY[state.code])}</Notice> : null}
-      </div>
-    </Modal>
+              </dl>
+            </>
+          ) : null}
+          {confirm || risk ? (
+            <Alert variant="warning">
+              <TriangleAlertIcon />
+              <AlertDescription className="dshx:text-foreground">{t('riskWarning')}</AlertDescription>
+            </Alert>
+          ) : null}
+          {state.kind === 'success' ? (
+            <Alert variant="success">
+              <CircleCheckIcon />
+              <AlertDescription className="dshx:text-foreground">{t('installSuccess')}</AlertDescription>
+            </Alert>
+          ) : null}
+          {state.kind === 'failure' ? (
+            <Alert variant="destructive">
+              <AlertDescription>{t(FAILURE_COPY[state.code])}</AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+        <DialogFooter>
+          {confirm || risk ? (
+            <>
+              <Button disabled={installing} onClick={onClose} size="sm" type="button" variant="outline">
+                {t('cancel')}
+              </Button>
+              <Button
+                disabled={installing}
+                onClick={() => {
+                  if (confirm) onContinue(state.plugin)
+                  else onInstall(state.plugin)
+                }}
+                ref={primaryRef}
+                size="sm"
+                type="button"
+              >
+                {installing ? <InstallSpinner /> : risk ? <DownloadIcon /> : null}
+                {installing ? t('downloading') : risk ? t('finalConfirmInstall') : t('continueInstall')}
+              </Button>
+            </>
+          ) : state.kind === 'failure' ? (
+            <>
+              <Button onClick={onClose} size="sm" type="button" variant="outline">
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  onRetry(state.plugin)
+                }}
+                ref={primaryRef}
+                size="sm"
+                type="button"
+              >
+                {t('retryInstall')}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onClose} ref={primaryRef} size="sm" type="button">
+              {t('close')}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -220,36 +264,59 @@ const PluginCard = ({
   const accessibleLabel = plugin.installed ? `${plugin.name}: ${label}` : interpolate(t(failed ? 'retryPlugin' : 'downloadPlugin'), { name: plugin.name })
 
   return (
-    <li className={styles.card}>
-      <div className={styles.cardHeader}>
-        <PluginIcon plugin={plugin} />
-        <div className={styles.identity}>
-          <div className={styles.titleLine}>
-            <h3>{plugin.name}</h3>
-            <Tag tone={plugin.badge === 'official' ? 'info' : 'neutral'}>{t(plugin.badge)}</Tag>
+    <li className="dshx:flex dshx:min-w-0 dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3 dshx:text-card-foreground">
+      <PluginIcon plugin={plugin} />
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <h3 className="dshx:truncate dshx:text-sm dshx:font-semibold">{plugin.name}</h3>
+          <Badge variant={plugin.badge === 'official' ? 'info' : 'muted'}>{t(plugin.badge)}</Badge>
+        </div>
+        <p className="dshx:line-clamp-2 dshx:text-sm dshx:text-muted-foreground">{plugin.description}</p>
+        <div className="dshx:mt-auto dshx:flex dshx:items-end dshx:justify-between dshx:gap-3 dshx:pt-2">
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:text-xs dshx:text-muted-foreground">
+            <code className="dshx:truncate dshx:font-mono" title={plugin.packageName}>
+              {plugin.packageName}
+            </code>
+            <span aria-label={`${t('versionLabel')} ${plugin.version}`}>v{plugin.version}</span>
           </div>
-          <p className={styles.description}>{plugin.description}</p>
+          <Button
+            aria-label={accessibleLabel}
+            className="dshx:shrink-0"
+            disabled={plugin.installed || installBusy}
+            onClick={onDownload}
+            size="sm"
+            type="button"
+            variant={plugin.installed ? 'outline' : 'default'}
+          >
+            {installing ? (
+              <InstallSpinner />
+            ) : plugin.installed ? (
+              <CheckIcon />
+            ) : (
+              <DownloadIcon />
+            )}
+            {label}
+          </Button>
         </div>
-      </div>
-      <div className={styles.cardFooter}>
-        <div className={styles.metadata}>
-          <code title={plugin.packageName}>{plugin.packageName}</code>
-          <span aria-label={`${t('versionLabel')} ${plugin.version}`}>v{plugin.version}</span>
-        </div>
-        <Button
-          variant={plugin.installed ? 'outline' : 'primary'}
-          size="sm"
-          icon={installing ? <InstallSpinner /> : plugin.installed ? undefined : <IconDownloadOutlineMedium />}
-          disabled={plugin.installed || installBusy}
-          aria-label={accessibleLabel}
-          onClick={onDownload}
-        >
-          {label}
-        </Button>
       </div>
     </li>
   )
 }
+
+const CardSkeleton = (): ReactNode => (
+  <div className="dshx:flex dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3">
+    <Skeleton className="dshx:size-10 dshx:shrink-0" />
+    <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-2">
+      <Skeleton className="dshx:h-4 dshx:w-1/2" />
+      <Skeleton className="dshx:h-3 dshx:w-full" />
+      <Skeleton className="dshx:h-3 dshx:w-3/4" />
+      <div className="dshx:flex dshx:justify-between dshx:pt-1">
+        <Skeleton className="dshx:h-3 dshx:w-1/3" />
+        <Skeleton className="dshx:h-7 dshx:w-20" />
+      </div>
+    </div>
+  </div>
+)
 
 /** Settings tab for browsing and installing Framework Hub plugins. */
 export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
@@ -257,9 +324,9 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const queryClient = useQueryClient()
   const locale = currentLocale()
   const [category, setCategory] = useState<string | undefined>()
+  const [search, setSearch] = useState('')
   const [failedSlugs, setFailedSlugs] = useState<ReadonlySet<string>>(() => new Set())
   const [modal, setModal] = useState<ModalState | null>(null)
-
   const catalog = useInfiniteQuery({
     queryKey: [...CATALOG_QUERY_KEY, locale, category ?? null],
     queryFn: ({ pageParam, signal }) => api.list({ locale, category, cursor: pageParam ?? undefined }, { signal }),
@@ -292,84 +359,140 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const categories = catalog.data?.pages[0]?.categories ?? []
   const initialLoading = catalog.isPending || (catalog.isFetching && items.length === 0)
   const listFailed = catalog.isError && !catalog.isFetchNextPageError && items.length === 0
+  const trimmedSearch = search.trim()
+  const visibleItems = useMemo(() => (trimmedSearch.length === 0 ? items : items.filter(item => matchesSearch(item, trimmedSearch))), [items, trimmedSearch])
   const installingSlug = install.isPending ? (install.variables?.slug ?? null) : null
 
   return (
-    <section className={styles.section} aria-busy={initialLoading || catalog.isFetchingNextPage}>
-      <nav className={styles.categories} aria-label={t('categoriesLabel')}>
-        <Pill
-          active={category === undefined}
-          aria-pressed={category === undefined}
-          onClick={() => {
-            setCategory(undefined)
-          }}
-        >
-          {t('all')}
-        </Pill>
-        {categories.map(item => (
-          <Pill
-            key={item.slug}
-            active={category === item.slug}
-            aria-pressed={category === item.slug}
-            onClick={() => {
-              setCategory(item.slug)
+    <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-4">
+      <div className="dshx:flex dshx:flex-col dshx:gap-3">
+        <InputGroup className="dshx:@2xl:max-w-sm">
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label={t('searchLabel')}
+            autoComplete="off"
+            onChange={event => {
+              setSearch(event.currentTarget.value)
             }}
+            placeholder={t('searchPlaceholder')}
+            type="search"
+            value={search}
+          />
+          {search.length > 0 ? (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                aria-label={t('clearSearch')}
+                onClick={() => {
+                  setSearch('')
+                }}
+                size="icon-xs"
+              >
+                <XIcon />
+              </InputGroupButton>
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
+        <nav aria-label={t('categoriesLabel')} className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+          <Toggle
+            onPressedChange={() => {
+              setCategory(undefined)
+            }}
+            pressed={category === undefined}
+            size="sm"
+            variant="outline"
+            className="dshx:px-2.5 dshx:text-xs"
           >
-            {item.name}
-          </Pill>
-        ))}
-      </nav>
-
-      {initialLoading ? <Notice>{t('loading')}</Notice> : null}
-      {listFailed && !initialLoading ? (
-        <Notice
-          tone="danger"
-          actions={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                void catalog.refetch()
+            {t('all')}
+          </Toggle>
+          {categories.map(item => (
+            <Toggle
+              className="dshx:px-2.5 dshx:text-xs"
+              key={item.slug}
+              onPressedChange={() => {
+                setCategory(item.slug)
               }}
+              pressed={category === item.slug}
+              size="sm"
+              variant="outline"
             >
-              {t('retry')}
-            </Button>
-          }
-        >
-          {t('unavailable')}
-        </Notice>
-      ) : null}
-      {!initialLoading && catalog.isSuccess && items.length === 0 ? <EmptyState description={t('empty')} compact /> : null}
+              {item.name}
+            </Toggle>
+          ))}
+        </nav>
+      </div>
 
-      {items.length > 0 ? (
-        <ul className={styles.cards} aria-label={t('pluginsLabel')}>
-          {items.map(plugin => (
+      {initialLoading ? (
+        <div aria-label={t('loading')} className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:@xl:grid-cols-2 dshx:@5xl:grid-cols-3" role="status">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      ) : null}
+      {listFailed && !initialLoading ? (
+        <Alert className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3" variant="destructive">
+          <AlertDescription>{t('unavailable')}</AlertDescription>
+          <Button
+            className="dshx:shrink-0"
+            onClick={() => {
+              void catalog.refetch()
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {t('retry')}
+          </Button>
+        </Alert>
+      ) : null}
+      {!initialLoading && catalog.isSuccess && (items.length === 0 || visibleItems.length === 0) ? (
+        <Empty className="dshx:border dshx:p-6 dshx:md:p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageSearchIcon />
+            </EmptyMedia>
+            <EmptyDescription>{items.length === 0 ? t('empty') : t('noSearchMatches')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
+
+      {visibleItems.length > 0 ? (
+        <ul aria-label={t('pluginsLabel')} className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:@xl:grid-cols-2 dshx:@5xl:grid-cols-3">
+          {visibleItems.map(plugin => (
             <PluginCard
-              key={plugin.slug}
-              plugin={plugin}
-              installing={installingSlug === plugin.slug}
-              installBusy={installingSlug !== null}
               failed={failedSlugs.has(plugin.slug)}
-              t={t}
+              installBusy={installingSlug !== null}
+              installing={installingSlug === plugin.slug}
+              key={plugin.slug}
               onDownload={() => {
                 setModal({ kind: 'confirm', plugin })
               }}
+              plugin={plugin}
+              t={t}
             />
           ))}
         </ul>
       ) : null}
 
       {catalog.hasNextPage && !showingPreviousCategory ? (
-        <div className={styles.loadMoreRow}>
-          {catalog.isFetchNextPageError ? <Notice tone="danger">{t('unavailable')}</Notice> : null}
+        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2">
+          {catalog.isFetchNextPageError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{t('unavailable')}</AlertDescription>
+            </Alert>
+          ) : null}
           <Button
-            variant="outline"
-            size="sm"
             disabled={catalog.isFetchingNextPage}
             onClick={() => {
               void catalog.fetchNextPage()
             }}
+            size="sm"
+            type="button"
+            variant="outline"
           >
+            {catalog.isFetchingNextPage ? <InstallSpinner /> : null}
             {catalog.isFetchingNextPage ? t('loadingMore') : catalog.isFetchNextPageError ? t('retry') : t('loadMore')}
           </Button>
         </div>
@@ -377,21 +500,21 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
 
       {modal !== null ? (
         <InstallDialog
-          state={modal}
           installing={installingSlug === modal.plugin.slug}
-          t={t}
           onClose={() => {
             if (installingSlug === null) setModal(null)
           }}
           onContinue={plugin => {
             setModal({ kind: 'risk', plugin })
           }}
-          onRetry={plugin => {
-            setModal({ kind: 'confirm', plugin })
-          }}
           onInstall={plugin => {
             if (installingSlug === null) install.mutate(plugin)
           }}
+          onRetry={plugin => {
+            setModal({ kind: 'confirm', plugin })
+          }}
+          state={modal}
+          t={t}
         />
       ) : null}
     </section>
