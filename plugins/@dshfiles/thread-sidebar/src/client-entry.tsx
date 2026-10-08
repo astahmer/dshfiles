@@ -5,7 +5,8 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
@@ -14,7 +15,6 @@ import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
 import { PALETTE_EVENT } from './palette.js'
-import type {} from './settings-slot.js'
 import { SettingsTab } from './settings-tab.js'
 import './client.css'
 
@@ -26,7 +26,8 @@ export default defineClient({
   // activate and then throw inside the slot, which blanks the sidebar instead of
   // failing the boot.
   inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions'],
-  setup(ctx) {
+  // Every registered component reads Settings, so each one goes through decorate.
+  setup(ctx, decorate) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
     const syncPanels = (): void => {
       const next = ctx.slots
@@ -167,7 +168,7 @@ export default defineClient({
           label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarSettingsTab'),
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
         },
-        ({ t }) => <SettingsTab t={t} hostShortcuts={ctx.shortcuts.catalog} />,
+        decorate(({ t }: { t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => <SettingsTab t={t} hostShortcuts={ctx.shortcuts.catalog} />),
       ),
     )
 
@@ -199,7 +200,7 @@ export default defineClient({
           children: sidebarChildren,
           inject: rootProps,
         },
-        SidebarRootAdapter,
+        decorate(SidebarRootAdapter),
       ),
     )
 
@@ -234,7 +235,7 @@ export default defineClient({
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
           }),
         },
-        ThreadSidebar,
+        decorate(ThreadSidebar),
       ),
     )
   },

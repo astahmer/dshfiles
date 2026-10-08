@@ -1,8 +1,20 @@
-import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore } from 'react'
+import { useSettings } from '@dshfiles/dshx/client'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { type SidebarPreferences } from './organization.js'
 import type { PaletteMode } from './palette.js'
-import { loadPreferences, parseStoredPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences.js'
+import {
+  clearStoredPreferences,
+  decodePreferences,
+  isPreferenceKey,
+  loadPreferences,
+  parseStoredPreferences,
+  preferencesToMigrate,
+  PREFERENCES_STORAGE_KEY,
+  readStoredPreferences,
+  savePreferences,
+} from './preferences.js'
+import { threadSidebarSettings } from './settings.js'
 
 export interface PaletteDestination {
   readonly id: string
@@ -42,23 +54,90 @@ const subscribe = (listener: () => void): (() => void) => {
   }
 }
 
-export const updateStoredPreferences = (patch: Partial<SidebarPreferences>): void => {
+const updateStoredPreferences = (patch: Partial<SidebarPreferences>): void => {
   const preferences = { ...readSnapshot().preferences, ...patch }
   publish({ preferences, storageWarning: !savePreferences(preferences) })
 }
 
-/** Preferences shared by every surface of this bundle in the current document (sidebar and its Settings tab). */
-export const usePreferences = (): PreferencesSnapshot & { updatePreferences: (patch: Partial<SidebarPreferences>) => void } => {
-  const current = useSyncExternalStore(subscribe, readSnapshot)
-  return { ...current, updatePreferences: updateStoredPreferences }
+/**
+ * A component outside a DSHX-decorated slot, or a Host started before this
+ * namespace existed, must still render, so a missing Settings context means
+ * "use the fallback". `useSettings` throws on its first hook when the context is
+ * absent, which keeps the hook order stable across renders.
+ */
+type ThreadSidebarSettingsState = ReturnType<typeof useThreadSidebarSettings>
+const useThreadSidebarSettings = () => useSettings(threadSidebarSettings)
+
+const useOptionalSettings = (): ThreadSidebarSettingsState | null => {
+  try {
+    return useThreadSidebarSettings()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Preferences from DSH Settings (Host-synced). Browser storage only stands in
+ * while the Host namespace is unavailable. Writes are not optimistic in the
+ * Settings API, so a pending overlay keeps drags and toggles from snapping back.
+ */
+export const usePreferences = (): PreferencesSnapshot & {
+  hostBacked: boolean
+  updatePreferences: (patch: Partial<SidebarPreferences>) => void
+} => {
+  const settings = useOptionalSettings()
+  const local = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
+  const [pending, setPending] = useState<Partial<SidebarPreferences>>({})
+  const [writeFailed, setWriteFailed] = useState(false)
+  const hostPreferences = useMemo(() => (settings?.value === undefined ? null : decodePreferences(settings.value)), [settings?.value])
+  const hostBacked = settings !== null && settings.status === 'ready' && settings.writable && hostPreferences !== null
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+
+  const updatePreferences = useCallback(
+    (patch: Partial<SidebarPreferences>) => {
+      if (!hostBacked) {
+        updateStoredPreferences(patch)
+        return
+      }
+      setPending(current => ({ ...current, ...patch }))
+      const writeKey = <Key extends keyof SidebarPreferences>(key: Key): Promise<boolean> => {
+        const value = patch[key]
+        const current = settingsRef.current
+        return value === undefined || current === null ? Promise.resolve(true) : current.set(key, value)
+      }
+      const keys = Object.keys(patch).filter(isPreferenceKey)
+      void Promise.all(keys.map(writeKey))
+        .then(results => setWriteFailed(results.includes(false)))
+        .catch(() => setWriteFailed(true))
+        .finally(() =>
+          setPending(current => {
+            const next = { ...current }
+            for (const key of keys) if (Object.is(next[key], patch[key])) delete next[key]
+            return next
+          }),
+        )
+    },
+    [hostBacked],
+  )
+
+  useEffect(() => {
+    if (!hostBacked || hostPreferences === null) return
+    const stored = readStoredPreferences()
+    if (stored === null) return
+    clearStoredPreferences()
+    const patch = preferencesToMigrate(stored, hostPreferences)
+    if (Object.keys(patch).length > 0) updatePreferences(patch)
+  }, [hostBacked, hostPreferences, updatePreferences])
+
+  const preferences = hostBacked ? { ...hostPreferences, ...pending } : local.preferences
+  return { preferences, storageWarning: hostBacked ? writeFailed : local.storageWarning, hostBacked, updatePreferences }
 }
 
 interface SidebarState {
   preferences: SidebarPreferences
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
   storageWarning: boolean
-  threadQuery: string
-  setThreadQuery: (query: string) => void
   paletteMode: PaletteMode | null
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
@@ -76,7 +155,6 @@ export const useSidebarState = (): SidebarState => {
 
 export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX.Element => {
   const { preferences, storageWarning, updatePreferences } = usePreferences()
-  const [threadQuery, setThreadQuery] = useState('')
   const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
   const [destinations, setDestinations] = useState<readonly PaletteDestination[]>([])
   const openPalette = useCallback((mode: PaletteMode) => setPaletteMode(mode), [])
@@ -87,15 +165,13 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       preferences,
       updatePreferences,
       storageWarning,
-      threadQuery,
-      setThreadQuery,
       paletteMode,
       openPalette,
       closePalette,
       destinations,
       setDestinations,
     }),
-    [preferences, updatePreferences, storageWarning, threadQuery, paletteMode, openPalette, closePalette, destinations],
+    [preferences, updatePreferences, storageWarning, paletteMode, openPalette, closePalette, destinations],
   )
 
   return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>

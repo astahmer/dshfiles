@@ -29,6 +29,44 @@ const preferencesSchema = z
   })
   .strict()
 
+/** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
+export const decodePreferences = (value: unknown): SidebarPreferences | null => {
+  const checked = preferencesSchema.safeParse(value)
+  return checked.success ? checked.data : null
+}
+
+/**
+ * Browser values to copy into Host settings once: only keys the Host still holds
+ * at their default, so another device's choices are never overwritten.
+ */
+export const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreferences): Partial<SidebarPreferences> => {
+  const patch: Partial<SidebarPreferences> = {}
+  for (const key of Object.keys(DEFAULT_PREFERENCES).filter(isPreferenceKey)) {
+    const same = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right)
+    if (same(host[key], DEFAULT_PREFERENCES[key]) && !same(local[key], host[key])) Object.assign(patch, { [key]: local[key] })
+  }
+  return patch
+}
+
+export const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
+
+export const readStoredPreferences = (): SidebarPreferences | null => {
+  try {
+    const stored = window.localStorage.getItem(PREFERENCES_STORAGE_KEY)
+    return stored === null ? null : parseStoredPreferences(stored)
+  } catch {
+    return null
+  }
+}
+
+export const clearStoredPreferences = (): void => {
+  try {
+    window.localStorage.removeItem(PREFERENCES_STORAGE_KEY)
+  } catch {
+    return
+  }
+}
+
 export const parseStoredPreferences = (stored: string | null): SidebarPreferences => {
   if (stored === null) return DEFAULT_PREFERENCES
 

@@ -12,12 +12,14 @@ the configured scan interval checks idle age and only calls
 `archiveSession(sessionId, { stopActivity: false })`. It skips running, blank,
 archived, pinned, parked, excluded-session, and excluded-project entries.
 
-Sidebar preferences persist under the browser `localStorage` key
-`dshfiles.thread-sidebar.v1`. They include project selection, collapsed
-sections, parked IDs, exclusions, settlement timing, header link mode/order/
-visibility, navigation density and overflow, palette chords, and independent
-footer order/visibility. The sidebar and its Settings tab share one in-document
-store, so a change in either applies immediately.
+Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
+namespace (`src/settings.ts`, registered by `src/host.ts`). User-facing fields
+(header style, density, icon-row overflow, recent-thread count, auto-archive)
+appear in the generated settings form; layout state (order, visibility,
+collapsed sections, project filter, split height, chords) is hidden there.
+Values previously kept in browser `localStorage` (`dshfiles.thread-sidebar.v1`)
+are copied once into keys the Host still holds at their default, then removed.
+Browser storage is only used while the Host namespace is unavailable.
 
 **Header navigation** follows BB's Sidebar Resize. Compact mode (and expanded
 mode once its pane is dragged to 76px or less) renders one horizontal icon row
@@ -38,7 +40,7 @@ points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,
   ⌘P / Ctrl+P thread search. Rebind or disable them in Settings › Plugins ›
-  Thread sidebar. A chord the Host shortcut catalog already binds is left to
+  Thread sidebar shortcuts. A chord the Host shortcut catalog already binds is left to
   the Host (so desktop ⌘K stays native Search sessions).
 - Host shortcut `threadSidebar.commandPalette` (⇧⌘P by default), editable in
   Settings › Shortcuts.
@@ -53,9 +55,9 @@ points:
 not fit move into More (⋯) together with entries hidden in Customize; overflow
 is recomputed from measured widths on resize.
 
-**Settings › Plugins › Thread sidebar** exposes header style, density, icon-row
-overflow, both palette chords (record / disable / reset, with Host-conflict and
-duplicate warnings), recent-thread count, and auto-archive timing.
+**Settings › Plugins › Thread sidebar shortcuts** records the two palette chords
+(record / disable / reset, with Host-conflict and duplicate warnings), which a
+generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID** and **Copy thread link** in
 its right-click menu. Child sessions render with increasing indentation and a
