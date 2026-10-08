@@ -4,9 +4,7 @@ import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/cl
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  Checkbox,
   IconArchiveOutlineRegular,
-  IconFolderOpenOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular,
   IconPauseOutlineRegular,
@@ -14,13 +12,35 @@ import {
   IconPinOutlineRegular,
   IconPlayOutlineRegular,
   IconUnarchiveOutlineRegular,
-  Input,
-  Menu,
-  MenuItemButton,
-  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { EmptyState, Field, Notice, TextArea, type NoticeTone } from '@dshfiles/plugin-ui'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { ActivityIcon, CirclePauseIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
   isAutoArchiveCandidate,
   parseSessionIds,
@@ -35,7 +55,6 @@ import { toggleCollapsedSection } from './preferences.js'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
-import styles from './thread-sidebar.module.css'
 
 type InjectedActions = {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -53,12 +72,7 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 
-interface ThreadContextMenuState {
-  sessionId: string
-  workspaceId?: string
-  x: number
-  y: number
-}
+type NoticeTone = 'danger' | 'warning' | 'success'
 
 interface SidebarNotice {
   tone: NoticeTone
@@ -67,8 +81,6 @@ interface SidebarNotice {
 
 const ALL_PROJECTS = '__all__'
 const UNASSIGNED_PROJECT = '__unassigned__'
-const SIDEBAR_SETTINGS = '__sidebar-settings__'
-const SIDEBAR_SETTINGS_LABEL = '__sidebar-settings-label__'
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'inactive', 'archived']
 
@@ -78,6 +90,16 @@ const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0
   parked: 'threadSidebarParked',
   inactive: 'threadSidebarInactive',
   archived: 'threadSidebarArchived',
+}
+
+const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
+
+const sectionIcons: Record<SidebarSection, ReactNode> = {
+  pinned: <IconPinOutlineRegular size={14} />,
+  active: <ActivityIcon className="dshx:size-3.5" />,
+  parked: <IconPauseOutlineRegular size={14} />,
+  inactive: <CirclePauseIcon className="dshx:size-3.5" />,
+  archived: <IconArchiveOutlineRegular size={14} />,
 }
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
@@ -117,9 +139,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, threadQuery } = useSidebarState()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
-  const [contextMenu, setContextMenu] = useState<ThreadContextMenuState | null>(null)
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
@@ -270,7 +291,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const copyContextValue = async (value: string, successMessage: string): Promise<void> => {
-    setContextMenu(null)
     try {
       await navigator.clipboard.writeText(value)
       setNotice({ tone: 'success', message: successMessage })
@@ -386,293 +406,358 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     preferences.workspaceFilter === null ? ALL_PROJECTS : preferences.workspaceFilter.length === 0 ? UNASSIGNED_PROJECT : preferences.workspaceFilter
 
   const selectProject = (value: string): void => {
-    setProjectMenuOpen(false)
-    if (value === SIDEBAR_SETTINGS) {
-      setSettingsOpen(current => !current)
-      return
-    }
     setSettingsOpen(false)
     if (value === ALL_PROJECTS) changePreferences({ workspaceFilter: null })
     else if (value === UNASSIGNED_PROJECT) changePreferences({ workspaceFilter: '' })
     else changePreferences({ workspaceFilter: value })
   }
 
-  const projectMenuItems = [
+  const projectOptions = [
     { id: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
     { id: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
     ...displayWorkspaces.map(workspace => ({ id: workspace.id, label: workspace.title })),
-    { type: 'separator' as const, id: SIDEBAR_SETTINGS_LABEL },
-    { id: SIDEBAR_SETTINGS, label: props.tSidebar('threadSidebarSettings') },
   ]
 
-  const projectFilterLabel = projectMenuItems.find(item => item.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
-
-  const contextMenuAnchorRect = useCallback(
-    (): DOMRect | null => (contextMenu === null ? null : new DOMRect(contextMenu.x, contextMenu.y, 0, 0)),
-    [contextMenu],
-  )
+  const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
 
   const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
-    <Tooltip label={label} side="top" delayMs={500} portal>
-      {anchor}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="dshx:inline-flex">{anchor}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
     </Tooltip>
   )
 
   return (
-    <section className={styles.sidebar} aria-label={props.tSidebar('threadSidebarTitle')}>
-      <header className={styles.header}>
-        <div className={styles.projectTitleRow}>
-          <Menu
-            className={styles.projectFilter}
-            open={projectMenuOpen}
-            portal
-            items={projectMenuItems}
-            selectedId={projectFilterValue}
-            onSelect={selectProject}
-            onClose={() => setProjectMenuOpen(false)}
-            anchor={
-              <button
-                type="button"
-                className={styles.projectFilterTrigger}
-                aria-haspopup="menu"
-                aria-expanded={projectMenuOpen}
+    <TooltipProvider delayDuration={500}>
+      <section className="dshx-root dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col" aria-label={props.tSidebar('threadSidebarTitle')}>
+        <header className="dshx:px-2 dshx:py-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="dshx:h-8 dshx:w-full dshx:justify-between dshx:px-2.5 dshx:text-base dshx:font-medium dshx:data-[settings-open=true]:text-muted-foreground"
                 data-settings-open={settingsOpen}
-                onClick={() => setProjectMenuOpen(value => !value)}
               >
-                {projectFilterLabel}
-              </button>
-            }
-          />
-        </div>
-      </header>
+                <span className="dshx:truncate">{projectFilterLabel}</span>
+                <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
+                  <IconChevronDownOutlineRegular size={14} />
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="dshx-root dshx:w-(--radix-dropdown-menu-trigger-width) dshx:min-w-56">
+              <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
+                {projectOptions.map(option => (
+                  <DropdownMenuRadioItem key={option.id} value={option.id}>
+                    <span className="dshx:truncate">{option.label}</span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
+                {props.tSidebar('threadSidebarSettings')}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
 
-      {settingsOpen ? (
-        <section className={styles.settings} aria-label={props.tSidebar('threadSidebarSettings')}>
-          <Checkbox
-            checked={preferences.autoArchiveEnabled}
-            label={props.tSidebar('threadSidebarAutoArchive')}
-            onChange={checked => changePreferences({ autoArchiveEnabled: checked })}
-          />
-          <Field label={props.tSidebar('threadSidebarIdleAfter')}>
-            {control => (
-              <Input
-                {...control}
-                type="number"
-                min={15}
-                max={10080}
-                value={preferences.idleMinutes}
-                onChange={event => {
-                  const value = Number(event.currentTarget.value)
-                  if (Number.isInteger(value) && value >= 15 && value <= 10080) changePreferences({ idleMinutes: value })
-                }}
-              />
-            )}
-          </Field>
-          <Field label={props.tSidebar('threadSidebarScanEvery')}>
-            {control => (
-              <Input
-                {...control}
-                type="number"
-                min={1}
-                max={120}
-                value={preferences.scanIntervalMinutes}
-                onChange={event => {
-                  const value = Number(event.currentTarget.value)
-                  if (Number.isInteger(value) && value >= 1 && value <= 120) changePreferences({ scanIntervalMinutes: value })
-                }}
-              />
-            )}
-          </Field>
-          <fieldset className={styles.exclusions}>
-            <legend>{props.tSidebar('threadSidebarExcludedProjects')}</legend>
-            {displayWorkspaces.map(workspace => (
+        {settingsOpen ? (
+          <section
+            className="dshx:mx-2 dshx:mb-2 dshx:grid dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3"
+            aria-label={props.tSidebar('threadSidebarSettings')}
+          >
+            <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox
-                key={workspace.id}
-                checked={preferences.excludedWorkspaceIds.includes(workspace.id)}
-                label={workspace.title}
-                onChange={checked => {
-                  const next = checked
-                    ? [...preferences.excludedWorkspaceIds, workspace.id]
-                    : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
-                  changePreferences({ excludedWorkspaceIds: next })
-                }}
+                checked={preferences.autoArchiveEnabled}
+                onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })}
               />
-            ))}
-          </fieldset>
-          <Field label={props.tSidebar('threadSidebarExcludedSessions')} description={props.tSidebar('threadSidebarExclusionHint')}>
-            {control => (
-              <TextArea
-                {...control}
+              {props.tSidebar('threadSidebarAutoArchive')}
+            </Label>
+            <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2">
+              <div className="dshx:grid dshx:content-start dshx:gap-1.5">
+                <Label htmlFor={`${settingsId}-idle`} className="dshx:text-xs dshx:font-normal dshx:leading-snug dshx:text-muted-foreground">
+                  {props.tSidebar('threadSidebarIdleAfter')}
+                </Label>
+                <Input
+                  id={`${settingsId}-idle`}
+                  className="dshx:h-7"
+                  type="number"
+                  min={15}
+                  max={10080}
+                  value={preferences.idleMinutes}
+                  onChange={event => {
+                    const value = Number(event.currentTarget.value)
+                    if (Number.isInteger(value) && value >= 15 && value <= 10080) changePreferences({ idleMinutes: value })
+                  }}
+                />
+              </div>
+              <div className="dshx:grid dshx:content-start dshx:gap-1.5">
+                <Label htmlFor={`${settingsId}-scan`} className="dshx:text-xs dshx:font-normal dshx:leading-snug dshx:text-muted-foreground">
+                  {props.tSidebar('threadSidebarScanEvery')}
+                </Label>
+                <Input
+                  id={`${settingsId}-scan`}
+                  className="dshx:h-7"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={preferences.scanIntervalMinutes}
+                  onChange={event => {
+                    const value = Number(event.currentTarget.value)
+                    if (Number.isInteger(value) && value >= 1 && value <= 120) changePreferences({ scanIntervalMinutes: value })
+                  }}
+                />
+              </div>
+            </div>
+            <fieldset className="dshx:grid dshx:min-w-0 dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
+              <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarExcludedProjects')}</legend>
+              {displayWorkspaces.map(workspace => (
+                <Label key={workspace.id} className="dshx:min-w-0 dshx:font-normal">
+                  <Checkbox
+                    checked={preferences.excludedWorkspaceIds.includes(workspace.id)}
+                    onCheckedChange={checked => {
+                      const next =
+                        checked === true
+                          ? [...preferences.excludedWorkspaceIds, workspace.id]
+                          : preferences.excludedWorkspaceIds.filter(id => id !== workspace.id)
+                      changePreferences({ excludedWorkspaceIds: next })
+                    }}
+                  />
+                  <span className="dshx:truncate">{workspace.title}</span>
+                </Label>
+              ))}
+            </fieldset>
+            <div className="dshx:grid dshx:gap-1.5">
+              <Label htmlFor={`${settingsId}-sessions`} className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+                {props.tSidebar('threadSidebarExcludedSessions')}
+              </Label>
+              <Textarea
+                id={`${settingsId}-sessions`}
+                className="dshx:min-h-14 dshx:font-mono! dshx:text-xs"
                 rows={3}
+                aria-describedby={`${settingsId}-sessions-hint`}
                 value={preferences.excludedSessionIds.join('\n')}
                 onChange={event => changePreferences({ excludedSessionIds: parseSessionIds(event.currentTarget.value) })}
               />
-            )}
-          </Field>
-          <p className={styles.note}>{props.tSidebar('threadSidebarTimestampNote')}</p>
-        </section>
-      ) : null}
+              <p id={`${settingsId}-sessions-hint`} className="dshx:text-xs dshx:text-muted-foreground">
+                {props.tSidebar('threadSidebarExclusionHint')}
+              </p>
+            </div>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarTimestampNote')}</p>
+          </section>
+        ) : null}
 
-      {notice !== null ? (
-        <Notice className={styles.notice} tone={notice.tone}>
-          {notice.message}
-        </Notice>
-      ) : null}
-      {storageWarning ? (
-        <Notice className={styles.notice} tone="warning">
-          {props.tSidebar('threadSidebarStorageFailure')}
-        </Notice>
-      ) : null}
+        {notice !== null || storageWarning ? (
+          <div className="dshx:grid dshx:gap-2 dshx:px-2 dshx:pb-2">
+            {notice !== null ? (
+              <Alert variant={notice.tone === 'danger' ? 'destructive' : notice.tone} className={noticeClass}>
+                {notice.message}
+              </Alert>
+            ) : null}
+            {storageWarning ? (
+              <Alert variant="warning" className={noticeClass}>{props.tSidebar('threadSidebarStorageFailure')}</Alert>
+            ) : null}
+          </div>
+        ) : null}
 
-      <div className={styles.sections}>
-        {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? <EmptyState compact title={props.tSidebar('threadSidebarLoading')} /> : null}
-        {sections.map(section => {
-          const rows = rowsBySection.get(section) ?? []
-          if (rows.length === 0 && section !== 'active') return null
-          const collapsed = preferences.collapsedSections.includes(section)
-          return (
-            <section className={styles.group} key={section}>
-              <button type="button" className={styles.groupHeader} aria-expanded={!collapsed} onClick={() => toggleSection(section)}>
-                <span>{props.tSidebar(sectionLabels[section])}</span>
-                <span className={styles.count}>({rows.length})</span>
-                {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
-              </button>
-              {!collapsed
-                ? rows.map(session => {
-                    const archived = archivedSessionIds.has(session.id)
-                    const pinned = pinnedSessionIds.has(session.id)
-                    const parked = parkedSessionIds.has(session.id)
-                    const lineage = sessionLineage(session, sessionState.byId)
-                    const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-                    const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title
-                    return (
-                      <article
-                        className={styles.row}
-                        data-selected={selectedSession?.id === session.id}
-                        data-lineage-depth={lineage.depth}
-                        key={session.id}
-                        onContextMenu={event => {
-                          event.preventDefault()
-                          setContextMenu({ sessionId: session.id, workspaceId, x: event.clientX, y: event.clientY })
-                        }}
-                        style={{ marginInlineStart: lineage.depth * 12 }}
-                      >
-                        <button
-                          type="button"
-                          className={styles.openButton}
-                          disabled={archived}
-                          title={new Date(session.updatedAt).toLocaleString()}
-                          onClick={() => openThread(session.id)}
-                        >
-                          <span className={styles.rowProjectLine}>
-                            <span className={styles.rowProject}>
-                              <IconFolderOpenOutlineRegular className={styles.projectIcon} size={14} aria-hidden="true" />
-                              <span className={styles.rowProjectName}>{workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}</span>
-                              {lineage.parentTitle === undefined ? null : (
-                                <span className={styles.parentLabel}>
-                                  {' · '}
-                                  {props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
-                                </span>
-                              )}
-                            </span>
-                            <span className={session.running ? `${styles.rowTime} ${styles.rowTimeRunning}` : styles.rowTime}>
-                              {session.running ? `${props.tSidebar('threadSidebarWorking')} · ` : ''}
-                              {relativeTime(session.updatedAt)}
-                            </span>
-                          </span>
-                          <span className={styles.rowTitle}>
-                            {session.attention?.unread ? (
-                              <span className={styles.unreadDot} role="img" aria-label={props.tSidebar('threadSidebarUnread')}>
-                                ●
-                              </span>
-                            ) : null}
-                            {session.displayTitle}
-                          </span>
-                          {session.cwd ? (
-                            <span className={styles.rowContext}>
-                              <span className={styles.rowDirectory}>{session.cwd}</span>
-                            </span>
-                          ) : null}
-                        </button>
-                        <div className={styles.actions}>
-                          {!archived ? (
-                            <>
-                              {withTooltip(
-                                props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
-                                <button
-                                  type="button"
-                                  aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                                  onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
-                                >
-                                  {pinned ? <IconPinFillRegular size={16} /> : <IconPinOutlineRegular size={16} />}
-                                </button>,
-                              )}
-                              {withTooltip(
-                                props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
-                                <button
-                                  type="button"
-                                  aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                                  disabled={session.running}
-                                  onClick={() => toggleParked(session.id)}
-                                >
-                                  {parked ? <IconPlayOutlineRegular size={16} /> : <IconPauseOutlineRegular size={16} />}
-                                </button>,
-                              )}
-                              {withTooltip(
-                                props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
-                                <button
-                                  type="button"
-                                  aria-label={props.tSidebar('threadSidebarArchive')}
-                                  disabled={session.running}
-                                  onClick={() => void mutateSession(session.id, props.archiveSession)}
-                                >
-                                  <IconArchiveOutlineRegular size={16} />
-                                </button>,
-                              )}
-                            </>
-                          ) : (
-                            withTooltip(
-                              props.tSidebar('threadSidebarRestore'),
+        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-2 dshx:pb-3">
+          {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
+            <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
+              <Spinner />
+              {props.tSidebar('threadSidebarLoading')}
+            </div>
+          ) : null}
+          {sections.map(section => {
+            const rows = rowsBySection.get(section) ?? []
+            if (rows.length === 0 && section !== 'active') return null
+            const collapsed = preferences.collapsedSections.includes(section)
+            return (
+              <section className="dshx:mt-1" key={section}>
+                <button
+                  type="button"
+                  className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                  aria-expanded={!collapsed}
+                  onClick={() => toggleSection(section)}
+                >
+                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                    {sectionIcons[section]}
+                  </span>
+                  <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
+                  <span className="dshx:text-xs dshx:tabular-nums">({rows.length})</span>
+                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                    {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
+                  </span>
+                </button>
+                {!collapsed
+                  ? rows.map(session => {
+                      const archived = archivedSessionIds.has(session.id)
+                      const pinned = pinnedSessionIds.has(session.id)
+                      const parked = parkedSessionIds.has(session.id)
+                      const unread = Boolean(session.attention?.unread)
+                      const lineage = sessionLineage(session, sessionState.byId)
+                      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+                      const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title
+                      return (
+                        <ContextMenu key={session.id}>
+                          <ContextMenuTrigger asChild>
+                            <article
+                              className="dshx:group/row dshx:relative dshx:min-w-0 dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:data-[selected=true]:bg-accent"
+                              data-selected={selectedSession?.id === session.id}
+                              data-lineage-depth={lineage.depth}
+                              style={{ marginInlineStart: lineage.depth * 12 }}
+                            >
                               <button
                                 type="button"
-                                aria-label={props.tSidebar('threadSidebarRestore')}
-                                onClick={() => void mutateSession(session.id, props.unarchiveSession)}
+                                className="dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:px-2.5 dshx:py-2.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default"
+                                disabled={archived}
+                                title={new Date(session.updatedAt).toLocaleString()}
+                                onClick={() => openThread(session.id)}
                               >
-                                <IconUnarchiveOutlineRegular size={16} />
-                              </button>,
-                            )
-                          )}
-                        </div>
-                      </article>
-                    )
-                  })
-                : null}
-            </section>
-          )
-        })}
-        {sessionState.phase === 'ready' && [...rowsBySection.values()].every(rows => rows.length === 0) ? (
-          <EmptyState compact title={props.tSidebar('threadSidebarEmpty')} />
-        ) : null}
-      </div>
-      <Menu open={contextMenu !== null} anchor={<span />} portal autoFocus getAnchorRect={contextMenuAnchorRect} onClose={() => setContextMenu(null)}>
-        {contextMenu === null ? null : (
-          <>
-            <MenuItemButton onSelect={() => void copyContextValue(contextMenu.sessionId, props.tSidebar('threadSidebarIdCopied'))}>
-              {props.tSidebar('threadSidebarCopyId')}
-            </MenuItemButton>
-            <MenuItemButton
-              onSelect={() =>
-                void copyContextValue(
-                  buildThreadUrl(window.location.href, contextMenu.sessionId, contextMenu.workspaceId),
-                  props.tSidebar('threadSidebarLinkCopied'),
-                )
-              }
-            >
-              {props.tSidebar('threadSidebarCopyLink')}
-            </MenuItemButton>
-          </>
-        )}
-      </Menu>
-    </section>
+                                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
+                                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                                    <span className={cn('dshx:truncate dshx:font-medium', lineage.parentTitle !== undefined && 'dshx:max-w-[60%] dshx:shrink-0')}>
+                                      {workspaceTitle ?? props.tSidebar('threadSidebarUnassigned')}
+                                    </span>
+                                    {lineage.parentTitle === undefined ? null : (
+                                      <span className="dshx:min-w-0 dshx:truncate dshx:text-xs">
+                                        {' · '}
+                                        {props.tSidebar('threadSidebarChildOf')} {lineage.parentTitle}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className={cn('dshx:shrink-0 dshx:tabular-nums', session.running && 'dshx:font-medium dshx:text-info')}>
+                                    {session.running ? `${props.tSidebar('threadSidebarWorking')} · ` : ''}
+                                    {relativeTime(session.updatedAt)}
+                                  </span>
+                                </span>
+                                <span className={cn('dshx:truncate dshx:text-base dshx:text-foreground', unread && 'dshx:font-semibold')}>
+                                  {session.displayTitle}
+                                </span>
+                                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+                                  {session.cwd ? (
+                                    <>
+                                      <MonitorIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                                      <span className="dshx:truncate">{session.cwd}</span>
+                                    </>
+                                  ) : null}
+                                  {unread ? (
+                                    <span
+                                      className="dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-[2px] dshx:bg-primary"
+                                      role="img"
+                                      aria-label={props.tSidebar('threadSidebarUnread')}
+                                    />
+                                  ) : (
+                                    <span
+                                      className={cn(
+                                        'dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-[2px]',
+                                        session.running ? 'dshx:animate-pulse dshx:bg-info' : 'dshx:bg-muted-foreground/40',
+                                      )}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                </span>
+                              </button>
+                              <div className="dshx:absolute dshx:right-1.5 dshx:bottom-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+                                {!archived ? (
+                                  <>
+                                    {withTooltip(
+                                      props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label={props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                                        onClick={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}
+                                      >
+                                        {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+                                      </Button>,
+                                    )}
+                                    {withTooltip(
+                                      props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label={props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                                        disabled={session.running}
+                                        onClick={() => toggleParked(session.id)}
+                                      >
+                                        {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
+                                      </Button>,
+                                    )}
+                                    {withTooltip(
+                                      props.tSidebar(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label={props.tSidebar('threadSidebarArchive')}
+                                        disabled={session.running}
+                                        onClick={() => void mutateSession(session.id, props.archiveSession)}
+                                      >
+                                        <IconArchiveOutlineRegular size={14} />
+                                      </Button>,
+                                    )}
+                                  </>
+                                ) : (
+                                  withTooltip(
+                                    props.tSidebar('threadSidebarRestore'),
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      aria-label={props.tSidebar('threadSidebarRestore')}
+                                      onClick={() => void mutateSession(session.id, props.unarchiveSession)}
+                                    >
+                                      <IconUnarchiveOutlineRegular size={14} />
+                                    </Button>,
+                                  )
+                                )}
+                              </div>
+                            </article>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={props.tSidebar('threadSidebarContextMenu')}>
+                            <ContextMenuItem onSelect={() => void copyContextValue(session.id, props.tSidebar('threadSidebarIdCopied'))}>
+                              {props.tSidebar('threadSidebarCopyId')}
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              onSelect={() =>
+                                void copyContextValue(buildThreadUrl(window.location.href, session.id, workspaceId), props.tSidebar('threadSidebarLinkCopied'))
+                              }
+                            >
+                              {props.tSidebar('threadSidebarCopyLink')}
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            {archived ? (
+                              <ContextMenuItem onSelect={() => void mutateSession(session.id, props.unarchiveSession)}>
+                                {props.tSidebar('threadSidebarRestore')}
+                              </ContextMenuItem>
+                            ) : (
+                              <>
+                                <ContextMenuItem onSelect={() => void mutateSession(session.id, pinned ? props.unpinSession : props.pinSession)}>
+                                  {props.tSidebar(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                                </ContextMenuItem>
+                                <ContextMenuItem disabled={session.running} onSelect={() => toggleParked(session.id)}>
+                                  {props.tSidebar(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                                </ContextMenuItem>
+                                <ContextMenuItem disabled={session.running} onSelect={() => void mutateSession(session.id, props.archiveSession)}>
+                                  {props.tSidebar('threadSidebarArchive')}
+                                </ContextMenuItem>
+                              </>
+                            )}
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      )
+                    })
+                  : null}
+              </section>
+            )
+          })}
+          {sessionState.phase === 'ready' && [...rowsBySection.values()].every(rows => rows.length === 0) ? (
+            <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
+              <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">{props.tSidebar('threadSidebarEmpty')}</EmptyTitle>
+            </Empty>
+          ) : null}
+        </div>
+      </section>
+    </TooltipProvider>
   )
 }
