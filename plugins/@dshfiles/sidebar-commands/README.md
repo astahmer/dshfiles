@@ -12,12 +12,18 @@ browser reads. A navigation that fails, for example because the panel was
 unregistered after the popup opened, surfaces in the popup shell and leaves the
 current view in place.
 
+When @dshfiles/thread-sidebar is loaded (it acknowledges a probe of the
+cancelable `dshfiles:command-palette` window event), the popup leads with
+**Open command palette** and **Search threads**. That palette lists every
+sidebar destination dynamically, which covers the BB Cmd-Shift-P page entries
+and the Customize sidebar entry.
+
 The command only navigates: it never creates, archives or submits anything.
 
 ## Port notes
 
 Ported from the 0.1-era `/go` plugin. It is named `goto` because DSH ships
 `/goal`, and typing `/go` highlighted `/goal` first, so Enter ran the wrong
-command. The palette entry and route navigation from the BB original remain
-platform boundaries: DSH's command palette has no plugin registration seam and
-DSH has no route paths.
+command. DSH has no native command palette or route paths; the palette lives in
+@dshfiles/thread-sidebar instead. BB's Remote access entry has no DSH
+counterpart.

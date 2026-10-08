@@ -12,6 +12,11 @@ const en = {
   sessionsGroup: 'Sessions',
   panelDetail: 'Panel',
   sessionDetail: 'Session',
+  actionsGroup: 'Actions',
+  actionDetail: 'Thread sidebar',
+  paletteLabel: 'Open command palette',
+  threadSearchLabel: 'Search threads',
+  paletteUnavailable: 'The command palette is not loaded.',
   panelUnavailable: 'That panel is no longer registered.',
   sessionUnavailable: 'That session is no longer available.',
 }
@@ -26,6 +31,11 @@ const zh = {
   sessionsGroup: '会话',
   panelDetail: '面板',
   sessionDetail: '会话',
+  actionsGroup: '操作',
+  actionDetail: '会话侧边栏',
+  paletteLabel: '打开命令面板',
+  threadSearchLabel: '搜索会话',
+  paletteUnavailable: '命令面板未加载。',
   panelUnavailable: '该面板已不再注册。',
   sessionUnavailable: '该会话已不可用。',
 }
@@ -36,6 +46,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export type GoToCopy = Readonly<Record<'panelsGroup' | 'sessionsGroup' | 'panelDetail' | 'sessionDetail', string>>
+export type GoToCopy = Readonly<
+  Record<'panelsGroup' | 'sessionsGroup' | 'panelDetail' | 'sessionDetail' | 'actionsGroup' | 'actionDetail' | 'paletteLabel' | 'threadSearchLabel', string>
+>
 
 export const sidebarCommandsLocale = defineLocale(SIDEBAR_COMMANDS_LOCALE_NAMESPACE, { en, zh })

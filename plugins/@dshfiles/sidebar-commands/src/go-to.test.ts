@@ -2,7 +2,16 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { describe, expect, it, vi } from 'vitest'
 import { buildGoToEntries, createDeferredNavigation } from './go-to.js'
 
-const copy = { panelsGroup: 'Panels', sessionsGroup: 'Sessions', panelDetail: 'Panel', sessionDetail: 'Session' }
+const copy = {
+  panelsGroup: 'Panels',
+  sessionsGroup: 'Sessions',
+  panelDetail: 'Panel',
+  sessionDetail: 'Session',
+  actionsGroup: 'Actions',
+  actionDetail: 'Thread sidebar',
+  paletteLabel: 'Open command palette',
+  threadSearchLabel: 'Search threads',
+}
 
 const session = (id: string, fields: Partial<Pick<SessionSummary, 'blank' | 'origin' | 'cwd' | 'updatedAt' | 'displayTitle'>> = {}) => ({
   id,
@@ -18,9 +27,19 @@ type Row = ReturnType<typeof session>
 const sessionsOf = (rows: readonly Row[]) => ({ ids: rows.map(row => row.id), byId: Object.fromEntries(rows.map(row => [row.id, row])) })
 
 const build = (overrides: Partial<Parameters<typeof buildGoToEntries<string>>[0]> = {}) =>
-  buildGoToEntries<string>({ panels: [], mainPanelKeys: new Set(), sessions: undefined, archivedSessionIds: new Set(), copy, ...overrides })
+  buildGoToEntries<string>({ panels: [], mainPanelKeys: new Set(), sessions: undefined, archivedSessionIds: new Set(), paletteAvailable: false, copy, ...overrides })
 
 describe('buildGoToEntries', () => {
+  it('leads with palette actions only when the thread sidebar acknowledged the palette', () => {
+    expect(build().length).toBe(0)
+    const entries = build({ paletteAvailable: true })
+    expect(entries.map(entry => entry.target)).toEqual([
+      { kind: 'palette', mode: 'all' },
+      { kind: 'palette', mode: 'threads' },
+    ])
+    expect(entries[0]?.option.group).toEqual({ name: 'actions', label: 'Actions' })
+  })
+
   it('lists only panels whose id is a registered main panel, sorted by label', () => {
     const entries = build({
       panels: [

@@ -20,13 +20,22 @@ export default defineClient({
     const translate = ctx.locale.bind(SIDEBAR_COMMANDS_LOCALE_NAMESPACE)
     let targets = new Map<string, SessionTarget>()
 
+    const PALETTE_EVENT = 'dshfiles:command-palette'
+    const requestPalette = (detail: { mode: 'all' | 'threads' } | { probe: true }): boolean =>
+      !window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail, cancelable: true }))
+
     const loadEntries = () => {
       const entries = buildGoToEntries({
         panels: ctx.slots.entriesOfSlot('sidebar.panellist').map(entry => ({ id: entry.options.id, label: resolveSlotLabel(entry.options.label) })),
         mainPanelKeys: new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? [])),
         sessions: ctx.sessions.list.getSnapshot(),
         archivedSessionIds: new Set(ctx.workspaces.list.getSnapshot().archivedSessionIds),
+        paletteAvailable: requestPalette({ probe: true }),
         copy: {
+          actionsGroup: translate('actionsGroup'),
+          actionDetail: translate('actionDetail'),
+          paletteLabel: translate('paletteLabel'),
+          threadSearchLabel: translate('threadSearchLabel'),
           panelsGroup: translate('panelsGroup'),
           sessionsGroup: translate('sessionsGroup'),
           panelDetail: translate('panelDetail'),
@@ -38,18 +47,23 @@ export default defineClient({
     }
 
     const isStillAvailable = (target: SessionTarget): boolean => {
+      if (target.kind === 'palette') return requestPalette({ probe: true })
       if (target.kind === 'panel') return ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === target.panelId)
       return ctx.sessions.list.getSnapshot().byId[target.sessionId] !== undefined
     }
 
     const open = (target: SessionTarget): void => {
+      if (target.kind === 'palette') {
+        requestPalette({ mode: target.mode })
+        return
+      }
       if (target.kind === 'panel') return ctx.layout.selectPanel(target.panelId)
       ctx.uiWorkspace.openSession(target.sessionId)
     }
 
     const select = createDeferredNavigation({
       isAvailable: isStillAvailable,
-      unavailableMessage: target => translate(target.kind === 'panel' ? 'panelUnavailable' : 'sessionUnavailable'),
+      unavailableMessage: target => translate(target.kind === 'palette' ? 'paletteUnavailable' : target.kind === 'panel' ? 'panelUnavailable' : 'sessionUnavailable'),
       navigate: open,
       schedule: run => void setTimeout(run, 0),
     })

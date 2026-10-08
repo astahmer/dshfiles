@@ -6,6 +6,7 @@ import type { GoToCopy } from './locales.js'
 const MAX_SESSION_ROWS = 20
 
 export type GoToTarget<SessionKey extends string> =
+  | { readonly kind: 'palette'; readonly mode: 'all' | 'threads' }
   | { readonly kind: 'panel'; readonly panelId: MainPanelId }
   | { readonly kind: 'session'; readonly sessionId: SessionKey }
 
@@ -32,7 +33,18 @@ interface GoToInput<SessionKey extends string> {
   readonly mainPanelKeys: ReadonlySet<string>
   readonly sessions: SessionList<SessionKey> | undefined
   readonly archivedSessionIds: ReadonlySet<string>
+  /** Whether @dshfiles/thread-sidebar acknowledged the command palette event. */
+  readonly paletteAvailable: boolean
   readonly copy: GoToCopy
+}
+
+const paletteEntries = <SessionKey extends string>(input: GoToInput<SessionKey>): GoToEntry<SessionKey>[] => {
+  if (!input.paletteAvailable) return []
+  const group = { name: 'actions', label: input.copy.actionsGroup }
+  return [
+    { option: { id: 'palette:all', label: input.copy.paletteLabel, detail: input.copy.actionDetail, group }, target: { kind: 'palette', mode: 'all' } },
+    { option: { id: 'palette:threads', label: input.copy.threadSearchLabel, detail: input.copy.actionDetail, group }, target: { kind: 'palette', mode: 'threads' } },
+  ]
 }
 
 const panelEntries = <SessionKey extends string>(input: GoToInput<SessionKey>): GoToEntry<SessionKey>[] => {
@@ -65,8 +77,9 @@ const sessionEntries = <SessionKey extends string>(input: GoToInput<SessionKey>)
     }))
 }
 
-/** Panels first, alphabetically; then the most recently updated sessions a user can navigate to. */
+/** Palette actions when available, panels alphabetically, then the most recently updated navigable sessions. */
 export const buildGoToEntries = <SessionKey extends string>(input: GoToInput<SessionKey>): readonly GoToEntry<SessionKey>[] => [
+  ...paletteEntries(input),
   ...panelEntries(input),
   ...sessionEntries(input),
 ]
