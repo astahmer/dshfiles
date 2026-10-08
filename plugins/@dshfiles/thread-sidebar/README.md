@@ -15,11 +15,47 @@ archived, pinned, parked, excluded-session, and excluded-project entries.
 Sidebar preferences persist under the browser `localStorage` key
 `dshfiles.thread-sidebar.v1`. They include project selection, collapsed
 sections, parked IDs, exclusions, settlement timing, header link mode/order/
-visibility, and independent footer order/visibility. Header links include New
-thread, Search, and the live `sidebar.panellist` registrations. Customize lets
-the user choose compact icons or expanded labels, reorder links, and show or
-hide them. Footer settings and `sidebar.footer.action` entries have separate
-ordering and visibility controls; hidden actions remain available in More.
+visibility, navigation density and overflow, palette chords, and independent
+footer order/visibility. The sidebar and its Settings tab share one in-document
+store, so a change in either applies immediately.
+
+**Header navigation** follows BB's Sidebar Resize. Compact mode (and expanded
+mode once its pane is dragged to 76px or less) renders one horizontal icon row
+that scrolls sideways (wheel included, scrollbar hidden, faded edges) with a
+pinned ⋮ button. The ⋮ menu is a filterable list ("Filter destinations…") of
+every destination plus **Customize sidebar**. Overflow can be Scroll, Overflow
+menu (only fitting icons, the rest in ⋮), or Scroll + menu (default).
+Expanded mode is a labelled list with a trailing Customize row; density is
+Compact (30px rows) or Comfortable (34px). Dragging the splitter past 76px from
+the icon row switches to expanded.
+
+**Command palette.** Search threads, the ⌘ button in the header, and the
+keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,
+project, path, and ID prefix, recent threads when the query is empty,
+destinations and actions (toggle sidebar, focus composer, customize) in the
+full palette, ⌘1–⌘9 on the first nine rows, and Enter to open. Keyboard entry
+points:
+
+- Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,
+  ⌘P / Ctrl+P thread search. Rebind or disable them in Settings › Plugins ›
+  Thread sidebar. A chord the Host shortcut catalog already binds is left to
+  the Host (so desktop ⌘K stays native Search sessions).
+- Host shortcut `threadSidebar.commandPalette` (⇧⌘P by default), editable in
+  Settings › Shortcuts.
+- Host `session.search` (⌥⌘K on the web, ⌘K on desktop) opens thread search:
+  the native browser stays registered under this one, and its request store is
+  followed through the slot ledger.
+- Any bundle can dispatch the cancelable `dshfiles:command-palette` window
+  event with `{ mode: 'all' | 'threads' }`; a `{ probe: true }` detail is only
+  acknowledged (`/goto` uses it).
+
+**Footer** entries render on one row and never shrink or wrap. Entries that do
+not fit move into More (⋯) together with entries hidden in Customize; overflow
+is recomputed from measured widths on resize.
+
+**Settings › Plugins › Thread sidebar** exposes header style, density, icon-row
+overflow, both palette chords (record / disable / reset, with Host-conflict and
+duplicate warnings), recent-thread count, and auto-archive timing.
 
 Every thread row also exposes **Copy thread ID** and **Copy thread link** in
 its right-click menu. Child sessions render with increasing indentation and a

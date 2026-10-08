@@ -1,7 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -13,6 +13,9 @@ import { ThreadSidebar } from './client.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
+import { PALETTE_EVENT } from './palette.js'
+import type {} from './settings-slot.js'
+import { SettingsTab } from './settings-tab.js'
 import './client.css'
 
 export default defineClient({
@@ -77,6 +80,96 @@ export default defineClient({
       ]
       return () => unsubscribe.forEach(stop => stop())
     }
+
+    // The native browser stays registered beneath ours; its injected share holds the
+    // store that Host `session.search` (⌥⌘K web, ⌘K desktop) bumps, so follow it.
+    const watchNativeSearchRequests = (): (() => void) => {
+      let release = (): void => undefined
+      const bind = (): void => {
+        release()
+        release = () => undefined
+        for (const entry of ctx.slots.entries('sidebar.workspaces')) {
+          if (entry.options.priority === -1000 || entry.inject === undefined) continue
+          const hooks: unknown = entry.inject().hooks
+          const store: unknown = typeof hooks === 'object' && hooks !== null ? Reflect.get(hooks, 'workspaceShortcuts') : undefined
+          const searchRequest = (): unknown => {
+            const read: unknown = typeof store === 'object' && store !== null ? Reflect.get(store, 'getSnapshot') : undefined
+            const snapshot: unknown = typeof read === 'function' ? Reflect.apply(read, store, []) : undefined
+            return typeof snapshot === 'object' && snapshot !== null ? Reflect.get(snapshot, 'searchRequest') : undefined
+          }
+          const subscribe: unknown = typeof store === 'object' && store !== null ? Reflect.get(store, 'subscribe') : undefined
+          if (typeof subscribe !== 'function') continue
+          let handled = searchRequest()
+          const unsubscribe: unknown = Reflect.apply(subscribe, store, [
+            () => {
+              const next = searchRequest()
+              if (next === handled) return
+              handled = next
+              window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } }))
+            },
+          ])
+          release = () => {
+            if (typeof unsubscribe === 'function') Reflect.apply(unsubscribe, undefined, [])
+          }
+          return
+        }
+      }
+      bind()
+      const stopWatching = ctx.slots.subscribe('sidebar.workspaces', bind)
+      return () => {
+        stopWatching()
+        release()
+      }
+    }
+    ctx.effect(watchNativeSearchRequests, 'thread-sidebar: native session search')
+
+    const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
+    const paletteCommandId = 'threadSidebar.commandPalette'
+    if (isShortcutCommandId(paletteCommandId)) {
+      const paletteBinding = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const
+      const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+      // A user binding or another plugin may already own the default; the palette
+      // still opens from its button and capture chords, so a refusal must not abort setup.
+      ctx.effect(() => {
+        try {
+          return ctx.shortcuts.register({
+            id: paletteCommandId,
+            label: () => translate('threadSidebarCommandPalette'),
+            aliases: ['command palette', 'go to', 'search threads'],
+            defaults: {
+              'desktop:macos': paletteBinding,
+              'desktop:windows': paletteBinding,
+              'desktop:linux': paletteBinding,
+              'web:macos': paletteBinding,
+              'web:windows': paletteBinding,
+            },
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({
+              status: 'handled',
+              run: () => window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'all' } })),
+            }),
+          })
+        } catch (error) {
+          console.warn('thread-sidebar: the command palette shortcut could not be registered', error)
+          return () => undefined
+        }
+      }, 'thread-sidebar: command palette shortcut')
+    }
+
+    ctx.slots.inject('settings.plugins.tab', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.plugins.tab',
+          registrant: '@dshfiles/thread-sidebar',
+          id: 'thread-sidebar',
+          order: 30,
+          label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarSettingsTab'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
+        ({ t }) => <SettingsTab t={t} hostShortcuts={ctx.shortcuts.catalog} />,
+      ),
+    )
 
     ctx.effect(() => ctx.slots.subscribe('sidebar.panellist', syncPanels), 'thread-sidebar: panel links')
     ctx.effect(() => ctx.locale.subscribe(syncPanels), 'thread-sidebar: panel labels')

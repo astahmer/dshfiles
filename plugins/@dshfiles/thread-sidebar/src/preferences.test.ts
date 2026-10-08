@@ -16,3 +16,17 @@ test('valid saved split heights persist and invalid heights fall back to default
   assert.equal(parseStoredPreferences(stored).headerRegionHeight, 384)
   assert.equal(parseStoredPreferences(invalidStored).headerRegionHeight, DEFAULT_PREFERENCES.headerRegionHeight)
 })
+
+test('preferences saved before navigation and palette settings existed gain their defaults', () => {
+  const { navigationDensity, navigationOverflow, paletteChord, threadSearchChord, paletteRecentLimit, ...older } = DEFAULT_PREFERENCES
+  const parsed = parseStoredPreferences(JSON.stringify({ ...older, headerMode: 'expanded' }))
+  assert.equal(parsed.headerMode, 'expanded')
+  assert.deepEqual(
+    [parsed.navigationDensity, parsed.navigationOverflow, parsed.paletteChord, parsed.threadSearchChord, parsed.paletteRecentLimit],
+    [navigationDensity, navigationOverflow, paletteChord, threadSearchChord, paletteRecentLimit],
+  )
+})
+
+test('a disabled chord persists as null', () => {
+  assert.equal(parseStoredPreferences(JSON.stringify({ ...DEFAULT_PREFERENCES, paletteChord: null })).paletteChord, null)
+})

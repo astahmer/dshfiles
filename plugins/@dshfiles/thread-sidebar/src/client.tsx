@@ -52,7 +52,9 @@ import {
   workspaceForLineage,
 } from './organization.js'
 import { toggleCollapsedSection } from './preferences.js'
+import { isMacPlatform, type ThreadCandidate } from './palette.js'
 import { useSidebarState } from './sidebar-state.js'
+import { ThreadPalette } from './thread-palette.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 
@@ -137,7 +139,7 @@ const relativeTime = (updatedAt: number): string => {
 export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, threadQuery } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, paletteMode, closePalette, destinations } = useSidebarState()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
@@ -369,17 +371,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
-    const normalizedQuery = threadQuery.trim().toLocaleLowerCase()
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
       if (session === undefined || session.blank) continue
       const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
-      if (normalizedQuery.length > 0) {
-        const workspaceTitle = displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title ?? ''
-        const searchable = (session.displayTitle + ' ' + workspaceTitle).toLocaleLowerCase()
-        if (!searchable.includes(normalizedQuery)) continue
-      }
       const section = sectionForSession(session, archivedSessionIds, pinnedSessionIds, parkedSessionIds)
       rows.get(section)?.push(session)
     }
@@ -391,16 +387,34 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     return rows
   }, [
     archivedSessionIds,
-    displayWorkspaces,
     parkedSessionIds,
     pinnedSessionIds,
     preferences.workspaceFilter,
     sessionState.byId,
     sessionState.ids,
-    threadQuery,
     workspaceBySession,
     workspaceState.pinnedSessionIds,
   ])
+
+  const paletteThreads = useMemo(() => {
+    if (paletteMode === null) return { candidates: [], byCandidateId: new Map<string, SessionSummary>() }
+    const titles = new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title]))
+    const byCandidateId = new Map<string, SessionSummary>()
+    const candidates: ThreadCandidate[] = []
+    for (const session of sessions) {
+      if (session.blank || archivedSessionIds.has(session.id)) continue
+      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+      byCandidateId.set(session.id, session)
+      candidates.push({
+        id: session.id,
+        title: session.displayTitle,
+        project: workspaceId === undefined ? '' : (titles.get(workspaceId) ?? ''),
+        cwd: session.cwd ?? '',
+        updatedAt: session.updatedAt,
+      })
+    }
+    return { candidates, byCandidateId }
+  }, [archivedSessionIds, displayWorkspaces, paletteMode, sessionState.byId, sessions, workspaceBySession])
 
   const projectFilterValue =
     preferences.workspaceFilter === null ? ALL_PROJECTS : preferences.workspaceFilter.length === 0 ? UNASSIGNED_PROJECT : preferences.workspaceFilter
@@ -432,6 +446,33 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   return (
     <TooltipProvider delayDuration={500}>
       <section className="dshx-root dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col" aria-label={props.tSidebar('threadSidebarTitle')}>
+        {paletteMode === null ? null : (
+          <ThreadPalette
+            mode={paletteMode}
+            threads={paletteThreads.candidates}
+            destinations={destinations}
+            recentLimit={preferences.paletteRecentLimit}
+            mac={isMacPlatform(navigator.platform)}
+            onClose={closePalette}
+            onOpenThread={candidateId => {
+              const session = paletteThreads.byCandidateId.get(candidateId)
+              if (session !== undefined) openThread(session.id)
+            }}
+            copy={{
+              title: props.tSidebar('threadSidebarPaletteTitle'),
+              threadsPlaceholder: props.tSidebar('threadSidebarPaletteThreadsPlaceholder'),
+              allPlaceholder: props.tSidebar('threadSidebarPaletteAllPlaceholder'),
+              recent: props.tSidebar('threadSidebarPaletteRecent'),
+              threads: props.tSidebar('threadSidebarTitle'),
+              destinations: props.tSidebar('threadSidebarPaletteDestinations'),
+              empty: props.tSidebar('threadSidebarPaletteEmpty'),
+              navigate: props.tSidebar('threadSidebarPaletteNavigate'),
+              open: props.tSidebar('threadSidebarPaletteOpen'),
+              close: props.tSidebar('threadSidebarPaletteClose'),
+              unassigned: props.tSidebar('threadSidebarUnassigned'),
+            }}
+          />
+        )}
         <header className="dshx:px-2 dshx:py-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

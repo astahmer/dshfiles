@@ -2,9 +2,14 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 
 export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
 
-export const SIDEBAR_HEADER_MIN_HEIGHT = 56
+export const SIDEBAR_HEADER_MIN_HEIGHT = 44
 export const SIDEBAR_THREAD_MIN_HEIGHT = 120
 export const SIDEBAR_SPLITTER_HEIGHT = 12
+/** At or below this navigation height the labelled list folds into BB's horizontal icon row. */
+export const SIDEBAR_ICON_ROW_THRESHOLD = 76
+
+export type NavigationDensity = 'compact' | 'comfortable'
+export type NavigationOverflow = 'scroll' | 'menu' | 'scroll-menu'
 
 export interface SidebarPreferences {
   autoArchiveEnabled: boolean
@@ -21,6 +26,12 @@ export interface SidebarPreferences {
   hiddenHeaderIds: string[]
   footerOrder: string[]
   hiddenFooterIds: string[]
+  navigationDensity: NavigationDensity
+  navigationOverflow: NavigationOverflow
+  /** Capture-phase chords in `primary+shift+KeyP` form; null disables the chord. */
+  paletteChord: string | null
+  threadSearchChord: string | null
+  paletteRecentLimit: number
 }
 
 export const DEFAULT_PREFERENCES: SidebarPreferences = {
@@ -39,6 +50,11 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   hiddenHeaderIds: [],
   footerOrder: [],
   hiddenFooterIds: [],
+  navigationDensity: 'compact',
+  navigationOverflow: 'scroll-menu',
+  paletteChord: 'primary+KeyK',
+  threadSearchChord: 'primary+KeyP',
+  paletteRecentLimit: 20,
 }
 
 export interface OrderedSidebarEntry {
@@ -191,4 +207,22 @@ export const sectionForSession = (
   if (session.running) return 'active'
   if (parkedSessionIds.has(session.id)) return 'parked'
   return 'inactive'
+}
+
+/**
+ * How many leading items fit in `available` pixels when a trailing control of
+ * `reserve` pixels must stay visible whenever anything overflows.
+ */
+export const fitLeadingItems = ({ widths, available, gap, reserve }: { widths: readonly number[]; available: number; gap: number; reserve: number }): number => {
+  const total = widths.reduce((sum, width, index) => sum + width + (index === 0 ? 0 : gap), 0)
+  if (total <= available) return widths.length
+  let used = reserve
+  let count = 0
+  for (const width of widths) {
+    const next = used + width + gap
+    if (next > available) break
+    used = next
+    count += 1
+  }
+  return count
 }

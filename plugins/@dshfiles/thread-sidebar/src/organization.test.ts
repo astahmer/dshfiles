@@ -4,6 +4,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { test, vi } from 'vitest'
 import {
   archiveWithoutStopping,
+  fitLeadingItems,
   type AutoArchiveContext,
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
@@ -232,4 +233,11 @@ test('archive adapter explicitly refuses to stop Host activity', async () => {
     request = { sessionId, options }
   }, 'session-1')
   assert.deepEqual(request, { sessionId: 'session-1', options: { stopActivity: false } })
+})
+
+test('footer and icon-row overflow keep whole items and reserve the More control only when something overflows', () => {
+  assert.equal(fitLeadingItems({ widths: [80, 120], available: 208, gap: 8, reserve: 36 }), 2)
+  assert.equal(fitLeadingItems({ widths: [80, 120], available: 200, gap: 8, reserve: 36 }), 1)
+  assert.equal(fitLeadingItems({ widths: [80, 120, 40], available: 100, gap: 8, reserve: 36 }), 0)
+  assert.equal(fitLeadingItems({ widths: [], available: 0, gap: 8, reserve: 36 }), 0)
 })

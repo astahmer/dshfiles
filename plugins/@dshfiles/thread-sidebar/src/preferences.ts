@@ -16,11 +16,16 @@ const preferencesSchema = z
     collapsedSections: z.array(sidebarSectionSchema).max(5),
     workspaceFilter: z.string().max(256).nullable(),
     headerMode: z.enum(['compact', 'expanded']),
-    headerRegionHeight: z.number().int().min(56).max(10000).nullable().default(null),
+    headerRegionHeight: z.number().int().min(40).max(10000).nullable().default(null),
     headerOrder: z.array(z.string().min(1).max(256)).max(300),
     hiddenHeaderIds: z.array(z.string().min(1).max(256)).max(300),
     footerOrder: z.array(z.string().min(1).max(256)).max(300),
     hiddenFooterIds: z.array(z.string().min(1).max(256)).max(300),
+    navigationDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.navigationDensity),
+    navigationOverflow: z.enum(['scroll', 'menu', 'scroll-menu']).default(DEFAULT_PREFERENCES.navigationOverflow),
+    paletteChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.paletteChord),
+    threadSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.threadSearchChord),
+    paletteRecentLimit: z.number().int().min(5).max(100).default(DEFAULT_PREFERENCES.paletteRecentLimit),
   })
   .strict()
 
