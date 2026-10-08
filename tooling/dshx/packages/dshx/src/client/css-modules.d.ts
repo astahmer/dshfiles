@@ -9,3 +9,6 @@ declare module '*.module.css' {
   const classes: Record<string, string>
   export default classes
 }
+
+/** Plain stylesheets (e.g. a Tailwind entry) are side-effect imports. */
+declare module '*.css' {}
