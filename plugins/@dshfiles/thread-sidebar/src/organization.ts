@@ -213,16 +213,18 @@ export const sectionForSession = (
  * How many leading items fit in `available` pixels when a trailing control of
  * `reserve` pixels must stay visible whenever anything overflows.
  */
-export const fitLeadingItems = ({ widths, available, gap, reserve }: { widths: readonly number[]; available: number; gap: number; reserve: number }): number => {
+/**
+ * Which items stay inline, in order. An item too wide for the remaining space overflows on its own,
+ * so one wide third-party footer card cannot push every later entry into the More menu.
+ */
+export const fitItems = ({ widths, available, gap, reserve }: { widths: readonly number[]; available: number; gap: number; reserve: number }): readonly boolean[] => {
   const total = widths.reduce((sum, width, index) => sum + width + (index === 0 ? 0 : gap), 0)
-  if (total <= available) return widths.length
+  if (total <= available) return widths.map(() => true)
   let used = reserve
-  let count = 0
-  for (const width of widths) {
+  return widths.map(width => {
     const next = used + width + gap
-    if (next > available) break
+    if (next > available) return false
     used = next
-    count += 1
-  }
-  return count
+    return true
+  })
 }

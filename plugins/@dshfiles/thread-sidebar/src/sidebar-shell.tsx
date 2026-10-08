@@ -28,7 +28,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  fitLeadingItems,
+  fitItems,
   orderSidebarEntries,
   reorderSidebarEntry,
   SIDEBAR_HEADER_MIN_HEIGHT,
@@ -159,12 +159,12 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
 
   const fitting =
     props.overflow === 'menu'
-      ? fitLeadingItems({
+      ? fitItems({
           widths: props.items.map(() => ICON_BUTTON_SIZE),
           available: width,
           gap: ICON_GAP,
           reserve: ICON_BUTTON_SIZE + ICON_GAP,
-        })
+        }).filter(Boolean).length
       : props.items.length
   const rowItems = props.items.slice(0, fitting)
   const menuItems = props.overflow === 'menu' ? props.items.slice(fitting) : props.items
@@ -320,7 +320,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const [footerSnapshot, setFooterSnapshot] = useState(props.readFooterSnapshot)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
-  const [footerFit, setFooterFit] = useState<number | null>(null)
+  const [footerFit, setFooterFit] = useState<readonly boolean[] | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
   const brandRef = useRef<HTMLDivElement>(null)
   const headerRegionRef = useRef<HTMLDivElement>(null)
@@ -542,8 +542,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const orderedFooterEntries = useMemo(() => orderSidebarEntries(footerEntries, preferences.footerOrder), [footerEntries, preferences.footerOrder])
   const visibleFooterEntries = orderedFooterEntries.filter(entry => !preferences.hiddenFooterIds.includes(entry.id))
   const hiddenFooterEntries = orderedFooterEntries.filter(entry => preferences.hiddenFooterIds.includes(entry.id))
-  const fittingFooterCount = wide && footerFit !== null ? Math.min(footerFit, visibleFooterEntries.length) : visibleFooterEntries.length
-  const overflowFooterEntries = [...visibleFooterEntries.slice(fittingFooterCount), ...hiddenFooterEntries]
+  const footerEntryFits = (index: number): boolean => !wide || footerFit === null || footerFit[index] !== false
+  const overflowFooterEntries = [...visibleFooterEntries.filter((_, index) => !footerEntryFits(index)), ...hiddenFooterEntries]
   const visibleFooterKey = visibleFooterEntries.map(entry => entry.id).join('|')
 
   useLayoutEffect(() => {
@@ -561,7 +561,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       const available = footer.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)
       const moreAlwaysShown = hiddenFooterEntries.length > 0
       setFooterFit(
-        fitLeadingItems({
+        fitItems({
           widths,
           available: moreAlwaysShown ? available - FOOTER_MORE_WIDTH - FOOTER_GAP : available,
           gap: FOOTER_GAP,
@@ -963,7 +963,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           )}
         >
           {visibleFooterEntries.map((entry, index) => {
-            const overflowed = wide && index >= fittingFooterCount
+            const overflowed = !footerEntryFits(index)
             const item = (
               <div
                 key={entry.id}
