@@ -1,16 +1,12 @@
-import {
-  Button,
-  IconFolderCloseRegular,
-  IconFolderOpenOutlineRegular,
-  IconSearchOutlineRegular,
-  Input,
-  Modal,
-  ShortcutKeys,
-  Tag,
-} from '@deepseek-ai/dsh-client-ui-primitives'
-import { EmptyState, Notice, joinClassNames } from '@dshfiles/plugin-ui'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { FolderIcon, FolderOpenIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import styles from './project-folder-picker.module.css'
 import { filterRegisteredProjects, folderSelection, movePickerSelection, workspaceSelection } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -52,7 +48,29 @@ export interface ProjectFolderPickerProps {
   readonly machineName?: string
 }
 
-const optionClassName = (active: boolean): string => joinClassNames(styles.item, active && styles.active)
+const projectGlyphTones = [
+  'dshx:bg-chart-1/15 dshx:text-chart-1',
+  'dshx:bg-chart-2/15 dshx:text-chart-2',
+  'dshx:bg-chart-3/15 dshx:text-chart-3',
+  'dshx:bg-chart-4/15 dshx:text-chart-4',
+  'dshx:bg-chart-5/15 dshx:text-chart-5',
+]
+
+const projectGlyphTone = (title: string): string => {
+  let hash = 0
+  for (const character of title) hash = (hash * 31 + character.charCodeAt(0)) % 997
+  return projectGlyphTones[hash % projectGlyphTones.length] ?? ''
+}
+
+const optionClassName = (active: boolean): string =>
+  cn(
+    'dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none',
+    active && 'dshx:bg-accent dshx:text-accent-foreground',
+  )
+
+const listClassName = 'dshx:flex dshx:max-h-[min(420px,55vh)] dshx:min-h-12 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-2 dshx:pb-2'
+
+const emptyClassName = 'dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground'
 
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
   const [query, setQuery] = useState('')
@@ -63,6 +81,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [error, setError] = useState<string | null>(null)
   const activeRequest = useRef<AbortController | null>(null)
   const generation = useRef(0)
+  const searchInput = useRef<HTMLInputElement | null>(null)
   const pathMode = query.startsWith('/')
   const matchingProjects = useMemo(() => filterRegisteredProjects(props.projects, query), [props.projects, query])
   const folderEntries = pathMode ? (listing?.entries ?? []) : []
@@ -189,130 +208,177 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     }
   }
 
+  const title = props.title ?? 'Choose a project or folder'
+
   return (
-    <Modal className={styles.dialog} headless onClose={props.onClose} open title={props.title ?? 'Choose a project or folder'}>
-      <div className={styles.searchRow}>
-        <Input
-          aria-label="Search projects or enter a folder path"
-          autoComplete="off"
-          className={styles.grow}
-          data-modal-autofocus
-          icon={<IconSearchOutlineRegular />}
-          onChange={event => {
-            setQuery(event.currentTarget.value)
-            if (!event.currentTarget.value.startsWith('/')) setListing(null)
-            setError(null)
-          }}
-          onKeyDown={onKeyDown}
-          placeholder="Search projects or type / for a folder…"
-          value={query}
-        />
-        <Button disabled={busy} icon={<IconFolderOpenOutlineRegular />} onClick={() => void chooseWithSystemPicker()} type="button" variant="outline">
-          Browse…
-        </Button>
-      </div>
-      {pathMode ? (
-        <>
-          {listing !== null && <p className={styles.path}>{listing.path}</p>}
-          <div className={styles.list} role="listbox" aria-label="Folders">
-            {folderEntries.map((entry, index) => (
-              <button
-                aria-selected={index === selectedIndex}
-                className={optionClassName(index === selectedIndex)}
-                key={entry.path}
-                onClick={() => void browse(entry.path)}
-                onMouseEnter={() => setSelectedIndex(index)}
-                role="option"
-                type="button"
-              >
-                <IconFolderCloseRegular className={styles.folderGlyph} />
-                <span className={styles.itemText}>
-                  <span className={styles.itemTitle}>{entry.name}</span>
-                  <span className={styles.itemDetail}>{entry.path}</span>
-                </span>
-                {entry.hidden && <Tag tone="quiet">Hidden</Tag>}
-              </button>
-            ))}
-            {listing === null && <EmptyState compact description="Enter an absolute folder path, then press Enter." />}
-            {listing !== null && folderEntries.length === 0 && <EmptyState compact description="No folders here." />}
+    <Dialog
+      onOpenChange={open => {
+        if (!open) props.onClose()
+      }}
+      open
+    >
+      <DialogContent
+        className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+        onOpenAutoFocus={event => {
+          event.preventDefault()
+          searchInput.current?.focus()
+        }}
+        showCloseButton={false}
+      >
+        <DialogTitle className="dshx:sr-only">{title}</DialogTitle>
+        <DialogDescription className="dshx:sr-only">Search registered projects, or type a path starting with / to browse folders.</DialogDescription>
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
+          <div className="dshx:relative dshx:flex-1">
+            <SearchIcon
+              aria-hidden
+              className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+            />
+            <Input
+              aria-label="Search projects or enter a folder path"
+              autoComplete="off"
+              className="dshx:h-9 dshx:pl-8"
+              onChange={event => {
+                setQuery(event.currentTarget.value)
+                if (!event.currentTarget.value.startsWith('/')) setListing(null)
+                setError(null)
+              }}
+              onKeyDown={onKeyDown}
+              placeholder="Search projects or type / for a folder…"
+              ref={searchInput}
+              value={query}
+            />
           </div>
-          {listing !== null && (
-            <div className={styles.folderActions}>
-              <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} type="button" variant="primary">
-                Select this folder
-              </Button>
-              <Button disabled={busy} onClick={() => void registerCurrentFolder()} type="button" variant="outline">
-                Register project
-              </Button>
-              <form
-                className={styles.createFolder}
-                onSubmit={event => {
-                  event.preventDefault()
-                  void createFolder()
-                }}
-              >
-                <Input
-                  aria-label="New folder name"
-                  className={styles.grow}
-                  onChange={event => setNewDirectoryName(event.currentTarget.value)}
-                  placeholder="New folder name"
-                  value={newDirectoryName}
-                />
-                <Button disabled={busy || newDirectoryName.trim().length === 0} type="submit" variant="outline">
-                  Create folder
-                </Button>
-              </form>
-              {listing.truncated && <Tag tone="warning">Folder list is truncated.</Tag>}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <p className={styles.sectionLabel}>Projects</p>
-          <div className={styles.list} role="listbox" aria-label="Registered projects">
-            {matchingProjects.map((project, index) => (
-              <button
-                aria-selected={index === selectedIndex}
-                className={optionClassName(index === selectedIndex)}
-                key={project.workspaceId}
-                onClick={() => props.onSelect(workspaceSelection(project))}
-                onMouseEnter={() => setSelectedIndex(index)}
-                role="option"
-                type="button"
-              >
-                <span className={styles.projectGlyph} aria-hidden>
-                  {project.title.slice(0, 2).toLocaleUpperCase()}
-                </span>
-                <span className={styles.itemText}>
-                  <span className={styles.itemTitle}>{project.title}</span>
-                  <span className={styles.itemDetail}>
-                    {props.machineName === undefined ? null : `${props.machineName} · `}
-                    {project.canonicalPath}
+          <Button disabled={busy} onClick={() => void chooseWithSystemPicker()} type="button" variant="outline">
+            <FolderOpenIcon aria-hidden />
+            Browse…
+          </Button>
+        </div>
+        {pathMode ? (
+          <>
+            {listing !== null && <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>}
+            <div aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
+              {folderEntries.map((entry, index) => (
+                <button
+                  aria-selected={index === selectedIndex}
+                  className={optionClassName(index === selectedIndex)}
+                  key={entry.path}
+                  onClick={() => void browse(entry.path)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  role="option"
+                  type="button"
+                >
+                  <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                    <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
+                    <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
                   </span>
-                </span>
-                {index < 9 && <ShortcutKeys keys={['⌘', String(index + 1)]} />}
-              </button>
-            ))}
-            {matchingProjects.length === 0 && <EmptyState compact description="No registered projects match." />}
+                  {entry.hidden && <Badge variant="muted">Hidden</Badge>}
+                </button>
+              ))}
+              {listing === null && <p className={emptyClassName}>Enter an absolute folder path, then press Enter.</p>}
+              {listing !== null && folderEntries.length === 0 && <p className={emptyClassName}>No folders here.</p>}
+            </div>
+            {listing !== null && (
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
+                <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} size="sm" type="button">
+                  Select this folder
+                </Button>
+                <Button disabled={busy} onClick={() => void registerCurrentFolder()} size="sm" type="button" variant="outline">
+                  Register project
+                </Button>
+                <form
+                  className="dshx:flex dshx:min-w-60 dshx:flex-1 dshx:items-center dshx:gap-2"
+                  onSubmit={event => {
+                    event.preventDefault()
+                    void createFolder()
+                  }}
+                >
+                  <Input
+                    aria-label="New folder name"
+                    className="dshx:h-7 dshx:flex-1"
+                    onChange={event => setNewDirectoryName(event.currentTarget.value)}
+                    placeholder="New folder name"
+                    value={newDirectoryName}
+                  />
+                  <Button disabled={busy || newDirectoryName.trim().length === 0} size="sm" type="submit" variant="outline">
+                    Create folder
+                  </Button>
+                </form>
+                {listing.truncated && (
+                  <Badge variant="warning">
+                    Folder list is truncated.
+                  </Badge>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Projects</p>
+            <div aria-label="Registered projects" className={listClassName} role="listbox">
+              {matchingProjects.map((project, index) => (
+                <button
+                  aria-selected={index === selectedIndex}
+                  className={optionClassName(index === selectedIndex)}
+                  key={project.workspaceId}
+                  onClick={() => props.onSelect(workspaceSelection(project))}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  role="option"
+                  type="button"
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+                      projectGlyphTone(project.title),
+                    )}
+                  >
+                    {project.title.slice(0, 2).toLocaleUpperCase()}
+                  </span>
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                    <span className="dshx:truncate dshx:text-sm dshx:font-medium">{project.title}</span>
+                    <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                      {props.machineName === undefined ? null : `${props.machineName} · `}
+                      <span className="dshx:font-mono">{project.canonicalPath}</span>
+                    </span>
+                  </span>
+                  {index < 9 && (
+                    <KbdGroup>
+                      <Kbd>⌘</Kbd>
+                      <Kbd>{index + 1}</Kbd>
+                    </KbdGroup>
+                  )}
+                </button>
+              ))}
+              {matchingProjects.length === 0 && <p className={emptyClassName}>No registered projects match.</p>}
+            </div>
+          </>
+        )}
+        {error !== null && (
+          <div className="dshx:px-2 dshx:pb-2">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           </div>
-        </>
-      )}
-      {error !== null && (
-        <Notice className={styles.error} tone="danger">
-          {error}
-        </Notice>
-      )}
-      <footer className={styles.footer}>
-        <span className={styles.hint}>
-          <ShortcutKeys keys={['↑', '↓']} /> Navigate
-        </span>
-        <span className={styles.hint}>
-          <ShortcutKeys keys={['Enter']} /> Select / open
-        </span>
-        <span className={styles.hint}>
-          <ShortcutKeys keys={['Esc']} /> Close
-        </span>
-      </footer>
-    </Modal>
+        )}
+        <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
+          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+            <KbdGroup>
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+            </KbdGroup>
+            Navigate
+          </span>
+          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+            <Kbd>Enter</Kbd>
+            Select / open
+          </span>
+          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+            <Kbd>Esc</Kbd>
+            Close
+          </span>
+        </footer>
+      </DialogContent>
+    </Dialog>
   )
 }

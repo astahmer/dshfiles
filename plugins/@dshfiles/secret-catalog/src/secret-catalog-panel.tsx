@@ -1,4 +1,12 @@
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { FolderOpenIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
@@ -10,11 +18,11 @@ import {
   type SecretUpdateForm,
 } from './secret-mutation-dialog.js'
 import { createSecretActionPolicy, filterSecretMetadata, type SecretScopeFilter } from './secret-catalog-model.js'
-import { nextSecretRevealStage, previewSecretValue, type SecretRevealStage } from './secret-reveal-model.js'
+import { nextSecretRevealStage, type SecretRevealStage } from './secret-reveal-model.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
-import styles from './secret-catalog.module.css'
+import { SecretCatalogTable } from './secret-catalog-table.js'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
@@ -234,17 +242,6 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     }
   }
 
-  const revealActionFor = (row: SecretMetadata): string => {
-    if (revealed?.id !== row.id) return t('preview')
-    return revealed.stage === 'preview' ? t('revealFull') : t('hide')
-  }
-
-  const revealedText = (value: string, stage: SecretRevealStage): string => {
-    if (stage === 'full') return value
-    const preview = previewSecretValue(value)
-    return preview.kind === 'excerpt' ? preview.text : t('previewMasked', { mask: preview.mask, count: preview.length })
-  }
-
   const displayedMachineName = machineName ?? t('currentHost')
 
   const openDialog = (next: ActiveDialog): void => {
@@ -260,216 +257,162 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   }
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <div className={styles.titleRow}>
-            <h1>{t('title')}</h1>
-            <span className={styles.count}>{t('aliasCount', { count: rows.length })}</span>
+    <TooltipProvider>
+      <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto dshx:bg-background">
+        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4">
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
+              <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
+              <Badge variant="muted">{t('aliasCount', { count: rows.length })}</Badge>
+            </div>
+            <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle')}</p>
           </div>
-          <p>{t('subtitle')}</p>
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            disabled={loading}
-            onClick={() => {
-              clearRevealed()
-              setRefreshGeneration(value => value + 1)
-            }}
-            type="button"
-          >
-            {t('refresh')}
-          </button>
-          <button onClick={() => openDialog({ mode: 'create' })} type="button">
-            {t('addSecret')}
-          </button>
-          <label className={styles.machine}>
-            {t('machine')}
-            <select
-              aria-label={t('machine')}
-              disabled
-              onChange={event => setMachineName(event.currentTarget.value)}
-              title={t('machineSelectorHint')}
-              value={displayedMachineName}
-            >
-              <option value={displayedMachineName}>{displayedMachineName}</option>
-            </select>
-          </label>
-        </div>
-      </header>
-      <section className={styles.filters} aria-label={t('catalogFilters')}>
-        <button className={styles.folderSelect} onClick={() => setPickerOpen(true)} type="button">
-          {selection === null ? t('chooseProjectFolder') : `${selection.title} · ${selection.canonicalPath}`}
-        </button>
-        <nav className={styles.scopes} aria-label={t('secretScope')}>
-          {scopes.map(value => (
-            <button
-              aria-pressed={scope === value}
-              className={scope === value ? styles.activeScope : ''}
-              key={value}
+          <div className="dshx:flex dshx:items-center dshx:gap-2">
+            <Button
+              disabled={loading}
               onClick={() => {
                 clearRevealed()
-                setScope(value)
+                setRefreshGeneration(value => value + 1)
               }}
               type="button"
+              variant="outline"
             >
-              {t(scopeLabelKeys[value])}
-            </button>
-          ))}
-        </nav>
-      </section>
-      {cwd === null && <p className={styles.notice}>{t('globalOnlyNotice')}</p>}
-      <input
-        className={styles.search}
-        aria-label={t('filterAliases')}
-        onChange={event => {
-          clearRevealed()
-          setSearch(event.currentTarget.value)
-        }}
-        placeholder={t('filterPlaceholder')}
-        value={search}
-      />
-      {error !== null && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
-      {notice !== null && (
-        <p className={styles.notice} role="status">
-          {notice}
-        </p>
-      )}
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>{t('columnVariable')}</th>
-              <th>{t('columnDescription')}</th>
-              <th>{t('columnValue')}</th>
-              <th>{t('columnActions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map(row => (
-              <tr key={row.id}>
-                <td>
-                  <strong className={styles.variable}>{row.variableName}</strong>
-                  <small>
-                    {row.alias} · {row.scope} · {row.environment}
-                    {row.field.length > 0 ? ` · ${row.field}` : ''}
-                  </small>
-                </td>
-                <td>
-                  <strong>{row.description || row.service || row.item || row.alias}</strong>
-                  <small>
-                    {row.service}
-                    {row.item && row.service !== row.item ? ` · ${row.item}` : ''}
-                  </small>
-                </td>
-                <td className={styles.valueCell}>
-                  {revealed?.id === row.id ? (
-                    <output className={styles.revealed}>{revealedText(revealed.value, revealed.stage)}</output>
-                  ) : (
-                    <span aria-label={t('hiddenValue')} className={styles.mask}>
-                      ••••••••••••
-                    </span>
-                  )}
-                </td>
-                <td>
-                  <div className={styles.actions}>
-                    <button
-                      aria-label={t('revealActionLabel', { action: revealActionFor(row), alias: row.alias })}
-                      disabled={!canActOnRow(row) || busyRow === row.id}
-                      onClick={() => void onReveal(row)}
-                      title={!canActOnRow(row) ? t('actionBlockedHint') : undefined}
-                      type="button"
-                    >
-                      {revealActionFor(row)}
-                    </button>
-                    <button
-                      aria-label={t('copyAlias', { alias: row.alias })}
-                      disabled={!canActOnRow(row) || busyRow === row.id}
-                      onClick={() => void onCopy(row)}
-                      title={!canActOnRow(row) ? t('actionBlockedHint') : undefined}
-                      type="button"
-                    >
-                      {t('copy')}
-                    </button>
-                    <button
-                      aria-label={t('editAlias', { alias: row.alias })}
-                      disabled={!canActOnRow(row) || busyRow === row.id}
-                      onClick={() => openDialog({ mode: 'edit', row })}
-                      type="button"
-                    >
-                      {t('edit')}
-                    </button>
-                    <button
-                      aria-label={t('removeAlias', { alias: row.alias })}
-                      disabled={!canActOnRow(row) || busyRow === row.id}
-                      onClick={() => openDialog({ mode: 'remove', row })}
-                      type="button"
-                    >
-                      {t('remove')}
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <RefreshCwIcon aria-hidden className={loading ? 'dshx:animate-spin' : undefined} />
+              {t('refresh')}
+            </Button>
+            <Button onClick={() => openDialog({ mode: 'create' })} type="button">
+              {t('addSecret')}
+            </Button>
+          </div>
+        </header>
+        <section aria-label={t('catalogFilters')} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3">
+          <Select disabled onValueChange={setMachineName} value={displayedMachineName}>
+            <SelectTrigger aria-label={t('machine')} className="dshx:w-56" title={t('machineSelectorHint')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={displayedMachineName}>{displayedMachineName}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            className="dshx:min-w-48 dshx:flex-1 dshx:justify-start dshx:bg-muted/50 dshx:font-normal"
+            onClick={() => setPickerOpen(true)}
+            type="button"
+            variant="outline"
+          >
+            <FolderOpenIcon aria-hidden className="dshx:text-muted-foreground" />
+            {selection === null ? (
+              <span className="dshx:text-muted-foreground">{t('chooseProjectFolder')}</span>
+            ) : (
+              <span className="dshx:truncate">
+                {selection.title} <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">· {selection.canonicalPath}</span>
+              </span>
+            )}
+          </Button>
+          <ToggleGroup
+            aria-label={t('secretScope')}
+            onValueChange={value => {
+              const next = scopes.find(candidate => candidate === value)
+              if (next === undefined) return
+              clearRevealed()
+              setScope(next)
+            }}
+            size="sm"
+            type="single"
+            value={scope}
+          >
+            {scopes.map(value => (
+              <ToggleGroupItem className="dshx:capitalize" key={value} value={value}>
+                {t(scopeLabelKeys[value])}
+              </ToggleGroupItem>
             ))}
-            {!loading && filteredRows.length === 0 && (
-              <tr>
-                <td className={styles.empty} colSpan={4}>
-                  {rows.length === 0 ? t('noAliases') : t('noMatchingAliases')}
-                </td>
-              </tr>
-            )}
-            {loading && (
-              <tr>
-                <td className={styles.empty} colSpan={4}>
-                  {t('loadingMetadata')}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {pickerOpen && (
-        <ProjectFolderPicker
-          directoryPicker={props.directoryPicker}
-          machineName={displayedMachineName}
-          onClose={() => setPickerOpen(false)}
-          onRegisterWorkspace={async canonicalPath => {
-            const workspace = await props.registerWorkspace(canonicalPath)
-            return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.canonicalPath }
-          }}
-          onSelect={selectFolder}
-          projects={projects}
-          title={t('chooseProjectFolderTitle')}
-        />
-      )}
-      {dialog !== null && (
-        <SecretMutationDialog
-          error={mutationError}
-          hasProjectFolder={cwd !== null}
-          initialCreateScope={scope === 'all' ? (cwd === null ? 'global' : 'project') : scope}
-          mode={dialog.mode}
-          onClose={() => {
-            setDialog(null)
-            setMutationError(null)
-          }}
-          onCreate={input => {
-            void onCreate(input)
-          }}
-          onRemove={(target, row) => {
-            void onRemove(target, row)
-          }}
-          onUpdate={input => {
-            void onUpdate(input)
-          }}
-          pending={mutationPending}
-          row={'row' in dialog ? dialog.row : undefined}
-          t={t}
-        />
-      )}
-    </main>
+          </ToggleGroup>
+        </section>
+        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:px-6 dshx:py-4">
+          {cwd === null && (
+            <Alert role="status" variant="info">
+              <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
+            </Alert>
+          )}
+          <InputGroup className="dshx:h-9 dshx:bg-muted/50">
+            <InputGroupAddon>
+              <SearchIcon aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t('filterAliases')}
+              onChange={event => {
+                clearRevealed()
+                setSearch(event.currentTarget.value)
+              }}
+              placeholder={t('filterPlaceholder')}
+              value={search}
+            />
+          </InputGroup>
+          {error !== null && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {notice !== null && (
+            <Alert role="status" variant="success">
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          )}
+          <SecretCatalogTable
+            actions={{
+              t,
+              revealed,
+              canActOnRow,
+              isRowBusy: row => busyRow === row.id,
+              onReveal: row => void onReveal(row),
+              onCopy: row => void onCopy(row),
+              onEdit: row => openDialog({ mode: 'edit', row }),
+              onRemove: row => openDialog({ mode: 'remove', row }),
+            }}
+            hasAnyRows={rows.length > 0}
+            loading={loading}
+            rows={filteredRows}
+          />
+        </div>
+        {pickerOpen && (
+          <ProjectFolderPicker
+            directoryPicker={props.directoryPicker}
+            machineName={displayedMachineName}
+            onClose={() => setPickerOpen(false)}
+            onRegisterWorkspace={async canonicalPath => {
+              const workspace = await props.registerWorkspace(canonicalPath)
+              return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.canonicalPath }
+            }}
+            onSelect={selectFolder}
+            projects={projects}
+            title={t('chooseProjectFolderTitle')}
+          />
+        )}
+        {dialog !== null && (
+          <SecretMutationDialog
+            error={mutationError}
+            hasProjectFolder={cwd !== null}
+            initialCreateScope={scope === 'all' ? (cwd === null ? 'global' : 'project') : scope}
+            mode={dialog.mode}
+            onClose={() => {
+              setDialog(null)
+              setMutationError(null)
+            }}
+            onCreate={input => {
+              void onCreate(input)
+            }}
+            onRemove={(target, row) => {
+              void onRemove(target, row)
+            }}
+            onUpdate={input => {
+              void onUpdate(input)
+            }}
+            pending={mutationPending}
+            row={'row' in dialog ? dialog.row : undefined}
+            t={t}
+          />
+        )}
+      </main>
+    </TooltipProvider>
   )
 }

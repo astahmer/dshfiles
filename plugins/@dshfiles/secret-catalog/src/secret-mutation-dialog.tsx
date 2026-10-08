@@ -1,4 +1,20 @@
-import { useState, type FormEvent } from 'react'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useId, useState, type FormEvent } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import {
@@ -9,7 +25,6 @@ import {
   type RemovalDialogState,
   type ValueReplacementStage,
 } from './secret-mutation-model.js'
-import styles from './secret-mutation.module.css'
 
 export type SecretMutationScope = 'global' | 'project' | 'local'
 export type SecretRemoveTarget = 'alias' | 'vault-item'
@@ -69,6 +84,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
   const [removeState, setRemoveState] = useState<RemovalDialogState>({ stage: 'choose' })
   const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
   const row = props.row
+  const fieldId = useId()
   const t = props.t
   const titleAlias = row?.alias ?? t('aliasFallback')
 
@@ -124,157 +140,261 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
     props.onRemove(target, row)
   }
 
+  const closeUnlessPending = (open: boolean): void => {
+    if (!open && !props.pending) props.onClose()
+  }
+
+  const errorAlert = props.error !== null && (
+    <Alert variant="destructive">
+      <AlertDescription>{props.error}</AlertDescription>
+    </Alert>
+  )
+
+  if (props.mode === 'remove') {
+    return (
+      <AlertDialog onOpenChange={closeUnlessPending} open>
+        <AlertDialogContent className="dshx-root">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{title}</AlertDialogTitle>
+            {row !== undefined && (
+              <AlertDialogDescription>
+                {removeState.stage === 'choose' ? (
+                  <>
+                    {t('chooseRemovalPrefix')} <strong className="dshx:font-mono dshx:text-foreground">{row.alias}</strong>
+                    {t('chooseRemovalSuffix')}
+                  </>
+                ) : removeState.target === 'alias' ? (
+                  t('confirmRemoveAlias', { alias: row.alias })
+                ) : (
+                  t('confirmDeleteItem', { alias: row.alias })
+                )}
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          {errorAlert}
+          {row !== undefined && removeState.stage === 'choose' && (
+            <div className="dshx:flex dshx:flex-col dshx:gap-2">
+              <Button
+                className="dshx:justify-start"
+                disabled={props.pending}
+                onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))}
+                type="button"
+                variant="outline"
+              >
+                {t('removeAliasAndOverrides')}
+              </Button>
+              <Button
+                className="dshx:justify-start"
+                disabled={props.pending}
+                onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))}
+                type="button"
+                variant="destructive"
+              >
+                {t('deleteVaultItem')}
+              </Button>
+            </div>
+          )}
+          <AlertDialogFooter>
+            {removeState.stage === 'choose' ? (
+              <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
+                {t('cancel')}
+              </Button>
+            ) : (
+              <>
+                <Button disabled={props.pending} onClick={() => setRemoveState({ stage: 'choose' })} type="button" variant="outline">
+                  {t('back')}
+                </Button>
+                <Button disabled={props.pending} onClick={finishRemove} type="button" variant="destructive">
+                  {props.pending ? t('removing') : removeState.target === 'alias' ? t('confirmRemoveAliasAction') : t('confirmDeleteItemAction')}
+                </Button>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )
+  }
+
+  const fieldClassName = 'dshx:flex-col dshx:gap-1.5'
+
   return (
-    <div className={styles.dialogOverlay}>
-      <section
-        aria-labelledby="secret-dialog-title"
-        aria-modal="true"
-        className={styles.dialog}
-        onKeyDown={event => {
-          if (event.key === 'Escape' && !props.pending) props.onClose()
-        }}
-        role="dialog"
-      >
-        <header className={styles.dialogHeader}>
-          <h2 id="secret-dialog-title">{title}</h2>
-          <button aria-label={t('closeDialog')} disabled={props.pending} onClick={props.onClose} type="button">
-            ×
-          </button>
-        </header>
-        {props.error !== null && (
-          <p className={styles.error} role="alert">
-            {props.error}
-          </p>
-        )}
+    <Dialog onOpenChange={closeUnlessPending} open>
+      <DialogContent {...(props.mode === 'create' ? { 'aria-describedby': undefined } : {})} className="dshx-root dshx:max-h-[calc(100%-2rem)] dshx:overflow-y-auto dshx:sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="dshx:text-base">{title}</DialogTitle>
+          {props.mode === 'edit' && row !== undefined && (
+            <DialogDescription>
+              {t('editAliasLabel')} <strong className="dshx:font-mono dshx:text-foreground">{row.alias}</strong> · {row.scope} · {row.environment}. {t('editKeepHint')}
+            </DialogDescription>
+          )}
+        </DialogHeader>
+        {errorAlert}
         {props.mode === 'create' && (
-          <form className={styles.dialogForm} onSubmit={submitCreate}>
-            <label>
-              {t('fieldAlias')}
-              <input
+          <form className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2" onSubmit={submitCreate}>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-alias`}>{t('fieldAlias')}</FieldLabel>
+              <Input
                 autoComplete="off"
+                className="dshx:font-mono!"
+                id={`${fieldId}-alias`}
                 maxLength={128}
                 onChange={event => setAlias(event.currentTarget.value)}
                 pattern="[A-Za-z_][A-Za-z0-9_-]*"
                 required
                 value={alias}
               />
-            </label>
-            <label>
-              {t('fieldTargetScope')}
-              <select
-                onChange={event => {
-                  if (isSecretScope(event.currentTarget.value)) setScope(event.currentTarget.value)
-                }}
-                value={scope}
-              >
-                <option value="global">{t('targetGlobal')}</option>
-                <option value="project">{t('targetProject')}</option>
-                <option disabled={!props.hasProjectFolder} value="local">
-                  {t('targetLocal')}
-                </option>
-              </select>
-            </label>
-            {scope !== 'global' && !props.hasProjectFolder && <p className={styles.formHint}>{t('needsProjectFolder')}</p>}
-            <label>
-              {t('fieldEnvironment')}
-              <input
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-environment`}>{t('fieldEnvironment')}</FieldLabel>
+              <Input
                 autoComplete="off"
+                id={`${fieldId}-environment`}
                 maxLength={256}
                 onChange={event => setEnvironment(event.currentTarget.value)}
                 pattern="[A-Za-z0-9_-]+"
                 required
                 value={environment}
               />
-            </label>
-            <label>
-              {t('fieldValueCreation')}
-              <select
-                onChange={event => {
-                  const nextMode = event.currentTarget.value === 'manual' ? 'manual' : 'generate'
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-scope`}>{t('fieldTargetScope')}</FieldLabel>
+              <Select
+                onValueChange={next => {
+                  if (isSecretScope(next)) setScope(next)
+                }}
+                value={scope}
+              >
+                <SelectTrigger className="dshx:w-full" id={`${fieldId}-scope`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="global">{t('targetGlobal')}</SelectItem>
+                  <SelectItem value="project">{t('targetProject')}</SelectItem>
+                  <SelectItem disabled={!props.hasProjectFolder} value="local">
+                    {t('targetLocal')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {scope !== 'global' && !props.hasProjectFolder && <FieldDescription className="dshx:text-xs dshx:text-destructive">{t('needsProjectFolder')}</FieldDescription>}
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-value-mode`}>{t('fieldValueCreation')}</FieldLabel>
+              <Select
+                onValueChange={next => {
+                  const nextMode = next === 'manual' ? 'manual' : 'generate'
                   setValueMode(nextMode)
                   if (nextMode === 'generate') setValue('')
                 }}
                 value={valueMode}
               >
-                <option value="generate">{t('valueGenerate')}</option>
-                <option value="manual">{t('valueManual')}</option>
-              </select>
-            </label>
+                <SelectTrigger className="dshx:w-full" id={`${fieldId}-value-mode`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="generate">{t('valueGenerate')}</SelectItem>
+                  <SelectItem value="manual">{t('valueManual')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             {valueMode === 'generate' ? (
-              <p className={styles.formHint}>{t('generateHint')}</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground dshx:sm:col-span-2">{t('generateHint')}</p>
             ) : (
-              <label>
-                {t('fieldSecretValue')}
-                <input autoComplete="new-password" onChange={event => setValue(event.currentTarget.value)} required type="password" value={value} />
-              </label>
+              <Field className={cn(fieldClassName, 'dshx:sm:col-span-2')}>
+                <FieldLabel htmlFor={`${fieldId}-value`}>{t('fieldSecretValue')}</FieldLabel>
+                <Input
+                  autoComplete="new-password"
+                  className="dshx:font-mono!"
+                  id={`${fieldId}-value`}
+                  onChange={event => setValue(event.currentTarget.value)}
+                  required
+                  type="password"
+                  value={value}
+                />
+              </Field>
             )}
-            <label>
-              {t('fieldItemName')}
-              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} value={name} />
-            </label>
-            <label>
-              {t('fieldSourceUrl')}
-              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} value={source} />
-            </label>
-            <label>
-              {t('fieldTags')}
-              <input autoComplete="off" onChange={event => setTags(event.currentTarget.value)} placeholder={t('tagsPlaceholder')} value={tags} />
-            </label>
-            <label>
-              {t('fieldItemType')}
-              <select onChange={event => setType(event.currentTarget.value)} value={type || 'login'}>
-                <option value="login">{t('itemTypeLogin')}</option>
-                <option value="secure-note">{t('itemTypeSecureNote')}</option>
-              </select>
-            </label>
-            <label>
-              {t('fieldField')}
-              <input autoComplete="off" onChange={event => setField(event.currentTarget.value)} placeholder={t('fieldPlaceholder')} value={field} />
-            </label>
-            <footer className={styles.dialogActions}>
-              <button disabled={props.pending} onClick={props.onClose} type="button">
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-name`}>{t('fieldItemName')}</FieldLabel>
+              <Input autoComplete="off" id={`${fieldId}-name`} onChange={event => setName(event.currentTarget.value)} value={name} />
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-source`}>{t('fieldSourceUrl')}</FieldLabel>
+              <Input autoComplete="off" id={`${fieldId}-source`} onChange={event => setSource(event.currentTarget.value)} value={source} />
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-tags`}>{t('fieldTags')}</FieldLabel>
+              <Input autoComplete="off" id={`${fieldId}-tags`} onChange={event => setTags(event.currentTarget.value)} placeholder={t('tagsPlaceholder')} value={tags} />
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-type`}>{t('fieldItemType')}</FieldLabel>
+              <Select onValueChange={setType} value={type || 'login'}>
+                <SelectTrigger className="dshx:w-full" id={`${fieldId}-type`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="login">{t('itemTypeLogin')}</SelectItem>
+                  <SelectItem value="secure-note">{t('itemTypeSecureNote')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className={cn(fieldClassName, 'dshx:sm:col-span-2')}>
+              <FieldLabel htmlFor={`${fieldId}-field`}>{t('fieldField')}</FieldLabel>
+              <Input autoComplete="off" id={`${fieldId}-field`} onChange={event => setField(event.currentTarget.value)} placeholder={t('fieldPlaceholder')} value={field} />
+            </Field>
+            <DialogFooter className="dshx:sm:col-span-2">
+              <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
                 {t('cancel')}
-              </button>
-              <button
-                disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)}
-                type="submit"
-              >
+              </Button>
+              <Button disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)} type="submit">
                 {props.pending ? t('adding') : t('addAlias')}
-              </button>
-            </footer>
+              </Button>
+            </DialogFooter>
           </form>
         )}
         {props.mode === 'edit' && row !== undefined && (
-          <form className={styles.dialogForm} onSubmit={submitUpdate}>
-            <p className={styles.formHint}>
-              {t('editAliasLabel')} <strong>{row.alias}</strong> · {row.scope} · {row.environment}. {t('editKeepHint')}
-            </p>
-            <label>
-              {t('fieldItemName')}
-              <input autoComplete="off" onChange={event => setName(event.currentTarget.value)} placeholder={row.item || t('keepCurrent')} value={name} />
-            </label>
-            <label>
-              {t('fieldSourceUrl')}
-              <input autoComplete="off" onChange={event => setSource(event.currentTarget.value)} placeholder={row.service || t('keepCurrent')} value={source} />
-            </label>
-            <label>
-              {t('fieldTags')}
-              <input
+          <form className="dshx:grid dshx:gap-4" onSubmit={submitUpdate}>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-name`}>{t('fieldItemName')}</FieldLabel>
+              <Input
+                autoComplete="off"
+                id={`${fieldId}-name`}
+                onChange={event => setName(event.currentTarget.value)}
+                placeholder={row.item || t('keepCurrent')}
+                value={name}
+              />
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-source`}>{t('fieldSourceUrl')}</FieldLabel>
+              <Input
+                autoComplete="off"
+                id={`${fieldId}-source`}
+                onChange={event => setSource(event.currentTarget.value)}
+                placeholder={row.service || t('keepCurrent')}
+                value={source}
+              />
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-tags`}>{t('fieldTags')}</FieldLabel>
+              <Input
                 autoComplete="off"
                 disabled={clearTags}
+                id={`${fieldId}-tags`}
                 onChange={event => setTags(event.currentTarget.value)}
                 placeholder={t('tagsPlaceholder')}
                 value={tags}
               />
-            </label>
-            <label className={styles.inlineField}>
-              <input checked={clearTags} onChange={event => setClearTags(event.currentTarget.checked)} type="checkbox" />
-              {t('clearAllTags')}
-            </label>
-            <label>
-              {t('replaceValue')}
-              <input
+            </Field>
+            <Field className="dshx:flex-row dshx:items-center dshx:gap-2" orientation="horizontal">
+              <Checkbox checked={clearTags} id={`${fieldId}-clear-tags`} onCheckedChange={checked => setClearTags(checked === true)} />
+              <FieldLabel className="dshx:font-normal" htmlFor={`${fieldId}-clear-tags`}>
+                {t('clearAllTags')}
+              </FieldLabel>
+            </Field>
+            <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-value`}>{t('replaceValue')}</FieldLabel>
+              <Input
                 autoComplete="new-password"
+                className="dshx:font-mono!"
+                id={`${fieldId}-value`}
                 onChange={event => {
                   setValue(event.currentTarget.value)
                   setValueReplacementStage('editing')
@@ -282,13 +402,19 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                 type="password"
                 value={value}
               />
-            </label>
-            {value.length > 0 && valueReplacementStage === 'confirming' && <p className={styles.formHint}>{t('confirmReplacementHint')}</p>}
-            <footer className={styles.dialogActions}>
-              <button disabled={props.pending} onClick={props.onClose} type="button">
+              {value.length > 0 && valueReplacementStage === 'confirming' && (
+                <FieldDescription className="dshx:text-xs dshx:text-warning">{t('confirmReplacementHint')}</FieldDescription>
+              )}
+            </Field>
+            <DialogFooter>
+              <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
                 {t('cancel')}
-              </button>
-              <button disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0)} type="submit">
+              </Button>
+              <Button
+                disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0)}
+                type="submit"
+                variant={value.length > 0 && valueReplacementStage === 'confirming' ? 'destructive' : 'default'}
+              >
                 {props.pending
                   ? t('saving')
                   : value.length > 0
@@ -296,53 +422,11 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                       ? t('reviewReplacement')
                       : t('confirmReplacement')
                     : t('saveChanges')}
-              </button>
-            </footer>
+              </Button>
+            </DialogFooter>
           </form>
         )}
-        {props.mode === 'remove' && row !== undefined && (
-          <div className={styles.dialogForm}>
-            {removeState.stage === 'choose' ? (
-              <>
-                <p>
-                  {t('chooseRemovalPrefix')} <strong>{row.alias}</strong>
-                  {t('chooseRemovalSuffix')}
-                </p>
-                <button disabled={props.pending} onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))} type="button">
-                  {t('removeAliasAndOverrides')}
-                </button>
-                <button
-                  className={styles.dangerButton}
-                  disabled={props.pending}
-                  onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))}
-                  type="button"
-                >
-                  {t('deleteVaultItem')}
-                </button>
-                <footer className={styles.dialogActions}>
-                  <button disabled={props.pending} onClick={props.onClose} type="button">
-                    {t('cancel')}
-                  </button>
-                </footer>
-              </>
-            ) : (
-              <>
-                <p className={styles.error} role="alert">
-                  {removeState.target === 'alias' ? t('confirmRemoveAlias', { alias: row.alias }) : t('confirmDeleteItem', { alias: row.alias })}
-                </p>
-                <footer className={styles.dialogActions}>
-                  <button disabled={props.pending} onClick={() => setRemoveState({ stage: 'choose' })} type="button">
-                    {t('back')}
-                  </button>
-                  <button className={styles.dangerButton} disabled={props.pending} onClick={finishRemove} type="button">
-                    {props.pending ? t('removing') : removeState.target === 'alias' ? t('confirmRemoveAliasAction') : t('confirmDeleteItemAction')}
-                  </button>
-                </footer>
-              </>
-            )}
-          </div>
-        )}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
