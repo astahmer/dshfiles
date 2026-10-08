@@ -61,6 +61,7 @@ export interface SecretUpdateInput {
   readonly cwd: string | null
   readonly value: string | null
   readonly environment: string
+  readonly newAlias?: string
   readonly name?: string
   readonly source?: string
   readonly tags?: string
@@ -143,9 +144,17 @@ export const createSecretCatalogOperations = (run: SecretCliRunner): SecretCatal
       return { created: true }
     },
     update: async input => {
-      const alias = validatedAlias(input.alias)
+      const currentAlias = validatedAlias(input.alias)
       const cwd = input.scope === 'global' ? validateCwd(input.cwd) : requireFolder(input.cwd)
       const metadata = updateMetadataArguments(input)
+      const renamed = input.newAlias !== undefined && input.newAlias !== currentAlias
+      const alias = renamed && input.newAlias !== undefined ? validatedAlias(input.newAlias) : currentAlias
+      if (metadata.length === 0 && input.value === null && !renamed) throw new Error('No secret changes were provided.')
+      if (renamed) {
+        const existingRows = await list(cwd)
+        if (existingRows.some(row => row.alias === alias)) throw new Error('An alias with this name already exists.')
+        await run({ args: ['mv', currentAlias, alias, ...scopeArguments(input.scope, cwd)], cwd, captureStdout: false })
+      }
       if (metadata.length > 0) {
         await run({
           args: ['edit', alias, ...metadata, ...environmentArguments(input.environment), ...metadataEditArguments(input.scope, cwd)],
@@ -161,7 +170,6 @@ export const createSecretCatalogOperations = (run: SecretCliRunner): SecretCatal
           stdin: input.value,
         })
       }
-      if (metadata.length === 0 && input.value === null) throw new Error('No secret changes were provided.')
       return { updated: true }
     },
     removeAlias: async (inputAlias, scope, cwd) => {

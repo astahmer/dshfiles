@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSecretActionPolicy, filterSecretMetadata } from './secret-catalog-model.js'
+import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex } from './secret-catalog-model.js'
 import { parseSecretPrintMetadata } from './secret-metadata.js'
 
 const rows = parseSecretPrintMetadata(
@@ -37,5 +37,17 @@ describe('Secret Catalog scopes and action identity', () => {
     expect(withoutFolder(globalRow)).toBe(true)
     expect(withFolder(localRow)).toBe(true)
     expect(withoutFolder(localRow)).toBe(false)
+  })
+})
+
+describe('Secret Catalog table keyboard navigation', () => {
+  it('moves within bounds and ignores unrelated keys', () => {
+    expect(nextRowIndex(0, 'ArrowDown', 3)).toBe(1)
+    expect(nextRowIndex(2, 'ArrowDown', 3)).toBe(2)
+    expect(nextRowIndex(0, 'ArrowUp', 3)).toBe(0)
+    expect(nextRowIndex(1, 'Home', 3)).toBe(0)
+    expect(nextRowIndex(0, 'End', 3)).toBe(2)
+    expect(nextRowIndex(0, 'Enter', 3)).toBeNull()
+    expect(nextRowIndex(0, 'ArrowDown', 0)).toBeNull()
   })
 })

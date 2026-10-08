@@ -189,7 +189,12 @@ export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element 
   )
   return (
     <SecretRowActionsContext.Provider value={props.actions}>
-      <DataTable cellClassName={columnId => columnClassNames[columnId]} empty={empty} table={table} />
+      <DataTable
+        cellClassName={columnId => columnClassNames[columnId]}
+        className="dshx:overflow-visible dshx:[&_[data-slot=table-container]]:overflow-visible dshx:[&_thead]:sticky dshx:[&_thead]:top-0 dshx:[&_thead]:z-10 dshx:[&_thead]:bg-muted dshx:[&_thead_th:first-child]:rounded-tl-lg dshx:[&_thead_th:last-child]:rounded-tr-lg"
+        empty={empty}
+        table={table}
+      />
     </SecretRowActionsContext.Provider>
   )
 }

@@ -6,8 +6,9 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { FolderOpenIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi } from '@dshfiles/dshx/client'
+import { FolderOpenIcon, RefreshCwIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
+import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import {
@@ -17,7 +18,8 @@ import {
   type SecretRemoveTarget,
   type SecretUpdateForm,
 } from './secret-mutation-dialog.js'
-import { createSecretActionPolicy, filterSecretMetadata, type SecretScopeFilter } from './secret-catalog-model.js'
+import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex, type SecretScopeFilter } from './secret-catalog-model.js'
+import { secretCatalogSettings } from './settings.js'
 import { nextSecretRevealStage, type SecretRevealStage } from './secret-reveal-model.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
@@ -45,11 +47,31 @@ const scopeLabelKeys = {
   local: 'scopeLocal',
 } satisfies Record<SecretScopeFilter, Parameters<SecretCatalogTranslate>[0]>
 
+const focusRowFromKey = (event: KeyboardEvent<HTMLDivElement>): void => {
+  if (!(event.target instanceof HTMLElement)) return
+  const row = event.target.closest('tbody tr')
+  const rows = [...event.currentTarget.querySelectorAll('tbody tr')]
+  if (row === null) return
+  const next = nextRowIndex(rows.indexOf(row), event.key, rows.length)
+  if (next === null) return
+  const target = rows[next]?.querySelector('button:not(:disabled)')
+  if (!(target instanceof HTMLElement)) return
+  event.preventDefault()
+  target.focus()
+}
+
 type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'remove'; readonly row: SecretMetadata }
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
   const api = useApi(secretCatalogApi)
   const t = props.t
+  const settings = useSettings(secretCatalogSettings)
+  const revealMs = (settings.value?.revealSeconds ?? 15) * 1000
+  const hideOnBlur = settings.value?.hideOnBlur ?? true
+  const noticeMs = (settings.value?.noticeSeconds ?? 4) * 1000
+  const defaultEnvironment = settings.value?.defaultEnvironment ?? 'prod'
+  const configuredScope = settings.value?.defaultScope
+  const appliedDefaultScope = useRef(false)
   // The store is read here, at render, so a slot that mounts later still sees
   // the live list rather than whatever existed while setup was running.
   // `getSnapshot` reads the model's own cache, so it has to keep its receiver:
@@ -114,6 +136,19 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   }, [api, clearRevealed, cwd, refreshGeneration, t])
 
   useEffect(() => {
+    if (appliedDefaultScope.current || configuredScope === undefined) return
+    appliedDefaultScope.current = true
+    setScope(configuredScope)
+  }, [configuredScope])
+
+  useEffect(() => {
+    if (notice === null || noticeMs === 0) return
+    const timer = setTimeout(() => setNotice(null), noticeMs)
+    return () => clearTimeout(timer)
+  }, [notice, noticeMs])
+
+  useEffect(() => {
+    if (!hideOnBlur) return
     const clearOnHidden = (): void => {
       if (document.visibilityState === 'hidden') clearRevealed()
     }
@@ -123,7 +158,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       window.removeEventListener('blur', clearRevealed)
       document.removeEventListener('visibilitychange', clearOnHidden)
     }
-  }, [clearRevealed])
+  }, [clearRevealed, hideOnBlur])
 
   useEffect(
     () => () => {
@@ -164,9 +199,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     setError(null)
     try {
       const value = await api.reveal({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      if (generation !== revealGeneration.current || document.visibilityState === 'hidden') return
+      if (generation !== revealGeneration.current || (hideOnBlur && document.visibilityState === 'hidden')) return
       setRevealed({ id: row.id, value, stage: 'preview' })
-      revealTimer.current = setTimeout(clearRevealed, 15_000)
+      revealTimer.current = setTimeout(clearRevealed, revealMs)
     } catch {
       if (generation === revealGeneration.current) setError(t('revealFailed'))
     } finally {
@@ -258,8 +293,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   return (
     <TooltipProvider>
-      <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto dshx:bg-background">
-        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4">
+      <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background">
+        <header className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
             <div className="dshx:flex dshx:items-center dshx:gap-2">
               <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
@@ -285,7 +320,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </Button>
           </div>
         </header>
-        <section aria-label={t('catalogFilters')} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3">
+        <section aria-label={t('catalogFilters')} className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3">
           <Select disabled onValueChange={setMachineName} value={displayedMachineName}>
             <SelectTrigger aria-label={t('machine')} className="dshx:w-56" title={t('machineSelectorHint')}>
               <SelectValue />
@@ -328,7 +363,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             ))}
           </ToggleGroup>
         </section>
-        <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:px-6 dshx:py-4">
+        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3 dshx:px-6 dshx:pt-4 dshx:pb-3">
           {cwd === null && (
             <Alert role="status" variant="info">
               <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
@@ -354,10 +389,15 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </Alert>
           )}
           {notice !== null && (
-            <Alert role="status" variant="success">
+            <Alert className="dshx:pr-10" role="status" variant="success">
               <AlertDescription>{notice}</AlertDescription>
+              <Button aria-label={t('dismissNotice')} className="dshx:absolute dshx:top-1.5 dshx:right-1.5" onClick={() => setNotice(null)} size="icon-xs" type="button" variant="ghost">
+                <XIcon aria-hidden />
+              </Button>
             </Alert>
           )}
+        </div>
+        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6" onKeyDown={focusRowFromKey}>
           <SecretCatalogTable
             actions={{
               t,
@@ -392,6 +432,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           <SecretMutationDialog
             error={mutationError}
             hasProjectFolder={cwd !== null}
+            defaultEnvironment={defaultEnvironment}
             initialCreateScope={scope === 'all' ? (cwd === null ? 'global' : 'project') : scope}
             mode={dialog.mode}
             onClose={() => {

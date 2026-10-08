@@ -5,6 +5,8 @@ import { defineHost } from '@dshfiles/dshx/host'
 import { secretCatalogApi } from './api.js'
 import { createSecretCatalogOperations } from './secret-operations.js'
 import { runSecretCli } from './secret-cli-runner.js'
+import { createSecretTools } from './secret-tools.js'
+import { secretCatalogSettings } from './settings.js'
 
 const operationsFor = (ctx: Context) => createSecretCatalogOperations(request => runSecretCli(ctx.subprocess, request))
 const cwdForScope = (scope: string, requestedCwd: string | null): string | null => {
@@ -33,8 +35,23 @@ const api = secretCatalogApi.host({
   deleteItem: ({ input, ctx }) => operationsFor(ctx).deleteItem(input.alias, input.scope, cwdForScope(input.scope, input.cwd), input.environment),
 })
 
+let hostContext: Context | undefined
+
+const tools = createSecretTools(() => {
+  if (hostContext === undefined) throw new Error('Secret Catalog Host is not active.')
+  return operationsFor(hostContext)
+})
+
 export default defineHost({
   name: 'secret-catalog',
   inject: ['connection', 'webServer', 'subprocess'],
   apis: [api],
+  tools,
+  settings: [secretCatalogSettings],
+  setup: ctx => {
+    hostContext = ctx
+    ctx.effect(() => () => {
+      if (hostContext === ctx) hostContext = undefined
+    }, 'secret-catalog tools context')
+  },
 })

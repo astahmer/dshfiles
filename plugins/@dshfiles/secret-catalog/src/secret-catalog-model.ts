@@ -23,3 +23,13 @@ export const createSecretActionPolicy = (rows: readonly SecretMetadata[], hasPro
     return counts.get(JSON.stringify([row.alias, row.environment])) === 1
   }
 }
+
+const rowNavigationKeys = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End'])
+
+/** Row a table keyboard key moves to, or null when the key does not navigate rows. */
+export const nextRowIndex = (current: number, key: string, rowCount: number): number | null => {
+  if (!rowNavigationKeys.has(key) || rowCount === 0) return null
+  if (key === 'Home') return 0
+  if (key === 'End') return rowCount - 1
+  return key === 'ArrowDown' ? Math.min(current + 1, rowCount - 1) : Math.max(current - 1, 0)
+}

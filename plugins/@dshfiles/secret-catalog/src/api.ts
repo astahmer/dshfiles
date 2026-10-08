@@ -43,6 +43,7 @@ export const secretCatalogApi = defineApi({
         scope: scopeSchema,
         value: z.string().max(262_144).nullable(),
         environment: environmentSchema,
+        newAlias: aliasSchema.optional(),
         ...updateMetadataSchema.shape,
       }),
       output: z.object({ updated: z.literal(true) }),

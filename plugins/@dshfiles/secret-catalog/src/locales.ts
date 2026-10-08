@@ -104,6 +104,8 @@ const en = {
   removing: 'Removing…',
   confirmRemoveAliasAction: 'Confirm remove alias',
   confirmDeleteItemAction: 'Confirm delete item',
+  renameHint: 'Renaming moves the alias inside its owning config with secret mv. The Bitwarden item is unchanged.',
+  dismissNotice: 'Dismiss',
 }
 
 const zh = {
@@ -207,6 +209,8 @@ const zh = {
   removing: '正在移除…',
   confirmRemoveAliasAction: '确认移除别名',
   confirmDeleteItemAction: '确认删除条目',
+  renameHint: '重命名会通过 secret mv 在所属配置中移动别名，Bitwarden 条目保持不变。',
+  dismissNotice: '关闭',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

@@ -46,6 +46,7 @@ export interface SecretUpdateForm {
   readonly alias: string
   readonly scope: SecretMutationScope
   readonly environment: string
+  readonly newAlias?: string
   readonly value: string | null
   readonly name?: string
   readonly source?: string
@@ -57,6 +58,7 @@ interface SecretMutationDialogProps {
   readonly row?: SecretMetadata
   readonly hasProjectFolder: boolean
   readonly initialCreateScope: SecretMutationScope
+  readonly defaultEnvironment: string
   readonly pending: boolean
   readonly error: string | null
   readonly onClose: () => void
@@ -72,7 +74,8 @@ const isSecretScope = (value: string): value is SecretMutationScope => value ===
 export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Element => {
   const [alias, setAlias] = useState('')
   const [scope, setScope] = useState<SecretMutationScope>(props.initialCreateScope)
-  const [environment, setEnvironment] = useState('prod')
+  const [environment, setEnvironment] = useState(props.defaultEnvironment)
+  const [renameTo, setRenameTo] = useState(props.row?.alias ?? '')
   const [valueMode, setValueMode] = useState<'generate' | 'manual'>('generate')
   const [value, setValue] = useState('')
   const [name, setName] = useState('')
@@ -122,10 +125,12 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
       return
     }
     if (!isSecretScope(row.scope)) return
+    const nextAlias = renameTo.trim()
     props.onUpdate({
       alias: row.alias,
       scope: row.scope,
       environment: row.environment,
+      ...(nextAlias.length > 0 && nextAlias !== row.alias ? { newAlias: nextAlias } : {}),
       value: value.length === 0 ? null : value,
       ...(optionalText(name) === undefined ? {} : { name }),
       ...(optionalText(source) === undefined ? {} : { source }),
@@ -353,6 +358,20 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
         {props.mode === 'edit' && row !== undefined && (
           <form className="dshx:grid dshx:gap-4" onSubmit={submitUpdate}>
             <Field className={fieldClassName}>
+              <FieldLabel htmlFor={`${fieldId}-rename`}>{t('fieldAlias')}</FieldLabel>
+              <Input
+                autoComplete="off"
+                className="dshx:font-mono!"
+                id={`${fieldId}-rename`}
+                maxLength={128}
+                onChange={event => setRenameTo(event.currentTarget.value)}
+                pattern="[A-Za-z_][A-Za-z0-9_-]*"
+                required
+                value={renameTo}
+              />
+              <FieldDescription className="dshx:text-xs">{t('renameHint')}</FieldDescription>
+            </Field>
+            <Field className={fieldClassName}>
               <FieldLabel htmlFor={`${fieldId}-name`}>{t('fieldItemName')}</FieldLabel>
               <Input
                 autoComplete="off"
@@ -411,7 +430,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
                 {t('cancel')}
               </Button>
               <Button
-                disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0)}
+                disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0 && renameTo.trim() === row.alias)}
                 type="submit"
                 variant={value.length > 0 && valueReplacementStage === 'confirming' ? 'destructive' : 'default'}
               >

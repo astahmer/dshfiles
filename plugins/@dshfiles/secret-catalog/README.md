@@ -60,6 +60,20 @@ inputs to the CLI wrapper, caps captured stdout at 1 MB, keeps stderr out of the
 UI and logs, and terminates the managed process range when the 15-second
 command deadline expires.
 
+## Rename, agent tools, and settings
+
+Edit can rename an alias inside its owning config with `secret mv`; it refuses
+a name that already exists. The Host registers two agent tools bound to the
+calling Session's workspace (`session.header.cwd`): `secret_list` returns
+metadata only, and `secret_get` returns one plaintext value, so it should be
+called only when the task needs it. Arrow keys, Home, and End move between
+table rows; the table header stays visible while rows scroll.
+
+The `secret-catalog` Settings namespace (DSH Settings page) sets the default
+scope filter, the environment prefilled for new secrets, how long a revealed
+value stays visible, whether blur/hidden pages hide it, and how long success
+notices stay.
+
 ## Machine and Host boundary
 
 The machine control identifies the current DSH Host using its OS hostname and

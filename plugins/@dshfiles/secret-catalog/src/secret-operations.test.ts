@@ -231,6 +231,26 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect(run.mock.calls.flatMap(([request]) => request.args)).not.toContain('synthetic-replacement')
   })
 
+  it('renames an alias in its own config before editing it under the new name', async () => {
+    const run = vi.fn(async (request: SecretCliRequest) => (request.args[0] === 'print' ? JSON.stringify([{ alias: 'SYNTHETIC_OLD' }]) : ''))
+    const operations = createSecretCatalogOperations(run)
+    await operations.update({ alias: 'SYNTHETIC_OLD', newAlias: 'SYNTHETIC_NEW', scope: 'global', cwd: null, environment: 'prod', value: null, source: 'https://example.test' })
+    expect(run.mock.calls.map(([request]) => request.args)).toEqual([
+      ['print', 'global', '--json'],
+      ['mv', 'SYNTHETIC_OLD', 'SYNTHETIC_NEW', '--global'],
+      ['edit', 'SYNTHETIC_NEW', '--source', 'https://example.test', '--env', 'prod', '--config', join(homedir(), '.config', 'secret', 'config.json')],
+    ])
+  })
+
+  it('refuses a rename onto an alias that already exists', async () => {
+    const run = vi.fn(async (_request: SecretCliRequest) => JSON.stringify([{ alias: 'SYNTHETIC_OLD' }, { alias: 'SYNTHETIC_TAKEN' }]))
+    const operations = createSecretCatalogOperations(run)
+    await expect(
+      operations.update({ alias: 'SYNTHETIC_OLD', newAlias: 'SYNTHETIC_TAKEN', scope: 'global', cwd: null, environment: 'prod', value: null }),
+    ).rejects.toThrow('already exists')
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps project alias removal distinct from global item deletion', async () => {
     const run = vi.fn(async (_request: SecretCliRequest) => '')
     const operations = createSecretCatalogOperations(run)
