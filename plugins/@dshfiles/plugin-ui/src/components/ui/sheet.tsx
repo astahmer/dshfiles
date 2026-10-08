@@ -33,7 +33,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "dshx:fixed dshx:inset-0 dshx:z-50 dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0",
+        "dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -57,7 +57,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "dshx:fixed dshx:z-50 dshx:flex dshx:flex-col dshx:gap-4 dshx:bg-background dshx:shadow-lg dshx:transition dshx:ease-in-out dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:duration-300 dshx:data-[state=open]:animate-in dshx:data-[state=open]:duration-500",
+          "dshx:fixed dshx:z-[1050] dshx:flex dshx:flex-col dshx:gap-4 dshx:bg-background dshx:shadow-lg dshx:transition dshx:ease-in-out dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:duration-300 dshx:data-[state=open]:animate-in dshx:data-[state=open]:duration-500",
           side === "right" &&
             "dshx:inset-y-0 dshx:right-0 dshx:h-full dshx:w-3/4 dshx:border-l dshx:data-[state=closed]:slide-out-to-right dshx:data-[state=open]:slide-in-from-right dshx:sm:max-w-sm",
           side === "left" &&

@@ -6,7 +6,14 @@
 @layer theme, base, components, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme) prefix(dshx);
-@import 'tailwindcss/utilities.css' layer(utilities) source('./') prefix(dshx);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none) prefix(dshx);
+/*
+ * Every plugin injects its own copy of this sheet, and same-specificity rules resolve by sheet order.
+ * Scanning every owned plugin makes all copies identical, so a later plugin's base rule can never
+ * override an earlier plugin's responsive/state variant (e.g. `max-w-[…]` beating `sm:max-w-2xl`).
+ */
+@source './';
+@source '../..';
 @import 'tw-animate-css' prefix(dshx);
 
 @custom-variant dark (&:where(body[data-ds-dark-theme] *));

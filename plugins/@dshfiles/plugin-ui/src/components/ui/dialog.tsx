@@ -37,7 +37,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "dshx:fixed dshx:inset-0 dshx:z-50 dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0",
+        "dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -62,7 +62,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "dshx:fixed dshx:top-[50%] dshx:left-[50%] dshx:z-50 dshx:grid dshx:w-full dshx:max-w-[calc(100%-2rem)] dshx:translate-x-[-50%] dshx:translate-y-[-50%] dshx:gap-4 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-6 dshx:shadow-lg dshx:duration-200 dshx:outline-none dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95 dshx:sm:max-w-lg",
+          "dshx:fixed dshx:top-[50%] dshx:left-[50%] dshx:z-[1050] dshx:grid dshx:w-full dshx:max-w-[calc(100%-2rem)] dshx:translate-x-[-50%] dshx:translate-y-[-50%] dshx:gap-4 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-6 dshx:shadow-lg dshx:duration-200 dshx:outline-none dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95 dshx:sm:max-w-lg",
           className
         )}
         {...props}

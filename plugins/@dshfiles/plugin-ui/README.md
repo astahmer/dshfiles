@@ -83,3 +83,12 @@ Radix parts run in jsdom. A Radix `Select` renders a hidden native `<select name
 ## Host CSS caveat
 
 The Host ships one unlayered `button, input, select, textarea { font-family: inherit }`. Unlayered rules beat Tailwind's layered utilities, so a monospace control needs the important form: `dshx:font-mono!`.
+
+## Shared stylesheet and stacking
+
+- Every plugin injects its own copy of the Tailwind sheet, and same-specificity rules resolve by sheet order.
+  `styles.css` therefore scans every owned plugin (`@source '../..'`) so all copies are identical; otherwise a
+  later plugin's base rule (`max-w-[…]`) overrides an earlier plugin's variant (`sm:max-w-2xl`). When you add
+  classes to one plugin, rebuild all plugins (or at least the ones loaded after it) so the copies stay equal.
+- Host modals sit at `z-index: 1000`. Kit dialogs/sheets use 1050 and floating layers (select, popover, menus,
+  tooltip, hover card) 1100, so they open above Host Settings and above our own dialogs.
