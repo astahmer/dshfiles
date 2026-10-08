@@ -882,6 +882,46 @@ describe('client compiler', () => {
     ).rejects.toThrow('DSHX1203')
   })
 
+  it('keeps the ModuleLoader protocol and inferred capabilities in a minified build', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineApi, method } from '@dshfiles/dshx/api'",
+        "import { defineClient, defineSlot, useApi } from '@dshfiles/dshx/client'",
+        "const status = defineApi({ id: 'status', version: 1, methods: { get: method() } })",
+        'function Status() { useApi(status); return null }',
+        "export default defineClient({ slots: [defineSlot('status', { component: Status })] })",
+        '',
+      ].join('\n'),
+    )
+    await buildClient({
+      packageId: '@dshx/fixture-plugin',
+      root,
+      entry: 'src/client.tsx',
+      outDir: 'dist',
+      inject: ['@deepseek-ai/dsh-client-connection'],
+      minify: true,
+    })
+    const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+    expect(code).not.toContain('__DSHX_CLIENT_API_CAPABILITY__')
+    expect(code).not.toContain('__DSHX_CLIENT_SETTINGS_CAPABILITY__')
+    expect(code).toMatch(/apiCapability:(?:true|!0)/)
+    expect(code).not.toContain('\n  ')
+  })
+
+  it('folds CSS into a minified factory before its return', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/client.css'), '.fixture-root { color: red; }\n')
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      ["import './client.css'", "import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({})', ''].join('\n'),
+    )
+    await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist', minify: true })
+    const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+    expect(code).toMatch(/fixture-root[^]*return [^;{}]*\.exports\}\}\)/)
+  })
+
   it('infers Connection from a retained useApi hook without Client api/apis', async () => {
     const root = await temporaryProject()
     await writeFile(

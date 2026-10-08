@@ -379,6 +379,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         outDir: project.outDir,
         sourcemap: project.build.sourcemap,
         declarations: project.build.declarations ?? true,
+        minify: project.build.minify ?? false,
         bundleDependencies: project.clientBundleDependencies ?? [],
         ...(project.clientVitePlugins === undefined ? {} : { vite: { plugins: project.clientVitePlugins } }),
         external,

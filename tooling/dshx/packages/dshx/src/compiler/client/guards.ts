@@ -45,10 +45,11 @@ export function singleClientChunkPlugin(): Plugin {
     const chunk = chunks[0]
     const requiredExports = ['Config', 'apply', 'inject', 'name']
     const missingExports = requiredExports.filter(name => !chunk.exports.includes(name))
+    // Client output is minified, so identifiers like `require`/`module`/`exports` may be renamed.
     const hasLoader = /window\.__ModuleLoader__\.load\(\{\s*id\s*:/.test(chunk.code)
-    const hasFactory = /factory\s*:\s*\(require\)\s*=>\s*\{/.test(chunk.code)
-    const hasReturn = /return\s+module\.exports\s*;\s*\}\s*\}\s*\)\s*;?/.test(chunk.code)
-    const missingAssignments = requiredExports.filter(name => !new RegExp(`\\bexports\\.${name}\\s*=`).test(chunk.code))
+    const hasFactory = /factory\s*:\s*\(?[\w$]+\)?\s*=>\s*\{/.test(chunk.code)
+    const hasReturn = /[\w$]+\.exports\s*;?\s*\}\s*\}\s*\)\s*;?/.test(chunk.code)
+    const missingAssignments = requiredExports.filter(name => !new RegExp(`[\\w$]\\.${name}\\s*=`).test(chunk.code))
     if (missingExports.length > 0 || missingAssignments.length > 0 || !hasLoader || !hasFactory || !hasReturn) {
       throw new DshxError('DSHX1101', 'A Vite plugin corrupted the DSH lazy Client factory protocol.', {
         hint: `Preserve the ModuleLoader wrapper and the ${requiredExports.join(', ')} exports; avoid replacing the final chunk in renderChunk/generateBundle.`,

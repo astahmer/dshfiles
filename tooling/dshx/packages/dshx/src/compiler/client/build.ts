@@ -55,6 +55,7 @@ export interface BuildClientOptions {
   readonly outDir: string
   readonly root?: string
   readonly sourcemap?: boolean
+  readonly minify?: boolean
   readonly declarations?: boolean
   readonly vite?: ViteExtensionOptions
   readonly bundleDependencies?: readonly string[]
@@ -187,8 +188,10 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
           hint: `Add ${JSON.stringify(API_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
         })
       }
-      const settingsExpression = new RegExp(`globalThis\\[["']${SETTINGS_CAPABILITY_GLOBAL}["']\\]\\s*===\\s*true`, 'g')
-      const apiExpression = new RegExp(`globalThis\\[["']${API_CAPABILITY_GLOBAL}["']\\]\\s*===\\s*true`, 'g')
+      // Matches both `globalThis["X"] === true` and the minified `globalThis.X===!0`.
+      const capabilityExpression = (name: string): RegExp => new RegExp(`globalThis(?:\\[["'\`]${name}["'\`]\\]|\\.${name})\\s*===\\s*(?:true|!0)`, 'g')
+      const settingsExpression = capabilityExpression(SETTINGS_CAPABILITY_GLOBAL)
+      const apiExpression = capabilityExpression(API_CAPABILITY_GLOBAL)
       chunk.code = chunk.code.replace(settingsExpression, settingsRetained ? 'true' : 'false').replace(apiExpression, apiRetained ? 'true' : 'false')
     },
   }
@@ -411,7 +414,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
       copyPublicDir: false,
       cssCodeSplit: false,
       assetsInlineLimit,
-      minify: false,
+      minify: !watch && options.minify === true,
       sourcemap: options.sourcemap ?? true,
       watch: null,
       rollupOptions: {

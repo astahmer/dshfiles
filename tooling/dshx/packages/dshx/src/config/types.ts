@@ -27,6 +27,8 @@ export interface DshxConfig {
   readonly build?: {
     readonly sourcemap?: boolean
     readonly declarations?: boolean
+    /** Minify the production Client chunk (not `dshx dev`). Defaults to false. */
+    readonly minify?: boolean
   }
   readonly compatibility?: {
     readonly allowUnsupported?: boolean
@@ -60,6 +62,7 @@ export interface ResolvedDshxConfig {
   readonly build: {
     readonly sourcemap: boolean
     readonly declarations?: boolean
+    readonly minify?: boolean
   }
   readonly compatibility: {
     readonly allowUnsupported: boolean

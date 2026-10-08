@@ -25,6 +25,7 @@ export default defineConfig({
   build: {
     sourcemap: true,
     declarations: true,
+    minify: false, // true minifies the production Client chunk; `dshx dev` never minifies
   },
 });
 ```

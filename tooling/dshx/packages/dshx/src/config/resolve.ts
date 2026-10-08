@@ -164,13 +164,19 @@ function validateConfig(value: unknown, file: string): DshxConfig {
   }
   if (value.build !== undefined) {
     if (!isObject(value.build)) {
-      throw new DshxError('DSHX4004', 'build must be an object.', { file, hint: 'Use build: { sourcemap: true | false, declarations: true | false }.' })
+      throw new DshxError('DSHX4004', 'build must be an object.', { file, hint: 'Use build: { sourcemap: true | false, declarations: true | false, minify: true | false }.' })
     }
-    rejectUnknownKeys(value.build, new Set(['sourcemap', 'declarations']), 'build', file)
+    rejectUnknownKeys(value.build, new Set(['sourcemap', 'declarations', 'minify']), 'build', file)
     if (value.build.sourcemap !== undefined && typeof value.build.sourcemap !== 'boolean') {
       throw new DshxError('DSHX4004', 'build.sourcemap must be a boolean.', {
         file,
         hint: 'Set build.sourcemap to true or false.',
+      })
+    }
+    if (value.build.minify !== undefined && typeof value.build.minify !== 'boolean') {
+      throw new DshxError('DSHX4004', 'build.minify must be a boolean.', {
+        file,
+        hint: 'Set build.minify to true or false.',
       })
     }
     if (value.build.declarations !== undefined && typeof value.build.declarations !== 'boolean') {
@@ -305,7 +311,11 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     outDir: resolve(root, 'dist'),
     profile: loaded.config.profile ?? 'web',
     dev: { hostRestart: loaded.config.dev?.hostRestart ?? 'auto' },
-    build: { sourcemap: loaded.config.build?.sourcemap ?? true, declarations: loaded.config.build?.declarations ?? true },
+    build: {
+      sourcemap: loaded.config.build?.sourcemap ?? true,
+      declarations: loaded.config.build?.declarations ?? true,
+      minify: loaded.config.build?.minify ?? false,
+    },
     compatibility: { allowUnsupported: loaded.config.compatibility?.allowUnsupported ?? false },
     manifest,
   }

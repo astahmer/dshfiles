@@ -43,14 +43,19 @@ export function clientCssPlugin(packageId: string, outDir: string): Plugin {
       if (pendingMaterializer === '') return
       const file = resolve(outDir, 'client.js')
       const code = await readFile(file, 'utf8')
-      const marker = 'return module.exports;'
-      const offset = code.lastIndexOf(marker)
-      if (offset < 0) throw new DshxError('DSHX1102', 'The lazy Client factory return marker is missing from client.js.')
-      const lineStart = code.lastIndexOf('\n', offset) + 1
-      const indentation = code.slice(lineStart, offset)
-      // Insertion occurs after all mapped module code and immediately before the
-      // generated factory return, so existing source mappings remain aligned.
-      await writeFile(file, `${code.slice(0, lineStart)}${indentation}${pendingMaterializer}\n${code.slice(lineStart)}`, 'utf8')
+      const offset = code.lastIndexOf('return module.exports;')
+      if (offset >= 0) {
+        const lineStart = code.lastIndexOf('\n', offset) + 1
+        const indentation = code.slice(lineStart, offset)
+        // Insertion occurs after all mapped module code and immediately before the
+        // generated factory return, so existing source mappings remain aligned.
+        await writeFile(file, `${code.slice(0, lineStart)}${indentation}${pendingMaterializer}\n${code.slice(lineStart)}`, 'utf8')
+        return
+      }
+      // A minified factory ends `return e.Config=…,t.exports}})`; insert before that return on the same line.
+      const minifiedReturn = [...code.matchAll(/return\s[^;{}]*?[\w$]+\.exports\s*\}\s*\}\s*\)/g)].at(-1)
+      if (minifiedReturn === undefined) throw new DshxError('DSHX1102', 'The lazy Client factory return marker is missing from client.js.')
+      await writeFile(file, `${code.slice(0, minifiedReturn.index)}${pendingMaterializer}${code.slice(minifiedReturn.index)}`, 'utf8')
     },
   }
 }
