@@ -2,25 +2,29 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { badgeFromName } from './account-draft.js'
+import { ROUTE_SLUG_HINT, badgeFromName } from './account-draft.js'
 import { KIND_LABEL } from './account-labels.js'
 import { PROVIDER_ICONS, type AccountDraft } from './api.js'
 import { LabelledControl, NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
-/** The section a route slug is valid under, so the field explains its own rule. */
-const SLUG_HINT = 'Letters, digits, dash and underscore. Appears as the provider in the model picker.'
 
 export const AccountIdentitySection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft }): JSX.Element => {
   const draft = props.draft
-  const { accounts, selected, selectedId, setDraft, setNotice, load } = props.state
+  const { accounts, selected, selectedId, setDraft, setNotice, load, commitRename, saveMode } = props.state
   return (
     <NumberedSection
       actions={
         <Button
-          disabled={draft.kind !== 'codex' || selectedId === null}
+          disabled={selectedId === null}
           onClick={() => {
             if (selectedId === null) return
+            if (draft.kind !== 'codex') {
+              void load()
+                .then(() => setNotice('Account identity refreshed.'))
+                .catch(() => setNotice('Could not read the account identity.'))
+              return
+            }
             void accounts
               .identity({ instanceId: selectedId })
               .then(identity => {
@@ -41,8 +45,18 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
       title="Account identity"
     >
       <div className="dshx:grid dshx:grid-cols-1 dshx:gap-x-3 dshx:gap-y-2.5 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">
-        <LabelledControl hint={SLUG_HINT} label="Route slug">
-          {id => <Input id={id} onChange={event => setDraft({ ...draft, instanceId: event.target.value })} value={draft.instanceId} />}
+        <LabelledControl hint={saveMode === 'auto' ? `${ROUTE_SLUG_HINT} Saved when you leave the field.` : ROUTE_SLUG_HINT} label="Route slug">
+          {id => (
+            <Input
+              id={id}
+              onBlur={() => void commitRename()}
+              onChange={event => setDraft({ ...draft, instanceId: event.target.value })}
+              onKeyDown={event => {
+                if (event.key === 'Enter') void commitRename()
+              }}
+              value={draft.instanceId}
+            />
+          )}
         </LabelledControl>
         <LabelledControl label="Display name">
           {id => (
@@ -62,7 +76,11 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
               readOnly
               value={
                 selected?.identity ??
-                (draft.kind === 'codex' ? 'Sign in, then refresh' : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+                (draft.kind === 'codex' || draft.kind === 'claude' || draft.kind === 'cursor'
+                  ? selected?.signedIn === true
+                    ? 'Signed in'
+                    : 'Sign in, then refresh'
+                  : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
               }
             />
           )}

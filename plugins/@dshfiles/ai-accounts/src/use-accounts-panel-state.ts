@@ -1,6 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { newAccountDraft, sameDraft } from './account-draft.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
+import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import {
   aiAccountsApi,
@@ -8,16 +9,17 @@ import {
   type AccountProfile,
   type AccountsCatalog,
   type AccountsFile,
-  type AccountsUsage,
-  type OverlaySettings,
   type UsageHistoryPoint,
 } from './api.js'
+import { useAccountsUsage } from './use-accounts-usage.js'
+import { usePreferences } from './use-preferences.js'
 
-const DEFAULT_OVERLAYS: OverlaySettings = { edgeWidget: true, footerQuota: true }
 
 export const useAccountsPanelState = () => {
   const accounts = useApi(aiAccountsApi)
-  const [usage, setUsage] = useState<AccountsUsage | null>(null)
+  const preferences = usePreferences()
+  const { usage } = useAccountsUsage()
+  const [autoSave, setAutoSave] = useState<AutoSaveStatus>({ kind: 'idle' })
   const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
   const [refreshingCatalog, setRefreshingCatalog] = useState(false)
   const [history, setHistory] = useState<readonly UsageHistoryPoint[]>([])
@@ -27,7 +29,6 @@ export const useAccountsPanelState = () => {
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [overlays, setOverlays] = useState<OverlaySettings>(DEFAULT_OVERLAYS)
 
   const load = useCallback(async () => {
     const next = await accounts.read()
@@ -38,18 +39,6 @@ export const useAccountsPanelState = () => {
   useEffect(() => {
     void load().catch(() => setNotice('The account host did not answer.'))
   }, [load])
-
-  // Surfaces are independent of the file, so read them once on open.
-  useEffect(() => {
-    void accounts
-      .overlaySettings()
-      .then(setOverlays)
-      .catch(() => setOverlays(DEFAULT_OVERLAYS))
-  }, [accounts])
-
-  const persistOverlay = async (patch: Partial<OverlaySettings>) => {
-    setOverlays(await accounts.saveOverlaySettings({ patch }))
-  }
 
   // The catalog is per account and only changes when the account does.
   const refreshCatalog = useCallback(
@@ -87,25 +76,6 @@ export const useAccountsPanelState = () => {
       .catch(() => setHistory([]))
   }, [accounts, selectedId, historyDays, usage])
 
-  // Quota moves on its own, so refresh on an interval rather than per render.
-  useEffect(() => {
-    let cancelled = false
-    const refresh = () => {
-      void accounts
-        .usage()
-        .then(next => {
-          if (!cancelled) setUsage(next)
-        })
-        .catch(() => undefined)
-    }
-    refresh()
-    const timer = setInterval(refresh, 60_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [accounts])
-
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
   // The editor follows the selection, and keeps unsaved edits across re-reads.
@@ -114,18 +84,53 @@ export const useAccountsPanelState = () => {
       setDraft(null)
       return
     }
-    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : { ...selected }))
+    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : toDraft(selected)))
   }, [selected])
 
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
+  const problem = draft === null ? null : draftProblem(draft)
+
+  // The saver outlives renders; its callbacks read the latest values through refs.
+  const delayRef = useRef(preferences.autoSaveDelayMs)
+  delayRef.current = preferences.autoSaveDelayMs
+  const saverRef = useRef<AutoSaver<AccountDraft> | null>(null)
+  saverRef.current ??= createAutoSaver<AccountDraft>({
+    save: async next => setFile(await accounts.save({ draft: next })),
+    equals: sameDraft,
+    onStatus: setAutoSave,
+    delayMs: () => delayRef.current,
+  })
+  const saver = saverRef.current
+
+  // Renames are committed explicitly (on blur), so a half-typed slug never
+  // becomes a route; every other field saves itself after a pause.
+  useEffect(() => {
+    if (preferences.saveMode !== 'auto' || selected === null || draft === null) return
+    if (draft.instanceId !== selected.instanceId || sameDraft(selected, draft) || draftProblem(draft) !== null) return
+    saver.schedule(draft)
+  }, [draft, selected, preferences.saveMode, saver])
+
+  useEffect(() => {
+    if (preferences.saveMode === 'manual') saver.cancel()
+  }, [preferences.saveMode, saver])
+
+  // Leaving an account (or the page) writes what is waiting rather than dropping it.
+  useEffect(
+    () => () => {
+      void saver.flush().catch(() => undefined)
+    },
+    [selectedId, saver],
+  )
 
   const save = async (next: AccountDraft) => {
     setSaving(true)
     setNotice(null)
+    const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
     try {
-      setFile(await accounts.save({ draft: next }))
+      setFile(await accounts.save({ draft: next, ...(previousInstanceId === undefined ? {} : { previousInstanceId }) }))
       setSelectedId(next.instanceId)
-      setNotice('Saved. New sessions use the updated route settings.')
+      saver.markSaved(next)
+      setNotice(previousInstanceId === undefined ? 'Saved. New sessions use the updated route settings.' : `Renamed to ${next.instanceId}.`)
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
     } finally {
@@ -133,21 +138,34 @@ export const useAccountsPanelState = () => {
     }
   }
 
+  /** Commit a route-slug edit: in auto mode on blur, in manual mode with Save. */
+  const commitRename = async () => {
+    if (preferences.saveMode !== 'auto' || selected === null || draft === null || draft.instanceId === selected.instanceId) return
+    if (draftProblem(draft) !== null) return
+    await save(draft)
+  }
+
+  const revert = () => {
+    saver.cancel()
+    setDraft(selected === null ? null : toDraft(selected))
+  }
+
   /** Write straight through, for the toggles the reference page saves on click. */
   const persist = async (patch: Partial<AccountDraft>) => {
     if (selected === null) return
-    const next = { ...selected, ...patch }
-    setDraft(next)
+    const next = { ...toDraft(selected), ...patch }
+    setDraft(current => (current === null ? next : { ...current, ...patch }))
     try {
       setFile(await accounts.save({ draft: next }))
+      saver.markSaved(next)
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
-      setDraft(selected)
+      setDraft(toDraft(selected))
     }
   }
 
   const toggleEnabled = async (profile: AccountProfile) => {
-    setFile(await accounts.save({ draft: { ...profile, enabled: !profile.enabled } }))
+    setFile(await accounts.save({ draft: { ...toDraft(profile), enabled: !profile.enabled } }))
   }
 
   const remove = async (profile: AccountProfile) => {
@@ -221,6 +239,12 @@ export const useAccountsPanelState = () => {
     draft,
     setDraft,
     dirty,
+    problem,
+    saveMode: preferences.saveMode,
+    autoSave,
+    retryAutoSave: () => void saver.retry().catch(() => undefined),
+    commitRename,
+    revert,
     notice,
     setNotice,
     saving,
@@ -231,8 +255,7 @@ export const useAccountsPanelState = () => {
     remove,
     createAccount,
     copy,
-    overlays,
-    persistOverlay,
+    preferences,
   }
 }
 

@@ -1,29 +1,59 @@
 # AI Accounts
 
-AI Accounts adds separate Codex and OpenCode Go provider routes. Its **Usage
-history** panel is available from the AI Accounts page, the quota footer, and
-the sidebar panel list.
+AI Accounts runs several subscription accounts side by side. Codex, Claude,
+OpenCode Go and Command Code accounts each become their own route in the model
+picker. Cursor accounts only track identity and quota, because Cursor sessions
+run through the `@dshfiles/cursor-agent` runtime driver.
 
-The Host records one quota snapshot per enabled, supported account on startup
-and at a configurable interval (5 minutes by default). It keeps quota
-percentages, provider reset timestamps, banked reset counts, and reported expiry
-dates for 90 days by default, configurable up to 365 days. Collection runs at
-any whole-minute interval from 1 to 60. History reads return at most 5,000
-points, preserving recent forecast inputs, reset boundaries, and reset-bank
-changes while sampling older quota points. Collection concurrency is bounded, failed
-provider reads do not create misleading zero-valued snapshots, and plugin
-unload cancels an active collection. Values remain in the Host's local
-`ai_accounts_usage` storage domain; provider credentials and raw responses are
-not stored there.
+## Providers
 
-The panel shows current provider limits, quota history split at reset
-boundaries, changes in banked reset balance and expiry dates, and a linear
-depletion estimate. An estimate uses up to the last 48 snapshots from the
-current reset cycle and is shown only with at least three readings across 30
-minutes. It compares the estimate with the provider's reported reset time and
-is labelled as an observed-pace estimate, not a provider prediction.
+| Kind | Login | Model route | Quota |
+| --- | --- | --- | --- |
+| Codex | `CODEX_HOME=… codex login`, one shadow home per account | yes | 5-hour and weekly windows, banked resets |
+| Claude | `claude /login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` value in a named `*_API_KEY` variable serves requests | yes | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`) |
+| OpenCode Go | key in a named variable | yes | rolling, weekly and monthly windows |
+| Command Code | key in a named variable, or `cmd login` | yes | 5-hour and weekly window limits (`/alpha/billing/credits`) |
+| Cursor | `cursor-agent login`, or a token in a named variable | no | included usage for the billing cycle (undocumented dashboard endpoint) |
 
-Older snapshots remain readable; they do not contain per-reset expiry dates.
-Command Code accounts do not currently expose a quota reader. This panel tracks
-provider quota history and banked resets; it does not import Codex CLI or
-OpenCode local token logs.
+The plugin reads Claude Code's login but never refreshes it. When that token
+expires, run Claude Code once on the account. Quota needs the interactive
+login, because a setup token cannot read usage. Cursor publishes no usage API,
+so the plugin reads the dashboard's own endpoint. If Cursor changes that
+endpoint, the card reports "unsupported" instead of a guessed number.
+
+## Editing
+
+Edits save automatically after a short pause by default. A subtle indicator
+shows whether changes are unsaved, saving, saved or failed, and a failed save
+can be retried. A route slug change saves when you leave the field, so a
+half-typed slug never becomes a route. Switch to manual saving (Save and
+Revert) under **Settings › AI Accounts**. The same page holds the auto-save
+delay, the usage refresh interval, the sidebar and edge surfaces, request
+distribution, and the history schedule.
+
+Accounts can also be listed, enabled and edited at the bottom of
+**Settings › Models**.
+
+## Usage
+
+The sidebar footer has a compact usage button. Its popover filters by
+provider and lists one card per enabled account, each showing its machine,
+session, weekly and monthly bars, reset times and snapshot age. Banked Codex
+resets can be expanded. The draggable edge overlay opens the same popover.
+Every open surface shares one Host reading, cached for 30 seconds; **Refresh**
+bypasses the cache.
+
+The Host records one quota snapshot per enabled account on startup and then
+at a configurable interval, 5 minutes by default and adjustable from 1 to 60
+minutes. Snapshots are kept for 90 days by default, up to 365. A reading in
+the same interval updates its row instead of adding one. Failed reads write
+nothing, and plugin unload cancels an active collection and closes the
+storage domain. History reads return at most 5,000 points, keeping recent
+forecast inputs, reset boundaries and banked-reset changes. Values stay in
+the Host's local `ai_accounts_usage` storage domain. Credentials and raw
+responses are not stored.
+
+The **Usage history** panel shows current limits, quota history split at
+reset boundaries, banked-reset changes, and a linear depletion estimate based
+on the observed pace. It does not import local token logs from Codex CLI or
+OpenCode.

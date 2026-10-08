@@ -1,14 +1,13 @@
 import { z } from 'zod'
-import { useApi } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
-import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
-import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { aiAccountsApi, type AccountsUsage } from './api.js'
-import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone, tightestWindow } from './quota-tone.js'
+import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
+import { useAccountsUsage } from './use-accounts-usage.js'
+import { usePreferences } from './use-preferences.js'
+import { UsageOverview } from './usage-overview.js'
+import { tightestRemaining } from './usage-overview-model.js'
 
 /**
  * Draggable edge usage overlay.
@@ -21,7 +20,6 @@ import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone, tightestWindow } from 
 
 export const EDGE_USAGE_STORAGE_KEY = 'ai-accounts-edge-usage-position'
 
-const EDGE_USAGE_INTERVAL = 60_000
 
 type Edge = 'left' | 'right' | 'top' | 'bottom'
 
@@ -71,17 +69,9 @@ const nearestEdge = (rect: { readonly left: number; readonly right: number; read
   return distances.sort((left, right) => left[1] - right[1])[0]?.[0] ?? 'right'
 }
 
-export const formatReset = (resetsAt: number | null): string | undefined => {
-  if (resetsAt === null) return undefined
-  const minutes = Math.round((resetsAt - Date.now()) / 60_000)
-  if (minutes < 60) return `${minutes}m`
-  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`
-}
-
 export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const accounts = useApi(aiAccountsApi)
-  const [enabled, setEnabled] = useState<boolean | null>(null)
-  const [usage, setUsage] = useState<AccountsUsage | null>(null)
+  const { edgeWidget } = usePreferences()
+  const { usage, refreshing, failed, refresh } = useAccountsUsage({ enabled: edgeWidget })
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<EdgePosition>(readPosition)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -94,31 +84,6 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     readonly moved: boolean
   } | null>(null)
   const dragMovedRef = useRef(false)
-
-  useEffect(() => {
-    void accounts
-      .overlaySettings()
-      .then(metadata => setEnabled(metadata.edgeWidget))
-      .catch(() => setEnabled(true))
-  }, [accounts])
-
-  useEffect(() => {
-    let cancelled = false
-    const refresh = () => {
-      void accounts
-        .usage()
-        .then(next => {
-          if (!cancelled) setUsage(next)
-        })
-        .catch(() => undefined)
-    }
-    refresh()
-    const timer = setInterval(refresh, EDGE_USAGE_INTERVAL)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [accounts])
 
   useEffect(() => {
     try {
@@ -135,11 +100,9 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     return () => window.removeEventListener('resize', resize)
   }, [])
 
-  const enabledRows = (usage?.cards ?? []).map(card => ({ card, tightest: tightestWindow(card.usage) })).filter(row => row.tightest !== undefined)
+  const primary = tightestRemaining(usage)
 
-  const primary = enabledRows.map(row => ({ percent: row.tightest?.percent ?? 100 })).sort((left, right) => left.percent - right.percent)[0]?.percent
-
-  if (enabled === false) return null
+  if (!edgeWidget) return null
 
   const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!event.isPrimary || event.button !== 0) return
@@ -219,7 +182,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
         </PopoverAnchor>
         <PopoverContent
           aria-label="Account quota"
-          className="dshx-root dshx:z-[10001] dshx:flex dshx:max-h-[70vh] dshx:w-[min(420px,calc(100vw-16px))] dshx:flex-col dshx:p-0"
+          className="dshx-root dshx:z-[10001] dshx:w-[min(420px,calc(100vw-16px))] dshx:p-0"
           collisionPadding={8}
           onInteractOutside={event => {
             if (event.target instanceof Node && triggerRef.current?.contains(event.target)) event.preventDefault()
@@ -227,43 +190,16 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
           side={POPOVER_SIDE[position.edge]}
           sideOffset={8}
         >
-          <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2">
-            <span className="dshx:text-xs dshx:text-muted-foreground">Tightest window per account</span>
-            <Button
-              aria-label="Open usage history"
-              onClick={() => {
-                setOpen(false)
-                props.onOpenUsageHistory()
-              }}
-              size="xs"
-              type="button"
-              variant="ghost"
-            >
-              <ArrowUpRightIcon />
-              History
-            </Button>
-          </header>
-          {enabledRows.length === 0 ? <p className="dshx:px-3 dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No account reports quota yet.</p> : null}
-          <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:p-1.5">
-            {enabledRows.map(row => {
-              const percent = row.tightest?.percent ?? 100
-              const tone = quotaTone(percent)
-              return (
-                <li className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:py-2 dshx:hover:bg-accent/50" key={row.card.instanceId}>
-                  <div className="dshx:flex dshx:items-baseline dshx:gap-2">
-                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{row.card.instanceId}</span>
-                    <span className="dshx:text-xs dshx:text-muted-foreground">{formatReset(row.tightest?.resetsAt ?? null) ?? ''}</span>
-                    <span className={cn('dshx:text-sm dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{String(Math.round(percent))}%</span>
-                  </div>
-                  <Progress
-                    aria-label={`${row.card.instanceId} remaining`}
-                    className={cn('dshx:h-1.5 dshx:bg-muted', QUOTA_TONE_PROGRESS[tone])}
-                    value={Math.max(0, Math.min(100, percent))}
-                  />
-                </li>
-              )
-            })}
-          </ul>
+          <UsageOverview
+            failed={failed}
+            onOpenHistory={() => {
+              setOpen(false)
+              props.onOpenUsageHistory()
+            }}
+            onRefresh={() => void refresh()}
+            refreshing={refreshing}
+            usage={usage}
+          />
         </PopoverContent>
       </Popover>
     </aside>,

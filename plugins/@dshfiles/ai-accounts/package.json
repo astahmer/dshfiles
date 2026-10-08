@@ -2,7 +2,7 @@
   "name": "@dshfiles/ai-accounts",
   "version": "0.1.0",
   "private": true,
-  "description": "Per-account Codex and OpenCode Go provider instances for DeepSeek Harness, in the spirit of T3 Code.",
+  "description": "Per-account Codex, Claude, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
   "files": [
     "dist",
     "cordis.patch.yml",

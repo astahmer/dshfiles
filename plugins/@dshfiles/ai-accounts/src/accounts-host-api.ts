@@ -1,12 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
-import { aiAccountsApi, baseModelName, type AccountProfile, type AccountsFile, type AccountsUsage, type UsageCard } from './api.js'
+import { hostname } from 'node:os'
+import { aiAccountsApi, baseModelName, type AccountsFile, type AccountsUsage } from './api.js'
 import { buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
-import { readCodexUsage, readOpenCodeUsage } from './usage.js'
+import { readAccountUsage } from './account-usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
-import { readKeyFromEnv } from './credentials.js'
-import { resolveCodexHomeLayout } from './codex-home.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 
 /**
@@ -32,12 +31,14 @@ export const accountsHostApi = aiAccountsApi.host({
     return accountsFile(ctx)
   },
   save: async ({ input, ctx }) => {
-    await upsertAccount(input.draft)
+    await upsertAccount(input.draft, input.previousInstanceId)
+    accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   remove: async ({ input, ctx }) => {
     await removeAccount(input.instanceId)
+    accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
@@ -67,60 +68,26 @@ export const accountsHostApi = aiAccountsApi.host({
     )
     return { instanceId: input.instanceId, models: resolved }
   },
-  usage: async ({ ctx }) => readAccountsUsage(ctx),
+  usage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx),
+  refreshUsage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx),
   history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     points: [...(await readUsageHistory(ctx, input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
   }),
   historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
   saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
-  overlaySettings: async ({ ctx }) => (await readUsageHistorySettings(ctx)).overlays,
-  saveOverlaySettings: async ({ input, ctx }) => {
-    const meta = await readUsageHistorySettings(ctx)
-    const next = await saveUsageHistorySettings(ctx, { overlays: { ...meta.overlays, ...input.patch } })
-    return next.overlays
-  },
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
   resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 
-/**
- * One account's live quota.
- *
- * A keyed provider reports against its own key, and Codex against the login in
- * its own home. A provider with no reachable quota endpoint is reported as
- * unsupported rather than failing the sweep.
- */
-const readAccountUsage = async (account: AccountProfile): Promise<UsageCard> => {
-  if (account.kind === 'codex') {
-    return readCodexUsage(
-      resolveCodexHomeLayout({
-        homePath: account.homePath,
-        shadowHomePath: account.shadowHomePath,
-      }).effectiveHomePath,
-    )
-  }
-  if (account.kind === 'commandcode') return unsupported()
-  return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv))
-}
-
 export const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
-  const account = (await accountsFile(ctx)).accounts.find(profile => profile.instanceId === accountId)
+  const file = await accountsFile(ctx)
+  const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
-  return knownQuotaResetAt(await readAccountUsage(account), Date.now())
+  return knownQuotaResetAt(await readAccountUsage({ account, shadowRoot: file.shadowRoot }), Date.now())
 }
-
-const unsupported = (): UsageCard => ({
-  status: 'unsupported',
-  message: null,
-  identity: null,
-  plan: null,
-  windows: [],
-  bankedResets: 0,
-  bankedResetExpiries: [],
-})
 
 /**
  * Live quota for every account, read with each account's own credential.
@@ -129,17 +96,20 @@ const unsupported = (): UsageCard => ({
  * on an interval, so a provider that is slow or down costs its own card rather
  * than the panel.
  */
-const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
+export const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
   const file = await accountsFile(ctx)
   const cards = await Promise.all(
     file.accounts.map(async account => ({
       instanceId: account.instanceId,
-      usage: await readAccountUsage(account),
+      displayName: account.displayName,
+      kind: account.kind,
+      enabled: account.enabled,
+      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot }),
     })),
   )
-  return { readAt: Date.now(), cards }
+  return { readAt: Date.now(), hostName: hostname(), cards }
 }
 
 /**

@@ -69,7 +69,7 @@ const parseCredits = (value: unknown): CodexResetCredits => {
 }
 
 /** Read how many reset credits an account has banked, and when they expire. */
-export const readCodexResetCredits = async (codexHome: string): Promise<CodexResetCredits> => {
+export const readCodexResetCredits = async (codexHome: string, signal?: AbortSignal): Promise<CodexResetCredits> => {
   let auth: z.infer<typeof authSchema>
   try {
     auth = authSchema.parse(JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
@@ -87,7 +87,7 @@ export const readCodexResetCredits = async (codexHome: string): Promise<CodexRes
         accept: 'application/json',
       },
       redirect: 'error',
-      signal: AbortSignal.timeout(5_000),
+      signal: signal === undefined ? AbortSignal.timeout(5_000) : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return emptyResetCredits
     return parseCredits(await response.json())

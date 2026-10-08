@@ -14,7 +14,7 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
  * it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = z.enum(['codex', 'opencode-go', 'commandcode'])
+export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'cursor'])
 
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
@@ -78,7 +78,7 @@ export const accountProfileSchema = z.object({
   kind: accountKindSchema,
   displayName: z.string().min(1).max(120),
   enabled: z.boolean(),
-  /** Home this account reads shared Codex state from. */
+  /** Codex: home holding shared state. Claude: the CLAUDE_CONFIG_DIR its login lives in. */
   homePath: homePathSchema,
   /** Per-account home holding a private `auth.json`; empty means the shared home. */
   shadowHomePath: homePathSchema,
@@ -161,11 +161,16 @@ export const usageCardSchema = z.object({
 })
 
 export const accountsUsageSchema = z.object({
-  /** Read when the panel opened, so a full sweep is not made on every render. */
+  /** When the sweep that produced these cards finished. */
   readAt: z.number(),
+  /** The machine the Host reads quota from, shown on every card. */
+  hostName: z.string().max(255),
   cards: z.array(
     z.object({
       instanceId: z.string().min(1).max(64),
+      displayName: z.string().max(120),
+      kind: accountKindSchema,
+      enabled: z.boolean(),
       usage: usageCardSchema,
     }),
   ),
@@ -186,7 +191,6 @@ export const accountsCatalogSchema = z.object({
 export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
-export type OverlaySettings = { readonly edgeWidget: boolean; readonly footerQuota: boolean }
 
 export const identityResultSchema = z.object({
   instanceId: z.string().min(1).max(64),
@@ -213,7 +217,11 @@ export const aiAccountsApi = defineApi({
     read: method({ input: z.void(), output: accountsFileSchema }),
     /** Create or update one account by its instance id. */
     save: method({
-      input: z.object({ draft: accountDraftSchema }),
+      input: z.object({
+        draft: accountDraftSchema,
+        /** Set when the draft renames an existing account, so the old slug is replaced rather than duplicated. */
+        previousInstanceId: z.string().min(1).max(64).optional(),
+      }),
       output: accountsFileSchema,
     }),
     /** Remove one account. */
@@ -278,22 +286,13 @@ export const aiAccountsApi = defineApi({
     }),
 
     /**
-     * Which surfaces quota lives on. The foot disclosure renders when footerQuota
-     * is on, the draggable edge overlay when edgeWidget is on; the two are
-     * independent so either surface can exist without the other.
-     */
-    overlaySettings: method({ input: z.void(), output: usageMetaSchema.shape.overlays.unwrap() }),
-    saveOverlaySettings: method({
-      input: z.object({ patch: z.object({ edgeWidget: z.boolean().optional(), footerQuota: z.boolean().optional() }) }),
-      output: usageMetaSchema.shape.overlays.unwrap(),
-    }),
-
-    /**
      * Live subscription quota for every account. Each card is read with its own
      * credential and a short timeout, so one unreachable provider degrades one
-     * card rather than the panel.
+     * card rather than the panel. Concurrent surfaces share one cached sweep.
      */
     usage: method({ input: z.void(), output: accountsUsageSchema }),
+    /** Bypass the shared short-lived sweep cache, for an explicit refresh. */
+    refreshUsage: method({ input: z.void(), output: accountsUsageSchema }),
 
     /** Read now and record, so a fresh chart does not wait for the next poll. */
     collectUsage: method({ input: z.void(), output: z.object({ recorded: z.number() }) }),

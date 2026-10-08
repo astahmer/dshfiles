@@ -3,16 +3,21 @@ import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import { accountsFile, accountsHostApi, readQuotaResetAt } from './accounts-host-api.js'
+import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } from './accounts-host-api.js'
+import { createUsageCache } from './account-usage.js'
+import { resolveClaudeInferenceToken } from './claude-account.js'
+import { readCommandCodeKey } from './commandcode-usage.js'
+import { aiAccountsSettings } from './settings.js'
 export { accountsSnapshot } from './accounts-host-api.js'
 import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
-import { createUsageHistoryScheduler } from './usage-recorder.js'
+import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -25,8 +30,8 @@ import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
-import { COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute, type Route } from './provider-routes.js'
-export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND } from './provider-routes.js'
+import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, buildRoutes, keyEnvFor, normalizeInstanceId, type KeyedRoute, type Route } from './provider-routes.js'
+export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -49,10 +54,21 @@ export default definePlugin({
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController'],
   apis: [accountsHostApi],
   tools: [aiAccountsTool],
+  settings: [aiAccountsSettings],
   setup: api => {
     const ctx = api.raw.ctx
     const runtime = activateAccountRuntime(ctx)
-    runtime.scheduler = createUsageHistoryScheduler(ctx, async () => (await accountsFile(ctx)).accounts)
+    runtime.scheduler = createUsageHistoryScheduler(ctx, async () => {
+      const file = await accountsFile(ctx)
+      return { accounts: file.accounts, shadowRoot: file.shadowRoot }
+    })
+    // 30 s: long enough that the page, footer and edge overlay share one sweep,
+    // short enough that a manual reload still feels live.
+    ctx.effect(() => () => {
+      runtime.scheduler?.dispose()
+      void closeUsageDomain(ctx).catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
+    })
+    runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => readAccountsUsage(ctx) })
     const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => readQuotaResetAt(ctx, accountId) })
     runtime.quotaContinuations = quotaContinuations
     ctx.effect(() => {
@@ -73,6 +89,7 @@ export default definePlugin({
 
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
+    const claudeUpstream = anthropicProvider()
     // Each keyed provider is built with its own base and key variable, so two
     // Command Code accounts can point at different deployments.
     const keyedUpstream = (route: KeyedRoute) =>
@@ -121,7 +138,7 @@ export default definePlugin({
         enabled.map(([id, route]) => [
           id,
           buildProfile({
-            upstream: route.kind === CODEX_KIND ? codexUpstream : keyedUpstream(route),
+            upstream: route.kind === CODEX_KIND ? codexUpstream : route.kind === CLAUDE_KIND ? claudeUpstream : keyedUpstream(route),
             provider: id,
             displayName: route.displayName,
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
@@ -171,11 +188,17 @@ export default definePlugin({
             await materializeCodexShadowHome(route.layout)
             return readCodexAccessToken(route.layout.effectiveHomePath)
           }
+          if (route.kind === CLAUDE_KIND) {
+            try {
+              return await resolveClaudeInferenceToken({ configDir: route.configDir, keyEnv: route.apiKeyEnv, now: Date.now() })
+            } catch (cause) {
+              throw new LlmError(cause instanceof Error ? cause.message : `No Claude login for '${provider}'.`, 'MISSING_CREDENTIAL')
+            }
+          }
           // Keyed providers read the variable their own account names, so several
           // subscriptions live in the vault without any value in the accounts file.
           const named = keyEnvFor(route)
-          const sharedKey = route.kind === COMMANDCODE_KIND ? '' : config.opencodeApiKey.trim()
-          const key = readKeyFromEnv(named) || sharedKey
+          const key = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named) : readKeyFromEnv(named) || config.opencodeApiKey.trim()
           if (key.length === 0) {
             throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
           }

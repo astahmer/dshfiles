@@ -7,6 +7,11 @@ import { accountDraftSchema, accountsFileSchema, type AccountDraft, type Account
 import { describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { readKeyFromEnv } from './credentials.js'
+import { KIND_LABEL } from './account-labels.js'
+import { claudeLoginHint, describeClaudeAuth, resolveClaudeConfigDir } from './claude-account.js'
+import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
+import { readCommandCodeKey } from './commandcode-usage.js'
+import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 
 /**
  * Account profiles on disk.
@@ -107,37 +112,84 @@ export const writeAccountFile = async (next: AccountStoreFile): Promise<AccountS
 
 const expandHome = (value: string): string => (value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
 
-/** Derive an account's Codex homes, defaulting the shadow under the root. */
-const layoutFor = (profile: AccountDraft, file: AccountStoreFile) =>
+/** Derive an account's Codex homes, defaulting the shadow under the root, exactly as its route does. */
+export const codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string) =>
   resolveCodexHomeLayout({
     homePath: profile.homePath,
-    shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(file.shadowRoot.replace(/\/$/, ''), profile.instanceId),
+    shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(shadowRoot.replace(/\/$/, ''), profile.instanceId),
   })
 
+const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => codexLayoutFor(profile, file.shadowRoot)
+
 const defaultName = (draft: AccountDraft): string =>
-  draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${draft.kind === 'codex' ? 'Codex' : 'OpenCode Go'} (${draft.instanceId})`
+  draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${KIND_LABEL[draft.kind]} (${draft.instanceId})`
+
+const observed = (
+  draft: AccountDraft,
+  facts: Pick<AccountProfile, 'signedIn' | 'identity' | 'plan' | 'loginHint' | 'detail'> & { readonly cooling: boolean },
+): AccountProfile => ({
+  ...draft,
+  displayName: defaultName(draft),
+  mode: 'direct',
+  signedIn: facts.signedIn,
+  identity: facts.identity,
+  plan: facts.plan,
+  state: !draft.enabled ? 'disabled' : facts.cooling ? 'cooling' : facts.signedIn ? 'healthy' : 'unconfigured',
+  loginHint: facts.loginHint,
+  detail: facts.detail,
+})
 
 /**
  * Observed fields for one stored profile: whether it holds a login, the identity
  * it presents, and how its Codex home is arranged. Never a credential.
  */
 const observe = async (draft: AccountDraft, file: AccountStoreFile, status: AccountStatus | undefined): Promise<AccountProfile> => {
+  const cooling = status?.state === 'cooling'
   if (draft.kind === 'opencode-go') {
     const hasKey = readKeyFromEnv(draft.apiKeyEnv).length > 0
-    return {
-      ...draft,
-      displayName: defaultName(draft),
-      mode: 'direct',
+    return observed(draft, {
+      cooling,
       signedIn: hasKey,
       identity: null,
       plan: null,
-      state: draft.enabled ? (hasKey ? 'healthy' : 'unconfigured') : 'disabled',
       loginHint:
-        draft.apiKeyEnv.trim().length > 0
-          ? `Export ${draft.apiKeyEnv.trim()} before using this account.`
-          : 'Set an API key environment variable for this account.',
+        draft.apiKeyEnv.trim().length > 0 ? `Export ${draft.apiKeyEnv.trim()} before using this account.` : 'Set an API key environment variable for this account.',
       detail: null,
-    }
+    })
+  }
+  if (draft.kind === 'commandcode') {
+    const hasKey = (await readCommandCodeKey(draft.apiKeyEnv)).length > 0
+    return observed(draft, {
+      cooling,
+      signedIn: hasKey,
+      identity: null,
+      plan: null,
+      loginHint: `cmd login   # or export ${draft.apiKeyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : draft.apiKeyEnv.trim()}`,
+      detail: null,
+    })
+  }
+  if (draft.kind === 'claude') {
+    const configDir = resolveClaudeConfigDir(draft.homePath)
+    const auth = await describeClaudeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now() })
+    return observed(draft, {
+      cooling,
+      signedIn: auth.signedIn,
+      identity: auth.identity ?? null,
+      plan: auth.plan ?? null,
+      loginHint: claudeLoginHint(configDir),
+      detail: auth.detail ?? null,
+    })
+  }
+  if (draft.kind === 'cursor') {
+    const token = await readCursorToken(draft.apiKeyEnv)
+    return observed(draft, {
+      cooling: false,
+      signedIn: token !== undefined,
+      identity: null,
+      plan: null,
+      loginHint: CURSOR_LOGIN_HINT,
+      detail: 'Cursor sessions run through the Cursor Agent runtime; this account tracks identity and quota only.',
+    })
   }
 
   let layout
@@ -163,7 +215,6 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
   } catch (error) {
     auth = { signedIn: false, identity: undefined, plan: undefined, error: String(error) }
   }
-  const cooling = status?.state === 'cooling'
   return {
     ...draft,
     displayName: defaultName(draft),
@@ -191,16 +242,24 @@ export const buildAccountsFile = async (file: AccountStoreFile, statuses: readon
   ),
 })
 
-/** Create or update one profile, keyed by its instance id. */
-export const upsertAccount = async (draft: AccountDraft): Promise<AccountStoreFile> => {
+/**
+ * Create or update one profile, keyed by its instance id. A rename names the
+ * previous id so the old entry is replaced in place instead of left behind.
+ */
+export const upsertAccount = async (draft: AccountDraft, previousInstanceId?: string): Promise<AccountStoreFile> => {
   const file = await readAccountFile()
-  const accounts = file.accounts.filter(existing => existing.instanceId !== draft.instanceId)
+  const replaced = previousInstanceId ?? draft.instanceId
+  if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId)) {
+    throw new Error(`An account named '${draft.instanceId}' already exists.`)
+  }
+  const position = file.accounts.findIndex(existing => existing.instanceId === replaced)
   const normalized: AccountDraft = { ...draft, displayName: defaultName(draft) }
   if (normalized.kind === 'codex') {
     // Materialize now so the login command points at a directory that exists.
     await materializeCodexShadowHome(layoutFor(normalized, file)).catch(() => undefined)
   }
-  return writeAccountFile({ ...file, accounts: [...accounts, normalized] })
+  const accounts = position === -1 ? [...file.accounts, normalized] : file.accounts.map((existing, index) => (index === position ? normalized : existing))
+  return writeAccountFile({ ...file, accounts })
 }
 
 export const removeAccount = async (instanceId: string): Promise<AccountStoreFile> => {

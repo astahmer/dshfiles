@@ -1,10 +1,12 @@
 import type { AiAccountsConfig, CodexAccountConfig } from './account-config.js'
 import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
+import { resolveClaudeConfigDir } from './claude-account.js'
 import { CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
 export const COMMANDCODE_KIND = CC_KIND
+export const CLAUDE_KIND = 'claude'
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -41,7 +43,16 @@ export interface KeyedRoute {
   readonly enabled: boolean
 }
 
-export type Route = CodexRoute | KeyedRoute
+export interface ClaudeRoute {
+  readonly kind: typeof CLAUDE_KIND
+  readonly instanceId: string
+  readonly displayName: string
+  readonly configDir: string
+  readonly apiKeyEnv: string
+  readonly enabled: boolean
+}
+
+export type Route = CodexRoute | KeyedRoute | ClaudeRoute
 
 export const keyEnvFor = (route: KeyedRoute): string =>
   route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
@@ -93,6 +104,17 @@ export const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
       displayName: displayNameFor(account.displayName, kind, instanceId),
       apiKeyEnv: account.apiKeyEnv,
       apiBaseUrl: account.apiBaseUrl,
+      enabled: account.enabled,
+    })
+  }
+  for (const account of config.claudeAccounts) {
+    const instanceId = normalizeInstanceId(account.instanceId, CLAUDE_KIND)
+    routes.set(instanceId, {
+      kind: CLAUDE_KIND,
+      instanceId,
+      displayName: displayNameFor(account.displayName, CLAUDE_KIND, instanceId),
+      configDir: resolveClaudeConfigDir(account.configDir),
+      apiKeyEnv: account.apiKeyEnv,
       enabled: account.enabled,
     })
   }

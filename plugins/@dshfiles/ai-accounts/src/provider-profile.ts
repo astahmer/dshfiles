@@ -3,8 +3,9 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { accountModelName } from './api.js'
-import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
-import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
+import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
@@ -15,7 +16,7 @@ export const buildProfile = (params: {
   readonly favoriteModelIds?: readonly string[]
   /** Explicit ordering; unlisted ids keep provider order after these. */
   readonly modelOrder?: readonly string[]
-  readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider>
+  readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider> | ReturnType<typeof anthropicProvider>
   readonly provider: string
   readonly displayName: string
   readonly additionalModelIds: readonly string[]

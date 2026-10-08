@@ -54,7 +54,7 @@ const FALLBACK: readonly CatalogEntry[] = [
 
 export class CommandCodeConfigError extends Error {}
 
-const resolveBase = (baseUrl: string | undefined): string => {
+export const resolveCommandCodeBase = (baseUrl: string | undefined): string => {
   const base = baseUrl === undefined || baseUrl.trim() === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl.trim()
   if (!isAllowedCommandCodeBase(base)) {
     throw new CommandCodeConfigError(`Refusing Command Code base '${base}': use https on commandcode.ai, or a loopback address.`)
@@ -71,7 +71,7 @@ const resolveKeyEnv = (keyEnv: string | undefined): string => {
 }
 
 /** Command Code serves its OpenAI-compatible routes under a provider prefix. */
-const providerBase = (baseUrl: string | undefined): string => `${resolveBase(baseUrl)}/provider`
+const providerBase = (baseUrl: string | undefined): string => `${resolveCommandCodeBase(baseUrl)}/provider`
 
 /**
  * Read the live catalog so the picker offers what the plan actually serves.
@@ -80,7 +80,7 @@ const providerBase = (baseUrl: string | undefined): string => `${resolveBase(bas
  * per model here rather than discovered from a failed request later.
  */
 export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions): Promise<readonly CatalogEntry[]> => {
-  const base = resolveBase(options.baseUrl)
+  const base = resolveCommandCodeBase(options.baseUrl)
   if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
     headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },

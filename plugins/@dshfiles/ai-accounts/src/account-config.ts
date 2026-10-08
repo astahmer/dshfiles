@@ -25,9 +25,20 @@ export interface KeyedAccountConfig {
 
 export type OpenCodeAccountConfig = KeyedAccountConfig
 
+export interface ClaudeAccountConfig {
+  readonly instanceId: string
+  readonly displayName: string
+  /** CLAUDE_CONFIG_DIR holding the Claude Code login; empty means ~/.claude. */
+  readonly configDir: string
+  /** Optional variable holding a `claude setup-token` value, preferred for inference. */
+  readonly apiKeyEnv: string
+  readonly enabled: boolean
+}
+
 export interface AiAccountsConfig {
   readonly codexAccounts: readonly CodexAccountConfig[]
   readonly opencodeAccounts: readonly OpenCodeAccountConfig[]
+  readonly claudeAccounts: readonly ClaudeAccountConfig[]
   readonly opencodeApiKey: string
   readonly distribution: Distribution
   readonly cooldownMs: number
@@ -74,8 +85,19 @@ export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSy
       enabled: account.enabled,
     }))
   const opencodeAccounts: KeyedAccountConfig[] = []
+  const claudeAccounts: ClaudeAccountConfig[] = []
   for (const account of file.accounts) {
-    if (account.kind === 'codex') continue
+    if (account.kind === 'codex' || account.kind === 'cursor') continue
+    if (account.kind === 'claude') {
+      claudeAccounts.push({
+        instanceId: account.instanceId,
+        displayName: account.displayName,
+        configDir: account.homePath,
+        apiKeyEnv: account.apiKeyEnv,
+        enabled: account.enabled,
+      })
+      continue
+    }
     opencodeAccounts.push({
       instanceId: account.instanceId,
       displayName: account.displayName,
@@ -90,6 +112,7 @@ export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSy
   return {
     codexAccounts,
     opencodeAccounts,
+    claudeAccounts,
     opencodeApiKey: readKeyFromEnv('OPENCODE_API_KEY') ?? '',
     distribution: file.distribution,
     cooldownMs: file.cooldownMs,

@@ -91,7 +91,7 @@ export const usageHistoryDomain = defineDomain({
   // `initial` is the shape the type is inferred from, so it carries every field.
   global: {
     schema: usageMetaSchema,
-    initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90, overlays: { edgeWidget: true, footerQuota: true } },
+    initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90 },
   },
   tables: {
     /** Keyed by account, interval, and interval bucket. */

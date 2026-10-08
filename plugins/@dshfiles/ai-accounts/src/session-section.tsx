@@ -6,6 +6,14 @@ import type { AccountDraft, AccountsFile } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
+const SESSION_MODE = {
+  codex: draft => (draft.shadowHomePath === '' ? 'Private auth under the shadow root' : 'Shared state, private auth'),
+  claude: draft => (draft.apiKeyEnv === '' ? 'Claude Code login' : 'Setup token, login for quota'),
+  'opencode-go': () => 'Key from the environment',
+  commandcode: draft => (draft.apiKeyEnv === '' ? 'cmd login or COMMANDCODE_API_KEY' : 'Key from the environment'),
+  cursor: () => 'Quota only; sessions use Cursor Agent',
+} satisfies Record<AccountDraft['kind'], (draft: AccountDraft) => string>
+
 export const SessionSection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft; readonly file: AccountsFile }): JSX.Element => {
   const draft = props.draft
   const file = props.file
@@ -14,7 +22,7 @@ export const SessionSection = (props: { readonly state: AccountsPanelState; read
     { label: 'Route', value: draft.instanceId, mono: true },
     {
       label: 'Mode',
-      value: draft.kind === 'codex' ? (draft.shadowHomePath === '' ? 'Shared auth' : 'Shared state, private auth') : 'Key from the environment',
+      value: SESSION_MODE[draft.kind](draft),
       mono: false,
     },
     { label: 'Account', value: selected?.identity ?? STATE_LABEL[selected?.state ?? 'unconfigured'], mono: false },

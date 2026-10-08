@@ -1,10 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { resolveCodexHomeLayout } from './codex-home.js'
-import { readCodexUsage, readOpenCodeUsage } from './usage.js'
+import { readAccountUsage } from './account-usage.js'
 import { USAGE_HISTORY_DOMAIN, boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
-import type { AccountProfile } from './api.js'
-import { readKeyFromEnv } from './credentials.js'
+import type { AccountProfile, UsageCard } from './api.js'
 
 /**
  * Quota history collection.
@@ -22,32 +20,65 @@ const MINUTE_MS = 60_000
 const SCHEDULER_CHECK_MS = MINUTE_MS
 const PROVIDER_READ_CONCURRENCY = 4
 
-const readAccountWindows = async (account: AccountProfile, signal?: AbortSignal) => {
-  if (signal?.aborted) return undefined
-  if (account.kind === 'codex') {
-    const layout = resolveCodexHomeLayout({
-      homePath: account.homePath,
-      shadowHomePath: account.shadowHomePath,
-    })
-    return readCodexUsage(layout.effectiveHomePath, signal)
-  }
-  if (account.kind === 'commandcode') return undefined
-  return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv), signal)
+export type AccountUsageReader = (account: AccountProfile, signal: AbortSignal | undefined) => Promise<UsageCard>
+
+interface AccountsForCollection {
+  readonly accounts: readonly AccountProfile[]
+  readonly shadowRoot: string
+}
+
+const providerReader =
+  (shadowRoot: string): AccountUsageReader =>
+  (account, signal) =>
+    readAccountUsage({ account, shadowRoot, signal })
+
+const facilityOf = (ctx: Context) => ctx.get('storageDomain')
+type Facility = NonNullable<ReturnType<typeof facilityOf>>
+const openDomain = (facility: Facility) => facility.open(usageHistoryDomain)
+type UsageDomain = Awaited<ReturnType<typeof openDomain>>
+
+/**
+ * The storage facility refuses a second `open` of a name that is already open,
+ * so the domain is opened once per facility and every reader shares the handle.
+ * The Host closes it on unload, so a reload can open it again.
+ */
+const openedDomains = new WeakMap<Facility, Promise<UsageDomain>>()
+
+const usageDomain = (ctx: Context): Promise<UsageDomain> | undefined => {
+  const facility = facilityOf(ctx)
+  if (facility === undefined) return undefined
+  const existing = openedDomains.get(facility)
+  if (existing !== undefined) return existing
+  const opening = openDomain(facility)
+  openedDomains.set(facility, opening)
+  opening.catch(() => {
+    if (openedDomains.get(facility) === opening) openedDomains.delete(facility)
+  })
+  return opening
+}
+
+export const closeUsageDomain = async (ctx: Context): Promise<void> => {
+  const facility = facilityOf(ctx)
+  if (facility === undefined) return
+  const opening = openedDomains.get(facility)
+  openedDomains.delete(facility)
+  const domain = await opening?.catch(() => undefined)
+  await domain?.close()
 }
 
 const defaultUsageMeta = (): UsageMeta => usageMetaSchema.parse({})
 
 export const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta> => {
-  const facility = ctx.get('storageDomain')
-  if (facility === undefined) return defaultUsageMeta()
-  const domain = await facility.open(usageHistoryDomain)
+  const opening = usageDomain(ctx)
+  if (opening === undefined) return defaultUsageMeta()
+  const domain = await opening
   return domain.global.get()
 }
 
 export const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySettings): Promise<UsageMeta> => {
-  const facility = ctx.get('storageDomain')
-  if (facility === undefined) throw new Error('Usage history storage is unavailable.')
-  const domain = await facility.open(usageHistoryDomain)
+  const opening = usageDomain(ctx)
+  if (opening === undefined) throw new Error('Usage history storage is unavailable.')
+  const domain = await opening
   const next = usageMetaSchema.parse({ ...domain.global.get(), ...settings })
   await domain.global.set(next)
   await pruneUsageHistory(ctx, next.retentionDays)
@@ -60,15 +91,20 @@ export const saveUsageHistorySettings = async (ctx: Context, settings: UsageHist
  * Exported so the API can offer a manual refresh, which uses the same path and
  * therefore cannot diverge from the scheduled one.
  */
-export const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfile[], signal?: AbortSignal): Promise<number> => {
-  const facility = ctx.get('storageDomain')
-  if (facility === undefined) return 0
-  const domain = await facility.open(usageHistoryDomain)
+export const collectUsageHistory = async (
+  ctx: Context,
+  accounts: readonly AccountProfile[],
+  readUsage: AccountUsageReader,
+  signal?: AbortSignal,
+): Promise<number> => {
+  const opening = usageDomain(ctx)
+  if (opening === undefined) return 0
+  const domain = await opening
   const quota = domain.table('quota')
   const settings = domain.global.get()
 
   let written = 0
-  const enabled = accounts.filter(account => account.enabled && account.kind !== 'commandcode')
+  const enabled = accounts.filter(account => account.enabled)
   // Provider reads are independent, but bound concurrency to avoid an
   // unbounded burst of authenticated requests for profiles with many accounts.
   for (let offset = 0; offset < enabled.length; offset += PROVIDER_READ_CONCURRENCY) {
@@ -77,7 +113,7 @@ export const collectUsageHistory = async (ctx: Context, accounts: readonly Accou
     const results = await Promise.all(
       batch.map(async account => {
         try {
-          return { account, usage: await readAccountWindows(account, signal) }
+          return { account, usage: signal?.aborted ? undefined : await readUsage(account, signal) }
         } catch {
           return { account, usage: undefined }
         }
@@ -107,9 +143,12 @@ export const collectUsageHistory = async (ctx: Context, accounts: readonly Accou
     }
   }
 
+  if (signal?.aborted) return written
   const attemptedAt = Date.now()
+  // Re-read: a settings save during the sweep must not be overwritten by the
+  // snapshot taken before it.
   await domain.global.set({
-    ...settings,
+    ...domain.global.get(),
     lastAttemptAt: attemptedAt,
     ...(written > 0 ? { lastReadAt: attemptedAt } : {}),
   })
@@ -118,9 +157,9 @@ export const collectUsageHistory = async (ctx: Context, accounts: readonly Accou
 
 /** Oldest snapshot worth keeping, given the configured retention. */
 export const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<number> => {
-  const facility = ctx.get('storageDomain')
-  if (facility === undefined) return 0
-  const domain = await facility.open(usageHistoryDomain)
+  const opening = usageDomain(ctx)
+  if (opening === undefined) return 0
+  const domain = await opening
   const quota = domain.table('quota')
   const cutoff = Date.now() - retentionDays * 24 * 60 * MINUTE_MS
   let removed = 0
@@ -135,9 +174,9 @@ export const pruneUsageHistory = async (ctx: Context, retentionDays: number): Pr
 
 /** Readings for one account, oldest first, so a chart reads left to right. */
 export const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number): Promise<readonly QuotaSnapshot[]> => {
-  const facility = ctx.get('storageDomain')
-  if (facility === undefined) return []
-  const domain = await facility.open(usageHistoryDomain)
+  const opening = usageDomain(ctx)
+  if (opening === undefined) return []
+  const domain = await opening
   const rows = [...domain.table('quota').entries()]
     .filter(([key, value]) => parseUsageBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
     .map(([, value]) => value)
@@ -153,9 +192,10 @@ export interface UsageHistoryScheduler {
 /** Share one in-flight collection between the manual action and host timer. */
 export const createUsageHistoryScheduler = (
   ctx: Context,
-  readAccounts: () => Promise<readonly AccountProfile[]>,
-  now: () => number = Date.now,
+  readAccounts: () => Promise<AccountsForCollection>,
+  options: { readonly now?: () => number; readonly readUsage?: AccountUsageReader } = {},
 ): UsageHistoryScheduler => {
+  const now = options.now ?? Date.now
   let disposed = false
   let inFlight: Promise<number> | null = null
   let controller: AbortController | null = null
@@ -166,8 +206,9 @@ export const createUsageHistoryScheduler = (
     const currentController = new AbortController()
     controller = currentController
     inFlight = (async () => {
-      const accounts = await readAccounts()
-      const recorded = await collectUsageHistory(ctx, accounts, currentController.signal)
+      const source = await readAccounts()
+      const recorded = await collectUsageHistory(ctx, source.accounts, options.readUsage ?? providerReader(source.shadowRoot), currentController.signal)
+      if (currentController.signal.aborted) return recorded
       const settings = await readUsageHistorySettings(ctx)
       await pruneUsageHistory(ctx, settings.retentionDays)
       return recorded
@@ -181,7 +222,7 @@ export const createUsageHistoryScheduler = (
   }
 
   const collectIfDue = async (): Promise<void> => {
-    if (disposed || inFlight !== null || ctx.get('storageDomain') === undefined) return
+    if (disposed || inFlight !== null || facilityOf(ctx) === undefined) return
     const settings = await readUsageHistorySettings(ctx)
     const latestAttempt = settings.lastAttemptAt ?? settings.lastReadAt
     if (latestAttempt === null || now() - latestAttempt >= settings.intervalMinutes * MINUTE_MS) {

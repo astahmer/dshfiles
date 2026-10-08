@@ -159,7 +159,7 @@ export interface CodexAuthView {
   readonly error: string | undefined
 }
 
-const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
+export const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
   const segment = token.split('.')[1]
   if (segment === undefined) return undefined
   try {

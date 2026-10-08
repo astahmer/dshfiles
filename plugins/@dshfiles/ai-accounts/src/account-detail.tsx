@@ -14,6 +14,8 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ArrowUpRightIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useId, useState } from 'react'
 import { AccountIdentitySection } from './account-identity-section.js'
+import { KIND_SUBSCRIPTION, routedKind } from './account-labels.js'
+import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import { ModelCuration } from './model-curation.js'
 import { NumberedSection, ProviderMark } from './panel-primitives.js'
@@ -29,23 +31,28 @@ export const AccountDetail = (props: {
   readonly onOpenUsageHistory: () => void
 }): JSX.Element => {
   const draft = props.draft
-  const { catalog, refreshingCatalog, refreshCatalog, selected, setDraft, persist, save, remove, dirty, saving, notice } = props.state
+  const { catalog, refreshingCatalog, refreshCatalog, selected, setDraft, persist, save, remove, dirty, saving, notice, problem } = props.state
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const enabledSwitchId = useId()
-  const kicker = draft.kind === 'opencode-go' ? 'OPENCODE SUBSCRIPTION' : draft.kind === 'commandcode' ? 'COMMAND CODE' : 'CHATGPT SUBSCRIPTION'
   return (
     <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-col dshx:overflow-hidden dshx:px-5 dshx:py-3.5">
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3.5 dshx:border-b dshx:pb-3">
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3">
           <ProviderMark badge={draft.badge === '' ? 'AI' : draft.badge} color={draft.accentColor} size="lg" />
           <div className="dshx:min-w-0">
-            <p className="dshx:text-[11px] dshx:font-semibold dshx:tracking-widest dshx:text-muted-foreground">{kicker}</p>
+            <p className="dshx:text-[11px] dshx:font-semibold dshx:tracking-widest dshx:text-muted-foreground">{KIND_SUBSCRIPTION[draft.kind]}</p>
             <h2 className="dshx:truncate dshx:text-lg dshx:font-semibold dshx:tracking-tight">{draft.displayName || draft.instanceId}</h2>
           </div>
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2.5">
           <Label className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" htmlFor={enabledSwitchId}>
-            {draft.enabled ? 'Enabled in model picker' : 'Hidden from model picker'}
+            {routedKind(draft.kind)
+              ? draft.enabled
+                ? 'Enabled in model picker'
+                : 'Hidden from model picker'
+              : draft.enabled
+                ? 'Tracking quota'
+                : 'Quota tracking off'}
           </Label>
           <Switch checked={draft.enabled} id={enabledSwitchId} onCheckedChange={enabled => void persist({ enabled })} />
         </div>
@@ -54,6 +61,7 @@ export const AccountDetail = (props: {
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-auto dshx:overscroll-contain dshx:pr-1">
         <AccountIdentitySection draft={draft} state={props.state} />
         <RuntimePathsSection draft={draft} state={props.state} />
+        {routedKind(draft.kind) ? (
         <NumberedSection
           actions={
             <Button
@@ -78,23 +86,30 @@ export const AccountDetail = (props: {
           </p>
           <ModelCuration account={draft} catalog={catalog?.models ?? []} onChange={next => setDraft({ ...draft, ...next })} />
         </NumberedSection>
+        ) : null}
         <QuotaSection state={props.state} />
         <SessionSection draft={draft} file={props.file} state={props.state} />
       </div>
 
       <footer className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:pt-3">
-        <Button disabled={!dirty || saving || draft.instanceId.trim().length === 0} onClick={() => void save(draft)} size="sm" type="button">
-          {saving ? 'Saving…' : 'Save changes'}
-        </Button>
-        <Button disabled={!dirty} onClick={() => setDraft(selected === null ? null : { ...selected })} size="sm" type="button" variant="outline">
-          Revert
-        </Button>
+        {props.state.saveMode === 'manual' ? (
+          <>
+            <Button disabled={!dirty || saving || problem !== null} onClick={() => void save(draft)} size="sm" type="button">
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+            <Button disabled={!dirty} onClick={props.state.revert} size="sm" type="button" variant="outline">
+              Revert
+            </Button>
+          </>
+        ) : (
+          <AutoSaveIndicator dirty={dirty} onRetry={props.state.retryAutoSave} problem={problem} renamePending={selected !== null && draft.instanceId !== selected.instanceId} status={props.state.autoSave} />
+        )}
         <Button onClick={props.onOpenUsageHistory} size="sm" type="button" variant="ghost">
           <ArrowUpRightIcon />
           Usage history
         </Button>
         <span className="dshx:min-w-40 dshx:flex-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-          {notice ?? (dirty ? 'Unsaved changes.' : 'Provider and account are separate entries in the model picker.')}
+          {notice ?? (props.state.saveMode === 'manual' && dirty ? (problem ?? 'Unsaved changes.') : 'Provider and account are separate entries in the model picker.')}
         </span>
         <Button
           className="dshx:text-destructive dshx:hover:text-destructive"

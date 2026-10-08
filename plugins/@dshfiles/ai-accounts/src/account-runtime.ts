@@ -3,12 +3,14 @@ import type { AiAccountsConfig } from './account-config.js'
 import type { createAccountPool } from './account-pool.js'
 import type { UsageHistoryScheduler } from './usage-recorder.js'
 import type { QuotaContinuationService } from './quota-continuation.js'
+import type { AccountsUsage } from './api.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
   scheduler?: UsageHistoryScheduler
   quotaContinuations?: QuotaContinuationService
   refreshRoutes?: () => Promise<void>
+  usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; invalidate(): void }
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

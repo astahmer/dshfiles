@@ -18,6 +18,8 @@ import { changedBankedResetSnapshots, forecastQuotaWindow } from './usage-histor
 import { QuotaMeter } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
+import { formatResetIn } from './usage-overview-model.js'
+import { usePreferences } from './use-preferences.js'
 
 const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90, 180, 365] as const
 const INTERVAL_OPTIONS = Array.from({ length: 60 }, (_, index) => index + 1)
@@ -27,16 +29,7 @@ const BANK_EVENT_LIMIT = 100
 const formatTimestamp = (value: number | null | undefined): string =>
   value === null || value === undefined || !Number.isFinite(value) ? 'Not reported' : new Date(value).toLocaleString()
 
-const formatReset = (value: number | null): string => {
-  if (value === null || !Number.isFinite(value)) return 'Reset time unavailable'
-  const remaining = value - Date.now()
-  if (remaining <= 0) return 'Resetting now'
-  const minutes = Math.floor(remaining / 60_000)
-  const days = Math.floor(minutes / (24 * 60))
-  return days > 0
-    ? `Resets in ${String(days)}d ${String(Math.floor(minutes / 60) % 24)}h`
-    : `Resets in ${String(Math.floor(minutes / 60))}h ${String(minutes % 60)}m`
-}
+const formatReset = (value: number | null): string => formatResetIn(value, Date.now())
 
 const formatForecast = (forecast: ReturnType<typeof forecastQuotaWindow>): string => {
   switch (forecast.status) {
@@ -151,6 +144,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
   const [savingSettings, setSavingSettings] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const selectedQueryRef = useRef({ selectedId, days })
+  const { usageRefreshMs } = usePreferences()
 
   useEffect(() => {
     selectedQueryRef.current = { selectedId, days }
@@ -158,7 +152,9 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
 
   useEffect(() => {
     let live = true
-    void Promise.all([accounts.read(), accounts.usage(), accounts.historySettings()])
+    // Usage and history settings fail independently of the account list (an
+    // older Host can lack either), so one failure does not blank the page.
+    void Promise.all([accounts.read(), accounts.usage().catch(() => null), accounts.historySettings().catch(() => null)])
       .then(([nextFile, nextUsage, nextSettings]) => {
         if (!live) return
         setFile(nextFile)
@@ -206,21 +202,33 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
     }
   }, [accounts, selectedId, days])
 
+  // Stored history grows on the Host's schedule, so reread it with the live
+  // quota rather than only when the selection changes.
   useEffect(() => {
     let live = true
-    const refresh = () =>
+    const refresh = () => {
       void accounts
         .usage()
         .then(next => {
           if (live) setUsage(next)
         })
         .catch(() => undefined)
-    const timer = setInterval(refresh, 60_000)
+      const query = selectedQueryRef.current
+      if (query.selectedId === '') return
+      void accounts
+        .history({ instanceId: query.selectedId, days: query.days })
+        .then(result => {
+          const latest = selectedQueryRef.current
+          if (live && latest.selectedId === query.selectedId && latest.days === query.days) setPoints(result.points)
+        })
+        .catch(() => undefined)
+    }
+    const timer = setInterval(refresh, usageRefreshMs)
     return () => {
       live = false
       clearInterval(timer)
     }
-  }, [accounts])
+  }, [accounts, usageRefreshMs])
 
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId), [file, selectedId])
   const current = usage?.cards.find(card => card.instanceId === selectedId)?.usage
@@ -247,7 +255,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
     try {
       const result = await accounts.collectUsage()
       const [nextUsage, nextSettings, nextHistory] = await Promise.all([
-        accounts.usage(),
+        accounts.refreshUsage().catch(() => accounts.usage()),
         accounts.historySettings(),
         query.selectedId === '' ? Promise.resolve({ points: [] as UsageHistoryPoint[] }) : accounts.history({ instanceId: query.selectedId, days: query.days }),
       ])

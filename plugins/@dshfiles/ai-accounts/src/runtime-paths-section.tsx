@@ -29,17 +29,37 @@ const PathField = (props: {
   </div>
 )
 
+const KEY_FIELD = {
+  codex: null,
+  claude: {
+    label: 'SETUP TOKEN',
+    hint: 'Optional variable holding a `claude setup-token` value, used for requests before the login.',
+    placeholder: 'CLAUDE_WORK_API_KEY',
+  },
+  'opencode-go': { label: 'API KEY', hint: 'Named, never valued: the key stays in the environment.', placeholder: 'OPENCODE_API_KEY' },
+  commandcode: { label: 'API KEY', hint: 'Named, never valued. Empty falls back to `cmd login`.', placeholder: 'COMMANDCODE_API_KEY' },
+  cursor: { label: 'ACCESS TOKEN', hint: 'Optional variable holding a Cursor token. Empty uses the `cursor-agent login`.', placeholder: 'CURSOR_WORK_API_KEY' },
+} satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
+
+const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
+
+const launchCommandFor = (draft: AccountDraft): string | null => {
+  if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return `CODEX_HOME=${shellQuote(draft.shadowHomePath)} codex`
+  if (draft.kind === 'claude' && draft.homePath.trim() !== '') return `CLAUDE_CONFIG_DIR=${shellQuote(draft.homePath)} claude`
+  return null
+}
+
 export const RuntimePathsSection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft }): JSX.Element => {
   const draft = props.draft
   const { setDraft, copy } = props.state
-  const launchCommand =
-    draft.kind === 'codex' && draft.shadowHomePath.trim() !== '' ? `CODEX_HOME='${draft.shadowHomePath.replaceAll("'", "'\\''")}' codex` : null
+  const launchCommand = launchCommandFor(draft)
+  const keyField = KEY_FIELD[draft.kind]
   return (
     <NumberedSection
       actions={
         launchCommand === null ? null : (
           <Button
-            onClick={() => void copy(launchCommand, 'Launch command copied. Run it in a terminal to open interactive Codex for this account.')}
+            onClick={() => void copy(launchCommand, 'Launch command copied. Run it in a terminal to open this account interactively.')}
             size="xs"
             type="button"
             variant="outline"
@@ -53,30 +73,52 @@ export const RuntimePathsSection = (props: { readonly state: AccountsPanelState;
       index="02"
       title="Runtime paths"
     >
-      <PathField
-        ariaLabel={draft.kind === 'codex' ? 'CODEX_HOME' : 'API key environment variable'}
-        hint={draft.kind === 'codex' ? 'Shared sessions, skills and plugins.' : 'Named, never valued: the key stays in the environment.'}
-        label={draft.kind === 'codex' ? 'CODEX_HOME' : 'API KEY'}
-        onChange={value => setDraft(draft.kind === 'codex' ? { ...draft, homePath: value } : { ...draft, apiKeyEnv: value })}
-        placeholder={draft.kind === 'codex' ? '~/.codex' : 'OPENCODE_API_KEY'}
-        value={draft.kind === 'codex' ? draft.homePath : draft.apiKeyEnv}
-      />
       {draft.kind === 'codex' ? (
+        <>
+          <PathField
+            ariaLabel="CODEX_HOME"
+            hint="Shared sessions, skills and plugins."
+            label="CODEX_HOME"
+            onChange={homePath => setDraft({ ...draft, homePath })}
+            placeholder="~/.codex"
+            value={draft.homePath}
+          />
+          <PathField
+            ariaLabel="Shadow home path"
+            hint="Per-account home keeping auth.json separate while sharing state."
+            label="Shadow home"
+            onChange={shadowHomePath => setDraft({ ...draft, shadowHomePath })}
+            placeholder="Leave empty for one under the shadow root"
+            value={draft.shadowHomePath}
+          />
+        </>
+      ) : null}
+      {draft.kind === 'claude' ? (
         <PathField
-          ariaLabel="Shadow home path"
-          hint="Per-account home keeping auth.json separate while sharing state."
-          label="Shadow home"
-          onChange={value => setDraft({ ...draft, shadowHomePath: value })}
-          placeholder="Leave empty for one under the shadow root"
-          value={draft.shadowHomePath}
+          ariaLabel="CLAUDE_CONFIG_DIR"
+          hint="Where Claude Code keeps this account's login. One directory per account."
+          label="CLAUDE_CONFIG_DIR"
+          onChange={homePath => setDraft({ ...draft, homePath })}
+          placeholder="~/.claude"
+          value={draft.homePath}
         />
       ) : null}
+      {keyField === null ? null : (
+        <PathField
+          ariaLabel={`${keyField.label} environment variable`}
+          hint={keyField.hint}
+          label={keyField.label}
+          onChange={apiKeyEnv => setDraft({ ...draft, apiKeyEnv })}
+          placeholder={keyField.placeholder}
+          value={draft.apiKeyEnv}
+        />
+      )}
       {draft.kind === 'commandcode' ? (
         <PathField
           ariaLabel="API base URL"
           hint="Leave empty for Command Code's own deployment."
           label="API base URL"
-          onChange={value => setDraft({ ...draft, apiBaseUrl: value })}
+          onChange={apiBaseUrl => setDraft({ ...draft, apiBaseUrl })}
           placeholder="https://api.commandcode.ai"
           value={draft.apiBaseUrl}
         />

@@ -1,11 +1,15 @@
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from './models-page-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { AccountsPanel } from './accounts-panel.js'
 import { QuotaFooter } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
+import { ModelsPageAccounts } from './models-page-accounts.js'
+import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 import './client.css'
 
@@ -34,6 +38,14 @@ export default defineClientPlugin({
     const UsageHistoryPanelView = (): JSX.Element => <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
     const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element | null => <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
     const EdgeUsageHostView = (): JSX.Element | null => <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} />
+    const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
+      <AiAccountsSettingsSection close={props.close} openAccounts={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+    )
+    // A settings page of its own, beside Models and Command Code in the nav.
+    api.ui.register({ name: 'settings.section', id: 'ai-accounts', order: 40, label, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SettingsSectionView)
+    // The Models page only draws rows for settings namespaces, which accounts
+    // are not, so they join it through its footer seat.
+    api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccounts)
     // The footer owns its whole surface, so quota lives there as a compact
     // disclosure: the number you want without opening the panel.
     api.ui.register(

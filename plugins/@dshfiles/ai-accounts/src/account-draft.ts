@@ -2,18 +2,30 @@ import { z } from 'zod'
 import { KIND_ACCENT, KIND_LABEL } from './account-labels.js'
 import { PROVIDER_ICONS, accountDraftSchema, type AccountDraft, type AccountKind, type AccountProfile } from './api.js'
 
-export { KIND_ACCENT, KIND_LABEL }
+export const ROUTE_SLUG_HINT = 'Starts with a letter; letters, digits, dash and underscore. Appears as the provider in the model picker.'
 
-export const ROUTE_SLUG_HINT = 'Letters, digits, dash and underscore. Appears as the provider in the model picker.'
-
-/** What the editor may submit: the wire draft, plus the slug rule the hint promises. */
-export const accountEditorSchema = accountDraftSchema.required().extend({
+/** What the editor may submit: the wire draft, plus the slug rule the route registry enforces. */
+const accountEditorSchema = accountDraftSchema.extend({
   instanceId: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9_-]{1,64}$/u, ROUTE_SLUG_HINT),
+    .regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u, ROUTE_SLUG_HINT),
   displayName: z.string().trim().min(1, 'Give the account a display name.').max(120),
 })
+
+/** The first problem that would make the Host refuse this draft, or null when it can be saved. */
+export const draftProblem = (draft: AccountDraft): string | null => {
+  const result = accountEditorSchema.safeParse(draft)
+  return result.success ? null : (result.error.issues[0]?.message ?? 'This account cannot be saved yet.')
+}
+
+const DEFAULT_HOME = {
+  codex: '~/.codex',
+  claude: '~/.claude',
+  'opencode-go': '',
+  commandcode: '',
+  cursor: '',
+} satisfies Record<AccountKind, string>
 
 /** The authored half of a profile; identity and health are observed, never sent back. */
 export const toDraft = (profile: AccountProfile): AccountDraft => ({
@@ -85,7 +97,7 @@ export const newAccountDraft = (input: { readonly kind: AccountKind; readonly ex
     kind: input.kind,
     displayName,
     enabled: true,
-    homePath: '~/.codex',
+    homePath: DEFAULT_HOME[input.kind],
     shadowHomePath: '',
     apiKeyEnv: '',
     apiBaseUrl: '',
