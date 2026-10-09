@@ -541,6 +541,8 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       const inputs = log.events
         .slice(log.inheritedEventCount)
         .flatMap(event => capture.toMemoryEvent({ session: { id: header.id, header: log.session }, event, projectId, policy: policy() }) ?? [])
+        // Streams are append-only, so backfilled history lands after newer live events; the flag (and createdAt) tells them apart.
+        .map(input => ({ ...input, meta: { ...input.meta, backfilled: true } }))
       for (let index = 0; index < inputs.length; index += 500) inserted += (await engine.append(inputs.slice(index, index + 500))).inserted
       progress.sessions[header.id] = lastSeq
       await writeFile(progressPath, JSON.stringify(progress), { mode: 0o600 })

@@ -361,5 +361,13 @@ describe('backfill', () => {
     expect(await runtime.backfill(10)).toContain('Backfilled 0 session(s)')
     expect(storedEvents(path).map(event => event.text)).toEqual(['Old fact: the cache TTL is 900 seconds', 'TTL 900 noted.', 'Older fact: logs rotate daily'])
     await runtime.stop()
+    const reader = openSqliteMemory({ path })
+    const metas = reader.database
+      .prepare('SELECT meta FROM events ORDER BY id')
+      .all()
+      .map(row => JSON.parse(String(row['meta'])))
+    reader.close()
+    expect(metas.map(meta => meta.backfilled)).toEqual([true, true, true])
+    expect(metas[0].source).toBe('user')
   })
 })
