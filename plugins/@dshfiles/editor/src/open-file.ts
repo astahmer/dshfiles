@@ -49,3 +49,33 @@ export const resolveRequestedPath = (request: OpenFileRequest, roots: readonly s
   }
   return path
 }
+
+const FILE_ADDRESS_PREFIX = 'dsh-resource://file/'
+
+/** Files the Host document preview renders better than a text editor or our binary fallback. */
+const HOST_PREVIEW_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'pages', 'numbers', 'key', 'epub'])
+
+/**
+ * A `dsh-resource://file/session/<sessionId>/<path>` address (what thread tool-call links and composer references
+ * open), decoded per segment; query and fragment ignored. `absolute/…` addresses carry no Session and are left alone.
+ */
+export const parseSessionFileAddress = (address: string): { readonly sessionId: string; readonly path: string } | undefined => {
+  if (!address.startsWith(FILE_ADDRESS_PREFIX)) return undefined
+  const end = address.search(/[?#]/)
+  const [scope, id, ...segments] = address.slice(FILE_ADDRESS_PREFIX.length, end === -1 ? undefined : end).split('/')
+  if (scope !== 'session' || id === undefined || id === '' || segments.length === 0) return undefined
+  try {
+    const path = segments.map(segment => decodeURIComponent(segment)).join('/')
+    return path === '' ? undefined : { sessionId: decodeURIComponent(id), path }
+  } catch {
+    return undefined
+  }
+}
+
+export const editorClaimsFileAddress = (address: string): boolean => {
+  const parsed = parseSessionFileAddress(address)
+  if (parsed === undefined || parsed.path.endsWith('/')) return false
+  return !HOST_PREVIEW_EXTENSIONS.has(parsed.path.split('.').at(-1)?.toLowerCase() ?? '')
+}
+
+export const fileLinkParamsSchema = z.object({ line: z.number().int().positive().optional() }).optional()

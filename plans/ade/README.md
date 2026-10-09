@@ -233,12 +233,16 @@ Acceptance: 5 MB file opens (ranged) without freezing; binary/image falls back t
 
 ### [~] P2.5 Open-from-anywhere (S) — deps: P2.4
 
-`dshfiles:open-file` window event (`{ path, line?, cwd? }`, cancelable); wired from jujutsu file rows. `/diff`, thread
-tool-call paths and the palette are still to wire.
+`dshfiles:open-file` window event (`{ path, line?, cwd? }`, cancelable); wired from jujutsu file rows and the ⌘P
+palette. Left: the Host `/diff` review tab header (only plugin toolbar buttons there, no per-file seam).
 
 - [x] jujutsu: "Open in editor" on every changed-file list (revision files, Source Control, composer bar) via row
   context menu, ⌘/Ctrl-click on the path and the Source Control row action; full-diff dialogs get a per-file header
   "Open" button (`PatchView.renderHeaderMetadata`) and close once the editor took the request.
+- [x] thread tool-call paths and composer file references: the Host opens them as `dsh-resource://file/session/…`
+  in the right sidebar; the editor registers an `extension`-band tab type for those addresses that hands the file
+  (and `line`) to the editor and closes itself. Documents the Host preview renders better (pdf, office, epub) stay
+  with it; setting `openFileLinks` (default on) turns the claim off.
 
 A plugin-ui event/service `openFile({ sessionId, path, line? })`: from `/diff` file header, jujutsu file rows,
 search results, thread tool-call file paths, palette (P3).

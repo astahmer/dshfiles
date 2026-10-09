@@ -10,6 +10,9 @@ export const editorSettings = defineSettings({
     ])
       .default('workbench')
       .description('Where files opened from other panels show up.'),
+    openFileLinks: Schema.boolean()
+      .default(true)
+      .description('Open file links from threads (tool calls, references) in the editor instead of the read-only preview.'),
   }),
   applies: 'live',
 })

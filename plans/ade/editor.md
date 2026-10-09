@@ -68,7 +68,8 @@ over the Host's 32 MB complete-read cap fall back to `stat` for the size.
 - Right panel and workbench share the per-session active tab; each surface keeps its own Monaco view state.
 - Workbench detection is heuristic (another panel id than ours registered); without the workbench plugin the
   setting falls back to the right panel.
-- No TS/CSS/HTML language services, no LSP (decision 5 upgrade path), no `/diff` header or thread tool-call
-  `openFile` wiring yet (only jujutsu file rows).
-- Host `file` resources (`dsh-resource://file/…`) are not claimed by the editor tab; `sidebarRightTabs` supports
-  `patterns`/`canOpen`, which would route Host file opens here.
+- No TS/CSS/HTML language services, no LSP (decision 5 upgrade path), no Host `/diff` header wiring.
+- File links: `@dshfiles/editor/file-link` claims `dsh-resource://file/session/**` (`extension` band, `canOpen` drops
+  pdf/office/epub and `absolute/…`). Its body is a redirect: open in the editor, then close the sidebar tab, so a
+  persisted layout holding one replays the open once on reload. The `openFileLinks` setting is mirrored in
+  localStorage for the synchronous `canOpen`, and only refreshes while an editor surface is mounted.

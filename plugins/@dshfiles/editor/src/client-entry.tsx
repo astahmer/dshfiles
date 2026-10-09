@@ -1,7 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
@@ -13,17 +13,29 @@ import { z } from 'zod'
 import './client.css'
 import { createEditorStore } from './editor-store.js'
 import { EditorPanel } from './editor-panel.js'
-import { GO_TO_LINE_EVENT, goToLineRequestSchema, OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
+import {
+  editorClaimsFileAddress,
+  fileLinkParamsSchema,
+  GO_TO_LINE_EVENT,
+  goToLineRequestSchema,
+  OPEN_FILE_EVENT,
+  openFileRequestSchema,
+  parseSessionFileAddress,
+} from './open-file.js'
 import { editorSettings } from './settings.js'
 import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
 
 const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'
+const FILE_LINK_ID = '@dshfiles/editor/file-link'
+const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 
 // Open requests arrive while no editor surface is mounted, so the setting is mirrored where the event handler reads it.
 const placement = createStoredValue({ key: 'dshfiles-editor:placement', schema: z.enum(['workbench', 'right-panel']), fallback: 'workbench' })
+// Read by the synchronous `canOpen` of the file-link claim, so it is mirrored the same way.
+const openFileLinks = createStoredValue({ key: 'dshfiles-editor:open-file-links', schema: z.boolean(), fallback: true })
 
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.
 const loadEngine = () => import('./monaco-engine.js').then(module => module.monacoEngine)
@@ -85,10 +97,15 @@ export default defineClient({
 
     const SessionEditorPanel = (): JSX.Element => {
       const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
-      const configured = useSettings(editorSettings).value?.editorPlacement
+      const settings = useSettings(editorSettings).value
+      const configured = settings?.editorPlacement
+      const claimLinks = settings?.openFileLinks
       useEffect(() => {
         if (configured !== undefined) placement.set(configured)
       }, [configured])
+      useEffect(() => {
+        if (claimLinks !== undefined) openFileLinks.set(claimLinks)
+      }, [claimLinks])
       return <EditorPanel loadEngine={loadEngine} remote={ctx.remote} sessionId={sessionId} store={store} />
     }
     const Panel = decorate(() => (
@@ -121,6 +138,42 @@ export default defineClient({
       if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
       else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
     }
+    // Thread tool-call paths and composer references open `dsh-resource://file/session/…` in the right sidebar. This
+    // type outranks the Host text preview (`extension` band) for those addresses, hands the file to the editor and
+    // closes itself, so the link lands in the one editor surface instead of a read-only preview tab.
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: FILE_LINK_ID,
+          kind: FILE_LINK_KIND,
+          patterns: ['dsh-resource://file/**'],
+          priority: 'extension',
+          canOpen: address => openFileLinks.get() && editorClaimsFileAddress(address),
+          title: address => parseSessionFileAddress(address)?.path.split('/').at(-1) ?? 'File',
+        }),
+      'dshfiles-editor: claim file links',
+    )
+    const FileLinkRedirect = (props: { readonly useTabInfo: UseSidebarRightTabInfo }): null => {
+      const { tab } = props.useTabInfo()
+      const address = tab.navigation.address
+      const revision = tab.navigation.revision
+      const params = tab.navigation.params
+      const actions = tab.actions
+      useEffect(() => {
+        const parsed = parseSessionFileAddress(address)
+        const line = fileLinkParamsSchema.safeParse(params).data?.line
+        if (parsed !== undefined) {
+          // SAFETY: the id comes from a Host-built address for this Client's Sessions.
+          const sessionId = parsed.sessionId as SessionId
+          store.open(sessionId, line === undefined ? { path: parsed.path } : { path: parsed.path, line })
+          showEditor()
+        }
+        actions.close()
+      }, [address, revision, params, actions])
+      return null
+    }
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: FILE_LINK_ID }, FileLinkRedirect))
+
     ctx.effect(() => {
       const onOpenFile = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
