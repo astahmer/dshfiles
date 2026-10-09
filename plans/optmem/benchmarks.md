@@ -213,3 +213,30 @@ True no-OptMem baseline (stock core, `enabled: false` under `dshfiles-optmem.con
   - full: 6/6 correct; t23 memory_search, B1 memory_search + memory_context found `KV_TOO_LARGE`, B2 from the view.
   - baseline: t21, t22, t24 correct from raw history; t23 could not cite (tool reports OptMem disabled); B1/B2 failed
     ("persistent memory is unavailable") — cross-session recall exists only with OptMem.
+
+## Re-run after Stage 5 hardening (2026-10-09)
+
+Same command and dataset, after the compact view (Stage 3), full mode (Stage 4) and the S5 fixes.
+Machine was busy (49 % CPU for the bench process, other DSH hosts running), so wall-clock rows are
+noisier than the first run.
+
+| metric | 10,000 | 100,000 |
+|---|---|---|
+| append (store, 1 event/tx) | 4,840 ev/s | 5,972 ev/s |
+| build tree+views from scratch | 5.5 s | 97.5 s |
+| summarizer calls / clips | 13,583 / 0 | 139,172 / 0 |
+| merge-batch line merges | 29,606 | 396,463 |
+| steady append+drain p50 / p95 | 4.24 ms / 13.96 ms | 5.41 ms / 19.92 ms |
+| search p50 / p95 | 3.02 ms / 5.51 ms | 46.14 ms / 292.14 ms |
+| zoom p50 / p95 | 0.04 ms / 0.29 ms | 0.03 ms / 0.31 ms |
+| context p50 / p95 | 0.04 ms / 0.19 ms | 0.26 ms / 0.95 ms |
+| snapshot p50 / p95 | 0.82 ms / 1.11 ms | 1.15 ms / 2.74 ms |
+| project view bytes (max) / lines | 124,587 / 400 | 124,408 / 395 |
+| database file | 29.6 MB | 247.6 MB |
+| process RSS | 184.3 MB | 101.1 MB |
+
+- Merge-batch line merges roughly double (×3 at 10k): every stream now maintains a `compact` view next
+  to `main`, and the compact view (8 KB upper bound) merges far more often. Summarizer calls are unchanged.
+- Build-from-scratch and append throughput are 3–4× slower than the first run; the view bytes, file size
+  and call counts match, so the gap is mostly load on the machine plus the second view per stream. Re-run
+  on an idle machine before treating it as a regression.
