@@ -44,7 +44,8 @@ const unavailable = (reason: string): NativeProviders => ({ available: false, li
 export const readNativeProviders = async (ctx: Context): Promise<NativeProviders> => {
   const patchPath = ctx.get('profileContext')?.patchPath
   const loader = ctx.get('loader')
-  if (patchPath === undefined || loader === undefined) return unavailable('This Host runs without a profile patch, so native providers cannot be switched here.')
+  if (patchPath === undefined || loader === undefined)
+    return unavailable('This Host runs without a profile patch, so native providers cannot be switched here.')
   const managed = managedDisabledRows(await readPatch(patchPath))
   const rows = new Map([...loader.entries()].map(entry => [entry.options.id, entry] as const))
 

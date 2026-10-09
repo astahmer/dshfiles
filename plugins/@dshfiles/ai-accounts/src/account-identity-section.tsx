@@ -8,7 +8,6 @@ import { PROVIDER_ICONS, type AccountDraft } from './api.js'
 import { LabelledControl, NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
-
 export const AccountIdentitySection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft }): JSX.Element => {
   const draft = props.draft
   const { accounts, selected, selectedId, setDraft, setNotice, load, commitRename, saveMode } = props.state

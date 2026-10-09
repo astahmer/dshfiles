@@ -153,7 +153,9 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
       identity: null,
       plan: null,
       loginHint:
-        draft.apiKeyEnv.trim().length > 0 ? `Export ${draft.apiKeyEnv.trim()} before using this account.` : 'Set an API key environment variable for this account.',
+        draft.apiKeyEnv.trim().length > 0
+          ? `Export ${draft.apiKeyEnv.trim()} before using this account.`
+          : 'Set an API key environment variable for this account.',
       detail: null,
     })
   }

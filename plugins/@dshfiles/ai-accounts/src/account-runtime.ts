@@ -10,6 +10,8 @@ interface AccountRuntime {
   scheduler?: UsageHistoryScheduler
   quotaContinuations?: QuotaContinuationService
   refreshRoutes?: () => Promise<void>
+  /** Accounts the last route build left out (e.g. a refused Codex home), each `instanceId: reason`. */
+  rejectedRoutes?: readonly string[]
   refreshModelCatalog?: (instanceId: string) => Promise<void>
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; invalidate(): void }
 }

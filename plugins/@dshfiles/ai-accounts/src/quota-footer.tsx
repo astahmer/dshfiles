@@ -39,7 +39,9 @@ export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsag
         >
           <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
           {props.wide ? <span>Usage</span> : null}
-          {tightest === undefined ? null : <span className={cn('dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{String(Math.round(tightest))}%</span>}
+          {tightest === undefined ? null : (
+            <span className={cn('dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{String(Math.round(tightest))}%</span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="dshx-root dshx:w-[min(400px,calc(100vw-16px))] dshx:p-0" collisionPadding={8} side="top" sideOffset={8}>

@@ -286,6 +286,7 @@ export default definePlugin({
       const nextConfig = configFromAccountsFile(sourceFile)
       const { routes: nextRoutes, rejected } = buildRoutes(nextConfig)
       for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
+      runtime.rejectedRoutes = rejected
       const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
       const providers = enabled.map(([id]) => id)
       const directoryEntries = enabled.map(([id, route]) => ({

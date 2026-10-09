@@ -8,7 +8,7 @@ export const UsageCardView = (props: { readonly usage: UsageCard | undefined }):
   if (usage.status !== 'ok' || usage.windows.length === 0) {
     return (
       <p className="dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:text-xs dshx:text-muted-foreground">
-        {usage.message ?? (usage.status === 'unauthenticated' ? 'Sign in to read this account\'s quota.' : 'This provider reported no quota windows.')}
+        {usage.message ?? (usage.status === 'unauthenticated' ? "Sign in to read this account's quota." : 'This provider reported no quota windows.')}
       </p>
     )
   }

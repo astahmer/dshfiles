@@ -20,7 +20,6 @@ import { tightestRemaining } from './usage-overview-model.js'
 
 export const EDGE_USAGE_STORAGE_KEY = 'ai-accounts-edge-usage-position'
 
-
 type Edge = 'left' | 'right' | 'top' | 'bottom'
 
 interface EdgePosition {

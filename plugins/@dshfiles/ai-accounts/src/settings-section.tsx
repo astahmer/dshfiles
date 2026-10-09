@@ -209,14 +209,21 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <Group description="Where current quota is shown." title="Usage surfaces">
         <Row hint="Compact usage button in the sidebar footer; its popover lists every account." label="Sidebar footer button">
-          {id => <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />}
+          {id => (
+            <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
+          )}
         </Row>
         <Row hint="Draggable tab pinned to a window edge." label="Edge overlay">
           {id => <Switch checked={preferences.edgeWidget} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('edgeWidget', value))} />}
         </Row>
         <Row hint="Lists and edits these accounts at the bottom of Settings › Models." label="Accounts on the Models page">
           {id => (
-            <Switch checked={preferences.modelsPageAccounts} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('modelsPageAccounts', value))} />
+            <Switch
+              checked={preferences.modelsPageAccounts}
+              disabled={readOnly}
+              id={id}
+              onCheckedChange={value => write(settings.set('modelsPageAccounts', value))}
+            />
           )}
         </Row>
         <Row hint="How often open surfaces ask for fresh quota. Surfaces share one Host reading." label="Refresh usage every">

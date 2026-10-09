@@ -9,15 +9,7 @@ import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
-import {
-  bankedExpiries,
-  formatAge,
-  formatResetIn,
-  overviewCards,
-  overviewProviders,
-  type OverviewCard,
-  type ProviderTab,
-} from './usage-overview-model.js'
+import { bankedExpiries, formatAge, formatResetIn, overviewCards, overviewProviders, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
 const useNow = (): number => {
   const [now, setNow] = useState(Date.now)
@@ -82,7 +74,9 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
               <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
-                <span title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}>{formatResetIn(window.resetsAt, props.now)}</span>
+                <span title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}>
+                  {formatResetIn(window.resetsAt, props.now)}
+                </span>
                 <span title="Age of this usage snapshot">Age {formatAge(props.readAt, props.now)}</span>
               </div>
             </div>
@@ -90,7 +84,8 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
         })
       ) : (
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          {usage.message ?? (usage.status === 'unauthenticated' ? 'Not signed in.' : usage.status === 'ok' ? 'No quota windows reported.' : 'Usage is not available.')}
+          {usage.message ??
+            (usage.status === 'unauthenticated' ? 'Not signed in.' : usage.status === 'ok' ? 'No quota windows reported.' : 'Usage is not available.')}
         </p>
       )}
       {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
@@ -160,7 +155,9 @@ export const UsageOverview = (props: {
         ) : cards.length === 0 ? (
           <p className="dshx:p-2 dshx:text-xs dshx:text-muted-foreground">No enabled account for this provider.</p>
         ) : (
-          cards.map(card => <AccountUsageCard card={card} hostName={props.usage?.hostName ?? ''} key={card.instanceId} now={now} readAt={props.usage?.readAt ?? now} />)
+          cards.map(card => (
+            <AccountUsageCard card={card} hostName={props.usage?.hostName ?? ''} key={card.instanceId} now={now} readAt={props.usage?.readAt ?? now} />
+          ))
         )}
       </div>
     </section>

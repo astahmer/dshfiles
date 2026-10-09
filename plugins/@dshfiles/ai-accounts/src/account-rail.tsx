@@ -44,7 +44,9 @@ export const AccountRail = (props: { readonly state: AccountsPanelState; readonl
       />
     ))}
     <section className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pt-3">
-      <h2 className="dshx:px-2 dshx:pb-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">Native providers</h2>
+      <h2 className="dshx:px-2 dshx:pb-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">
+        Native providers
+      </h2>
       <NativeProvidersList compact />
     </section>
     <p className="dshx:mt-auto dshx:px-2 dshx:pt-3.5 dshx:text-xs dshx:text-muted-foreground">

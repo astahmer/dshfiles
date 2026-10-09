@@ -74,7 +74,9 @@ const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:sm:col-span-2">
         {preferences.saveMode === 'manual' ? (
           <>
-            <Button disabled={!dirty || problem !== null || status.kind === 'saving'} onClick={() => {
+            <Button
+              disabled={!dirty || problem !== null || status.kind === 'saving'}
+              onClick={() => {
                 saver.schedule(draft)
                 void saver.flush().catch(() => undefined)
               }}

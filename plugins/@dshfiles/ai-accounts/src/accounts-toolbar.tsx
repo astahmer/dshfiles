@@ -27,12 +27,16 @@ export const AccountsToolbar = (props: { readonly state: AccountsPanelState; rea
     <OverlaySwitch
       checked={props.state.preferences.edgeWidget}
       label="Edge overlay"
-      onChange={edgeWidget => void props.state.preferences.settings.set('edgeWidget', edgeWidget).catch(() => props.state.setNotice('Settings are read-only here.'))}
+      onChange={edgeWidget =>
+        void props.state.preferences.settings.set('edgeWidget', edgeWidget).catch(() => props.state.setNotice('Settings are read-only here.'))
+      }
     />
     <OverlaySwitch
       checked={props.state.preferences.footerButton}
       label="Sidebar foot"
-      onChange={footerButton => void props.state.preferences.settings.set('footerButton', footerButton).catch(() => props.state.setNotice('Settings are read-only here.'))}
+      onChange={footerButton =>
+        void props.state.preferences.settings.set('footerButton', footerButton).catch(() => props.state.setNotice('Settings are read-only here.'))
+      }
     />
     <span className="dshx:flex dshx:items-center dshx:gap-2">
       <span>Spreading requests</span>

@@ -21,6 +21,7 @@ export const aiAccountsTool = defineTool({
       properties: {
         distribution: { type: 'string' },
         cooldownMs: { type: 'number' },
+        skipped: { type: 'array', items: { type: 'string' } },
         accounts: {
           type: 'array',
           items: {
@@ -55,6 +56,7 @@ export const aiAccountsTool = defineTool({
             `  pool: ${account.state}`,
           ].join('\n'),
         ),
+        ...((value.skipped ?? []).length === 0 ? [] : ['', 'Skipped (no route registered):', ...(value.skipped ?? []).map(reason => `  ${reason}`)]),
       ]
       return [{ type: 'text', text: lines.join('\n') }]
     },
@@ -63,10 +65,12 @@ export const aiAccountsTool = defineTool({
     const ctx = exec.agent?.ctx
     if (ctx === undefined) throw new Error('AI Accounts requires an active agent context.')
     const { accountsSnapshot } = await import('./host.js')
+    const { accountRuntime } = await import('./account-runtime.js')
     const snapshot = await accountsSnapshot(ctx)
     return {
       distribution: snapshot.distribution,
       cooldownMs: snapshot.cooldownMs,
+      skipped: [...(accountRuntime(ctx)?.rejectedRoutes ?? [])],
       accounts: snapshot.accounts.map(account => ({
         route: account.instanceId,
         kind: account.kind,

@@ -24,7 +24,13 @@ export const managedDisabledRows = (text: string): Map<string, string> => {
     if (!line.startsWith(MARKER)) return
     const id = /^- id: (\S+)$/.exec(lines[index + 1] ?? '')?.[1]
     if (id === undefined || lines[index + 2] !== '  disabled: true') return
-    rows.set(id, line.slice(MARKER.length).replace(/^ — /, '').trim() || id)
+    rows.set(
+      id,
+      line
+        .slice(MARKER.length)
+        .replace(/^ — /, '')
+        .trim() || id,
+    )
   })
   return rows
 }

@@ -32,7 +32,9 @@ describe('native provider switch in the profile patch', () => {
   })
 
   it('handles an empty or missing patch and refuses shapes it cannot append to safely', () => {
-    expect(withRowDisabled('', { id: 'llm-deepseek', label: 'DeepSeek' })).toBe('# ai-accounts: native provider switch — DeepSeek\n- id: llm-deepseek\n  disabled: true\n')
+    expect(withRowDisabled('', { id: 'llm-deepseek', label: 'DeepSeek' })).toBe(
+      '# ai-accounts: native provider switch — DeepSeek\n- id: llm-deepseek\n  disabled: true\n',
+    )
     expect(withRowDisabled('[]\n', { id: 'llm-deepseek', label: '' })).toContain('- id: llm-deepseek\n')
     expect(() => withRowDisabled('[{ id: x }]\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
     expect(() => withRowDisabled('root:\n  - id: x\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
