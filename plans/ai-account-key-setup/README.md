@@ -11,7 +11,7 @@ Objective: make missing keyed-provider credentials configurable in AI Accounts w
 | Correct CommandCode model id after live-catalog check | completed | Public catalog advertises `gpt-6-luna`; runtime curation no longer stores `openai/gpt-6-luna` |
 | Add focused tests and document seed/runtime/secret-store behavior | completed | Bridge, resolver, visibility, and catalog tests; package suites pass |
 | Build and verify in an isolated profile | completed | UI-plugin builds and Host import checks passed; scratch profile boot reported no activation failures; live DSH was not restarted |
-| Review security boundaries and split owned changes with jj | in progress | Host keeps reveal→credential write; Client gets metadata only; path/consent trust relies on DSH's authenticated local-client boundary |
+| Review security boundaries and split owned changes with jj | in progress | Source revision created; mixed `plugins/pnpm-lock.yaml` remains in shared `@` because it contains other agents' changes |
 
 ## Safety invariants
 
@@ -23,4 +23,4 @@ Objective: make missing keyed-provider credentials configurable in AI Accounts w
 - DSH credentials are the non-versioned, write-only secret store fallback; no new raw-secret JSON file is needed.
 - Never modify `.secret.json` or restart the live DSH instance on `127.0.0.1:3080`.
 
-Resume here: import-check the rebuilt AI Accounts Host after the CommandCode correction, verify in an isolated profile without touching live DSH, then split the owned source changes with jj.
+Resume here: split only the AI Accounts importer hunk from the mixed lockfile once the other owners' dependency changes are coordinated; then the user can restart Host plugins and import OpenCode Go Alex's key.
