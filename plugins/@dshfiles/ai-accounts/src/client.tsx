@@ -35,7 +35,7 @@ export default defineClientPlugin({
   id: 'llm-ai-accounts',
   name: '@dshfiles/ai-accounts',
   uses: ['ui'],
-  inject: ['layout', 'locale', 'remote'],
+  inject: ['layout', 'locale', 'remote', 'remote.credentials'],
   locales: [aiAccountsLocale],
   // Declare the services used through the scoped context. The UI capability
   // supplies the native slot adapter and decorates each registered component.
