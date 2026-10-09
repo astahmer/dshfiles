@@ -48,8 +48,9 @@ describe('defineConfig', () => {
       defineConfig({
         build: {
           sourcemap: true,
-          // @ts-expect-error nested excess build fields are rejected
           minify: true,
+          // @ts-expect-error nested excess build fields are rejected
+          target: 'es2022',
         },
       })
     }
