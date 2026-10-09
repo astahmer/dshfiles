@@ -8,21 +8,14 @@ Design: [design.md](design.md).
 | Stage | State | Notes |
 |---|---|---|
 | 1 Research + design | done | Gist: no licence → clean-room only. DSH: no per-request message-replace hook; compat mode needs no fork; full mode = fork waterfall `agent/request-messages` (preferred) or durable `agent/pre-step` replace |
-| 2 Core engine | in progress | optmem-core + optmem-sqlite per design §3–4, §8 |
+| 2 Core engine | done | `@dshfiles/optmem-core` (zero deps) + `@dshfiles/optmem-sqlite` (`node:sqlite`, FTS5); 53 tests green on Node 22.23.3; 100k-event bench in [benchmarks.md](benchmarks.md) |
 | 3 DSH compatibility adapter | not started | |
 | 4 Full mode | not started | |
 | 5 Evaluation + hardening | not started | |
 
 ## Resume here
-1. Write `design.md` from the two research files + task.md: data model (events with global append order per
-   stream; contiguous ids per memory stream — one stream per scope: global / project / conversation, events stored
-   once and referenced by stream position), SQLite schema (`node:sqlite`, FTS5, migrations, projection cursors for
-   tree/summaries and FTS separately), core interfaces, tree/merge rule from research-optmem.md (due =
-   (T-last)/2^l, merge batch when view > 128 KB down to ≤ 64 KB, 512 B summaries, view persisted byte-for-byte),
-   per-mode lifecycle, HarnessCapabilities, package layout (`optmem/packages/{core,storage-sqlite,adapter-dsh,evals}`
-   as a pnpm workspace inside dshfiles — check how plugins/ workspace is wired before choosing), risks.
-2. Ask the user to approve the design, then Stage 2 (core + storage tests, runnable without DSH).
-3. A leftover background research agent may still finish and overwrite `research-dsh.md`; diff and keep the richer one.
+1. Stage 3: DSH compatibility adapter `plugins/@dshfiles/optmem` (design §6): capture via `session/event`, the four
+   memory tools over `createMemoryEngine`, `definePromptContext` injection, a summarizer over `ctx.llm`. Verify in `probe`.
 
 ## Rules
 - dshfiles is a jj repo; one described revision per chunk; never restart the live DSH (`web`); verify in `probe`.
