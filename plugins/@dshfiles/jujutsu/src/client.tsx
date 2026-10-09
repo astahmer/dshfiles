@@ -78,6 +78,7 @@ import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
+import { openInEditor } from './open-in-editor.js'
 import { revisionActionMachine } from './revision-action-machine.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
@@ -644,6 +645,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               className="dshx:ml-1 dshx:border-l dshx:pl-1"
               files={visibleFiles}
               onOpen={filePath => openFullDiff(revision, filePath)}
+              onOpenInEditor={filePath => openInEditor({ path: filePath, cwd: repositoryRoot })}
               onSelectionChange={paths => {
                 const selected = new Set(paths)
                 updateFileReviews(
@@ -1119,6 +1121,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             focusPath={fullDiff.focusPath}
             layout={diffLayout}
             onClose={() => setFullDiff(null)}
+            onOpenInEditor={path => {
+              if (state !== undefined && openInEditor({ path, cwd: state.root })) setFullDiff(null)
+            }}
             patch={fullDiffQuery.data?.patch}
             title={fullDiff.title}
             truncated={fullDiffQuery.data?.truncated ?? false}

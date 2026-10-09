@@ -31,6 +31,7 @@ import { describeDraftChanged } from './graph.js'
 import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { sourceControlGroups } from './source-control.js'
+import { openInEditor } from './open-in-editor.js'
 
 interface SourceControlViewProps {
   readonly repoId: string
@@ -314,13 +315,8 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                           </IconAction>
                           {file.status !== 'D' && (
                             <IconAction
-                              label="Open file"
-                              onClick={() =>
-                                // Handled by @dshfiles/editor when installed; see its open-file.ts contract.
-                                window.dispatchEvent(
-                                  new CustomEvent('dshfiles:open-file', { detail: { path: file.path, cwd: props.repositoryRoot }, cancelable: true }),
-                                )
-                              }
+                              label="Open in editor"
+                              onClick={() => openInEditor({ path: file.path, cwd: props.repositoryRoot })}
                             >
                               <FilePenLineIcon />
                             </IconAction>
@@ -358,6 +354,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                       )}
                       files={files}
                       onOpen={path => props.onOpenDiff(revision, path)}
+                      onOpenInEditor={path => openInEditor({ path, cwd: props.repositoryRoot })}
                       showCounts={false}
                       statusAtEnd
                       view={props.fileView}

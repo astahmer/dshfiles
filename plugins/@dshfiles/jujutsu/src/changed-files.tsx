@@ -1,4 +1,5 @@
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -67,6 +68,8 @@ interface ChangedFilesProps {
   readonly selectionLabel?: string
   readonly onSelectionChange?: (paths: readonly string[]) => void
   readonly onOpen: (path: string) => void
+  /** Adds "Open in editor" to the row context menu and to ⌘/Ctrl-click on the path; deleted files are skipped. */
+  readonly onOpenInEditor?: (path: string) => void
   readonly actions?: (file: FileStat) => ReactNode
   readonly className?: string
 }
@@ -90,7 +93,8 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
 
   const fileRow = (file: FileStat, depth: number): JSX.Element => {
     const parts = splitFilePath(file.path)
-    return (
+    const openInEditor = file.status === 'D' ? undefined : props.onOpenInEditor
+    const row = (
       <li
         className="dshx:group/file dshx:flex dshx:h-6 dshx:items-center dshx:gap-1.5 dshx:rounded-sm dshx:pr-1 dshx:hover:bg-accent"
         key={file.path}
@@ -106,8 +110,11 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
         )}
         <button
           className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-          onClick={() => props.onOpen(file.path)}
-          title={`${file.path} · open diff`}
+          onClick={event => {
+            if (openInEditor !== undefined && (event.metaKey || event.ctrlKey)) openInEditor(file.path)
+            else props.onOpen(file.path)
+          }}
+          title={openInEditor === undefined ? `${file.path} · open diff` : `${file.path} · open diff (⌘/Ctrl-click: open in editor)`}
           type="button"
         >
           {props.statusAtEnd !== true && <FileStatusLetter status={file.status} />}
@@ -126,6 +133,21 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
         )}
         {props.statusAtEnd === true && <FileStatusLetter status={file.status} />}
       </li>
+    )
+    if (props.onOpenInEditor === undefined) return row
+    return (
+      <ContextMenu key={file.path}>
+        <ContextMenuTrigger asChild onContextMenu={event => event.stopPropagation()}>
+          {row}
+        </ContextMenuTrigger>
+        <ContextMenuContent className="dshx-root dshx:w-52">
+          <ContextMenuLabel className="dshx:truncate dshx:font-mono dshx:text-xs">{file.path}</ContextMenuLabel>
+          <ContextMenuItem onSelect={() => props.onOpen(file.path)}>Open diff</ContextMenuItem>
+          <ContextMenuItem disabled={openInEditor === undefined} onSelect={() => openInEditor?.(file.path)}>
+            Open in editor
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     )
   }
 

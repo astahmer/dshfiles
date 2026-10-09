@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { parsePatchFiles, PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
+import { FilePenLineIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo } from 'react'
 
 interface FullDiffDialogProps {
@@ -13,6 +14,7 @@ interface FullDiffDialogProps {
   readonly focusPath: string | null
   readonly layout: PatchLayout
   readonly onClose: () => void
+  readonly onOpenInEditor: (path: string) => void
 }
 
 /** Every changed file of one revision, virtualized and syntax-highlighted. */
@@ -55,7 +57,20 @@ export const FullDiffDialog = (props: FullDiffDialogProps): JSX.Element => {
           {props.patch !== undefined && files.length === 0 && (
             <p className="dshx:p-4 dshx:text-xs dshx:text-muted-foreground">This revision has no changed files.</p>
           )}
-          <PatchView className="dshx:flex-1" files={files} focusPath={props.focusPath} layout={props.layout} />
+          <PatchView
+            className="dshx:flex-1"
+            files={files}
+            focusPath={props.focusPath}
+            layout={props.layout}
+            renderHeaderMetadata={file =>
+              file.type === 'deleted' ? null : (
+                <Button aria-label={'Open ' + file.name + ' in editor'} onClick={() => props.onOpenInEditor(file.name)} size="xs" title="Open in editor" type="button" variant="ghost">
+                  <FilePenLineIcon />
+                  Open
+                </Button>
+              )
+            }
+          />
           {props.truncated && <p className="dshx:p-3 dshx:text-xs dshx:text-warning">The diff reached the output limit; later files are missing.</p>}
         </div>
       </DialogContent>

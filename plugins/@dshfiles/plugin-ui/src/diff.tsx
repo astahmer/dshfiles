@@ -16,6 +16,8 @@ export type PatchViewProps = PatchSource & {
   readonly focusPath?: string | null
   readonly empty?: ReactNode
   readonly renderHeaderPrefix?: (file: FileDiffMetadata) => ReactNode
+  /** Trailing slot of each sticky file header, e.g. per-file actions. */
+  readonly renderHeaderMetadata?: (file: FileDiffMetadata) => ReactNode
   readonly className?: string
 }
 
@@ -79,6 +81,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
                 hunkSeparators: 'line-info',
                 overflow: 'scroll',
               }}
+              renderHeaderMetadata={props.renderHeaderMetadata}
               renderHeaderPrefix={props.renderHeaderPrefix}
             />
           </div>

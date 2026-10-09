@@ -235,6 +235,10 @@ Acceptance: 5 MB file opens (ranged) without freezing; binary/image falls back t
 `dshfiles:open-file` window event (`{ path, line?, cwd? }`, cancelable); wired from jujutsu file rows. `/diff`, thread
 tool-call paths and the palette are still to wire.
 
+- [x] jujutsu: "Open in editor" on every changed-file list (revision files, Source Control, composer bar) via row
+  context menu, ⌘/Ctrl-click on the path and the Source Control row action; full-diff dialogs get a per-file header
+  "Open" button (`PatchView.renderHeaderMetadata`) and close once the editor took the request.
+
 A plugin-ui event/service `openFile({ sessionId, path, line? })`: from `/diff` file header, jujutsu file rows,
 search results, thread tool-call file paths, palette (P3).
 

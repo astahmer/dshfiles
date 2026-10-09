@@ -17,6 +17,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { z } from 'zod'
 import { useAutoRefresh } from './auto-refresh.js'
+import { openInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import { composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
@@ -169,7 +170,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   const fileCount = repository.totals?.files ?? repository.files.length
   const heading = context.base.kind === 'parent' ? 'Uncommitted' : 'Since ' + repository.base.label
   const openFile = (path: string): void => {
-    window.dispatchEvent(new CustomEvent('dshfiles:open-file', { detail: { path, cwd: repository.root }, cancelable: true }))
+    openInEditor({ path, cwd: repository.root })
   }
 
   return (
@@ -261,6 +262,9 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
           focusPath={fullDiffPath}
           layout="unified"
           onClose={() => setFullDiffPath(undefined)}
+          onOpenInEditor={path => {
+            if (openInEditor({ path, cwd: repository.root })) setFullDiffPath(undefined)
+          }}
           patch={diffQuery.data?.patch}
           title={heading + ' · ' + basename(repository.root)}
           truncated={diffQuery.data?.truncated ?? false}
