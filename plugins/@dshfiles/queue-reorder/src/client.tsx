@@ -8,10 +8,21 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation } from '@dshfiles/plugin-ui/query'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
 import { queueReorderSettings } from './settings.js'
+
+// Inline instead of client.css so this plugin's sheet stays byte-identical to the shared plugin-ui sheet.
+const QUEUE_DOCK_STYLE: CSSProperties = {
+  boxSizing: 'border-box',
+  width:
+    'calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
+  maxWidth: 'calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',
+  margin: '0 auto calc(0px - var(--dsh-composer-stack-gap) - 3px)',
+  padding: '0 var(--dsh-composer-dock-inset)',
+  flex: 'none',
+}
 
 /**
  * The shipped queue dock, with reordering added.
@@ -91,7 +102,15 @@ const RowAction = (props: {
 }): JSX.Element => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <Button type="button" variant="ghost" size="icon-xs" className="dshx:text-muted-foreground dshx:hover:text-foreground" aria-label={props.label} disabled={props.disabled} onClick={props.onClick}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="dshx:text-muted-foreground dshx:hover:text-foreground"
+        aria-label={props.label}
+        disabled={props.disabled}
+        onClick={props.onClick}
+      >
         {props.children}
       </Button>
     </TooltipTrigger>
@@ -137,7 +156,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const running = props.useSession((state: SessionState) => state.running)
   const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
-  const queueEditActive = props.useInput(state => 'queueEdit' in state && state.queueEditActive)
+  const queueEditActive = Boolean(props.useInput(state => ('queueEdit' in state ? state.queueEdit : undefined)))
   const [editError, setEditError] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -188,7 +207,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="dshx-root" data-queue-dock="">
+      <div className="dshx-root" data-queue-dock="" style={QUEUE_DOCK_STYLE}>
         <div className="dshx:w-full dshx:overflow-hidden dshx:rounded-t-lg dshx:border dshx:border-b-0 dshx:bg-popover dshx:py-0.5 dshx:text-popover-foreground">
           {rowCount > 1 ? (
             <button
@@ -265,7 +284,12 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                       </span>
                       {queueMutable ? (
                         <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
-                          <RowAction label={`Move queued message ${index + 1} up`} tooltip="Move up" disabled={queueEditActive || index === 0 || busy !== null} onClick={() => void move(row.id, 'up')}>
+                          <RowAction
+                            label={`Move queued message ${index + 1} up`}
+                            tooltip="Move up"
+                            disabled={queueEditActive || index === 0 || busy !== null}
+                            onClick={() => void move(row.id, 'up')}
+                          >
                             <ChevronUpIcon />
                           </RowAction>
                           <RowAction
@@ -294,10 +318,20 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           >
                             <PencilIcon />
                           </RowAction>
-                          <RowAction label="Remove queued message" tooltip="Remove" disabled={busy !== null || queueEditActive || isBusy} onClick={() => applyAction(row.id, { kind: 'remove' })}>
+                          <RowAction
+                            label="Remove queued message"
+                            tooltip="Remove"
+                            disabled={busy !== null || queueEditActive || isBusy}
+                            onClick={() => applyAction(row.id, { kind: 'remove' })}
+                          >
                             <Trash2Icon />
                           </RowAction>
-                          <RowAction label="Steer with queued message" tooltip="Steer" disabled={busy !== null || queueEditActive || !running} onClick={() => applyAction(row.id, { kind: 'steer' })}>
+                          <RowAction
+                            label="Steer with queued message"
+                            tooltip="Steer"
+                            disabled={busy !== null || queueEditActive || !running}
+                            onClick={() => applyAction(row.id, { kind: 'steer' })}
+                          >
                             <SendIcon />
                           </RowAction>
                         </span>
@@ -313,7 +347,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
             </div>
           ) : null}
           {editError !== null ? (
-            <div className="dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-destructive" role="alert">{editError}</div>
+            <div className="dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-destructive" role="alert">
+              {editError}
+            </div>
           ) : null}
         </div>
       </div>
