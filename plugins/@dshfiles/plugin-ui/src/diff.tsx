@@ -1,7 +1,8 @@
-import { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
+import { getFiletypeFromFileName, parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { cn } from './lib/utils.js'
+import { bundledLanguages } from './shiki-slim.js'
 
 export { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 
@@ -22,6 +23,12 @@ const subscribeToDarkTheme = (onChange: () => void): (() => void) => {
   const observer = new MutationObserver(onChange)
   observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
   return () => observer.disconnect()
+}
+
+/** Render grammars outside the slim Shiki set as plain text instead of failing to highlight. */
+const withHighlightableLanguage = (file: FileDiffMetadata): FileDiffMetadata => {
+  const language = file.lang ?? getFiletypeFromFileName(file.name)
+  return language === 'text' || language in bundledLanguages ? file : { ...file, lang: 'text' }
 }
 
 const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-theme')
@@ -45,7 +52,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
   const dark = useDshDarkTheme()
   const root = useRef<HTMLDivElement | null>(null)
   const files = useMemo(
-    () => props.files ?? (props.patch === undefined ? [] : parsePatchFiles(props.patch).flatMap(parsed => parsed.files)),
+    () => (props.files ?? (props.patch === undefined ? [] : parsePatchFiles(props.patch).flatMap(parsed => parsed.files))).map(withHighlightableLanguage),
     [props.files, props.patch],
   )
   const layout = props.layout ?? 'unified'

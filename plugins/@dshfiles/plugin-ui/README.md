@@ -84,7 +84,10 @@ string (`patch`) or pre-parsed `files` (`parsePatchFiles(patch).flatMap(p => p.f
 megabyte patches stay responsive; give it a bounded height through `className`. Light/dark follows
 `body[data-ds-dark-theme]` with the `pierre-light`/`pierre-dark` themes. Every file renders in its own shadow root
 with adopted stylesheets, so no library CSS leaks into the page; style it only through inherited `--diffs-*`
-custom properties. Patch-parsed diffs carry only the patch lines, so collapsed context shows as a count and cannot
+custom properties. `pluginUiVite()` aliases the library's `shiki` import to `src/shiki-slim.ts` (a curated grammar
+set on the JavaScript regex engine) and drops unused themes and the WASM engine, because dshx inlines every dynamic
+import into one client file; other languages render as plain text. Add a grammar there when a plugin needs one, and
+check the bundle. Patch-parsed diffs carry only the patch lines, so collapsed context shows as a count and cannot
 expand without full file contents (`loadDiffFiles`).
 
 ## Tests
