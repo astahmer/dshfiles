@@ -221,8 +221,9 @@ Budget: editor plugin ≤ 600 KB min client.js; first editor open < 150 ms.
 
 ### [~] P2.4 File viewer/editor tab, read-only first (M) — deps: P2.2, P2.3
 
-Editable from the start (`@dshfiles/editor`: right-panel tab + workbench panel, own tree, tabs, live reload). Not yet:
-ranged reads for files > 5 MB, binary/image preview fallback. See [editor.md](editor.md).
+Editable from the start (`@dshfiles/editor`: right-panel tab + workbench panel, own tree, tabs, live reload, one tab
+per file across path spellings, image/binary preview with Host open/reveal). Not yet: ranged reads for files > 5 MB.
+See [editor.md](editor.md).
 
 Open `workspaceFiles.read` (ranged for big files, `readBytes` for binary → preview), language from extension,
 Shiki theme shared with `/diff`, live reload on `changes`, go-to-line, find. Tabs in the right panel with a

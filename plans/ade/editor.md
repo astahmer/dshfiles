@@ -46,6 +46,13 @@ worker, or select individual `features/*/register` instead of `register.all`.
   mode preservation, symlinked root prefix.
 - Host dist imports under Node 22.23.3.
 
+## Binary files
+
+Images (png, jpg, gif, webp, svg) render as an `<img>` from a `blob:` URL; other files that are not NUL-free UTF-8
+show their size and "Binary file". Neither reaches Monaco, both are read-only. "Open" / "Show file location" use the
+Session Remote's `openWorkspacePath` and appear only when `canOpenWorkspacePath` says the Host has a desktop. Files
+over the Host's 32 MB complete-read cap fall back to `stat` for the size.
+
 ## Gaps
 
 - **Approval:** `ctx.approval.request` needs an Agent with an open turn (it audits into that session's log), so a

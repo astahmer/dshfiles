@@ -1,4 +1,5 @@
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import {
@@ -12,9 +13,9 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { editorApi } from './api.js'
 import type { CodeEditorEngine, CodeEditorHandle } from './code-editor.js'
@@ -23,7 +24,7 @@ import { FileTree } from './file-tree.js'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
-  readonly remote: Pick<ClientRemote, 'workspaceFiles'>
+  readonly remote: Pick<ClientRemote, 'workspaceFiles' | 'session'>
   readonly sessionId: SessionId | undefined
   readonly loadEngine: () => Promise<CodeEditorEngine>
 }
@@ -50,6 +51,62 @@ const DIALOG_COPY = {
   },
   discard: { title: 'Discard unsaved changes?', description: 'Closing this tab drops the edits that are not saved.', action: 'Discard' },
 } as const
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** Image and binary files: shown here, never handed to the editor engine. Open/reveal only when the Host has a desktop. */
+const FilePreview = (props: { readonly document: OpenDocument; readonly remote: Pick<ClientRemote, 'session'> }): JSX.Element | null => {
+  const content = props.document.content
+  const absolutePath = props.document.absolutePath
+  const desktop = useQuery({
+    queryKey: ['dshfiles-editor', 'can-open-externally'],
+    queryFn: async () => {
+      const result = await props.remote.session.canOpenWorkspacePath()
+      return result.ok && result.value
+    },
+    staleTime: Infinity,
+  })
+  const openExternally = useMutation({
+    mutationFn: async (action: 'default' | 'reveal') => {
+      if (absolutePath === null) throw new Error('The file has no Host path yet.')
+      const result = await props.remote.session.openWorkspacePath(action === 'reveal' ? { path: absolutePath, action } : { path: absolutePath })
+      if (!result.ok) throw new Error(result.error.message)
+    },
+  })
+  if (content.kind === 'text') return null
+  const actions = desktop.data === true && absolutePath !== null && (
+    <div className="dshx:flex dshx:items-center dshx:gap-1">
+      <Button disabled={openExternally.isPending} onClick={() => openExternally.mutate('default')} size="xs" variant="outline">
+        <ExternalLinkIcon /> Open
+      </Button>
+      <Button disabled={openExternally.isPending} onClick={() => openExternally.mutate('reveal')} size="xs" variant="ghost">
+        <FolderOpenIcon /> Show file location
+      </Button>
+    </div>
+  )
+  return (
+    <div
+      className="dshx:absolute dshx:inset-0 dshx:flex dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-3 dshx:overflow-auto dshx:p-4"
+      data-file-preview={content.kind}
+    >
+      {content.kind === 'image' ? (
+        <img alt={props.document.name} className="dshx:max-h-[70%] dshx:max-w-full dshx:object-contain" src={content.url} />
+      ) : (
+        <FileQuestionIcon className="dshx:size-10 dshx:text-muted-foreground" />
+      )}
+      <p className="dshx:text-xs dshx:text-muted-foreground">
+        {content.kind === 'image' ? 'Image' : 'Binary file'}
+        {content.bytes === null ? '' : ` · ${formatBytes(content.bytes)}`}
+      </p>
+      {actions}
+      {openExternally.isError && <p className="dshx:text-xs dshx:text-destructive">{errorMessage(openExternally.error, 'Could not open the file.')}</p>}
+    </div>
+  )
+}
 
 /** File tree, tabs and one editor surface for the session on screen. Usable as a right-pane tab or a docked panel. */
 export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
@@ -91,7 +148,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   })
 
   requestSaveRef.current = () => {
-    if (active === undefined || active.status !== 'ready' || save.isPending) return
+    if (active === undefined || active.status !== 'ready' || active.content.kind !== 'text' || save.isPending) return
     // Host approval (`ctx.approval`) only answers for an Agent with an open turn; a user save has none, so the
     // panel asks once per open tab instead.
     if (!approved.current.has(active.id)) {
@@ -101,7 +158,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     save.mutate({ document: active, overwrite: false })
   }
 
-  const needsEngine = active?.status === 'ready'
+  const editable = active?.status === 'ready' && active.content.kind === 'text'
+  const needsEngine = editable
   useEffect(() => {
     if (!needsEngine || engineStatus !== 'idle') return
     setEngineStatus('loading')
@@ -141,7 +199,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       handle.close(id)
       appliedText.current.delete(id)
     }
-    if (active === undefined || active.status !== 'ready') return
+    if (active === undefined || active.status !== 'ready' || active.content.kind !== 'text') return
     const editorDocument = { id: active.id, path: active.path, text: active.text }
     const applied = appliedText.current.get(active.id)
     handle.show(editorDocument)
@@ -220,7 +278,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         </div>
         <Button
           aria-label="Save"
-          disabled={active?.status !== 'ready' || save.isPending}
+          disabled={!editable || save.isPending}
           onClick={() => requestSaveRef.current()}
           size="icon-xs"
           title="Save (⌘S)"
@@ -257,7 +315,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         </div>
       )}
       <div className="dshx:relative dshx:min-h-0 dshx:flex-1">
-        <div className={cn('dshx:absolute dshx:inset-0', active?.status !== 'ready' && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
+        <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
+        {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
         {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
         {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
         {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
@@ -270,7 +329,15 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         {save.isPending && <span>Saving…</span>}
         {save.isError && <span className="dshx:text-destructive">{errorMessage(save.error, 'Save failed.')}</span>}
         {active !== undefined && !save.isPending && (
-          <span>{active.dirty ? 'Unsaved' : active.sha256 === null && active.status === 'ready' ? 'New file' : 'Saved'}</span>
+          <span>
+            {active.content.kind !== 'text'
+              ? 'Read-only'
+              : active.dirty
+                ? 'Unsaved'
+                : active.sha256 === null && active.status === 'ready'
+                  ? 'New file'
+                  : 'Saved'}
+          </span>
         )}
       </div>
       <AlertDialog onOpenChange={open => !open && setDialog(null)} open={dialog !== null}>

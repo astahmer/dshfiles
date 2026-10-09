@@ -81,3 +81,26 @@ describe('editor store tab identity', () => {
     store.dispose()
   })
 })
+
+describe('editor store binary content', () => {
+  it('previews images, flags other binary files and keeps both away from the text buffer', async () => {
+    const { remote } = fakeRemote({
+      '/real/w/logo.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]),
+      '/real/w/data.bin': new Uint8Array([0, 1, 2, 3]),
+      '/real/w/latin1.txt': new Uint8Array([0xe9, 0x74, 0xe9]),
+      '/real/w/notes.md': text('# hi'),
+    })
+    // SAFETY: as above.
+    const store = createEditorStore({ remote: remote as never })
+    for (const path of ['logo.png', 'data.bin', 'latin1.txt', 'notes.md']) store.open(session, { path })
+    await loaded(store)
+    const byPath = Object.fromEntries(store.getSnapshot().documents.map(document => [document.path, document]))
+    expect(byPath['logo.png']?.content).toMatchObject({ kind: 'image', bytes: 6 })
+    expect(byPath['logo.png']?.content.kind === 'image' && byPath['logo.png'].content.url.startsWith('blob:')).toBe(true)
+    expect(byPath['data.bin']?.content).toEqual({ kind: 'binary', bytes: 4 })
+    expect(byPath['latin1.txt']?.content).toEqual({ kind: 'binary', bytes: 3 })
+    expect(byPath['notes.md']).toMatchObject({ content: { kind: 'text' }, text: '# hi' })
+    for (const path of ['logo.png', 'data.bin', 'latin1.txt']) expect(byPath[path]?.text).toBe('')
+    store.dispose()
+  })
+})

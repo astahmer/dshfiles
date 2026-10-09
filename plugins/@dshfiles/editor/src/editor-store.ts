@@ -5,6 +5,21 @@ import { resolveRequestedPath, type OpenFileRequest } from './open-file.js'
 
 export const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 
+const IMAGE_TYPES: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+}
+
+/** What the panel shows: text goes to the editor engine; images and other binary files never reach it. */
+export type DocumentContent =
+  | { readonly kind: 'text' }
+  | { readonly kind: 'image'; readonly url: string; readonly bytes: number }
+  | { readonly kind: 'binary'; readonly bytes: number | null }
+
 export interface OpenDocument {
   readonly id: string
   readonly sessionId: SessionId
@@ -15,6 +30,7 @@ export interface OpenDocument {
   readonly name: string
   readonly status: 'loading' | 'ready' | 'error'
   readonly error?: string
+  readonly content: DocumentContent
   /** Text as loaded; the live buffer belongs to the editor engine. */
   readonly text: string
   /** sha256 of the bytes on disk the buffer is based on; null for a file that does not exist yet. */
@@ -37,6 +53,17 @@ type Remote = Pick<ClientRemote, 'workspaceFiles'>
 const documentId = (sessionId: string, path: string): string => sessionId + '\n' + path
 
 const baseName = (path: string): string => path.split('/').filter(Boolean).at(-1) ?? path
+
+const imageType = (path: string): string | undefined => IMAGE_TYPES[path.split('.').at(-1)?.toLowerCase() ?? '']
+
+const decodeText = (data: Uint8Array): string | undefined => {
+  if (data.includes(0)) return undefined
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(data)
+  } catch {
+    return undefined
+  }
+}
 
 const sha256 = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
   if (globalThis.crypto?.subtle === undefined) throw new Error('Saving needs a secure context (https or localhost) for content hashing.')
@@ -71,8 +98,14 @@ export const createEditorStore = (options: {
     state = next
     for (const listener of listeners) listener()
   }
-  const patch = (id: string, change: Partial<OpenDocument>): void =>
+  const releaseContent = (document: OpenDocument | undefined): void => {
+    if (document?.content.kind === 'image') URL.revokeObjectURL(document.content.url)
+  }
+  const patch = (id: string, change: Partial<OpenDocument>): void => {
+    const previous = state.documents.find(document => document.id === id)
+    if (change.content !== undefined && change.content !== previous?.content) releaseContent(previous)
     set({ ...state, documents: state.documents.map(document => (document.id === id ? { ...document, ...change } : document)) })
+  }
   const find = (id: string): OpenDocument | undefined => state.documents.find(document => document.id === id)
 
   /** A second spelling of an open file resolved to the same Host path: keep the first tab, drop this one. */
@@ -112,24 +145,40 @@ export const createEditorStore = (options: {
     }
     if (!result.ok) {
       if (result.error.code === 'workspace-file/not-found') {
-        patch(id, { status: 'ready', text: '', sha256: null, version: null, dirty: false, diskChanged: false })
+        patch(id, { status: 'ready', content: { kind: 'text' }, text: '', sha256: null, version: null, dirty: false, diskChanged: false })
+        return
+      }
+      if (result.error.code === 'workspace-file/too-large') {
+        const stat = await remote.workspaceFiles.stat(document.sessionId, document.path, signal)
+        patch(id, {
+          status: 'ready',
+          content: { kind: 'binary', bytes: stat.ok ? (stat.value.bytes ?? null) : null },
+          absolutePath: stat.ok ? stat.value.absolutePath : document.absolutePath,
+          version: stat.ok ? stat.value.version : null,
+        })
         return
       }
       patch(id, { status: 'error', error: result.error.message })
       return
     }
-    if (result.value.data.byteLength > MAX_EDITABLE_BYTES) {
+    const data = result.value.data
+    const mime = imageType(document.path)
+    if (mime !== undefined) {
+      const url = URL.createObjectURL(new Blob([data], { type: mime }))
+      patch(id, { status: 'ready', content: { kind: 'image', url, bytes: data.byteLength }, version: result.value.version, dirty: false, diskChanged: false })
+      return
+    }
+    const text = decodeText(data)
+    if (text === undefined) {
+      patch(id, { status: 'ready', content: { kind: 'binary', bytes: data.byteLength }, version: result.value.version, dirty: false, diskChanged: false })
+      return
+    }
+    if (data.byteLength > MAX_EDITABLE_BYTES) {
       patch(id, { status: 'error', error: `File is larger than ${MAX_EDITABLE_BYTES / 1024 / 1024} MB; the editor does not open it.` })
       return
     }
-    let text: string
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(result.value.data)
-    } catch {
-      patch(id, { status: 'error', error: 'Binary or non-UTF-8 file; the editor only opens text.' })
-      return
-    }
     patch(id, {
+      content: { kind: 'text' },
       status: 'ready',
       absolutePath: result.value.absolutePath,
       text,
@@ -149,7 +198,7 @@ export const createEditorStore = (options: {
           const document = find(id)
           if (document === undefined || frame.kind !== 'change') continue
           if ('absent' in frame.change || frame.change.version === document.version) continue
-          if (!document.dirty) {
+          if (!document.dirty || document.content.kind !== 'text') {
             await load(id, controller.signal)
             continue
           }
@@ -196,6 +245,7 @@ export const createEditorStore = (options: {
         absolutePath: null,
         name: baseName(path),
         status: 'loading',
+        content: { kind: 'text' },
         text: '',
         sha256: null,
         version: null,
@@ -213,6 +263,7 @@ export const createEditorStore = (options: {
       watches.get(id)?.abort()
       watches.delete(id)
       const closing = find(id)
+      releaseContent(closing)
       const documents = state.documents.filter(document => document.id !== id)
       const activeBySession = { ...state.activeBySession }
       if (closing !== undefined && activeBySession[closing.sessionId] === id) {
@@ -231,6 +282,7 @@ export const createEditorStore = (options: {
     dispose: (): void => {
       for (const controller of watches.values()) controller.abort()
       watches.clear()
+      for (const document of state.documents) releaseContent(document)
       listeners.clear()
     },
   }
