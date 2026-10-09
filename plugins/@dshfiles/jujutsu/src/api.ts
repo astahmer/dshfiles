@@ -116,6 +116,18 @@ export const stateSchema = z.object({
   evolutionHistoryTruncated: z.boolean(),
 })
 
+const detailsSchema = z.object({
+  files: z.array(fileChangeSchema).max(1000),
+  additions: z.number().int().min(0),
+  deletions: z.number().int().min(0),
+  patch: z.string().max(1_200_000),
+  truncated: z.boolean(),
+  evolution: z.string().max(120_000),
+})
+
+// dshx replaces any thrown handler error with a generic message, so reads report their real failure in the output.
+const readFailureSchema = z.object({ failure: z.object({ message: z.string().max(500) }) })
+
 export const jujutsuApi = defineApi({
   id: 'jujutsu',
   version: 1,
@@ -126,18 +138,11 @@ export const jujutsuApi = defineApi({
     }),
     load: method({
       input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(300) }),
-      output: stateSchema,
+      output: z.union([stateSchema, readFailureSchema]),
     }),
     details: method({
       input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),
-      output: z.object({
-        files: z.array(fileChangeSchema).max(1000),
-        additions: z.number().int().min(0),
-        deletions: z.number().int().min(0),
-        patch: z.string().max(1_200_000),
-        truncated: z.boolean(),
-        evolution: z.string().max(120_000),
-      }),
+      output: z.union([detailsSchema, readFailureSchema]),
     }),
     revisionFiles: method({
       input: z.object({ repoId: repoIdSchema, commitIds: z.array(commitIdSchema).min(1).max(40) }),
@@ -164,5 +169,7 @@ export const jujutsuApi = defineApi({
 export type Revision = z.infer<typeof revisionSchema>
 export type Mutation = z.infer<typeof mutationSchema>
 export type JujutsuState = z.infer<typeof stateSchema>
+export type RevisionDetails = z.infer<typeof detailsSchema>
+export type ReadFailure = z.infer<typeof readFailureSchema>
 export type FileStat = z.infer<typeof fileStatSchema>
 export type FileStatus = z.infer<typeof fileStatusSchema>

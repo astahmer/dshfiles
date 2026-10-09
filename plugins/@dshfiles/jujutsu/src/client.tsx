@@ -72,7 +72,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { z } from 'zod'
-import type { Mutation, Revision } from './api.js'
+import type { Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
@@ -136,6 +136,11 @@ const jujutsuKeys = {
   repository: (repoId: string) => ['jujutsu', repoId] as const,
   state: (repoId: string, limit: number) => ['jujutsu', repoId, 'state', limit] as const,
   details: (repoId: string, commitId: string) => ['jujutsu', repoId, 'details', commitId] as const,
+}
+
+const throwReadFailure = <Output extends object>(result: Output | ReadFailure): Output => {
+  if ('failure' in result) throw new Error(result.failure.message)
+  return result
 }
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
@@ -264,7 +269,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const stateQuery = useQuery({
     queryKey: jujutsuKeys.state(repoId ?? '', preferences.revisionLimit),
-    queryFn: ({ signal }) => api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal }),
+    queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal })),
     enabled: repoId !== null,
     ...autoRefresh.queryOptions,
   })
@@ -277,7 +282,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const detailsQuery = useQuery({
     queryKey: jujutsuKeys.details(repoId ?? '', selectedRevision?.commitId ?? ''),
-    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: selectedRevision?.commitId ?? '' }, { signal }),
+    queryFn: async ({ signal }) => throwReadFailure(await api.details({ repoId: repoId ?? '', commitId: selectedRevision?.commitId ?? '' }, { signal })),
     enabled: repoId !== null && selectedRevision !== undefined,
   })
   const details = detailsQuery.data
@@ -285,7 +290,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const fullDiffQuery = useQuery({
     queryKey: jujutsuKeys.details(repoId ?? '', fullDiff?.commitId ?? ''),
-    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal }),
+    queryFn: async ({ signal }) => throwReadFailure(await api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal })),
     enabled: repoId !== null && fullDiff !== null,
   })
 
@@ -357,7 +362,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
-    detailsQuery.error && errorMessage(detailsQuery.error, 'Could not load revision details.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
     actionSnapshot.context.error,
   ].filter((message): message is string => Boolean(message))
@@ -596,7 +600,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
           )}
         </div>
-        {details === undefined ? (
+        {details === undefined && detailsQuery.error !== null ? (
+          <Alert className="dshx:px-3 dshx:py-2" variant="destructive">
+            <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+              <span className="dshx:min-w-0 dshx:flex-1">{errorMessage(detailsQuery.error, 'Could not load revision details.')}</span>
+              <Button disabled={detailsQuery.isFetching} onClick={() => void detailsQuery.refetch()} size="xs" type="button" variant="outline">
+                {detailsQuery.isFetching ? <Spinner /> : <RefreshCwIcon />}
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : details === undefined ? (
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground">
             <Spinner className="dshx:size-3" />
             Loading revision details…

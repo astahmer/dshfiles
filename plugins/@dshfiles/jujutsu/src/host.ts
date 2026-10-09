@@ -20,7 +20,8 @@ import {
   validatedRepositoryPath,
   type PreparedMutation,
 } from './core.js'
-import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { RevisionReads, type JjRun } from './revision-reads.js'
 import { composerContextHost } from './composer-context-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
@@ -204,12 +205,17 @@ const resolveRepo = async (ctx: Context, repoId: string, signal: AbortSignal | u
   return repo
 }
 
+const repoRun =
+  (ctx: Context, repo: RegisteredRepo, signal: AbortSignal | undefined): JjRun =>
+  (args, options) =>
+    runAt(ctx, repo.root, repo.identity, args, signal, options)
+
 const readRevisions = async (ctx: Context, repo: RegisteredRepo, limit: number, signal: AbortSignal | undefined): Promise<Revision[]> => {
   const result = await runAt(
     ctx,
     repo.root,
     repo.identity,
-    ['log', '--no-graph', '--limit', String(limit), '--revisions', 'all()', '--template', REVISION_TEMPLATE],
+    [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--limit', String(limit), '--revisions', 'all()', '--template', REVISION_TEMPLATE],
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
@@ -228,7 +234,7 @@ const readEvolvedCommitIds = async (
       ctx,
       repo.root,
       repo.identity,
-      ['evolog', '--no-graph', '--revisions', revisions.map(revision => revision.commitId).join('|'), '--limit', '1500', '--template', EVOLUTION_TEMPLATE],
+      [RevisionReads.ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', revisions.map(revision => revision.commitId).join('|'), '--limit', '1500', '--template', EVOLUTION_TEMPLATE],
       signal,
       { outputLimit: 512_000 },
     )
@@ -255,67 +261,13 @@ const readEvolvedCommitIds = async (
   }
 }
 
-const readPaths = async (ctx: Context, repo: RegisteredRepo, revision: string, signal: AbortSignal | undefined): Promise<string[]> => {
-  const result = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', revision, '--name-only'], signal, { outputLimit: 256_000 })
-  if (result.truncated) throw new Error('Changed file list exceeded the bounded output limit.')
-  return result.stdout
-    .split(/\r?\n/)
-    .filter(path => path.length > 0)
-    .slice(0, 1000)
-}
-
-const fileStatsRowSchema = z.object({
-  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
-  files: z
-    .array(
-      z.object({
-        path: z.string().max(2048),
-        status: z.string().max(32),
-        additions: z.number().int().min(0),
-        deletions: z.number().int().min(0),
-      }),
-    )
-    .max(20_000),
-})
-
-const readFileStats = async (
-  ctx: Context,
-  repo: RegisteredRepo,
-  commitIds: readonly string[],
-  signal: AbortSignal | undefined,
-): Promise<{ readonly revisions: { readonly commitId: string; readonly files: FileStat[] }[]; readonly truncated: boolean }> => {
-  const result = await runAt(
-    ctx,
-    repo.root,
-    repo.identity,
-    ['log', '--no-graph', '--revisions', commitIds.join('|'), '--template', FILE_STATS_TEMPLATE],
-    signal,
-    {
-      outputLimit: 1_000_000,
-    },
-  )
-  const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-  const rows = parseJsonLines(completeOutput, value => fileStatsRowSchema.parse(value))
-  let truncated = result.truncated
-  const revisions = rows.map(row => {
-    if (row.files.length > 2000) truncated = true
-    return {
-      commitId: row.commitId,
-      files: row.files
-        .slice(0, 2000)
-        .map(file => ({ path: file.path, status: fileStatusLetter(file.status), additions: file.additions, deletions: file.deletions })),
-    }
-  })
-  return { revisions, truncated }
-}
-
 const readRemotes = async (
   ctx: Context,
   repo: RegisteredRepo,
   signal: AbortSignal | undefined,
 ): Promise<{ readonly names: string[]; readonly configFingerprint: string }> => {
   try {
-    const result = await runAt(ctx, repo.root, repo.identity, ['git', 'remote', 'list'], signal, { outputLimit: 32_000 })
+    const result = await runAt(ctx, repo.root, repo.identity, [RevisionReads.ignoreWorkingCopy, 'git', 'remote', 'list'], signal, { outputLimit: 32_000 })
     if (result.truncated) return { names: [], configFingerprint: 'truncated' }
     const names = result.stdout.split(/\r?\n/).flatMap(line => {
       const name = line.trim().split(/\s+/, 1)[0]
@@ -364,10 +316,11 @@ const readLastPush = async (
 }
 
 const snapshot = async (ctx: Context, repo: RegisteredRepo, limit: number, signal: AbortSignal | undefined): Promise<Snapshot> => {
-  const [revisions, status, changedPaths, remotes, lastPush] = await Promise.all([
+  // `status` is the only working-copy snapshot; every later read ignores the working copy so it sees that same `@`.
+  const status = await runAt(ctx, repo.root, repo.identity, ['status'], signal, { outputLimit: 78_000 })
+  const [revisions, changedPaths, remotes, lastPush] = await Promise.all([
     readRevisions(ctx, repo, limit, signal),
-    runAt(ctx, repo.root, repo.identity, ['status'], signal, { outputLimit: 78_000 }),
-    readPaths(ctx, repo, '@', signal),
+    RevisionReads.paths(repoRun(ctx, repo, signal), '@'),
     readRemotes(ctx, repo, signal),
     readLastPush(ctx, repo, signal),
   ])
@@ -613,7 +566,7 @@ const prepareMutation = async (
       : preparedAction.kind === 'squash' && preparedAction.paths !== undefined
         ? preparedAction.sourceId
         : undefined
-  const paths = pathsRevision === undefined ? current.state.changedPaths : await readPaths(ctx, repo, pathsRevision, signal)
+  const paths = pathsRevision === undefined ? current.state.changedPaths : await RevisionReads.paths(repoRun(ctx, repo, signal), pathsRevision)
   const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
   const argv = buildMutationArgv(preparedAction)
   let detail = preview.detail
@@ -660,36 +613,24 @@ const jujutsuHostApi = jujutsuApi.host({
     return { repoId: repo.id, root: repo.root }
   },
   load: async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
-    return (await snapshot(ctx, repo, input.limit, signal)).state
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return (await snapshot(ctx, repo, input.limit, signal)).state
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not load this repository.')
+    }
   },
   details: async ({ input, ctx, signal }) => {
-    const repo = await resolveRepo(ctx, input.repoId, signal)
-    const revisions = await readRevisions(ctx, repo, MAX_REVISIONS, signal)
-    findRevision(revisions, input.commitId)
-    const paths = await readPaths(ctx, repo, input.commitId, signal)
-    const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', input.commitId, '--git'], signal)
-    const evolution = await runAt(ctx, repo.root, repo.identity, ['evolog', '--no-graph', '--revisions', input.commitId, '--limit', '30'], signal, {
-      outputLimit: 118_000,
-    })
-    const stats = await readFileStats(ctx, repo, [input.commitId], signal)
-    const statusByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file.status]) ?? [])
-    const files = parsePatchStats(patch.stdout, paths, patch.truncated).map(file => ({
-      ...file,
-      status: statusByPath.get(file.path) ?? fileStatusLetter('modified'),
-    }))
-    return {
-      files,
-      additions: files.reduce((sum, file) => sum + file.additions, 0),
-      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
-      patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-      truncated: patch.truncated,
-      evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await RevisionReads.details(repoRun(ctx, repo, signal), input.commitId)
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not load revision details.')
     }
   },
   revisionFiles: async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
-    return readFileStats(ctx, repo, [...new Set(input.commitIds)], signal)
+    return RevisionReads.fileStats(repoRun(ctx, repo, signal), [...new Set(input.commitIds)])
   },
   workingDiff: async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
