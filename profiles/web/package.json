@@ -15,7 +15,9 @@
     "@dshfiles/settings-search": "link:../../../dev/dshfiles/plugins/@dshfiles/settings-search",
     "@dshfiles/agent-communication": "link:../../../dev/dshfiles/plugins/@dshfiles/agent-communication",
     "@dshfiles/goal-stall-guard": "link:../../../dev/dshfiles/plugins/@dshfiles/goal-stall-guard",
-    "@dshfiles/multi-host": "link:../../../dev/dshfiles/plugins/@dshfiles/multi-host"
+    "@dshfiles/multi-host": "link:../../../dev/dshfiles/plugins/@dshfiles/multi-host",
+    "@dshfiles/editor": "link:../../../dev/dshfiles/plugins/@dshfiles/editor",
+    "@dshfiles/workbench": "link:../../../dev/dshfiles/plugins/@dshfiles/workbench"
   },
   "dsh": {
     "profile": {
@@ -35,7 +37,9 @@
         "@dshfiles/settings-search",
         "@dshfiles/agent-communication",
         "@dshfiles/goal-stall-guard",
-        "@dshfiles/multi-host"
+        "@dshfiles/multi-host",
+        "@dshfiles/editor",
+        "@dshfiles/workbench"
       ]
     }
   }
