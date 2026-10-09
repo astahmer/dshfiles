@@ -86,7 +86,7 @@ Acceptance: palette targets met with 2,000 synthetic threads; palette.test.ts st
 > keys, cap/virtualize rows, useDeferredValue for input. Target: open < 50 ms, keystroke < 16 ms with 2,000
 > threads. Keep tests green; add a render-count/perf regression test."
 
-### P0.4 Sidebar re-render storms (M) — deps: P0.1
+### [x] P0.4 Sidebar re-render storms (M) — deps: P0.1
 
 Check `sidebar-state.tsx` provider (one context value object → every consumer re-renders), unstable callbacks/props
 into row components, `useSyncExternalStore` snapshots that return new objects each call (must be cached by

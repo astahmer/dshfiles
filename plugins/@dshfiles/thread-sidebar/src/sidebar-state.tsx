@@ -130,7 +130,10 @@ export const usePreferences = (): PreferencesSnapshot & {
     if (Object.keys(patch).length > 0) updatePreferences(patch)
   }, [hostBacked, hostPreferences, updatePreferences])
 
-  const preferences = hostBacked ? { ...hostPreferences, ...pending } : local.preferences
+  const preferences = useMemo(
+    () => (hostBacked ? { ...hostPreferences, ...pending } : local.preferences),
+    [hostBacked, hostPreferences, pending, local.preferences],
+  )
   return { preferences, storageWarning: hostBacked ? writeFailed : local.storageWarning, hostBacked, updatePreferences }
 }
 
@@ -138,18 +141,29 @@ interface SidebarState {
   preferences: SidebarPreferences
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
   storageWarning: boolean
-  paletteMode: PaletteMode | null
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
-  destinations: readonly PaletteDestination[]
   setDestinations: (destinations: readonly PaletteDestination[]) => void
 }
 
+interface PaletteState {
+  paletteMode: PaletteMode | null
+  destinations: readonly PaletteDestination[]
+}
+
 const SidebarStateContext = createContext<SidebarState | null>(null)
+const PaletteStateContext = createContext<PaletteState | null>(null)
 
 export const useSidebarState = (): SidebarState => {
   const state = useContext(SidebarStateContext)
   if (state === null) throw new Error('Sidebar state is unavailable outside its root')
+  return state
+}
+
+/** Separate from {@link useSidebarState} so opening the palette does not re-render every sidebar consumer. */
+export const usePaletteState = (): PaletteState => {
+  const state = useContext(PaletteStateContext)
+  if (state === null) throw new Error('Palette state is unavailable outside its root')
   return state
 }
 
@@ -161,18 +175,14 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
   const closePalette = useCallback(() => setPaletteMode(null), [])
 
   const state = useMemo(
-    () => ({
-      preferences,
-      updatePreferences,
-      storageWarning,
-      paletteMode,
-      openPalette,
-      closePalette,
-      destinations,
-      setDestinations,
-    }),
-    [preferences, updatePreferences, storageWarning, paletteMode, openPalette, closePalette, destinations],
+    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, setDestinations }),
+    [preferences, updatePreferences, storageWarning, openPalette, closePalette],
   )
+  const paletteState = useMemo(() => ({ paletteMode, destinations }), [paletteMode, destinations])
 
-  return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>
+  return (
+    <SidebarStateContext.Provider value={state}>
+      <PaletteStateContext.Provider value={paletteState}>{children}</PaletteStateContext.Provider>
+    </SidebarStateContext.Provider>
+  )
 }

@@ -54,3 +54,18 @@ lowercased once per thread list (`indexThreads`) and the query goes through `use
 
 The Browser pane was hidden for this run, so `requestAnimationFrame` numbers are not comparable with P0.1; commit
 latency excludes paint. Regression guard: `thread-sidebar/src/palette-perf.test.ts` (p95 < 8 ms at 2,000 threads).
+
+## After P0.4 (sidebar re-renders)
+
+Causes found by reading the code (no React DevTools hook in the pane): `props.useSessions(state => state)` re-renders
+`ThreadSidebar` on every session change and every row (Radix ContextMenu + 4 Tooltips each) was inline; the
+Host-backed `preferences` object was rebuilt each render, churning the one context value; palette open/close state
+lived in that same context, so `SidebarShell` re-rendered on every palette toggle. Fixes: memoized `ThreadRow` with
+primitive props and one stable ref-backed actions object, memoized `preferences`, palette state in its own context.
+
+| Metric | P0.3 | P0.4 |
+|---|---|---|
+| Palette open → commit (p50 / max) | 21.2 / 21.7 ms | 12.7 / 17.5 ms |
+| Keystroke → commit (p50 / p95) | 1.1 / 4.2 ms | 2.2 / 4.9 ms |
+
+Not verified live: per-row commit counts (the scratch home lists 0 threads); P0.6 should seed sessions and count.
