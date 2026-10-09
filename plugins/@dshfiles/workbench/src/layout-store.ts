@@ -6,7 +6,7 @@ import type { WorkbenchPanelDefinition } from './registry.js'
 /** Every docked panel uses this one Dockview component; the panel id names the registry entry it renders. */
 export const WORKBENCH_COMPONENT = 'workbench-panel'
 
-const LAYOUT_STORAGE_KEY = 'dshfiles.workbench.layout.v1'
+const LAYOUT_STORAGE_KEYS = { main: 'dshfiles.workbench.layout.v1', 'side-panel': 'dshfiles.workbench.side-panel-layout.v1' } as const
 
 const serializedPanelSchema = z.looseObject({ id: z.string(), contentComponent: z.literal(WORKBENCH_COMPONENT), title: z.string().optional() })
 
@@ -18,8 +18,11 @@ const serializedDockviewSchema = z.looseObject({
 /** The outer shape Dockview reads; anything deeper that it rejects makes `restoreLayout` fall back to the default. */
 const layoutSchema = z.custom<SerializedDockview>(value => serializedDockviewSchema.safeParse(value).success)
 
-export const createLayoutStore = (options?: { readonly storage?: () => Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null }) =>
-  createStoredValue({ key: LAYOUT_STORAGE_KEY, schema: layoutSchema, fallback: null, ...options })
+/** The main-area and side-panel workbenches keep separate layouts, so docking in one never rearranges the other. */
+export const createLayoutStore = (options?: {
+  readonly surface?: keyof typeof LAYOUT_STORAGE_KEYS
+  readonly storage?: () => Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
+}) => createStoredValue({ key: LAYOUT_STORAGE_KEYS[options?.surface ?? 'main'], schema: layoutSchema, fallback: null, storage: options?.storage })
 
 export type LayoutStore = ReturnType<typeof createLayoutStore>
 

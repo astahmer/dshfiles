@@ -1,7 +1,12 @@
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useLayoutEffect } from 'react'
@@ -9,10 +14,14 @@ import { demoPanels } from './demo-panels.js'
 import { createLayoutStore } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import { workbenchPanels } from './registry.js'
+import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-workbench'
+const RIGHT_PANE_ID = '@dshfiles/workbench/side-panel'
+const RIGHT_PANE_KIND = 'dshfiles-workbench-side-panel'
+const TOGGLE_COMMAND_ID = 'workbench.toggleSidePanel'
 const SHEET_SELECTOR = 'style[data-dshfiles-workbench-sheet]'
 
 /**
@@ -32,11 +41,12 @@ const useDockviewSheet = (): void => {
 export default defineClient({
   name: '@dshfiles/workbench',
   locales: [workbenchLocale],
-  inject: ['slots', 'layout'],
+  inject: ['slots', 'layout', 'sidebarRightTabs', 'sidebarRight', 'shortcuts'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(WORKBENCH_LOCALE_NAMESPACE)
     const registry = workbenchPanels()
     const store = createLayoutStore()
+    const sideStore = createLayoutStore({ surface: 'side-panel' })
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
@@ -67,5 +77,88 @@ export default defineClient({
         }),
       ),
     )
+
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: RIGHT_PANE_ID,
+          kind: RIGHT_PANE_KIND,
+          keepMounted: true,
+          title: () => translate('title'),
+          guide: [
+            {
+              id: 'workbench',
+              order: 46,
+              title: () => translate('title'),
+              description: () => translate('sidePanelGuide'),
+              icon: (props: { readonly size?: number }) => <LayoutGridIcon aria-hidden size={props.size ?? 18} />,
+            },
+          ],
+        }),
+      'workbench: right pane tab type',
+    )
+    ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register(
+        { name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, locale: WORKBENCH_LOCALE_NAMESPACE },
+        decorate(props => {
+          useDockviewSheet()
+          return <WorkbenchView registry={registry} store={sideStore} t={props.t} />
+        }),
+      ),
+    )
+
+    // Same shape as the Jujutsu toggle: close the side panel when it already shows the workbench, otherwise show it.
+    const toggleSidePanel = (): void => {
+      const sidebar = ctx.sidebarRight
+      if (sidebar.isExpanded() && sidebar.active()?.kind === RIGHT_PANE_KIND) {
+        sidebar.toggleExpanded()
+        return
+      }
+      sidebar.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+    }
+
+    const HeaderToggle = decorate(() => {
+      const settings = useSettings(workbenchSettings)
+      // Absent until a DSH restart registers the namespace; the toggle stays on by default.
+      if (settings.value?.headerToggle === false) return null
+      const label = translate('toggleSidePanel')
+      return (
+        <Button
+          aria-label={label}
+          className="dshx-root dshx:text-muted-foreground"
+          onClick={toggleSidePanel}
+          size="icon-sm"
+          title={label}
+          type="button"
+          variant="ghost"
+        >
+          <LayoutGridIcon aria-hidden size={16} />
+        </Button>
+      )
+    })
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register({ name: 'conversation.session.header.utilities', id: 'dshfiles-workbench-toggle', order: 41 }, HeaderToggle),
+    )
+
+    const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
+    if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
+      // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
+      ctx.effect(() => {
+        try {
+          return ctx.shortcuts.register({
+            id: TOGGLE_COMMAND_ID,
+            label: () => translate('toggleSidePanel'),
+            aliases: ['workbench', 'dock', 'panels', 'side panel'],
+            defaults: {},
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({ status: 'handled', run: toggleSidePanel }),
+          })
+        } catch (error) {
+          console.warn('workbench: the side panel toggle command could not be registered', error)
+          return () => undefined
+        }
+      }, 'workbench: side panel toggle command')
+    }
   },
 })

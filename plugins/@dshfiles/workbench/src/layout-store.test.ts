@@ -27,6 +27,13 @@ describe('layout store', () => {
     expect(createLayoutStore({ storage: memory.storage }).get()).toEqual(layout)
   })
 
+  it('keeps the side-panel layout apart from the main-area one', () => {
+    const memory = memoryStorage()
+    createLayoutStore({ surface: 'side-panel', storage: memory.storage }).set(layout)
+    expect(createLayoutStore({ storage: memory.storage }).get()).toBeNull()
+    expect(createLayoutStore({ surface: 'side-panel', storage: memory.storage }).get()).toEqual(layout)
+  })
+
   it('reads a layout from another component, malformed JSON or a missing grid as no layout', () => {
     const memory = memoryStorage()
     const store = createLayoutStore({ storage: memory.storage })
