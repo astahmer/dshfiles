@@ -30,11 +30,32 @@ const loadEngine = () => import('./monaco-engine.js').then(module => module.mona
 
 const noSession = (): undefined => undefined
 
+const sessionListSchema = z.object({ byId: z.record(z.string(), z.object({ cwd: z.string().optional() })) })
+
+/**
+ * The Client `sessions` service (`ISessions.list`). This package also types the Host `ctx.sessions` (a different
+ * shape under the same name) for its write API, so the Client face is decoded here; `z.custom` keeps the observable's
+ * own reference (and `this`).
+ */
+const clientSessionsSchema = z.object({
+  list: z.custom<{ readonly getSnapshot: () => unknown }>(
+    value => typeof value === 'object' && value !== null && 'getSnapshot' in value && typeof value.getSnapshot === 'function',
+  ),
+})
+
 export default defineClient({
   name: '@dshfiles/editor',
-  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles'],
+  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles'],
   setup(ctx, decorate) {
-    const store = createEditorStore(ctx.remote)
+    const clientSessions = clientSessionsSchema.safeParse(ctx.sessions)
+    const store = createEditorStore({
+      remote: ctx.remote,
+      workspaceRoot: sessionId => {
+        if (!clientSessions.success) return undefined
+        const list = sessionListSchema.safeParse(clientSessions.data.list.getSnapshot())
+        return list.success ? list.data.byId[sessionId]?.cwd : undefined
+      },
+    })
     ctx.effect(
       () => () => {
         store.dispose()

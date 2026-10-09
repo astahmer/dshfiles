@@ -8,7 +8,10 @@ export const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 export interface OpenDocument {
   readonly id: string
   readonly sessionId: SessionId
+  /** Workspace-relative when the file lies under the session root, else absolute. */
   readonly path: string
+  /** Host `absolutePath` (symlinks resolved) once loaded; the identity two spellings of one file share. */
+  readonly absolutePath: string | null
   readonly name: string
   readonly status: 'loading' | 'ready' | 'error'
   readonly error?: string
@@ -46,11 +49,23 @@ const sha256 = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
  * bytes — trailing newline included — are what the editor hashes and later saves over); each open file is watched
  * through `changes` and reloads when clean, or is flagged when it has unsaved edits.
  */
-export const createEditorStore = (remote: Remote) => {
+export const createEditorStore = (options: {
+  readonly remote: Remote
+  /** The session's workspace directory as the Client knows it (`sessions.list` summary `cwd`). */
+  readonly workspaceRoot?: (sessionId: SessionId) => string | undefined
+}) => {
+  const remote = options.remote
   let state: EditorState = { documents: [], activeBySession: {} }
   let requests = 0
   const listeners = new Set<() => void>()
   const watches = new Map<string, AbortController>()
+  // Symlink-resolved roots learnt from loads, e.g. `/private/tmp/w` for a session whose cwd is `/tmp/w`.
+  const resolvedRoots = new Map<string, Set<string>>()
+
+  const rootsOf = (sessionId: SessionId): readonly string[] => {
+    const configured = options.workspaceRoot?.(sessionId)
+    return [...(configured === undefined ? [] : [configured]), ...(resolvedRoots.get(sessionId) ?? [])]
+  }
 
   const set = (next: EditorState): void => {
     state = next
@@ -60,11 +75,41 @@ export const createEditorStore = (remote: Remote) => {
     set({ ...state, documents: state.documents.map(document => (document.id === id ? { ...document, ...change } : document)) })
   const find = (id: string): OpenDocument | undefined => state.documents.find(document => document.id === id)
 
+  /** A second spelling of an open file resolved to the same Host path: keep the first tab, drop this one. */
+  const mergeIntoTwin = (id: string, absolutePath: string): boolean => {
+    const document = find(id)
+    if (document === undefined) return false
+    const twin = state.documents.find(other => other.id !== id && other.sessionId === document.sessionId && other.absolutePath === absolutePath)
+    if (twin === undefined) return false
+    const activeBySession = { ...state.activeBySession }
+    if (activeBySession[document.sessionId] === id) activeBySession[document.sessionId] = twin.id
+    const reveal = document.reveal === null ? twin.reveal : { line: document.reveal.line, request: ++requests }
+    set({
+      activeBySession,
+      documents: state.documents.filter(other => other.id !== id).map(other => (other.id === twin.id ? { ...other, reveal } : other)),
+    })
+    return true
+  }
+
+  const learnRoot = (sessionId: SessionId, path: string, absolutePath: string): void => {
+    if (path.startsWith('/') || !absolutePath.endsWith('/' + path)) return
+    const root = absolutePath.slice(0, -(path.length + 1))
+    if (root === '') return
+    const roots = resolvedRoots.get(sessionId) ?? new Set()
+    roots.add(root)
+    resolvedRoots.set(sessionId, roots)
+  }
+
   const load = async (id: string, signal?: AbortSignal): Promise<void> => {
     const document = find(id)
     if (document === undefined) return
     const result = await remote.workspaceFiles.readBytes(document.sessionId, document.path, {}, signal)
     if (find(id) === undefined) return
+    if (result.ok) {
+      learnRoot(document.sessionId, document.path, result.value.absolutePath)
+      if (mergeIntoTwin(id, result.value.absolutePath)) return
+      if (document.absolutePath !== result.value.absolutePath) patch(id, { absolutePath: result.value.absolutePath })
+    }
     if (!result.ok) {
       if (result.error.code === 'workspace-file/not-found') {
         patch(id, { status: 'ready', text: '', sha256: null, version: null, dirty: false, diskChanged: false })
@@ -84,7 +129,15 @@ export const createEditorStore = (remote: Remote) => {
       patch(id, { status: 'error', error: 'Binary or non-UTF-8 file; the editor only opens text.' })
       return
     }
-    patch(id, { status: 'ready', text, sha256: await sha256(result.value.data), version: result.value.version, dirty: false, diskChanged: false })
+    patch(id, {
+      status: 'ready',
+      absolutePath: result.value.absolutePath,
+      text,
+      sha256: await sha256(result.value.data),
+      version: result.value.version,
+      dirty: false,
+      diskChanged: false,
+    })
   }
 
   const watch = (id: string, sessionId: SessionId, path: string): void => {
@@ -118,11 +171,17 @@ export const createEditorStore = (remote: Remote) => {
     },
     getSnapshot: (): EditorState => state,
     open: (sessionId: SessionId, request: OpenFileRequest): void => {
-      const path = resolveRequestedPath(request)
-      const id = documentId(sessionId, path)
+      const roots = rootsOf(sessionId)
+      const path = resolveRequestedPath(request, roots)
+      const spellings = new Set(path.startsWith('/') ? [path] : [path, ...roots.map(root => root.replace(/\/+$/, '') + '/' + path)])
+      const existing = state.documents.find(
+        document =>
+          document.sessionId === sessionId && (spellings.has(document.path) || (document.absolutePath !== null && spellings.has(document.absolutePath))),
+      )
+      const id = existing?.id ?? documentId(sessionId, path)
       const reveal = request.line === undefined ? null : { line: request.line, request: ++requests }
       const activeBySession = { ...state.activeBySession, [sessionId]: id }
-      if (find(id) !== undefined) {
+      if (existing !== undefined) {
         set({
           ...state,
           activeBySession,
@@ -134,6 +193,7 @@ export const createEditorStore = (remote: Remote) => {
         id,
         sessionId,
         path,
+        absolutePath: null,
         name: baseName(path),
         status: 'loading',
         text: '',

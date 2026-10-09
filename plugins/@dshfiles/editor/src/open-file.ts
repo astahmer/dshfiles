@@ -22,7 +22,30 @@ export const goToLineRequestSchema = z.object({ line: z.number().int().positive(
 
 export type OpenFileRequest = z.infer<typeof openFileRequestSchema>
 
-export const resolveRequestedPath = (request: OpenFileRequest): string => {
-  if (request.path.startsWith('/') || request.cwd === undefined) return request.path
-  return request.cwd.replace(/\/+$/, '') + '/' + request.path.replace(/^\.\//, '')
+const normalizeSegments = (path: string): string => {
+  const absolute = path.startsWith('/')
+  const segments: string[] = []
+  for (const segment of path.split('/')) {
+    if (segment === '' || segment === '.') continue
+    if (segment === '..' && segments.length > 0 && segments.at(-1) !== '..') segments.pop()
+    else if (segment !== '..' || !absolute) segments.push(segment)
+  }
+  return (absolute ? '/' : '') + segments.join('/')
+}
+
+/**
+ * One spelling per file, so the same file opened by tree (relative), tool call (absolute), `./x` or `a/../x` is one
+ * tab: resolve against `cwd`, collapse `.`/`..`/`//`, and make it workspace-relative when it lies under one of the
+ * session's known roots (its `cwd`, plus the symlink-resolved root learnt from Host `absolutePath`s).
+ */
+export const resolveRequestedPath = (request: OpenFileRequest, roots: readonly string[] = []): string => {
+  const raw = request.path.replace(/\\/g, '/')
+  const joined = raw.startsWith('/') || request.cwd === undefined ? raw : request.cwd.replace(/\/+$/, '') + '/' + raw
+  const path = normalizeSegments(joined)
+  if (!path.startsWith('/')) return path
+  for (const root of roots) {
+    const normalizedRoot = normalizeSegments(root)
+    if (normalizedRoot !== '/' && path.startsWith(normalizedRoot + '/')) return path.slice(normalizedRoot.length + 1)
+  }
+  return path
 }

@@ -55,8 +55,9 @@ worker, or select individual `features/*/register` instead of `register.all`.
 - Writes resolve the workspace root from the session header (`cwd`); a session without one cannot save.
 - Hashing uses `crypto.subtle` (secure context: localhost or https).
 - Open tabs live in memory: an HMR reload of the plugin (any rebuild of `dist/client.js`) drops them.
-- The tree opens files by workspace-relative path, open-from-anywhere usually by absolute path: the same file
-  opened both ways gets two tabs.
+- Tab identity: paths are normalized (`./`, `//`, `..`) and made workspace-relative against the session `cwd` and
+  the symlink-resolved root learnt from Host `absolutePath`s; two spellings that still differ merge into one tab once
+  both report the same `absolutePath`.
 - Right panel and workbench share the per-session active tab; each surface keeps its own Monaco view state.
 - Workbench detection is heuristic (another panel id than ours registered); without the workbench plugin the
   setting falls back to the right panel.
