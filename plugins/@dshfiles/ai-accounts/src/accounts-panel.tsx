@@ -6,6 +6,8 @@ import { AccountRail } from './account-rail.js'
 import { AccountsToolbar } from './accounts-toolbar.js'
 import { QuotaContinuations } from './quota-continuations.js'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
+import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import type { CredentialSetupPort } from './credential-setup-port.js'
 
 /**
  * The accounts page, in the shape of the reference account page: a rail of
@@ -17,8 +19,12 @@ import { useAccountsPanelState } from './use-accounts-panel-state.js'
  * shows whether it holds a login, who that login belongs to, and the exact
  * command that creates one.
  */
-export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
-  const state = useAccountsPanelState()
+export const AccountsPanel = (props: {
+  readonly onOpenUsageHistory: () => void
+  readonly credentialSetup?: CredentialSetupPort
+  readonly folderPicker: WorkspacePickerPorts
+}): JSX.Element => {
+  const state = useAccountsPanelState(props.credentialSetup)
 
   if (state.file === null) {
     return (
@@ -39,7 +45,7 @@ export const AccountsPanel = (props: { readonly onOpenUsageHistory: () => void }
         <AccountRail file={state.file} state={state} />
 
         {state.draft !== null ? (
-          <AccountDetail draft={state.draft} file={state.file} onOpenUsageHistory={props.onOpenUsageHistory} state={state} />
+          <AccountDetail draft={state.draft} file={state.file} folderPicker={props.folderPicker} onOpenUsageHistory={props.onOpenUsageHistory} state={state} />
         ) : (
           <Empty>
             <EmptyHeader>

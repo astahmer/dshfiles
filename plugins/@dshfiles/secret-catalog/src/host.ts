@@ -7,6 +7,9 @@ import { createSecretCatalogOperations } from './secret-operations.js'
 import { runSecretCli } from './secret-cli-runner.js'
 import { createSecretTools } from './secret-tools.js'
 import { secretCatalogSettings } from './settings.js'
+import { createSecretCatalogCredentialBridge } from './credential-bridge.js'
+
+export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from './credential-bridge.js'
 
 const operationsFor = (ctx: Context) => createSecretCatalogOperations(request => runSecretCli(ctx.subprocess, request))
 const cwdForScope = (scope: string, requestedCwd: string | null): string | null => {
@@ -50,6 +53,13 @@ export default defineHost({
   settings: [secretCatalogSettings],
   setup: ctx => {
     hostContext = ctx
+    ctx.provide(
+      'secretCatalogCredentials',
+      createSecretCatalogCredentialBridge({
+        operations: operationsFor(ctx),
+        getCredentials: () => ctx.get('credentials'),
+      }),
+    )
     ctx.effect(() => () => {
       if (hostContext === ctx) hostContext = undefined
     }, 'secret-catalog tools context')

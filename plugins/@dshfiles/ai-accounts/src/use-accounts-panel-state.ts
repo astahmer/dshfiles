@@ -6,11 +6,12 @@ import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-dra
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
+import { aiAccountsApi, isKeyEnvName, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
+import type { CredentialSetupPort } from './credential-setup-port.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 
-export const useAccountsPanelState = () => {
+export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => {
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
   const preferences = usePreferences()
@@ -71,7 +72,14 @@ export const useAccountsPanelState = () => {
 
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
   const problem = draft === null ? null : draftProblem(draft)
-
+  const credentialRefName = draft?.apiKeyEnv.trim() ?? ''
+  const credentialInfoQuery = useQuery({
+    queryKey: aiAccountsKeys.credential(credentialRefName),
+    queryFn: () => credentialSetup?.describe(credentialRefName) ?? Promise.reject(new Error('Credential setup is unavailable.')),
+    enabled: credentialSetup !== undefined && isKeyEnvName(credentialRefName),
+    staleTime: 10_000,
+    retry: false,
+  })
   const { saver, status: autoSave } = useAutoSaver<AccountDraft>({
     save: async next => setFile(await accounts.save({ draft: next })),
     equals: sameDraft,
@@ -108,14 +116,73 @@ export const useAccountsPanelState = () => {
     },
   })
 
-  const save = async (next: AccountDraft) => {
+  const save = async (next: AccountDraft): Promise<boolean> => {
     const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
     try {
       await saveMutation.mutateAsync({ draft: next, ...(previousInstanceId === undefined ? {} : { previousInstanceId }) })
       saver.markSaved(next)
       setNotice(previousInstanceId === undefined ? 'Saved. New sessions use the updated route settings.' : `Renamed to ${next.instanceId}.`)
+      return true
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
+      return false
+    }
+  }
+
+  const storeCredential = async (input: { readonly ref: string; readonly value: string }): Promise<boolean> => {
+    if (
+      credentialSetup === undefined ||
+      draft === null ||
+      problem !== null ||
+      input.ref !== draft.apiKeyEnv.trim() ||
+      !isKeyEnvName(input.ref)
+    ) {
+      setNotice('Save a valid account and API-key variable before storing a key.')
+      return false
+    }
+    if (!(await save(draft))) return false
+    if (input.value.length === 0) {
+      setNotice('Enter a non-empty key.')
+      return false
+    }
+    try {
+      await credentialSetup.set(input.ref, input.value)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.credential(input.ref) }),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file }),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.usage }),
+      ])
+      setNotice('Key stored in DSH credentials. The next request uses it; no relaunch needed.')
+      return true
+    } catch {
+      setNotice('Could not store the key. A read-only environment source may shadow this variable; choose another API-key variable or update its source.')
+      return false
+    }
+  }
+
+  const importSecretCatalogKey = async (input: {
+    readonly alias: string
+    readonly environment: string
+    readonly scope: 'global' | 'project' | 'local'
+    readonly cwd: string | null
+  }): Promise<boolean> => {
+    if (draft === null || problem !== null || !isKeyEnvName(draft.apiKeyEnv.trim())) {
+      setNotice('Save a valid API-key variable ending in _API_KEY before importing a key.')
+      return false
+    }
+    if (!(await save(draft))) return false
+    try {
+      await accounts.importSecretCatalogKey({ instanceId: draft.instanceId, ...input })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.credential(draft.apiKeyEnv.trim()) }),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file }),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.usage }),
+      ])
+      setNotice('Secret imported into DSH credentials. The next request uses it; no relaunch needed.')
+      return true
+    } catch {
+      setNotice('The account mapping was saved, but the Secret Catalog key could not be imported. Check the entry and retry.')
+      return false
     }
   }
 
@@ -203,6 +270,12 @@ export const useAccountsPanelState = () => {
     setDraft,
     dirty,
     problem,
+    credentialInfo: credentialInfoQuery.data ?? null,
+    credentialInfoLoading: credentialInfoQuery.isFetching,
+    credentialInfoUnavailable: credentialInfoQuery.isError,
+    credentialSetupAvailable: credentialSetup !== undefined,
+    storeCredential,
+    importSecretCatalogKey,
     saveMode: preferences.saveMode,
     autoSave,
     retryAutoSave: () => void saver.retry().catch(() => undefined),

@@ -16,7 +16,7 @@ import { primeAccountFile, readAccountFile, readAccountFileSync } from './accoun
 import { aiAccountsTool } from './accounts-tool.js'
 import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
-import { discoveryCatalogOptions, readKeyFromEnv } from './credentials.js'
+import { discoveryCatalogOptions, readKeyFromEnv, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -75,11 +75,16 @@ export default definePlugin({
   settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
+    const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
-    runtime.scheduler = createUsageHistoryScheduler(ctx, async () => {
-      const file = await accountsFile(ctx)
-      return { accounts: file.accounts, shadowRoot: file.shadowRoot }
-    })
+    runtime.scheduler = createUsageHistoryScheduler(
+      ctx,
+      async () => {
+        const file = await accountsFile(ctx)
+        return { accounts: file.accounts, shadowRoot: file.shadowRoot }
+      },
+      { resolveCredential },
+    )
     // 30 s: long enough that the page, footer and edge overlay share one sweep,
     // short enough that a manual reload still feels live.
     ctx.effect(() => () => {
@@ -87,6 +92,9 @@ export default definePlugin({
       void closeUsageDomain(ctx).catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
     })
     runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => readAccountsUsage(ctx) })
+    ctx.on('credentials/reference-updated', ref => {
+      if (readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
+    })
     const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
     runtime.pricing = pricing
     const refreshStalePricing = (): void => {
@@ -139,6 +147,7 @@ export default definePlugin({
         ? createCommandCodeProvider({
             baseUrl: route.apiBaseUrl,
             keyEnv: route.apiKeyEnv,
+            resolveCredential,
           })
         : opencodeUpstream
     // Per-account, per-model default efforts, read from the same file as the
@@ -241,7 +250,12 @@ export default definePlugin({
           }
           if (route.kind === CLAUDE_KIND) {
             try {
-              return await resolveClaudeInferenceToken({ configDir: route.configDir, keyEnv: route.apiKeyEnv, now: Date.now() })
+              return await resolveClaudeInferenceToken({
+                configDir: route.configDir,
+                keyEnv: route.apiKeyEnv,
+                now: Date.now(),
+                resolveCredential,
+              })
             } catch (cause) {
               throw new LlmError(cause instanceof Error ? cause.message : `No Claude login for '${provider}'.`, 'MISSING_CREDENTIAL')
             }
@@ -249,7 +263,8 @@ export default definePlugin({
           // Keyed providers read the variable their own account names, so several
           // subscriptions live in the vault without any value in the accounts file.
           const named = keyEnvFor(route)
-          const key = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named) : readKeyFromEnv(named) || config.opencodeApiKey.trim()
+          const namedKey = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named, resolveCredential) : await resolveCredential(named)
+          const key = namedKey || config.opencodeApiKey.trim()
           if (key.length === 0) {
             throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
           }
@@ -298,7 +313,11 @@ export default definePlugin({
       const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
         if (route.kind === COMMANDCODE_KIND) {
           const entries = await fetchCommandCodeCatalog({
-            ...discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }),
+            ...discoveryCatalogOptions(
+              request,
+              { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) },
+              await resolveCredential(keyEnvFor(route)),
+            ),
             signal,
           })
           return entries.map(entry => ({

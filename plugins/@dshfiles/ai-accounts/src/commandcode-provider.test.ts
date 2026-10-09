@@ -32,6 +32,21 @@ describe('fetchCommandCodeCatalog', () => {
     ])
   })
 
+  it('preserves the live Command Code model id without an OpenAI namespace prefix', async () => {
+    catalogPayload = { data: [{ id: 'gpt-6-luna' }] }
+    try {
+      const entries = await fetchCommandCodeCatalog({ baseUrl, apiKey: 'typed-key' })
+      expect(entries).toContainEqual({ id: 'gpt-6-luna', api: 'openai-completions' })
+    } finally {
+      catalogPayload = { data: [{ id: 'anthropic/claude-test' }, { id: 'openai/gpt-test' }] }
+    }
+  })
+
+  it('keeps the verified GPT-6 Luna id in the no-key fallback', async () => {
+    const entries = await fetchCommandCodeCatalog({ baseUrl, apiKey: '' })
+    expect(entries).toContainEqual({ id: 'gpt-6-luna', api: 'openai-completions' })
+  })
+
   it('uses the fallback catalog when the response shape is invalid', async () => {
     catalogPayload = { data: [{ id: 42 }] }
     try {

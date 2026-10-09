@@ -1,4 +1,6 @@
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -7,7 +9,9 @@ import type {} from './models-page-slot.js'
 import type {} from './sidebar-footer-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { createWorkspacePickerPorts, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { AccountsPanel } from './accounts-panel.js'
+import type { CredentialSetupPort } from './credential-setup-port.js'
 import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
@@ -31,12 +35,30 @@ export default defineClientPlugin({
   id: 'llm-ai-accounts',
   name: '@dshfiles/ai-accounts',
   uses: ['ui'],
-  inject: ['layout', 'locale'],
+  inject: ['layout', 'locale', 'remote'],
   locales: [aiAccountsLocale],
   // Declare the services used through the scoped context. The UI capability
   // supplies the native slot adapter and decorates each registered component.
   setup(api) {
     const ctx = api.raw.ctx
+    const folderPicker: WorkspacePickerPorts = createWorkspacePickerPorts(ctx.remote)
+    const remoteCredentials = ctx.remote?.credentials
+    const credentialSetup: CredentialSetupPort | undefined =
+      remoteCredentials === undefined
+        ? undefined
+        : {
+            describe: async ref => {
+              const result = await remoteCredentials.describe([ref])
+              if (!result.ok) throw new Error('Credential status is unavailable.')
+              const info = result.value[ref]
+              if (info === undefined) throw new Error('Credential status is unavailable.')
+              return info
+            },
+            set: async (ref, value) => {
+              const result = await remoteCredentials.set(ref, value)
+              if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
+            },
+          }
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
     const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
     const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
@@ -44,7 +66,7 @@ export default defineClientPlugin({
     // and panels read one usage cache instead of polling side by side.
     const AccountsPanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <AccountsPanel onOpenUsageHistory={openUsageHistory} />
+        <AccountsPanel credentialSetup={credentialSetup} folderPicker={folderPicker} onOpenUsageHistory={openUsageHistory} />
       </PluginQueryProvider>
     )
     const UsageHistoryPanelView = (): JSX.Element => (

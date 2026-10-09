@@ -1,7 +1,15 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { queryOptions } from '@dshfiles/plugin-ui/query'
 import { z } from 'zod'
-import { accountKindSchema, aiAccountsApi, usageCardSchema, type AccountsCatalog, type AccountsUsage, type NativeProviders } from './api.js'
+import {
+  accountKindSchema,
+  aiAccountsApi,
+  usageCardSchema,
+  type AccountsCatalog,
+  type AccountsUsage,
+  type NativeProviders,
+  type SecretCatalogKeys,
+} from './api.js'
 
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
@@ -12,6 +20,8 @@ const LIVE_RELOAD_POLL_MS = 3_500
 export const aiAccountsKeys = {
   file: ['ai-accounts', 'file'] as const,
   usage: ['ai-accounts', 'usage'] as const,
+  secretCatalogKeys: (cwd: string | null) => ['ai-accounts', 'secret-catalog-keys', cwd] as const,
+  credential: (ref: string) => ['ai-accounts', 'credential', ref] as const,
   catalog: (instanceId: string) => ['ai-accounts', 'catalog', instanceId] as const,
   history: ['ai-accounts', 'history'] as const,
   historyRange: (instanceId: string, days: number) => ['ai-accounts', 'history', instanceId, days] as const,
@@ -56,6 +66,13 @@ const hasPendingLiveReload = (state: NativeProviders | undefined): boolean =>
   state?.liveReload === true && state.providers.some(provider => provider.enabled !== provider.running && provider.lockedReason === null)
 
 export const aiAccountsQueries = {
+  secretCatalogKeys: (accounts: Pick<AccountsClient, 'secretCatalogKeys'>, cwd: string | null) =>
+    queryOptions<SecretCatalogKeys>({
+      queryKey: aiAccountsKeys.secretCatalogKeys(cwd),
+      queryFn: ({ signal }) => accounts.secretCatalogKeys({ cwd }, { signal }).catch(() => ({ available: false, items: [] })),
+      retry: false,
+    }),
+
   file: (accounts: Pick<AccountsClient, 'read'>) =>
     queryOptions({ queryKey: aiAccountsKeys.file, queryFn: ({ signal }) => accounts.read(undefined, { signal }) }),
 

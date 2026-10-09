@@ -252,12 +252,43 @@ export type UsageHistoryMeta = z.infer<typeof usageMetaSchema>
 /** Icon names the page offers, matching the reference account page. */
 export const PROVIDER_ICONS = ['Bot', 'Rocket', 'Sparkles', 'Terminal', 'Layers', 'Brain', 'Globe', 'Code', 'Gem'] as const
 
+export const secretCatalogKeyOptionSchema = z.object({
+  alias: z.string().min(1).max(256),
+  environment: z.string().min(1).max(256),
+  scope: z.enum(['global', 'project', 'local']),
+  cwd: z.string().max(4096).nullable(),
+  variableName: z.string().max(256),
+  service: z.string().max(512),
+  description: z.string().max(1024),
+})
+
+export const secretCatalogKeysSchema = z.object({
+  available: z.boolean(),
+  items: z.array(secretCatalogKeyOptionSchema).max(2_000),
+})
+
+export type SecretCatalogKeyOption = z.infer<typeof secretCatalogKeyOptionSchema>
+export type SecretCatalogKeys = z.infer<typeof secretCatalogKeysSchema>
+
 export const aiAccountsApi = defineApi({
   id: 'ai-accounts',
   version: 1,
   methods: {
     /** Read the whole file: distribution plus every account. */
     read: method({ input: z.void(), output: accountsFileSchema }),
+    /** Value-free Secret Catalog metadata for global entries or one explicitly selected folder. */
+    secretCatalogKeys: method({ input: z.object({ cwd: z.string().max(4096).nullable() }), output: secretCatalogKeysSchema }),
+    /** Import one selected scoped alias into the saved account's DSH credential reference. */
+    importSecretCatalogKey: method({
+      input: z.object({
+        instanceId: z.string().min(1).max(64),
+        alias: z.string().min(1).max(256),
+        environment: z.string().min(1).max(256),
+        scope: z.enum(['global', 'project', 'local']),
+        cwd: z.string().max(4096).nullable(),
+      }),
+      output: z.object({ imported: z.literal(true), apiKeyEnv: z.string().max(128) }),
+    }),
     /** Create or update one account by its instance id. */
     save: method({
       input: z.object({

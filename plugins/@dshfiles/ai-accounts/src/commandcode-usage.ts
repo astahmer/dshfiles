@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV, resolveCommandCodeBase } from './commandcode-provider.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { emptyUsage, usageSignal, type UsageWindow } from './usage.js'
 
 /**
@@ -29,8 +29,9 @@ const authFileSchema = z.object({
 const keyFromRecord = (record: z.infer<typeof credentialRecordSchema> | undefined): string | undefined =>
   record === undefined ? undefined : record.type === 'oauth' ? record.access : (record.key ?? record.access)
 
-export const readCommandCodeKey = async (keyEnv: string): Promise<string> => {
-  const named = readKeyFromEnv(keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv)
+export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string> => {
+  const name = keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv
+  const named = resolveCredential === undefined ? readKeyFromEnv(name) : await resolveCredential(name)
   if (named.length > 0) return named
   try {
     const parsed = authFileSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))
@@ -98,9 +99,12 @@ export const parseCommandCodeUsage = (input: { readonly credits: unknown; readon
 
 const COMMAND_CODE_HEADERS = { 'accept-encoding': 'identity', 'x-cli-environment': 'production', accept: 'application/json' }
 
-export const readCommandCodeUsage = async (input: { readonly keyEnv: string; readonly apiBaseUrl: string }, signal?: AbortSignal): Promise<UsageCard> => {
+export const readCommandCodeUsage = async (
+  input: { readonly keyEnv: string; readonly apiBaseUrl: string; readonly resolveCredential?: CredentialValueResolver },
+  signal?: AbortSignal,
+): Promise<UsageCard> => {
   if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
-  const key = await readCommandCodeKey(input.keyEnv)
+  const key = await readCommandCodeKey(input.keyEnv, input.resolveCredential)
   if (key.length === 0) return emptyUsage('unauthenticated', 'Export the account key variable or run `cmd login`.')
   let base: string
   try {

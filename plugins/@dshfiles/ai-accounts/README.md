@@ -10,16 +10,42 @@ run through the `@dshfiles/cursor-agent` runtime driver.
 | Kind | Login | Model route | Quota |
 | --- | --- | --- | --- |
 | Codex | `CODEX_HOME=… codex login`, one shadow home per account | yes | 5-hour and weekly windows, banked resets |
-| Claude | `claude /login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` value in a named `*_API_KEY` variable serves requests | yes | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`) |
-| OpenCode Go | key in a named variable | yes | rolling, weekly and monthly windows |
-| Command Code | key in a named variable, or `cmd login` | yes | 5-hour and weekly window limits (`/alpha/billing/credits`) |
-| Cursor | `cursor-agent login`, or a token in a named variable | no | included usage for the billing cycle (undocumented dashboard endpoint) |
+| Claude | `claude /login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`) |
+| OpenCode Go | key in DSH credentials or the Host environment | yes | rolling, weekly and monthly windows |
+| Command Code | key in DSH credentials or the Host environment, or `cmd login` | yes | 5-hour and weekly window limits (`/alpha/billing/credits`) |
+| Cursor | `cursor-agent login`, or a token in DSH credentials or the Host environment | no | included usage for the billing cycle (undocumented dashboard endpoint) |
 
 The plugin reads Claude Code's login but never refreshes it. When that token
 expires, run Claude Code once on the account. Quota needs the interactive
 login, because a setup token cannot read usage. Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
 endpoint, the card reports "unsupported" instead of a guessed number.
+
+## API keys
+
+For keyed accounts, **Configure key…** appears only when the account has no
+usable login/key and DSH reports the named credential is missing and writable.
+It does not appear for a provider 404 or other request error. Entered keys go
+straight to DSH's write-only credential
+controller; they are not stored in AI Accounts JSON or sent to chat. Managed
+credential-store changes are resolved for the next request without restarting
+DSH.
+
+Secret Catalog is optional. When active, the dialog can import a unique global
+entry or a project/local entry from a folder you explicitly choose. The Client
+sees metadata only; the Host rechecks the selected scope and entry, reads its
+value, and writes it to DSH credentials. Unknown or ambiguous rows are hidden.
+Without Secret Catalog, direct entry still uses DSH credentials. If credential
+management is unavailable, set the named variable in the Host environment;
+changing the process environment requires relaunching DSH.
+
+The account field stores only the variable name matching `^[A-Z][A-Z0-9_]*_API_KEY$`.
+The checked-in `profiles/web/ai-accounts.json` is seed metadata; an existing
+runtime account store lives at `${DSH_HOME:-~/.dsh}/plugins/ai-accounts/accounts.json`.
+Changing the seed does not rewrite that runtime store. Edit the account in the
+panel or change its `apiKeyEnv` field in the appropriate JSON file, but never put
+a secret value in either file. The DSH credential provider is the unversioned
+secret store fallback; no separate credential JSON file is needed.
 
 ## Editing
 

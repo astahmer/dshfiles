@@ -22,12 +22,14 @@ import { NumberedSection, ProviderMark } from './panel-primitives.js'
 import { QuotaSection } from './quota-section.js'
 import { RuntimePathsSection } from './runtime-paths-section.js'
 import { SessionSection } from './session-section.js'
+import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
 export const AccountDetail = (props: {
   readonly state: AccountsPanelState
   readonly draft: AccountDraft
   readonly file: AccountsFile
+  readonly folderPicker: WorkspacePickerPorts
   readonly onOpenUsageHistory: () => void
 }): JSX.Element => {
   const draft = props.draft
@@ -60,7 +62,7 @@ export const AccountDetail = (props: {
 
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-auto dshx:overscroll-contain dshx:pr-1">
         <AccountIdentitySection draft={draft} state={props.state} />
-        <RuntimePathsSection draft={draft} state={props.state} />
+        <RuntimePathsSection draft={draft} folderPicker={props.folderPicker} state={props.state} />
         {routedKind(draft.kind) ? (
           <NumberedSection
             actions={

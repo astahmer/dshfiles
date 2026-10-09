@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { decodeJwtPayload } from './codex-home.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { emptyUsage, remainingFromUsed, usageSignal } from './usage.js'
 
@@ -29,8 +29,8 @@ export const CURSOR_LOGIN_HINT = 'cursor-agent login'
 
 const fileAuthSchema = z.object({ accessToken: z.string().min(1) })
 
-export const readCursorToken = async (keyEnv: string): Promise<string | undefined> => {
-  const named = readKeyFromEnv(keyEnv)
+export const readCursorToken = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string | undefined> => {
+  const named = resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await resolveCredential(keyEnv)
   if (named.length > 0) return named
   const fromKeychain = await readKeychainSecret({ service: 'cursor-access-token', account: 'cursor-user' })
   if (fromKeychain !== undefined) return fromKeychain
@@ -84,9 +84,13 @@ export const parseCursorUsage = (raw: unknown): UsageCard => {
   }
 }
 
-export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal): Promise<UsageCard> => {
+export const readCursorUsage = async (
+  keyEnv: string,
+  signal?: AbortSignal,
+  resolveCredential?: CredentialValueResolver,
+): Promise<UsageCard> => {
   if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
-  const token = await readCursorToken(keyEnv)
+  const token = await readCursorToken(keyEnv, resolveCredential)
   if (token === undefined) return emptyUsage('unauthenticated', `Sign in with ${CURSOR_LOGIN_HINT}.`)
   const cookie = cursorSessionCookie(token)
   if (cookie === undefined) return emptyUsage('unsupported', 'This Cursor token does not identify a user, so its dashboard usage cannot be read.')

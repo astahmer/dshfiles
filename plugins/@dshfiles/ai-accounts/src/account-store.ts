@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { codexAccountHome, describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { KIND_LABEL } from './account-labels.js'
 import { claudeLoginHint, describeClaudeAuth, resolveClaudeConfigDir } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
@@ -143,10 +143,17 @@ const observed = (
  * Observed fields for one stored profile: whether it holds a login, the identity
  * it presents, and how its Codex home is arranged. Never a credential.
  */
-const observe = async (draft: AccountDraft, file: AccountStoreFile, status: AccountStatus | undefined): Promise<AccountProfile> => {
+const observe = async (
+  draft: AccountDraft,
+  file: AccountStoreFile,
+  status: AccountStatus | undefined,
+  resolveCredential?: CredentialValueResolver,
+): Promise<AccountProfile> => {
   const cooling = status?.state === 'cooling'
+  const resolveKey = async (name: string): Promise<string> =>
+    resolveCredential === undefined ? readKeyFromEnv(name) : resolveCredential(name)
   if (draft.kind === 'opencode-go') {
-    const hasKey = readKeyFromEnv(draft.apiKeyEnv).length > 0
+    const hasKey = (await resolveKey(draft.apiKeyEnv)).length > 0
     return observed(draft, {
       cooling,
       signedIn: hasKey,
@@ -160,7 +167,7 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
     })
   }
   if (draft.kind === 'commandcode') {
-    const hasKey = (await readCommandCodeKey(draft.apiKeyEnv)).length > 0
+    const hasKey = (await readCommandCodeKey(draft.apiKeyEnv, resolveCredential)).length > 0
     return observed(draft, {
       cooling,
       signedIn: hasKey,
@@ -172,7 +179,7 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
   }
   if (draft.kind === 'claude') {
     const configDir = resolveClaudeConfigDir(draft.homePath)
-    const auth = await describeClaudeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now() })
+    const auth = await describeClaudeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
     return observed(draft, {
       cooling,
       signedIn: auth.signedIn,
@@ -183,7 +190,7 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
     })
   }
   if (draft.kind === 'cursor') {
-    const token = await readCursorToken(draft.apiKeyEnv)
+    const token = await readCursorToken(draft.apiKeyEnv, resolveCredential)
     return observed(draft, {
       cooling: false,
       signedIn: token !== undefined,
@@ -234,12 +241,16 @@ const observe = async (draft: AccountDraft, file: AccountStoreFile, status: Acco
  * The whole store as the page and the tool read it: stored profiles joined with
  * the pool's live health and each home's observed login.
  */
-export const buildAccountsFile = async (file: AccountStoreFile, statuses: readonly AccountStatus[]): Promise<AccountsFile> => ({
+export const buildAccountsFile = async (
+  file: AccountStoreFile,
+  statuses: readonly AccountStatus[],
+  resolveCredential?: CredentialValueResolver,
+): Promise<AccountsFile> => ({
   ...file,
   accounts: await Promise.all(
     file.accounts.map(async draft => {
       const status = statuses.find(candidate => candidate.id === draft.instanceId)
-      return observe(draft, file, status)
+      return observe(draft, file, status, resolveCredential)
     }),
   ),
 })

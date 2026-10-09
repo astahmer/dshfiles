@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+export { secretScopeSchema } from './credential-bridge-contract.js'
+export type { SecretScope } from './credential-bridge-contract.js'
+
 const secretPrintRowSchema = z
   .object({
     alias: z.string().min(1).max(256),

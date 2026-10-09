@@ -74,6 +74,18 @@ scope filter, the environment prefilled for new secrets, how long a revealed
 value stays visible, whether blur/hidden pages hide it, and how long success
 notices stay.
 
+## AI Accounts credential import
+
+When both plugins are active, AI Accounts can browse value-free Secret Catalog
+metadata: global entries without a folder, and project/local entries only after
+the user chooses a Host folder. The Host omits unknown scopes and ambiguous
+alias/environment/scope rows. Import is an explicit action: it rechecks the
+source metadata, verifies the target `*_API_KEY` reference is writable and
+empty, reveals only on the Host, and writes directly to DSH credentials. No key
+value crosses to the Client or enters the account JSON. Manual entry through
+DSH's write-only credential controller remains available when Secret Catalog is
+not installed.
+
 ## Machine and Host boundary
 
 The machine control identifies the current DSH Host using its OS hostname and

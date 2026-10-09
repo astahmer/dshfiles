@@ -1,10 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { SecretCatalogCredentialBridge } from '@dshfiles/secret-catalog/credential-bridge-contract'
 import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
-import { aiAccountsApi, baseModelName, type AccountsFile, type AccountsUsage } from './api.js'
+import { aiAccountsApi, baseModelName, isKeyEnvName, type AccountsFile, type AccountsUsage } from './api.js'
 import { buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
 import { readAccountUsage } from './account-usage.js'
+import { resolveKeyFromContext } from './credentials.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
@@ -17,7 +19,7 @@ import { readPricingSettings } from './settings.js'
  * `ai_accounts` tool can never describe different state.
  */
 export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
-  buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [])
+  buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [], resolveKeyFromContext(ctx))
 
 export const accountsSnapshot = accountsFile
 
@@ -33,11 +35,38 @@ const quotaContinuationServiceFor = (ctx: Context) => {
   return service
 }
 
+const secretCatalogBridgeFor = (ctx: Context): SecretCatalogCredentialBridge | undefined => ctx.get('secretCatalogCredentials')
+
 export const accountsHostApi = aiAccountsApi.host({
   read: async ({ ctx }) => {
     // A changed file means changed routes, so rebuild before answering.
     await refreshRoutes(ctx)
     return accountsFile(ctx)
+  },
+  secretCatalogKeys: async ({ input, ctx }) => {
+    const bridge = secretCatalogBridgeFor(ctx)
+    if (bridge === undefined) return { available: false, items: [] }
+    try {
+      return { available: true, items: [...await bridge.listKeys(input.cwd)] }
+    } catch {
+      return { available: false, items: [] }
+    }
+  },
+  importSecretCatalogKey: async ({ input, ctx }) => {
+    const account = (await readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
+    if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
+    if (!isKeyEnvName(account.apiKeyEnv)) throw new Error('Save a valid API-key variable ending in _API_KEY first.')
+    const bridge = secretCatalogBridgeFor(ctx)
+    if (bridge === undefined) throw new Error('Secret Catalog is not active.')
+    await bridge.importKey({
+      alias: input.alias,
+      environment: input.environment,
+      scope: input.scope,
+      cwd: input.cwd,
+      targetRef: account.apiKeyEnv,
+    })
+    accountRuntime(ctx)?.usageCache?.invalidate()
+    return { imported: true, apiKeyEnv: account.apiKeyEnv }
   },
   save: async ({ input, ctx }) => {
     await upsertAccount(input.draft, input.previousInstanceId)
@@ -120,7 +149,7 @@ export const readQuotaResetAt = async (ctx: Context, accountId: string): Promise
   const file = await accountsFile(ctx)
   const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
-  return knownQuotaResetAt(await readAccountUsage({ account, shadowRoot: file.shadowRoot }), Date.now())
+  return knownQuotaResetAt(await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential: resolveKeyFromContext(ctx) }), Date.now())
 }
 
 /**
@@ -134,13 +163,14 @@ export const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> =>
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
   const file = await accountsFile(ctx)
+  const resolveCredential = resolveKeyFromContext(ctx)
   const cards = await Promise.all(
     file.accounts.map(async account => ({
       instanceId: account.instanceId,
       displayName: account.displayName,
       kind: account.kind,
       enabled: account.enabled,
-      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot }),
+      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential }),
     })),
   )
   return { readAt: Date.now(), hostName: hostname(), cards }

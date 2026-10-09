@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { emptyUsage, remainingFromUsed, usageSignal, type UsageWindow } from './usage.js'
 
@@ -97,9 +97,18 @@ interface ClaudeAuthView {
   readonly detail: string | undefined
 }
 
-export const describeClaudeAuth = async (input: { readonly configDir: string; readonly keyEnv: string; readonly now: number }): Promise<ClaudeAuthView> => {
-  const [credential, identity] = await Promise.all([readClaudeCredential(input.configDir), readClaudeIdentity(input.configDir)])
-  const hasKey = readKeyFromEnv(input.keyEnv).length > 0
+export const describeClaudeAuth = async (input: {
+  readonly configDir: string
+  readonly keyEnv: string
+  readonly now: number
+  readonly resolveCredential?: CredentialValueResolver
+}): Promise<ClaudeAuthView> => {
+  const [credential, identity, named] = await Promise.all([
+    readClaudeCredential(input.configDir),
+    readClaudeIdentity(input.configDir),
+    input.resolveCredential === undefined ? Promise.resolve(readKeyFromEnv(input.keyEnv)) : input.resolveCredential(input.keyEnv),
+  ])
+  const hasKey = named.length > 0
   const expired = credential?.expiresAt !== undefined && credential.expiresAt <= input.now
   return {
     signedIn: hasKey || (credential !== undefined && !expired),
@@ -110,8 +119,13 @@ export const describeClaudeAuth = async (input: { readonly configDir: string; re
 }
 
 /** The token a request authenticates with: the named setup-token first, then the live login. */
-export const resolveClaudeInferenceToken = async (input: { readonly configDir: string; readonly keyEnv: string; readonly now: number }): Promise<string> => {
-  const named = readKeyFromEnv(input.keyEnv)
+export const resolveClaudeInferenceToken = async (input: {
+  readonly configDir: string
+  readonly keyEnv: string
+  readonly now: number
+  readonly resolveCredential?: CredentialValueResolver
+}): Promise<string> => {
+  const named = input.resolveCredential === undefined ? readKeyFromEnv(input.keyEnv) : await input.resolveCredential(input.keyEnv)
   if (named.length > 0) return named
   const credential = await readClaudeCredential(input.configDir)
   if (credential === undefined) throw new Error(`No Claude login found. Run: ${claudeLoginHint(input.configDir)}`)

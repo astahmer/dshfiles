@@ -5,13 +5,17 @@
   "description": "Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.",
   "files": [
     "dist",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "src/credential-bridge-contract.ts"
   ],
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./credential-bridge-contract": {
+      "types": "./src/credential-bridge-contract.ts"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -30,6 +34,7 @@
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-workspace-controller": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
@@ -50,6 +55,7 @@
     "@deepseek-ai/dsh-api-gateway": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-remotes": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",

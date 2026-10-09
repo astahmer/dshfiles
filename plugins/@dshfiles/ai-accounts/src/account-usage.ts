@@ -2,7 +2,7 @@ import type { AccountProfile, UsageCard } from './api.js'
 import { readClaudeUsage, resolveClaudeConfigDir } from './claude-account.js'
 import { codexLayoutFor } from './account-store.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
 import { emptyUsage, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
@@ -16,6 +16,7 @@ export const readAccountUsage = async (input: {
   /** The file's shadow root: an account with no explicit shadow home reads the one its route uses. */
   readonly shadowRoot: string
   readonly signal?: AbortSignal
+  readonly resolveCredential?: CredentialValueResolver
 }): Promise<UsageCard> => {
   const { account, signal } = input
   switch (account.kind) {
@@ -31,11 +32,13 @@ export const readAccountUsage = async (input: {
     case 'claude':
       return readClaudeUsage(resolveClaudeConfigDir(account.homePath), signal)
     case 'commandcode':
-      return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl }, signal)
+      return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
     case 'cursor':
-      return readCursorUsage(account.apiKeyEnv, signal)
-    case 'opencode-go':
-      return readOpenCodeUsage(readKeyFromEnv(account.apiKeyEnv), signal)
+      return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
+    case 'opencode-go': {
+      const key = input.resolveCredential === undefined ? readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
+      return readOpenCodeUsage(key, signal)
+    }
   }
 }
 

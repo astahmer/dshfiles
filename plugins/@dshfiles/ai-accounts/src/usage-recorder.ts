@@ -3,6 +3,7 @@ import { readAccountUsage } from './account-usage.js'
 import { USAGE_HISTORY_DOMAIN, boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
+import type { CredentialValueResolver } from './credentials.js'
 
 /**
  * Quota history collection.
@@ -28,9 +29,9 @@ interface AccountsForCollection {
 }
 
 const providerReader =
-  (shadowRoot: string): AccountUsageReader =>
+  (shadowRoot: string, resolveCredential?: CredentialValueResolver): AccountUsageReader =>
   (account, signal) =>
-    readAccountUsage({ account, shadowRoot, signal })
+    readAccountUsage({ account, shadowRoot, signal, resolveCredential })
 
 const facilityOf = (ctx: Context) => ctx.get('storageDomain')
 type Facility = NonNullable<ReturnType<typeof facilityOf>>
@@ -193,7 +194,11 @@ export interface UsageHistoryScheduler {
 export const createUsageHistoryScheduler = (
   ctx: Context,
   readAccounts: () => Promise<AccountsForCollection>,
-  options: { readonly now?: () => number; readonly readUsage?: AccountUsageReader } = {},
+  options: {
+    readonly now?: () => number
+    readonly readUsage?: AccountUsageReader
+    readonly resolveCredential?: CredentialValueResolver
+  } = {},
 ): UsageHistoryScheduler => {
   const now = options.now ?? Date.now
   let disposed = false
@@ -207,7 +212,12 @@ export const createUsageHistoryScheduler = (
     controller = currentController
     inFlight = (async () => {
       const source = await readAccounts()
-      const recorded = await collectUsageHistory(ctx, source.accounts, options.readUsage ?? providerReader(source.shadowRoot), currentController.signal)
+      const recorded = await collectUsageHistory(
+        ctx,
+        source.accounts,
+        options.readUsage ?? providerReader(source.shadowRoot, options.resolveCredential),
+        currentController.signal,
+      )
       if (currentController.signal.aborted) return recorded
       const settings = await readUsageHistorySettings(ctx)
       await pruneUsageHistory(ctx, settings.retentionDays)

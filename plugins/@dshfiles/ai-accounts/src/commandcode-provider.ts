@@ -4,7 +4,7 @@ import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.l
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { z } from 'zod'
 import { isAllowedCommandCodeBase, isKeyEnvName } from './api.js'
-import { readKeyFromEnv } from './credentials.js'
+import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { describeEmptyResponse, EMPTY_RESPONSE_CODE, isEmptyCompletion } from './empty-response.js'
 
 /**
@@ -33,6 +33,7 @@ export interface CatalogEntry {
 export interface CommandCodeProviderOptions {
   readonly baseUrl?: string
   readonly keyEnv?: string
+  readonly resolveCredential?: CredentialValueResolver
 }
 
 export interface CommandCodeCatalogOptions {
@@ -47,6 +48,7 @@ export interface CommandCodeCatalogOptions {
  * deliberately small; the real list comes from {@link fetchCommandCodeCatalog}.
  */
 const FALLBACK: readonly CatalogEntry[] = [
+  { id: 'gpt-6-luna', api: 'openai-completions' },
   { id: 'openai/gpt-5.1', api: 'openai-completions' },
   { id: 'anthropic/claude-sonnet-4-5', api: 'anthropic-messages' },
   { id: 'anthropic/claude-opus-4-1', api: 'anthropic-messages' },
@@ -199,7 +201,10 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
     models: modelsFor(FALLBACK, base),
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
-    fetchModels: async () => modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey: readKeyFromEnv(keyEnv) }), base),
+    fetchModels: async () => {
+      const apiKey = options.resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
+      return modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey }), base)
+    },
     api: {
       'openai-completions': rejectEmptyCompletion(openAICompletionsApi()),
       'openai-responses': rejectEmptyCompletion(openAIResponsesApi()),
