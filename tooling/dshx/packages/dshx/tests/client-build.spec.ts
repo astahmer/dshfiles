@@ -736,6 +736,17 @@ describe('client compiler', () => {
     expect(await readFile(resolve(root, 'dist/client.js'), 'utf8')).toMatch(/"pluginPageNamespaces":\s*\[\]/)
   })
 
+  it('refuses a dsh.client.inject edge one typo away from an installed package', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/client.tsx'), "import { defineClient } from '@dshfiles/dshx/client'; export default defineClient({})")
+    const options = { packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' }
+    await expect(buildClient({ ...options, inject: ['@deepseek-ai/dsh-client-ui-setings'] })).rejects.toMatchObject({
+      code: 'DSHX1207',
+      message: expect.stringContaining('"@deepseek-ai/dsh-client-ui-settings"'),
+    })
+    await expect(buildClient({ ...options, inject: ['@deepseek-ai/dsh-client-ui-settings', '@acme/provider-from-the-installation'] })).resolves.toBeDefined()
+  })
+
   it('preserves native named Client exports and Config', async () => {
     const root = await temporaryProject()
     await writeFile(

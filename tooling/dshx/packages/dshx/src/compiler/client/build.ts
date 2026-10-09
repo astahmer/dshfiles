@@ -1,4 +1,5 @@
-import { readFile, realpath } from 'node:fs/promises'
+import { readdir, readFile, realpath } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, type InlineConfig, type Plugin } from 'vite'
@@ -249,6 +250,70 @@ async function validateLocaleProviderEdge(paths: Awaited<ReturnType<typeof resol
   })
 }
 
+const MAX_INJECT_TYPO_DISTANCE = 2
+
+const editDistance = (left: string, right: string): number => {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index)
+  for (let row = 1; row <= left.length; row += 1) {
+    const current = [row]
+    for (let column = 1; column <= right.length; column += 1) {
+      const substitution = previous[column - 1]! + (left[row - 1] === right[column - 1] ? 0 : 1)
+      current.push(Math.min(previous[column]! + 1, current[column - 1]! + 1, substitution))
+    }
+    previous = current
+  }
+  return previous[right.length]!
+}
+
+/**
+ * `dsh.client.inject` lists package names the Loader must load before this
+ * Client. A misspelled name never fails on its own: DSH waits for a provider
+ * that does not exist and the plugin silently never activates. Names stay
+ * open strings, because DSH resolves edges from its own installation and any
+ * browser package is a valid edge, so only a name that is not installed here
+ * yet sits one typo away from one that is gets refused.
+ */
+async function validateInjectPackages(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
+  const inject = options.inject ?? []
+  if (inject.length === 0) return
+  const resolver = createRequire(resolve(paths.root, 'package.json'))
+  const installed = (name: string): boolean =>
+    [`${name}/package.json`, name].some(request => {
+      try {
+        resolver.resolve(request)
+        return true
+      } catch {
+        return false
+      }
+    })
+  const missing = inject.filter(name => !installed(name))
+  if (missing.length === 0) return
+  const manifest = JSON.parse(await readFile(resolve(paths.root, 'package.json'), 'utf8').catch(() => '{}')) as Record<
+    string,
+    Record<string, string> | undefined
+  >
+  const scoped = await readdir(resolve(paths.root, 'node_modules/@deepseek-ai')).catch(() => [] as string[])
+  const candidates = [
+    ...new Set([
+      ...Object.keys(manifest.peerDependencies ?? {}),
+      ...Object.keys(manifest.devDependencies ?? {}),
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...scoped.map(name => `@deepseek-ai/${name}`),
+    ]),
+  ].filter(installed)
+  for (const name of missing) {
+    const suggestion = candidates
+      .map(candidate => ({ candidate, distance: editDistance(name, candidate) }))
+      .filter(item => item.distance > 0 && item.distance <= MAX_INJECT_TYPO_DISTANCE)
+      .sort((left, right) => left.distance - right.distance)[0]?.candidate
+    if (suggestion === undefined) continue
+    throw new DshxError('DSHX1207', `dsh.client.inject names ${JSON.stringify(name)}, which is not installed; did you mean ${JSON.stringify(suggestion)}?`, {
+      file: resolve(paths.root, 'package.json'),
+      hint: `Replace it with ${JSON.stringify(suggestion)} in package.json dsh.client.inject. DSH waits for every edge, so a misspelled one keeps the plugin from activating.`,
+    })
+  }
+}
+
 /**
  * A `list` slot addresses entries by `id`, so a plugin that reuses a shipped id
  * lands in the same cell. The cell then renders one occupant and drops the other
@@ -465,6 +530,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
 export async function watchClient(options: BuildClientOptions): Promise<BuildWatcher> {
   const paths = await resolveOptions(options)
   await validateSlotOccupancy(paths)
+  await validateInjectPackages(paths, options)
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)
@@ -484,6 +550,7 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
 export async function buildClient(options: BuildClientOptions): Promise<ClientBuildResult> {
   const paths = await resolveOptions(options)
   await validateSlotOccupancy(paths)
+  await validateInjectPackages(paths, options)
   await validateSetupServiceEdges(paths, options)
   await validateLocaleProviderEdge(paths, options)
   await validateConversationProviderEdges(paths, options)

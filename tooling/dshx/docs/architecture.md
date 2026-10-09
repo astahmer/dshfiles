@@ -53,6 +53,8 @@ Final artifacts contain no import of a DSHX authoring/runtime-private module.
 
 There is no marker-string scan, global API cache, global Settings scope, or stale HMR map.
 
+`dsh.client.inject` entries stay open package-name strings, because DSH resolves edges from its own installation and any browser package is a valid edge. The build refuses (`DSHX1207`) only a name that is not installed for the package yet sits within two edits of one that is, naming the intended package: a misspelled edge would otherwise make DSH wait forever. Runtime services are checked separately: `ctx.<service>` used in `setup` must appear in `defineClient.inject` (`DSHX1204`) and its optional provider must be a package edge (`DSHX1203`).
+
 ## Vite extension boundary
 
 User Vite plugins are standard `PluginOption[]`, not a DSHX plugin abstraction. They can transform modules and CSS but cannot replace roots, entries, output protocol, target, externals, chunking, or inline-asset policy. `dshx dev` is build-watch rather than a Vite dev server. See [Build](./guides/build.md).
