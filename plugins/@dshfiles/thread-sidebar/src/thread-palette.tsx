@@ -1,20 +1,27 @@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { FileIcon, FileSearchIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 import { frecencyBoosts, paletteFrecency, recordUse } from './frecency.js'
 import {
+  GO_TO_LINE_EVENT,
   indexFiles,
   indexThreads,
   OPEN_FILE_EVENT,
+  parseLineNumber,
+  parsePaletteQuery,
   rankActions,
   rankFiles,
   rankThreads,
   WORKSPACE_FILES_EVENT,
+  type ContentHit,
   type PaletteMode,
+  type PalettePrefix,
   type ThreadCandidate,
 } from './palette.js'
 import type { PaletteDestination } from './sidebar-state.js'
@@ -39,7 +46,27 @@ export interface ThreadPaletteCopy {
   readonly open: string
   readonly close: string
   readonly unassigned: string
+  readonly prefixHint: string
+  readonly viewAll: string
+  readonly viewCommands: string
+  readonly viewContent: string
+  readonly viewLine: string
+  readonly viewHelp: string
+  readonly commandsPlaceholder: string
+  readonly contentPlaceholder: string
+  readonly linePlaceholder: string
+  readonly helpPlaceholder: string
+  readonly helpCommands: string
+  readonly helpContent: string
+  readonly helpLine: string
+  readonly helpNone: string
+  readonly goToLine: string
+  readonly noEditorFile: string
+  readonly contentSearching: string
+  readonly contentUnavailable: string
 }
+
+type ContentSearch = (query: string, signal: AbortSignal) => Promise<readonly ContentHit[]>
 
 interface ThreadPaletteProps {
   readonly mode: PaletteMode
@@ -48,6 +75,7 @@ interface ThreadPaletteProps {
   readonly recentLimit: number
   readonly mac: boolean
   readonly copy: ThreadPaletteCopy
+  readonly searchContent: ContentSearch | null
   readonly onOpenThread: (sessionId: string) => void
   readonly onClose: () => void
 }
@@ -56,6 +84,9 @@ type PaletteRow =
   | { readonly kind: 'thread'; readonly thread: ThreadCandidate }
   | { readonly kind: 'destination'; readonly destination: PaletteDestination }
   | { readonly kind: 'file'; readonly path: string }
+  | { readonly kind: 'content'; readonly thread: ThreadCandidate; readonly snippet: string }
+  | { readonly kind: 'line'; readonly line: number }
+  | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
 
 const RESULT_LIMIT = 50
 const COMMAND_LIMIT = 30
@@ -64,8 +95,46 @@ const GO_TO_FILE_ID = 'action:go-to-file'
 
 const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'thread') return `thread:${row.thread.id}`
+  if (row.kind === 'content') return `content:${row.thread.id}`
   if (row.kind === 'file') return `file:${row.path}`
+  if (row.kind === 'line') return `line:${row.line}`
+  if (row.kind === 'help') return `help:${row.prefix}`
   return `destination:${row.destination.id}`
+}
+
+type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help'
+
+const VIEW_BY_PREFIX: Readonly<Record<PalettePrefix, PaletteView>> = { '>': 'commands', '#': 'content', ':': 'line', '?': 'help' }
+
+interface ContentState {
+  readonly status: 'idle' | 'searching' | 'done' | 'failed'
+  readonly hits: readonly ContentHit[]
+}
+
+const NO_CONTENT: ContentState = { status: 'idle', hits: [] }
+
+/** Host message-content search, debounced and cancelled when the query changes. */
+const useContentSearch = (query: string, search: ContentSearch | null): ContentState => {
+  const debounced = useDebouncedValue({ value: query.trim(), delayMs: 200 })
+  const [state, setState] = useState<ContentState>(NO_CONTENT)
+  useEffect(() => {
+    if (search === null || debounced.length === 0) {
+      setState(NO_CONTENT)
+      return
+    }
+    const controller = new AbortController()
+    setState(current => ({ ...current, status: 'searching' }))
+    search(debounced, controller.signal).then(
+      hits => {
+        if (!controller.signal.aborted) setState({ status: 'done', hits })
+      },
+      () => {
+        if (!controller.signal.aborted) setState({ status: 'failed', hits: [] })
+      },
+    )
+    return () => controller.abort()
+  }, [debounced, search])
+  return state
 }
 
 const filesReplySchema = z.union([
@@ -123,8 +192,11 @@ const glyphTone = (project: string): string => {
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [mode, setMode] = useState(props.mode)
   const [query, setQuery] = useState('')
-  const deferredQuery = useDeferredValue(query)
+  const parsed = parsePaletteQuery(useDeferredValue(query))
+  const view: PaletteView = parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
+  const deferredQuery = parsed.text
   const emptyQuery = deferredQuery.trim().length === 0
+  const [notice, setNotice] = useState<string | null>(null)
   const [selected, setSelected] = useState('')
   const frecency = paletteFrecency.useValue()
   const boosts = useMemo(() => frecencyBoosts(frecency, Date.now()), [frecency])
@@ -136,19 +208,42 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const fileKey = (path: string): string => `file:${fileScope}:${path}`
   const fileRows = useMemo(
     () =>
-      mode === 'files'
+      view === 'files'
         ? rankFiles({ index: fileIndex, query: deferredQuery, limit: RESULT_LIMIT, boost: path => boosts.get(`file:${fileScope}:${path}`) ?? 0 })
         : [],
-    [boosts, deferredQuery, fileIndex, fileScope, mode],
+    [boosts, deferredQuery, fileIndex, fileScope, view],
   )
 
   const threadIndex = useMemo(() => indexThreads(props.threads), [props.threads])
   const threadRows = useMemo(
     () =>
-      mode === 'files'
-        ? []
-        : rankThreads({ index: threadIndex, query: deferredQuery, limit: deferredQuery.trim().length === 0 ? props.recentLimit : RESULT_LIMIT }),
-    [deferredQuery, mode, props.recentLimit, threadIndex],
+      view === 'all' || view === 'threads'
+        ? rankThreads({ index: threadIndex, query: deferredQuery, limit: deferredQuery.trim().length === 0 ? props.recentLimit : RESULT_LIMIT })
+        : [],
+    [deferredQuery, props.recentLimit, threadIndex, view],
+  )
+
+  const content = useContentSearch(view === 'content' ? deferredQuery : '', props.searchContent)
+  const contentRows = useMemo(() => {
+    if (view !== 'content') return []
+    const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
+    return content.hits.flatMap(hit => {
+      const thread = threadsById.get(hit.sessionId)
+      return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
+    })
+  }, [content.hits, props.threads, view])
+  const line = view === 'line' ? parseLineNumber(deferredQuery) : null
+  const helpRows = useMemo(
+    () =>
+      view === 'help'
+        ? [
+            { prefix: '>' as const, label: props.copy.helpCommands },
+            { prefix: '#' as const, label: props.copy.helpContent },
+            { prefix: ':' as const, label: props.copy.helpLine },
+            { prefix: '' as const, label: props.copy.helpNone },
+          ]
+        : [],
+    [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, view],
   )
 
   const goToFile: PaletteDestination = useMemo(
@@ -164,34 +259,38 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   )
   const destinationRows = useMemo(
     () =>
-      mode === 'all'
+      view === 'all' || view === 'commands'
         ? rankActions({
             actions: [goToFile, ...props.destinations.filter(destination => destination.group === 'destination')],
             query: deferredQuery,
             boost: id => boosts.get(id) ?? 0,
           })
         : [],
-    [boosts, deferredQuery, goToFile, mode, props.destinations],
+    [boosts, deferredQuery, goToFile, props.destinations, view],
   )
   const commandRows = useMemo(() => {
-    if (mode !== 'all') return []
+    if (view !== 'all' && view !== 'commands') return []
     const commands = props.destinations.filter(destination => destination.group === 'command')
+    if (view === 'commands') return rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
     if (deferredQuery.trim().length > 0)
       return rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
     return rankActions({ actions: commands.filter(command => boosts.has(command.id)), query: '', boost: id => boosts.get(id) ?? 0 }).slice(
       0,
       FRECENT_COMMANDS_ON_EMPTY,
     )
-  }, [boosts, deferredQuery, mode, props.destinations])
+  }, [boosts, deferredQuery, props.destinations, view])
 
   const rows: PaletteRow[] = useMemo(
     () => [
+      ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
+      ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
+      ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
       ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [commandRows, destinationRows, fileRows, threadRows],
+    [commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
   )
   const numbered = rows.slice(0, 9)
 
@@ -200,6 +299,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const activate = (row: PaletteRow): void => {
+    if (row.kind === 'help') {
+      setQuery(row.prefix)
+      return
+    }
+    if (row.kind === 'line') {
+      const handled = !window.dispatchEvent(new CustomEvent(GO_TO_LINE_EVENT, { detail: { line: row.line }, cancelable: true }))
+      if (handled) props.onClose()
+      else setNotice(props.copy.noEditorFile)
+      return
+    }
     if (row.kind === 'destination' && row.destination.id === GO_TO_FILE_ID) {
       remember(GO_TO_FILE_ID)
       setMode('files')
@@ -207,7 +316,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       return
     }
     props.onClose()
-    if (row.kind === 'thread') {
+    if (row.kind === 'thread' || row.kind === 'content') {
       props.onOpenThread(row.thread.id)
       return
     }
@@ -253,7 +362,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const itemClass = 'dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
-  const placeholder = mode === 'files' ? props.copy.filesPlaceholder : mode === 'threads' ? props.copy.threadsPlaceholder : props.copy.allPlaceholder
+  const viewCopy: Readonly<Record<PaletteView, { readonly chip: string; readonly placeholder: string }>> = {
+    all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
+    threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
+    files: { chip: props.copy.files, placeholder: props.copy.filesPlaceholder },
+    commands: { chip: props.copy.viewCommands, placeholder: props.copy.commandsPlaceholder },
+    content: { chip: props.copy.viewContent, placeholder: props.copy.contentPlaceholder },
+    line: { chip: props.copy.viewLine, placeholder: props.copy.linePlaceholder },
+    help: { chip: props.copy.viewHelp, placeholder: props.copy.helpPlaceholder },
+  }
+  const placeholder = viewCopy[view].placeholder
 
   const destinationItem = (destination: PaletteDestination): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
@@ -268,8 +386,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     )
   }
 
+  const contentStatus =
+    view !== 'content'
+      ? null
+      : props.searchContent === null || content.status === 'failed'
+        ? props.copy.contentUnavailable
+        : content.status === 'searching'
+          ? props.copy.contentSearching
+          : null
   const filesStatus =
-    mode !== 'files'
+    view !== 'files'
       ? null
       : workspaceFiles.status === 'unavailable'
         ? props.copy.filesUnavailable
@@ -287,9 +413,63 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         <DialogTitle className="dshx:sr-only">{props.copy.title}</DialogTitle>
         <DialogDescription className="dshx:sr-only">{placeholder}</DialogDescription>
         <Command shouldFilter={false} value={selected} onValueChange={setSelected} onKeyDown={onKeyDown} loop className="dshx:rounded-none">
-          <CommandInput autoFocus className="dshx:h-11" value={query} onValueChange={setQuery} placeholder={placeholder} />
+          <CommandInput
+            autoFocus
+            className="dshx:h-11"
+            value={query}
+            onValueChange={next => {
+              setQuery(next)
+              setNotice(null)
+            }}
+            placeholder={placeholder}
+          />
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+            <Badge variant="secondary">{viewCopy[view].chip}</Badge>
+            <span className="dshx:truncate">{notice ?? props.copy.prefixHint}</span>
+          </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
-            <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">{filesStatus ?? props.copy.empty}</CommandEmpty>
+            <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">{filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty)}
+            </CommandEmpty>
+            {helpRows.length > 0 ? (
+              <CommandGroup heading={props.copy.viewHelp}>
+                {helpRows.map(help => {
+                  const row: PaletteRow = { kind: 'help', ...help }
+                  return (
+                    <CommandItem key={help.prefix} value={rowValue(row)} className={itemClass} onSelect={() => activate(row)}>
+                      <Kbd className="dshx:min-w-7 dshx:justify-center">{help.prefix === '' ? '∅' : help.prefix}</Kbd>
+                      <span className="dshx:truncate dshx:text-sm">{help.label}</span>
+                      {shortcut(row)}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            ) : null}
+            {line === null ? null : (
+              <CommandGroup heading={props.copy.viewLine}>
+                <CommandItem value={rowValue({ kind: 'line', line })} className={itemClass} onSelect={() => activate({ kind: 'line', line })}>
+                  <ListOrderedIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                  <span className="dshx:truncate dshx:text-sm">{`${props.copy.goToLine} ${line}`}</span>
+                  {shortcut({ kind: 'line', line })}
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {contentRows.length > 0 ? (
+              <CommandGroup heading={props.copy.viewContent}>
+                {contentRows.map(hit => {
+                  const row: PaletteRow = { kind: 'content', ...hit }
+                  return (
+                    <CommandItem key={hit.thread.id} value={rowValue(row)} className={itemClass} onSelect={() => activate(row)}>
+                      <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                        <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
+                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{hit.snippet}</span>
+                      </span>
+                      {shortcut(row)}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            ) : null}
             {destinationRows.length > 0 ? <CommandGroup heading={props.copy.destinations}>{destinationRows.map(destinationItem)}</CommandGroup> : null}
             {commandRows.length > 0 ? (
               <>

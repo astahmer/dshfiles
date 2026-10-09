@@ -8,6 +8,8 @@ import {
   indexThreads,
   matchesChord,
   parseChord,
+  parseLineNumber,
+  parsePaletteQuery,
   rankActions,
   rankFiles,
   rankThreads,
@@ -103,6 +105,18 @@ test('actions match labels and aliases, keep source order on ties, and rise with
     rankActions({ actions, query: '', boost: id => (id === 'action:customize-sidebar' ? 80 : 0) }).map(action => action.id),
     ['action:customize-sidebar', 'command:jujutsu.toggleSessionRepository', 'action:toggle-sidebar'],
   )
+})
+
+test('a leading prefix picks the palette view and is stripped from the search text', () => {
+  assert.deepEqual(parsePaletteQuery('>toggle'), { prefix: '>', text: 'toggle' })
+  assert.deepEqual(parsePaletteQuery('#migration plan'), { prefix: '#', text: 'migration plan' })
+  assert.deepEqual(parsePaletteQuery(':42'), { prefix: ':', text: '42' })
+  assert.deepEqual(parsePaletteQuery('?'), { prefix: '?', text: '' })
+  assert.deepEqual(parsePaletteQuery('src/>x'), { prefix: null, text: 'src/>x' })
+  assert.equal(parseLineNumber(' 42 '), 42)
+  assert.equal(parseLineNumber('0'), null)
+  assert.equal(parseLineNumber('4a'), null)
+  assert.equal(parseLineNumber(''), null)
 })
 
 test('chords round-trip, reject unmodified keys, and match exactly', () => {

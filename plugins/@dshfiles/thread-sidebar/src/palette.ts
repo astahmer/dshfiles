@@ -4,6 +4,30 @@ export const PALETTE_EVENT = 'dshfiles:command-palette'
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
 export const OPEN_FILE_EVENT = 'dshfiles:open-file'
 export const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
+export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
+
+/** VS Code-style query prefixes: `>` commands, `#` thread content, `:` line in the open file, `?` the list of prefixes. */
+export type PalettePrefix = '>' | '#' | ':' | '?'
+
+export const PALETTE_PREFIXES: readonly PalettePrefix[] = ['>', '#', ':', '?']
+
+export const parsePaletteQuery = (query: string): { readonly prefix: PalettePrefix | null; readonly text: string } => {
+  const prefix = PALETTE_PREFIXES.find(candidate => query.startsWith(candidate)) ?? null
+  return { prefix, text: prefix === null ? query : query.slice(1) }
+}
+
+/** A positive line number from the text after `:`, or null. */
+export const parseLineNumber = (text: string): number | null => {
+  const trimmed = text.trim()
+  if (!/^\d{1,7}$/u.test(trimmed)) return null
+  const line = Number(trimmed)
+  return line > 0 ? line : null
+}
+
+export interface ContentHit {
+  readonly sessionId: string
+  readonly snippet: string
+}
 
 export interface ThreadCandidate {
   readonly id: string

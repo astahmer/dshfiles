@@ -290,6 +290,14 @@ export default defineClient({
                 })
               ).ok,
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
+            searchContent:
+              typeof ctx.sessions.search === 'function'
+                ? async (query: string, signal: AbortSignal) => {
+                    const result = await ctx.sessions.search(query, signal)
+                    if (!result.ok) throw new Error('Session content search failed.')
+                    return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
+                  }
+                : null,
           }),
         },
         decorate(ThreadSidebar),

@@ -50,7 +50,7 @@ import {
   workspaceForLineage,
 } from './organization.js'
 import { toggleCollapsedSection } from './preferences.js'
-import { isMacPlatform, type ThreadCandidate } from './palette.js'
+import { isMacPlatform, type ContentHit, type ThreadCandidate } from './palette.js'
 import { usePaletteState, useSidebarState } from './sidebar-state.js'
 import { ThreadPalette } from './thread-palette.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -66,6 +66,8 @@ type InjectedActions = {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   markRead: (sessionId: SessionSummary['id']) => Promise<boolean>
   setSnoozed: (sessionId: SessionSummary['id'], snoozed: boolean) => Promise<boolean>
+  /** Host message-content search; null when this Host has none. */
+  searchContent: ((query: string, signal: AbortSignal) => Promise<readonly ContentHit[]>) | null
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useWorkspaces'> &
@@ -830,6 +832,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             recentLimit={preferences.paletteRecentLimit}
             mac={isMacPlatform(navigator.platform)}
             onClose={closePalette}
+            searchContent={props.searchContent}
             onOpenThread={candidateId => {
               const session = paletteThreads.byCandidateId.get(candidateId)
               if (session !== undefined) openThread(session.id)
@@ -846,6 +849,24 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               filesTruncated: props.tSidebar('threadSidebarPaletteFilesTruncated'),
               filesNoSession: props.tSidebar('threadSidebarPaletteFilesNoSession'),
               filesUnavailable: props.tSidebar('threadSidebarPaletteFilesUnavailable'),
+              prefixHint: props.tSidebar('threadSidebarPalettePrefixHint'),
+              viewAll: props.tSidebar('threadSidebarPaletteViewAll'),
+              viewCommands: props.tSidebar('threadSidebarPaletteCommands'),
+              viewContent: props.tSidebar('threadSidebarPaletteViewContent'),
+              viewLine: props.tSidebar('threadSidebarPaletteViewLine'),
+              viewHelp: props.tSidebar('threadSidebarPaletteViewHelp'),
+              commandsPlaceholder: props.tSidebar('threadSidebarPaletteCommandsPlaceholder'),
+              contentPlaceholder: props.tSidebar('threadSidebarPaletteContentPlaceholder'),
+              linePlaceholder: props.tSidebar('threadSidebarPaletteLinePlaceholder'),
+              helpPlaceholder: props.tSidebar('threadSidebarPaletteHelpPlaceholder'),
+              helpCommands: props.tSidebar('threadSidebarPaletteHelpCommands'),
+              helpContent: props.tSidebar('threadSidebarPaletteHelpContent'),
+              helpLine: props.tSidebar('threadSidebarPaletteHelpLine'),
+              helpNone: props.tSidebar('threadSidebarPaletteHelpNone'),
+              goToLine: props.tSidebar('threadSidebarPaletteGoToLine'),
+              noEditorFile: props.tSidebar('threadSidebarPaletteNoEditorFile'),
+              contentSearching: props.tSidebar('threadSidebarPaletteContentSearching'),
+              contentUnavailable: props.tSidebar('threadSidebarPaletteContentUnavailable'),
               recent: props.tSidebar('threadSidebarPaletteRecent'),
               threads: props.tSidebar('threadSidebarTitle'),
               destinations: props.tSidebar('threadSidebarPaletteDestinations'),
