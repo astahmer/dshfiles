@@ -55,3 +55,23 @@ only, with no model latency.
 
 Not measured yet: cache-read %, prompt size per turn, real-model compaction cost. These belong to
 Stage 3/5 on DSH.
+
+## Compat vs full mode, live (Stage 4, 2026-10-09)
+
+Same 4 prompts, fork Host, `codex-emialex/gpt-6-luna` effort low (see runtime-evidence.md Stage 4). Input = total −
+output tokens from `assistant/message.usage`; cache = `cacheReadTokens`.
+
+| Conv/turn/step | full input | full cache | compat input | compat cache |
+|---|---|---|---|---|
+| A 1/1 | 11,109 | 0 % | 11,014 | 0 % |
+| A 2/1 | 11,165 | 96 % | 11,073 | 97 % |
+| A 2/2 | 11,447 | 94 % | 11,373 | 95 % |
+| A 3/1 | 11,398 | 94 % | 11,402 | 94 % |
+| B 1/1 | 11,457 | 0 % | 11,179 | 0 % |
+| B 1/2 | 11,795 | 91 % | 11,516 | 93 % |
+
+Reading: ~10.7k tokens are the stable system prompt + tool schemas, cached identically in both modes (the provider
+cache key is per session, so a new conversation starts cold). With three short turns the raw history is smaller than
+the view header, so full mode costs ~50–300 tokens more per request; at A 3/1 they meet (full sends 6 messages vs 11).
+Full mode's benefit — per-request history bounded by the view instead of the whole conversation — needs long
+conversations to show; not measured yet (Stage 5).

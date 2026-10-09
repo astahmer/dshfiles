@@ -76,3 +76,48 @@ Prompts were entered through the hidden browser pane (DOM input, no files writte
 | Command registration, backfill through `sessionQuery`, subagent parent links | proven | first pass above |
 | Summarizer unavailable path (`[pending summary]`, status message) | tests only | route resolver tests |
 | Cross-turn cache-read % / prompt size | not measured | Stage 5 |
+
+# Stage 4 — full mode through the fork (2026-10-09)
+
+Runtime: DSH 0.2.0-rc.2 CLI on Node 22.23.3, a throwaway profile `optmem-full` created by dshx `createScratchProfile`
+(bundles `dsh-base`, `dsh-web-app`, `@dshfiles/dsh-core-runtime`, `@dshfiles/ai-accounts`, `@dshfiles/optmem`; every
+`@deepseek-ai/dsh-*` core package linked to `tooling/dsh-core`). `dsh-core-runtime` was rebuilt first: its dist bundles
+the fork, so a fork change is inactive until `pnpm --dir plugins/@dshfiles/dsh-core-runtime run build`.
+Boot overlay: `dshfiles-core-runtime.sessionPersistenceRoot` → the scratch home (the fork writes v5 logs, never into
+`~/.dsh/sessions`), agent default `codex-emialex` / `gpt-6-luna` / effort `low`, `dshfiles-optmem.mode: full`.
+Driven headless through the dshx platform client (`sessions.create/prompt/history`), cwd = a scratch project dir.
+`web` (port 3080, pid unchanged) and the `probe` profile were not touched; the temporary
+`~/.dsh/profiles/optmem-full` symlink was removed afterwards. The driver script lived in the session scratchpad.
+
+Why `DSH_HOME` stayed the real one: with an isolated `DSH_HOME` every turn (stock core too) ended `completed` with an
+empty assistant message and no usage within ~30 ms — the Codex account route does not work from a fresh DSH home even
+with a sanitized `accounts.json`; not investigated further (unrelated to OptMem). Side effect: the turns were captured
+into the probe memory DB `~/.dsh/plugins/optmem/optmem.db` under a `project:path:864f…` project.
+
+## Turns (full mode)
+
+| Conversation | Turn/step | Request (derived → sent) | Notes |
+|---|---|---|---|
+| A | 1/1 | 5 → 6 | view `(no memory yet)`; reply acknowledged codename `teal-otter-42` |
+| A | 2/1, 2/2 | 7 → 6, 9 → 8 | model called `memory_status`: `mode full`, `replaceContext=yes resetPerTurn=yes`, `last full-mode request: turn 2 step 1, 7 → 6 messages (4 carried), view v2 196 B, 0 pending` |
+| A | 3/1 | 11 → 6 | prompt forbade tools; answered `teal-otter-42` — turn 1 was only reachable through the memory view |
+| B (new session, same cwd) | 1/1, 1/2 | 5 → 6, 7 → 8 | called `memory_search` (4 project hits incl. conversation A), answered `teal-otter-42` |
+
+Every request carried a `request/messages-override` session event with these counts; 6 sent = system prompt + 3
+carried contexts (runtime context, instructions, skill catalog) + memory view + the current user message. The session
+log keeps the full raw history (11 derived messages at A/3), so the user-visible conversation is unchanged; both
+conversations stayed single sessions (`sessions.list`). Step 2 of a turn reused the turn's view (`8 = 6 + assistant +
+tool result`).
+
+## Proven / not proven
+
+| Claim | Status | How |
+|---|---|---|
+| Fork hook active in a real Host; plugin detects it | proven | `memory_status` capabilities, override events |
+| Turn N request has no prior-turn raw messages | proven (by count) | override events 11 → 6; message bodies are not logged |
+| Memory view present and used | proven | A/3 answered without tools; status line view v2 196 B |
+| Tools and tool round trips inside a full-mode turn | proven | `memory_status` / `memory_search` steps 2 |
+| Cross-conversation recall | proven | B/1 via `memory_search` (view also contained it) |
+| Byte-identical prefix across steps/turns | tests only | `full-mode.test.ts`; runtime shows equal cache reads, not bytes |
+| Cancellation during the barrier | tests only | abort test |
+| Real summaries in full mode | not exercised | summarizer route `not resolved yet`; events were short (verbatim leaves) |
