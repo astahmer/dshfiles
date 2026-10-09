@@ -60,7 +60,7 @@ import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotic
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
-import { captureComposerSelection, insertThreadMention } from './thread-mention.js'
+import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 
 type InjectedActions = {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -266,7 +266,6 @@ const ChildThreadList = (props: {
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, rowStyle } = props
-  const composerSelection = useRef<ReturnType<typeof captureComposerSelection>>(null)
   const t = props.actions.translate
   const unread = Boolean(session.attention?.unread)
   const compact = rowStyle.density === 'compact'
@@ -279,13 +278,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <article
-          className="dshx:group/row dshx:relative dshx:min-w-0"
-          data-selected={props.selected}
-          onContextMenu={() => {
-            composerSelection.current = captureComposerSelection()
-          }}
-        >
+        <article className="dshx:group/row dshx:relative dshx:min-w-0" data-selected={props.selected} onContextMenu={captureThreadMentionInsertion}>
           <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
             <button
               type="button"
@@ -448,7 +441,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         </article>
       </ContextMenuTrigger>
       <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarContextMenu')}>
-        <ContextMenuItem onSelect={() => insertThreadMention(session.id, composerSelection.current)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
         <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
         <ContextMenuItem
           onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}

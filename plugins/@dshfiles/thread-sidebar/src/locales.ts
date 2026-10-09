@@ -53,7 +53,7 @@ const en = {
   threadSidebarRunningNotice: 'Running work cannot be archived. Stop it in DSH first.',
   threadSidebarArchiveFailure: 'The Host could not archive this thread; its state may have changed.',
   threadSidebarContextMenu: 'Thread actions',
-  threadSidebarInsertMention: 'Insert thread mention',
+  threadSidebarInsertMention: '@Mention thread',
   threadSidebarCopyId: 'Copy thread ID',
   threadSidebarCopyLink: 'Copy thread link',
   threadSidebarIdCopied: 'Thread ID copied.',

@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -9,6 +10,7 @@ import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-s
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
+import { useEffect, useRef } from 'react'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
 import { sidebarChildren } from './sidebar-contract.js'
@@ -17,7 +19,35 @@ import { archiveWithoutStopping } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from './palette.js'
 import { SettingsTab } from './settings-tab.js'
+import { decodeThreadMentionText, THREAD_MENTION_CAPTURE_EVENT, THREAD_MENTION_INSERT_EVENT } from './thread-mention.js'
 import './client.css'
+
+const ThreadMentionInput = (props: { readonly inputActions: InputActions }): null => {
+  const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)
+
+  useEffect(() => {
+    const capture = (): void => {
+      insertion.current = props.inputActions.captureInsertion()
+    }
+    const insert = (event: Event): void => {
+      const mention = event instanceof CustomEvent ? decodeThreadMentionText(event.detail) : null
+      if (mention === null) return
+      const savedInsertion = insertion.current
+      insertion.current = null
+      if (savedInsertion !== null && props.inputActions.insertText(mention, savedInsertion)) return
+      props.inputActions.insertText(mention, props.inputActions.captureInsertion())
+    }
+
+    window.addEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
+    window.addEventListener(THREAD_MENTION_INSERT_EVENT, insert)
+    return () => {
+      window.removeEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
+      window.removeEventListener(THREAD_MENTION_INSERT_EVENT, insert)
+    }
+  }, [props.inputActions])
+
+  return null
+}
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
@@ -245,6 +275,16 @@ export default defineClient({
         openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
         runCommand={runCommand}
       />
+    )
+
+    ctx.slots.inject('conversation.input.overlay', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.input.overlay',
+          id: 'thread-sidebar-mention-input',
+        },
+        decorate(ThreadMentionInput),
+      ),
     )
 
     ctx.slots.inject('sidebar', () =>
