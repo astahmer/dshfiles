@@ -169,7 +169,13 @@ Acceptance (met): moving, tabbing, splitting and floating a panel does not remou
 drags in a probe instance on :3197: mount count unchanged, textarea draft and ticker kept). The layout survives a
 reload. Reset and unknown-panel recovery are tested. One shared plugin sheet once every UI plugin is rebuilt.
 
-### P2.1 Decide tree component (S, spike) — deps: P0.2
+### [~] P2.1 Decide tree component (S, spike) — deps: P0.2
+
+Interim (2026-10-10): the editor's own lazy tree (`editor/src/file-tree.tsx`, plugin-ui + TanStack Query, one
+`list` per expanded folder, relisted on `changes`) backs the Explorer panel; no new runtime. Still to decide with a
+measurement: virtualization for 10k+ visible rows (flat visible-row list on `@tanstack/react-virtual`) and
+keyboard nav (roving tabindex, arrows, type-ahead). `@pierre/trees` and the Host
+`dsh-client-ui-sidebar-files` tree were not re-measured.
 
 Criteria: virtualization for 10k+ nodes, keyboard nav (arrows, type-ahead, Home/End), lazy children from
 `workspaceFiles.list`, live updates from `changes`, drag/drop (later), a11y tree roles, bundle cost, theming via
@@ -190,7 +196,12 @@ Acceptance: decision note in this file with measured bundle delta and a 10k-node
 > (c) @pierre/trees 1.0.0-beta.6 (Preact 11 beta runtime). Measure bundle delta and 10k-node scroll; check
 > keyboard nav and live updates via workspaceFiles.changes. Record the decision in plans/ade/README.md P2.1."
 
-### P2.2 Explorer panel (M) — deps: P2.1
+### [~] P2.2 Explorer panel (M) — deps: P2.1
+
+Minimal version landed in `@dshfiles/editor` (no separate plugin): workbench panel `dshfiles-editor.explorer`
+("Explorer", dockable beside the Editor) showing the session workspace tree with lazy folders and live relisting; a
+click opens the file in the editor. No right-sidebar tab (the Host Files tab already covers that seat). Left:
+reveal-active-file, copy path, virtualization/keyboard (P2.1), and "works with no session (pick workspace)".
 
 Right-panel tab (`sidebarRightTabs.register`) + optional left slot: workspace root per active session, lazy
 `list`, `changes` watch per expanded dir (abort on collapse), reveal-active-file, copy path, open in editor.

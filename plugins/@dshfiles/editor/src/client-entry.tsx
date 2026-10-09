@@ -13,6 +13,7 @@ import { z } from 'zod'
 import './client.css'
 import { createEditorStore } from './editor-store.js'
 import { EditorPanel } from './editor-panel.js'
+import { FileTree } from './file-tree.js'
 import {
   editorClaimsFileAddress,
   fileLinkParamsSchema,
@@ -28,6 +29,7 @@ import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestS
 const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'
+const EXPLORER_PANEL_ID = 'dshfiles-editor.explorer'
 const FILE_LINK_ID = '@dshfiles/editor/file-link'
 const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
@@ -42,7 +44,8 @@ const loadEngine = () => import('./monaco-engine.js').then(module => module.mona
 
 const noSession = (): undefined => undefined
 
-const sessionListSchema = z.object({ byId: z.record(z.string(), z.object({ cwd: z.string().optional() })) })
+const sessionListSchema = z.object({ byId: z.record(z.string(), z.unknown()) })
+const sessionCwdSchema = z.object({ cwd: z.string().min(1) })
 
 /**
  * The Client `sessions` service (`ISessions.list`). This package also types the Host `ctx.sessions` (a different
@@ -65,7 +68,9 @@ export default defineClient({
       workspaceRoot: sessionId => {
         if (!clientSessions.success) return undefined
         const list = sessionListSchema.safeParse(clientSessions.data.list.getSnapshot())
-        return list.success ? list.data.byId[sessionId]?.cwd : undefined
+        if (!list.success) return undefined
+        // One summary at a time: an unrelated session's odd shape must not hide this one's cwd.
+        return sessionCwdSchema.safeParse(list.data.byId[sessionId]).data?.cwd
       },
     })
     ctx.effect(
@@ -118,6 +123,40 @@ export default defineClient({
     const workbench = workbenchPanels()
     ctx.effect(() => workbench.register({ id: WORKBENCH_PANEL_ID, title: 'Editor', component: Panel }), 'dshfiles-editor: workbench panel')
     const workbenchInstalled = (): boolean => workbench.list().some(panel => !panel.id.startsWith('dshfiles-editor.'))
+    const showEditor = (): void => {
+      if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
+      else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+    }
+
+    // P2.2 minimal explorer: the editor's lazy tree as its own dockable panel; a click opens the file in the editor.
+    const ExplorerTree = (): JSX.Element => {
+      const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
+      const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
+      if (sessionId === undefined) {
+        return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse its files.</p>
+      }
+      const activeId = state.activeBySession[sessionId]
+      const activePath = state.documents.find(document => document.id === activeId)?.path ?? null
+      return (
+        <div className="dshx-root dshx:h-full dshx:overflow-auto dshx:bg-background dshx:text-foreground">
+          <FileTree
+            activePath={activePath}
+            onOpen={path => {
+              store.open(sessionId, { path })
+              showEditor()
+            }}
+            remote={ctx.remote}
+            sessionId={sessionId}
+          />
+        </div>
+      )
+    }
+    const Explorer = decorate(() => (
+      <PluginQueryProvider>
+        <ExplorerTree />
+      </PluginQueryProvider>
+    ))
+    ctx.effect(() => workbench.register({ id: EXPLORER_PANEL_ID, title: 'Explorer', component: Explorer }), 'dshfiles-editor: explorer panel')
 
     ctx.effect(
       () =>
@@ -134,10 +173,6 @@ export default defineClient({
     )
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, Panel))
 
-    const showEditor = (): void => {
-      if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
-      else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
-    }
     // Thread tool-call paths and composer references open `dsh-resource://file/session/…` in the right sidebar. This
     // type outranks the Host text preview (`extension` band) for those addresses, hands the file to the editor and
     // closes itself, so the link lands in the one editor surface instead of a read-only preview tab.
