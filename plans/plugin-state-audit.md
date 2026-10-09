@@ -52,7 +52,7 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 | L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | ~~`@tanstack/react-virtual` + Host `useCodeHighlighter`~~ superseded by `@pierre/diffs` 1.5.2 `PatchView` (`@dshfiles/plugin-ui/diff`: virtualized, Shiki, unified/split) in full-diff dialog, inline revision patch and Source Control file diff; jujutsu client.js 594→1,881 KB (150→381 KB gz) with the slim Shiki alias | high | M | [x] |
 | L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [ ] |
 | L4 | thread-sidebar/client.tsx:129, jujutsu/client.tsx:158 (two disagreeing relative-time fns) | Host `relativeTime` | med | S | [x] |
-| L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [ ] |
+| L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [x] |
 | L6 | thread-sidebar/palette.ts:62 `filterByLabel` | Host `rankByName` (keep weighted `rankThreads`) | low | S | [ ] |
 | L7 | 5 localStorage stores (sidebar-state.tsx:31, viewed-marks.ts:44, jujutsu client.tsx:134 + preferences.ts:58, edge-usage.tsx:53) | plugin-ui `createStoredValue(key, zodSchema)` (useSyncExternalStore + storage event) | med | S | [ ] |
 | L8 | thread-sidebar/sidebar-shell.tsx:729 customize drag | add move up/down buttons (keyboard a11y); pragmatic-drag-and-drop only if reused with L9 | med | S | [ ] |

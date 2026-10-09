@@ -1,3 +1,4 @@
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -176,12 +177,7 @@ export const useAccountsPanelState = () => {
   }
 
   const copy = async (text: string, message: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setNotice(message)
-    } catch {
-      setNotice(`Copy this into a terminal: ${text}`)
-    }
+    setNotice((await writeClipboard(text)) ? message : `Copy this into a terminal: ${text}`)
   }
 
   /**

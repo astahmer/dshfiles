@@ -13,6 +13,7 @@ import {
   IconPlayOutlineRegular,
   IconUnarchiveOutlineRegular,
   relativeTime,
+  writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -456,12 +457,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const copyContextValue = async (value: string, successMessage: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setNotice({ tone: 'success', message: successMessage })
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarClipboardFailure') })
-    }
+    setNotice(
+      (await writeClipboard(value))
+        ? { tone: 'success', message: successMessage }
+        : { tone: 'danger', message: props.tSidebar('threadSidebarClipboardFailure') },
+    )
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
