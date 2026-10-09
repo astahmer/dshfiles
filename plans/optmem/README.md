@@ -36,7 +36,7 @@ Design: [design.md](design.md).
 - Fork-only `request/messages-override` events are now written with `ignorable: true`, so stock DSH can still
   read session logs produced in full mode (fork session package + dsh-core-runtime rebuilt).
 - Remaining (Stage 5): long-conversation token/cache comparison compat vs full; real summaries in full mode;
-  capture actual request bytes; why the codex route returns empty replies from an isolated DSH_HOME. (oxfmt: done.)
+  (done since: request bytes recorded (S3), isolated-HOME empty replies fixed in ai-accounts (S4), oxfmt.)
 
 ## Stage 5 report (S1–S2, 2026-10-09)
 
