@@ -2,15 +2,27 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  GripVerticalIcon,
+  ListOrderedIcon,
+  PencilIcon,
+  SendIcon,
+  Trash2Icon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
+import { editableQueueText } from './queue-edit.js'
 import { queueReorderSettings } from './settings.js'
 
 // Inline instead of client.css so this plugin's sheet stays byte-identical to the shared plugin-ui sheet.
@@ -32,9 +44,10 @@ const QUEUE_DOCK_STYLE: CSSProperties = {
  * shipped one, which is what produced two stacked queues.
  *
  * Everything the shipped dock does is preserved — the same structure, spacing and
- * tokens, the same remove/steer actions still mutating through `updateQueue`, and
- * queue editing enters the shared composer through `inputActions`. The same
- * collapse behaviour and session-derived gating decide whether steer is offered.
+ * tokens, and the same remove/edit/steer actions mutating through `updateQueue`.
+ * Queue text editing stays inside this dock so it works with the current Host
+ * contract; attachment-bearing messages remain non-editable. The same collapse
+ * behaviour and session-derived gating decide whether steer is offered.
  * `running` and `queueMutable` come from the
  * live session rather than being pinned, because a dock whose steer button is
  * permanently disabled is worse than no dock.
@@ -130,13 +143,6 @@ export interface QueueDockInjected {
  */
 export type DockProps = ComposedProps<'conversation.input.dock', string, never, undefined, QueueDockInjected, never, undefined>
 
-type QueueEditInputActions = NonNullable<DockProps['inputActions']> & {
-  readonly beginQueueEdit: (itemId: MessageId) => boolean
-}
-
-const hasQueueEditInputActions = (actions: DockProps['inputActions']): actions is QueueEditInputActions =>
-  actions !== undefined && 'beginQueueEdit' in actions && typeof actions.beginQueueEdit === 'function'
-
 export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const inbox = props.useProjection('inbox')
   const queue = useApi(queueApi)
@@ -156,8 +162,10 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const running = props.useSession((state: SessionState) => state.running)
   const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
-  const queueEditActive = Boolean(props.useInput(state => ('queueEdit' in state ? state.queueEdit : undefined)))
+  const [editingId, setEditingId] = useState<MessageId | null>(null)
+  const [draft, setDraft] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
+  const queueEditActive = editingId !== null
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default (the `expandByDefault` setting): the list is the point of the
@@ -177,6 +185,14 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
 
   const queueAction = useMutation({
     mutationFn: (request: { readonly itemId: MessageId; readonly action: QueueAction }) => props.updateQueue(request.itemId, request.action),
+    onSuccess: (_result, request) => {
+      if (request.action.kind !== 'edit') return
+      setEditingId(null)
+      setDraft('')
+    },
+    onError: (_error, request) => {
+      if (request.action.kind === 'edit') setEditError('Could not save this queued message. Try again.')
+    },
   })
   const busy = queueAction.isPending ? (queueAction.variables?.itemId ?? null) : null
 
@@ -233,6 +249,8 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
               ? rows.map((row, index) => {
                   const files = attachmentsOf(row.content)
                   const isBusy = busy === row.id
+                  const isEditing = editingId === row.id
+                  const editableText = editableQueueText(row.content)
                   return (
                     <li
                       className={cn(
@@ -279,9 +297,21 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                       >
                         <GripVerticalIcon className="dshx:size-3.5" />
                       </span>
-                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
-                        {previewOf(row.content, previewLength) || files || '—'}
-                      </span>
+                      {isEditing ? (
+                        <Textarea
+                          aria-label="Edit queued message"
+                          autoFocus
+                          className="dshx:min-h-16 dshx:min-w-0 dshx:flex-1 dshx:resize-y dshx:text-sm"
+                          disabled={busy !== null}
+                          onChange={event => setDraft(event.currentTarget.value)}
+                          rows={2}
+                          value={draft}
+                        />
+                      ) : (
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
+                          {previewOf(row.content, previewLength) || files || '—'}
+                        </span>
+                      )}
                       {queueMutable ? (
                         <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
                           <RowAction
@@ -300,24 +330,47 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           >
                             <ChevronDownIcon />
                           </RowAction>
-                          <RowAction
-                            label="Edit queued message"
-                            tooltip="Edit"
-                            disabled={busy !== null || queueEditActive}
-                            onClick={() => {
-                              setEditError(null)
-                              const inputActions = props.inputActions
-                              if (!hasQueueEditInputActions(inputActions)) {
-                                setEditError('This DSH version does not support composer-based queue editing.')
-                                return
-                              }
-                              if (!inputActions.beginQueueEdit(row.id)) {
-                                setEditError('Could not start editing this queued message.')
-                              }
-                            }}
-                          >
-                            <PencilIcon />
-                          </RowAction>
+                          {isEditing ? (
+                            <>
+                              <RowAction
+                                label="Save queued message"
+                                tooltip="Save"
+                                disabled={busy !== null || draft.trim().length === 0}
+                                onClick={() => {
+                                  setEditError(null)
+                                  applyAction(row.id, { kind: 'edit', content: [{ type: 'text', text: draft }] })
+                                }}
+                              >
+                                <CheckIcon />
+                              </RowAction>
+                              <RowAction
+                                label="Cancel editing queued message"
+                                tooltip="Cancel"
+                                disabled={busy !== null}
+                                onClick={() => {
+                                  setEditingId(null)
+                                  setDraft('')
+                                  setEditError(null)
+                                }}
+                              >
+                                <XIcon />
+                              </RowAction>
+                            </>
+                          ) : (
+                            <RowAction
+                              label="Edit queued message"
+                              tooltip={editableText === null ? 'Only text-only messages can be edited' : 'Edit'}
+                              disabled={busy !== null || queueEditActive || editableText === null}
+                              onClick={() => {
+                                if (editableText === null) return
+                                setEditError(null)
+                                setEditingId(row.id)
+                                setDraft(editableText)
+                              }}
+                            >
+                              <PencilIcon />
+                            </RowAction>
+                          )}
                           <RowAction
                             label="Remove queued message"
                             tooltip="Remove"
@@ -343,7 +396,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           </ul>
           {queueEditActive ? (
             <div className="dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground" role="status">
-              Editing in the composer; save or cancel there to continue.
+              Editing queued message; save or cancel to continue.
             </div>
           ) : null}
           {editError !== null ? (
