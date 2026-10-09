@@ -80,6 +80,7 @@ import {
 import { formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
 import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 
@@ -108,6 +109,7 @@ type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMeta
 const NAVIGATION_SETTLE_MS = 1500
 /** Holding Back or Forward this long opens the history menu, as browsers do. */
 const HISTORY_HOLD_MS = 450
+const PLUGIN_UPDATE_CHECK_MS = 60_000
 const DRAG_THRESHOLD_PX = 5
 
 const rowFieldKeys = [
@@ -459,6 +461,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const restartApi = useApi(threadSidebarRestartApi)
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
+  const pluginUpdates = useApiQuery(threadSidebarPluginUpdatesApi, 'pending')
+  const pendingPlugins = pluginUpdates.data?.plugins ?? []
+  const pluginUpdatesSupported = pluginUpdates.status !== 'error'
+  const refetchPluginUpdates = pluginUpdates.refetch
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [restartRequestPending, setRestartRequestPending] = useState(false)
   const [restartRequestFailed, setRestartRequestFailed] = useState(false)
@@ -604,6 +610,22 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     event.preventDefault()
     resizeHeaderRegion(nextHeight)
   }
+
+  // Rebuilds happen in another window, so check on return to this one and now and then while it stays visible.
+  useEffect(() => {
+    if (!pluginUpdatesSupported) return
+    const check = (): void => {
+      if (!document.hidden) refetchPluginUpdates()
+    }
+    const timer = window.setInterval(check, PLUGIN_UPDATE_CHECK_MS)
+    window.addEventListener('focus', check)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+      document.removeEventListener('visibilitychange', check)
+    }
+  }, [pluginUpdatesSupported, refetchPluginUpdates])
 
   useEffect(() => {
     const sync = (): void => setFooterSnapshot(props.readFooterSnapshot())
@@ -848,6 +870,20 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       .finally(() => setRestartRequestPending(false))
   }
 
+  const openRestartDialog = (): void => {
+    if (!restartAvailable) return
+    setRestartRequestFailed(false)
+    setRestartDialogOpen(true)
+  }
+  const pendingUpdatesLabel =
+    pendingPlugins.length === 0
+      ? null
+      : `${text(props.t, 'threadSidebarUpdatesPending')} (${String(pendingPlugins.length)} ${text(props.t, pendingPlugins.length === 1 ? 'threadSidebarUpdatesPlugin' : 'threadSidebarUpdatesPlugins')})`
+  const pendingUpdatesTitle =
+    pendingUpdatesLabel === null
+      ? undefined
+      : [text(props.t, 'threadSidebarUpdatesHint'), ...pendingPlugins, ...(restartAvailable ? [] : [text(props.t, 'threadSidebarUpdatesManual')])].join('\n')
+
   const runCommand = props.runCommand
   const paletteDestinations = useMemo<PaletteDestination[]>(
     () => [
@@ -886,12 +922,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             {
               id: 'action:restart-dsh',
               group: 'destination',
-              label: text(props.t, 'threadSidebarRestart'),
+              label: pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart'),
+              aliases: ['restart', 'reload host', 'apply updates'],
               icon: <RefreshCwIcon className="dshx:size-4" />,
-              run: () => {
-                setRestartRequestFailed(false)
-                setRestartDialogOpen(true)
-              },
+              run: openRestartDialog,
             } satisfies PaletteDestination,
           ]
         : []),
@@ -910,7 +944,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               run: () => window.setTimeout(() => runCommand(entry.id), 0),
             }))),
     ],
-    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, setRestartDialogOpen, setRestartRequestFailed, hostShortcuts, runCommand],
+    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, pendingUpdatesLabel, hostShortcuts, runCommand],
   )
 
   useEffect(() => setDestinations(paletteDestinations), [paletteDestinations, setDestinations])
@@ -1411,6 +1445,19 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
         {wide ? (
           <div ref={footerAboveRef} className="dshx:flex dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:empty:hidden">
+            {pendingUpdatesLabel === null ? null : (
+              <button
+                type="button"
+                className="dshx:flex dshx:h-7 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:border-t dshx:px-3 dshx:text-left dshx:text-xs dshx:text-warning dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:aria-disabled:cursor-default dshx:aria-disabled:hover:bg-transparent"
+                title={pendingUpdatesTitle}
+                aria-label={pendingUpdatesLabel}
+                aria-disabled={!restartAvailable}
+                onClick={openRestartDialog}
+              >
+                <RefreshCwIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                <span className="dshx:truncate">{pendingUpdatesLabel}</span>
+              </button>
+            )}
             {props.renderSlot('sidebar.footer.above', {})}
           </div>
         ) : null}
@@ -1424,6 +1471,25 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               : 'dshx:h-[52px] dshx:shrink-0 dshx:flex-nowrap dshx:items-center dshx:gap-2 dshx:overflow-hidden dshx:px-2',
           )}
         >
+          {props.collapsed && pendingUpdatesLabel !== null ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="dshx:shrink-0 dshx:text-warning"
+                  aria-label={pendingUpdatesLabel}
+                  aria-disabled={!restartAvailable}
+                  onClick={openRestartDialog}
+                >
+                  <RefreshCwIcon className="dshx:size-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="dshx:whitespace-pre-line">
+                {`${pendingUpdatesLabel}\n${pendingUpdatesTitle ?? ''}`}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
           {visibleFooterEntries.map((entry, index) => {
             const overflowed = !footerEntryFits(index)
             const item = (
@@ -1496,6 +1562,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             <AlertDialogTitle>{text(props.t, 'threadSidebarRestartTitle')}</AlertDialogTitle>
             <AlertDialogDescription>{text(props.t, 'threadSidebarRestartDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
+          {pendingPlugins.length === 0 ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-6 dshx:text-sm">
+              <p className="dshx:text-muted-foreground">{text(props.t, 'threadSidebarUpdatesApplied')}</p>
+              <ul className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:font-mono dshx:text-xs">
+                {pendingPlugins.map(plugin => (
+                  <li key={plugin}>{plugin}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {restartRequestFailed ? (
             <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
               {text(props.t, 'threadSidebarRestartFailure')}

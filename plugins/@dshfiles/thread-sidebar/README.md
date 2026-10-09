@@ -48,7 +48,18 @@ destinations and actions (toggle sidebar, focus composer, customize, and Restart
 DSH when launched through the managed supervisor) in the full palette, ⌘1–⌘9
 on the first nine rows, and Enter to open. Restart asks for confirmation, then
 requests a graceful Host exit; the Nix supervisor relaunches only its own DSH
-child. Keyboard entry
+child.
+
+**Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
+`cordis.patch.yml` load only at boot. The Host half remembers a content hash of
+those files for every plugin package the Host's client module registry lists
+(at boot, or when a package joins the graph) and the shell checks again on
+window focus and every minute. When any differ, a subtle "Restart DSH to apply
+updates (N plugins)" row sits above the foot (a ↻ icon on the rail) listing the
+packages; it opens the restart confirmation, and the `>` palette entry carries
+the same label. Identical rebuilds flag nothing. Host-only packages without a
+client bundle are not listed by that registry and are not tracked. Hosts
+started before this plugin version report nothing. Keyboard entry
 points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,
