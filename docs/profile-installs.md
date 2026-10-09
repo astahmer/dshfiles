@@ -10,10 +10,10 @@ dsh --profile web --dump-config          # full composed tree
 dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
 ```
 
-The `web` profile manifest and patch are also declared in nixfiles
-(`modules/dsh.nix`, `assets/dsh/web-profile/`). Those assets currently describe
-an older plugin set, so `nixapply` would replace the live `web` manifest; keep
-them in step when `web` changes.
+The `web` profile seed lives in this repo: `profiles/web/package.json` and
+`profiles/web/cordis.patch.yml`. nixfiles `modules/dsh.nix` reads them on apply and
+reconciles only its marked block, so promoting a bundle means editing that seed
+(then `pnpm profile:sync --profile web --bundle <name>`); no nixfiles change is needed.
 
 ## `pnpm add <path>` is blocked; `pnpm install` is not
 
