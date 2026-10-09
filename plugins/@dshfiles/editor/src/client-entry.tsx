@@ -15,6 +15,7 @@ import { createEditorStore } from './editor-store.js'
 import { EditorPanel } from './editor-panel.js'
 import { OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
 import { editorSettings } from './settings.js'
+import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
 
 const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
@@ -109,6 +110,34 @@ export default defineClient({
       window.addEventListener(OPEN_FILE_EVENT, onOpenFile)
       return () => window.removeEventListener(OPEN_FILE_EVENT, onOpenFile)
     }, 'dshfiles-editor: open-file requests')
+
+    ctx.effect(() => {
+      const fileIndex = createWorkspaceFileIndex<SessionId>({
+        list: async (sessionId, path, signal) => {
+          const result = await ctx.remote.workspaceFiles.list(sessionId, path, signal)
+          if (!result.ok) throw result.error
+          return result.value
+        },
+      })
+      const onFilesRequest = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = workspaceFilesRequestSchema.safeParse(event.detail)
+        if (!request.success) return
+        event.preventDefault()
+        const sessionId = currentSession()
+        if (sessionId === undefined) {
+          request.data.respond({ status: 'no-session' })
+          return
+        }
+        const stop = fileIndex.request(sessionId, request.data.respond)
+        request.data.signal?.addEventListener('abort', stop, { once: true })
+      }
+      window.addEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
+      return () => {
+        window.removeEventListener(WORKSPACE_FILES_EVENT, onFilesRequest)
+        fileIndex.dispose()
+      }
+    }, 'dshfiles-editor: workspace file listing')
   },
 })
 
