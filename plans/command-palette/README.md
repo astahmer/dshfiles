@@ -14,7 +14,7 @@ Extract the app-wide command palette into its own plugin and give client plugins
 
 ## Resume here
 
-After the concurrent Secret Catalog and AI Accounts edits typecheck, rebuild the remaining UI consumers and run the one-shared-stylesheet e2e guard. The full `probe` boot reports nonactivations including unrelated `llm-commandcode`; the isolated palette-check profile boots cleanly. The two scoped JJ revisions are split; rebased descendant trees retained their original diff checksum, and the pre-existing conflicted Thread Sidebar descendant remains untouched.
+After the concurrent Secret Catalog and AI Accounts edits typecheck, rebuild the remaining UI consumers and run the one-shared-stylesheet e2e guard. The full `probe` boot reports nonactivations including unrelated `llm-commandcode`; the isolated palette-check profile boots cleanly. The two code revisions and progress note are scoped; JJ rebased both descendant copies while preserving their file diffs and the full worktree checksum. The pre-existing Thread Sidebar descendant conflict remains, with no new conflict introduced.
 
 ## Constraints
 
