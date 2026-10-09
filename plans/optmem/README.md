@@ -21,11 +21,13 @@ Design: [design.md](design.md).
    Full-mode rules: user, agent-message, subagent-settled, compact-checkpoint messages are per-turn; instructions,
    skill catalog, goal and the latest runtime context are carried ahead of the view; subagents are never rewritten.
 2. Known gaps (after S5): backfilled history still sits after newer live events in a project stream (marked
-   `meta.backfilled`, original `createdAt` kept); a conversation already resolved to `path:` in a running host keeps
-   writing there until its next resolution (then folded again); the compat view is re-emitted after ≥ `injectRefreshBytes`
+   `meta.backfilled`, original `createdAt` kept); the compat view is re-emitted after ≥ `injectRefreshBytes`
    growth or a merge, so a long session still gains a few `runtime-context` messages; the probe DB keeps two legacy
    injected-context rows captured before the allowlist fix. Resolved in S5: stock DSH reads full-mode logs (tested),
-   `path:`→`workspace:` split, ai-accounts silent skipped routes.
+   `path:`→`workspace:` split, ai-accounts silent skipped routes. Resolved after S5: a running conversation on a `path:`
+   id re-resolves on the next captured event after a 2 s TTL (the workspace registry has no change event), folds the
+   path stream and writes later events to `workspace:` (tested). Open: the 100k bench rerun is still pending because
+   load stayed ≥ 8 (1-min 8.47 / 10.28 on 2026-10-09).
 
 ## Rules
 - dshfiles is a jj repo; one described revision per chunk; never restart the live DSH (`web`); verify in `probe`.
