@@ -83,10 +83,19 @@ dependency chain, older class-component API, no advantage over the two above).
 - Registry: ordering, a stale disposer cannot remove a replacement, snapshot stability, the open-request queue, and
   the global singleton.
 
+### Proven in a browser (probe profile, `dsh --profile probe --port 3197`, headless Chromium, real mouse drags)
+
+- Dragging *Scratchpad* into *Ticker*'s group (tab), then to its bottom edge (split), then shift-dragging it out
+  (floating group) leaves both mount counters unchanged. The draft stays, and the ticker keeps counting.
+- The saved layout, including the floating group, is restored after a page reload. *Reset layout* returns to the
+  side-by-side default.
+- *Reset layout* recreates panels by design, so their state resets. No console errors. The injected dockview sheet is
+  about 47 KB.
+
 ### Gaps
 
-- Moves are driven through the API in tests. Drag-and-drop only gets a manual browser check (see the README P2.0
-  entry). jsdom has no layout, so scroll-position preservation is not asserted.
+- Moves are driven through the API in jsdom tests. Drag-and-drop was checked once in a browser and has no committed
+  e2e. Scroll-position preservation is not asserted.
 - Real panels: jujutsu, explorer and editor do not register yet. Each needs a one-line `workbenchPanels().register`
   in its own client (not done here: shared working copy, other owners).
 - Native DSH views (conversation, terminal) cannot dock: the Host exposes no layout ownership or reparent contract

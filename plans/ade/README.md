@@ -155,6 +155,18 @@ builds; assert one `style[data-plugin]` Tailwind sheet. Fails CI on regression b
 
 New plugin `@dshfiles/explorer` (client + small host part for anything the Host lacks).
 
+### [x] P2.0 Docking probe (M) — deps: none
+
+Decision 2 in [decisions.md](decisions.md): a move-anything layer under the editor. Trellis is non-commercial or
+sponsor-only, so it is out. The probe uses dockview-react 8.4.1 (MIT) in `@dshfiles/workbench`: a `main`-slot
+workbench, a page-wide panel registry (`workbenchPanels()` from `@dshfiles/workbench/registry`), persisted layout,
+reset, and unknown-panel recovery. Licence check, alternatives table, gaps, and how the editor docks in:
+[docking.md](docking.md).
+
+Acceptance (met): moving, tabbing, splitting and floating a panel does not remount it (jsdom tests, plus real mouse
+drags in a probe instance on :3197: mount count unchanged, textarea draft and ticker kept). The layout survives a
+reload. Reset and unknown-panel recovery are tested. One shared plugin sheet once every UI plugin is rebuilt.
+
 ### P2.1 Decide tree component (S, spike) — deps: P0.2
 
 Criteria: virtualization for 10k+ nodes, keyboard nav (arrows, type-ahead, Home/End), lazy children from
