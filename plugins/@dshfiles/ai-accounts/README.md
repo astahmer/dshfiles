@@ -36,7 +36,9 @@ Accounts can also be listed, enabled and edited at the bottom of
 
 ## Usage
 
-A usage strip sits above the sidebar foot: one meter per account (its binding
+A usage strip sits above the sidebar foot (the thread sidebar's
+`sidebar.footer.above` seat; with the stock sidebar it renders in place among
+the footer actions): one meter per account (its binding
 window's percent left over the time to its reset), wrapping onto more lines as
 accounts grow; the collapsed rail shows one button with the most critical
 account. A spent limit draws as a red "Limit reached" pill. Clicking a meter

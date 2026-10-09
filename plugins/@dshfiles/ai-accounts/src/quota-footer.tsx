@@ -1,8 +1,7 @@
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ChartColumnIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useRef, useState, type RefObject } from 'react'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
@@ -49,63 +48,20 @@ const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: num
 const meterButtonClass =
   'dshx-root dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50'
 
-/**
- * Finds the sidebar foot this footer action renders in and mounts the strip in
- * a node just above it. The thread sidebar's foot is a single non-wrapping row
- * that folds overflow behind "…", so the strip cannot live inside it; the stock
- * sidebar already stacks footer actions above Settings, so there it renders in
- * place. No slot exists above the foot today; this is the client-side stand-in.
- */
-const useStripHost = (enabled: boolean) => {
-  const markerRef = useRef<HTMLSpanElement>(null)
-  const [host, setHost] = useState<HTMLElement | null>(null)
-  useLayoutEffect(() => {
-    const foot = markerRef.current?.closest('footer')
-    if (!enabled || foot === null || foot === undefined || foot.parentElement === null) {
-      setHost(null)
-      return
-    }
-    const node = document.createElement('div')
-    node.dataset.aiAccountsUsageStrip = ''
-    node.className = 'dshx:w-full dshx:min-w-0 dshx:shrink-0'
-    foot.parentElement.insertBefore(node, foot)
-    setHost(node)
-    return () => {
-      node.remove()
-      setHost(null)
-    }
-  }, [enabled])
-  return { markerRef, host }
-}
-
-/**
- * The sidebar usage surface. Wide: a wrapping strip above the sidebar foot
- * with one meter per visible account (its binding window's percent left and
- * time to reset), in the user's order; drag to reorder, right-click to move or
- * hide. Collapsed rail: one button with the most critical account. Either
- * opens the usage popover; the "Sidebar usage" switch hides both.
- */
-export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { footerButton } = usePreferences()
-  const arrangement = useUsageLayout()
-  const [open, setOpen] = useState(false)
-  const { usage, refreshing, failed, refresh } = useAccountsUsage({ enabled: footerButton })
-  const now = useNow()
-  const stripRef = useRef<HTMLDivElement>(null)
-  const { markerRef, host } = useStripHost(footerButton && props.wide)
-
-  if (!footerButton) return null
-  const items = stripItems(usage, arrangement.layout)
-  const shownIds = items.map(item => item.instanceId)
-  const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
-
-  const content = (
+/** The usage popover, anchored on whichever surface opened it; clicks inside `keepOpenWithin` do not dismiss it. */
+const UsagePopoverContent = (props: {
+  readonly keepOpenWithin?: RefObject<HTMLElement | null>
+  readonly onOpenUsageHistory: () => void
+  readonly close: () => void
+}): JSX.Element => {
+  const { usage, refreshing, failed, refresh } = useAccountsUsage()
+  return (
     <PopoverContent
       align="start"
       className="dshx-root dshx:w-[min(400px,calc(100vw-16px))] dshx:p-0"
       collisionPadding={8}
       onInteractOutside={event => {
-        if (event.target instanceof Node && stripRef.current?.contains(event.target) === true) event.preventDefault()
+        if (event.target instanceof Node && props.keepOpenWithin?.current?.contains(event.target) === true) event.preventDefault()
       }}
       side="top"
       sideOffset={8}
@@ -113,7 +69,7 @@ export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsag
       <UsageOverview
         failed={failed}
         onOpenHistory={() => {
-          setOpen(false)
+          props.close()
           props.onOpenUsageHistory()
         }}
         onRefresh={() => void refresh()}
@@ -122,62 +78,103 @@ export const QuotaFooter = (props: { readonly wide: boolean; readonly onOpenUsag
       />
     </PopoverContent>
   )
+}
 
-  if (!props.wide) {
-    const critical = mostCritical(items)
-    return (
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger asChild>
-          <button
-            aria-label={label}
-            className={cn(meterButtonClass, open && 'dshx:bg-accent dshx:text-foreground')}
-            title={items.map(item => describeItem(item, now)).join('\n') || label}
-            type="button"
-          >
-            {critical === undefined ? <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" /> : <SummaryItem item={critical} now={now} />}
-          </button>
-        </PopoverTrigger>
-        {content}
-      </Popover>
-    )
-  }
+/**
+ * The wide usage surface: a wrapping strip with one meter per visible account
+ * (its binding window's percent left and time to reset), in the user's order;
+ * drag to reorder, right-click to move or hide, click to open the popover. The
+ * thread sidebar seats it above its foot; the stock sidebar stacks footer
+ * actions above Settings, so there it renders in place.
+ */
+export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+  const { footerButton } = usePreferences()
+  const arrangement = useUsageLayout()
+  const [open, setOpen] = useState(false)
+  const { usage } = useAccountsUsage({ enabled: footerButton })
+  const now = useNow()
+  const stripRef = useRef<HTMLDivElement>(null)
 
-  const strip = (
-    <div
-      aria-label={label}
-      className="dshx-root dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-x-1 dshx:gap-y-0.5 dshx:border-t dshx:px-2 dshx:py-1"
-      ref={stripRef}
-      role="group"
-    >
-      {items.length === 0 ? (
-        <button aria-label={label} className={meterButtonClass} onClick={() => setOpen(current => !current)} type="button">
-          <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
-          <span>Usage</span>
-        </button>
-      ) : (
-        items.map(item => (
-          <ArrangeableAccount arrangement={arrangement} direction="row" id={item.instanceId} key={item.instanceId} name={item.displayName} shownIds={shownIds}>
-            <button
-              aria-expanded={open}
-              aria-label={describeItem(item, now)}
-              className={cn(meterButtonClass, open && 'dshx:text-foreground')}
-              onClick={() => setOpen(current => !current)}
-              title={describeItem(item, now)}
-              type="button"
-            >
-              <SummaryItem item={item} now={now} />
-            </button>
-          </ArrangeableAccount>
-        ))
-      )}
-    </div>
-  )
+  if (!footerButton) return null
+  const items = stripItems(usage, arrangement.layout)
+  const shownIds = items.map(item => item.instanceId)
+  const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
 
   return (
     <Popover onOpenChange={setOpen} open={open}>
-      <span hidden ref={markerRef} />
-      {host === null ? <PopoverAnchor asChild>{strip}</PopoverAnchor> : createPortal(<PopoverAnchor asChild>{strip}</PopoverAnchor>, host)}
-      {content}
+      <PopoverAnchor asChild>
+        <div
+          aria-label={label}
+          className="dshx-root dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-x-1 dshx:gap-y-0.5 dshx:border-t dshx:px-2 dshx:py-1"
+          ref={stripRef}
+          role="group"
+        >
+          {items.length === 0 ? (
+            <button aria-label={label} className={meterButtonClass} onClick={() => setOpen(current => !current)} type="button">
+              <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+              <span>Usage</span>
+            </button>
+          ) : (
+            items.map(item => (
+              <ArrangeableAccount arrangement={arrangement} direction="row" id={item.instanceId} key={item.instanceId} name={item.displayName} shownIds={shownIds}>
+                <button
+                  aria-expanded={open}
+                  aria-label={describeItem(item, now)}
+                  className={cn(meterButtonClass, open && 'dshx:text-foreground')}
+                  onClick={() => setOpen(current => !current)}
+                  title={describeItem(item, now)}
+                  type="button"
+                >
+                  <SummaryItem item={item} now={now} />
+                </button>
+              </ArrangeableAccount>
+            ))
+          )}
+        </div>
+      </PopoverAnchor>
+      <UsagePopoverContent close={() => setOpen(false)} keepOpenWithin={stripRef} onOpenUsageHistory={props.onOpenUsageHistory} />
     </Popover>
   )
+}
+
+/** Collapsed rail: one button with the most critical account, opening the usage popover. */
+const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+  const arrangement = useUsageLayout()
+  const [open, setOpen] = useState(false)
+  const { usage } = useAccountsUsage()
+  const now = useNow()
+  const items = stripItems(usage, arrangement.layout)
+  const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
+  const critical = mostCritical(items)
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <button
+          aria-label={label}
+          className={cn(meterButtonClass, open && 'dshx:bg-accent dshx:text-foreground')}
+          title={items.map(item => describeItem(item, now)).join('\n') || label}
+          type="button"
+        >
+          {critical === undefined ? <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" /> : <SummaryItem item={critical} now={now} />}
+        </button>
+      </PopoverTrigger>
+      <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} />
+    </Popover>
+  )
+}
+
+/**
+ * The sidebar footer action: the rail button when collapsed; when wide, the
+ * strip in place unless a seat above the foot already holds it. The "Sidebar
+ * usage" switch hides both.
+ */
+export const QuotaFooter = (props: {
+  readonly wide: boolean
+  readonly stripSeated: boolean
+  readonly onOpenUsageHistory: () => void
+}): JSX.Element | null => {
+  const { footerButton } = usePreferences()
+  if (!footerButton) return null
+  if (!props.wide) return <QuotaRailButton onOpenUsageHistory={props.onOpenUsageHistory} />
+  return props.stripSeated ? null : <QuotaStrip onOpenUsageHistory={props.onOpenUsageHistory} />
 }

@@ -68,3 +68,15 @@ test('composition disables native declarations before the full sidebar can own t
   assert.equal(workspacesWinner?.component, customThreadBrowser)
   assert.equal(workspacesWinner?.options.priority, -1000)
 })
+
+test('the seat above the foot exists only once this sidebar declares it', () => {
+  const slots = new SlotCore()
+  slots.register({ name: 'root', children: { sidebar: { kind: 'single', scope: 'root' } } }, childSlotOwner())
+  const strip = () => null
+  assert.throws(() => slots.register({ name: 'sidebar.footer.above', id: 'usage-strip' }, strip))
+
+  slots.register({ name: 'sidebar', priority: -1000, registrant: '@dshfiles/thread-sidebar', children: sidebarChildren }, childSlotOwner())
+  slots.register({ name: 'sidebar.footer.above', id: 'usage-strip' }, strip)
+  assert.equal(slots.spec('sidebar.footer.above')?.kind, 'list')
+  assert.equal(slots.entriesOfSlot('sidebar.footer.above')[0]?.component, strip)
+})

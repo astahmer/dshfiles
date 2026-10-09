@@ -1,6 +1,6 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconEllipsisOutlineRegular,
   IconNewChatOutlineRegular,
@@ -80,6 +80,7 @@ import { formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sa
 import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import type { sidebarChildren } from './sidebar-contract.js'
 
 interface FooterRegistration {
   id: string
@@ -117,9 +118,10 @@ const rowFieldKeys = [
 ] as const satisfies readonly (readonly [keyof SidebarPreferences, Parameters<SidebarShellTranslate>[0]])[]
 
 type SidebarShellTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
-export type SidebarShellBaseProps = Omit<SidebarRootComponentProps, 't'> & {
-  t: SidebarShellTranslate
-}
+export type SidebarShellBaseProps = Omit<SidebarRootComponentProps, 't' | 'renderSlot' | '__renders'> &
+  PropsRenderSlots<keyof typeof sidebarChildren> & {
+    t: SidebarShellTranslate
+  }
 type SidebarShellProps = SidebarShellBaseProps & SidebarShellExtras
 
 interface HeaderEntry extends OrderedSidebarEntry {
@@ -176,13 +178,14 @@ const readSidebarSplitBounds = (elements: {
   shell: HTMLDivElement | null
   brand: HTMLDivElement | null
   headerRegion: HTMLDivElement | null
+  footerAbove: HTMLDivElement | null
   footer: HTMLElement | null
   splitter: HTMLButtonElement | null
 }): SidebarSplitBounds | null => {
-  const { shell, brand, headerRegion, footer, splitter } = elements
+  const { shell, brand, headerRegion, footerAbove, footer, splitter } = elements
   if (shell === null || headerRegion === null) return null
 
-  const fixedHeight = (brand?.getBoundingClientRect().height ?? 0) + (footer?.getBoundingClientRect().height ?? 0)
+  const fixedHeight = [brand, footerAbove, footer].reduce((total, element) => total + (element?.getBoundingClientRect().height ?? 0), 0)
   const splitterHeight = splitter?.getBoundingClientRect().height ?? SIDEBAR_SPLITTER_HEIGHT
   const availableMaximum = shell.clientHeight - fixedHeight - splitterHeight - SIDEBAR_THREAD_MIN_HEIGHT
   const maximum = Math.max(SIDEBAR_HEADER_MIN_HEIGHT, Math.floor(availableMaximum))
@@ -466,6 +469,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const shellRef = useRef<HTMLDivElement>(null)
   const brandRef = useRef<HTMLDivElement>(null)
   const headerRegionRef = useRef<HTMLDivElement>(null)
+  const footerAboveRef = useRef<HTMLDivElement>(null)
   const footerRegionRef = useRef<HTMLElement>(null)
   const footerItemRefs = useRef(new Map<string, HTMLDivElement>())
   const splitterRef = useRef<HTMLButtonElement>(null)
@@ -488,6 +492,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     shell: shellRef.current,
     brand: brandRef.current,
     headerRegion: headerRegionRef.current,
+    footerAbove: footerAboveRef.current,
     footer: footerRegionRef.current,
     splitter: splitterRef.current,
   })
@@ -505,6 +510,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     const observer = new ResizeObserver(measure)
     if (shellRef.current !== null) observer.observe(shellRef.current)
     if (headerRegionRef.current !== null) observer.observe(headerRegionRef.current)
+    if (footerAboveRef.current !== null) observer.observe(footerAboveRef.current)
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', measure)
@@ -1302,6 +1308,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             },
           })}
         </div>
+
+        {wide ? (
+          <div ref={footerAboveRef} className="dshx:flex dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:empty:hidden">
+            {props.renderSlot('sidebar.footer.above', {})}
+          </div>
+        ) : null}
 
         <footer
           ref={footerRegionRef}

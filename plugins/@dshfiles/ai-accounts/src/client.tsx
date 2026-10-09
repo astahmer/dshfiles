@@ -4,16 +4,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from './models-page-slot.js'
+import type {} from './sidebar-footer-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AccountsPanel } from './accounts-panel.js'
-import { QuotaFooter } from './quota-footer.js'
+import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
+import { useSyncExternalStore } from 'react'
 import './client.css'
 
 /**
@@ -23,6 +25,7 @@ import './client.css'
  */
 const PANEL_ID = 'ai-accounts'
 const USAGE_PANEL_ID = 'ai-accounts-usage'
+const USAGE_STRIP_ID = 'ai-accounts-usage-strip'
 
 export default defineClientPlugin({
   id: 'llm-ai-accounts',
@@ -49,9 +52,19 @@ export default defineClientPlugin({
         <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
       </PluginQueryProvider>
     )
-    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element => (
+    const subscribeStripSeat = (listener: () => void): (() => void) => ctx.slots.subscribe('sidebar.footer.above', listener)
+    const stripSeated = (): boolean => ctx.slots.entriesOfSlot('sidebar.footer.above').some(entry => entry.options.id === USAGE_STRIP_ID)
+    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element => {
+      const seated = useSyncExternalStore(subscribeStripSeat, stripSeated)
+      return (
+        <PluginQueryProvider>
+          <QuotaFooter onOpenUsageHistory={openUsageHistory} stripSeated={seated} wide={props.wide} />
+        </PluginQueryProvider>
+      )
+    }
+    const QuotaStripView = (): JSX.Element => (
       <PluginQueryProvider>
-        <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
+        <QuotaStrip onOpenUsageHistory={openUsageHistory} />
       </PluginQueryProvider>
     )
     const EdgeUsageHostView = (): JSX.Element => (
@@ -91,6 +104,8 @@ export default defineClientPlugin({
       },
       QuotaFooterView,
     )
+    // Only the thread sidebar declares this seat; registration waits for it, and the footer action yields the wide strip to it.
+    api.ui.register({ name: 'sidebar.footer.above', id: USAGE_STRIP_ID, order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, QuotaStripView)
     // The edge overlay mounts with the shell, so it survives panel switches; a
     // settings toggle decides whether it draws.
     api.ui.register(

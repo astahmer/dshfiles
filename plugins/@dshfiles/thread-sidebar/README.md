@@ -58,6 +58,12 @@ points:
 not fit move into More (⋯) together with entries hidden in Customize; overflow
 is recomputed from measured widths on resize.
 
+`sidebar.footer.above` (list, owner `{}`) is a full-width seat stacked above the
+wide foot, for rows that must not fold into More (the AI Accounts usage strip).
+Its height counts against the header/thread resize limit. The stock sidebar has
+no such seat, so an occupant keeps a footer-action fallback and registers through
+`ctx.slots.inject`, which waits for the declaration.
+
 **Settings › Plugins › Thread sidebar shortcuts** records the two palette chords
 (record / disable / reset, with Host-conflict and duplicate warnings), which a
 generated text field cannot capture.
@@ -97,7 +103,7 @@ The full shell uses the public `sidebar` root slot and Host `ctx.layout` state
 and actions for width, collapse, and panel selection.
 
 Its root declaration owns the same seven child slots declared by the native
-shell. The package patch disables `ui-sidebar` first: SlotCore refuses to redeclare an existing child
+shell, plus `sidebar.footer.above`. The package patch disables `ui-sidebar` first: SlotCore refuses to redeclare an existing child
 slot, and retained native declarations do not transfer render authorization.
 The custom root and workspace browser both register at priority `-1000`, below
 the Host's default priority `0`; lower priority wins the live single slot.
