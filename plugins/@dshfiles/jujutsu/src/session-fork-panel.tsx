@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { durableForkBoundaries } from './fork-boundaries.js'
 
@@ -45,10 +46,11 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null)
   const [historyError, setHistoryError] = useState<SessionError | null>(null)
   const [selectedBoundary, setSelectedBoundary] = useState<SelectedBoundary | null>(null)
-  const [loadingOlderSessionId, setLoadingOlderSessionId] = useState<SessionSummary['id'] | null>(null)
-  const [forkingSessionId, setForkingSessionId] = useState<SessionSummary['id'] | null>(null)
-  const [forkError, setForkError] = useState<string | null>(null)
-  const [forkedSessionId, setForkedSessionId] = useState<SessionSummary['id'] | null>(null)
+  const loadOlderMutation = useMutation({ mutationFn: (reference: SessionReference) => reference.binding.session.loadOlder() })
+  const forkMutation = useMutation({
+    mutationFn: (variables: { readonly sessionId: SessionSummary['id']; readonly atSeq: number }) => props.sessions.fork(variables),
+    onSuccess: childId => props.openSession(childId),
+  })
 
   const subscribeSessions = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const readSessions = useCallback(() => props.sessions.list.getSnapshot(), [props.sessions])
@@ -81,7 +83,17 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
   const activeReference = reference?.sessionId === selectedSessionId ? reference : null
   const activeWindow = historyWindow !== null && historyWindow.sessionId === selectedSessionId ? historyWindow.window : null
   const activeStatus = sessionStatus !== null && sessionStatus.sessionId === selectedSessionId ? sessionStatus.snapshot : null
-  const activeError = historyError !== null && historyError.sessionId === selectedSessionId ? historyError.message : null
+  const loadOlderFailed = loadOlderMutation.isError && loadOlderMutation.variables.sessionId === selectedSessionId
+  const activeError =
+    historyError !== null && historyError.sessionId === selectedSessionId
+      ? historyError.message
+      : loadOlderFailed
+        ? errorMessage(loadOlderMutation.error, 'Could not load older Session history.')
+        : null
+  const loadingOlderSessionId = loadOlderMutation.isPending ? loadOlderMutation.variables.sessionId : null
+  const forkingSessionId = forkMutation.isPending ? forkMutation.variables.sessionId : null
+  const forkError = forkMutation.isError ? errorMessage(forkMutation.error, 'Could not fork this Session boundary.') : null
+  const forkedSessionId = forkMutation.data ?? null
   const boundaries = useMemo(() => durableForkBoundaries(activeWindow?.entries ?? []), [activeWindow?.entries])
   const selectedBoundarySeq =
     selectedBoundary !== null && selectedBoundary.sessionId === selectedSessionId && boundaries.some(boundary => boundary.seq === selectedBoundary.seq)
@@ -89,35 +101,13 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
       : boundaries.at(-1)?.seq
   const selectedSession = selectedSessionId === '' ? undefined : sessionList.byId[selectedSessionId]
 
-  const loadOlder = async (): Promise<void> => {
-    const sessionId = selectedSessionId
-    if (activeReference === null || sessionId === '') return
-    setLoadingOlderSessionId(sessionId)
-    setHistoryError(null)
-    try {
-      await activeReference.binding.session.loadOlder()
-    } catch (reason) {
-      setHistoryError({ sessionId, message: reason instanceof Error ? reason.message : 'Could not load older Session history.' })
-    } finally {
-      setLoadingOlderSessionId(null)
-    }
+  const loadOlder = (): void => {
+    if (activeReference !== null) loadOlderMutation.mutate(activeReference)
   }
 
-  const forkAtBoundary = async (): Promise<void> => {
-    const sessionId = selectedSessionId
-    if (sessionId === '' || selectedBoundarySeq === undefined) return
-    setForkingSessionId(sessionId)
-    setForkError(null)
-    setForkedSessionId(null)
-    try {
-      const childId = await props.sessions.fork({ sessionId, atSeq: selectedBoundarySeq })
-      setForkedSessionId(childId)
-      props.openSession(childId)
-    } catch (reason) {
-      setForkError(reason instanceof Error ? reason.message : 'Could not fork this Session boundary.')
-    } finally {
-      setForkingSessionId(null)
-    }
+  const forkAtBoundary = (): void => {
+    if (selectedSessionId === '' || selectedBoundarySeq === undefined) return
+    forkMutation.mutate({ sessionId: selectedSessionId, atSeq: selectedBoundarySeq })
   }
 
   return (
@@ -181,7 +171,7 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
           <Button
             disabled={selectedSessionId === '' || selectedBoundarySeq === undefined || forkingSessionId !== null}
-            onClick={() => void forkAtBoundary()}
+            onClick={forkAtBoundary}
             size="sm"
             type="button"
           >
@@ -190,7 +180,7 @@ export const SessionForkPanel = (props: SessionForkPanelProps): JSX.Element => {
           {activeWindow?.hasMore && (
             <Button
               disabled={activeReference === null || loadingOlderSessionId === selectedSessionId}
-              onClick={() => void loadOlder()}
+              onClick={loadOlder}
               size="sm"
               type="button"
               variant="outline"
