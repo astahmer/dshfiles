@@ -2,9 +2,10 @@ import type { AccountKind, AccountsUsage } from './api.js'
 import { KIND_GROUPS } from './account-labels.js'
 
 /**
- * What the usage popover shows: enabled accounts that report quota, filtered
- * by provider tab, each with its windows in session → weekly → monthly order.
- * Pure so the footer, the edge overlay and the tests read it one way.
+ * What the usage strip and popover show: enabled accounts that report quota,
+ * filtered by provider tab and arranged by the user, each with its windows in
+ * session → weekly → monthly order. Pure so the footer, the edge overlay and
+ * the tests read it one way.
  */
 
 export type ProviderTab = 'all' | AccountKind
@@ -30,14 +31,59 @@ export const overviewProviders = (usage: AccountsUsage | null): AccountKind[] =>
 /** A window whose rounded percent left is 0: requests fail until it resets. */
 export const isExhausted = (percentRemaining: number): boolean => Math.round(percentRemaining) <= 0
 
-const cardExhausted = (card: OverviewCard): boolean => card.usage.status === 'ok' && card.usage.windows.some(window => isExhausted(window.percentRemaining))
+type UsageWindow = OverviewCard['usage']['windows'][number]
 
-/** Enabled cards for the tab; accounts with a spent window sink below the usable ones. */
-export const overviewCards = (usage: AccountsUsage | null, tab: ProviderTab): OverviewCard[] =>
-  (usage?.cards ?? [])
-    .filter(card => card.enabled && (tab === 'all' || card.kind === tab))
+/** Luna Reserve only counts once an ordinary window is spent; until then it is an extra meter. */
+export const reserveInUse = (windows: readonly UsageWindow[]): UsageWindow | undefined =>
+  windows.some(window => window.reserve !== true && isExhausted(window.percentRemaining))
+    ? windows.find(window => window.reserve === true && !isExhausted(window.percentRemaining))
+    : undefined
+
+/** An ordinary window is spent and no reserve is left to fall back on. */
+export const isCardLimited = (windows: readonly UsageWindow[]): boolean =>
+  windows.some(window => window.reserve !== true && isExhausted(window.percentRemaining)) && reserveInUse(windows) === undefined
+
+const cardExhausted = (card: OverviewCard): boolean => card.usage.status === 'ok' && isCardLimited(card.usage.windows)
+
+/** Where the user arranged the usage surfaces: one order and one hidden list, shared by the strip and the popover. */
+export interface UsageLayout {
+  readonly order: readonly string[]
+  readonly hidden: readonly string[]
+}
+
+/** Stable: ids the user never placed keep their default order after the placed ones. */
+const arrange = <Item extends { readonly instanceId: string }>(items: readonly Item[], order: readonly string[]): Item[] => {
+  const rank = (id: string): number => {
+    const index = order.indexOf(id)
+    return index === -1 ? order.length : index
+  }
+  return [...items].sort((left, right) => rank(left.instanceId) - rank(right.instanceId))
+}
+
+const hasQuota = (card: OverviewCard): boolean => card.usage.status === 'ok' && card.usage.windows.length > 0
+
+/**
+ * Enabled cards for the tab, split three ways: the ones with quota to show
+ * (spent ones below usable ones until the user orders them), the ones without
+ * quota data (signed out, failing), and the ones the user hid.
+ */
+export const overviewSections = (
+  usage: AccountsUsage | null,
+  tab: ProviderTab,
+  layout: UsageLayout,
+): { readonly cards: OverviewCard[]; readonly unavailable: OverviewCard[]; readonly hidden: OverviewCard[] } => {
+  const enabled = (usage?.cards ?? []).filter(card => card.enabled && (tab === 'all' || card.kind === tab))
+  const visible = enabled.filter(card => !layout.hidden.includes(card.instanceId))
+  const cards = visible
+    .filter(hasQuota)
     .map(card => ({ ...card, usage: { ...card.usage, windows: sortWindows(card.usage.windows) } }))
     .sort((left, right) => Number(cardExhausted(left)) - Number(cardExhausted(right)))
+  return {
+    cards: arrange(cards, layout.order),
+    unavailable: visible.filter(card => !hasQuota(card)),
+    hidden: enabled.filter(card => layout.hidden.includes(card.instanceId)),
+  }
+}
 
 export interface QuotaSummaryItem {
   readonly instanceId: string
@@ -47,6 +93,8 @@ export interface QuotaSummaryItem {
   readonly percentRemaining: number
   readonly resetsAt: number | null
   readonly exhausted: boolean
+  /** The ordinary limit is spent and requests draw on Luna Reserve. */
+  readonly onReserve: boolean
 }
 
 const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSITIVE_INFINITY
@@ -58,8 +106,22 @@ const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSIT
  */
 export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined => {
   if (!card.enabled || card.usage.status !== 'ok') return undefined
-  const spent = card.usage.windows.filter(window => isExhausted(window.percentRemaining))
-  const candidates = spent.length > 0 ? spent : card.usage.windows
+  const reserve = reserveInUse(card.usage.windows)
+  if (reserve !== undefined) {
+    return {
+      instanceId: card.instanceId,
+      displayName: card.displayName,
+      kind: card.kind,
+      windowLabel: reserve.label,
+      percentRemaining: Math.max(0, reserve.percentRemaining),
+      resetsAt: reserve.resetsAt,
+      exhausted: false,
+      onReserve: true,
+    }
+  }
+  const ordinary = card.usage.windows.filter(window => window.reserve !== true)
+  const spent = ordinary.filter(window => isExhausted(window.percentRemaining))
+  const candidates = spent.length > 0 ? spent : ordinary
   const binding = [...candidates].sort((left, right) =>
     spent.length > 0
       ? resetOrder(right.resetsAt) - resetOrder(left.resetsAt)
@@ -74,27 +136,33 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
     percentRemaining: Math.max(0, binding.percentRemaining),
     resetsAt: binding.resetsAt,
     exhausted: spent.length > 0,
+    onReserve: false,
   }
 }
 
+/** The usage strip: each visible account's binding window, in the popover's order. */
+export const stripItems = (usage: AccountsUsage | null, layout: UsageLayout): QuotaSummaryItem[] =>
+  overviewSections(usage, 'all', layout).cards.flatMap(card => bindingWindow(card) ?? [])
+
+/** The one item a narrow surface shows: the lowest percent left, the sooner reset breaking a tie. */
+export const mostCritical = (items: readonly QuotaSummaryItem[]): QuotaSummaryItem | undefined =>
+  [...items].sort((left, right) => left.percentRemaining - right.percentRemaining || resetOrder(left.resetsAt) - resetOrder(right.resetsAt))[0]
+
 /**
- * What the footer button shows: the chosen accounts' binding windows, most
- * critical first (lowest percent, then soonest reset), cut to `maxItems`. An
- * empty `accountIds` means every enabled account; ids that no longer exist are
- * ignored, so a stale pick falls back to all rather than to nothing.
+ * Moves `id` to `toIndex` among the ids a surface shows, and keeps the
+ * remembered position of every id it does not show (hidden, signed out,
+ * another tab) after them.
  */
-export const footerSummary = (input: {
-  readonly usage: AccountsUsage | null
-  readonly accountIds: readonly string[]
-  readonly maxItems: number
-}): { readonly shown: readonly QuotaSummaryItem[]; readonly hidden: readonly QuotaSummaryItem[] } => {
-  const all = (input.usage?.cards ?? []).flatMap(card => bindingWindow(card) ?? [])
-  const picked = all.filter(item => input.accountIds.includes(item.instanceId))
-  const ranked = (picked.length > 0 ? picked : all).sort(
-    (left, right) => left.percentRemaining - right.percentRemaining || resetOrder(left.resetsAt) - resetOrder(right.resetsAt),
-  )
-  const limit = Math.max(1, Math.floor(input.maxItems))
-  return { shown: ranked.slice(0, limit), hidden: ranked.slice(limit) }
+export const moveAccount = (input: {
+  readonly order: readonly string[]
+  readonly shownIds: readonly string[]
+  readonly id: string
+  readonly toIndex: number
+}): string[] => {
+  const others = input.shownIds.filter(id => id !== input.id)
+  const index = Math.max(0, Math.min(others.length, input.toIndex))
+  const shown = [...others.slice(0, index), input.id, ...others.slice(index)]
+  return [...shown, ...input.order.filter(id => !shown.includes(id))]
 }
 
 /** "4d 12h", "1h 11m", "9m", "now", or null without a known reset. */

@@ -36,14 +36,27 @@ Accounts can also be listed, enabled and edited at the bottom of
 
 ## Usage
 
-The sidebar footer has a compact usage button: one meter per account (its
-binding window's percent left over the time to its reset), most critical
-first, the rest folded into "+N". A spent limit draws as a red "Limit reached"
-pill. Settings › AI Accounts picks which accounts it summarizes and how many it
-lists. Its popover filters by provider and lists one card per enabled account,
-each showing its machine, session, weekly and monthly bars, reset times and
-snapshot age; accounts with a spent window carry a "Limit reached" badge and
-sink below the usable ones. Banked Codex resets can be expanded. The draggable edge overlay opens the same popover.
+A usage strip sits above the sidebar foot: one meter per account (its binding
+window's percent left over the time to its reset), wrapping onto more lines as
+accounts grow; the collapsed rail shows one button with the most critical
+account. A spent limit draws as a red "Limit reached" pill. Clicking a meter
+opens the popover, which filters by provider and lists one card per enabled
+account with quota, each showing its machine, session, weekly and monthly bars,
+reset times and snapshot age; accounts with a spent window carry a "Limit
+reached" badge and sink below the usable ones until you order them. Accounts
+without quota data (signed out, failing) fold into one "N hidden" line that
+expands. Strip and popover share one order and one hidden list (Settings › AI
+Accounts): drag a meter or card onto another to reorder, or right-click it
+(Shift+F10 / the menu key) to move it, hide it, or show every hidden account.
+Banked Codex resets can be expanded; spending one stays a manual "Reset usage"
+in the Codex app. The draggable edge overlay opens the same popover.
+
+Codex Luna Reserve: the usage read asks for the reserve meter the way the
+official client does (`x-openai-codex-luna-reserve: 1`) and shows it as its own
+window. It never replaces the ordinary gauges. While a weekly limit is spent,
+unreset, and the reserve lasts, requests on that account go out as
+`gpt-reserve` (Settings › AI Accounts › Codex Luna Reserve, on by default);
+the picker and transcript keep the model you chose.
 Every open surface shares one Host reading, cached for 30 seconds; **Refresh**
 bypasses the cache.
 

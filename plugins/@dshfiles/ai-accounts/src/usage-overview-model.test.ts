@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { createUsageCache } from './account-usage.js'
 import type { AccountsUsage } from './api.js'
-import { bankedExpiries, bindingWindow, footerSummary, formatAge, formatResetIn, formatResetShort, overviewCards, overviewProviders } from './usage-overview-model.js'
+import {
+  bankedExpiries,
+  bindingWindow,
+  formatAge,
+  formatResetIn,
+  formatResetShort,
+  moveAccount,
+  mostCritical,
+  overviewProviders,
+  overviewSections,
+  stripItems,
+} from './usage-overview-model.js'
 
 const usage: AccountsUsage = {
   readAt: 0,
@@ -43,18 +54,20 @@ const usage: AccountsUsage = {
   ],
 }
 
+const noLayout = { order: [], hidden: [] }
+
 describe('usage overview', () => {
   it('shows enabled accounts only, with session before weekly', () => {
     expect(overviewProviders(usage)).toEqual(['codex'])
-    const cards = overviewCards(usage, 'all')
+    const cards = overviewSections(usage, 'all', noLayout).cards
     expect(cards.map(card => card.instanceId)).toEqual(['codex'])
     expect(cards[0]?.usage.windows.map(window => window.label)).toEqual(['Current session', 'Weekly limit'])
-    expect(overviewCards(usage, 'commandcode')).toEqual([])
+    expect(overviewSections(usage, 'commandcode', noLayout).cards).toEqual([])
   })
 
   it('takes the tightest window across enabled accounts only', () => {
-    expect(footerSummary({ usage, accountIds: [], maxItems: 3 }).shown.map(item => [item.instanceId, item.percentRemaining])).toEqual([['codex', 53]])
-    expect(footerSummary({ usage: null, accountIds: [], maxItems: 3 })).toEqual({ shown: [], hidden: [] })
+    expect(stripItems(usage, noLayout).map(item => [item.instanceId, item.percentRemaining])).toEqual([['codex', 53]])
+    expect(stripItems(null, noLayout)).toEqual([])
   })
 
   it('formats resets and ages like the reference footer', () => {
@@ -70,7 +83,11 @@ describe('usage overview', () => {
 
 const window = (label: string, percentRemaining: number, resetsAt: number | null) => ({ label, percentRemaining, resetsAt })
 
-const card = (instanceId: string, windows: ReturnType<typeof window>[], overrides: Partial<AccountsUsage['cards'][number]> = {}): AccountsUsage['cards'][number] => ({
+const card = (
+  instanceId: string,
+  windows: ReturnType<typeof window>[],
+  overrides: Partial<AccountsUsage['cards'][number]> = {},
+): AccountsUsage['cards'][number] => ({
   instanceId,
   displayName: instanceId,
   kind: 'codex',
@@ -94,33 +111,86 @@ describe('footer summary', () => {
     expect(bindingWindow({ ...usable, usage: { ...usable.usage, status: 'unauthenticated' } })).toBeUndefined()
   })
 
-  it('ranks the most critical account first and folds the overflow into hidden', () => {
-    const summary = footerSummary({
-      usage: {
+  it('points a narrow surface at the most critical account', () => {
+    const items = stripItems(
+      {
         readAt: 0,
         hostName: 'mac',
-        cards: [card('roomy', [window('Weekly limit', 90, HOUR)]), card('spent', [window('Weekly limit', 0, 108 * HOUR)]), card('low', [window('Weekly limit', 20, 4 * HOUR)])],
+        cards: [
+          card('roomy', [window('Weekly limit', 90, HOUR)]),
+          card('spent', [window('Weekly limit', 0, 108 * HOUR)]),
+          card('low', [window('Weekly limit', 20, 4 * HOUR)]),
+        ],
       },
-      accountIds: [],
-      maxItems: 2,
-    })
-    expect(summary.shown.map(item => item.instanceId)).toEqual(['spent', 'low'])
-    expect(summary.hidden.map(item => item.instanceId)).toEqual(['roomy'])
-  })
-
-  it('keeps only the picked accounts, and falls back to all when the pick is stale', () => {
-    const picked: AccountsUsage = { readAt: 0, hostName: 'mac', cards: [card('a', [window('Weekly limit', 10, HOUR)]), card('b', [window('Weekly limit', 60, HOUR)])] }
-    expect(footerSummary({ usage: picked, accountIds: ['b'], maxItems: 3 }).shown.map(item => item.instanceId)).toEqual(['b'])
-    expect(footerSummary({ usage: picked, accountIds: ['gone'], maxItems: 3 }).shown.map(item => item.instanceId)).toEqual(['a', 'b'])
-    expect(footerSummary({ usage: picked, accountIds: [], maxItems: 0 }).shown).toHaveLength(1)
-  })
-
-  it('sinks accounts with a spent window below usable ones in the popover', () => {
-    const cards = overviewCards(
-      { readAt: 0, hostName: 'mac', cards: [card('spent', [window('Weekly limit', 0, HOUR)]), card('usable', [window('Weekly limit', 40, HOUR)])] },
-      'all',
+      noLayout,
     )
-    expect(cards.map(item => item.instanceId)).toEqual(['usable', 'spent'])
+    expect(items.map(item => item.instanceId)).toEqual(['roomy', 'low', 'spent'])
+    expect(mostCritical(items)?.instanceId).toBe('spent')
+  })
+
+  it('sinks accounts with a spent window below usable ones until the user orders them', () => {
+    const both: AccountsUsage = {
+      readAt: 0,
+      hostName: 'mac',
+      cards: [card('spent', [window('Weekly limit', 0, HOUR)]), card('usable', [window('Weekly limit', 40, HOUR)])],
+    }
+    expect(overviewSections(both, 'all', noLayout).cards.map(item => item.instanceId)).toEqual(['usable', 'spent'])
+    expect(overviewSections(both, 'all', { order: ['spent'], hidden: [] }).cards.map(item => item.instanceId)).toEqual(['spent', 'usable'])
+  })
+})
+
+describe('usage layout', () => {
+  const mixed: AccountsUsage = {
+    readAt: 0,
+    hostName: 'mac',
+    cards: [
+      card('a', [window('Weekly limit', 50, HOUR)]),
+      card('signed-out', [], {
+        usage: { status: 'unauthenticated', message: null, identity: null, plan: null, windows: [], bankedResets: 0, bankedResetExpiries: [] },
+      }),
+      card('b', [window('Weekly limit', 60, HOUR)]),
+      card('c', [window('Weekly limit', 70, HOUR)]),
+    ],
+  }
+
+  it('keeps accounts without quota data and hidden ones out of the cards and the strip', () => {
+    const sections = overviewSections(mixed, 'all', { order: [], hidden: ['b', 'gone'] })
+    expect(sections.cards.map(item => item.instanceId)).toEqual(['a', 'c'])
+    expect(sections.unavailable.map(item => item.instanceId)).toEqual(['signed-out'])
+    expect(sections.hidden.map(item => item.instanceId)).toEqual(['b'])
+    expect(stripItems(mixed, { order: ['c'], hidden: ['b'] }).map(item => item.instanceId)).toEqual(['c', 'a'])
+  })
+
+  it('moves an account among the shown ones and keeps the remembered rest after them', () => {
+    expect(moveAccount({ order: ['x', 'a'], shownIds: ['a', 'b', 'c'], id: 'c', toIndex: 0 })).toEqual(['c', 'a', 'b', 'x'])
+    expect(moveAccount({ order: [], shownIds: ['a', 'b', 'c'], id: 'a', toIndex: 1 })).toEqual(['b', 'a', 'c'])
+    expect(moveAccount({ order: [], shownIds: ['a', 'b'], id: 'b', toIndex: 9 })).toEqual(['a', 'b'])
+  })
+})
+
+describe('Luna Reserve meter', () => {
+  const reserve = (percentRemaining: number) => ({ label: 'Luna Reserve', percentRemaining, resetsAt: 200 * HOUR, reserve: true })
+
+  it('binds a spent account to its reserve while it lasts, and to the spent limit after', () => {
+    expect(bindingWindow(card('codex', [window('Weekly limit', 0, 100 * HOUR), reserve(80)]))).toMatchObject({
+      windowLabel: 'Luna Reserve',
+      percentRemaining: 80,
+      exhausted: false,
+      onReserve: true,
+    })
+    expect(bindingWindow(card('codex', [window('Weekly limit', 0, 100 * HOUR), reserve(0)]))).toMatchObject({
+      windowLabel: 'Weekly limit',
+      exhausted: true,
+      onReserve: false,
+    })
+  })
+
+  it('ignores the reserve while the ordinary limit has room, so it never replaces a fresh gauge', () => {
+    expect(bindingWindow(card('codex', [window('Weekly limit', 100, 100 * HOUR), reserve(5)]))).toMatchObject({
+      windowLabel: 'Weekly limit',
+      percentRemaining: 100,
+      onReserve: false,
+    })
   })
 })
 

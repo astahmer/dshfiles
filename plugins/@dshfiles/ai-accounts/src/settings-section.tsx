@@ -21,7 +21,6 @@ const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
 const INTERVAL_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const
 const RETENTION_DAYS = [30, 90, 180, 365] as const
 const PRICING_REFRESH_HOURS = [6, 12, 24, 48, 168] as const
-const FOOTER_MAX_ITEMS = [1, 2, 3, 4, 5, 6] as const
 
 const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
 
@@ -232,32 +231,33 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             )}
           </Row>
         )}
+        <Row
+          hint="Once a Codex account's weekly limit is spent, send its requests to Luna Reserve (gpt-reserve) while the reserve lasts, like the Codex app's “Continue with Luna Reserve”."
+          label="Codex Luna Reserve"
+        >
+          {id => (
+            <Switch
+              checked={preferences.codexLunaReserve}
+              disabled={readOnly}
+              id={id}
+              onCheckedChange={value => write(settings.set('codexLunaReserve', value))}
+            />
+          )}
+        </Row>
       </Group>
 
       <Group description="Where current quota is shown." title="Usage surfaces">
-        <Row hint="Compact usage button in the sidebar footer; its popover lists every account." label="Sidebar footer button">
+        <Row hint="Meters above the sidebar foot (one button on the collapsed rail); click one for the account cards." label="Sidebar usage">
           {id => (
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
           )}
         </Row>
-        <Row hint="How many accounts the button lists before folding the rest into +N; a narrow sidebar shows one." label="Accounts in the button">
-          {id => (
-            <NumberSelect
-              disabled={readOnly || !preferences.footerButton}
-              format={value => String(value)}
-              id={id}
-              onChange={value => write(settings.set('footerMaxItems', value))}
-              options={FOOTER_MAX_ITEMS}
-              value={preferences.footerMaxItems}
-            />
-          )}
-        </Row>
         {file === null ? null : (
-          <FooterAccountsPicker
+          <UsageAccountsPicker
             accounts={file.accounts.filter(account => account.enabled)}
-            disabled={readOnly || !preferences.footerButton}
-            onChange={ids => write(settings.set('footerAccounts', ids))}
-            selected={preferences.footerAccounts}
+            disabled={readOnly}
+            hidden={preferences.hiddenUsageAccounts}
+            onChange={ids => write(settings.set('hiddenUsageAccounts', ids))}
           />
         )}
         <Row hint="Draggable tab pinned to a window edge." label="Edge overlay">
@@ -319,32 +319,27 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
   )
 }
 
-/** Which accounts the footer button summarizes; every box checked is stored as "all" so new accounts join it. */
-const FooterAccountsPicker = (props: {
+/** Which accounts the usage strip and popover show; a new account shows until it is hidden. */
+const UsageAccountsPicker = (props: {
   readonly accounts: readonly AccountsFile['accounts'][number][]
-  readonly selected: readonly string[]
+  readonly hidden: readonly string[]
   readonly disabled: boolean
   readonly onChange: (ids: string[]) => void
 }): JSX.Element | null => {
-  if (props.accounts.length < 2) return null
-  const allIds = props.accounts.map(account => account.instanceId)
-  const picked = props.selected.filter(id => allIds.includes(id))
-  const checked = new Set(picked.length > 0 ? picked : allIds)
-  const toggle = (id: string, on: boolean): void => {
-    const next = allIds.filter(candidate => (candidate === id ? on : checked.has(candidate)))
-    if (next.length === 0) return
-    props.onChange(next.length === allIds.length ? [] : next)
-  }
+  if (props.accounts.length === 0) return null
+  const hidden = new Set(props.hidden)
+  const toggle = (id: string, shown: boolean): void =>
+    props.onChange(shown ? props.hidden.filter(candidate => candidate !== id) : [...props.hidden.filter(candidate => candidate !== id), id])
   return (
     <fieldset className="dshx:flex dshx:flex-col dshx:gap-1.5">
-      <legend className="dshx:text-sm">Accounts summarized in the button</legend>
-      <p className="dshx:text-xs dshx:text-muted-foreground">The popover still lists every enabled account.</p>
+      <legend className="dshx:text-sm">Accounts in the usage strip and popover</legend>
+      <p className="dshx:text-xs dshx:text-muted-foreground">Right-click an account there to hide it or move it; drag to reorder.</p>
       <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
         {props.accounts.map(account => (
           <Label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-normal" key={account.instanceId}>
             <Checkbox
-              checked={checked.has(account.instanceId)}
-              disabled={props.disabled || (checked.size === 1 && checked.has(account.instanceId))}
+              checked={!hidden.has(account.instanceId)}
+              disabled={props.disabled}
               onCheckedChange={value => toggle(account.instanceId, value === true)}
             />
             {account.displayName}
