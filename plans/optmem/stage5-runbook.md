@@ -110,7 +110,17 @@ Then re-run only the full long run from S1 to get byte numbers.
 > resolution), backfill ordering (append in original chronological order or mark backfilled events), runtime-context
 > accumulation in compat mode (only re-emit when the compact view changed by more than N bytes, setting);
 > (4) tests/typecheck/build/contract; path-scoped jj revisions; update README status. Terse report.
-- [ ] S5 done
+- [x] stock-load test: `tooling/dsh-core/session/tests/stock-load.spec.ts` loads a fork log with the ignorable
+  `request/messages-override` event on the globally installed stock rc.2 `dsh-session` (skips if not installed)
+- [x] compat runtime-context accumulation: setting `injectRefreshBytes` (default 1024); re-emit only on growth ≥ N
+  bytes or when a merge rewrote earlier lines (`optmem/src/injection.test.ts`)
+- [x] project id switch: `path:` stream folded into `workspace:` stream on first workspace resolution
+  (`MemoryStore.moveStream`, engine `moveStream`; test "project id switch")
+- [x] backfill ordering: streams stay append-only; backfilled events carry `meta.backfilled = true` (createdAt keeps
+  the original time); tested in "backfill"
+- [x] ai-accounts dropped route: `ai_accounts` tool lists accounts skipped by `buildRoutes` (reason per account)
+- [x] 100k bench re-run recorded in benchmarks.md (busy machine, load avg ~30)
+- [x] S5 done
 
 ## Report template (append to README when finished)
 | Metric | stock | compat | full |
