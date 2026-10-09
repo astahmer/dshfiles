@@ -40,6 +40,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
   isAutoArchiveCandidate,
+  nextIdleTransitionAt,
   parseSessionIds,
   sessionLineage,
   sectionForSession,
@@ -475,6 +476,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const { paletteMode, destinations } = usePaletteState()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
   useEffect(() => {
@@ -724,12 +726,46 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     })
   }, [archivedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
 
+  const sectionEntries = useMemo(
+    () =>
+      threadTree.roots.map(session => ({
+        session,
+        activity: {
+          id: session.id,
+          updatedAt: session.updatedAt,
+          // A parent waiting on a running subagent is still active work.
+          running: session.running || (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => child.running),
+        },
+      })),
+    [threadTree],
+  )
+  const nextIdleAt = useMemo(
+    () =>
+      nextIdleTransitionAt(
+        sectionEntries.map(entry => entry.activity),
+        now,
+        preferences.idleMinutes,
+      ),
+    [now, preferences.idleMinutes, sectionEntries],
+  )
+
+  useEffect(() => {
+    if (nextIdleAt === null) return
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextIdleAt - Date.now() + 1))
+    return () => window.clearTimeout(timer)
+  }, [nextIdleAt])
+
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
-    for (const session of threadTree.roots) {
-      // A parent waiting on a running subagent is still active work.
-      const running = session.running || (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => child.running)
-      const section = sectionForSession({ id: session.id, running }, archivedSessionIds, pinnedSessionIds, parkedSessionIds)
+    for (const { session, activity } of sectionEntries) {
+      const section = sectionForSession({
+        session: activity,
+        archivedSessionIds,
+        pinnedSessionIds,
+        parkedSessionIds,
+        now,
+        idleMinutes: preferences.idleMinutes,
+      })
       rows.get(section)?.push(session)
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
@@ -738,7 +774,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
     )
     return rows
-  }, [archivedSessionIds, parkedSessionIds, pinnedSessionIds, threadTree, workspaceState.pinnedSessionIds])
+  }, [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, sectionEntries, workspaceState.pinnedSessionIds])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({

@@ -42,7 +42,11 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.maxChildren)
       .description('Child threads listed under a parent before the expandable "more" line.'),
     autoArchiveEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.autoArchiveEnabled).description('Archive idle threads automatically.'),
-    idleMinutes: Schema.natural().min(15).max(10080).default(DEFAULT_PREFERENCES.idleMinutes).description('Idle threshold in minutes before auto-archive.'),
+    idleMinutes: Schema.natural()
+      .min(15)
+      .max(10080)
+      .default(DEFAULT_PREFERENCES.idleMinutes)
+      .description('Idle threshold in minutes before threads move to Inactive; auto-archive uses the same threshold.'),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)

@@ -9,6 +9,7 @@ import {
   type AutoArchiveContext,
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
+  nextIdleTransitionAt,
   moveSidebarEntry,
   reorderSidebarEntry,
   reorderVisibleEntry,
@@ -81,12 +82,40 @@ test('every default collapsed section is one the sidebar can actually render', (
   for (const section of DEFAULT_PREFERENCES.collapsedSections) assert.ok(known.has(section), `unknown section ${section}`)
 })
 
-test('live running, pinned, parked, and archived state selects one stable sidebar section', () => {
+test('recent threads stay active until idle threshold; running and organization state keep priority', () => {
   const parkedIds = new Set(['parked'])
-  assert.equal(sectionForSession(sessionSummary({ id: 'running', running: true }), idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'active')
-  assert.equal(sectionForSession(sessionSummary({ id: 'pinned', running: false }), idSets.archivedSessionIds, new Set(['pinned']), parkedIds), 'pinned')
-  assert.equal(sectionForSession(sessionSummary({ id: 'parked', running: false }), idSets.archivedSessionIds, idSets.pinnedSessionIds, parkedIds), 'parked')
-  assert.equal(sectionForSession(sessionSummary({ id: 'archived', running: false }), new Set(['archived']), idSets.pinnedSessionIds, parkedIds), 'archived')
+  const classify = (session: SessionSummary, overrides: { archived?: ReadonlySet<string>; pinned?: ReadonlySet<string>; parked?: ReadonlySet<string> } = {}) =>
+    sectionForSession({
+      session,
+      archivedSessionIds: overrides.archived ?? idSets.archivedSessionIds,
+      pinnedSessionIds: overrides.pinned ?? idSets.pinnedSessionIds,
+      parkedSessionIds: overrides.parked ?? parkedIds,
+      now,
+      idleMinutes: 120,
+    })
+
+  assert.equal(classify(sessionSummary({ id: 'recent', updatedAt: now - 119 * 60_000 })), 'active')
+  assert.equal(classify(sessionSummary({ id: 'inactive', updatedAt: now - 120 * 60_000 })), 'inactive')
+  assert.equal(classify(sessionSummary({ id: 'running', running: true, updatedAt: now - 240 * 60_000 })), 'active')
+  assert.equal(classify(sessionSummary({ id: 'pinned', updatedAt: now }), { pinned: new Set(['pinned']) }), 'pinned')
+  assert.equal(classify(sessionSummary({ id: 'parked', updatedAt: now })), 'parked')
+  assert.equal(classify(sessionSummary({ id: 'archived', updatedAt: now }), { archived: new Set(['archived']) }), 'archived')
+})
+
+test('next idle transition ignores running sessions and returns earliest future boundary', () => {
+  assert.equal(
+    nextIdleTransitionAt(
+      [
+        { running: false, updatedAt: now - 60 * 60_000 },
+        { running: true, updatedAt: now + 60_000 },
+        { running: false, updatedAt: now - 180 * 60_000 },
+      ],
+      now,
+      120,
+    ),
+    now + 60 * 60_000,
+  )
+  assert.equal(nextIdleTransitionAt([{ running: false, updatedAt: now - 120 * 60_000 }], now, 120), null)
 })
 
 test('auto archive requires an old, idle, nonblank, unpinned, unparked, included session', () => {
@@ -172,7 +201,7 @@ test('navigation preferences preserve independent order, visibility, and header 
   assert.deepEqual(stored.hiddenFooterIds, ['footer:tasks'])
 })
 
-test('parked ids, settlement settings, and navigation choices round-trip through browser storage', () => {
+test('parked ids, sidebar settings, and navigation choices round-trip through browser storage', () => {
   const localStorage = new MemoryStorage()
   vi.stubGlobal('localStorage', localStorage)
 

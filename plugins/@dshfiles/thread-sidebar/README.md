@@ -2,20 +2,24 @@
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
-status, with pinned, active, parked, inactive, and archived sections. The
-project picker scopes those rows to one workspace or unassigned sessions.
+activity, with pinned, active, parked, inactive, and archived sections. Active
+includes running or recently updated threads; the idle threshold moves older,
+non-running threads to Inactive. The project picker scopes rows to one workspace
+or unassigned sessions.
 
-Running state comes from `SessionSummary.running`. Pin and archive state come
-from the Host Workspace controller stream. Pin, unpin, archive, and restore
-call that controller directly. Auto-archive is off by default; when enabled,
-the configured scan interval checks idle age and only calls
+Running state comes from `SessionSummary.running`; recency uses its
+`updatedAt` value. Pin and archive state come from the Host Workspace controller
+stream. Pin, unpin, archive, and restore call that controller directly.
+Auto-archive is off by default; when enabled, the configured scan interval
+checks the same idle threshold and only calls
 `archiveSession(sessionId, { stopActivity: false })`. It skips running, blank,
 archived, pinned, parked, excluded-session, and excluded-project entries.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). User-facing fields
-(header style, density, icon-row overflow, recent-thread count, auto-archive)
-appear in the generated settings form; layout state (order, visibility,
+(header style, density, icon-row overflow, recent-thread count, inactive
+threshold, auto-archive) appear in the generated settings form; layout state
+(order, visibility,
 collapsed sections, project filter, split height, chords) is hidden there.
 Values previously kept in browser `localStorage` (`dshfiles.thread-sidebar.v1`)
 are copied once into keys the Host still holds at their default, then removed.

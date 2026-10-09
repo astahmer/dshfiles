@@ -239,28 +239,49 @@ export const archiveWithoutStopping = <SessionId extends string>(
   sessionId: SessionId,
 ): Promise<void> => archive(sessionId, { stopActivity: false })
 
+const hasPassedIdleThreshold = (session: Pick<SessionActivity, 'updatedAt'>, now: number, idleMinutes: number): boolean =>
+  Number.isFinite(session.updatedAt) && session.updatedAt <= now && now - session.updatedAt >= idleMinutes * 60_000
+
+export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
+  let next: number | null = null
+  for (const session of sessions) {
+    if (session.running || !Number.isFinite(session.updatedAt)) continue
+    const inactiveAt = session.updatedAt + idleMinutes * 60_000
+    if (inactiveAt > now && (next === null || inactiveAt < next)) next = inactiveAt
+  }
+  return next
+}
+
 export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
   if (!preferences.autoArchiveEnabled || session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
   if (preferences.excludedSessionIds.includes(session.id)) return false
   if (workspaceId !== undefined && preferences.excludedWorkspaceIds.includes(workspaceId)) return false
-  if (!Number.isFinite(session.updatedAt) || session.updatedAt > now) return false
 
-  return now - session.updatedAt >= preferences.idleMinutes * 60_000
+  return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
 }
 
-export const sectionForSession = (
-  session: Pick<SessionSummary, 'id' | 'running'>,
-  archivedSessionIds: ReadonlySet<string>,
-  pinnedSessionIds: ReadonlySet<string>,
-  parkedSessionIds: ReadonlySet<string>,
-): SidebarSection => {
+export const sectionForSession = ({
+  session,
+  archivedSessionIds,
+  pinnedSessionIds,
+  parkedSessionIds,
+  now,
+  idleMinutes,
+}: {
+  readonly session: Pick<SessionSummary, 'id' | 'running' | 'updatedAt'>
+  readonly archivedSessionIds: ReadonlySet<string>
+  readonly pinnedSessionIds: ReadonlySet<string>
+  readonly parkedSessionIds: ReadonlySet<string>
+  readonly now: number
+  readonly idleMinutes: number
+}): SidebarSection => {
   if (archivedSessionIds.has(session.id)) return 'archived'
   if (pinnedSessionIds.has(session.id)) return 'pinned'
   if (session.running) return 'active'
   if (parkedSessionIds.has(session.id)) return 'parked'
-  return 'inactive'
+  return hasPassedIdleThreshold(session, now, idleMinutes) ? 'inactive' : 'active'
 }
 
 /**
