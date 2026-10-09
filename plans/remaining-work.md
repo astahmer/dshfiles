@@ -43,7 +43,7 @@ In flight when the session stopped (check `jj log` for their revisions before re
 - [ ] ai-accounts: configurable failure policy per kind (transport, 429, exhausted, auth, oversized): retry /
   fail over / Luna Reserve / shrink / fail; defaults transport→retry then fail over, exhausted→reserve then
   fail over, 429→fail over then wait; works in jj workspace `ai-failover` (don't commit `tooling/dsh-core/*/lib`)
-- [ ] editor: tab dedupe (relative/absolute), binary/image preview, file list refresh on `workspaceFiles.changes`,
+- [x] (smnxwkqq→utsossws) editor: tab dedupe (relative/absolute), binary/image preview, file list refresh on `workspaceFiles.changes`,
   ⌘P `.gitignore`, open from thread tool-call paths (or note gap in dsh-host-gaps.md), minimal explorer panel
 
 Urgent before the next DSH restart:
