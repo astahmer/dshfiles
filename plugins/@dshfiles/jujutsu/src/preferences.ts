@@ -20,6 +20,7 @@ const preferencesSchema = z.object({
   refreshOnVisible: z.boolean().catch(true),
   composerBar: z.boolean().catch(true),
   composerChips: z.boolean().catch(true),
+  headerToggle: z.boolean().catch(true),
   composerBarBase: z.string().max(256).catch('parent'),
 })
 

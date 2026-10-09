@@ -86,6 +86,7 @@ import { descendantCommitIds, emptyAncestorCandidates } from './source-control.j
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisioner } from './workspace-provisioner.js'
 import { WorkspaceRestorePanel } from './workspace-restore-panel.js'
+import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 
 type View = 'graph' | 'source'
 
@@ -185,7 +186,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
-  const [path, setPath] = useState(storedRepoPath.get)
+  const [path, setPath] = useState(() => (sidePanel ? sidePanelRepository.takePending() : null) ?? storedRepoPath.get())
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -287,6 +288,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal }),
     enabled: repoId !== null && fullDiff !== null,
   })
+
+  const shownRoot = state?.root ?? null
+  useEffect(() => (sidePanel ? sidePanelRepository.show(shownRoot) : undefined), [sidePanel, shownRoot])
+  const shownRootRef = useRef(shownRoot)
+  shownRootRef.current = shownRoot
+  useEffect(() => {
+    if (!sidePanel) return
+    return sidePanelRepository.onRequest(requested => {
+      if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested)) return
+      autoRegisterPath.current = requested
+      registerMutation.mutate(requested)
+    })
+  }, [sidePanel, registerMutation.mutate])
 
   useEffect(() => {
     const selectedPath = path.trim()

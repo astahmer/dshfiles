@@ -22,6 +22,11 @@ contracts.
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal
   filesets), split by selected files, and group describe/new/edit/squash.
+- One-click toggle of the right-panel Jujutsu page on the current thread's
+  repository: the composer chips, a conversation-header button (setting
+  `headerToggle`), and the `jujutsu.toggleSessionRepository` command, unbound
+  by default under Settings › Shortcuts. It opens the page on that repository,
+  or collapses the panel when it already shows it.
 - Repository selection through the shared project/folder command palette
   (registered DSH projects, recent repositories, `/` folder browsing).
 - Dragging a local bookmark or revision onto a revision (main page and side

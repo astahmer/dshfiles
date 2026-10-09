@@ -25,7 +25,8 @@ import { jujutsuSettings } from './settings.js'
 
 export interface ComposerJujutsuServices {
   readonly sessions: ISessions
-  readonly openJujutsu: () => void
+  /** Open the right panel on the repository holding `path`, or collapse it when it already shows that repository. */
+  readonly toggleJujutsu: (path: string) => void
 }
 
 export interface ComposerSlotProps {
@@ -62,7 +63,7 @@ const composerKeys = {
 }
 
 /** Settings, the Session cwd and the chosen base, then the shared context query both composer slots read. */
-const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | 'composerChips') => {
+const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | 'composerChips' | 'headerToggle') => {
   const settings = useSettings(jujutsuSettings)
   // Keys added after the Host started are absent until a DSH restart; field-wise defaults keep the slots on.
   const preferences = decodePreferences(settings.value ?? {})
@@ -280,28 +281,29 @@ const Chip = (props: { readonly title: string; readonly onClick: () => void; rea
   </button>
 )
 
-/** Folder, JJ workspace and working-copy chips below the composer; each opens the Jujutsu panel. */
+/** Folder, JJ workspace and working-copy chips below the composer; each toggles the Jujutsu panel on this repository. */
 export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
   if (repository === null) return null
+  const toggle = (): void => props.jujutsu.toggleJujutsu(repository.root)
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   return (
     <div className="dshx-root dshx:flex dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground" ref={context.ref}>
-      <Chip onClick={props.jujutsu.openJujutsu} title={repository.root}>
+      <Chip onClick={toggle} title={'Toggle Jujutsu on ' + repository.root}>
         <FolderIcon />
         <span className="dshx:max-w-40 dshx:truncate">{basename(repository.root)}</span>
       </Chip>
       {repository.workspace !== null && (
-        <Chip onClick={props.jujutsu.openJujutsu} title={'JJ workspace ' + repository.workspace}>
+        <Chip onClick={toggle} title={'JJ workspace ' + repository.workspace}>
           <LayersIcon />
           <span className="dshx:max-w-32 dshx:truncate">{repository.workspace}</span>
         </Chip>
       )}
       <Chip
-        onClick={props.jujutsu.openJujutsu}
+        onClick={toggle}
         title={'@ ' + repository.changeId + ' (' + repository.commitId + ')' + (repository.description.length > 0 ? ' — ' + repository.description : '')}
       >
         {ownBookmark !== undefined || nearestBookmark !== undefined ? <GitBranchIcon /> : <GitCommitHorizontalIcon />}
@@ -318,5 +320,27 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
         )}
       </Chip>
     </div>
+  )
+}
+
+/** One click in the conversation header: the Jujutsu side panel on this Session's repository, or closed again. */
+export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly icon: ReactNode }): JSX.Element | null => {
+  const context = useComposerContext(props, 'headerToggle')
+  const repository = context.repository
+  if (repository === null) return null
+  const label = 'Toggle Jujutsu on ' + basename(repository.root)
+  return (
+    <Button
+      aria-label={label}
+      className="dshx-root dshx:text-muted-foreground"
+      onClick={() => props.jujutsu.toggleJujutsu(repository.root)}
+      ref={context.ref}
+      size="icon-sm"
+      title={label + ' (' + repository.root + ')'}
+      type="button"
+      variant="ghost"
+    >
+      {props.icon}
+    </Button>
   )
 }

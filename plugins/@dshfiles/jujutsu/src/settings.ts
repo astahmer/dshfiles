@@ -30,6 +30,7 @@ export const jujutsuSettings = defineSettings({
     refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
     composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
     composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
+    headerToggle: Schema.boolean().default(true).description('Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository.'),
     composerBarBase: Schema.string()
       .default('parent')
       .description('Default base of the composer bar: `parent` (working copy vs @-), `trunk` (since trunk()), or a local bookmark name.'),
