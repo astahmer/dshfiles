@@ -721,6 +721,21 @@ describe('client compiler', () => {
     expect(code).not.toContain('@dshfiles/dshx/api')
   })
 
+  it('embeds the package Loader row ids as Plugins page settings namespaces', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/client.tsx'), "import { defineClient } from '@dshfiles/dshx/client'; export default defineClient({})")
+    const options = { packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' }
+    await buildClient(options)
+    expect(await readFile(resolve(root, 'dist/client.js'), 'utf8')).toMatch(/"pluginPageNamespaces":\s*\[\s*"dshx-fixture"\s*\]/)
+
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      "export const inject = ['slots']; export function apply(ctx) { ctx.slots.register({ name: 'plugins.bundle.config', key: '@dshx/fixture-plugin' }, () => null) }",
+    )
+    await buildClient(options)
+    expect(await readFile(resolve(root, 'dist/client.js'), 'utf8')).toMatch(/"pluginPageNamespaces":\s*\[\]/)
+  })
+
   it('preserves native named Client exports and Config', async () => {
     const root = await temporaryProject()
     await writeFile(

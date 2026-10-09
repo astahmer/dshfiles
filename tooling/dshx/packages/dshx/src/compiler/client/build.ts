@@ -1,7 +1,8 @@
-import { realpath } from 'node:fs/promises'
+import { readFile, realpath } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, type InlineConfig, type Plugin } from 'vite'
+import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY } from '../../compat/index.js'
 import type { DshCompatibility } from '../../compat/types.js'
 import { DshxError } from '../../diagnostics.js'
@@ -78,6 +79,38 @@ function isInside(parent: string, child: string): boolean {
   return path !== '' && !path.startsWith('..') && !isAbsolute(path)
 }
 
+const PLUGIN_PAGE_SLOT = 'plugins.bundle.config'
+
+/**
+ * Loader row ids this package inserts for itself. DSHX requires a Settings
+ * namespace to equal its row id, so these are the namespaces the package's
+ * Plugins page can render; the runtime shows only the ones the Host serves.
+ * A client that registers its own bundle page keeps it.
+ */
+async function pluginPageNamespaces(root: string, entry: string, packageId: string): Promise<readonly string[]> {
+  let patch: unknown
+  try {
+    patch = parse(await readFile(resolve(root, 'cordis.patch.yml'), 'utf8'))
+  } catch {
+    return []
+  }
+  const ids = new Set<string>()
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+    if (typeof value !== 'object' || value === null) return
+    const row = value as Record<string, unknown>
+    if (typeof row.id === 'string' && typeof row.name === 'string' && (row.name === packageId || row.name.startsWith(`${packageId}/`))) ids.add(row.id)
+    Object.values(row).forEach(visit)
+  }
+  visit(patch)
+  if (ids.size === 0) return []
+  const registrations = await clientSlotRegistrations(entry, root)
+  return registrations.some(registration => registration.slot === PLUGIN_PAGE_SLOT) ? [] : [...ids]
+}
+
 function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Plugin {
   const name = options.logicalName ?? options.packageId
   return {
@@ -107,7 +140,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       }
       return null
     },
-    load(id) {
+    async load(id) {
       if (id === VIRTUAL_CLIENT_PUBLIC)
         return [
           `export { defineClient, defineSlot } from ${JSON.stringify(CLIENT_DEFINE_PATH)}`,
@@ -151,6 +184,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         logicalName: name,
         sourceFile: relative(paths.root, paths.entry).replaceAll('\\', '/'),
         compatibility: options.compatibility ?? DEFAULT_COMPATIBILITY,
+        pluginPageNamespaces: await pluginPageNamespaces(paths.root, paths.entry, options.packageId),
       }
       return [
         `import * as source from ${JSON.stringify(paths.entry)}`,

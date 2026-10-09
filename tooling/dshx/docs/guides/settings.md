@@ -153,3 +153,9 @@ Provider or namespace absence sets `writable: false`; `set`/`unset` reject befor
 ## Automatic Client wiring
 
 If `useSettings` survives final tree-shaking, compiler module metadata adds the `settingsScope` service. The project must declare `@deepseek-ai/dsh-client-ui-settings` in `dsh.client.inject`; `dshx check` reports a missing edge and `build` is authoritative. Multiple components using the same contract reuse one official bound scope inside the current Client Fiber.
+
+## Plugins page form
+
+Every DSHX Client also renders its package's Settings on its own **Plugins** page, the way native companions do. At build time the compiler reads the Loader row ids the package's `cordis.patch.yml` inserts for itself (rows whose `name` is the package); since a Settings namespace equals its row id, those are the candidate namespaces. At runtime the Client registers `plugins.bundle.config` keyed by the package name while the Host serves any of them, and renders one staged form per served namespace with the official `SettingsForm` primitives over the shared `ConfigForms` entry, so it round-trips with `useSettings`, Settings Search and any plugin-owned settings page.
+
+Top-level fields render by schema kind: booleans as switches, literal unions as segmented controls (a select for many or long labels), numbers and strings as text fields, anything else as JSON. Fields marked `.hidden()` or `role('secret')` are left out; labels come from the field name and hints from `.description()`. The registration is optional: a Host without the Plugins page, `ConfigForms.whileServed`, `settingsSchema`, or the primitives module shows nothing and the plugin runs unchanged. A Client that registers its own `plugins.bundle.config` keeps it, and the automatic form is skipped.

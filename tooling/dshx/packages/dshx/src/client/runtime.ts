@@ -15,6 +15,7 @@ import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
 import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
 import { createApiClientRuntime, provideApiContext } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
+import { registerPluginPageSettings } from '../settings/plugin-page.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
 import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
@@ -30,6 +31,8 @@ export interface ClientPluginMetadata {
   readonly settingsCapability?: boolean
   readonly apiCapability?: boolean
   readonly compatibility?: DshCompatibility
+  /** Loader row ids of this package, rendered as a form on its Plugins page while served. */
+  readonly pluginPageNamespaces?: readonly string[]
 }
 
 /** Normalized Client module surface consumed by the virtual entry. */
@@ -310,6 +313,15 @@ function registerContributions(client: ClientRuntimeContext, definition: ClientD
   }
 }
 
+function registerPluginPage(ctx: unknown, metadata: ClientPluginMetadata): void {
+  try {
+    registerPluginPageSettings(ctx, { packageId: metadata.packageId, namespaces: metadata.pluginPageNamespaces ?? [] })
+  } catch (error) {
+    // The Plugins page form is a convenience; a Host that cannot host it must still run the plugin.
+    console.warn(`DSHX Plugins page settings unavailable: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 /** Convert a definition into the standard Cordis Client module contract. */
 export function createClientPlugin(value: unknown, metadata: ClientPluginMetadata): CreatedClientPlugin {
   const definition = validateDefinition(value, metadata)
@@ -346,6 +358,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
     inject,
     apply(ctx) {
       const client = ctx as ClientRuntimeContext
+      registerPluginPage(ctx, metadata)
       registerLocales(client, definition)
       const settings = metadata.settingsCapability === true ? createSettingsClientRuntime(ctx) : undefined
       if (!hasApiCapability) {
@@ -389,6 +402,7 @@ export function createClientModule(source: Record<string, unknown>, metadata: Cl
     ...(source.inject === undefined ? {} : { inject: source.inject }),
     ...(source.Config === undefined ? {} : { Config: source.Config }),
     apply(ctx, config) {
+      registerPluginPage(ctx, metadata)
       return apply(ctx, config)
     },
   }
