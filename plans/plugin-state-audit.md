@@ -50,7 +50,7 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 |---|---|---|---|---|---|
 | L1 | mcp-servers/src/oauth.ts:100-216 | `oauth4webapi` (adds issuer check RFC 8414 §3.3, correct OIDC discovery URL, `WWW-Authenticate` resource_metadata hint) | high (security) | M | [x] |
 | L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | ~~`@tanstack/react-virtual` + Host `useCodeHighlighter`~~ superseded by `@pierre/diffs` 1.5.2 `PatchView` (`@dshfiles/plugin-ui/diff`: virtualized, Shiki, unified/split) in full-diff dialog, inline revision patch and Source Control file diff; jujutsu client.js 594→1,881 KB (150→381 KB gz) with the slim Shiki alias | high | M | [x] |
-| L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [ ] |
+| L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [x] `@dshfiles/plugin-ui/virtual` (TanStack Virtual 3.14.13): flat day-heading + revision rows, measured expanded rows, sticky day heading and drag source pinned via `rangeExtractor`, arrow/Home/End focus, scroll-to-@ on load + button; 500 rows mount ~35–50 nodes |
 | L4 | thread-sidebar/client.tsx:129, jujutsu/client.tsx:158 (two disagreeing relative-time fns) | Host `relativeTime` | med | S | [x] |
 | L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [x] |
 | L6 | thread-sidebar/palette.ts:62 `filterByLabel` | Host `rankByName` (keep weighted `rankThreads`) | low | S | [x] |

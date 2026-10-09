@@ -98,6 +98,12 @@ import into one client file; other languages render as plain text. Add a grammar
 check the bundle. Patch-parsed diffs carry only the patch lines, so collapsed context shows as a count and cannot
 expand without full file contents (`loadDiffFiles`).
 
+## Virtual
+
+`@dshfiles/plugin-ui/virtual` re-exports TanStack Virtual 3.14 (`useVirtualizer`, `defaultRangeExtractor`) for long
+row lists (jujutsu revision graph). Measure variable rows with `measureElement`; pin sticky headers or a drag source
+with a custom `rangeExtractor` so they stay mounted. `PatchView` virtualizes on its own.
+
 ## Tests
 
 Radix parts run in jsdom. A Radix `Select` renders a hidden native `<select name=…>`; drive it with `fireEvent.change`. Host primitives still cannot be imported under Node — alias them to `./testing/host-primitives.tsx` in `vitest.config.ts` when a plugin keeps any.

@@ -58,19 +58,21 @@ import {
   EllipsisVerticalIcon,
   FolderGit2Icon,
   GripVerticalIcon,
+  LocateFixedIcon,
   RefreshCwIcon,
   SearchIcon,
   Settings2Icon,
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
+import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
@@ -79,6 +81,7 @@ import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type 
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
+import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
 import { revisionActionMachine } from './revision-action-machine.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
@@ -359,6 +362,73 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
     [dragSource, state],
   )
+
+  const listItems = useMemo(
+    () => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }),
+    [groups, collapsedDays, graphRowsByCommitId],
+  )
+  const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const pendingFocusIndex = useRef<number | null>(null)
+  const scrolledToWorkingCopy = useRef<string | null>(null)
+  const revisionRowHeight = sidePanel ? 26 : 30
+  const dragSourceIndex = dragSource === null ? -1 : listItems.findIndex(item => item.key === dragSource)
+  const workingCopyIndex = listItems.findIndex(item => item.kind === 'revision' && item.revision.workingCopy)
+  const listVirtualizer = useVirtualizer({
+    count: listItems.length,
+    getScrollElement: () => listScrollRef.current,
+    getItemKey: index => listItems[index]?.key ?? index,
+    estimateSize: index => {
+      const item = listItems[index]
+      if (item?.kind === 'day') return 18
+      return item?.key === selectedRevision?.commitId ? revisionRowHeight + 320 : revisionRowHeight
+    },
+    overscan: 12,
+    paddingEnd: 16,
+    // The sticky day heading and a dragged row stay mounted: unmounting the drag source would drop its dragend.
+    rangeExtractor: range => {
+      const indexes = new Set(defaultRangeExtractor(range))
+      const dayIndex = activeDayIndex(listItems, range.startIndex)
+      if (dayIndex !== null) indexes.add(dayIndex)
+      if (dragSourceIndex >= 0) indexes.add(dragSourceIndex)
+      return [...indexes].sort((left, right) => left - right)
+    },
+  })
+  const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
+
+  const scrollToWorkingCopy = (): void => {
+    if (workingCopyIndex >= 0) listVirtualizer.scrollToIndex(workingCopyIndex, { align: 'center' })
+  }
+
+  useEffect(() => {
+    if (repoId === null || workingCopyIndex < 0 || listScrollRef.current === null || scrolledToWorkingCopy.current === repoId) return
+    scrolledToWorkingCopy.current = repoId
+    listVirtualizer.scrollToIndex(workingCopyIndex, { align: 'center' })
+  }, [repoId, workingCopyIndex, view, listVirtualizer])
+
+  // Arrow-key focus may target a row that is not mounted yet; retried after each render until the virtualizer shows it.
+  const focusPendingRow = (): void => {
+    const index = pendingFocusIndex.current
+    if (index === null) return
+    const target = listScrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"] [data-row-focus]`)
+    if (target === null || target === undefined) return
+    pendingFocusIndex.current = null
+    target.focus({ preventScroll: true })
+  }
+  useEffect(focusPendingRow)
+
+  const moveRowFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-row-focus')) return
+    const current = pendingFocusIndex.current ?? Number(event.target.closest('[data-index]')?.getAttribute('data-index'))
+    if (!Number.isInteger(current)) return
+    const last = listItems.length - 1
+    const next =
+      event.key === 'ArrowDown' ? Math.min(current + 1, last) : event.key === 'ArrowUp' ? Math.max(current - 1, 0) : event.key === 'Home' ? 0 : event.key === 'End' ? last : null
+    if (next === null) return
+    event.preventDefault()
+    pendingFocusIndex.current = next
+    listVirtualizer.scrollToIndex(next, { align: 'auto' })
+    focusPendingRow()
+  }
   const emptyAncestors = useMemo(() => emptyAncestorCandidates(state?.revisions ?? []), [state])
 
   const errorMessages = [
@@ -691,6 +761,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       <>
         <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5">
           <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1">
+            <Button
+              aria-label="Scroll to the working copy"
+              className="dshx:mr-auto dshx:text-muted-foreground"
+              disabled={workingCopyIndex < 0}
+              onClick={scrollToWorkingCopy}
+              size="icon-sm"
+              title="Scroll to @"
+              type="button"
+              variant="ghost"
+            >
+              <LocateFixedIcon />
+            </Button>
             <Toggle
               className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
               onPressedChange={pressed => setPreference('mineOnly', pressed)}
@@ -773,77 +855,86 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
         </div>
-        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain dshx:pb-4" onDragEnd={endDrag}>
-          {groups.map(group => {
-            const firstLayout = group.rows.map(revision => graphRowsByCommitId.get(revision.commitId)).find(layout => layout !== undefined)
-            const dayCollapsed = collapsedDays.has(group.day)
-            return (
-              <section aria-label={group.day || 'Revisions'} key={group.day}>
-                {group.day.length > 0 && (
-                  <button
-                    aria-expanded={!dayCollapsed}
-                    className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground dshx:hover:text-foreground"
-                    onClick={() =>
-                      setCollapsedDays(current => {
-                        const next = new Set(current)
-                        if (next.has(group.day)) next.delete(group.day)
-                        else next.add(group.day)
-                        return next
-                      })
-                    }
-                    type="button"
-                  >
-                    <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
-                      {firstLayout !== undefined &&
-                        [...firstLayout.topLanes, ...(firstLayout.incoming ? [firstLayout.commitLane] : [])].map(lane => (
-                          <line
-                            className={laneStroke(lane)}
-                            key={lane}
-                            strokeOpacity={0.8}
-                            strokeWidth={1.25}
-                            x1={laneCenter(lane)}
-                            x2={laneCenter(lane)}
-                            y1={0}
-                            y2={18}
-                          />
-                        ))}
-                    </svg>
-                    <ChevronDownIcon className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', dayCollapsed && 'dshx:-rotate-90')} />
-                    <span className="dshx:truncate">{group.day}</span>
-                    <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{group.rows.length}</span>
-                  </button>
-                )}
-                {!dayCollapsed &&
-                  group.rows.map(revision => {
-                    const graphLayout = graphRowsByCommitId.get(revision.commitId)
-                    if (graphLayout === undefined) return null
-                    const expanded = selectedRevision?.commitId === revision.commitId
-                    return (
-                      <RevisionRow
-                        bookmarkMenu={bookmarkMenu}
-                        dimmed={movingBranch?.has(revision.commitId) === true}
-                        dropTarget={dropTarget === revision.commitId}
-                        expanded={expanded}
-                        graphLayout={graphLayout}
-                        graphWidth={graphWidth}
-                        key={revision.commitId}
-                        menu={revisionMenu(revision)}
-                        onDragEnter={event => {
-                          if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) sendAction({ type: 'drag.enter', targetId: revision.commitId })
-                        }}
-                        onDragStart={() => sendAction({ type: 'drag.start', sourceId: revision.commitId })}
-                        onDrop={event => dropOn(event, revision)}
-                        onToggle={() => toggleRevision(revision)}
-                        revision={revision}
-                        sidePanel={sidePanel}
-                      >
-                        {expanded && revisionDetails(revision)}
-                      </RevisionRow>
-                    )
-                  })}
-              </section>
-            )
-          })}
+        <div
+          aria-label="Revisions"
+          className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
+          onDragEnd={endDrag}
+          onKeyDown={moveRowFocus}
+          ref={listScrollRef}
+          role="region"
+        >
+          <div className="dshx:relative dshx:w-full" style={{ height: listVirtualizer.getTotalSize() }}>
+            {listVirtualizer.getVirtualItems().map(virtualRow => {
+              const item = listItems[virtualRow.index]
+              if (item === undefined) return null
+              const sticky = virtualRow.index === stickyDayIndex
+              return (
+                <div
+                  className={sticky ? 'dshx:sticky dshx:top-0 dshx:z-10' : 'dshx:absolute dshx:top-0 dshx:left-0 dshx:w-full'}
+                  data-index={virtualRow.index}
+                  key={virtualRow.key}
+                  ref={listVirtualizer.measureElement}
+                  style={sticky ? undefined : { transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  {item.kind === 'day' ? (
+                    <button
+                      aria-expanded={!collapsedDays.has(item.day)}
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-left dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                      data-row-focus=""
+                      onClick={() =>
+                        setCollapsedDays(current => {
+                          const next = new Set(current)
+                          if (next.has(item.day)) next.delete(item.day)
+                          else next.add(item.day)
+                          return next
+                        })
+                      }
+                      type="button"
+                    >
+                      <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
+                        {item.firstLayout !== undefined &&
+                          [...item.firstLayout.topLanes, ...(item.firstLayout.incoming ? [item.firstLayout.commitLane] : [])].map(lane => (
+                            <line
+                              className={laneStroke(lane)}
+                              key={lane}
+                              strokeOpacity={0.8}
+                              strokeWidth={1.25}
+                              x1={laneCenter(lane)}
+                              x2={laneCenter(lane)}
+                              y1={0}
+                              y2={18}
+                            />
+                          ))}
+                      </svg>
+                      <ChevronDownIcon className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', collapsedDays.has(item.day) && 'dshx:-rotate-90')} />
+                      <span className="dshx:truncate">{item.day}</span>
+                      <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{item.count}</span>
+                    </button>
+                  ) : (
+                    <RevisionRow
+                      bookmarkMenu={bookmarkMenu}
+                      dimmed={movingBranch?.has(item.revision.commitId) === true}
+                      dropTarget={dropTarget === item.revision.commitId}
+                      expanded={selectedRevision?.commitId === item.revision.commitId}
+                      graphLayout={item.layout}
+                      graphWidth={graphWidth}
+                      menu={revisionMenu(item.revision)}
+                      onDragEnter={event => {
+                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
+                      }}
+                      onDragStart={() => sendAction({ type: 'drag.start', sourceId: item.revision.commitId })}
+                      onDrop={event => dropOn(event, item.revision)}
+                      onToggle={() => toggleRevision(item.revision)}
+                      revision={item.revision}
+                      sidePanel={sidePanel}
+                    >
+                      {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
+                    </RevisionRow>
+                  )}
+                </div>
+              )
+            })}
+          </div>
           {visibleRevisions.length === 0 && (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyHeader>
@@ -1419,6 +1510,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
             <button
               aria-expanded={props.expanded}
               className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              data-row-focus=""
               onClick={props.onToggle}
               type="button"
             >
