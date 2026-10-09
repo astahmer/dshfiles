@@ -3,7 +3,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
-import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
+import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
@@ -15,7 +15,6 @@ export const useAccountsPanelState = () => {
   const queryClient = useQueryClient()
   const preferences = usePreferences()
   const { usage } = useAccountsUsage()
-  const [autoSave, setAutoSave] = useState<AutoSaveStatus>({ kind: 'idle' })
   const [historyDays, setHistoryDays] = useState(7)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
@@ -73,17 +72,11 @@ export const useAccountsPanelState = () => {
   const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
   const problem = draft === null ? null : draftProblem(draft)
 
-  // The saver outlives renders; its callbacks read the latest values through refs.
-  const delayRef = useRef(preferences.autoSaveDelayMs)
-  delayRef.current = preferences.autoSaveDelayMs
-  const saverRef = useRef<AutoSaver<AccountDraft> | null>(null)
-  saverRef.current ??= createAutoSaver<AccountDraft>({
+  const { saver, status: autoSave } = useAutoSaver<AccountDraft>({
     save: async next => setFile(await accounts.save({ draft: next })),
     equals: sameDraft,
-    onStatus: setAutoSave,
-    delayMs: () => delayRef.current,
+    delayMs: preferences.autoSaveDelayMs,
   })
-  const saver = saverRef.current
 
   // Renames are committed explicitly (on blur), so a half-typed slug never
   // becomes a route; every other field saves itself after a pause.

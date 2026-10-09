@@ -5,12 +5,12 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ChevronDownIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
 import { KIND_GROUPS, KIND_LABEL, STATE_LABEL } from './account-labels.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
-import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
+import { useAutoSaver } from './auto-save.js'
 import { NativeProvidersList } from './native-providers-list.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { usePreferences } from './use-preferences.js'
@@ -28,17 +28,11 @@ const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved
   const accounts = useApi(aiAccountsApi)
   const preferences = usePreferences()
   const [draft, setDraft] = useState<AccountDraft>(() => toDraft(props.profile))
-  const [status, setStatus] = useState<AutoSaveStatus>({ kind: 'idle' })
-  const delayRef = useRef(preferences.autoSaveDelayMs)
-  delayRef.current = preferences.autoSaveDelayMs
-  const saverRef = useRef<AutoSaver<AccountDraft> | null>(null)
-  saverRef.current ??= createAutoSaver<AccountDraft>({
+  const { saver, status } = useAutoSaver<AccountDraft>({
     save: async next => props.onSaved(await accounts.save({ draft: next })),
     equals: sameDraft,
-    onStatus: setStatus,
-    delayMs: () => delayRef.current,
+    delayMs: preferences.autoSaveDelayMs,
   })
-  const saver = saverRef.current
   const saved = toDraft(props.profile)
   const dirty = !sameDraft(saved, draft)
   const problem = draftProblem(draft)

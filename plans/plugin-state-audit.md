@@ -10,7 +10,7 @@ queue-reorder. optmem has no UI.
 
 | # | Plugin | Where | Target | Value | Size | Done |
 |---|---|---|---|---|---|---|
-| 1 | ai-accounts | use-accounts-panel-state.ts:14-248 (9 useState/8 effects, draft) | Query ×3 + mutation(save) + useAppForm draft | high | L | [~] Query/mutations done; draft stays useState until #13 (auto-saver owns it) |
+| 1 | ai-accounts | use-accounts-panel-state.ts:14-248 (9 useState/8 effects, draft) | Query ×3 + mutation(save) + useAppForm draft | high | L | [~] Query/mutations done; draft kept in useState: it re-syncs from the selected account and renames commit on blur, so a form store would be a second source of truth beside the auto-saver |
 | 2 | ai-accounts | use-accounts-panel-state.ts:212-225 (sign-in setInterval poll) | query refetchInterval until signed in | high | S | [x] |
 | 3 | ai-accounts | usage-history-panel.tsx:139-272 | Query ×3 (refetchInterval) + mutations | high | M | [x] |
 | 4 | ai-accounts | use-accounts-usage.ts:41-74 | query + mutation(refreshUsage) → setQueryData | high | S | [x] |
@@ -22,7 +22,7 @@ queue-reorder. optmem has no UI.
 | 10 | project-folder-picker | project-folder-picker.tsx:84-176 | query(browse) + 3 mutations | med | M | [x] |
 | 11 | ai-accounts | quota-continuations.tsx:17-62 | query + mutation (variables = busy id) | med | S | [x] |
 | 12 | ai-accounts | native-providers-list.tsx:24-47 | query refetchInterval while pending + mutation | med | S | [x] |
-| 13 | ai-accounts | models-page-accounts.tsx:30-56 + auto-save.ts | auto-save machine shared by both editors | med | M | [ ] |
+| 13 | ai-accounts | models-page-accounts.tsx:30-56 + auto-save.ts | auto-save machine shared by both editors | med | M | [x] auto-save.ts is an xstate machine; both editors use useAutoSaver (latest save/delay via ref) |
 | 14 | multi-host | client.tsx:335-391 (view lease + setInterval poll) | spawned lease actor per runtime view | med | M | [ ] |
 | 15 | jujutsu | session-fork-panel.tsx:42-117 | mutation(fork) + useInfiniteQuery (history) | med | M | [x] mutations for fork + loadOlder; history stays the Host-retained event window (no fetchable pages for useInfiniteQuery) |
 | 16 | jujutsu | client.tsx:228-229,260-276,356-399 (drag→preview→confirm) | machine (same shape as #7) | med | M | [x] revision-action-machine.ts (menus share it) |
