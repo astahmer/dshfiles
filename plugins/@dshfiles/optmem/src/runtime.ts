@@ -390,7 +390,12 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         refreshStream(stream)
         return ''
       }
-      return injection.render({ stream, conversationId: agent.id, budgetBytes: options.settings().injectUpperBytes })
+      return injection.render({
+        stream,
+        conversationId: agent.id,
+        budgetBytes: options.settings().injectUpperBytes,
+        refreshBytes: options.settings().injectRefreshBytes,
+      })
     } catch (error) {
       logger.warn('optmem: prompt context failed: %s', errorMessage(error))
       return ''

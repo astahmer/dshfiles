@@ -13,6 +13,13 @@ export const optmemSettings = defineSettings({
       .description('Full mode is validated at startup and reported unsupported on stock DSH; the plugin then runs in compatibility mode.'),
     injectUpperBytes: Schema.natural().min(1_024).max(65_536).default(8_192).description('Compact view merge threshold, and the injected memory budget.'),
     injectLowerBytes: Schema.natural().min(512).max(65_536).default(4_096).description('Compact view size a merge batch shrinks to.'),
+    injectRefreshBytes: Schema.natural()
+      .min(0)
+      .max(65_536)
+      .default(1_024)
+      .description(
+        'Compatibility mode: the injected view is re-emitted only once it grew by this many bytes, or when a merge rewrote it (each re-emit adds a context message to the session).',
+      ),
     viewUpperBytes: Schema.natural().min(4_096).max(1_048_576).default(128_000).description('Main view merge threshold.'),
     viewLowerBytes: Schema.natural().min(2_048).max(1_048_576).default(64_000).description('Main view size a merge batch shrinks to.'),
     maxNodeBytes: Schema.natural().min(128).max(4_096).default(512).description('Byte budget of one memory node (verbatim event or summary).'),

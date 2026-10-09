@@ -76,6 +76,7 @@ export const defaultSettings: OptmemSettings = {
   mode: 'compat',
   injectUpperBytes: 2_048,
   injectLowerBytes: 1_024,
+  injectRefreshBytes: 0,
   viewUpperBytes: 16_000,
   viewLowerBytes: 8_000,
   maxNodeBytes: 512,
