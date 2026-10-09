@@ -1,3 +1,4 @@
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSettings } from '@dshfiles/dshx/client'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -104,6 +105,9 @@ interface SidebarState {
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
   setDestinations: (destinations: readonly PaletteDestination[]) => void
+  /** The thread shown in the main view, reported by the thread list for navigation history. */
+  selectedThreadId: SessionSummary['id'] | null
+  setSelectedThreadId: (sessionId: SessionSummary['id'] | null) => void
 }
 
 interface PaletteState {
@@ -131,12 +135,13 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
   const { preferences, storageWarning, updatePreferences } = usePreferences()
   const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
   const [destinations, setDestinations] = useState<readonly PaletteDestination[]>([])
+  const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const openPalette = useCallback((mode: PaletteMode) => setPaletteMode(mode), [])
   const closePalette = useCallback(() => setPaletteMode(null), [])
 
   const state = useMemo(
-    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, setDestinations }),
-    [preferences, updatePreferences, storageWarning, openPalette, closePalette],
+    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, setDestinations, selectedThreadId, setSelectedThreadId }),
+    [preferences, updatePreferences, storageWarning, openPalette, closePalette, selectedThreadId],
   )
   const paletteState = useMemo(() => ({ paletteMode, destinations }), [paletteMode, destinations])
 

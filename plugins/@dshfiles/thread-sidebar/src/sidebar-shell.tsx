@@ -1,3 +1,4 @@
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -25,6 +26,8 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CommandIcon,
@@ -48,9 +51,11 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  dropIndexAt,
   fitItems,
   orderSidebarEntries,
   reorderSidebarEntry,
+  reorderVisibleEntry,
   SIDEBAR_HEADER_MIN_HEIGHT,
   SIDEBAR_ICON_ROW_THRESHOLD,
   SIDEBAR_SPLITTER_HEIGHT,
@@ -58,7 +63,19 @@ import {
   type NavigationDensity,
   type NavigationOverflow,
   type OrderedSidebarEntry,
+  type SidebarPreferences,
 } from './organization.js'
+import {
+  canStep,
+  currentLocation,
+  emptyNavigationHistory,
+  NAVIGATION_EVENT,
+  sameLocation,
+  stepHistory,
+  visitLocation,
+  type NavigationHistory,
+  type NavigationLocation,
+} from './navigation-history.js'
 import { formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
 import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -78,7 +95,23 @@ export interface FooterSnapshot {
 interface SidebarShellExtras {
   readFooterSnapshot: () => FooterSnapshot
   subscribeFooterSnapshot: (listener: () => void) => () => void
+  openSession: (sessionId: SessionSummary['id']) => void
 }
+
+type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMetadata['id']>
+
+/** A Back/Forward step waits this long for its own navigation before treating a new location as a fresh visit. */
+const NAVIGATION_SETTLE_MS = 1500
+const DRAG_THRESHOLD_PX = 5
+
+const rowFieldKeys = [
+  ['threadRowProject', 'threadSidebarRowProject'],
+  ['threadRowTitle', 'threadSidebarRowTitle'],
+  ['threadRowMachine', 'threadSidebarRowMachine'],
+  ['threadRowPath', 'threadSidebarRowPath'],
+  ['threadRowTime', 'threadSidebarRowTime'],
+  ['threadRowStatusDot', 'threadSidebarRowStatusDot'],
+] as const satisfies readonly (readonly [keyof SidebarPreferences, Parameters<SidebarShellTranslate>[0]])[]
 
 type SidebarShellTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
 export type SidebarShellBaseProps = Omit<SidebarRootComponentProps, 't'> & {
@@ -168,6 +201,9 @@ interface NavigationIconRowProps {
   readonly overflow: NavigationOverflow
   readonly labels: { readonly more: string; readonly filter: string; readonly empty: string; readonly customize: string; readonly navigation: string }
   readonly onCustomize: () => void
+  /** Pointer drag within the row; indices are positions among `items`. */
+  readonly onReorder: (fromIndex: number, toIndex: number) => void
+  readonly dragHint: string
 }
 
 /** BB's collapsed navigation: one scrollable icon row plus a pinned ⋮ destination menu. */
@@ -177,6 +213,15 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
   const [edges, setEdges] = useState({ start: false, end: false })
   const [menuOpen, setMenuOpen] = useState(false)
   const [filter, setFilter] = useState('')
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const dragRef = useRef<{ pointerId: number; index: number; startX: number; centers: number[] | null } | null>(null)
+  const suppressClick = useRef(false)
+  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null)
+
+  const endDrag = (): void => {
+    dragRef.current = null
+    setDrag(null)
+  }
 
   const fitting =
     props.overflow === 'menu'
@@ -187,7 +232,8 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
           reserve: ICON_BUTTON_SIZE + ICON_GAP,
         }).filter(Boolean).length
       : props.items.length
-  const rowItems = props.items.slice(0, fitting)
+  const fittingItems = props.items.slice(0, fitting)
+  const rowItems = drag === null ? fittingItems : reorderSidebarEntry(fittingItems.map(item => item.id), drag.from, drag.to).flatMap(id => fittingItems.filter(item => item.id === id))
   const menuItems = props.overflow === 'menu' ? props.items.slice(fitting) : props.items
   const showMenu = props.overflow === 'scroll-menu' || (props.overflow === 'menu' && menuItems.length > 0)
   const filteredMenuItems = rankByName(menuItems.map(item => ({ name: item.label, item })), filter.trim()).map(entry => entry.item)
@@ -235,25 +281,73 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
           event.currentTarget.scrollLeft += event.deltaY
         }}
       >
-        {rowItems.map(item => (
-          <Tooltip key={item.id}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
-                  item.active && 'dshx:bg-accent dshx:text-foreground',
-                )}
-                aria-label={item.label}
-                aria-current={item.active ? 'page' : undefined}
-                onClick={item.run}
-              >
-                {item.icon}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{item.label}</TooltipContent>
-          </Tooltip>
-        ))}
+        {rowItems.map(item => {
+          const index = fittingItems.indexOf(item)
+          return (
+            <Tooltip key={item.id}>
+              <TooltipTrigger asChild>
+                <Button
+                  ref={element => {
+                    itemRefs.current[index] = element
+                  }}
+                  variant="ghost"
+                  className={cn(
+                    'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
+                    item.active && 'dshx:bg-accent dshx:text-foreground',
+                    drag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
+                  )}
+                  aria-label={item.label}
+                  aria-current={item.active ? 'page' : undefined}
+                  onPointerDown={event => {
+                    if (event.button !== 0) return
+                    dragRef.current = { pointerId: event.pointerId, index, startX: event.clientX, centers: null }
+                  }}
+                  onPointerMove={event => {
+                    const current = dragRef.current
+                    if (current === null || current.pointerId !== event.pointerId) return
+                    if (current.centers === null) {
+                      if (Math.abs(event.clientX - current.startX) < DRAG_THRESHOLD_PX) return
+                      current.centers = fittingItems.map((_, position) => {
+                        const rect = itemRefs.current[position]?.getBoundingClientRect()
+                        return rect === undefined ? Number.POSITIVE_INFINITY : rect.left + rect.width / 2
+                      })
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                    }
+                    event.preventDefault()
+                    setDrag({ from: current.index, to: dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX }) })
+                  }}
+                  onPointerUp={event => {
+                    const current = dragRef.current
+                    if (current === null || current.pointerId !== event.pointerId) return
+                    if (current.centers !== null) {
+                      suppressClick.current = true
+                      const to = dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX })
+                      if (to !== current.index) props.onReorder(current.index, to)
+                    }
+                    endDrag()
+                  }}
+                  onPointerCancel={endDrag}
+                  onLostPointerCapture={() => {
+                    if (dragRef.current?.centers !== null) endDrag()
+                  }}
+                  onClick={() => {
+                    if (suppressClick.current) {
+                      suppressClick.current = false
+                      return
+                    }
+                    item.run()
+                  }}
+                >
+                  {item.icon}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {item.label}
+                <span className="dshx:block dshx:text-xs dshx:opacity-70">{props.dragHint}</span>
+              </TooltipContent>
+            </Tooltip>
+          )
+        })}
       </div>
       {showMenu ? (
         <Popover
@@ -334,7 +428,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
-  const { preferences, updatePreferences, openPalette, setDestinations } = useSidebarState()
+  const { preferences, updatePreferences, openPalette, setDestinations, selectedThreadId } = useSidebarState()
+  const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(emptyNavigationHistory)
+  const pendingStep = useRef<{ target: SidebarLocation; until: number } | null>(null)
   const restartApi = useApi(threadSidebarRestartApi)
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
@@ -489,13 +585,54 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }, [props.readFooterSnapshot, props.subscribeFooterSnapshot])
 
   useEffect(() => {
-    const paletteChord = parseChord(preferences.paletteChord)
-    const threadSearchChord = parseChord(preferences.threadSearchChord)
-    const ownedByHost = (chord: NonNullable<typeof paletteChord>): boolean => hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
+    const location = currentLocation({ panelId: activePanelId, threadId: selectedThreadId })
+    if (location === null) return
+    const pending = pendingStep.current
+    if (pending !== null) {
+      if (sameLocation(pending.target, location)) {
+        pendingStep.current = null
+        return
+      }
+      // Opening a thread from a panel passes through the old thread first; that is not a visit.
+      if (Date.now() < pending.until) return
+      pendingStep.current = null
+    }
+    setHistory(current => visitLocation(current, location))
+  }, [activePanelId, selectedThreadId])
+
+  const stepNavigation = (direction: -1 | 1): void => {
+    const step = stepHistory(history, direction)
+    if (step === null) return
+    pendingStep.current = { target: step.target, until: Date.now() + NAVIGATION_SETTLE_MS }
+    setHistory(step.history)
+    if (step.target.kind === 'thread') {
+      props.openSession(step.target.id)
+      return
+    }
+    const panelId = step.target.id
+    if (panels.some(panel => panel.id === panelId)) props.selectPanel(panelId)
+  }
+  const latestStepNavigation = useRef(stepNavigation)
+  latestStepNavigation.current = stepNavigation
+
+  useEffect(() => {
+    const onNavigate = (event: Event): void => {
+      const direction: unknown = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null ? Reflect.get(event.detail, 'direction') : undefined
+      if (direction === -1 || direction === 1) latestStepNavigation.current(direction)
+    }
+    window.addEventListener(NAVIGATION_EVENT, onNavigate)
+    return () => window.removeEventListener(NAVIGATION_EVENT, onNavigate)
+  }, [])
+
+  useEffect(() => {
+    const ownedByHost = (chord: NonNullable<ReturnType<typeof parseChord>>): boolean => hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
+    // ⌘[ / ⌘] are browser-reserved for Host web shortcuts, so on the web they are claimed here before the browser.
     const chords = [
-      { chord: paletteChord, mode: 'all' as const },
-      { chord: threadSearchChord, mode: 'threads' as const },
-    ].flatMap(({ chord, mode }) => (chord === null || ownedByHost(chord) ? [] : [{ chord, mode }]))
+      { chord: parseChord(preferences.paletteChord), run: () => openPalette('all') },
+      { chord: parseChord(preferences.threadSearchChord), run: () => openPalette('threads') },
+      { chord: parseChord(preferences.backChord), run: () => latestStepNavigation.current(-1) },
+      { chord: parseChord(preferences.forwardChord), run: () => latestStepNavigation.current(1) },
+    ].flatMap(({ chord, run }) => (chord === null || ownedByHost(chord) ? [] : [{ chord, run }]))
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || event.isComposing || event.repeat) return
@@ -503,7 +640,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       if (match === undefined) return
       event.preventDefault()
       event.stopPropagation()
-      openPalette(match.mode)
+      match.run()
     }
     // Cancelable so other bundles can tell the palette exists; a `probe` request only acknowledges.
     const onPaletteRequest = (event: Event): void => {
@@ -520,7 +657,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener(PALETTE_EVENT, onPaletteRequest)
     }
-  }, [hostShortcuts, mac, openPalette, preferences.paletteChord, preferences.threadSearchChord])
+  }, [hostShortcuts, mac, openPalette, preferences.backChord, preferences.forwardChord, preferences.paletteChord, preferences.threadSearchChord])
 
   const headerEntries = useMemo<HeaderEntry[]>(
     () => [
@@ -780,6 +917,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }
 
   const paletteHint = parseChord(preferences.paletteChord)
+  const withChordHint = (label: string, chordValue: string | null): string => {
+    const chord = parseChord(chordValue)
+    return chord === null ? label : `${label} (${formatChord(chord, mac).join('')})`
+  }
 
   return (
     <TooltipProvider delayDuration={350}>
@@ -808,6 +949,28 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           ) : null}
           {wide ? (
             <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="dshx:text-muted-foreground"
+                aria-label={text(props.t, 'threadSidebarBack')}
+                title={withChordHint(text(props.t, 'threadSidebarBack'), preferences.backChord)}
+                disabled={!canStep(history, -1)}
+                onClick={() => stepNavigation(-1)}
+              >
+                <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="dshx:text-muted-foreground"
+                aria-label={text(props.t, 'threadSidebarForward')}
+                title={withChordHint(text(props.t, 'threadSidebarForward'), preferences.forwardChord)}
+                disabled={!canStep(history, 1)}
+                onClick={() => stepNavigation(1)}
+              >
+                <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -881,6 +1044,17 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 items={navigationItems}
                 overflow={preferences.navigationOverflow}
                 onCustomize={openCustomize}
+                dragHint={text(props.t, 'threadSidebarDragToReorder')}
+                onReorder={(fromIndex, toIndex) =>
+                  updatePreferences({
+                    headerOrder: reorderVisibleEntry({
+                      orderedIds: orderedHeaderEntries.map(entry => entry.id),
+                      visibleIds: visibleHeaderEntries.map(entry => entry.id),
+                      fromVisible: fromIndex,
+                      toVisible: toIndex,
+                    }),
+                  })
+                }
                 labels={{
                   more: text(props.t, 'threadSidebarMoreDestinations'),
                   filter: text(props.t, 'threadSidebarFilterDestinations'),
@@ -957,6 +1131,32 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 <ToggleGroupItem value="expanded">{text(props.t, 'threadSidebarExpanded')}</ToggleGroupItem>
               </ToggleGroup>
             </div>
+            <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>
+              <h3 id={`${headerRegionId}-rows`} className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                {text(props.t, 'threadSidebarThreadRows')}
+              </h3>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                aria-labelledby={`${headerRegionId}-rows`}
+                value={preferences.threadRowDensity}
+                onValueChange={value => {
+                  if (value === 'compact' || value === 'comfortable') updatePreferences({ threadRowDensity: value })
+                }}
+              >
+                <ToggleGroupItem value="compact">{text(props.t, 'threadSidebarRowCompact')}</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable">{text(props.t, 'threadSidebarRowComfortable')}</ToggleGroupItem>
+              </ToggleGroup>
+              <div className="dshx:grid dshx:grid-cols-2 dshx:gap-x-3 dshx:gap-y-1.5 dshx:pt-1">
+                {rowFieldKeys.map(([key, label]) => (
+                  <label key={key} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
+                    <Checkbox checked={preferences[key]} onCheckedChange={checked => updatePreferences({ [key]: checked === true })} />
+                    {text(props.t, label)}
+                  </label>
+                ))}
+              </div>
+            </section>
             <section className="dshx:flex dshx:flex-col dshx:gap-0.5">
               <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{text(props.t, 'threadSidebarHeaderLinks')}</h3>
               {orderedHeaderEntries.map((entry, index) =>

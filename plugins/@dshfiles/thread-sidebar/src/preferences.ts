@@ -26,7 +26,17 @@ const preferencesSchema = z
     navigationOverflow: z.enum(['scroll', 'menu', 'scroll-menu']).default(DEFAULT_PREFERENCES.navigationOverflow),
     paletteChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.paletteChord),
     threadSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.threadSearchChord),
+    backChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.backChord),
+    forwardChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.forwardChord),
     paletteRecentLimit: z.number().int().min(5).max(100).default(DEFAULT_PREFERENCES.paletteRecentLimit),
+    threadRowDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.threadRowDensity),
+    threadRowProject: z.boolean().default(DEFAULT_PREFERENCES.threadRowProject),
+    threadRowTitle: z.boolean().default(DEFAULT_PREFERENCES.threadRowTitle),
+    threadRowMachine: z.boolean().default(DEFAULT_PREFERENCES.threadRowMachine),
+    threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),
+    threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
+    threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
+    maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
   })
   .strict()
 

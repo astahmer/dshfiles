@@ -31,8 +31,21 @@ export interface SidebarPreferences {
   /** Capture-phase chords in `primary+shift+KeyP` form; null disables the chord. */
   paletteChord: string | null
   threadSearchChord: string | null
+  backChord: string | null
+  forwardChord: string | null
   paletteRecentLimit: number
+  threadRowDensity: ThreadRowDensity
+  threadRowProject: boolean
+  threadRowTitle: boolean
+  threadRowMachine: boolean
+  threadRowPath: boolean
+  threadRowTime: boolean
+  threadRowStatusDot: boolean
+  /** Child threads listed under a parent before the "N more…" line. */
+  maxChildren: number
 }
+
+export type ThreadRowDensity = 'compact' | 'comfortable'
 
 export const DEFAULT_PREFERENCES: SidebarPreferences = {
   autoArchiveEnabled: false,
@@ -54,7 +67,17 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   navigationOverflow: 'scroll-menu',
   paletteChord: 'primary+KeyK',
   threadSearchChord: 'primary+KeyP',
+  backChord: 'primary+BracketLeft',
+  forwardChord: 'primary+BracketRight',
   paletteRecentLimit: 20,
+  threadRowDensity: 'compact',
+  threadRowProject: true,
+  threadRowTitle: true,
+  threadRowMachine: true,
+  threadRowPath: false,
+  threadRowTime: true,
+  threadRowStatusDot: true,
+  maxChildren: 3,
 }
 
 export interface OrderedSidebarEntry {
@@ -179,6 +202,29 @@ export const reorderSidebarEntry = (orderedIds: readonly string[], fromIndex: nu
   next.splice(toIndex, 0, moved)
   return next
 }
+
+/**
+ * Reorder among the shown entries while hidden ones keep their saved slots: the
+ * dragged entry lands where the shown entry it was dropped on sits in the full order.
+ */
+export const reorderVisibleEntry = (options: {
+  readonly orderedIds: readonly string[]
+  readonly visibleIds: readonly string[]
+  readonly fromVisible: number
+  readonly toVisible: number
+}): string[] => {
+  const movedId = options.visibleIds[options.fromVisible]
+  const targetId = options.visibleIds[options.toVisible]
+  if (movedId === undefined || targetId === undefined) return [...options.orderedIds]
+  return reorderSidebarEntry(options.orderedIds, options.orderedIds.indexOf(movedId), options.orderedIds.indexOf(targetId))
+}
+
+/**
+ * Final index for a pointer drag along one axis: how many of the other items'
+ * centres the pointer has passed.
+ */
+export const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
+  options.centers.filter((center, index) => index !== options.fromIndex && center < options.position).length
 
 export const archiveWithoutStopping = <SessionId extends string>(
   archive: (sessionId: SessionId, options: { readonly stopActivity: false }) => Promise<void>,

@@ -3,6 +3,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { useApiQuery } from '@dshfiles/dshx/client'
 import {
   IconArchiveOutlineRegular,
   IconChevronDownOutlineRegular,
@@ -34,7 +35,7 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ActivityIcon, CirclePauseIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
@@ -45,6 +46,7 @@ import {
   type SessionActivity,
   type SidebarPreferences,
   type SidebarSection,
+  type ThreadRowDensity,
   workspaceForLineage,
 } from './organization.js'
 import { toggleCollapsedSection } from './preferences.js'
@@ -53,6 +55,8 @@ import { usePaletteState, useSidebarState } from './sidebar-state.js'
 import { ThreadPalette } from './thread-palette.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
+import { threadSidebarMachineApi } from './machine-api.js'
+import { groupThreadChildren, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 
 type InjectedActions = {
@@ -96,6 +100,12 @@ const sectionIcons: Record<SidebarSection, ReactNode> = {
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
 
+const toggleSetMember = (values: ReadonlySet<string>, value: string): ReadonlySet<string> => {
+  const next = new Set(values)
+  if (!next.delete(value)) next.add(value)
+  return next
+}
+
 const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Readonly<Record<string, SessionSummary>>): SessionSummary[] =>
   ids.flatMap(sessionId => {
     const session = byId[sessionId]
@@ -125,7 +135,20 @@ interface RowActions {
   readonly mutate: (sessionId: SessionSummary['id'], operation: RowOperation) => Promise<void>
   readonly toggleParked: (sessionId: SessionSummary['id']) => void
   readonly copy: (value: string, successMessage: string) => Promise<void>
+  readonly toggleChildren: (sessionId: SessionSummary['id']) => void
+  readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
   readonly translate: ThreadSidebarTranslate
+}
+
+interface RowStyle {
+  readonly density: ThreadRowDensity
+  readonly project: boolean
+  readonly title: boolean
+  readonly machine: boolean
+  readonly path: boolean
+  readonly time: boolean
+  readonly statusDot: boolean
+  readonly maxChildren: number
 }
 
 interface ThreadRowProps {
@@ -134,13 +157,21 @@ interface ThreadRowProps {
   readonly pinned: boolean
   readonly parked: boolean
   readonly selected: boolean
-  readonly depth: number
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  readonly machine: string | undefined
   readonly age: string
+  readonly rowStyle: RowStyle
+  readonly childThreads: readonly SessionSummary[]
+  readonly childrenOpen: boolean
+  readonly allChildrenShown: boolean
+  /** Set only when the open thread is one of this row's children, so other rows skip re-rendering. */
+  readonly selectedChildId: SessionSummary['id'] | undefined
   readonly actions: RowActions
 }
+
+const NO_CHILDREN: readonly SessionSummary[] = []
 
 const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   <Tooltip>
@@ -151,66 +182,175 @@ const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   </Tooltip>
 )
 
+const statusDotClass = (session: SessionSummary): string => {
+  if (session.attention?.unread) return 'dshx:bg-primary'
+  if (session.running) return 'dshx:animate-pulse dshx:bg-info'
+  return 'dshx:bg-muted-foreground/45'
+}
+
+const StatusDot = (props: { readonly session: SessionSummary; readonly unreadLabel: string }): JSX.Element => {
+  const unread = Boolean(props.session.attention?.unread)
+  return (
+    <span
+      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', statusDotClass(props.session))}
+      role={unread ? 'img' : undefined}
+      aria-label={unread ? props.unreadLabel : undefined}
+      aria-hidden={unread ? undefined : true}
+    />
+  )
+}
+
+const ChildThreadList = (props: {
+  readonly parentId: SessionSummary['id']
+  readonly childThreads: readonly SessionSummary[]
+  readonly allShown: boolean
+  readonly selectedChildId: SessionSummary['id'] | undefined
+  readonly rowStyle: RowStyle
+  readonly actions: RowActions
+}): JSX.Element => {
+  const t = props.actions.translate
+  const { shown, hiddenCount } = visibleChildren({
+    children: props.childThreads,
+    limit: props.rowStyle.maxChildren,
+    showAll: props.allShown,
+    selectedId: props.selectedChildId,
+  })
+  const compact = props.rowStyle.density === 'compact'
+  const lineClass = cn(
+    'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+    compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
+  )
+  return (
+    <ul className="dshx:mb-1 dshx:ml-3.5 dshx:flex dshx:flex-col dshx:border-l dshx:pl-1.5" aria-label={t('threadSidebarChildThreads')}>
+      {shown.map(child => (
+        <li key={child.id}>
+          <button
+            type="button"
+            className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
+            data-selected={child.id === props.selectedChildId}
+            title={new Date(child.updatedAt).toLocaleString()}
+            onClick={() => props.actions.open(child.id)}
+          >
+            <StatusDot session={child} unreadLabel={t('threadSidebarUnread')} />
+            <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', child.attention?.unread && 'dshx:font-semibold')}>
+              {child.displayTitle}
+            </span>
+            {props.rowStyle.time ? <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span> : null}
+          </button>
+        </li>
+      ))}
+      {hiddenCount > 0 || props.allShown ? (
+        <li>
+          <button
+            type="button"
+            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
+            aria-expanded={props.allShown}
+            onClick={() => props.actions.toggleAllChildren(props.parentId)}
+          >
+            {props.allShown ? t('threadSidebarFewerChildren') : `${hiddenCount} ${t('threadSidebarMoreChildren')}`}
+          </button>
+        </li>
+      ) : null}
+    </ul>
+  )
+}
+
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
-  const { session, archived, pinned, parked } = props
+  const { session, archived, pinned, parked, rowStyle } = props
   const t = props.actions.translate
   const unread = Boolean(session.attention?.unread)
+  const compact = rowStyle.density === 'compact'
+  const childCount = props.childThreads.length
+  const showProject = rowStyle.project || props.parentTitle !== undefined
+  const showMachine = rowStyle.machine && props.machine !== undefined
+  const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
+  const metaLine = showProject || showMachine || showPath || childCount > 0
+  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <article
-          className="dshx:group/row dshx:relative dshx:min-w-0 dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:data-[selected=true]:bg-accent"
+          className="dshx:group/row dshx:relative dshx:min-w-0"
           data-selected={props.selected}
-          data-lineage-depth={props.depth}
-          style={{ marginInlineStart: props.depth * 12 }}
         >
+          <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
           <button
             type="button"
-            className="dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:rounded-md dshx:px-2.5 dshx:py-2.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default"
+            className={cn(
+              'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+              compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+            )}
             disabled={archived}
             title={new Date(session.updatedAt).toLocaleString()}
             onClick={() => props.actions.open(session.id)}
           >
-            <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
-              <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
-                <span className={cn('dshx:truncate dshx:font-medium', props.parentTitle !== undefined && 'dshx:max-w-[60%] dshx:shrink-0')}>
-                  {props.workspaceTitle ?? t('threadSidebarUnassigned')}
+            {headLine ? (
+              <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} /> : null}
+                <span
+                  className={cn(
+                    'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
+                    compact ? 'dshx:text-sm' : 'dshx:text-base',
+                    unread && 'dshx:font-semibold',
+                  )}
+                >
+                  {rowStyle.title ? session.displayTitle : null}
                 </span>
+                {rowStyle.time ? (
+                  <span className={cn('dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground', session.running && 'dshx:font-medium dshx:text-info')}>
+                    {session.running ? `${t('threadSidebarWorking')} · ` : ''}
+                    {props.age}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+            {metaLine ? (
+              <span
+                className={cn(
+                  'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
+                  rowStyle.statusDot && 'dshx:pl-4',
+                  childCount > 0 && 'dshx:pr-16',
+                )}
+              >
+                {showProject ? (
+                  <span className={cn('dshx:truncate dshx:font-medium', (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0')}>
+                    {props.workspaceTitle ?? t('threadSidebarUnassigned')}
+                  </span>
+                ) : null}
                 {props.parentTitle === undefined ? null : (
-                  <span className="dshx:min-w-0 dshx:truncate dshx:text-xs">
-                    {' · '}
+                  <span className="dshx:min-w-0 dshx:truncate">
                     {t('threadSidebarChildOf')} {props.parentTitle}
                   </span>
                 )}
+                {showMachine ? (
+                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                    <MonitorIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                    <span className="dshx:truncate">{props.machine}</span>
+                  </span>
+                ) : null}
+                {showPath ? <span className="dshx:min-w-0 dshx:truncate" title={session.cwd}>{session.cwd}</span> : null}
               </span>
-              <span className={cn('dshx:shrink-0 dshx:tabular-nums', session.running && 'dshx:font-medium dshx:text-info')}>
-                {session.running ? `${t('threadSidebarWorking')} · ` : ''}
-                {props.age}
-              </span>
-            </span>
-            <span className={cn('dshx:truncate dshx:text-base dshx:text-foreground', unread && 'dshx:font-semibold')}>{session.displayTitle}</span>
-            <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-              {session.cwd ? (
-                <>
-                  <MonitorIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                  <span className="dshx:truncate">{session.cwd}</span>
-                </>
-              ) : null}
-              {unread ? (
-                <span className="dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-[2px] dshx:bg-primary" role="img" aria-label={t('threadSidebarUnread')} />
-              ) : (
-                <span
-                  className={cn(
-                    'dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-[2px]',
-                    session.running ? 'dshx:animate-pulse dshx:bg-info' : 'dshx:bg-muted-foreground/40',
-                  )}
-                  aria-hidden="true"
-                />
-              )}
-            </span>
+            ) : null}
           </button>
-          <div className="dshx:absolute dshx:right-1.5 dshx:bottom-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+          {childCount > 0 ? (
+            <button
+              type="button"
+              className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              aria-expanded={props.childrenOpen}
+              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
+              onClick={() => props.actions.toggleChildren(session.id)}
+            >
+              <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
+                {props.childThreads.slice(0, 3).map(child => (
+                  <span key={child.id} className={cn('dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background', statusDotClass(child))} />
+                ))}
+              </span>
+              <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
+              {props.childrenOpen ? <ChevronUpIcon className="dshx:size-3" aria-hidden="true" /> : <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />}
+            </button>
+          ) : null}
+          <div className="dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
             {!archived ? (
               <>
                 {withTooltip(
@@ -263,6 +403,17 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )
             )}
           </div>
+          </div>
+          {childCount > 0 && props.childrenOpen ? (
+            <ChildThreadList
+              parentId={session.id}
+              childThreads={props.childThreads}
+              allShown={props.allChildrenShown}
+              selectedChildId={props.selectedChildId}
+              rowStyle={rowStyle}
+              actions={props.actions}
+            />
+          ) : null}
         </article>
       </ContextMenuTrigger>
       <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarContextMenu')}>
@@ -296,7 +447,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
 export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, closePalette } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, closePalette, setSelectedThreadId } = useSidebarState()
+  const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
+  const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
+  const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const { paletteMode, destinations } = usePaletteState()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsId = useId()
@@ -345,6 +499,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     )
   }, [preferences.parkedSessionIds, sessions])
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
+
+  useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
 
   useEffect(() => {
     if (sessionState.phase !== 'ready') return
@@ -530,14 +686,27 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     return () => window.clearInterval(timer)
   }, [preferences.autoArchiveEnabled, preferences.scanIntervalMinutes, sessionState.phase, workspaceState.phase])
 
-  const rowsBySection = useMemo(() => {
-    const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
+  const threadTree = useMemo(() => {
+    const listed: SessionSummary[] = []
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
       if (session === undefined || session.blank) continue
       const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
-      const section = sectionForSession(session, archivedSessionIds, pinnedSessionIds, parkedSessionIds)
+      listed.push(session)
+    }
+    return groupThreadChildren({
+      threads: listed,
+      canNest: (child, ancestor) => archivedSessionIds.has(child.id) === archivedSessionIds.has(ancestor.id),
+    })
+  }, [archivedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
+
+  const rowsBySection = useMemo(() => {
+    const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
+    for (const session of threadTree.roots) {
+      // A parent waiting on a running subagent is still active work.
+      const running = session.running || (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => child.running)
+      const section = sectionForSession({ id: session.id, running }, archivedSessionIds, pinnedSessionIds, parkedSessionIds)
       rows.get(section)?.push(session)
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
@@ -546,16 +715,30 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
     )
     return rows
-  }, [
-    archivedSessionIds,
-    parkedSessionIds,
-    pinnedSessionIds,
-    preferences.workspaceFilter,
-    sessionState.byId,
-    sessionState.ids,
-    workspaceBySession,
-    workspaceState.pinnedSessionIds,
-  ])
+  }, [archivedSessionIds, parkedSessionIds, pinnedSessionIds, threadTree, workspaceState.pinnedSessionIds])
+
+  const rowStyle = useMemo<RowStyle>(
+    () => ({
+      density: preferences.threadRowDensity,
+      project: preferences.threadRowProject,
+      title: preferences.threadRowTitle,
+      machine: preferences.threadRowMachine,
+      path: preferences.threadRowPath,
+      time: preferences.threadRowTime,
+      statusDot: preferences.threadRowStatusDot,
+      maxChildren: preferences.maxChildren,
+    }),
+    [
+      preferences.maxChildren,
+      preferences.threadRowDensity,
+      preferences.threadRowMachine,
+      preferences.threadRowPath,
+      preferences.threadRowProject,
+      preferences.threadRowStatusDot,
+      preferences.threadRowTime,
+      preferences.threadRowTitle,
+    ],
+  )
 
   const paletteThreads = useMemo(() => {
     if (paletteMode === null) return { candidates: [], byCandidateId: new Map<string, SessionSummary>() }
@@ -610,6 +793,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operations[operation]()),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
+      toggleChildren: sessionId => setClosedParents(current => toggleSetMember(current, sessionId)),
+      toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -808,6 +993,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                   ? rows.map(session => {
                       const lineage = sessionLineage(session, sessionState.byId)
                       const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+                      const childThreads = threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN
+                      const selectedChildId = childThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
                       return (
                         <ThreadRow
                           key={session.id}
@@ -816,11 +1003,16 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                           pinned={pinnedSessionIds.has(session.id)}
                           parked={parkedSessionIds.has(session.id)}
                           selected={selectedSession?.id === session.id}
-                          depth={lineage.depth}
                           parentTitle={lineage.parentTitle}
                           workspaceId={workspaceId}
                           workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
+                          machine={machine}
                           age={formatAge(session.updatedAt)}
+                          rowStyle={rowStyle}
+                          childThreads={childThreads}
+                          childrenOpen={!closedParents.has(session.id)}
+                          allChildrenShown={expandedParents.has(session.id)}
+                          selectedChildId={selectedChildId}
                           actions={rowActions}
                         />
                       )

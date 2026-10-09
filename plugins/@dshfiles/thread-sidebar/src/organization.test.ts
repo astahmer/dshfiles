@@ -4,12 +4,14 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { test, vi } from 'vitest'
 import {
   archiveWithoutStopping,
+  dropIndexAt,
   fitItems,
   type AutoArchiveContext,
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
   moveSidebarEntry,
   reorderSidebarEntry,
+  reorderVisibleEntry,
   orderSidebarEntries,
   parseSessionIds,
   sessionLineage,
@@ -216,6 +218,22 @@ test('drag reordering moves to the dropped index in both directions', () => {
   assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd'])
   assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 3, 1), ['a', 'd', 'b', 'c'])
   assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 1, 1), ['a', 'b', 'c'])
+})
+
+test('a pointer drag drops past every other icon centre it crosses', () => {
+  const centers = [16, 50, 84, 118]
+  assert.equal(dropIndexAt({ centers, fromIndex: 0, position: 90 }), 2)
+  assert.equal(dropIndexAt({ centers, fromIndex: 3, position: 10 }), 0)
+  assert.equal(dropIndexAt({ centers, fromIndex: 1, position: 52 }), 1)
+  assert.equal(dropIndexAt({ centers, fromIndex: 0, position: 500 }), 3)
+})
+
+test('reordering the icon row keeps hidden entries in their saved slots', () => {
+  const orderedIds = ['new', 'hidden', 'search', 'panel:a', 'panel:b']
+  const visibleIds = ['new', 'search', 'panel:a', 'panel:b']
+  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 3, toVisible: 0 }), ['panel:b', 'new', 'hidden', 'search', 'panel:a'])
+  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 0, toVisible: 2 }), ['hidden', 'search', 'panel:a', 'new', 'panel:b'])
+  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 9, toVisible: 0 }), orderedIds)
 })
 
 test('drag reordering ignores an out-of-range or non-integer index', () => {

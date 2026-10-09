@@ -18,7 +18,7 @@ interface SettingsTabProps {
   readonly hostShortcuts: ObservableSnapshot<readonly ShortcutCatalogEntry[]>
 }
 
-type ChordKey = 'paletteChord' | 'threadSearchChord'
+type ChordKey = 'paletteChord' | 'threadSearchChord' | 'backChord' | 'forwardChord'
 
 export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning } = usePreferences()
@@ -93,6 +93,8 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
         <FieldGroup className="dshx:gap-4">
           {chordRow('paletteChord', props.t('threadSidebarPaletteChord'))}
           {chordRow('threadSearchChord', props.t('threadSidebarThreadSearchChord'))}
+          {chordRow('backChord', props.t('threadSidebarNavigateBack'))}
+          {chordRow('forwardChord', props.t('threadSidebarNavigateForward'))}
         </FieldGroup>
       </FieldSet>
 

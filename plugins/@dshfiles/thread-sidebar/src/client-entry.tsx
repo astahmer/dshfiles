@@ -14,6 +14,7 @@ import { ThreadSidebar } from './client.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
+import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from './palette.js'
 import { SettingsTab } from './settings-tab.js'
 import './client.css'
@@ -125,10 +126,45 @@ export default defineClient({
     ctx.effect(watchNativeSearchRequests, 'thread-sidebar: native session search')
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
+    const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+    const navigationCommands = [
+      { id: 'threadSidebar.navigateBack', code: 'BracketLeft', direction: -1, label: 'threadSidebarNavigateBack', aliases: ['back', 'previous thread'] },
+      { id: 'threadSidebar.navigateForward', code: 'BracketRight', direction: 1, label: 'threadSidebarNavigateForward', aliases: ['forward', 'next thread'] },
+    ] as const
+    for (const command of navigationCommands) {
+      const commandId = command.id
+      if (!isShortcutCommandId(commandId)) continue
+      const binding = { code: command.code, modifiers: ['primary'] } as const
+      // The Host refuses ⌘[ / ⌘] as Web defaults (browser-reserved), so the web uses the sidebar's capture chords;
+      // a user binding or another plugin may also own them, and the header buttons still work.
+      ctx.effect(() => {
+        try {
+          return ctx.shortcuts.register({
+            id: commandId,
+            label: () => translate(command.label),
+            aliases: [...command.aliases],
+            defaults: {
+              'desktop:macos': binding,
+              'desktop:windows': binding,
+              'desktop:linux': binding,
+            },
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({
+              status: 'handled',
+              run: () => window.dispatchEvent(new CustomEvent(NAVIGATION_EVENT, { detail: { direction: command.direction } })),
+            }),
+          })
+        } catch (error) {
+          console.warn(`thread-sidebar: the ${commandId} shortcut could not be registered`, error)
+          return () => undefined
+        }
+      }, `thread-sidebar: ${commandId} shortcut`)
+    }
+
     const paletteCommandId = 'threadSidebar.commandPalette'
     if (isShortcutCommandId(paletteCommandId)) {
       const paletteBinding = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const
-      const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
       // A user binding or another plugin may already own the default; the palette
       // still opens from its button and capture chords, so a refusal must not abort setup.
       ctx.effect(() => {
@@ -187,7 +223,12 @@ export default defineClient({
     })
 
     const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => (
-      <SidebarRoot {...props} readFooterSnapshot={readFooterSnapshot} subscribeFooterSnapshot={subscribeFooterSnapshot} />
+      <SidebarRoot
+        {...props}
+        readFooterSnapshot={readFooterSnapshot}
+        subscribeFooterSnapshot={subscribeFooterSnapshot}
+        openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+      />
     )
 
     ctx.slots.inject('sidebar', () =>
