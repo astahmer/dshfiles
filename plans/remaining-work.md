@@ -21,7 +21,7 @@ indicator; dock-everything plan in [ade/docking.md](ade/docking.md) (feasible wi
 
 Small follow-ups:
 - [x] jujutsu prepare/confirm: throw `PluginApiError` so real messages reach the panel
-- [ ] ai-accounts Settings: price catalog line shows "fetched [object Object]"
+- [x] ai-accounts Settings: price catalog line shows "fetched [object Object]"
 - [x] dshx `tests/config.spec.ts:51` unused `@ts-expect-error` (typecheck error)
 - [ ] restart indicator misses host-only plugins (e.g. optmem) — Host client registry doesn't list them
 - [ ] optmem settings can't show on its Plugins page (no client half)

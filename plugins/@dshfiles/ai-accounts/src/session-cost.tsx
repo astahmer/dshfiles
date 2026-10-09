@@ -7,6 +7,7 @@ import { useMemo } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
 import { SESSION_COST_PROJECTION_KEY, estimateCost, formatUsd, routeKey, sessionCostViewSchema, type CostEstimate, type RouteQuote } from './cost-estimate.js'
+import { fetchedAgo } from './pricing-status.js'
 import { usePreferences } from './use-preferences.js'
 
 type ProjectionHook = (key: string) => unknown
@@ -117,7 +118,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
           ))}
         </ul>
         <p className="dshx:text-muted-foreground">
-          Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, fetched ${relativeTime(fetchedAt, Date.now())}`}), not an invoice.
+          Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, ${fetchedAgo(relativeTime(fetchedAt, Date.now()))}`}), not an invoice.
           {session.partial ? ' Routes without a price are left out.' : ''}
         </p>
       </HoverCardContent>

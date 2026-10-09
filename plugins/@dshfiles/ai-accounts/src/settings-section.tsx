@@ -14,6 +14,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { DISTRIBUTION_HINT, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
+import { pricingStatusLine } from './pricing-status.js'
 import { usePreferences } from './use-preferences.js'
 
 const DELAYS = [400, 800, 1_500, 3_000] as const
@@ -431,13 +432,7 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
         )}
       </Row>
       <Row
-        hint={
-          pricing === null
-            ? 'This Host predates cost estimates; restart DSH to load them.'
-            : pricing.fetchedAt === null
-              ? (pricing.lastError ?? 'No catalog yet.')
-              : `${String(pricing.modelCount)} models priced, fetched ${relativeTime(pricing.fetchedAt, Date.now())}${pricing.lastError === null ? '' : ` · last refresh failed: ${pricing.lastError}`}`
-        }
+        hint={pricingStatusLine({ pricing, fetchedAge: pricing === null || pricing.fetchedAt === null ? null : relativeTime(pricing.fetchedAt, Date.now()) })}
         label="Price catalog"
       >
         {() => (
