@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { createCommandCodeProvider } from './commandcode-provider.js'
-import { buildProfile } from './provider-profile.js'
+import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
 
 const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
   if (profile.piProvider === undefined) throw new Error('The resolved profile must expose its provider.')
@@ -52,5 +54,62 @@ describe('account provider profiles', () => {
     })
 
     expect(modelsFor(profile).map(model => model.id)).not.toContain('deepseek-v4-flash')
+  })
+})
+
+describe('Codex upstream replay overflow', () => {
+  const ENVOY_REPLAY_OVERFLOW = 'exceeded request buffer limit while retrying upstream'
+  const claims = btoa(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-test' } }))
+  const fakeCodexToken = `e30.${claims}.sig`
+
+  const finishOf = async (body: string, status: number) => {
+    const profile = buildProfile({ upstream: openaiCodexProvider(), provider: 'codex-test', displayName: 'Codex Test', additionalModelIds: [] })
+    const model = modelsFor(profile)[0]
+    if (model === undefined) throw new Error('The Codex profile must offer a model.')
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['codex-test', profile]]),
+        resolveApiKey: async () => fakeCodexToken,
+        auth: {
+          credentials: {
+            read: async () => ({ type: 'oauth', access: fakeCodexToken, refresh: 'refresh', expires: Date.now() + 3_600_000, accountId: 'acct-test' }),
+            list: async () => [],
+            modify: async () => undefined,
+            delete: async () => undefined,
+          },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map() },
+    )
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async () => new Response(body, { status })
+    try {
+      const chunks: StreamChunk[] = []
+      for await (const chunk of adapter.stream({
+        provider: 'codex-test',
+        model: model.id,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      })) {
+        chunks.push(chunk)
+      }
+      return chunks.at(-1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  }
+
+  it('codes the replay overflow as a transport failure so the retry policy sends a fresh request', async () => {
+    expect(await finishOf(ENVOY_REPLAY_OVERFLOW, 507)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: 'TRANSPORT', message: ENVOY_REPLAY_OVERFLOW } },
+    })
+  })
+
+  it('keeps an unrelated failure under its own code', async () => {
+    expect(await finishOf('{"error":{"message":"unsupported parameter"}}', 400)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: 'PI_AI_ERROR', message: 'unsupported parameter' } },
+    })
   })
 })

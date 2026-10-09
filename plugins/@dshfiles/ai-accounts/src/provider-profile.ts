@@ -96,6 +96,25 @@ const pinnedCall = (options: GenerateOptions, pins: ReadonlyMap<string, Readonly
 }
 
 /**
+ * Envoy in front of the ChatGPT backend answers 507 with this text when its own
+ * upstream reset and the body was too large for Envoy to replay. The model never
+ * saw the request, so a fresh one is safe, but the text carries no status that
+ * dsh-llm-pi-ai recognizes: it lands as `PI_AI_ERROR`, which no retry policy
+ * lists, and one transient reset ends a long turn.
+ */
+const UPSTREAM_REPLAY_OVERFLOW = /exceeded request buffer limit while retrying upstream/i
+
+async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> {
+  for await (const chunk of chunks) {
+    if (chunk.type === 'finish' && chunk.reason.kind === 'error' && UPSTREAM_REPLAY_OVERFLOW.test(chunk.reason.failure.message)) {
+      yield { ...chunk, reason: { ...chunk.reason, failure: { ...chunk.reason.failure, code: 'TRANSPORT' } } }
+      continue
+    }
+    yield chunk
+  }
+}
+
+/**
  * One default per model, not one per route.
  *
  * pi-ai materializes a default effort through the route-wide `profile.reasoning`
@@ -115,13 +134,13 @@ export class EffortPinnedAdapter extends PiAiAdapter {
   }
 
   override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return super.stream(pinnedCall(options, this.reasoningDefaults))
+    return retryableUpstreamReplayOverflow(super.stream(pinnedCall(options, this.reasoningDefaults)))
   }
 
   override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return super.prepareCall(provider, model, signal).then(call => ({
       ...call,
-      stream: (options: GenerateOptions) => call.stream(pinnedCall(options, this.reasoningDefaults)),
+      stream: (options: GenerateOptions) => retryableUpstreamReplayOverflow(call.stream(pinnedCall(options, this.reasoningDefaults))),
     }))
   }
 }
