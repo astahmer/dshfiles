@@ -1,0 +1,32 @@
+{
+  "name": "@dshfiles/optmem-sqlite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "node:sqlite store and FTS5 search for the OptMem engine.",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "bench": "node bench/run.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dshfiles/optmem-core": "link:../optmem-core"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1311,6 +1311,31 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
+  '@dshfiles/optmem-core':
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
+
+  '@dshfiles/optmem-sqlite':
+    dependencies:
+      '@dshfiles/optmem-core':
+        specifier: link:../optmem-core
+        version: link:../optmem-core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.0
+        version: 22.20.5
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
+
   '@dshfiles/plugin-marketplace':
     dependencies:
       '@deepseek-ai/dsh-tools':
