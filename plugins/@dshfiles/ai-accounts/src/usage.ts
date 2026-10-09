@@ -45,15 +45,34 @@ const codexWindowSchema = z.object({
   resets_at: z.number().finite().optional(),
 })
 
+const codexRateLimitSchema = z.object({
+  primary_window: codexWindowSchema.nullish().catch(undefined),
+  secondary_window: codexWindowSchema.nullish().catch(undefined),
+})
+
 const codexUsageSchema = z.object({
   plan_type: z.string().optional(),
-  rate_limit: z
-    .object({
-      primary_window: codexWindowSchema.nullish(),
-      secondary_window: codexWindowSchema.nullish(),
-    })
-    .nullish(),
+  rate_limit: codexRateLimitSchema.nullish(),
+  /** Extra metered limits; Luna Reserve is one of them when the request asks for it. */
+  additional_rate_limits: z
+    .array(
+      z
+        .object({
+          limit_name: z.string().nullish(),
+          metered_feature: z.string().nullish(),
+          rate_limit: codexRateLimitSchema.nullish(),
+        })
+        .nullable()
+        .catch(null),
+    )
+    .nullish()
+    .catch(undefined),
 })
+
+/** Asks the usage endpoint to include the Luna Reserve meter, as the official client does. */
+const LUNA_RESERVE_HEADER = 'x-openai-codex-luna-reserve'
+
+const isReserveLimit = (name: string | null | undefined): boolean => name !== undefined && name !== null && /luna|reserve/i.test(name)
 
 const codexAuthSchema = z.object({
   tokens: z.object({
@@ -96,6 +115,17 @@ export const parseCodexUsage = (raw: unknown, credits: CodexResetCredits, now: n
       resetsAt: codexResetAt(window, now),
     })
   }
+  // Reserve meters only ever add a window: the ordinary gauges above always come from `rate_limit`.
+  for (const limit of parsed.data.additional_rate_limits ?? []) {
+    if (limit === null || !(isReserveLimit(limit.limit_name) || isReserveLimit(limit.metered_feature))) continue
+    const reserveWindows = [limit.rate_limit?.primary_window, limit.rate_limit?.secondary_window].flatMap(window =>
+      window === undefined || window === null ? [] : [{ percentRemaining: remainingFromUsed(window.used_percent), resetsAt: codexResetAt(window, now) }],
+    )
+    const tightest = reserveWindows.sort((left, right) => left.percentRemaining - right.percentRemaining)[0]
+    if (tightest === undefined || windows.length >= 6) continue
+    const name = limit.limit_name?.trim() ?? ''
+    windows.push({ label: isReserveLimit(name) ? name.slice(0, 32) : 'Luna Reserve', ...tightest, reserve: true })
+  }
   return {
     status: 'ok',
     message: null,
@@ -129,6 +159,7 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
           authorization: `Bearer ${auth.tokens.access_token}`,
           'chatgpt-account-id': accountId,
           accept: 'application/json',
+          [LUNA_RESERVE_HEADER]: '1',
         },
         redirect: 'error',
         signal: usageSignal(signal),

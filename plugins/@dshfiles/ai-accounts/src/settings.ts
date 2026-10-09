@@ -16,16 +16,18 @@ export const aiAccountsSettings = defineSettings({
     autoSaveDelayMs: Schema.natural().min(200).max(10_000).default(800),
     /** How often open quota surfaces ask the Host for fresh usage. */
     usageRefreshSeconds: Schema.natural().min(15).max(3_600).default(60),
-    /** The compact usage button in the sidebar footer. */
+    /** The usage strip above the sidebar foot (a compact button on the collapsed rail). */
     footerButton: Schema.boolean().default(true),
-    /** Account ids the footer button summarizes; empty means every enabled account. */
-    footerAccounts: Schema.array(Schema.string()).default([]),
-    /** How many accounts the footer button lists before collapsing the rest into "+N". */
-    footerMaxItems: Schema.natural().min(1).max(6).default(3),
+    /** Account ids in the order the usage strip and popover list them; unlisted accounts follow. */
+    usageOrder: Schema.array(Schema.string()).default([]),
+    /** Account ids the usage strip and popover leave out. */
+    hiddenUsageAccounts: Schema.array(Schema.string()).default([]),
     /** The draggable usage tab pinned to a window edge. */
     edgeWidget: Schema.boolean().default(true),
     /** Show the accounts block on Settings › Models. */
     modelsPageAccounts: Schema.boolean().default(true),
+    /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
+    codexLunaReserve: Schema.boolean().default(true),
     /** Estimated session cost beside the composer stats, priced from models.dev. */
     costEstimates: Schema.boolean().default(true),
     /** How often the Host refetches models.dev prices. */
@@ -45,7 +47,6 @@ export const DEFAULT_CLIENT_SETTINGS = {
   autoSaveDelayMs: 800,
   usageRefreshSeconds: 60,
   footerButton: true,
-  footerMaxItems: 3,
   edgeWidget: true,
   modelsPageAccounts: true,
   costEstimates: true,
@@ -55,7 +56,6 @@ export const DEFAULT_CLIENT_SETTINGS = {
   readonly autoSaveDelayMs: number
   readonly usageRefreshSeconds: number
   readonly footerButton: boolean
-  readonly footerMaxItems: number
   readonly edgeWidget: boolean
   readonly modelsPageAccounts: boolean
   readonly costEstimates: boolean
@@ -92,4 +92,18 @@ export const readPricingSettings = (): PricingSettings => {
     value = undefined
   }
   return pricingSettingsSchema.parse(typeof value === 'object' && value !== null ? value : {})
+}
+
+/** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
+export const readLunaReserveRouting = (): boolean => {
+  let value: unknown
+  try {
+    value = readHostSettings?.()
+  } catch {
+    value = undefined
+  }
+  return z
+    .object({ codexLunaReserve: z.boolean().catch(true) })
+    .catch({ codexLunaReserve: true })
+    .parse(value ?? {}).codexLunaReserve
 }

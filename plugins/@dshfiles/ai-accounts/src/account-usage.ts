@@ -63,6 +63,8 @@ export const createUsageCache = <Value>(input: { readonly ttlMs: number; readonl
     return pending
   }
   return {
+    /** The last sweep, however old, without starting a new one. */
+    latest: (): Value | undefined => cached?.value,
     invalidate: (): void => {
       cached = undefined
     },

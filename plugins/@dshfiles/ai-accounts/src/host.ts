@@ -7,7 +7,8 @@ import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } fr
 import { createUsageCache } from './account-usage.js'
 import { resolveClaudeInferenceToken } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { aiAccountsHostSettings, readPricingSettings } from './settings.js'
+import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings } from './settings.js'
+import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
 export { accountsSnapshot } from './accounts-host-api.js'
@@ -178,7 +179,17 @@ export default definePlugin({
         enabled.map(([id, route]) => [
           id,
           buildProfile({
-            upstream: route.kind === CODEX_KIND ? codexUpstream : route.kind === CLAUDE_KIND ? claudeUpstream : keyedUpstream(route),
+            upstream:
+              route.kind === CODEX_KIND
+                ? withLunaReserve({
+                    upstream: codexUpstream,
+                    onReserve: () =>
+                      readLunaReserveRouting() &&
+                      shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now()),
+                  })
+                : route.kind === CLAUDE_KIND
+                  ? claudeUpstream
+                  : keyedUpstream(route),
             provider: id,
             displayName: route.displayName,
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],

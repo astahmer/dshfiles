@@ -153,6 +153,8 @@ export const usageCardSchema = z.object({
         label: z.string().max(32),
         percentRemaining: z.number(),
         resetsAt: z.number().nullable(),
+        /** Luna Reserve: drawn on only after an ordinary window is spent. */
+        reserve: z.boolean().optional(),
       }),
     )
     .max(6),
