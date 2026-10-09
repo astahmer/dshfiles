@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from './models-page-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AccountsPanel } from './accounts-panel.js'
 import { QuotaFooter } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
@@ -34,10 +35,33 @@ export default defineClientPlugin({
     const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
     const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
     const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
-    const AccountsPanelView = (): JSX.Element => <AccountsPanel onOpenUsageHistory={openUsageHistory} />
-    const UsageHistoryPanelView = (): JSX.Element => <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
-    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element | null => <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
-    const EdgeUsageHostView = (): JSX.Element | null => <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} />
+    // Every slot shares the bundle's query client, so the footer, edge widget
+    // and panels read one usage cache instead of polling side by side.
+    const AccountsPanelView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <AccountsPanel onOpenUsageHistory={openUsageHistory} />
+      </PluginQueryProvider>
+    )
+    const UsageHistoryPanelView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+      </PluginQueryProvider>
+    )
+    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element => (
+      <PluginQueryProvider>
+        <QuotaFooter {...props} onOpenUsageHistory={openUsageHistory} />
+      </PluginQueryProvider>
+    )
+    const EdgeUsageHostView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} />
+      </PluginQueryProvider>
+    )
+    const ModelsPageAccountsView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <ModelsPageAccounts />
+      </PluginQueryProvider>
+    )
     const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
       <AiAccountsSettingsSection close={props.close} openAccounts={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
     )
@@ -45,7 +69,7 @@ export default defineClientPlugin({
     api.ui.register({ name: 'settings.section', id: 'ai-accounts', order: 40, label, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SettingsSectionView)
     // The Models page only draws rows for settings namespaces, which accounts
     // are not, so they join it through its footer seat.
-    api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccounts)
+    api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccountsView)
     // The footer owns its whole surface, so quota lives there as a compact
     // disclosure: the number you want without opening the panel.
     api.ui.register(
