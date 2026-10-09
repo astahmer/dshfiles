@@ -1,13 +1,30 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { decodeThreadMentionText, threadMentionText } from './thread-mention.js'
+import { buildThreadReferenceInsert, decodeThreadMentionSessionId } from './thread-mention.js'
 
-test('thread mentions are inserted as a token followed by one space', () => {
-  assert.equal(threadMentionText('thr_123'), '@thread:thr_123 ')
+test('thread reference keeps the native session mention and title presentation', () => {
+  const mention = '@[Explore Agent Questions Plugin Features](dsh-session:InNlc3Npb24tZXhhbXBsZSI)'
+
+  assert.deepEqual(
+    buildThreadReferenceInsert({
+      mention,
+      label: 'session-example',
+      displayTitle: 'Explore Agent Questions Plugin Features',
+    }),
+    {
+      source: 'reference',
+      ref: mention,
+      label: 'Explore Agent Questions Plugin Features',
+      appearance: 'session',
+      clipboardText: mention,
+    },
+  )
 })
 
-test('thread mention events accept only non-empty text tokens', () => {
-  assert.equal(decodeThreadMentionText(threadMentionText('thr_123')), '@thread:thr_123 ')
-  assert.equal(decodeThreadMentionText('@thread:   '), null)
-  assert.equal(decodeThreadMentionText({ text: '@thread:thr_123' }), null)
+test('thread mention requests decode only a non-empty session id', () => {
+  assert.equal(decodeThreadMentionSessionId({ sessionId: 'session-example' }), 'session-example')
+  assert.equal(decodeThreadMentionSessionId({ sessionId: '' }), null)
+  assert.equal(decodeThreadMentionSessionId({ sessionId: 'session-example', label: 'untrusted' }), null)
+  assert.equal(decodeThreadMentionSessionId({ sessionId: 'x'.repeat(513) }), null)
+  assert.equal(decodeThreadMentionSessionId('@thread:session-example'), null)
 })

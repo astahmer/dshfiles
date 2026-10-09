@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
-import { LlmError } from '@deepseek-ai/dsh-llm'
-import { queueApi } from './api.js'
+import { LlmError, type FileBlock } from '@deepseek-ai/dsh-llm'
+import { MAX_QUEUE_FILE_BYTES, queueApi } from './api.js'
 import { queueReorderSettings } from './settings.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describeInbox, isDirection, moveWithinInbox, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
@@ -48,6 +48,55 @@ export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Pr
 export const describeQueueOrder = (ctx: Context, sessionId: string) => {
   const agent = liveAgent(ctx, sessionId)
   return agent === undefined ? [] : describeInbox(agent.inbox)
+}
+
+type FileAttachmentRef = FileBlock['attachment']
+
+interface FileReader {
+  readFileStream(ref: FileAttachmentRef, signal?: AbortSignal): AsyncIterable<Uint8Array>
+}
+
+const isFileReader = (value: unknown): value is FileReader =>
+  typeof value === 'object' && value !== null && 'readFileStream' in value && typeof value.readFileStream === 'function'
+
+/**
+ * File references this Host has already confirmed in a session's queue. Editing removes the message from the queue,
+ * and Cancel still needs its files, so a reference stays readable for that session once it was seen there.
+ */
+const confirmedFiles = new Map<string, Map<string, FileAttachmentRef>>()
+
+const queuedFileRef = (ctx: Context, sessionId: string, attachmentId: string): FileAttachmentRef | undefined => {
+  const confirmed = confirmedFiles.get(sessionId)?.get(attachmentId)
+  if (confirmed !== undefined) return confirmed
+  const agent = liveAgent(ctx, sessionId)
+  if (agent === undefined) return undefined
+  for (const message of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
+    for (const block of message.content) {
+      if (block.type !== 'file' || block.attachment.attachmentId !== attachmentId) continue
+      const session = confirmedFiles.get(sessionId) ?? new Map<string, FileAttachmentRef>()
+      session.set(attachmentId, block.attachment)
+      confirmedFiles.set(sessionId, session)
+      return block.attachment
+    }
+  }
+  return undefined
+}
+
+/** Bytes of one file attached to a queued message, so the composer can hold it while the message is edited. */
+export const readQueuedFile = async (ctx: Context, request: { readonly sessionId: string; readonly attachmentId: string }) => {
+  const ref = queuedFileRef(ctx, request.sessionId, request.attachmentId)
+  if (ref === undefined) throw new LlmError('That file is not attached to a message queued in this session.', 'NOT_FOUND')
+  if (ref.bytes > MAX_QUEUE_FILE_BYTES) throw new LlmError('That file is too large to edit in the composer.', 'INVALID_ARGUMENT')
+  const store = ctx.get('attachments')
+  if (!isFileReader(store)) throw new LlmError('attachments service unavailable', 'MISSING_SERVICE')
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for await (const chunk of store.readFileStream(ref)) {
+    total += chunk.byteLength
+    if (total > MAX_QUEUE_FILE_BYTES) throw new LlmError('That file is too large to edit in the composer.', 'INVALID_ARGUMENT')
+    chunks.push(chunk)
+  }
+  return { name: ref.name, data: Buffer.concat(chunks).toString('base64') }
 }
 
 /** The context this plugin activated on, captured once at setup. */
@@ -107,6 +156,12 @@ const queueHostApi = queueApi.host({
   describe: async ({ input }) => {
     if (hostContext === undefined) return []
     return describeQueueOrder(hostContext, input.sessionId)
+  },
+  readFile: async ({ input }) => {
+    if (hostContext === undefined) {
+      throw new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE')
+    }
+    return readQueuedFile(hostContext, { sessionId: input.sessionId, attachmentId: input.attachment.attachmentId })
   },
 })
 

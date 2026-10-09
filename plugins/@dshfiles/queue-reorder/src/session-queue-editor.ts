@@ -1,0 +1,245 @@
+import type { Context } from '@deepseek-ai/cordis'
+import type { AttachmentIdType } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { PromptContentPart } from '@deepseek-ai/dsh-api-session-controller/types'
+import type {
+  ComposerAttachment,
+  DraftAttachmentId,
+  DraftFileUploads,
+  SessionInput,
+  SubmitAttachment,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { ApiClient } from '@dshfiles/dshx/api'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import type { queueApi } from './api.js'
+import { createQueueEditor, decodeQueuedRows, queueEditRecordsSchema, type QueueEditor, type QueuedRow } from './queue-edit.js'
+
+/**
+ * Binds the queue editor to one live DSH session: its inbox projection, its pending submissions, its composer
+ * input, the Conversation's draft-attachment registry, and this plugin's Host API.
+ *
+ * Every Host or Client service is reached through a decoded boundary. When a piece is missing — an older Host
+ * without `readFile`, or a Conversation build without draft attachments — editing degrades instead of throwing.
+ */
+
+type QueueApiClient = ApiClient<(typeof queueApi)['methods']>
+type ReceiptId = Extract<PromptContentPart, { readonly type: 'file' }>['receiptId']
+
+interface DraftAttachmentApi {
+  createDrafts(sessionId: SessionFace['sessionId'], files: readonly File[]): readonly ComposerAttachment[]
+  releaseDraftAttachment(id: DraftAttachmentId): void
+  resolveDraftAttachments(ids: readonly DraftAttachmentId[]): readonly ComposerAttachment[]
+  serializeDraftAttachments(ids: readonly DraftAttachmentId[]): Promise<{ readonly attachments: readonly SubmitAttachment[] }>
+  readonly fileUploads: { getSnapshot(): DraftFileUploads; subscribe(listener: () => void): () => void }
+}
+
+interface ConversationWithInput {
+  readonly input: { for(ctx: Context): SessionInput }
+}
+
+const DRAFT_METHODS = ['createDrafts', 'releaseDraftAttachment', 'resolveDraftAttachments', 'serializeDraftAttachments'] as const
+
+const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi =>
+  typeof value === 'object' &&
+  value !== null &&
+  DRAFT_METHODS.every(name => typeof Reflect.get(value, name) === 'function') &&
+  typeof Reflect.get(Object(Reflect.get(value, 'fileUploads')), 'subscribe') === 'function'
+
+const hasSessionInput = (value: unknown): value is ConversationWithInput =>
+  typeof value === 'object' && value !== null && typeof Reflect.get(Object(Reflect.get(value, 'input')), 'for') === 'function'
+
+const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
+const isReceiptId = (value: string): value is ReceiptId => value.length > 0
+
+/** One upload wait never outlives a stuck network: Cancel reports the failure and stays retryable. */
+const UPLOAD_TIMEOUT_MS = 5 * 60_000
+
+const bytesFromBase64 = (data: string): Uint8Array<ArrayBuffer> => {
+  const binary = atob(data)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
+
+const memoized = <Source, Value>(read: () => Source, derive: (source: Source) => Value): (() => Value) => {
+  let cache: { readonly source: Source; readonly value: Value } | undefined
+  return () => {
+    const source = read()
+    if (cache?.source !== source) cache = { source, value: derive(source) }
+    return cache.value
+  }
+}
+
+const storedEdits = createStoredValue({ key: 'dshfiles.queue-reorder.edits.v1', schema: queueEditRecordsSchema, fallback: {} })
+
+/** The Host API client, set by the dock: dshx hands it out only inside a Client Slot component. */
+let queueClient: QueueApiClient | undefined
+
+export const useQueueClientForEditing = (client: QueueApiClient): void => {
+  queueClient = client
+}
+
+const requireQueueClient = (): QueueApiClient => {
+  if (queueClient === undefined) throw new Error('queue dock is not mounted')
+  return queueClient
+}
+
+const waitForUploads = (drafts: DraftAttachmentApi, ids: readonly DraftAttachmentId[]): Promise<void> => {
+  const fileIds = drafts.resolveDraftAttachments(ids).flatMap(draft => (draft.kind === 'file' ? [draft.id] : []))
+  return new Promise((resolve, reject) => {
+    let unsubscribe = (): void => {}
+    const timer = setTimeout(() => {
+      unsubscribe()
+      reject(new Error('a file upload did not finish'))
+    }, UPLOAD_TIMEOUT_MS)
+    const check = (): boolean => {
+      const uploads = drafts.fileUploads.getSnapshot()
+      const failed = fileIds.find(id => uploads[id]?.status === 'error')
+      if (failed !== undefined) {
+        clearTimeout(timer)
+        reject(new Error('a file upload failed'))
+        return true
+      }
+      if (!fileIds.every(id => uploads[id]?.status === 'ready')) return false
+      clearTimeout(timer)
+      resolve()
+      return true
+    }
+    if (check()) return
+    unsubscribe = drafts.fileUploads.subscribe(() => {
+      if (check()) unsubscribe()
+    })
+  })
+}
+
+const toPromptPart = (part: { readonly type: 'text'; readonly text: string } | SubmitAttachment): PromptContentPart => {
+  if (part.type !== 'file') return part
+  if (!isReceiptId(part.receiptId)) throw new Error('a file upload has no receipt')
+  return { type: 'file', receiptId: part.receiptId }
+}
+
+const createEditor = (input: {
+  readonly sessionId: SessionFace['sessionId']
+  readonly session: SessionFace
+  readonly composer: SessionInput
+  readonly drafts: DraftAttachmentApi
+}): QueueEditor => {
+  const inbox = input.session.projections.faceOf('inbox')
+  const records = {
+    load: () => storedEdits.get()[input.sessionId] ?? null,
+    save: (record: ReturnType<typeof records.load>) => {
+      const { [input.sessionId]: _previous, ...others } = storedEdits.get()
+      storedEdits.set(record === null ? others : { ...others, [input.sessionId]: record })
+    },
+  }
+  return createQueueEditor<DraftAttachmentId, SubmitAttachment>({
+    queue: { getSnapshot: memoized(() => inbox.getSnapshot(), decodeQueuedRows), subscribe: listener => inbox.subscribe(listener) },
+    pendingRequestIds: {
+      getSnapshot: memoized(
+        () => input.session.getSnapshot(),
+        snapshot => snapshot.pendingSubmissions.map(submission => submission.requestId),
+      ),
+      subscribe: listener => input.session.subscribe(listener),
+    },
+    composer: {
+      getSnapshot: memoized(
+        () => input.composer.state.getSnapshot(),
+        state => ({ draft: state.draft, attachmentIds: state.attachmentIds, idle: state.phase === 'plain' }),
+      ),
+      subscribe: listener => input.composer.state.subscribe(listener),
+      setDraft: text => input.composer.setDraft(text),
+      addAttachments: ids => input.composer.addAttachments(ids),
+      removeAttachment: id => {
+        input.composer.removeAttachment(id)
+      },
+      submit: () => input.composer.submit('queue', 'click'),
+      focus: () => input.composer.focus(),
+    },
+    drafts: {
+      create: files => input.drafts.createDrafts(input.sessionId, files).map(draft => draft.id),
+      release: ids => {
+        for (const id of ids) input.drafts.releaseDraftAttachment(id)
+      },
+      live: ids => input.drafts.resolveDraftAttachments(ids).map(draft => draft.id),
+      serialize: async ids => {
+        await waitForUploads(input.drafts, ids)
+        return (await input.drafts.serializeDraftAttachments(ids)).attachments
+      },
+    },
+    host: {
+      readImage: async attachment => {
+        if (!isAttachmentId(attachment.attachmentId)) throw new Error('image has no id')
+        const result = await input.session.readAttachment(attachment.attachmentId)
+        if (!result.ok) throw new Error(result.error.message)
+        const name = attachment.name ?? result.value.attachment.name ?? 'image'
+        return new File([new Uint8Array(result.value.data)], name, { type: result.value.attachment.mediaType })
+      },
+      readFile: async attachment => {
+        const file = await requireQueueClient().readFile({ sessionId: input.sessionId, attachment })
+        return new File([bytesFromBase64(file.data)], file.name)
+      },
+      remove: async itemId => {
+        const result = await input.session.updateQueue(MessageId(itemId), { kind: 'remove' })
+        if (!result.ok) throw new Error(result.error.message)
+      },
+      enqueue: async parts => {
+        const text = parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join('')
+        const handle = input.session.beginSubmission({ mode: 'queue', text, attachments: [] })
+        let content: PromptContentPart[]
+        try {
+          content = parts.map(toPromptPart)
+        } catch (error) {
+          handle.abandon()
+          throw error
+        }
+        const result = await input.session.prompt(content, 'queue', undefined, handle.requestId)
+        if (!result.ok) throw new Error(result.error.message)
+        return handle.requestId
+      },
+      move: async (itemId, direction) => (await requireQueueClient().move({ sessionId: input.sessionId, itemId, direction })).index,
+    },
+    records,
+  })
+}
+
+const editors = new Map<string, { readonly session: SessionFace; readonly editor: QueueEditor; readonly release: () => void }>()
+
+/**
+ * The editor for one session, kept for the page's lifetime so an edit survives switching threads. While a record
+ * is open the session stays retained, so its inbox and submissions keep flowing to the editor in the background.
+ */
+export const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): QueueEditor | undefined => {
+  const binding = ctx.sessions.binding(sessionId)
+  const scoped = ctx.sessions.scope(sessionId)
+  if (binding === undefined || scoped === undefined) return undefined
+  const existing = editors.get(sessionId)
+  if (existing?.session === binding.session) return existing.editor
+  existing?.release()
+  existing?.editor.dispose()
+  const conversation = scoped.get('conversation')
+  if (!hasDraftAttachmentApi(conversation) || !hasSessionInput(conversation)) return undefined
+  const editor = createEditor({ sessionId, session: binding.session, composer: conversation.input.for(scoped), drafts: conversation })
+  let reference: { release(): void } | undefined
+  const retainWhileEditing = (): void => {
+    const editing = editor.getSnapshot().record !== null
+    if (editing && reference === undefined) reference = ctx.sessions.retain(sessionId, { source: 'controllerOperation' })
+    if (!editing && reference !== undefined) {
+      reference.release()
+      reference = undefined
+    }
+  }
+  const stopRetaining = editor.subscribe(retainWhileEditing)
+  retainWhileEditing()
+  editors.set(sessionId, {
+    session: binding.session,
+    editor,
+    release: () => {
+      stopRetaining()
+      reference?.release()
+    },
+  })
+  return editor
+}
+
+export type { QueuedRow }

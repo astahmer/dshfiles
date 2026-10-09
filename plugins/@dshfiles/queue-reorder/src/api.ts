@@ -32,6 +32,15 @@ export const queueEntrySchema = z.object({
   items: z.array(z.string()).max(256),
 })
 
+/** Largest queued file the dock copies back into the composer; base64 crosses the wire as one JSON string. */
+export const MAX_QUEUE_FILE_BYTES = 25 * 1024 * 1024
+
+export const queueFileAttachmentSchema = z.object({
+  attachmentId: z.string().min(1).max(256),
+  name: z.string().min(1).max(512),
+  bytes: z.number().int().min(0).max(MAX_QUEUE_FILE_BYTES),
+})
+
 export type QueueMoveInput = z.infer<typeof queueMoveInputSchema>
 export type QueuePosition = z.infer<typeof queuePositionSchema>
 
@@ -43,6 +52,11 @@ export const queueApi = defineApi({
     describe: method({
       input: z.object({ sessionId: z.string().min(1).max(128) }),
       output: z.array(queueEntrySchema).max(4),
+    }),
+    // Added after the first release: a Host started before it answers with an unknown-endpoint error.
+    readFile: method({
+      input: z.object({ sessionId: z.string().min(1).max(128), attachment: queueFileAttachmentSchema }),
+      output: z.object({ name: z.string().min(1).max(512), data: z.string().max(Math.ceil(MAX_QUEUE_FILE_BYTES / 3) * 4) }),
     }),
   },
 })
