@@ -34,8 +34,11 @@ the icon row switches to expanded.
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,
 project, path, and ID prefix, recent threads when the query is empty,
-destinations and actions (toggle sidebar, focus composer, customize) in the
-full palette, ⌘1–⌘9 on the first nine rows, and Enter to open. Keyboard entry
+destinations and actions (toggle sidebar, focus composer, customize, and Restart
+DSH when launched through the managed supervisor) in the full palette, ⌘1–⌘9
+on the first nine rows, and Enter to open. Restart asks for confirmation, then
+requests a graceful Host exit; the Nix supervisor relaunches only its own DSH
+child. Keyboard entry
 points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,

@@ -7,6 +7,15 @@ import {
   IconSettingsOutlineRegular,
   IconSlidersTwoOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
@@ -14,7 +23,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CommandIcon, EllipsisVerticalIcon, GripVerticalIcon, PanelLeftIcon, SlidersHorizontalIcon, TextCursorInputIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  CommandIcon,
+  EllipsisVerticalIcon,
+  GripVerticalIcon,
+  PanelLeftIcon,
+  RefreshCwIcon,
+  SlidersHorizontalIcon,
+  TextCursorInputIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   useEffect,
@@ -42,6 +59,7 @@ import {
 import { filterByLabel, formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
 import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { threadSidebarRestartApi } from './restart-api.js'
 
 interface FooterRegistration {
   id: string
@@ -270,7 +288,10 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
                           item.run()
                         }}
                       >
-                        <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+                        <span
+                          className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                          aria-hidden="true"
+                        >
                           {item.icon}
                         </span>
                         <span className="dshx:truncate">{item.label}</span>
@@ -311,6 +332,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
   const { preferences, updatePreferences, openPalette, setDestinations } = useSidebarState()
+  const restartApi = useApi(threadSidebarRestartApi)
+  const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
+  const restartAvailable = restartAvailability.data?.available === true
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
+  const [restartRequestPending, setRestartRequestPending] = useState(false)
+  const [restartRequestFailed, setRestartRequestFailed] = useState(false)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -627,6 +654,19 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     run: () => activateHeaderEntry(entry),
   }))
 
+  const requestDshRestart = (): void => {
+    if (restartRequestPending) return
+    setRestartRequestPending(true)
+    setRestartRequestFailed(false)
+    void restartApi
+      .requestRestart(undefined)
+      .then(
+        () => setRestartDialogOpen(false),
+        () => setRestartRequestFailed(true),
+      )
+      .finally(() => setRestartRequestPending(false))
+  }
+
   const paletteDestinations = useMemo<PaletteDestination[]>(
     () => [
       ...orderedHeaderEntries
@@ -650,8 +690,21 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         icon: <SlidersHorizontalIcon className="dshx:size-4" />,
         run: openCustomize,
       },
+      ...(restartAvailable
+        ? [
+            {
+              id: 'action:restart-dsh',
+              label: text(props.t, 'threadSidebarRestart'),
+              icon: <RefreshCwIcon className="dshx:size-4" />,
+              run: () => {
+                setRestartRequestFailed(false)
+                setRestartDialogOpen(true)
+              },
+            },
+          ]
+        : []),
     ],
-    [orderedHeaderEntries, activePanelId, props.t, props.collapsed],
+    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, setRestartDialogOpen, setRestartRequestFailed],
   )
 
   useEffect(() => setDestinations(paletteDestinations), [paletteDestinations, setDestinations])
@@ -714,7 +767,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         )}
         style={{ width: props.width }}
       >
-        <div ref={brandRef} className={cn('dshx:flex dshx:h-12 dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-2', props.collapsed ? 'dshx:justify-center' : 'dshx:px-3')}>
+        <div
+          ref={brandRef}
+          className={cn('dshx:flex dshx:h-12 dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-2', props.collapsed ? 'dshx:justify-center' : 'dshx:px-3')}
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -723,7 +779,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           >
             {props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>}
           </Button>
-          {wide ? <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span> : null}
+          {wide ? (
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span>
+          ) : null}
           {wide ? (
             <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
               <Button
@@ -731,7 +789,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 size="icon-sm"
                 className="dshx:text-muted-foreground"
                 aria-label={text(props.t, 'threadSidebarCommandPalette')}
-                title={paletteHint === null ? text(props.t, 'threadSidebarCommandPalette') : `${text(props.t, 'threadSidebarCommandPalette')} (${formatChord(paletteHint, mac).join('')})`}
+                title={
+                  paletteHint === null
+                    ? text(props.t, 'threadSidebarCommandPalette')
+                    : `${text(props.t, 'threadSidebarCommandPalette')} (${formatChord(paletteHint, mac).join('')})`
+                }
                 onClick={() => openPalette('all')}
               >
                 <CommandIcon className="dshx:size-4" aria-hidden="true" />
@@ -756,10 +818,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           ref={headerRegionRef}
           className={cn(
             'dshx:w-full dshx:min-h-0',
-            props.collapsed ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]' : iconRow ? 'dshx:shrink-0' : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
+            props.collapsed
+              ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]'
+              : iconRow
+                ? 'dshx:shrink-0'
+                : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
           )}
           id={headerRegionId}
-          style={wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined}
+          style={
+            wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined
+          }
         >
           {props.collapsed ? (
             <nav className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:pb-2" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
@@ -768,7 +836,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      className={cn('dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground', item.active && 'dshx:bg-accent dshx:text-foreground')}
+                      className={cn(
+                        'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
+                        item.active && 'dshx:bg-accent dshx:text-foreground',
+                      )}
                       aria-label={item.label}
                       aria-current={item.active ? 'page' : undefined}
                       onClick={item.run}
@@ -1021,6 +1092,34 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           ) : null}
         </footer>
       </div>
+      <AlertDialog
+        open={restartDialogOpen}
+        onOpenChange={open => {
+          if (restartRequestPending && !open) return
+          setRestartDialogOpen(open)
+          if (!open) setRestartRequestFailed(false)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{text(props.t, 'threadSidebarRestartTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{text(props.t, 'threadSidebarRestartDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          {restartRequestFailed ? (
+            <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
+              {text(props.t, 'threadSidebarRestartFailure')}
+            </p>
+          ) : null}
+          <AlertDialogFooter>
+            <Button type="button" variant="outline" disabled={restartRequestPending} onClick={() => setRestartDialogOpen(false)}>
+              {text(props.t, 'threadSidebarRestartCancel')}
+            </Button>
+            <Button type="button" variant="destructive" disabled={restartRequestPending} onClick={requestDshRestart}>
+              {text(props.t, restartRequestPending ? 'threadSidebarRestartPending' : 'threadSidebarRestartConfirm')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   )
 }
