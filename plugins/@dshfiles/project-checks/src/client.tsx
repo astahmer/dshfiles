@@ -2,14 +2,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { projectChecksApi, type ProjectActionView, type ProjectCheckReceipt, type ProjectHookEvent } from './api.js'
+import { useSyncExternalStore } from 'react'
+import { projectChecksApi, type ProjectActionView, type ProjectCheckReceipt } from './api.js'
 import { PlayIcon, RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import './client.css'
 
 type Listener = () => void
@@ -68,7 +69,11 @@ export default defineClient({
           order: 4,
           inject: sessionId => ({ sessionId, panel: panels.forSession(sessionId) }),
         },
-        decorate(ProjectChecksPanel),
+        decorate((slotProps: { readonly sessionId: string; readonly panel: SessionPanel }) => (
+          <PluginQueryProvider>
+            <ProjectChecksPanel sessionId={slotProps.sessionId} panel={slotProps.panel} />
+          </PluginQueryProvider>
+        )),
       ),
     )
     ctx.effect(
@@ -106,46 +111,43 @@ const freshnessLabel = (receipt: ProjectCheckReceipt): string => {
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)
   const open = useSyncExternalStore(props.panel.subscribe, props.panel.getSnapshot)
-  const [actions, setActions] = useState<readonly ProjectActionView[]>([])
-  const [receipts, setReceipts] = useState<readonly ProjectCheckReceipt[]>([])
-  const [hooks, setHooks] = useState<readonly ProjectHookEvent[]>([])
-  const [busyAction, setBusyAction] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
-  const [reload, setReload] = useState(0)
+  const queryClient = useQueryClient()
+  const sessionKey = ['project-checks', props.sessionId] as const
+  const receiptsKey = [...sessionKey, 'receipts'] as const
+  const actionsQuery = useQuery({
+    queryKey: [...sessionKey, 'actions'],
+    queryFn: ({ signal }) => api.actions({ sessionId: props.sessionId }, { signal }),
+    enabled: open,
+  })
+  const receiptsQuery = useQuery({
+    queryKey: receiptsKey,
+    queryFn: ({ signal }) => api.receipts({ sessionId: props.sessionId }, { signal }),
+    enabled: open,
+  })
+  const hooksQuery = useQuery({
+    queryKey: [...sessionKey, 'hooks'],
+    queryFn: ({ signal }) => api.hookEvents({ sessionId: props.sessionId }, { signal }),
+    enabled: open,
+  })
+  const runMutation = useMutation({
+    mutationFn: (action: ProjectActionView) => api.run({ sessionId: props.sessionId, actionId: action.id }),
+    onSuccess: receipt => {
+      queryClient.setQueryData<readonly ProjectCheckReceipt[]>(receiptsKey, current =>
+        [receipt, ...(current ?? []).filter(item => item.id !== receipt.id)].slice(0, 30),
+      )
+      return queryClient.invalidateQueries({ queryKey: sessionKey })
+    },
+  })
 
-  const refresh = useCallback(async () => {
-    setNotice('')
-    try {
-      const [nextActions, nextReceipts, nextHooks] = await Promise.all([
-        api.actions({ sessionId: props.sessionId }),
-        api.receipts({ sessionId: props.sessionId }),
-        api.hookEvents({ sessionId: props.sessionId }),
-      ])
-      setActions(nextActions)
-      setReceipts(nextReceipts)
-      setHooks(nextHooks)
-    } catch {
-      setNotice('Project checks could not load this session. Refresh and try again.')
-    }
-  }, [api, props.sessionId])
-
-  useEffect(() => {
-    if (open) void refresh()
-  }, [open, refresh, reload])
-
-  const run = async (action: ProjectActionView): Promise<void> => {
-    setBusyAction(action.id)
-    setNotice('')
-    try {
-      const receipt = await api.run({ sessionId: props.sessionId, actionId: action.id })
-      setReceipts(current => [receipt, ...current.filter(item => item.id !== receipt.id)].slice(0, 30))
-      await refresh()
-    } catch {
-      setNotice('The action did not start. Confirm the session directory and trusted project root.')
-    } finally {
-      setBusyAction(null)
-    }
-  }
+  const actions = actionsQuery.data ?? []
+  const receipts = receiptsQuery.data ?? []
+  const hooks = hooksQuery.data ?? []
+  const busyAction = runMutation.isPending ? (runMutation.variables?.id ?? null) : null
+  const notice = runMutation.isError
+    ? 'The action did not start. Confirm the session directory and trusted project root.'
+    : actionsQuery.isError || receiptsQuery.isError || hooksQuery.isError
+      ? 'Project checks could not load this session. Refresh and try again.'
+      : ''
 
   if (!open) return null
 
@@ -161,7 +163,10 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         </CardTitle>
         <CardDescription className="dshx:text-xs">Profile-trusted commands run with argv in this session’s project directory.</CardDescription>
         <CardAction className="dshx:flex dshx:items-center dshx:gap-1">
-          <Button type="button" variant="ghost" size="xs" onClick={() => setReload(value => value + 1)} aria-label="Refresh project checks">
+          <Button type="button" variant="ghost" size="xs" onClick={() => {
+              runMutation.reset()
+              void queryClient.invalidateQueries({ queryKey: sessionKey })
+            }} aria-label="Refresh project checks">
             <RefreshCwIcon />
             Refresh
           </Button>
@@ -196,7 +201,7 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
                 </ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Button type="button" variant="outline" size="xs" disabled={busyAction !== null} onClick={() => void run(action)}>
+                <Button type="button" variant="outline" size="xs" disabled={busyAction !== null} onClick={() => runMutation.mutate(action)}>
                   {busyAction === action.id ? <Spinner aria-hidden /> : <PlayIcon />}
                   {busyAction === action.id ? 'Running…' : 'Run'}
                 </Button>
