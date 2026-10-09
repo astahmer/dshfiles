@@ -34,3 +34,21 @@ Design: [design.md](design.md).
   read session logs produced in full mode (fork session package + dsh-core-runtime rebuilt).
 - Remaining (Stage 5): long-conversation token/cache comparison compat vs full; real summaries in full mode;
   capture actual request bytes; why the codex route returns empty replies from an isolated DSH_HOME. (oxfmt: done.)
+
+## Stage 5 report (S1–S2, 2026-10-09)
+
+Long scenario (24 + 2 turns), `codex-emialex/gpt-6-luna` effort low, isolated scratch homes. Details:
+[benchmarks.md](benchmarks.md) "Long conversation", [runtime-evidence.md](runtime-evidence.md) "Stage 5".
+
+| Metric | stock | compat | full | no-OptMem baseline |
+|---|---|---|---|---|
+| total input tokens (24+2 turns) | 387,621 | 202,964 | 234,934 | 349,526 |
+| cache-read % | 83.3 | 79.0 | 79.3 | 81.7 |
+| input tokens at turn 24 | 25,407 (2 steps; 12,578 first step) | 8,952 | 8,103 | 12,397 |
+| sent bytes at turn 24 (S3) | n/a | n/a | 16,989 (original 40,864, −58 %) | n/a |
+| recall correct (turns 21–24, B) | 6/6 | 5/6 (B1 missed the error code) | 6/6 | 3/6 (no citation, B fails) |
+| summaries written / max node bytes | n/a | 18 / 498 | 54 / 512 | n/a |
+
+Caveat: the stock core made the model use workspace tools on code turns (multi-step turns, tool results in history),
+the fork core mostly did not, so run totals are not a like-for-like memory comparison; per-step growth is (full
++2.3k tokens over 24 turns vs baseline +6.7k).

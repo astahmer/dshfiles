@@ -26,7 +26,7 @@ pnpm --dir plugins/@dshfiles/optmem run build
 pnpm --dir plugins/@dshfiles/ai-accounts run build
 ```
 
-- [ ] S0 done
+- [x] S0 done
 
 ## S1 — long-conversation comparison (stock vs compat vs full)
 Smoke first (≈2 cheap turns) to confirm the route answers:
@@ -52,7 +52,7 @@ What to record in benchmarks.md (paste `/tmp/optmem-s1.md` + a short reading):
 - total input tokens, cache-read %, output tokens per mode; per-turn growth curve (stock/compat grow linearly with
   history, full should stay ~flat = system + view + current turn).
 - recall answers for turns 21–24 and conversation B (correct / wrong / used tool).
-- [ ] S1 done
+- [x] S1 done — tables + reading in benchmarks.md "Long conversation" (incl. the no-OptMem baseline); `cacheReadTokens` is the right field, summarize.mjs unchanged
 
 ## S2 — real summaries in full mode (from the S1 full run DB)
 ```bash
@@ -68,7 +68,7 @@ console.log("cursors", q("select * from cursors"));
 ```
 (If `kind` doesn't exist in `views`, drop it — check `select sql from sqlite_master`.) Expect: level-0 nodes with
 model `gpt-6-luna` for the 2.5 KB paste and long code answers, some level ≥1 nodes, all `bytes ≤ 512`.
-- [ ] S2 done (paste the output into runtime-evidence.md "Stage 5")
+- [x] S2 done — runtime-evidence.md "Stage 5": 54 LLM nodes, levels 0–4, all ≤ 512 bytes
 
 ## S3 — record actual request bytes (small code change) — paste to an agent
 > In /Users/astahmer/dev/dshfiles (jj, shared working copy — touch only these paths), extend the fork event

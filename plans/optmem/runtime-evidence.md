@@ -121,3 +121,38 @@ tool result`).
 | Byte-identical prefix across steps/turns | tests only | `full-mode.test.ts`; runtime shows equal cache reads, not bytes |
 | Cancellation during the barrier | tests only | abort test |
 | Real summaries in full mode | not exercised | summarizer route `not resolved yet`; events were short (verbatim leaves) |
+
+# Stage 5 — real summaries in full mode (S2, 2026-10-09)
+
+DB copied from the S1 full long run (`/tmp/optmem-db-full/optmem.db`, isolated scratch home, summarizer
+`codex-emialex/gpt-6-luna` effort low). Query from the runbook (`views` has `kind`):
+
+```
+events 66
+nodes by model (model, level, n, maxBytes)
+  codex-emialex/gpt-6-luna          0  18  512
+  verbatim                          0 112  500
+  codex-emialex/gpt-6-luna          1   8  448
+  concat                            1  48  448
+  codex-emialex/gpt-6-luna          2  13  511
+  concat                            2  13  505
+  clipped:codex-emialex/gpt-6-luna  3   1  512
+  codex-emialex/gpt-6-luna          3  10  508
+  codex-emialex/gpt-6-luna          4   4  506
+views (stream, kind, through_pos, bytes, version)
+  conversation:…ab703ed8224e  compact   7  1130   4
+  conversation:…ab703ed8224e  main      7  1130   4
+  conversation:…23b46fe57906  compact  58  4509  32
+  conversation:…23b46fe57906  main     58  8814  32
+  project:path:ec0fd403f3fd3383  compact  65  5577  35
+  project:path:ec0fd403f3fd3383  main     65  9951  35
+cursors
+  fts events 66 · leaf conversation:…23b46fe57906 58 · leaf project:path:ec0fd403f3fd3383 65 ·
+  leaf conversation:…ab703ed8224e 7
+```
+
+Proven: the summarizer ran in full mode on the real route — 54 LLM nodes (levels 0–4, 1 clipped at the 512-byte
+cap), every node ≤ 512 bytes; level-0 LLM nodes cover events too long to keep verbatim (the paste, long code answers); events up to
+500 bytes stay `verbatim`, small merges stay `concat`. All cursors are caught up (fts 66 = events 66; leaf = last position per
+stream). The project compact view the model saw was 5.6 KB at the end of 26 turns. For comparison the S1 compat run
+wrote 18 LLM nodes (max 498 bytes, levels 0–4) over 56 events.
