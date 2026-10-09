@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-command-palette
+      name: '@dshfiles/command-palette'
