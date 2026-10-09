@@ -34,12 +34,15 @@
 # defaults to the blocking legacy schema. Selecting timed mode lets a model call
 # ask_user_question with `timeout: -1` to block until answered, or any positive
 # seconds to keep working while the question stays answerable; a later answer is
-# steered in as a user-question-reply message. The row lives inside the preset's
-# plugins list, so it is addressed by the nested preset-scoped id.
-- id: 'preset-standard:tool-ask-user'
+# steered in as a user-question-reply message. Preset plugins are config data,
+# so patch their id inside the preset's `config.plugins` list.
+- id: preset-standard
   config:
-    mode: timed
-    timeout: 300
+    plugins:
+      - id: tool-ask-user
+        config:
+          mode: timed
+          timeout: 300
 
 # Account identities and model preferences are in ai-accounts.json; credentials
 # stay in the provider's local auth store.
