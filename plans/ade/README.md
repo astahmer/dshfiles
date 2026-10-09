@@ -198,7 +198,9 @@ outside a session scope is a Host gap.
 Acceptance: 10k-file repo expands without jank; external file create shows up < 1 s; works with no session (pick
 workspace).
 
-### P2.3 Editor: Monaco vs CodeMirror 6 (S, decision) — deps: P0.5
+### [x] P2.3 Editor: Monaco vs CodeMirror 6 (S, decision) — deps: P0.5
+
+Done: Monaco (decisions.md #1), built in `@dshfiles/editor`; workers/CSS approach and numbers in [editor.md](editor.md).
 
 | | Monaco (`monaco-editor` ESM) | CodeMirror 6 |
 |---|---|---|
@@ -215,7 +217,10 @@ and dshx gains worker support or blob workers prove reliable. If the user insist
 
 Budget: editor plugin ≤ 600 KB min client.js; first editor open < 150 ms.
 
-### P2.4 File viewer/editor tab, read-only first (M) — deps: P2.2, P2.3
+### [~] P2.4 File viewer/editor tab, read-only first (M) — deps: P2.2, P2.3
+
+Editable from the start (`@dshfiles/editor`: right-panel tab + workbench panel, own tree, tabs, live reload). Not yet:
+ranged reads for files > 5 MB, binary/image preview fallback. See [editor.md](editor.md).
 
 Open `workspaceFiles.read` (ranged for big files, `readBytes` for binary → preview), language from extension,
 Shiki theme shared with `/diff`, live reload on `changes`, go-to-line, find. Tabs in the right panel with a
@@ -223,12 +228,19 @@ small in-plugin tab strip until Host multi-pane exists.
 
 Acceptance: 5 MB file opens (ranged) without freezing; binary/image falls back to preview; theme follows Host.
 
-### P2.5 Open-from-anywhere (S) — deps: P2.4
+### [~] P2.5 Open-from-anywhere (S) — deps: P2.4
+
+`dshfiles:open-file` window event (`{ path, line?, cwd? }`, cancelable); wired from jujutsu file rows. `/diff`, thread
+tool-call paths and the palette are still to wire.
 
 A plugin-ui event/service `openFile({ sessionId, path, line? })`: from `/diff` file header, jujutsu file rows,
 search results, thread tool-call file paths, palette (P3).
 
-### P2.6 Save (M, Host-gated) — deps: P2.4, Host write API
+### [x] P2.6 Save (M, Host-gated) — deps: P2.4, Host write API
+
+Host part of `@dshfiles/editor` (`editor.write`): session-root confinement, symlink checks, 8 MB cap, atomic
+rename, sha256 conflict detection; UI confirmation instead of `ctx.approval` (needs an Agent turn). Gaps in
+[editor.md](editor.md).
 
 `workspaceFiles` has no write. Options: host part of `@dshfiles/explorer` exposing `write(sessionId, path, text,
 expectedMtime)` with workspace-root confinement, symlink check, size cap and conflict detection; or upstream write.
