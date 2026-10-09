@@ -5,16 +5,13 @@ import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
 import { defineHost } from '@dshfiles/dshx/host'
-import { z } from 'zod'
-import { jujutsuApi, revisionSchema, type FileStat, type JujutsuState, type Mutation, type Revision } from './api.js'
+import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import {
   buildMutationArgv,
-  fileStatusLetter,
   isCommitId,
   isRecordedJjGitPush,
   isSafeSplitPath,
   parseJsonLines,
-  parsePatchStats,
   PreviewStore,
   redactRemoteOutput,
   validatedRepositoryPath,
