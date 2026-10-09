@@ -62,6 +62,7 @@ import {
   Settings2Icon,
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -202,6 +203,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const api = useApi(jujutsuApi)
   const queryClient = useQueryClient()
   const [preferences, setPreference] = usePreferences()
+  const diffLayout: PatchLayout =
+    preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
   const [path, setPath] = useState(() => readStorage(SELECTED_REPO_KEY) ?? '')
   const [repoId, setRepoId] = useState<string | null>(null)
@@ -661,10 +664,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             <Collapsible defaultOpen={preferences.diffExpanded}>
               <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
                 <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
-                Raw patch
+                Patch
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <pre className={CODE_BLOCK}>{details.patch}</pre>
+                <PatchView className="dshx:h-80 dshx:rounded-md dshx:border" layout={diffLayout} patch={details.patch} />
               </CollapsibleContent>
             </Collapsible>
           </>
@@ -1105,6 +1108,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <FullDiffDialog
             error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
             focusPath={fullDiff.focusPath}
+            layout={diffLayout}
             onClose={() => setFullDiff(null)}
             patch={fullDiffQuery.data?.patch}
             title={fullDiff.title}
@@ -1249,8 +1253,29 @@ const PreferencesMenu = (): JSX.Element => {
           className="dshx:text-xs"
           onCheckedChange={checked => setPreference('diffExpanded', checked)}
         >
-          Expand raw patch by default
+          Expand patch by default
         </DropdownMenuCheckboxItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Diff layout ({preferences.diffLayout})</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup
+              onValueChange={value => {
+                if (value === 'auto' || value === 'unified' || value === 'split') setPreference('diffLayout', value)
+              }}
+              value={preferences.diffLayout}
+            >
+              <DropdownMenuRadioItem className="dshx:text-xs" value="auto">
+                Auto
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="unified">
+                Unified
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="split">
+                Split
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuCheckboxItem
           checked={preferences.dateHeadings}
           className="dshx:text-xs"

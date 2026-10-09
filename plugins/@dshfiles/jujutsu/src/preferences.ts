@@ -10,6 +10,7 @@ const preferencesSchema = z.object({
   ancestorCount: z.number().int().min(1).max(20).catch(5),
   fileView: z.enum(['flat', 'tree']).catch('tree'),
   diffExpanded: z.boolean().catch(false),
+  diffLayout: z.enum(['auto', 'unified', 'split']).catch('auto'),
   hideImmutable: z.boolean().catch(false),
   mineOnly: z.boolean().catch(false),
   dateHeadings: z.boolean().catch(true),

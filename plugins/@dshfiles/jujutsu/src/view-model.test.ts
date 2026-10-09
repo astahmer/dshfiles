@@ -1,6 +1,6 @@
+import { parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { describe, expect, it } from 'vitest'
 import { buildFileTree, splitFilePath } from './file-tree.ts'
-import { parseGitPatch } from './patch-view.ts'
 import { refreshQueryOptions } from './auto-refresh.ts'
 import { decodePreferences, legacyPreferences } from './preferences.ts'
 import { descendantCommitIds, emptyAncestorCandidates, sourceControlGroups } from './source-control.ts'
@@ -20,14 +20,14 @@ const revision = (
   description: options.description ?? '',
 })
 
-describe('full diff patch parsing', () => {
-  it('numbers rows and counts the unmodified lines between hunks', () => {
+describe('jj git patch parsing for PatchView', () => {
+  it('keeps paths with spaces, hunk starts and the gaps between hunks', () => {
     const patch = [
       'diff --git a/.changeset/config.json b/.changeset/config.json',
       'index 1..2 100644',
       '--- a/.changeset/config.json',
       '+++ b/.changeset/config.json',
-      '@@ -8,4 +8,4 @@',
+      '@@ -8,3 +8,3 @@',
       ' ],',
       '-"linked": []',
       '+"linked": ["x"]',
@@ -50,20 +50,18 @@ describe('full diff patch parsing', () => {
       '@@ -1 +0,0 @@',
       '-bye',
     ].join('\n')
-    const [modified, added, deleted] = parseGitPatch(patch)
-    expect(modified?.status).toBe('M')
-    expect(modified?.hunks.map(hunk => hunk.unmodifiedBefore)).toEqual([7, 8])
-    expect(modified?.hunks[0]?.rows.slice(1, 3)).toEqual([
-      { kind: 'deletion', oldLine: 9, newLine: null, text: '"linked": []' },
-      { kind: 'addition', oldLine: null, newLine: 9, text: '"linked": ["x"]' },
+    const [modified, added, deleted] = parsePatchFiles(patch).flatMap(parsed => parsed.files)
+    expect(modified?.type).toBe('change')
+    expect(modified?.hunks.map(hunk => [hunk.deletionStart, hunk.collapsedBefore])).toEqual([
+      [8, 7],
+      [20, 9],
     ])
-    expect(added).toMatchObject({ path: 'dir with space/new file.txt', status: 'A', previousPath: null })
-    expect(added?.hunks[0]).toEqual({ unmodifiedBefore: 0, rows: [{ kind: 'addition', oldLine: null, newLine: 1, text: 'hello' }] })
-    expect(deleted).toMatchObject({ path: 'gone.txt', status: 'D' })
+    expect(added).toMatchObject({ name: 'dir with space/new file.txt', type: 'new' })
+    expect(deleted).toMatchObject({ name: 'gone.txt', type: 'deleted' })
   })
 
   it('reports renames and binary files without hunks', () => {
-    const [renamed, binary] = parseGitPatch(
+    const [renamed, binary] = parsePatchFiles(
       [
         'diff --git a/old.ts b/new.ts',
         'similarity index 100%',
@@ -72,9 +70,9 @@ describe('full diff patch parsing', () => {
         'diff --git a/logo.png b/logo.png',
         'Binary files a/logo.png and b/logo.png differ',
       ].join('\n'),
-    )
-    expect(renamed).toMatchObject({ path: 'new.ts', previousPath: 'old.ts', status: 'R', hunks: [] })
-    expect(binary).toMatchObject({ path: 'logo.png', binary: true })
+    ).flatMap(parsed => parsed.files)
+    expect(renamed).toMatchObject({ name: 'new.ts', prevName: 'old.ts', type: 'rename-pure', hunks: [] })
+    expect(binary).toMatchObject({ name: 'logo.png', hunks: [] })
   })
 })
 

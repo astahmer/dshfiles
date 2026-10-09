@@ -2,10 +2,8 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useMemo, useRef } from 'react'
-import { FileStatusLetter } from './changed-files.js'
-import { parseGitPatch } from './patch-view.js'
+import { parsePatchFiles, PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
+import { useMemo } from 'react'
 
 interface FullDiffDialogProps {
   readonly title: string
@@ -13,31 +11,13 @@ interface FullDiffDialogProps {
   readonly truncated: boolean
   readonly error: string | null
   readonly focusPath: string | null
+  readonly layout: PatchLayout
   readonly onClose: () => void
 }
 
-const ROW_TONE = {
-  context: '',
-  addition: 'dshx:bg-success/15',
-  deletion: 'dshx:bg-destructive/15',
-} as const
-
-const GUTTER_TONE = {
-  context: 'dshx:text-muted-foreground',
-  addition: 'dshx:border-l-2 dshx:border-success dshx:text-success',
-  deletion: 'dshx:border-l-2 dshx:border-destructive dshx:text-destructive',
-} as const
-
-/** Every changed file of one revision with numbered hunks, like BB's full-diff overlay. */
+/** Every changed file of one revision, virtualized and syntax-highlighted. */
 export const FullDiffDialog = (props: FullDiffDialogProps): JSX.Element => {
-  const files = useMemo(() => (props.patch === undefined ? [] : parseGitPatch(props.patch)), [props.patch])
-  const body = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (props.focusPath === null || files.length === 0) return
-    const target = body.current?.querySelector(`[data-diff-path="${CSS.escape(props.focusPath)}"]`)
-    target?.scrollIntoView({ block: 'start' })
-  }, [files, props.focusPath])
+  const files = useMemo(() => (props.patch === undefined ? [] : parsePatchFiles(props.patch).flatMap(parsed => parsed.files)), [props.patch])
 
   return (
     <Dialog
@@ -60,7 +40,7 @@ export const FullDiffDialog = (props: FullDiffDialogProps): JSX.Element => {
             Close
           </Button>
         </header>
-        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain" ref={body}>
+        <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
           {props.error !== null && (
             <Alert className="dshx:m-3 dshx:w-auto" variant="destructive">
               <AlertDescription>{props.error}</AlertDescription>
@@ -75,35 +55,7 @@ export const FullDiffDialog = (props: FullDiffDialogProps): JSX.Element => {
           {props.patch !== undefined && files.length === 0 && (
             <p className="dshx:p-4 dshx:text-xs dshx:text-muted-foreground">This revision has no changed files.</p>
           )}
-          {files.map(file => (
-            <section data-diff-path={file.path} key={file.path}>
-              <h3 className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:items-center dshx:gap-2 dshx:border-y dshx:bg-muted dshx:px-3 dshx:py-1.5 dshx:font-mono dshx:text-xs dshx:font-semibold">
-                <FileStatusLetter status={file.status} />
-                <span className="dshx:min-w-0 dshx:truncate">{file.previousPath === null ? file.path : `${file.previousPath} → ${file.path}`}</span>
-              </h3>
-              {file.binary && <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">Binary file changed.</p>}
-              {!file.binary && file.hunks.length === 0 && <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No content changes.</p>}
-              <div className="dshx:py-2 dshx:font-mono dshx:text-[12px] dshx:leading-[18px]">
-                {file.hunks.map((hunk, hunkIndex) => (
-                  <div key={hunkIndex}>
-                    {hunk.unmodifiedBefore > 0 && (
-                      <div className="dshx:mx-3 dshx:my-1.5 dshx:rounded-sm dshx:bg-muted dshx:px-2 dshx:py-1 dshx:font-sans dshx:text-xs dshx:text-muted-foreground">
-                        {hunk.unmodifiedBefore} unmodified {hunk.unmodifiedBefore === 1 ? 'line' : 'lines'}
-                      </div>
-                    )}
-                    {hunk.rows.map((row, rowIndex) => (
-                      <div className={cn('dshx:flex dshx:min-w-max', ROW_TONE[row.kind])} key={rowIndex}>
-                        <span className={cn('dshx:w-12 dshx:flex-none dshx:pr-3 dshx:text-right dshx:select-none', GUTTER_TONE[row.kind])}>
-                          {row.newLine ?? row.oldLine}
-                        </span>
-                        <span className="dshx:pr-4 dshx:whitespace-pre">{row.text.length === 0 ? ' ' : row.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+          <PatchView className="dshx:flex-1" files={files} focusPath={props.focusPath} layout={props.layout} />
           {props.truncated && <p className="dshx:p-3 dshx:text-xs dshx:text-warning">The diff reached the output limit; later files are missing.</p>}
         </div>
       </DialogContent>
