@@ -76,7 +76,9 @@ export const createInjectionCache = () => {
       const key = `${request.stream}|${view.version}|${request.conversationId}|${request.budgetBytes}`
       const cached = rendered.get(key)
       if (cached !== undefined) return cached
-      const kept = view.lines.filter((_line, position) => !onlyConversation(request.stream, view.starts[position] ?? 0, view.lengths[position] ?? 0, request.conversationId))
+      const kept = view.lines.filter(
+        (_line, position) => !onlyConversation(request.stream, view.starts[position] ?? 0, view.lengths[position] ?? 0, request.conversationId),
+      )
       let text = ''
       if (kept.length > 0) {
         const available = request.budgetBytes - Utf8.byteLength(preamble) - 2

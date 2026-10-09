@@ -171,7 +171,9 @@ export type MemoryEngine = {
   close(): Promise<void>
 }
 
-type Job = { readonly kind: 'leaf'; readonly stream: StreamId; readonly pos: number } | { readonly kind: 'parent'; readonly stream: StreamId; readonly address: NodeAddress }
+type Job =
+  | { readonly kind: 'leaf'; readonly stream: StreamId; readonly pos: number }
+  | { readonly kind: 'parent'; readonly stream: StreamId; readonly address: NodeAddress }
 
 class Fifo<Item> {
   #items: (Item | undefined)[] = []
@@ -611,7 +613,10 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     const view = stored.view ?? ViewMath.empty(request.stream)
     const end = Math.min(stored.length, request.endPos ?? stored.length)
     const tail = end > view.throughPos ? await store.readStream(request.stream, view.throughPos, end) : []
-    const viewText = end >= view.throughPos ? view.rendered : ViewMath.render(ViewMath.lines(view.rendered).filter((_line, index) => TreeMath.start(view.nodes[index] ?? { level: 0, idx: end }) < end))
+    const viewText =
+      end >= view.throughPos
+        ? view.rendered
+        : ViewMath.render(ViewMath.lines(view.rendered).filter((_line, index) => TreeMath.start(view.nodes[index] ?? { level: 0, idx: end }) < end))
     const builtLeaves = new Map((await store.listNodes(request.stream, 0, view.throughPos, stored.length)).map(node => [node.address.idx, node.text]))
     const pendingLines = tail.map(entry => {
       const built = builtLeaves.get(entry.pos)
@@ -650,9 +655,14 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const zoom: MemoryEngine['zoom'] = async request => {
     await assertReadable(request.stream, request.access)
     const address = TreeMath.parse(request.address)
-    if (!address) throw new MemoryError('invalid-address', `"${request.address}" is not a node address; use <start>+<len> with len a power of 2 and start a multiple of len`)
+    if (!address)
+      throw new MemoryError(
+        'invalid-address',
+        `"${request.address}" is not a node address; use <start>+<len> with len a power of 2 and start a multiple of len`,
+      )
     const length = await store.streamLength(request.stream)
-    if (!TreeMath.isComplete(address, length)) throw new MemoryError('out-of-range', `${request.address} is past the end of ${request.stream} (${length} entries)`)
+    if (!TreeMath.isComplete(address, length))
+      throw new MemoryError('out-of-range', `${request.address} is past the end of ${request.stream} (${length} entries)`)
     const children = TreeMath.children(address)
     if (!children) {
       const [entry] = await store.readStream(request.stream, address.idx, address.idx + 1)
@@ -725,7 +735,10 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     const hits = await searchIndex.search({ query: request.query, stream, limit: Math.min(Math.max(1, request.limit ?? 10), maxSearchLimit) })
     return Promise.all(
       hits.map(async hit => {
-        const entry = stream === null ? (hit.entries.find(candidate => candidate.stream.startsWith('project:')) ?? hit.entries[0]) : hit.entries.find(candidate => candidate.stream === stream)
+        const entry =
+          stream === null
+            ? (hit.entries.find(candidate => candidate.stream.startsWith('project:')) ?? hit.entries[0])
+            : hit.entries.find(candidate => candidate.stream === stream)
         const viewNodes = entry ? (await loadView(entry.stream)).view.nodes : []
         const covering = entry ? viewNodes[TreeMath.covering(viewNodes, entry.pos)] : undefined
         return {

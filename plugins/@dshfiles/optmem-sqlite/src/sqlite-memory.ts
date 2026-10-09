@@ -229,7 +229,9 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
         .map(row => ({ pos: integer(row, 'pos'), event: eventFromRow(row) })),
 
     findEntries: async eventId =>
-      prepare('SELECT stream, pos FROM stream_entries WHERE event_id = ? ORDER BY stream').all(eventId).map(row => ({ stream: stream(row, 'stream'), pos: integer(row, 'pos') })),
+      prepare('SELECT stream, pos FROM stream_entries WHERE event_id = ? ORDER BY stream')
+        .all(eventId)
+        .map(row => ({ stream: stream(row, 'stream'), pos: integer(row, 'pos') })),
 
     streamLength: async streamId => streamLength(streamId),
 
@@ -288,7 +290,14 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
 
     commitView: async (view, expectedVersion) =>
       transaction('IMMEDIATE', () => {
-        const values = [view.throughPos, JSON.stringify(view.nodes.map(node => [node.level, node.idx])), view.rendered, view.bytes, view.version, view.mergePending ? 1 : 0]
+        const values = [
+          view.throughPos,
+          JSON.stringify(view.nodes.map(node => [node.level, node.idx])),
+          view.rendered,
+          view.bytes,
+          view.version,
+          view.mergePending ? 1 : 0,
+        ]
         const changes =
           expectedVersion === 0
             ? prepare(
@@ -301,7 +310,11 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
               ).run(...values, view.stream, view.kind, expectedVersion).changes
         if (Number(changes) !== 1) return false
         if (view.kind !== 'main') return true
-        prepare('INSERT INTO cursors (name, stream, pos) VALUES (?, ?, ?) ON CONFLICT(name, stream) DO UPDATE SET pos = excluded.pos').run('leaf', view.stream, view.throughPos)
+        prepare('INSERT INTO cursors (name, stream, pos) VALUES (?, ?, ?) ON CONFLICT(name, stream) DO UPDATE SET pos = excluded.pos').run(
+          'leaf',
+          view.stream,
+          view.throughPos,
+        )
         return true
       }),
 
@@ -329,7 +342,12 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
         for (const row of rows) insert.run(integer(row, 'id'), text(row, 'text'))
         const last = rows.at(-1)
         const cursor = last ? integer(last, 'id') : ftsCursor()
-        if (last) prepare('INSERT INTO cursors (name, stream, pos) VALUES (?, ?, ?) ON CONFLICT(name, stream) DO UPDATE SET pos = excluded.pos').run('fts', ftsCursorStream, cursor)
+        if (last)
+          prepare('INSERT INTO cursors (name, stream, pos) VALUES (?, ?, ?) ON CONFLICT(name, stream) DO UPDATE SET pos = excluded.pos').run(
+            'fts',
+            ftsCursorStream,
+            cursor,
+          )
         return { indexed: rows.length, cursor }
       }),
 
@@ -348,7 +366,9 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
       return ranked.flatMap(rankedRow => {
         const eventId = integer(rankedRow, 'id')
         // node:sqlite binds JS numbers as REAL, which an FTS5 rowid constraint silently ignores.
-        const snippetRow = prepare(`SELECT snippet(events_fts, 0, '[', ']', '…', ${snippetTokens}) AS snippet FROM events_fts WHERE events_fts MATCH ? AND rowid = CAST(? AS INTEGER)`).get(match, eventId)
+        const snippetRow = prepare(
+          `SELECT snippet(events_fts, 0, '[', ']', '…', ${snippetTokens}) AS snippet FROM events_fts WHERE events_fts MATCH ? AND rowid = CAST(? AS INTEGER)`,
+        ).get(match, eventId)
         const row = prepare('SELECT id, conversation_id, project_id, role, created_at FROM events WHERE id = ?').get(eventId)
         if (!row) return []
         const hit: StoredSearchHit = {

@@ -29,13 +29,22 @@ export const createSessionFixture = (header: CaptureHeader) => {
       next(base => ({
         ...base,
         type: 'user/message',
-        data: createUserMessage({ content: [{ type: 'text', text }], source: kind === 'user' ? { kind: 'user' } : compactCheckpointSource(CompactionId('compaction-1')) }),
+        data: createUserMessage({
+          content: [{ type: 'text', text }],
+          source: kind === 'user' ? { kind: 'user' } : compactCheckpointSource(CompactionId('compaction-1')),
+        }),
         surfaceOp: 'append',
       })),
     /** Injected context exactly as DSH logs it; these source kinds are declared in modules their packages do not export. */
     injected: (text: string, kind: 'runtime-context' | 'agent-instructions' | 'skill-catalog'): SessionEvent => {
       const event: SessionEvent = JSON.parse(
-        JSON.stringify({ type: 'user/message', seq: seq++, time: (time += 1_000), data: { id: `context-${seq}`, role: 'user', content: [{ type: 'text', text }], source: { kind } }, surfaceOp: 'append' }),
+        JSON.stringify({
+          type: 'user/message',
+          seq: seq++,
+          time: (time += 1_000),
+          data: { id: `context-${seq}`, role: 'user', content: [{ type: 'text', text }], source: { kind } },
+          surfaceOp: 'append',
+        }),
       )
       events.push(event)
       return event

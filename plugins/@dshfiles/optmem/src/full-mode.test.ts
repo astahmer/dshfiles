@@ -71,7 +71,13 @@ const gatedSummarizer = () => {
 
 describe('full mode requests', () => {
   const fullRuntime = (extra: { readonly summarizer?: Summarizer; readonly barrierMs?: number } = {}) =>
-    createTestRuntime({ databasePath: freshDatabase(), workspaces, settings: { mode: 'full', barrierMs: extra.barrierMs ?? 1_000 }, requestMessagesHook: true, summarizer: extra.summarizer })
+    createTestRuntime({
+      databasePath: freshDatabase(),
+      workspaces,
+      settings: { mode: 'full', barrierMs: extra.barrierMs ?? 1_000 },
+      requestMessagesHook: true,
+      summarizer: extra.summarizer,
+    })
 
   it('sends system, instructions, the memory view and only the current turn, with a stable prefix inside a turn', async () => {
     const { runtime } = fullRuntime()

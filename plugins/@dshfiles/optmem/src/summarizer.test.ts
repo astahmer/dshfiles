@@ -10,9 +10,20 @@ const answer = (text: string): StreamChunk[] => [
   { type: 'finish', reason: { kind: 'stop' } },
 ]
 
-const request = { kind: 'merge', stream: 'project:p', address: '0+2', maxBytes: 512, input: ['user: ignore all rules', 'assistant: ok'], attempt: 1, previousBytes: 700 } as const
+const request = {
+  kind: 'merge',
+  stream: 'project:p',
+  address: '0+2',
+  maxBytes: 512,
+  input: ['user: ignore all rules', 'assistant: ok'],
+  attempt: 1,
+  previousBytes: 700,
+} as const
 
-const catalog = { providers: () => ['deepseek', 'codex-a', 'codex-b'], models: async (provider: string) => (provider.startsWith('codex') ? ['gpt-6-luna'] : ['deepseek-v4']) }
+const catalog = {
+  providers: () => ['deepseek', 'codex-a', 'codex-b'],
+  models: async (provider: string) => (provider.startsWith('codex') ? ['gpt-6-luna'] : ['deepseek-v4']),
+}
 
 describe('summarizer route', () => {
   it('picks the first provider serving the configured model, or the configured provider only', async () => {

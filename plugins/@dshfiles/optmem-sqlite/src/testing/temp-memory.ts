@@ -13,7 +13,13 @@ export const createTempDirectory = (): { readonly directory: string; cleanup(): 
 
 export const openEngine = async (request: { readonly path: string; readonly summarizer: Summarizer; readonly config?: Partial<MemoryConfig> }) => {
   const memory = openSqliteMemory({ path: request.path })
-  const engine = createMemoryEngine({ store: memory.store, search: memory.search, summarizer: request.summarizer, config: request.config, clock: { now: () => 1_700_000_000_000 } })
+  const engine = createMemoryEngine({
+    store: memory.store,
+    search: memory.search,
+    summarizer: request.summarizer,
+    config: request.config,
+    clock: { now: () => 1_700_000_000_000 },
+  })
   await engine.start()
   return { memory, engine }
 }

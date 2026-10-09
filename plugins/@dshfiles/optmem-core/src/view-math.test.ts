@@ -27,7 +27,16 @@ describe('ViewMath', () => {
     const nodes = leaves(8)
     expect(ViewMath.pickMergePair(nodes, 8, () => true)).toBe(0)
     expect(ViewMath.pickMergePair(nodes, 8, parent => parent.idx !== 0)).toBe(2)
-    expect(ViewMath.pickMergePair([{ level: 0, idx: 1 }, { level: 0, idx: 2 }], 3, () => true)).toBe(-1)
+    expect(
+      ViewMath.pickMergePair(
+        [
+          { level: 0, idx: 1 },
+          { level: 0, idx: 2 },
+        ],
+        3,
+        () => true,
+      ),
+    ).toBe(-1)
   })
 
   it('brings the view under the lower bound in one batch and keeps a tiling', () => {

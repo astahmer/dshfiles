@@ -14,9 +14,6 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
-  "engines": {
-    "node": ">=22.13.0"
-  },
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
@@ -58,6 +55,9 @@
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   },
   "dsh": {
     "bundle": {

@@ -16,15 +16,27 @@ let engine: MemoryEngine
 let memory: SqliteMemory
 
 const filler = (conversationId: string, projectId: string | null, count: number) =>
-  Array.from({ length: count }, (_unused, index) => event({ conversationId, projectId, role: index % 2 === 0 ? 'user' : 'assistant', text: `routine chatter ${index} about lunch and weather` }))
+  Array.from({ length: count }, (_unused, index) =>
+    event({ conversationId, projectId, role: index % 2 === 0 ? 'user' : 'assistant', text: `routine chatter ${index} about lunch and weather` }),
+  )
 
 beforeAll(async () => {
-  ;({ engine, memory } = await openEngine({ path: join(temp.directory, 'search.db'), summarizer: createFakeSummarizer(), config: { redactLiterals: ['p4ssw0rd-literal'] } }))
+  ;({ engine, memory } = await openEngine({
+    path: join(temp.directory, 'search.db'),
+    summarizer: createFakeSummarizer(),
+    config: { redactLiterals: ['p4ssw0rd-literal'] },
+  }))
   await engine.append([
     ...filler('a1', 'alpha', 20),
     event({ conversationId: 'a1', projectId: 'alpha', text: 'The staging database lives on port 54329, remember that.' }),
     event({ conversationId: 'a1', projectId: 'alpha', role: 'tool_call', toolName: 'bash', text: 'rg "parseInvoiceTotals(" src' }),
-    event({ conversationId: 'a1', projectId: 'alpha', role: 'tool_result', toolName: 'bash', text: 'src/billing.ts:42: export const parseInvoiceTotals = (rows: Row[]) => rows.reduce(sum, 0)' }),
+    event({
+      conversationId: 'a1',
+      projectId: 'alpha',
+      role: 'tool_result',
+      toolName: 'bash',
+      text: 'src/billing.ts:42: export const parseInvoiceTotals = (rows: Row[]) => rows.reduce(sum, 0)',
+    }),
     ...filler('a1', 'alpha', 20),
     event({ conversationId: 'a1', projectId: 'alpha', text: 'Decision: invoices are rounded with bankers rounding (half-even).' }),
     event({ conversationId: 'a1', projectId: 'alpha', text: 'my token is sk-ant-api03-SECRETSECRETSECRET01 and the db pass is p4ssw0rd-literal' }),

@@ -51,21 +51,32 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
     return access.projectId === null ? StreamIds.conversation(access.conversationId) : StreamIds.project(access.projectId)
   }
 
-  const search = async (args: { readonly query: string; readonly scope?: Scope | undefined; readonly limit?: number | undefined }, agent: MemoryCaller | undefined) => {
+  const search = async (
+    args: { readonly query: string; readonly scope?: Scope | undefined; readonly limit?: number | undefined },
+    agent: MemoryCaller | undefined,
+  ) => {
     const { engine, access } = await prepare(agent)
     const scope = args.scope ?? 'project'
     const hits = await engine.search({ query: args.query, scope, access, limit: args.limit ?? 8 })
     if (hits.length === 0) return { summary: `No memory matches "${args.query}" in ${scope} scope.` }
     const lines = hits.map(hit => {
-      const where = hit.address === null ? '' : ` · ${hit.stream} ${hit.address}${hit.viewAddress && hit.viewAddress !== hit.address ? ` (view ${hit.viewAddress})` : ''}`
+      const where =
+        hit.address === null ? '' : ` · ${hit.stream} ${hit.address}${hit.viewAddress && hit.viewAddress !== hit.address ? ` (view ${hit.viewAddress})` : ''}`
       const origin = hit.conversationId === access.conversationId ? 'this conversation' : `conversation ${short(hit.conversationId)}`
       return `#${hit.eventId} ${time(hit.createdAt)} ${hit.role}, ${origin}${where}\n  ${hit.snippet}`
     })
-    return { summary: [`${hits.length} hit(s) in ${scope} scope. ${untrusted}`, ...lines, 'Next: memory_context eventId=<#id> for the surrounding events.'].join('\n') }
+    return {
+      summary: [`${hits.length} hit(s) in ${scope} scope. ${untrusted}`, ...lines, 'Next: memory_context eventId=<#id> for the surrounding events.'].join('\n'),
+    }
   }
 
   const zoom = async (
-    args: { readonly address: string; readonly scope?: TreeScope | undefined; readonly conversationId?: string | undefined; readonly page?: number | undefined },
+    args: {
+      readonly address: string
+      readonly scope?: TreeScope | undefined
+      readonly conversationId?: string | undefined
+      readonly page?: number | undefined
+    },
     agent: MemoryCaller | undefined,
   ) => {
     const { engine, access } = await prepare(agent)
@@ -77,7 +88,13 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
   }
 
   const context = async (
-    args: { readonly eventId: number; readonly scope?: TreeScope | undefined; readonly conversationId?: string | undefined; readonly before?: number | undefined; readonly after?: number | undefined },
+    args: {
+      readonly eventId: number
+      readonly scope?: TreeScope | undefined
+      readonly conversationId?: string | undefined
+      readonly before?: number | undefined
+      readonly after?: number | undefined
+    },
     agent: MemoryCaller | undefined,
   ) => {
     const { engine, access } = await prepare(agent)
@@ -85,7 +102,8 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
     const bound = (value: number | undefined): number => Math.min(20, Math.max(0, value ?? 3))
     const result = await engine.context({ stream, access, eventId: args.eventId, before: bound(args.before), after: bound(args.after) })
     const lines = result.entries.map(
-      entry => `${entry.pos === result.center ? '>' : ' '} ${entry.address} #${entry.eventId} ${time(entry.createdAt)} ${entry.role} (${short(entry.conversationId)}): ${entry.text}${entry.clipped ? ' …[clipped; memory_zoom the address for all of it]' : ''}`,
+      entry =>
+        `${entry.pos === result.center ? '>' : ' '} ${entry.address} #${entry.eventId} ${time(entry.createdAt)} ${entry.role} (${short(entry.conversationId)}): ${entry.text}${entry.clipped ? ' …[clipped; memory_zoom the address for all of it]' : ''}`,
     )
     return { summary: [`${result.stream} around position ${result.center}. ${untrusted}`, ...lines].join('\n') }
   }
@@ -101,7 +119,9 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
       `state ${host.state}${host.failure ? ` (${host.failure})` : ''}; mode ${host.mode.mode}${host.mode.ok ? '' : ` unsupported → compatibility (${host.mode.missing.join(', ')} missing)`}`,
       `capabilities ${capabilities}`,
       ...(host.lastFullRequest
-        ? [`last full-mode request: turn ${host.lastFullRequest.turn} step ${host.lastFullRequest.step}, ${host.lastFullRequest.originalCount} → ${host.lastFullRequest.sentCount} messages (${host.lastFullRequest.carriedCount} carried), view v${host.lastFullRequest.viewVersion} ${host.lastFullRequest.viewBytes} B, ${host.lastFullRequest.pendingCount} pending${host.lastFullRequest.reusedView ? ', view reused' : ''}`]
+        ? [
+            `last full-mode request: turn ${host.lastFullRequest.turn} step ${host.lastFullRequest.step}, ${host.lastFullRequest.originalCount} → ${host.lastFullRequest.sentCount} messages (${host.lastFullRequest.carriedCount} carried), view v${host.lastFullRequest.viewVersion} ${host.lastFullRequest.viewBytes} B, ${host.lastFullRequest.pendingCount} pending${host.lastFullRequest.reusedView ? ', view reused' : ''}`,
+          ]
         : []),
       `captured ${host.captured} event(s), skipped ${host.skipped}, queued ${host.queued}${host.lastCaptureError ? `, last capture error: ${host.lastCaptureError}` : ''}`,
       `summarizer ${host.summarizer.target.model} (effort ${host.summarizer.target.effort}): ${host.summarizer.kind === 'ready' ? `via ${host.summarizer.route.provider}` : host.summarizer.kind === 'unavailable' ? `UNAVAILABLE — ${host.summarizer.reason}; oversized events stay [pending summary]` : 'not resolved yet'}`,
@@ -111,10 +131,17 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
       const engine = runtime.requireEngine()
       const access = await runtime.access(agent)
       const memory = await engine.status()
-      const own = memory.streams.filter(stream => stream.stream === StreamIds.conversation(access.conversationId) || (access.projectId !== null && stream.stream === StreamIds.project(access.projectId)))
+      const own = memory.streams.filter(
+        stream =>
+          stream.stream === StreamIds.conversation(access.conversationId) ||
+          (access.projectId !== null && stream.stream === StreamIds.project(access.projectId)),
+      )
       lines.push(
         `streams ${memory.streams.length} total; this project ${access.projectId ?? '(none)'}`,
-        ...own.map(stream => `  ${stream.stream}: ${stream.length} events, view ${stream.viewLines} lines/${stream.viewBytes} B, compact ${stream.compactLines} lines/${stream.compactBytes} B${stream.mergePending ? ', merge pending' : ''}`),
+        ...own.map(
+          stream =>
+            `  ${stream.stream}: ${stream.length} events, view ${stream.viewLines} lines/${stream.viewBytes} B, compact ${stream.compactLines} lines/${stream.compactBytes} B${stream.mergePending ? ', merge pending' : ''}`,
+        ),
         `queue ${memory.queue.leaves} leaves, ${memory.queue.parents} parents, ${memory.queue.running} running${memory.queue.parentsFirst ? ' (parents first)' : ''}`,
         `summaries ${memory.summarizer.calls} call(s), ${memory.summarizer.clips} clipped; failures ${memory.failures.count}${memory.failures.lastError ? ` (last: ${memory.failures.lastError})` : ''}${memory.failures.retryInMs === null ? '' : `, retry in ${memory.failures.retryInMs} ms`}`,
         `search index lag ${memory.search?.lag ?? 'n/a'}${memory.search?.error ? ` (error: ${memory.search.error})` : ''}`,

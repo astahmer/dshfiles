@@ -12,9 +12,6 @@
     },
     "./package.json": "./package.json"
   },
-  "engines": {
-    "node": ">=22.13.0"
-  },
   "scripts": {
     "bench": "node bench/run.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -28,5 +25,8 @@
     "@types/node": "^22.19.0",
     "typescript": "7.0.2",
     "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

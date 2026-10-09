@@ -11,7 +11,23 @@ import { createFakeSummarizer } from '../src/testing/fake-summarizer.ts'
 const sizes = process.argv.slice(2).map(Number).filter(Number.isFinite)
 const projects = ['atlas', 'borealis', 'cobalt', 'delta']
 const conversationsPerProject = 5
-const words = ['invoice', 'deploy', 'migration', 'cache', 'refactor', 'parser', 'schema', 'retry', 'webhook', 'tenant', 'billing', 'session', 'token', 'index', 'queue']
+const words = [
+  'invoice',
+  'deploy',
+  'migration',
+  'cache',
+  'refactor',
+  'parser',
+  'schema',
+  'retry',
+  'webhook',
+  'tenant',
+  'billing',
+  'session',
+  'token',
+  'index',
+  'queue',
+]
 
 const random = (() => {
   let seed = 0x5eed
@@ -100,7 +116,9 @@ const runBenchmark = async (size: number): Promise<Record<string, string>> => {
     const snapshot = await engine.snapshot({ stream })
     const view = (await memory.store.getView(stream)) ?? { nodes: [] }
     const internal = view.nodes.filter(node => node.level > 0)
-    const searchLatency = await timeEach(50, index => engine.search({ query: index % 2 === 0 ? pick(words) : `unique-${Math.floor(random() * size)}`, scope: 'project', access }))
+    const searchLatency = await timeEach(50, index =>
+      engine.search({ query: index % 2 === 0 ? pick(words) : `unique-${Math.floor(random() * size)}`, scope: 'project', access }),
+    )
     const zoomLatency = await timeEach(50, index => {
       const node = internal[index % Math.max(1, internal.length)] ?? view.nodes[0]
       return engine.zoom({ stream, address: node ? TreeMath.format(node) : '0+1', access })

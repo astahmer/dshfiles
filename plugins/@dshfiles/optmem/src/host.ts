@@ -23,7 +23,15 @@ import { createMemoryTools } from './tools.ts'
 declare module '@deepseek-ai/cordis' {
   interface Events {
     'agent/request-messages'(
-      payload: { agent: Agent; turn: number; step: number; isFirstStepOfTurn: boolean; messages: readonly Message[]; toolHistory: ToolHistory; signal: AbortSignal },
+      payload: {
+        agent: Agent
+        turn: number
+        step: number
+        isFirstStepOfTurn: boolean
+        messages: readonly Message[]
+        toolHistory: ToolHistory
+        signal: AbortSignal
+      },
       next: () => Promise<readonly Message[]>,
     ): Promise<readonly Message[]>
   }
@@ -86,7 +94,10 @@ const hostServices = (ctx: Context): HostServices => {
     catalog: () => {
       const llm = ctx.get('llm')
       if (!llm) return undefined
-      return { providers: () => llm.listProviders().map(provider => provider.id), models: async provider => (await llm.listModels(provider)).map(model => model.id) }
+      return {
+        providers: () => llm.listProviders().map(provider => provider.id),
+        models: async provider => (await llm.listModels(provider)).map(model => model.id),
+      }
     },
     target: () => {
       const settings = currentSettings()
@@ -97,7 +108,13 @@ const hostServices = (ctx: Context): HostServices => {
     has: service => ctx.get(service) !== undefined,
     requestMessagesHook: () => {
       const loop: unknown = ctx.get('agentLoop')
-      return typeof loop === 'object' && loop !== null && 'forkFeatures' in loop && loop.forkFeatures instanceof Set && loop.forkFeatures.has('agent/request-messages')
+      return (
+        typeof loop === 'object' &&
+        loop !== null &&
+        'forkFeatures' in loop &&
+        loop.forkFeatures instanceof Set &&
+        loop.forkFeatures.has('agent/request-messages')
+      )
     },
     workspaceId: async path => (await ctx.get('workspaceRegistry')?.resolveByPath(path))?.id,
     sessionLogs: () => {

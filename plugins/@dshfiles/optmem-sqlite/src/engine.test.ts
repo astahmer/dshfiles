@@ -231,7 +231,15 @@ describe('recovery', () => {
         streams: [conversation],
       },
     ])
-    await memory.store.saveNode({ stream: conversation, address: { level: 0, idx: 0 }, text: 'user: built then crashed', bytes: 24, eventId: appended?.eventId ?? null, model: 'verbatim', createdAt: 1 })
+    await memory.store.saveNode({
+      stream: conversation,
+      address: { level: 0, idx: 0 },
+      text: 'user: built then crashed',
+      bytes: 24,
+      eventId: appended?.eventId ?? null,
+      model: 'verbatim',
+      createdAt: 1,
+    })
     memory.close()
     const resumed = await openEngine({ path, summarizer: createFakeSummarizer() })
     await resumed.engine.drain()
@@ -278,7 +286,11 @@ describe('recovery', () => {
 
   it('times out a hung summarizer and frees its concurrency slot', async () => {
     const hung = { model: 'hung', summarize: () => new Promise<string>(() => {}) }
-    const { engine, memory } = await openEngine({ path: dbPath('hung'), summarizer: hung, config: { summaryTimeoutMs: 20, summaryRetries: 0, concurrency: 1, retryBaseMs: 60_000 } })
+    const { engine, memory } = await openEngine({
+      path: dbPath('hung'),
+      summarizer: hung,
+      config: { summaryTimeoutMs: 20, summaryRetries: 0, concurrency: 1, retryBaseMs: 60_000 },
+    })
     await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) }), ...turns(2)])
     await engine.drain()
     const status = await engine.status()
@@ -322,7 +334,8 @@ describe('compact view', () => {
     const { DatabaseSync } = await import('node:sqlite')
     const path = dbPath('migrate-v1')
     const first = openSqliteMemory({ path })
-    first.database.exec(`DROP TABLE views; CREATE TABLE views (stream TEXT PRIMARY KEY, through_pos INTEGER NOT NULL, nodes TEXT NOT NULL, rendered TEXT NOT NULL, bytes INTEGER NOT NULL, version INTEGER NOT NULL, merge_pending INTEGER NOT NULL) STRICT;
+    first.database
+      .exec(`DROP TABLE views; CREATE TABLE views (stream TEXT PRIMARY KEY, through_pos INTEGER NOT NULL, nodes TEXT NOT NULL, rendered TEXT NOT NULL, bytes INTEGER NOT NULL, version INTEGER NOT NULL, merge_pending INTEGER NOT NULL) STRICT;
       INSERT INTO views VALUES ('conversation:c1', 1, '[[0,0]]', '0+1| user: old\n', 16, 3, 0); PRAGMA user_version = 1;`)
     first.close()
     const raw = new DatabaseSync(path)

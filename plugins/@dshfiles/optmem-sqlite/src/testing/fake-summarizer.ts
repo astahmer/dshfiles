@@ -6,7 +6,9 @@ export type FakeSummarizer = Summarizer & { readonly requests: SummaryRequest[];
  * Deterministic stand-in for the compaction model: echoes a squashed prefix of its input within the budget.
  * `overshootAttempts` answers past the budget first; `gated` holds every call until `release()`.
  */
-export const createFakeSummarizer = (options: { readonly overshootAttempts?: number; readonly gated?: boolean; readonly failing?: boolean } = {}): FakeSummarizer => {
+export const createFakeSummarizer = (
+  options: { readonly overshootAttempts?: number; readonly gated?: boolean; readonly failing?: boolean } = {},
+): FakeSummarizer => {
   const requests: SummaryRequest[] = []
   let release = (): void => {}
   const gate = options.gated ? new Promise<void>(resolve => (release = resolve)) : Promise.resolve()

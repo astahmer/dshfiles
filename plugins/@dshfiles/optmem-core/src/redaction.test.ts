@@ -15,7 +15,8 @@ describe('Redaction', () => {
       '-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
     ].join('\n')
     const result = Redaction.redact(input, [])
-    for (const secret of ['sk-ant-api03', 'ghp_abc', jwt, 'AKIAABCD', 'abcdefghijklmnop1234', 'hunter22hunter', 'MIIabc']) expect(result.text).not.toContain(secret)
+    for (const secret of ['sk-ant-api03', 'ghp_abc', jwt, 'AKIAABCD', 'abcdefghijklmnop1234', 'hunter22hunter', 'MIIabc'])
+      expect(result.text).not.toContain(secret)
     expect(result.text).toContain('password = "[REDACTED:secret]"')
     expect(result.count).toBe(7)
   })

@@ -32,7 +32,10 @@ const storedEvents = (path: string) => {
   }))
 }
 
-const agentOf = (session: { readonly id: string; readonly header: { readonly id: string; readonly cwd?: string } }) => ({ id: session.id, session: { header: session.header } })
+const agentOf = (session: { readonly id: string; readonly header: { readonly id: string; readonly cwd?: string } }) => ({
+  id: session.id,
+  session: { header: session.header },
+})
 
 describe('capture', () => {
   it('stores user, assistant text, tool calls and results once, even when DSH re-delivers them', async () => {
@@ -138,7 +141,10 @@ describe('tools', () => {
     const first = createSessionFixture({ id: 'session-first', cwd: projectA })
     const second = createSessionFixture({ id: 'session-second', cwd: projectA })
     const other = createSessionFixture({ id: 'session-other', cwd: projectB })
-    for (const event of [first.user('The staging database port is 6543, not 5432'), first.assistant([{ type: 'text', text: 'Recorded: staging uses port 6543.' }])]) {
+    for (const event of [
+      first.user('The staging database port is 6543, not 5432'),
+      first.assistant([{ type: 'text', text: 'Recorded: staging uses port 6543.' }]),
+    ]) {
       runtime.onSessionEvent(first.session, event)
     }
     runtime.onSessionEvent(second.session, second.user('Start on the release notes'))
@@ -168,7 +174,9 @@ describe('tools', () => {
   it('hides other projects unless all-projects retrieval is enabled', async () => {
     const { runtime, update, tools, second } = await seed()
     expect((await tools.search({ query: 'zebra-token-777' }, agentOf(second.session))).summary).toContain('No memory matches')
-    await expect(tools.search({ query: 'zebra-token-777', scope: 'all-projects' }, agentOf(second.session))).rejects.toThrow('all-projects retrieval is disabled')
+    await expect(tools.search({ query: 'zebra-token-777', scope: 'all-projects' }, agentOf(second.session))).rejects.toThrow(
+      'all-projects retrieval is disabled',
+    )
     await expect(tools.zoom({ address: '0+1', conversationId: 'session-other' }, agentOf(second.session))).rejects.toThrow('outside this conversation')
     await update({ allowAllProjects: true })
     expect((await tools.search({ query: 'zebra-token-777', scope: 'all-projects' }, agentOf(second.session))).summary).toContain('conversation other')
@@ -227,7 +235,12 @@ describe('injection', () => {
   it('keeps the injected view within its budget once the project outgrows it', async () => {
     const path = freshDatabase()
     const summarizer = fakeSummarizer()
-    const { runtime } = createTestRuntime({ databasePath: path, workspaces, summarizer, settings: { injectUpperBytes: 1_200, injectLowerBytes: 600, maxNodeBytes: 128 } })
+    const { runtime } = createTestRuntime({
+      databasePath: path,
+      workspaces,
+      summarizer,
+      settings: { injectUpperBytes: 1_200, injectLowerBytes: 600, maxNodeBytes: 128 },
+    })
     await runtime.start()
     const writer = createSessionFixture({ id: 'session-writer', cwd: projectA })
     for (let turn = 0; turn < 64; turn++) runtime.onSessionEvent(writer.session, writer.user(`turn ${turn}: ${'context '.repeat(8)}`))

@@ -191,7 +191,6 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     return { excludedTools: settings.excludedTools, excludedPaths: settings.excludedPaths, captureSubagents: settings.captureSubagents }
   }
 
-
   const resolveProject = (header: CaptureHeader): Promise<string | null> => {
     const known = projects.get(header.id)
     if (known !== undefined) return Promise.resolve(known)
@@ -347,7 +346,14 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     try {
       if (!options.settings().enabled || (state !== 'ready' && state !== 'starting')) return
       if (event.type === 'turn/start') turnBoundaries.delete(session.id)
-      if (event.type !== 'user/message' && event.type !== 'assistant/message' && event.type !== 'tool/call' && event.type !== 'tool/result' && event.type !== 'turn/start') return
+      if (
+        event.type !== 'user/message' &&
+        event.type !== 'assistant/message' &&
+        event.type !== 'tool/call' &&
+        event.type !== 'tool/result' &&
+        event.type !== 'turn/start'
+      )
+        return
       void resolveProject(session.header)
       queue.push({ session: { id: session.id, header: session.header }, event })
       scheduleFlush()
@@ -403,7 +409,8 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       const turnStart = events.findLastIndex(event => event.type === 'turn/start')
       const turnEvents = turnStart < 0 ? [] : events.slice(turnStart)
       const firstUser =
-        turnEvents.find(event => event.type === 'user/message' && turnSources.has(event.data.source.kind)) ?? turnEvents.find(event => event.type === 'user/message')
+        turnEvents.find(event => event.type === 'user/message' && turnSources.has(event.data.source.kind)) ??
+        turnEvents.find(event => event.type === 'user/message')
       const cut = firstUser?.type === 'user/message' ? input.messages.findIndex(message => message.id === firstUser.data.id) : -1
       if (cut < 0) return undefined
       let leadEnd = cut + 1
@@ -416,8 +423,14 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       // Contexts DSH adds next to the turn's first message move ahead of the view.
       const head = [...input.messages.slice(0, cut), ...input.messages.slice(cut + 1, leadEnd)]
       const latestRuntime = head.findLastIndex(message => isContext(message) && supersedingSources.has(message.source.kind))
-      const carried = head.filter((message, index) => message.role === 'system' || (isContext(message) && (!supersedingSources.has(message.source.kind) || index === latestRuntime)))
-      const current = [...input.messages.slice(cut, cut + 1), ...input.messages.slice(cut + 1, leadEnd).filter(message => !isContext(message)), ...input.messages.slice(leadEnd)]
+      const carried = head.filter(
+        (message, index) => message.role === 'system' || (isContext(message) && (!supersedingSources.has(message.source.kind) || index === latestRuntime)),
+      )
+      const current = [
+        ...input.messages.slice(cut, cut + 1),
+        ...input.messages.slice(cut + 1, leadEnd).filter(message => !isContext(message)),
+        ...input.messages.slice(leadEnd),
+      ]
       let view = turnViews.get(input.agent.id)
       const reusedView = view?.turn === input.turn
       let snapshot: { readonly viewVersion: number; readonly bytes: number; readonly pendingCount: number } | undefined
@@ -426,9 +439,15 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         const engine = requireEngine()
         const projectId = await resolveProject(input.agent.session.header)
         const stream = projectId === null ? StreamIds.conversation(input.agent.id) : StreamIds.project(projectId)
-        const taken = await abortable(engine.snapshot({ stream, barrierMs: options.settings().barrierMs, endPos: turnBoundaries.get(input.agent.id) }), input.signal)
+        const taken = await abortable(
+          engine.snapshot({ stream, barrierMs: options.settings().barrierMs, endPos: turnBoundaries.get(input.agent.id) }),
+          input.signal,
+        )
         const text = `${viewPreamble}\n\n${taken.text.length > 0 ? taken.text : '(no memory yet)'}`
-        view = view?.text === text ? { ...view, turn: input.turn } : { turn: input.turn, text, message: createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }) }
+        view =
+          view?.text === text
+            ? { ...view, turn: input.turn }
+            : { turn: input.turn, text, message: createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }) }
         turnViews.set(input.agent.id, view)
         snapshot = taken
       }
@@ -485,7 +504,8 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     const progress: BackfillProgress = await readFile(progressPath, 'utf8')
       .then((text): BackfillProgress => {
         const parsed: unknown = JSON.parse(text)
-        if (typeof parsed !== 'object' || parsed === null || !('sessions' in parsed) || typeof parsed.sessions !== 'object' || parsed.sessions === null) return { sessions: {} }
+        if (typeof parsed !== 'object' || parsed === null || !('sessions' in parsed) || typeof parsed.sessions !== 'object' || parsed.sessions === null)
+          return { sessions: {} }
         return { sessions: Object.fromEntries(Object.entries(parsed.sessions).filter((entry): entry is [string, number] => typeof entry[1] === 'number')) }
       })
       .catch(() => ({ sessions: {} }))
@@ -501,7 +521,9 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       if ((progress.sessions[header.id] ?? -1) >= lastSeq) continue
       sessions++
       const projectId = await resolveProject(log.session)
-      const inputs = log.events.slice(log.inheritedEventCount).flatMap(event => capture.toMemoryEvent({ session: { id: header.id, header: log.session }, event, projectId, policy: policy() }) ?? [])
+      const inputs = log.events
+        .slice(log.inheritedEventCount)
+        .flatMap(event => capture.toMemoryEvent({ session: { id: header.id, header: log.session }, event, projectId, policy: policy() }) ?? [])
       for (let index = 0; index < inputs.length; index += 500) inserted += (await engine.append(inputs.slice(index, index + 500))).inserted
       progress.sessions[header.id] = lastSeq
       await writeFile(progressPath, JSON.stringify(progress), { mode: 0o600 })

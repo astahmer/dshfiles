@@ -61,11 +61,13 @@ export class ViewMath {
    * Merges the most due pairs until the view fits in `lowerBytes` or nothing is mergeable. Pure and deterministic:
    * same order as repeatedly applying `pickMergePair`, in O(V log V) because a pair's due is fixed within a batch.
    */
-  static planMergeBatch(request: ViewLines & {
-    readonly throughPos: number
-    readonly lowerBytes: number
-    readonly nodeText: (address: NodeAddress) => string | undefined
-  }): MergePlan {
+  static planMergeBatch(
+    request: ViewLines & {
+      readonly throughPos: number
+      readonly lowerBytes: number
+      readonly nodeText: (address: NodeAddress) => string | undefined
+    },
+  ): MergePlan {
     const addresses: NodeAddress[] = [...request.nodes]
     const lines: string[] = [...request.lines]
     const previous = addresses.map((_address, index) => index - 1)

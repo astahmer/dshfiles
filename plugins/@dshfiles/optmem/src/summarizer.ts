@@ -42,12 +42,17 @@ const unavailableRetryMs = 60_000
  * Finds the provider route serving the configured model: the configured provider when set, else the first provider
  * listing that model. A miss is remembered for a minute so retried summaries do not rescan every provider.
  */
-export const createRouteResolver = (options: { readonly catalog: () => ModelCatalog | undefined; readonly target: () => SummarizerTarget; readonly now?: () => number }) => {
+export const createRouteResolver = (options: {
+  readonly catalog: () => ModelCatalog | undefined
+  readonly target: () => SummarizerTarget
+  readonly now?: () => number
+}) => {
   const now = options.now ?? Date.now
   let state: SummarizerRouteState = { kind: 'unresolved', target: options.target() }
   let checkedAt = 0
 
-  const sameTarget = (left: SummarizerTarget, right: SummarizerTarget): boolean => left.provider === right.provider && left.model === right.model && left.effort === right.effort
+  const sameTarget = (left: SummarizerTarget, right: SummarizerTarget): boolean =>
+    left.provider === right.provider && left.model === right.model && left.effort === right.effort
 
   const resolve = async (): Promise<SummarizerRouteState> => {
     const target = options.target()
