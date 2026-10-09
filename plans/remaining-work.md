@@ -25,7 +25,7 @@ Small follow-ups:
 - [x] dshx `tests/config.spec.ts:51` unused `@ts-expect-error` (typecheck error)
 - [ ] restart indicator misses host-only plugins (e.g. optmem) — Host client registry doesn't list them
 - [ ] optmem settings can't show on its Plugins page (no client half)
-- [ ] palette-perf tests flaky under machine load (thresholds or isolate)
+- [x] palette-perf tests flaky under machine load (thresholds or isolate)
 - [ ] 423 old `conflicts()` revisions in dshfiles from shared-working-copy agents — tidy (abandon/resolve)
 
 Next, in order (workbench/dock work last):
