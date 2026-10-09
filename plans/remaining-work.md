@@ -28,6 +28,30 @@ Small follow-ups:
 - [x] palette-perf tests flaky under machine load (thresholds or isolate)
 - [ ] 423 old `conflicts()` revisions in dshfiles from shared-working-copy agents — tidy (abandon/resolve)
 
+## Handoff (2026-10-10, Claude session near its usage limit)
+
+Landed since last update: jj panel VirtualList + keyboard nav + scroll-to-@ (`ktovxoms`, plugin-ui `/virtual`),
+polling pause when hidden (`qlrkyxvl`), "Open in editor" from changed-file lists (`tyxulltq`), jujutsu lint
+(`mvwzzpxv`); PI_AI_ERROR Envoy replay-buffer overflow retried as TRANSPORT (`yoouomyw`, needs DSH restart);
+jj history unified twice (undo ops `ac933835aa89`, `88b08d737db7`), 1,123 old leftovers abandoned; Schedule
+delivery test kept (`yzukrqzw`); verify-core-runtime-scratch.mjs current version kept.
+
+In flight when the session stopped (check `jj log` for their revisions before redoing):
+- [ ] queue-reorder: edit a queued item through the composer (text + attachments back in composer; Submit puts
+  it back at the same position, Cancel/Escape restores the original; races covered); then forget the
+  `queue-rich-edit` workspace if inactive (keep its dir)
+- [ ] ai-accounts: configurable failure policy per kind (transport, 429, exhausted, auth, oversized): retry /
+  fail over / Luna Reserve / shrink / fail; defaults transport→retry then fail over, exhausted→reserve then
+  fail over, 429→fail over then wait; works in jj workspace `ai-failover` (don't commit `tooling/dsh-core/*/lib`)
+- [ ] editor: tab dedupe (relative/absolute), binary/image preview, file list refresh on `workspaceFiles.changes`,
+  ⌘P `.gitignore`, open from thread tool-call paths (or note gap in dsh-host-gaps.md), minimal explorer panel
+
+Urgent before the next DSH restart:
+- [ ] `probe` fails to boot: ai-accounts and the CommandCode provider register the same adapter (after
+  "fix(profiles): activate configured CommandCode provider"); check whether `web` is affected and fix
+- [ ] repo `pnpm lint` errors in mcp-servers, secret-catalog, plugin-marketplace, ai-accounts
+- [ ] delete scratch profile `~/.dsh/profiles/scratch-jj` (leftover, harmless)
+
 Next, in order (workbench/dock work last):
 1. Luna Reserve live check when a Codex weekly limit is next spent
 2. ADE leftovers: P0.5 bundle diet (shared deps) + pause polling when hidden, P0.6 perf e2e, P1.10/L3 jj
