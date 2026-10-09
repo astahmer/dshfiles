@@ -45,7 +45,7 @@ const waitForProviderCalls = async (path, provider, expected) => {
 }
 
 export const name = packageName
-export const inject = ['agents', 'llm', 'parentFeedback', 'subagents']
+export const inject = ['agents', 'llm', 'parentFeedback', 'parentQuestions', 'subagents', 'tools']
 export const apply = async context => {
   const home = process.env.DSH_HOME
   if (home === undefined) throw new Error('The scratch DSH_HOME is unavailable.')
@@ -149,21 +149,64 @@ export const apply = async context => {
       if (record.status !== 'pending') {
         throw new Error('The scratch feedback request ended in status ' + record.status + '.')
       }
+
+      const questionOperationId = randomUUID()
+      const questionInput = {
+        question: 'Choose a harmless scratch-test outcome.',
+        context: 'This verifies Host tool access to the question service.',
+        options: [
+          { id: 'recommended', label: 'Use the recommendation', description: 'Default demonstration choice.' },
+          { id: 'alternate', label: 'Use the alternate choice' },
+        ],
+        recommendedOptionId: 'recommended',
+        expiryBehavior: 'recommended',
+        timeoutMs: 10_000,
+      }
+      const questionReceipt = await context.parentQuestions.request({
+        agent: child,
+        operationId: questionOperationId,
+        ...questionInput,
+        signal: new AbortController().signal,
+      })
+      const childQuestionWait = context.tools.execute({
+        signal: new AbortController().signal,
+        callId: questionOperationId,
+        name: 'ask_parent_question',
+        arguments: questionInput,
+        agent: child,
+      })
+      const parentQuestionAnswer = await context.tools.execute({
+        signal: new AbortController().signal,
+        callId: randomUUID(),
+        name: 'answer_parent_question',
+        arguments: { questionId: questionReceipt.questionId, answer: 'Use the alternate choice.' },
+        agent: parent,
+      })
+      const childQuestionResult = await childQuestionWait
+      if (parentQuestionAnswer.isError || childQuestionResult.isError || !String(childQuestionResult.value).includes('Use the alternate choice.')) {
+        throw new Error('The Agent Questions Host tools did not complete a child question and parent answer.')
+      }
       releaseFirstChildTurn()
       await waitForIdle(child, 'The initial provider-backed child turn')
       await waitForIdle(parent, 'The parent feedback notice turn')
 
-      await writeJson(statePath, {
-        phase: 'pending',
-        parentSessionId: parent.id,
-        childSessionId: child.id,
-        feedbackId: record.feedbackId,
-        childProviderCalls: initialCalls,
-      }, home)
+      await writeJson(
+        statePath,
+        {
+          phase: 'pending',
+          parentSessionId: parent.id,
+          childSessionId: child.id,
+          feedbackId: record.feedbackId,
+          childProviderCalls: initialCalls,
+          parentQuestionToolPassed: true,
+        },
+        home,
+      )
       return
     }
 
     if (state.phase !== 'pending') throw new Error('The scratch feedback state has an unsupported phase.')
+    if (state.parentQuestionToolPassed !== true) throw new Error('The scratch question and answer tools were not verified on the first Host boot.')
     if (context.agents.get(state.childSessionId) !== undefined) {
       throw new Error('The child was already resident at the second Host boot.')
     }
@@ -186,17 +229,30 @@ export const apply = async context => {
     const childProviderCalls = (await readJson(callCountPath))?.[childProvider] ?? 0
     if (childProviderCalls !== 2) throw new Error('The cold-resumed child did not reach the scratch provider a second time.')
     if (resolved.status !== 'resolved' || resolution?.notified !== true) {
-      throw new Error('Cold-resumed feedback status=' + resolved.status + ', parent status=' + String(resolution?.status) + ', notified=' + String(resolution?.notified) + '.')
+      throw new Error(
+        'Cold-resumed feedback status=' +
+          resolved.status +
+          ', parent status=' +
+          String(resolution?.status) +
+          ', notified=' +
+          String(resolution?.notified) +
+          '.',
+      )
     }
 
-    await writeJson(resultPath, {
-      passed: true,
-      childAbsentAtHostRestart: true,
-      childResumedAfterResolution: true,
-      childProviderCalls,
-      feedbackStatus: resolved.status,
-      parentNotified: resolution.notified,
-    }, home)
+    await writeJson(
+      resultPath,
+      {
+        passed: true,
+        parentQuestionToolPassed: true,
+        childAbsentAtHostRestart: true,
+        childResumedAfterResolution: true,
+        childProviderCalls,
+        feedbackStatus: resolved.status,
+        parentNotified: resolution.notified,
+      },
+      home,
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await writeJson(resultPath, { passed: false, error: message }, home)

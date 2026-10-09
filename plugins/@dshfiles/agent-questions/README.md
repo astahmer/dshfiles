@@ -13,7 +13,8 @@ the request. A cancelled or expired request cannot be answered later.
 Each new question names a valid recommended option and an expiry behavior:
 `recommended` returns that option to the child when the deadline passes, while
 `defer` writes a private Markdown record under the child's workspace
-`questions/` directory. The record includes the question, context, options,
+`questions/` directory. Options have an id and label, plus an optional bounded
+description. The record includes the question, context, options,
 recommendation, child Session id, timestamps, and an answer placeholder. It is
 not an answer transport; editing it does not deliver a response to the child.
 Deferred file paths are relative, persisted with the question, and reused on
@@ -27,7 +28,8 @@ rows are eligible for cleanup after seven days when a later request performs
 admission. Host shutdown interrupts active waits without cancelling their
 durable pending rows.
 
-The child tool waits up to three minutes. On expiry, it either returns the
+The child tool waits three minutes by default. A request may override this with
+`timeoutMs` from 1,000 ms to 3,600,000 ms. On expiry, it either returns the
 selected recommendation or writes and records the deferred file before the
 child continues.
 

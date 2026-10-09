@@ -28,12 +28,7 @@ const profileName = 'agent-questions'
 const scratch = await createScratchProfile({
   profileName,
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/web'),
-  bundleIds: [
-    '@deepseek-ai/dsh-base',
-    '@deepseek-ai/dsh-web-app',
-    '@dshfiles/agent-questions',
-    '@dshfiles/agent-questions-cold-resume-fixture',
-  ],
+  bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@dshfiles/agent-questions', '@dshfiles/agent-questions-cold-resume-fixture'],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
   extraDependencies: {
     '@dshfiles/agent-questions': `link:${packagePath}`,
@@ -160,6 +155,7 @@ try {
   const result = await waitForJson(fixtureResultPath, 'The cold-resume result')
   assert.deepEqual(result, {
     passed: true,
+    parentQuestionToolPassed: true,
     childAbsentAtHostRestart: true,
     childResumedAfterResolution: true,
     childProviderCalls: 2,

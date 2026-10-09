@@ -106,6 +106,26 @@ describe('parent question Host contract', () => {
     await service.close()
   })
 
+  it('stores optional option descriptions and honors a shorter expiry delay', async () => {
+    const table = createMemoryTable()
+    const service = makeService(table, () => 1_000)
+    const input = requestInput({})
+
+    await service.request({
+      ...input,
+      options: [
+        { id: 'expand-contract', label: 'Expand and contract', description: 'Preserve old and new data paths during rollout.' },
+        { id: 'direct', label: 'Replace directly' },
+      ],
+      timeoutMs: 20_000,
+    })
+
+    const record = [...table.entries()][0]?.[1]
+    expect(record?.expiresAt).toBe(21_000)
+    expect(record?.options[0]?.description).toBe('Preserve old and new data paths during rollout.')
+    await service.close()
+  })
+
   it('isolates concurrent child answers by question id', async () => {
     const service = makeService(createMemoryTable())
     const first = await service.request(requestInput({ operationId: 'call-a' }))
