@@ -1,4 +1,4 @@
-import type { ISessions, SessionSummary, SessionWorkspaceRestorePreview, SessionWorkspaceRestoreReceipt } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionWorkspaceRestorePreview } from '@deepseek-ai/dsh-api-session-controller/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -15,7 +15,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshf
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
+import { workspaceRestoreMachine } from './workspace-restore-machine.js'
 
 interface WorkspaceRestorePanelProps {
   readonly sessions: ISessions
@@ -27,12 +29,14 @@ interface WorkspaceRestorePanelProps {
 type RestoreAction = SessionWorkspaceRestorePreview['action']
 
 export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.Element => {
-  const [selectedSessionId, setSelectedSessionId] = useState<SessionSummary['id'] | ''>('')
-  const [preview, setPreview] = useState<SessionWorkspaceRestorePreview | null>(null)
-  const [receipt, setReceipt] = useState<SessionWorkspaceRestoreReceipt | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const operation = useRef<{ readonly controller: AbortController } | null>(null)
+  const [snapshot, send, restoreActor] = useMachine(workspaceRestoreMachine, {
+    input: { client: props.sessions, workspacePath: props.workspacePath, targetCommitId: props.targetCommitId },
+  })
+  const { preview, receipt, error } = snapshot.context
+  const selectedSessionId = snapshot.context.sessionId ?? ''
+  const busy = snapshot.hasTag('busy')
+  const onRestored = useRef(props.onRestored)
+  onRestored.current = props.onRestored
 
   const subscribeSessions = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const readSessions = useCallback(() => props.sessions.list.getSnapshot(), [props.sessions])
@@ -44,119 +48,18 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
   }, [props.sessions, sessionList.phase])
 
   useEffect(() => {
-    operation.current?.controller.abort()
-    operation.current = null
-    setBusy(false)
-    setPreview(null)
-    setReceipt(null)
-    setError(null)
-    return () => operation.current?.controller.abort()
-  }, [props.targetCommitId, props.workspacePath, selectedSessionId])
+    const subscription = restoreActor.on('restored', () => onRestored.current())
+    return () => subscription.unsubscribe()
+  }, [restoreActor])
 
-  const prepare = async (action: RestoreAction): Promise<void> => {
-    if (selectedSessionId === '') return
-    if (action === 'restore' && props.targetCommitId === null) return
-    operation.current?.controller.abort()
-    const currentOperation = { controller: new AbortController() }
-    operation.current = currentOperation
-    setBusy(true)
-    setError(null)
-    setPreview(null)
-    try {
-      const result = await props.sessions.prepareWorkspaceRestore(
-        {
-          sessionId: selectedSessionId,
-          action,
-          ...(action === 'restore' ? { targetCommitId: props.targetCommitId ?? undefined } : {}),
-        },
-        currentOperation.controller.signal,
-      )
-      if (operation.current !== currentOperation) return
-      if (!result.ok) {
-        setError(result.error.message)
-        return
-      }
-      if (result.value.workspacePath !== props.workspacePath) {
-        setError(`The selected Session belongs to ${result.value.workspacePath}; this repository is ${props.workspacePath}.`)
-        return
-      }
-      setReceipt(null)
-      setPreview(result.value)
-    } catch (reason) {
-      if (operation.current === currentOperation) {
-        setError(reason instanceof Error ? reason.message : 'Could not prepare the filesystem restore.')
-      }
-    } finally {
-      if (operation.current === currentOperation) {
-        operation.current = null
-        setBusy(false)
-      }
-    }
-  }
+  useEffect(() => {
+    send({ type: 'target.change', workspacePath: props.workspacePath, targetCommitId: props.targetCommitId })
+  }, [props.targetCommitId, props.workspacePath, send])
 
-  const confirm = async (): Promise<void> => {
-    if (preview === null) return
-    operation.current?.controller.abort()
-    const currentOperation = { controller: new AbortController() }
-    operation.current = currentOperation
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await props.sessions.confirmWorkspaceRestore({ previewId: preview.previewId }, currentOperation.controller.signal)
-      if (operation.current !== currentOperation) return
-      if (!result.ok) {
-        setError(result.error.message)
-        return
-      }
-      setReceipt(result.value)
-      setPreview(null)
-      props.onRestored()
-    } catch (reason) {
-      if (operation.current === currentOperation) {
-        setError(reason instanceof Error ? reason.message : 'Could not confirm the filesystem restore.')
-      }
-    } finally {
-      if (operation.current === currentOperation) {
-        operation.current = null
-        setBusy(false)
-      }
-    }
-  }
-
-  const inspectStatus = async (): Promise<void> => {
-    if (selectedSessionId === '') return
-    operation.current?.controller.abort()
-    const currentOperation = { controller: new AbortController() }
-    operation.current = currentOperation
-    setBusy(true)
-    setError(null)
-    setPreview(null)
-    try {
-      const result = await props.sessions.workspaceRestoreStatus({ sessionId: selectedSessionId }, currentOperation.controller.signal)
-      if (operation.current !== currentOperation) return
-      if (!result.ok) {
-        setError(result.error.message)
-        return
-      }
-      setReceipt(result.value)
-      if (result.value !== null) props.onRestored()
-    } catch (reason) {
-      if (operation.current === currentOperation) {
-        setError(reason instanceof Error ? reason.message : 'Could not inspect the latest filesystem restore.')
-      }
-    } finally {
-      if (operation.current === currentOperation) {
-        operation.current = null
-        setBusy(false)
-      }
-    }
-  }
+  const prepare = (action: RestoreAction): void => send({ type: 'prepare', action })
 
   const chooseSession = (value: string): void => {
-    operation.current?.controller.abort()
-    operation.current = null
-    setBusy(false)
-    setSelectedSessionId(sessionList.ids.find(sessionId => sessionId === value) ?? '')
+    send({ type: 'session.select', sessionId: sessionList.ids.find(sessionId => sessionId === value) ?? null })
   }
 
   const changedPathList =
@@ -208,14 +111,14 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
         <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
           <Button
             disabled={selectedSessionId === '' || props.targetCommitId === null || busy}
-            onClick={() => void prepare('restore')}
+            onClick={() => prepare('restore')}
             size="sm"
             type="button"
             variant="outline"
           >
             Preview file restore
           </Button>
-          <Button disabled={selectedSessionId === '' || busy} onClick={() => void inspectStatus()} size="sm" type="button" variant="ghost">
+          <Button disabled={selectedSessionId === '' || busy} onClick={() => send({ type: 'inspect' })} size="sm" type="button" variant="ghost">
             Inspect latest restore status
           </Button>
         </div>
@@ -236,12 +139,12 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
               {(receipt.canRetry || receipt.canRollback) && (
                 <span className="dshx:flex dshx:gap-1.5">
                   {receipt.canRetry && (
-                    <Button disabled={busy} onClick={() => void prepare('retry')} size="xs" type="button" variant="outline">
+                    <Button disabled={busy} onClick={() => prepare('retry')} size="xs" type="button" variant="outline">
                       Preview retry
                     </Button>
                   )}
                   {receipt.canRollback && (
-                    <Button disabled={busy} onClick={() => void prepare('rollback')} size="xs" type="button" variant="outline">
+                    <Button disabled={busy} onClick={() => prepare('rollback')} size="xs" type="button" variant="outline">
                       Preview rollback
                     </Button>
                   )}
@@ -265,7 +168,7 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
                 jj diff --from {preview.currentCommitId} --to {preview.targetCommitId}
               </code>
               <div className="dshx:w-full dshx:text-foreground">{changedPathList}</div>
-              <Button onClick={() => setPreview(null)} size="xs" type="button" variant="outline">
+              <Button onClick={() => send({ type: 'preview.close' })} size="xs" type="button" variant="outline">
                 Close path preview
               </Button>
             </AlertDescription>
@@ -273,7 +176,7 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
         )}
         <AlertDialog
           onOpenChange={open => {
-            if (!open) setPreview(null)
+            if (!open) send({ type: 'preview.close' })
           }}
           open={preview !== null && !preview.changedPathsTruncated}
         >
@@ -302,7 +205,7 @@ export const WorkspaceRestorePanel = (props: WorkspaceRestorePanelProps): JSX.El
                   disabled={busy}
                   onClick={event => {
                     event.preventDefault()
-                    void confirm()
+                    send({ type: 'confirm' })
                   }}
                   size="sm"
                 >

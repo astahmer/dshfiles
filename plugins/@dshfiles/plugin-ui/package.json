@@ -42,6 +42,10 @@
       "types": "./src/form.tsx",
       "default": "./src/form.tsx"
     },
+    "./machine": {
+      "types": "./src/machine.ts",
+      "default": "./src/machine.ts"
+    },
     "./chart": {
       "types": "./src/chart.tsx",
       "default": "./src/chart.tsx"
@@ -68,6 +72,7 @@
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-table": "^9.2.6",
+    "@xstate/react": "6.1.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
@@ -77,7 +82,8 @@
     "shiki": "4.5.0",
     "tailwind-merge": "3.7.0",
     "tailwindcss": "4.3.3",
-    "tw-animate-css": "1.4.0"
+    "tw-animate-css": "1.4.0",
+    "xstate": "5.33.2"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",

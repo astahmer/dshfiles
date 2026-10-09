@@ -72,6 +72,14 @@ import { useAppForm } from '@dshfiles/plugin-ui/form'
 
 Field components: `TextField`, `TextAreaField`, `SelectField` (shadcn Select), `CheckboxField`, `SwitchField`; `form.SubmitButton`. Validators are Standard Schema (zod 4).
 
+## Machine (xstate v5)
+
+```tsx
+import { assign, fromPromise, setup, useMachine } from '@dshfiles/plugin-ui/machine'
+```
+
+Only for tangled flows with three or more states (select → prepare → confirm → receipt). Machines own flow state; server data stays in Query. Call the Host through `fromPromise` actors and forward their `signal` — leaving a state stops the actor and aborts the call.
+
 ## Chart
 
 `@dshfiles/plugin-ui/chart` re-exports TanStack Charts 1.0.0 and `ChartFrame`, which maps `--ts-chart-*` onto DSH tokens.
