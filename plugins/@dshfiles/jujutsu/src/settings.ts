@@ -16,6 +16,11 @@ export const jujutsuSettings = defineSettings({
     mineOnly: Schema.boolean().default(false).description('Show only your own revisions (and the working copy) in the graph.'),
     dateHeadings: Schema.boolean().default(true).description('Group graph revisions under day headings.'),
     revisionLimit: Schema.natural().min(50).max(500).default(300).description('Revisions loaded into the graph.'),
+    refreshMode: Schema.union([Schema.const('interval').description('Every interval'), Schema.const('manual').description('Manual only')])
+      .default('interval')
+      .description('How the revision graph and Source Control reload repository data.'),
+    refreshIntervalSeconds: Schema.natural().min(10).default(60).description('Seconds between automatic refreshes while the panel is visible.'),
+    refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
   }),
   applies: 'live',
 })

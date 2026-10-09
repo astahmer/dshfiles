@@ -27,6 +27,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { jujutsuApi, type FileStat, type Mutation, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, type FileView } from './changed-files.js'
 import { describeDraftChanged } from './graph.js'
+import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { sourceControlGroups } from './source-control.js'
 
@@ -41,6 +42,7 @@ interface SourceControlViewProps {
   readonly onAction: (action: Mutation) => void
   readonly onOpenDiff: (revision: Revision, focusPath: string | null) => void
   readonly onRefresh: () => void
+  readonly refreshOptions: ReturnType<typeof refreshQueryOptions>
 }
 
 const firstLine = (description: string): string => description.split('\n')[0] || '(no description)'
@@ -81,6 +83,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
     queryKey: ['jujutsu', props.repoId, 'revision-files', commitIds.join(',')],
     queryFn: ({ signal }) => api.revisionFiles({ repoId: props.repoId, commitIds }, { signal }),
     enabled: commitIds.length > 0,
+    ...props.refreshOptions,
   })
   const filesByCommit = useMemo(() => new Map(filesQuery.data?.revisions.map(row => [row.commitId, row.files]) ?? []), [filesQuery.data])
   const workingCopy = groups[0]?.revision

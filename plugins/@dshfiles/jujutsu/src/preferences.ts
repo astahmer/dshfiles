@@ -14,6 +14,9 @@ const preferencesSchema = z.object({
   mineOnly: z.boolean().catch(false),
   dateHeadings: z.boolean().catch(true),
   revisionLimit: z.number().int().min(50).max(500).catch(300),
+  refreshMode: z.enum(['interval', 'manual']).catch('interval'),
+  refreshIntervalSeconds: z.number().int().min(10).catch(60),
+  refreshOnVisible: z.boolean().catch(true),
 })
 
 export type JujutsuPreferences = z.infer<typeof preferencesSchema>

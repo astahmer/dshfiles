@@ -73,6 +73,7 @@ import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
+import { useAutoRefresh } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
@@ -231,32 +232,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const mineOnly = preferences.mineOnly
   const hideImmutable = preferences.hideImmutable
 
-  const stateQuery = useQuery({
-    queryKey: jujutsuKeys.state(repoId ?? '', preferences.revisionLimit),
-    queryFn: ({ signal }) => api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal }),
-    enabled: repoId !== null,
-  })
-  const state = stateQuery.data
-
-  const selectedRevision = useMemo(() => {
-    if (state === undefined || selection === null) return undefined
-    return state.revisions.find(row => row.commitId === selection.commitId) ?? state.revisions.find(row => row.changeId === selection.changeId)
-  }, [state, selection])
-
-  const detailsQuery = useQuery({
-    queryKey: jujutsuKeys.details(repoId ?? '', selectedRevision?.commitId ?? ''),
-    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: selectedRevision?.commitId ?? '' }, { signal }),
-    enabled: repoId !== null && selectedRevision !== undefined,
-  })
-  const details = detailsQuery.data
-  const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
-
-  const fullDiffQuery = useQuery({
-    queryKey: jujutsuKeys.details(repoId ?? '', fullDiff?.commitId ?? ''),
-    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal }),
-    enabled: repoId !== null && fullDiff !== null,
-  })
-
   const prepareMutation = useMutation({
     mutationFn: (input: { readonly repoId: string; readonly action: Mutation }) => api.prepare(input),
   })
@@ -286,6 +261,41 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       writeStorage(SELECTED_REPO_KEY, registered.root)
       void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(registered.repoId) })
     },
+  })
+
+  const autoRefresh = useAutoRefresh({
+    preferences,
+    paused: registerMutation.isPending || prepareMutation.isPending || confirmMutation.isPending || preview !== undefined,
+    onBecameVisible: () => {
+      if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
+    },
+  })
+
+  const stateQuery = useQuery({
+    queryKey: jujutsuKeys.state(repoId ?? '', preferences.revisionLimit),
+    queryFn: ({ signal }) => api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal }),
+    enabled: repoId !== null,
+    ...autoRefresh.queryOptions,
+  })
+  const state = stateQuery.data
+
+  const selectedRevision = useMemo(() => {
+    if (state === undefined || selection === null) return undefined
+    return state.revisions.find(row => row.commitId === selection.commitId) ?? state.revisions.find(row => row.changeId === selection.changeId)
+  }, [state, selection])
+
+  const detailsQuery = useQuery({
+    queryKey: jujutsuKeys.details(repoId ?? '', selectedRevision?.commitId ?? ''),
+    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: selectedRevision?.commitId ?? '' }, { signal }),
+    enabled: repoId !== null && selectedRevision !== undefined,
+  })
+  const details = detailsQuery.data
+  const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
+
+  const fullDiffQuery = useQuery({
+    queryKey: jujutsuKeys.details(repoId ?? '', fullDiff?.commitId ?? ''),
+    queryFn: ({ signal }) => api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal }),
+    enabled: repoId !== null && fullDiff !== null,
   })
 
   useEffect(() => {
@@ -871,6 +881,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               onFileViewChange={value => setPreference('fileView', value)}
               onOpenDiff={openFullDiff}
               onRefresh={refreshRepository}
+              refreshOptions={autoRefresh.queryOptions}
               repoId={repoId}
               revisions={state.revisions}
             />
@@ -880,7 +891,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   )
 
   return (
-    <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground">
+    <main ref={autoRefresh.ref} className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground">
       <TooltipProvider>
         <Tabs className="dshx:min-h-0 dshx:flex-1 dshx:gap-0" onValueChange={value => setView(value === 'source' ? 'source' : 'graph')} value={view}>
           <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">

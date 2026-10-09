@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildFileTree, splitFilePath } from './file-tree.ts'
 import { parseGitPatch } from './patch-view.ts'
+import { refreshQueryOptions } from './auto-refresh.ts'
 import { decodePreferences, legacyPreferences } from './preferences.ts'
 import { descendantCommitIds, emptyAncestorCandidates, sourceControlGroups } from './source-control.ts'
 
@@ -137,5 +138,32 @@ describe('preferences', () => {
     expect(legacyPreferences(JSON.stringify({ mineOnly: true, fileView: 'tree', ancestorCount: 8 })).changed).toEqual(['ancestorCount', 'mineOnly'])
     expect(legacyPreferences('not json').changed).toEqual([])
     expect(legacyPreferences(null).changed).toEqual([])
+  })
+})
+
+describe('refreshQueryOptions', () => {
+  const preferences = { refreshMode: 'interval', refreshIntervalSeconds: 60, refreshOnVisible: true } as const
+
+  it('polls at the configured interval only while visible and idle', () => {
+    expect(refreshQueryOptions({ preferences, visible: true, paused: false })).toEqual({
+      refetchInterval: 60_000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
+    })
+    expect(refreshQueryOptions({ preferences, visible: false, paused: false }).refetchInterval).toBe(false)
+  })
+
+  it('holds every refresh while a confirm or mutation is in flight', () => {
+    expect(refreshQueryOptions({ preferences, visible: true, paused: true })).toMatchObject({ refetchInterval: false, refetchOnWindowFocus: false })
+  })
+
+  it('never polls in manual mode and ties focus refetch to refreshOnVisible', () => {
+    const manual = refreshQueryOptions({ preferences: { ...preferences, refreshMode: 'manual', refreshOnVisible: false }, visible: true, paused: false })
+    expect(manual).toMatchObject({ refetchInterval: false, refetchOnWindowFocus: false })
+  })
+
+  it('falls back to defaults for out-of-range settings', () => {
+    const decoded = decodePreferences({ refreshMode: 'sometimes', refreshIntervalSeconds: 3 })
+    expect(decoded).toMatchObject({ refreshMode: 'interval', refreshIntervalSeconds: 60, refreshOnVisible: true })
   })
 })
