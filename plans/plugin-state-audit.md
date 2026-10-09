@@ -49,7 +49,7 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 | # | Where | Swap | Value | Size | Done |
 |---|---|---|---|---|---|
 | L1 | mcp-servers/src/oauth.ts:100-216 | `oauth4webapi` (adds issuer check RFC 8414 §3.3, correct OIDC discovery URL, `WWW-Authenticate` resource_metadata hint) | high (security) | M | [x] |
-| L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | `@tanstack/react-virtual` wrapper in plugin-ui + Host `useCodeHighlighter(languageForPath)` | high | M | [ ] |
+| L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | ~~`@tanstack/react-virtual` + Host `useCodeHighlighter`~~ superseded by `@pierre/diffs` 1.5.2 `PatchView` (`@dshfiles/plugin-ui/diff`: virtualized, Shiki, unified/split) in full-diff dialog, inline revision patch and Source Control file diff; jujutsu client.js 594→1,881 KB (150→381 KB gz) with the slim Shiki alias | high | M | [x] |
 | L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [ ] |
 | L4 | thread-sidebar/client.tsx:129, jujutsu/client.tsx:158 (two disagreeing relative-time fns) | Host `relativeTime` | med | S | [ ] |
 | L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [ ] |
@@ -58,7 +58,10 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 | L8 | thread-sidebar/sidebar-shell.tsx:729 customize drag | add move up/down buttons (keyboard a11y); pragmatic-drag-and-drop only if reused with L9 | med | S | [ ] |
 | L9 | jujutsu drag (client.tsx:198,414,821) | `@atlaskit/pragmatic-drag-and-drop` + auto-scroll (optional) | low-med | M | [ ] |
 | L10 | ai-accounts/native-provider-patch.ts:43 heuristic | `yaml` parseDocument check (host side) | low-med | S | [ ] |
-| L11 | jujutsu/core.ts:180 second +/- pass | reuse `parseGitPatch` | low | S | [ ] |
+| L11 | jujutsu/core.ts:180 second +/- pass | `parseGitPatch` removed with the hand-rolled renderer; host `parsePatchStats` is the only count pass, `@pierre/diffs` parses for rendering | low | S | [x] |
 
 Skipped (small/clear or lib not worth it): debounces (@tanstack/pacer still 0.x), optmem backoff, auto-save.ts,
 command-line.ts quoting, file-tree/graph, keychain wrapper, sidebar splitter, parse-diff/react-diff-view.
+`@pierre/trees` 1.0.0-beta.6 for the jujutsu changed-file Tree: no per-row checkbox or inline hover-action API
+(one text/icon decoration per row plus a context menu), so review marks and row actions would need hacks; it also
+ships a Preact 11 beta runtime and a second `@pierre/theming`.
