@@ -1,10 +1,11 @@
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDeferredValue, useMemo, useState, type KeyboardEvent } from 'react'
-import { filterByLabel, indexThreads, rankThreads, type PaletteMode, type ThreadCandidate } from './palette.js'
+import { indexThreads, rankThreads, type PaletteMode, type ThreadCandidate } from './palette.js'
 import type { PaletteDestination } from './sidebar-state.js'
 
 export interface ThreadPaletteCopy {
@@ -60,7 +61,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     [props.recentLimit, threadIndex, deferredQuery],
   )
   const destinationRows = useMemo(
-    () => (props.mode === 'all' ? filterByLabel(props.destinations, deferredQuery) : []),
+    () =>
+      props.mode === 'all'
+        ? rankByName(
+            props.destinations.map(destination => ({ name: destination.label, destination })),
+            deferredQuery.trim(),
+          ).map(entry => entry.destination)
+        : [],
     [props.destinations, props.mode, deferredQuery],
   )
   const rows: PaletteRow[] = useMemo(

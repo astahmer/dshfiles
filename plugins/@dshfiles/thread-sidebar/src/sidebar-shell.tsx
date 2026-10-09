@@ -6,6 +6,7 @@ import {
   IconSearchOutlineRegular,
   IconSettingsOutlineRegular,
   IconSlidersTwoOutlineRegular,
+  rankByName,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import {
@@ -56,7 +57,7 @@ import {
   type NavigationOverflow,
   type OrderedSidebarEntry,
 } from './organization.js'
-import { filterByLabel, formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
+import { formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
 import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarRestartApi } from './restart-api.js'
@@ -187,7 +188,7 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
   const rowItems = props.items.slice(0, fitting)
   const menuItems = props.overflow === 'menu' ? props.items.slice(fitting) : props.items
   const showMenu = props.overflow === 'scroll-menu' || (props.overflow === 'menu' && menuItems.length > 0)
-  const filteredMenuItems = filterByLabel(menuItems, filter)
+  const filteredMenuItems = rankByName(menuItems.map(item => ({ name: item.label, item })), filter.trim()).map(entry => entry.item)
 
   useLayoutEffect(() => {
     const scroller = scrollRef.current

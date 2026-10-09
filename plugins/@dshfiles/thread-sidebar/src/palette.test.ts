@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import {
   chordFromEvent,
-  filterByLabel,
   formatChord,
   fuzzyScore,
   indexThreads,
@@ -63,15 +62,6 @@ test('thread search matches title, project, and id prefix, best title match firs
   assert.deepEqual(
     rankThreads({ index: indexThreads(threads), query: 'nix', limit: 10 }).map(item => item.id),
     ['thr_abc'],
-  )
-})
-
-test('destination filtering keeps every item for an empty query and drops non-matches', () => {
-  const items = [{ label: 'Files' }, { label: 'MCP Servers' }, { label: 'Secret Catalog' }]
-  assert.equal(filterByLabel(items, ' ').length, 3)
-  assert.deepEqual(
-    filterByLabel(items, 'sec').map(item => item.label),
-    ['Secret Catalog'],
   )
 })
 

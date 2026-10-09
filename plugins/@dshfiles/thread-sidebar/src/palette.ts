@@ -87,17 +87,6 @@ export const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query
     .map(({ thread }) => thread)
 }
 
-export const filterByLabel = <Item extends { readonly label: string }>(items: readonly Item[], query: string): Item[] => {
-  if (query.trim().length === 0) return [...items]
-  return items
-    .flatMap(item => {
-      const score = fuzzyScore(query, item.label)
-      return score === null ? [] : [{ item, score }]
-    })
-    .sort((left, right) => right.score - left.score)
-    .map(({ item }) => item)
-}
-
 type ChordModifier = 'primary' | 'control' | 'alt' | 'shift'
 
 export interface Chord {
