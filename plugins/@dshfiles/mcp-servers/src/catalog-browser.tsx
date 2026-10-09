@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { ManagerSnapshot } from './api.js'
 import { endpointKey, filterProviders } from './catalog.js'
@@ -89,16 +90,11 @@ export const CatalogBrowser = (props: {
 }): JSX.Element => {
   const t = props.t
   const [search, setSearch] = useState('')
-  const [registryQuery, setRegistryQuery] = useState('')
   const [pendingUrl, setPendingUrl] = useState<string | null>(null)
   const registryEnabled = props.snapshot?.registrySearch ?? true
-  const registry = useRegistrySearch(registryQuery, props.open && registryEnabled)
   const trimmed = search.trim()
-
-  useEffect(() => {
-    const timer = setTimeout(() => setRegistryQuery(trimmed), REGISTRY_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [trimmed])
+  const registryQuery = useDebouncedValue({ value: trimmed, delayMs: REGISTRY_DEBOUNCE_MS })
+  const registry = useRegistrySearch(registryQuery, props.open && registryEnabled)
 
   const servers = props.snapshot?.servers ?? []
   const registered = new Set(servers.flatMap(server => (server.transport === 'stdio' ? [] : [endpointKey(server.url)])))

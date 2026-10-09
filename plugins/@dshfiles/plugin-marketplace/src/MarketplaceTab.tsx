@@ -26,6 +26,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale, MarketplaceSort } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
@@ -389,7 +390,6 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const locale = currentLocale()
   const [category, setCategory] = useState<string | undefined>()
   const [search, setSearch] = useState('')
-  const [query, setQuery] = useState<string | undefined>()
   const [sortOverride, setSortOverride] = useState<MarketplaceSort | undefined>()
   const [compatibleOverride, setCompatibleOverride] = useState<boolean | undefined>()
   const [failedSlugs, setFailedSlugs] = useState<ReadonlySet<string>>(() => new Set())
@@ -399,15 +399,8 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const hubBaseUrl = settings.value?.hubBaseUrl ?? DEFAULT_HUB_BASE_URL
   const starFormat = useMemo(() => new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en', { notation: 'compact' }), [locale])
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const trimmed = search.trim().slice(0, MAX_QUERY_LENGTH)
-      setQuery(trimmed.length === 0 ? undefined : trimmed)
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [search])
+  const debouncedSearch = useDebouncedValue({ value: search.trim().slice(0, MAX_QUERY_LENGTH), delayMs: SEARCH_DEBOUNCE_MS })
+  const query = debouncedSearch.length === 0 ? undefined : debouncedSearch
 
   const catalog = useInfiniteQuery({
     queryKey: [...CATALOG_QUERY_KEY, locale, category ?? null, query ?? null, sort],
