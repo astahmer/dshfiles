@@ -145,6 +145,8 @@ export type OptmemRuntimeOptions = {
   readonly logger: Logger
 }
 
+const pathRecheckMs = 2_000
+
 /**
  * Everything OptMem does inside DSH. Every entry point catches its own failures: a broken store or summarizer degrades
  * memory, never the DSH session that triggered it.
@@ -154,6 +156,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
   const capture = createCapture()
   const injection = createInjectionCache()
   const projects = new Map<string, string | null>()
+  const pathResolvedAt = new Map<string, number>()
   const resolving = new Map<string, Promise<string | null>>()
   const injectedStreams = new Set<StreamId>()
   const refreshing = new Map<StreamId, boolean>()
@@ -194,7 +197,9 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
 
   const resolveProject = (header: CaptureHeader): Promise<string | null> => {
     const known = projects.get(header.id)
-    if (known !== undefined) return Promise.resolve(known)
+    // The workspace registry exposes no change event, so a `path:` id is rechecked after a short TTL to pick up a newly registered workspace.
+    const stalePath = known?.startsWith('path:') === true && Date.now() - (pathResolvedAt.get(header.id) ?? 0) >= pathRecheckMs
+    if (known !== undefined && !stalePath) return Promise.resolve(known)
     const inflight = resolving.get(header.id)
     if (inflight) return inflight
     const pending = (async (): Promise<string | null> => {
@@ -221,6 +226,8 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       })
       .then(projectId => {
         projects.set(header.id, projectId)
+        if (projectId?.startsWith('path:') === true) pathResolvedAt.set(header.id, Date.now())
+        else pathResolvedAt.delete(header.id)
         resolving.delete(header.id)
         return projectId
       })

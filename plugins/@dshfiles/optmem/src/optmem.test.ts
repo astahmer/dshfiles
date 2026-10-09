@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { openSqliteMemory } from '@dshfiles/optmem-sqlite'
@@ -216,6 +216,31 @@ describe('project id switch', () => {
     expect(streams.map(summary => summary.stream).filter(stream => stream.startsWith('project:'))).toEqual(['project:workspace:ws-a'])
     expect(workspaceStream.map(entry => entry.event.text)).toEqual(['Decision recorded before the workspace existed', 'Question asked after registration'])
     expect(storedEvents(path).map(event => event.project)).toEqual(['workspace:ws-a', 'workspace:ws-a'])
+  })
+
+  it('moves a running conversation from the path id to the workspace stream once the workspace is registered', async () => {
+    const path = freshDatabase()
+    const liveWorkspaces: Record<string, string> = {}
+    const { runtime } = createTestRuntime({ databasePath: path, workspaces: liveWorkspaces })
+    await runtime.start()
+    const session = createSessionFixture({ id: 'session-live', cwd: projectA })
+    runtime.onSessionEvent(session.session, session.user('Said before registration'))
+    await runtime.settle()
+
+    liveWorkspaces[projectA] = 'ws-a'
+    const now = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(now + 60_000)
+    runtime.onSessionEvent(session.session, session.user('Said after registration'))
+    await runtime.settle()
+    await runtime.stop()
+    vi.restoreAllMocks()
+
+    const reader = openSqliteMemory({ path })
+    const streams = await reader.store.listStreams()
+    const workspaceStream = await reader.store.readStream('project:workspace:ws-a', 0, 10)
+    reader.close()
+    expect(streams.map(summary => summary.stream).filter(stream => stream.startsWith('project:'))).toEqual(['project:workspace:ws-a'])
+    expect(workspaceStream.map(entry => entry.event.text)).toEqual(['Said before registration', 'Said after registration'])
   })
 })
 
