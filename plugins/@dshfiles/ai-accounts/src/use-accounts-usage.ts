@@ -24,9 +24,10 @@ export const useAccountsUsage = (options: { readonly enabled?: boolean } = {}) =
     usage: usageQuery.data ?? null,
     refreshing: refreshMutation.isPending,
     failed: usageQuery.isError || usageQuery.data === null || refreshFailed,
-    refresh: (): Promise<void> => refreshMutation.mutateAsync().then(
-      () => undefined,
-      () => undefined,
-    ),
+    refresh: (): Promise<void> =>
+      refreshMutation.mutateAsync().then(
+        () => undefined,
+        () => undefined,
+      ),
   }
 }

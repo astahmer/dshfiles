@@ -1,83 +1,62 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
 import { createAutoSaver, type AutoSaveStatus, type AutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
-import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsCatalog, type AccountsFile, type UsageHistoryPoint } from './api.js'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
+import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
-import { createCatalogRequestGuard } from './catalog-request.js'
 
 export const useAccountsPanelState = () => {
   const accounts = useApi(aiAccountsApi)
+  const queryClient = useQueryClient()
   const preferences = usePreferences()
   const { usage } = useAccountsUsage()
   const [autoSave, setAutoSave] = useState<AutoSaveStatus>({ kind: 'idle' })
-  const [catalog, setCatalog] = useState<AccountsCatalog | null>(null)
-  const [refreshingCatalog, setRefreshingCatalog] = useState(false)
-  const [history, setHistory] = useState<readonly UsageHistoryPoint[]>([])
   const [historyDays, setHistoryDays] = useState(7)
-  const [file, setFile] = useState<AccountsFile | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const selectedIdRef = useRef(selectedId)
-  selectedIdRef.current = selectedId
-  const catalogRequestGuard = useRef(createCatalogRequestGuard())
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    const next = await accounts.read()
-    setFile(next)
-    setSelectedId(current => current ?? next.accounts[0]?.instanceId ?? null)
-  }, [accounts])
+  const fileQuery = useQuery(aiAccountsQueries.file(accounts))
+  const file = fileQuery.data ?? null
+  const setFile = (next: AccountsFile): void => {
+    queryClient.setQueryData(aiAccountsKeys.file, next)
+  }
+  const load = async (): Promise<void> => {
+    const result = await fileQuery.refetch({ throwOnError: true })
+    setSelectedId(current => current ?? result.data?.accounts[0]?.instanceId ?? null)
+  }
 
+  // The first read opens the first account; later reads keep the selection, even an empty one after a remove.
+  const initialSelectionDone = useRef(false)
   useEffect(() => {
-    void load().catch(() => setNotice('The account host did not answer.'))
-  }, [load])
+    if (file === null || initialSelectionDone.current) return
+    initialSelectionDone.current = true
+    setSelectedId(current => current ?? file.accounts[0]?.instanceId ?? null)
+  }, [file])
 
-  // Request ownership prevents a slow response from the previous account replacing this catalog.
-  const refreshCatalog = useCallback(
-    async (instanceId: string): Promise<void> => {
-      const requestId = catalogRequestGuard.current.start()
-      setRefreshingCatalog(true)
-      try {
-        const next = await accounts.catalog({ instanceId })
-        if (!catalogRequestGuard.current.isLatest(requestId) || selectedIdRef.current !== instanceId) return
-        setCatalog(next)
-      } catch {
-        if (!catalogRequestGuard.current.isLatest(requestId) || selectedIdRef.current !== instanceId) return
-        setCatalog(null)
-      } finally {
-        if (catalogRequestGuard.current.isLatest(requestId)) setRefreshingCatalog(false)
-      }
-    },
-    [accounts],
-  )
+  // Keyed per account, so a slow answer for the previous account never lands on this one.
+  const catalogQuery = useQuery({ ...aiAccountsQueries.catalog(accounts, selectedId ?? ''), enabled: selectedId !== null })
+  const catalog = selectedId === null || catalogQuery.isError ? null : (catalogQuery.data ?? null)
+  const refreshCatalog = async (instanceId: string): Promise<void> => {
+    await queryClient.refetchQueries({ queryKey: aiAccountsKeys.catalog(instanceId) })
+  }
 
-  useEffect(() => {
-    if (selectedId === null) {
-      catalogRequestGuard.current.invalidate()
-      setCatalog(null)
-      setRefreshingCatalog(false)
-      return
-    }
-    setCatalog(null)
-    void refreshCatalog(selectedId)
-  }, [selectedId, refreshCatalog])
+  const historyQuery = useQuery({
+    ...aiAccountsQueries.history(accounts, { instanceId: selectedId ?? '', days: historyDays, refetchInterval: preferences.usageRefreshMs }),
+    enabled: selectedId !== null,
+  })
+  const history = selectedId === null || historyQuery.isError ? [] : (historyQuery.data?.points ?? [])
 
-  // History is read alongside the catalog, and a manual collect fills it in
-  // immediately rather than waiting for the next scheduled sweep.
-  useEffect(() => {
-    if (selectedId === null) {
-      setHistory([])
-      return
-    }
-    void accounts
-      .history({ instanceId: selectedId, days: historyDays })
-      .then(result => setHistory(result.points))
-      .catch(() => setHistory([]))
-  }, [accounts, selectedId, historyDays, usage])
+  // A manual collect fills the chart in immediately rather than waiting for the next scheduled sweep.
+  const recordUsageMutation = useMutation({
+    mutationFn: () => accounts.collectUsage(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.history }),
+    onError: () => setNotice('Could not record usage right now.'),
+  })
 
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
@@ -125,19 +104,24 @@ export const useAccountsPanelState = () => {
     [selectedId, saver],
   )
 
+  // Explicit saves and new accounts show as busy; auto-save and switch toggles write quietly.
+  const saveMutation = useMutation({
+    mutationFn: (input: { readonly draft: AccountDraft; readonly previousInstanceId?: string }) => accounts.save(input),
+    onMutate: () => setNotice(null),
+    onSuccess: (next, input) => {
+      setFile(next)
+      setSelectedId(input.draft.instanceId)
+    },
+  })
+
   const save = async (next: AccountDraft) => {
-    setSaving(true)
-    setNotice(null)
     const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
     try {
-      setFile(await accounts.save({ draft: next, ...(previousInstanceId === undefined ? {} : { previousInstanceId }) }))
-      setSelectedId(next.instanceId)
+      await saveMutation.mutateAsync({ draft: next, ...(previousInstanceId === undefined ? {} : { previousInstanceId }) })
       saver.markSaved(next)
       setNotice(previousInstanceId === undefined ? 'Saved. New sessions use the updated route settings.' : `Renamed to ${next.instanceId}.`)
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -182,17 +166,12 @@ export const useAccountsPanelState = () => {
    * identity and the card lights up when Codex writes the file.
    */
   const createAccount = async (kind: AccountProfile['kind']) => {
-    setSaving(true)
-    setNotice(null)
+    const next = newAccountDraft({ kind, existing: file?.accounts ?? [] })
     try {
-      const next = newAccountDraft({ kind, existing: file?.accounts ?? [] })
-      setFile(await accounts.save({ draft: next }))
-      setSelectedId(next.instanceId)
+      await saveMutation.mutateAsync({ draft: next })
       setNotice(`Added ${next.displayName}. ${connectHintFor(kind)}`)
     } catch (error) {
       setNotice(`Could not add the account: ${String(error)}`)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -209,29 +188,21 @@ export const useAccountsPanelState = () => {
    * While an account has no login, poll for one: the user signs in with the
    * command shown, and the card refreshes as soon as Codex writes the file.
    */
+  const awaitingSignIn = selected !== null && !selected.signedIn && selected.kind === 'codex'
+  const signInQuery = useQuery({ ...aiAccountsQueries.signInIdentity(accounts, selected?.instanceId ?? ''), enabled: awaitingSignIn })
+  const signedInNow = awaitingSignIn && signInQuery.data?.signedIn === true
   useEffect(() => {
-    if (selected === null || selected.signedIn || selected.kind !== 'codex') return
-    let cancelled = false
-    const check = async () => {
-      const identity = await accounts.identity({ instanceId: selected.instanceId })
-      if (cancelled || !identity.signedIn) return
-      setFile(await accounts.read())
-    }
-    const timer = setInterval(() => void check().catch(() => undefined), 2500)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [accounts, selected])
+    if (signedInNow) void queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file })
+  }, [signedInNow, queryClient])
 
   return {
     accounts,
     usage,
     catalog,
-    refreshingCatalog,
+    refreshingCatalog: catalogQuery.isFetching,
     refreshCatalog,
     history,
-    setHistory,
+    recordUsage: () => recordUsageMutation.mutate(),
     historyDays,
     setHistoryDays,
     file,
@@ -248,9 +219,9 @@ export const useAccountsPanelState = () => {
     retryAutoSave: () => void saver.retry().catch(() => undefined),
     commitRename,
     revert,
-    notice,
+    notice: notice ?? (fileQuery.isError && file === null ? 'The account host did not answer.' : null),
     setNotice,
-    saving,
+    saving: saveMutation.isPending,
     load,
     save,
     persist,

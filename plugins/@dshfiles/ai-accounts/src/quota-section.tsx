@@ -8,7 +8,7 @@ import { UsageCardView } from './usage-card-view.js'
 const HISTORY_RANGES = [1, 3, 7, 14, 30] as const
 
 export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX.Element => {
-  const { accounts, selected, selectedId, usage, history, setHistory, historyDays, setHistoryDays, setNotice } = props.state
+  const { selected, selectedId, usage, history, historyDays, setHistoryDays, recordUsage } = props.state
   return (
     <NumberedSection
       actions={
@@ -25,19 +25,7 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
               ))}
             </SelectContent>
           </Select>
-          <Button
-            onClick={() => {
-              if (selectedId === null) return
-              void accounts
-                .collectUsage()
-                .then(() => accounts.history({ instanceId: selectedId, days: historyDays }))
-                .then(result => setHistory(result.points))
-                .catch(() => setNotice('Could not record usage right now.'))
-            }}
-            size="xs"
-            type="button"
-            variant="outline"
-          >
+          <Button disabled={selectedId === null} onClick={recordUsage} size="xs" type="button" variant="outline">
             Record now
           </Button>
         </>

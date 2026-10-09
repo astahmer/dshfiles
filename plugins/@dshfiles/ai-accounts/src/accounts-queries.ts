@@ -1,7 +1,7 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { queryOptions } from '@dshfiles/plugin-ui/query'
 import { z } from 'zod'
-import { accountKindSchema, aiAccountsApi, usageCardSchema, type AccountsUsage, type NativeProviders } from './api.js'
+import { accountKindSchema, aiAccountsApi, usageCardSchema, type AccountsCatalog, type AccountsUsage, type NativeProviders } from './api.js'
 
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
@@ -66,7 +66,10 @@ export const aiAccountsQueries = {
     normalizeUsage(await accounts.refreshUsage().catch(() => accounts.usage())),
 
   catalog: (accounts: Pick<AccountsClient, 'catalog'>, instanceId: string) =>
-    queryOptions({ queryKey: aiAccountsKeys.catalog(instanceId), queryFn: ({ signal }) => accounts.catalog({ instanceId }, { signal }) }),
+    queryOptions({
+      queryKey: aiAccountsKeys.catalog(instanceId),
+      queryFn: ({ signal }): Promise<AccountsCatalog> => accounts.catalog({ instanceId }, { signal }),
+    }),
 
   /** Stored history grows on the Host's schedule, so it is reread with the live quota. */
   history: (accounts: Pick<AccountsClient, 'history'>, input: { readonly instanceId: string; readonly days: number; readonly refetchInterval: number }) =>

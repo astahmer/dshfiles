@@ -8,10 +8,7 @@ const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value))
 
 const usageCard = { status: 'ok', message: null, identity: null, plan: null, windows: [], bankedResets: 0, bankedResetExpiries: [] }
 
-const nextPollAfterFetch = (
-  client: QueryClient,
-  options: { readonly queryKey: QueryKey; readonly refetchInterval?: unknown },
-): unknown => {
+const nextPollAfterFetch = (client: QueryClient, options: { readonly queryKey: QueryKey; readonly refetchInterval?: unknown }): unknown => {
   const query = client.getQueryCache().find({ queryKey: options.queryKey })
   if (query === undefined || typeof options.refetchInterval !== 'function') return options.refetchInterval
   return options.refetchInterval(query)
