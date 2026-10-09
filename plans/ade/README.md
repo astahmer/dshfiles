@@ -136,7 +136,7 @@ builds; assert one `style[data-plugin]` Tailwind sheet. Fails CI on regression b
 | [x] P1.5 Host utility swaps | L4, L5, L6 | S | — | one relative-time fn, Host clipboard, `rankByName` for label filter |
 | [x] P1.6 `createStoredValue(key, zodSchema)` in plugin-ui + 5 stores | L7 | S | — | storage-event sync across tabs; invalid JSON falls back |
 | [x] P1.7 Query/Form leftovers (#17 #18 #21 #22 skipped, see audit) | #9, #10, #15, #17, #18, #20, #21, #22, #23 | M | — | no hand-rolled loading/error state left in those files |
-| P1.8 Customize: move up/down buttons | L8 | S | — | keyboard-only reorder works |
+| [x] P1.8 Customize: move up/down buttons | L8 | S | — | keyboard-only reorder works |
 | P1.9 yaml parseDocument check | L10 | S | — | malformed provider patch rejected on host side |
 | P1.10 jujutsu revision list VirtualList | L3 | M | P0.5 | 500 rows scroll at 60 fps |
 

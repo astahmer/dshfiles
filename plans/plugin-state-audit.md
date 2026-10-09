@@ -55,7 +55,7 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 | L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [x] |
 | L6 | thread-sidebar/palette.ts:62 `filterByLabel` | Host `rankByName` (keep weighted `rankThreads`) | low | S | [x] |
 | L7 | 5 localStorage stores (sidebar-state.tsx:31, viewed-marks.ts:44, jujutsu client.tsx:134 + preferences.ts:58, edge-usage.tsx:53) | plugin-ui `createStoredValue(key, zodSchema)` (useSyncExternalStore + storage event) | med | S | [x] sidebar prefs, diff-viewed marks, jujutsu repo path+history, edge position; jujutsu review progress (byte cap, no-change-on-failure) and preferences.ts (one-shot legacy migration) stay direct |
-| L8 | thread-sidebar/sidebar-shell.tsx:729 customize drag | add move up/down buttons (keyboard a11y); pragmatic-drag-and-drop only if reused with L9 | med | S | [ ] |
+| L8 | thread-sidebar/sidebar-shell.tsx:729 customize drag | add move up/down buttons (keyboard a11y); pragmatic-drag-and-drop only if reused with L9 | med | S | [x] |
 | L9 | jujutsu drag (client.tsx:198,414,821) | `@atlaskit/pragmatic-drag-and-drop` + auto-scroll (optional) | low-med | M | [ ] |
 | L10 | ai-accounts/native-provider-patch.ts:43 heuristic | `yaml` parseDocument check (host side) | low-med | S | [ ] |
 | L11 | jujutsu/core.ts:180 second +/- pass | `parseGitPatch` removed with the hand-rolled renderer; host `parsePatchStats` is the only count pass, `@pierre/diffs` parses for rendering | low | S | [x] |

@@ -25,6 +25,8 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  ChevronDownIcon,
+  ChevronUpIcon,
   CommandIcon,
   EllipsisVerticalIcon,
   GripVerticalIcon,
@@ -713,6 +715,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const renderCustomizeRow = (options: {
     entry: { id: string; label: string }
     index: number
+    count: number
     icon: ReactNode
     hidden: boolean
     control: 'checkbox' | 'switch'
@@ -723,7 +726,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     return (
       <div
         className={cn(
-          'dshx:grid dshx:grid-cols-[14px_20px_minmax(0,1fr)_auto] dshx:items-center dshx:gap-2.5',
+          'dshx:grid dshx:grid-cols-[14px_20px_minmax(0,1fr)_auto_auto] dshx:items-center dshx:gap-2.5',
           options.control === 'checkbox' ? 'dshx:h-8 dshx:rounded-md dshx:px-2 dshx:hover:bg-accent' : 'dshx:h-11 dshx:px-3',
         )}
         key={options.entry.id}
@@ -747,6 +750,26 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           {options.icon}
         </span>
         <span className="dshx:truncate dshx:text-sm">{options.entry.label}</span>
+        <span className="dshx:flex dshx:items-center">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`${text(props.t, 'threadSidebarMoveUp')}: ${options.entry.label}`}
+            disabled={options.index === 0}
+            onClick={() => options.onReorder(options.index, options.index - 1)}
+          >
+            <ChevronUpIcon aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`${text(props.t, 'threadSidebarMoveDown')}: ${options.entry.label}`}
+            disabled={options.index === options.count - 1}
+            onClick={() => options.onReorder(options.index, options.index + 1)}
+          >
+            <ChevronDownIcon aria-hidden="true" />
+          </Button>
+        </span>
         {options.control === 'checkbox' ? (
           <Checkbox checked={!options.hidden} aria-label={visibilityLabel} onCheckedChange={options.onToggle} />
         ) : (
@@ -940,6 +963,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 renderCustomizeRow({
                   entry,
                   index,
+                  count: orderedHeaderEntries.length,
                   icon: headerIconFor(entry, 16),
                   hidden: preferences.hiddenHeaderIds.includes(entry.id),
                   control: 'checkbox',
@@ -963,6 +987,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   renderCustomizeRow({
                     entry,
                     index,
+                    count: orderedFooterEntries.length,
                     icon:
                       entry.kind === 'settings' ? (
                         <IconSettingsOutlineRegular size={16} />
