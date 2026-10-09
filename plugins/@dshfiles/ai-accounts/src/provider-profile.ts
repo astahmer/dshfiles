@@ -63,7 +63,8 @@ export const buildProfile = (params: {
     displayName: params.displayName,
     ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
     transport: 'sse',
-    streamIdleTimeoutMs: 120_000,
+    // 5 min (pi-ai's default): high/max-effort models can reason silently for > 2 min before the first answer token.
+    streamIdleTimeoutMs: 300_000,
     maxRequestImageBytes: 20_971_520,
     requestImagePixelBudget: 4_194_304,
     requestImageMaxBytes: 1_048_576,
