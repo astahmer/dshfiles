@@ -7,7 +7,7 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLeg
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useState, useSyncExternalStore } from 'react'
 import { DEFAULT_PREFERENCES } from './organization.js'
-import { chordFromEvent, formatChord, isMacPlatform, parseChord, sameAsHostBinding, serializeChord } from './palette.js'
+import { chordFromEvent, formatChord, isMacPlatform, parseChord, sameAsHostBinding, serializeChord } from './keyboard-shortcuts.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { usePreferences } from './sidebar-state.js'
 

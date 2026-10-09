@@ -1,23 +1,11 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSettings } from '@dshfiles/dshx/client'
+import { closePalette, openPalette, type PaletteMode } from '@dshfiles/command-palette/api'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
-import type { PaletteMode } from './palette.js'
 import { decodePreferences, isPreferenceKey, preferencesToMigrate, storedPreferences } from './preferences.js'
 import { threadSidebarSettings } from './settings.js'
-
-export interface PaletteDestination {
-  readonly id: string
-  /** Host shortcut commands are listed apart from the sidebar's own destinations and actions. */
-  readonly group: 'destination' | 'command'
-  readonly label: string
-  readonly aliases?: readonly string[]
-  /** Keycaps of the bound shortcut, shown as a hint. */
-  readonly keys?: readonly string[]
-  readonly icon: ReactNode
-  readonly run: () => void
-}
 
 interface PreferencesSnapshot {
   readonly preferences: SidebarPreferences
@@ -109,7 +97,6 @@ interface SidebarState {
   storageWarning: boolean
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
-  setDestinations: (destinations: readonly PaletteDestination[]) => void
   /** The thread shown in the main view, reported by the thread list for navigation history. */
   selectedThreadId: SessionSummary['id'] | null
   setSelectedThreadId: (sessionId: SessionSummary['id'] | null) => void
@@ -117,13 +104,7 @@ interface SidebarState {
   threadTitle: MutableRefObject<(sessionId: SessionSummary['id']) => string | undefined>
 }
 
-interface PaletteState {
-  paletteMode: PaletteMode | null
-  destinations: readonly PaletteDestination[]
-}
-
 const SidebarStateContext = createContext<SidebarState | null>(null)
-const PaletteStateContext = createContext<PaletteState | null>(null)
 
 export const useSidebarState = (): SidebarState => {
   const state = useContext(SidebarStateContext)
@@ -131,31 +112,15 @@ export const useSidebarState = (): SidebarState => {
   return state
 }
 
-/** Separate from {@link useSidebarState} so opening the palette does not re-render every sidebar consumer. */
-export const usePaletteState = (): PaletteState => {
-  const state = useContext(PaletteStateContext)
-  if (state === null) throw new Error('Palette state is unavailable outside its root')
-  return state
-}
-
 export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX.Element => {
   const { preferences, storageWarning, updatePreferences } = usePreferences()
-  const [paletteMode, setPaletteMode] = useState<PaletteMode | null>(null)
-  const [destinations, setDestinations] = useState<readonly PaletteDestination[]>([])
   const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
-  const openPalette = useCallback((mode: PaletteMode) => setPaletteMode(mode), [])
-  const closePalette = useCallback(() => setPaletteMode(null), [])
 
   const state = useMemo(
-    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, setDestinations, selectedThreadId, setSelectedThreadId, threadTitle }),
-    [preferences, updatePreferences, storageWarning, openPalette, closePalette, selectedThreadId],
+    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, selectedThreadId, setSelectedThreadId, threadTitle }),
+    [preferences, updatePreferences, storageWarning, selectedThreadId],
   )
-  const paletteState = useMemo(() => ({ paletteMode, destinations }), [paletteMode, destinations])
 
-  return (
-    <SidebarStateContext.Provider value={state}>
-      <PaletteStateContext.Provider value={paletteState}>{children}</PaletteStateContext.Provider>
-    </SidebarStateContext.Provider>
-  )
+  return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>
 }

@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -17,37 +18,10 @@ import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
-import { PALETTE_EVENT } from './palette.js'
+import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
-import { decodeThreadMentionText, THREAD_MENTION_CAPTURE_EVENT, THREAD_MENTION_INSERT_EVENT } from './thread-mention.js'
+import { buildThreadReferenceInsert, decodeThreadMentionSessionId, THREAD_MENTION_CAPTURE_EVENT, THREAD_MENTION_INSERT_EVENT } from './thread-mention.js'
 import './client.css'
-
-const ThreadMentionInput = (props: { readonly inputActions: InputActions }): null => {
-  const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)
-
-  useEffect(() => {
-    const capture = (): void => {
-      insertion.current = props.inputActions.captureInsertion()
-    }
-    const insert = (event: Event): void => {
-      const mention = event instanceof CustomEvent ? decodeThreadMentionText(event.detail) : null
-      if (mention === null) return
-      const savedInsertion = insertion.current
-      insertion.current = null
-      if (savedInsertion !== null && props.inputActions.insertText(mention, savedInsertion)) return
-      props.inputActions.insertText(mention, props.inputActions.captureInsertion())
-    }
-
-    window.addEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
-    window.addEventListener(THREAD_MENTION_INSERT_EVENT, insert)
-    return () => {
-      window.removeEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
-      window.removeEventListener(THREAD_MENTION_INSERT_EVENT, insert)
-    }
-  }, [props.inputActions])
-
-  return null
-}
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
@@ -56,7 +30,7 @@ export default defineClient({
   // so the compiler cannot infer them. Declaring only slots lets the plugin
   // activate and then throw inside the slot, which blanks the sidebar instead of
   // failing the boot.
-  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions'],
+  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions', 'conversation', 'remote'],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
@@ -157,6 +131,60 @@ export default defineClient({
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
     const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+    const ThreadMentionInput = (props: { readonly inputActions: InputActions; readonly sessionId: SessionSummary['id'] }): null => {
+      const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)
+      const pending = useRef(new Set<AbortController>())
+
+      useEffect(() => {
+        const sessionContext = ctx.sessions.scope(props.sessionId)
+        if (sessionContext === undefined) return
+        const input = ctx.conversation.input.for(sessionContext)
+        const capture = (): void => {
+          insertion.current = props.inputActions.captureInsertion()
+        }
+        const insert = (event: Event): void => {
+          const targetSessionId = event instanceof CustomEvent ? decodeThreadMentionSessionId(event.detail) : null
+          if (targetSessionId === null) return
+          const span = insertion.current ?? props.inputActions.captureInsertion()
+          insertion.current = null
+          const controller = new AbortController()
+          pending.current.add(controller)
+          void (async () => {
+            try {
+              const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
+              if (controller.signal.aborted) return
+              if (!result.ok) {
+                input.notify('error', translate('threadSidebarMentionFailure'))
+                return
+              }
+              const candidate = result.value.find(item => item.sessionId === targetSessionId)
+              if (candidate === undefined) {
+                input.notify('info', translate('threadSidebarMentionUnavailable'))
+                return
+              }
+              if (!input.insertReference(buildThreadReferenceInsert(candidate), span)) {
+                input.notify('info', translate('threadSidebarMentionDraftChanged'))
+              }
+            } catch {
+              if (!controller.signal.aborted) input.notify('error', translate('threadSidebarMentionFailure'))
+            } finally {
+              pending.current.delete(controller)
+            }
+          })()
+        }
+
+        window.addEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
+        window.addEventListener(THREAD_MENTION_INSERT_EVENT, insert)
+        return () => {
+          window.removeEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
+          window.removeEventListener(THREAD_MENTION_INSERT_EVENT, insert)
+          for (const controller of pending.current) controller.abort()
+          pending.current.clear()
+        }
+      }, [props.inputActions, props.sessionId, translate])
+
+      return null
+    }
     const navigationCommands = [
       { id: 'threadSidebar.navigateBack', code: 'BracketLeft', direction: -1, label: 'threadSidebarNavigateBack', aliases: ['back', 'previous thread'] },
       { id: 'threadSidebar.navigateForward', code: 'BracketRight', direction: 1, label: 'threadSidebarNavigateForward', aliases: ['forward', 'next thread'] },
@@ -190,38 +218,6 @@ export default defineClient({
           return () => undefined
         }
       }, `thread-sidebar: ${commandId} shortcut`)
-    }
-
-    const paletteCommandId = 'threadSidebar.commandPalette'
-    if (isShortcutCommandId(paletteCommandId)) {
-      const paletteBinding = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const
-      // A user binding or another plugin may already own the default; the palette
-      // still opens from its button and capture chords, so a refusal must not abort setup.
-      ctx.effect(() => {
-        try {
-          return ctx.shortcuts.register({
-            id: paletteCommandId,
-            label: () => translate('threadSidebarCommandPalette'),
-            aliases: ['command palette', 'go to', 'search threads'],
-            defaults: {
-              'desktop:macos': paletteBinding,
-              'desktop:windows': paletteBinding,
-              'desktop:linux': paletteBinding,
-              'web:macos': paletteBinding,
-              'web:windows': paletteBinding,
-            },
-            regions: ['page', 'editable'],
-            modals: [],
-            resolve: () => ({
-              status: 'handled',
-              run: () => window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'all' } })),
-            }),
-          })
-        } catch (error) {
-          console.warn('thread-sidebar: the command palette shortcut could not be registered', error)
-          return () => undefined
-        }
-      }, 'thread-sidebar: command palette shortcut')
     }
 
     ctx.slots.inject('settings.plugins.tab', () =>
@@ -330,14 +326,6 @@ export default defineClient({
                 })
               ).ok,
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
-            searchContent:
-              typeof ctx.sessions.search === 'function'
-                ? async (query: string, signal: AbortSignal) => {
-                    const result = await ctx.sessions.search(query, signal)
-                    if (!result.ok) throw new Error('Session content search failed.')
-                    return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
-                  }
-                : null,
           }),
         },
         decorate(ThreadSidebar),

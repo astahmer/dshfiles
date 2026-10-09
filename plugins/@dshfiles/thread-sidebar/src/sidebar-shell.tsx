@@ -77,8 +77,9 @@ import {
   type NavigationHistory,
   type NavigationLocation,
 } from './navigation-history.js'
-import { formatChord, isMacPlatform, matchesChord, PALETTE_EVENT, parseChord, sameAsHostBinding, type PaletteMode } from './palette.js'
-import { SidebarStateProvider, useSidebarState, type PaletteDestination } from './sidebar-state.js'
+import { registerPaletteAction, type PaletteAction } from '@dshfiles/command-palette/api'
+import { formatChord, isMacPlatform, matchesChord, parseChord, sameAsHostBinding } from './keyboard-shortcuts.js'
+import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
@@ -158,10 +159,8 @@ const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTran
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
-const isPaletteMode = (value: unknown): value is PaletteMode => value === 'all' || value === 'threads' || value === 'files'
-
 /** Commands that only reopen this palette are left out of its command list. */
-const SELF_COMMAND_IDS = new Set(['threadSidebar.commandPalette'])
+const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 
 const focusComposer = (): void => {
   const composer = document.querySelector<HTMLElement>('[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])')
@@ -452,7 +451,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
-  const { preferences, updatePreferences, openPalette, setDestinations, selectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, openPalette, selectedThreadId, threadTitle } = useSidebarState()
   const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(emptyNavigationHistory)
   const pendingStep = useRef<{ target: SidebarLocation; until: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -696,21 +695,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       event.stopPropagation()
       match.run()
     }
-    // Cancelable so other bundles can tell the palette exists; a `probe` request only acknowledges.
-    const onPaletteRequest = (event: Event): void => {
-      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
-      const field = (name: string): unknown => (typeof detail === 'object' && detail !== null ? Reflect.get(detail, name) : undefined)
-      event.preventDefault()
-      if (field('probe') === true) return
-      const mode = field('mode')
-      openPalette(isPaletteMode(mode) ? mode : 'all')
-    }
     window.addEventListener('keydown', onKeyDown, true)
-    window.addEventListener(PALETTE_EVENT, onPaletteRequest)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
-      window.removeEventListener(PALETTE_EVENT, onPaletteRequest)
-    }
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [
     hostShortcuts,
     mac,
@@ -885,69 +871,103 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       : [text(props.t, 'threadSidebarUpdatesHint'), ...pendingPlugins, ...(restartAvailable ? [] : [text(props.t, 'threadSidebarUpdatesManual')])].join('\n')
 
   const runCommand = props.runCommand
-  const paletteDestinations = useMemo<PaletteDestination[]>(
+  const paletteActions = useMemo<PaletteAction[]>(
     () => [
       ...orderedHeaderEntries
         .filter(entry => entry.kind !== 'search')
-        .map((entry): PaletteDestination => ({
-          id: entry.id,
+        .map((entry): PaletteAction => ({
+          id: `@dshfiles/thread-sidebar/header/${entry.id}`,
           group: 'destination',
           label: entry.label,
           icon: headerIconFor(entry, 16),
           run: () => activateHeaderEntry(entry),
         })),
       {
-        id: 'action:toggle-sidebar',
+        id: '@dshfiles/thread-sidebar/action/toggle-sidebar',
         group: 'destination',
         label: text(props.t, 'threadSidebarToggleSidebar'),
         icon: <PanelLeftIcon className="dshx:size-4" />,
         run: props.toggleSidebar,
       },
       {
-        id: 'action:focus-composer',
+        id: '@dshfiles/thread-sidebar/action/focus-composer',
         group: 'destination',
         label: text(props.t, 'threadSidebarFocusComposer'),
         icon: <TextCursorInputIcon className="dshx:size-4" />,
         run: () => window.setTimeout(focusComposer, 0),
       },
       {
-        id: 'action:customize-sidebar',
+        id: '@dshfiles/thread-sidebar/action/customize-sidebar',
         group: 'destination',
         label: text(props.t, 'threadSidebarCustomize'),
         icon: <SlidersHorizontalIcon className="dshx:size-4" />,
         run: openCustomize,
       },
+      {
+        id: '@dshfiles/thread-sidebar/navigation/back',
+        group: 'action',
+        label: text(props.t, 'threadSidebarBack'),
+        aliases: ['history', 'previous'],
+        icon: <ArrowLeftIcon className="dshx:size-4" />,
+        isAvailable: () => canStep(history, -1),
+        run: () => latestStepNavigation.current(-1),
+      },
+      {
+        id: '@dshfiles/thread-sidebar/navigation/forward',
+        group: 'action',
+        label: text(props.t, 'threadSidebarForward'),
+        aliases: ['history', 'next'],
+        icon: <ArrowRightIcon className="dshx:size-4" />,
+        isAvailable: () => canStep(history, 1),
+        run: () => latestStepNavigation.current(1),
+      },
       ...(restartAvailable
         ? [
             {
-              id: 'action:restart-dsh',
-              group: 'destination',
+              id: '@dshfiles/thread-sidebar/action/restart-dsh',
+              group: 'destination' as const,
               label: pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart'),
               aliases: ['restart', 'reload host', 'apply updates'],
               icon: <RefreshCwIcon className="dshx:size-4" />,
               run: openRestartDialog,
-            } satisfies PaletteDestination,
+            },
           ]
         : []),
       ...(runCommand === null
         ? []
         : hostShortcuts
             .filter(entry => !SELF_COMMAND_IDS.has(entry.id))
-            .map((entry): PaletteDestination => ({
-              id: `command:${entry.id}`,
+            .map((entry): PaletteAction => ({
+              id: `@dshfiles/thread-sidebar/command/${entry.id}`,
               group: 'command',
               label: entry.label,
               aliases: entry.aliases,
               keys: entry.binding === null ? [] : entry.keys,
               icon: <CommandIcon className="dshx:size-4" />,
-              // After the palette dialog has closed, so the command resolves against the page, not the dialog.
-              run: () => window.setTimeout(() => runCommand(entry.id), 0),
+              run: () => {
+                window.setTimeout(() => runCommand(entry.id), 0)
+              },
             }))),
     ],
-    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, pendingUpdatesLabel, hostShortcuts, runCommand],
+    [
+      orderedHeaderEntries,
+      props.t,
+      props.toggleSidebar,
+      restartAvailable,
+      pendingUpdatesLabel,
+      hostShortcuts,
+      runCommand,
+      history,
+      activateHeaderEntry,
+      openCustomize,
+      openRestartDialog,
+    ],
   )
 
-  useEffect(() => setDestinations(paletteDestinations), [paletteDestinations, setDestinations])
+  useEffect(() => {
+    const disposers = paletteActions.map(action => registerPaletteAction(action))
+    return () => disposers.forEach(dispose => dispose())
+  }, [paletteActions])
 
   const renderCustomizeRow = (options: {
     entry: { id: string; label: string }

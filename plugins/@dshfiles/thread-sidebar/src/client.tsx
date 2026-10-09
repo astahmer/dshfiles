@@ -35,7 +35,7 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ActivityIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
@@ -51,9 +51,8 @@ import {
   workspaceForLineage,
 } from './organization.js'
 import { toggleCollapsedSection } from './preferences.js'
-import { isMacPlatform, type ContentHit, type ThreadCandidate } from './palette.js'
-import { usePaletteState, useSidebarState } from './sidebar-state.js'
-import { ThreadPalette } from './thread-palette.js'
+import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
+import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
@@ -69,8 +68,6 @@ type InjectedActions = {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   markRead: (sessionId: SessionSummary['id']) => Promise<boolean>
   setSnoozed: (sessionId: SessionSummary['id'], snoozed: boolean) => Promise<boolean>
-  /** Host message-content search; null when this Host has none. */
-  searchContent: ((query: string, signal: AbortSignal) => Promise<readonly ContentHit[]>) | null
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useWorkspaces'> &
@@ -472,11 +469,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
 export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, closePalette, setSelectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
-  const { paletteMode, destinations } = usePaletteState()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
@@ -803,26 +799,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     ],
   )
 
-  const paletteThreads = useMemo(() => {
-    if (paletteMode === null) return { candidates: [], byCandidateId: new Map<string, SessionSummary>() }
-    const titles = new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title]))
-    const byCandidateId = new Map<string, SessionSummary>()
-    const candidates: ThreadCandidate[] = []
-    for (const session of sessions) {
-      if (session.blank || archivedSessionIds.has(session.id)) continue
-      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-      byCandidateId.set(session.id, session)
-      candidates.push({
-        id: session.id,
-        title: session.displayTitle,
-        project: workspaceId === undefined ? '' : (titles.get(workspaceId) ?? ''),
-        cwd: session.cwd ?? '',
-        updatedAt: session.updatedAt,
-      })
-    }
-    return { candidates, byCandidateId }
-  }, [archivedSessionIds, displayWorkspaces, paletteMode, sessionState.byId, sessions, workspaceBySession])
-
   const projectFilterValue =
     preferences.workspaceFilter === null ? ALL_PROJECTS : preferences.workspaceFilter.length === 0 ? UNASSIGNED_PROJECT : preferences.workspaceFilter
 
@@ -841,8 +817,65 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
 
-  const latestRowActions = useRef({ openThread, mutateSession, toggleParked, copyContextValue, props })
-  latestRowActions.current = { openThread, mutateSession, toggleParked, copyContextValue, props }
+  const latestRowActions = useRef({ openThread, mutateSession, toggleParked, copyContextValue, props, sessionsById: sessionState.byId })
+  latestRowActions.current = { openThread, mutateSession, toggleParked, copyContextValue, props, sessionsById: sessionState.byId }
+  useEffect(() => {
+    setPaletteRecentLimit(preferences.paletteRecentLimit)
+  }, [preferences.paletteRecentLimit])
+  useEffect(() => () => setPaletteRecentLimit(10), [])
+  useEffect(() => {
+    const actions: readonly PaletteAction[] = [
+      {
+        id: '@dshfiles/thread-sidebar/thread/copy-link',
+        label: () => latestRowActions.current.props.tSidebar('threadSidebarCopyLink'),
+        aliases: ['copy link', 'thread url'],
+        icon: <LinkIcon className="dshx:size-4" />,
+        group: 'action',
+        isAvailable: context => context.thread !== null,
+        run: async context => {
+          const thread = context.thread
+          if (thread === null) return
+          const current = latestRowActions.current
+          const session = Object.values(current.sessionsById).find(candidate => candidate.id === thread.id)
+          if (session === undefined) return
+          await current.copyContextValue(
+            buildThreadUrl(window.location.href, session.id, thread.workspaceId),
+            current.props.tSidebar('threadSidebarLinkCopied'),
+          )
+        },
+      },
+      {
+        id: '@dshfiles/thread-sidebar/thread/pin',
+        label: () => latestRowActions.current.props.tSidebar('threadSidebarPin'),
+        aliases: ['pin thread'],
+        icon: <IconPinOutlineRegular size={16} />,
+        group: 'action',
+        isAvailable: context => context.thread !== null && !context.thread.pinned,
+        run: async context => {
+          const thread = context.thread
+          if (thread === null) return
+          const session = Object.values(latestRowActions.current.sessionsById).find(candidate => candidate.id === thread.id)
+          if (session !== undefined) await latestRowActions.current.props.pinSession(session.id)
+        },
+      },
+      {
+        id: '@dshfiles/thread-sidebar/thread/unpin',
+        label: () => latestRowActions.current.props.tSidebar('threadSidebarUnpin'),
+        aliases: ['unpin thread'],
+        icon: <IconPinFillRegular size={16} />,
+        group: 'action',
+        isAvailable: context => context.thread !== null && context.thread.pinned,
+        run: async context => {
+          const thread = context.thread
+          if (thread === null) return
+          const session = Object.values(latestRowActions.current.sessionsById).find(candidate => candidate.id === thread.id)
+          if (session !== undefined) await latestRowActions.current.props.unpinSession(session.id)
+        },
+      },
+    ]
+    const disposers = actions.map(action => registerPaletteAction(action))
+    return () => disposers.forEach(dispose => dispose())
+  }, [])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
     const operations = {
@@ -868,60 +901,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         className="dshx-root dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
         aria-label={props.tSidebar('threadSidebarTitle')}
       >
-        {paletteMode === null ? null : (
-          <ThreadPalette
-            mode={paletteMode}
-            threads={paletteThreads.candidates}
-            destinations={destinations}
-            recentLimit={preferences.paletteRecentLimit}
-            mac={isMacPlatform(navigator.platform)}
-            onClose={closePalette}
-            searchContent={props.searchContent}
-            onOpenThread={candidateId => {
-              const session = paletteThreads.byCandidateId.get(candidateId)
-              if (session !== undefined) openThread(session.id)
-            }}
-            copy={{
-              title: props.tSidebar('threadSidebarPaletteTitle'),
-              threadsPlaceholder: props.tSidebar('threadSidebarPaletteThreadsPlaceholder'),
-              allPlaceholder: props.tSidebar('threadSidebarPaletteAllPlaceholder'),
-              filesPlaceholder: props.tSidebar('threadSidebarPaletteFilesPlaceholder'),
-              commands: props.tSidebar('threadSidebarPaletteCommands'),
-              files: props.tSidebar('threadSidebarPaletteFiles'),
-              goToFile: props.tSidebar('threadSidebarPaletteGoToFile'),
-              filesIndexing: props.tSidebar('threadSidebarPaletteFilesIndexing'),
-              filesTruncated: props.tSidebar('threadSidebarPaletteFilesTruncated'),
-              filesNoSession: props.tSidebar('threadSidebarPaletteFilesNoSession'),
-              filesUnavailable: props.tSidebar('threadSidebarPaletteFilesUnavailable'),
-              prefixHint: props.tSidebar('threadSidebarPalettePrefixHint'),
-              viewAll: props.tSidebar('threadSidebarPaletteViewAll'),
-              viewCommands: props.tSidebar('threadSidebarPaletteCommands'),
-              viewContent: props.tSidebar('threadSidebarPaletteViewContent'),
-              viewLine: props.tSidebar('threadSidebarPaletteViewLine'),
-              viewHelp: props.tSidebar('threadSidebarPaletteViewHelp'),
-              commandsPlaceholder: props.tSidebar('threadSidebarPaletteCommandsPlaceholder'),
-              contentPlaceholder: props.tSidebar('threadSidebarPaletteContentPlaceholder'),
-              linePlaceholder: props.tSidebar('threadSidebarPaletteLinePlaceholder'),
-              helpPlaceholder: props.tSidebar('threadSidebarPaletteHelpPlaceholder'),
-              helpCommands: props.tSidebar('threadSidebarPaletteHelpCommands'),
-              helpContent: props.tSidebar('threadSidebarPaletteHelpContent'),
-              helpLine: props.tSidebar('threadSidebarPaletteHelpLine'),
-              helpNone: props.tSidebar('threadSidebarPaletteHelpNone'),
-              goToLine: props.tSidebar('threadSidebarPaletteGoToLine'),
-              noEditorFile: props.tSidebar('threadSidebarPaletteNoEditorFile'),
-              contentSearching: props.tSidebar('threadSidebarPaletteContentSearching'),
-              contentUnavailable: props.tSidebar('threadSidebarPaletteContentUnavailable'),
-              recent: props.tSidebar('threadSidebarPaletteRecent'),
-              threads: props.tSidebar('threadSidebarTitle'),
-              destinations: props.tSidebar('threadSidebarPaletteDestinations'),
-              empty: props.tSidebar('threadSidebarPaletteEmpty'),
-              navigate: props.tSidebar('threadSidebarPaletteNavigate'),
-              open: props.tSidebar('threadSidebarPaletteOpen'),
-              close: props.tSidebar('threadSidebarPaletteClose'),
-              unassigned: props.tSidebar('threadSidebarUnassigned'),
-            }}
-          />
-        )}
         <header className="dshx:px-2 dshx:py-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
