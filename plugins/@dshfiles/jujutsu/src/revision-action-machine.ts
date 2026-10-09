@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { Mutation, previewSchema } from './api.js'
 import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 
@@ -36,7 +36,13 @@ type RevisionActionEvent =
   | { readonly type: 'cancel' }
   | { readonly type: 'reset' }
 
-const failureMessage = (error: unknown, fallback: string): string => (error instanceof Error && error.message.length > 0 ? error.message : fallback)
+// A Host from before PluginApiError (until the user restarts DSH) sends this generic failure; name the action instead.
+const genericHostFailure = z.object({ kind: z.literal('remote'), remoteCode: z.literal('internal') })
+
+const failureMessage = (error: unknown, fallback: string): string => {
+  if (genericHostFailure.safeParse(error).success) return fallback
+  return error instanceof Error && error.message.length > 0 ? error.message : fallback
+}
 
 const idleContext = { dragSource: null, dropTarget: null, preview: null } as const
 

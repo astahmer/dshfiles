@@ -20,7 +20,7 @@ the usage strip, meter label setting, history menu next to ← →, `hideBrandLo
 indicator; dock-everything plan in [ade/docking.md](ade/docking.md) (feasible without a fork; D0 probe first).
 
 Small follow-ups:
-- [ ] jujutsu prepare/confirm: throw `PluginApiError` so real messages reach the panel
+- [x] jujutsu prepare/confirm: throw `PluginApiError` so real messages reach the panel
 - [ ] ai-accounts Settings: price catalog line shows "fetched [object Object]"
 - [x] dshx `tests/config.spec.ts:51` unused `@ts-expect-error` (typecheck error)
 - [ ] restart indicator misses host-only plugins (e.g. optmem) — Host client registry doesn't list them

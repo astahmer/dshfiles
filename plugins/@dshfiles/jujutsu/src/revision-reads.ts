@@ -1,3 +1,4 @@
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import type { FileStat, ReadFailure, RevisionDetails } from './api.js'
 import { fileStatusLetter, isCommitId, parseJsonLines, parsePatchStats } from './core.js'
@@ -24,7 +25,7 @@ const fileStatsRowSchema = z.object({
     .max(20_000),
 })
 
-const SAFE_FAILURE_MESSAGE = /^(Choose |Invalid |Registered |Selected |Split |Jujutsu |Repository |Revision |Changed |Remote |Bookmark |Preview |Workspace )/
+const SAFE_FAILURE_MESSAGE = /^(Choose |Invalid |Registered |Selected |Split |Jujutsu |Repository |Revision |Changed |Remote |Bookmark |Preview |Workspace |Descriptions )/
 
 /**
  * Reads that never snapshot the working copy. A commit id names immutable content, so reading it with
@@ -97,5 +98,10 @@ export class RevisionReads {
   static failure(error: unknown, fallback: string): ReadFailure {
     const message = error instanceof Error && SAFE_FAILURE_MESSAGE.test(error.message) ? error.message.slice(0, 500) : fallback
     return { failure: { message } }
+  }
+
+  /** The same user-written messages, thrown so the Client reads them; anything else stays a generic, Host-logged failure. */
+  static publicError(error: unknown): unknown {
+    return error instanceof Error && SAFE_FAILURE_MESSAGE.test(error.message) ? new PluginApiError(error.message, { cause: error }) : error
   }
 }

@@ -3,6 +3,7 @@ import { realpath } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
 import { z } from 'zod'
 import { composerContextApi, type ComposerBase } from './composer-context-api.js'
+import { RevisionReads } from './revision-reads.js'
 import {
   COMPOSER_BOOKMARKS_TEMPLATE,
   COMPOSER_FILE_TEMPLATE,
@@ -114,13 +115,17 @@ export const composerContextHost = (run: RunJj) =>
       }
     },
     diff: async ({ input, ctx, signal }) => {
-      const root = await workspaceRoot(ctx, run, input.cwd, signal)
-      if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
-      const patch = await run(ctx, root, ['diff', ...composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
-      return {
-        patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-        truncated: patch.truncated,
-        files: parsePatchFileStats(patch.stdout).slice(0, 2000),
+      try {
+        const root = await workspaceRoot(ctx, run, input.cwd, signal)
+        if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
+        const patch = await run(ctx, root, ['diff', ...composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
+        return {
+          patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+          truncated: patch.truncated,
+          files: parsePatchFileStats(patch.stdout).slice(0, 2000),
+        }
+      } catch (error) {
+        throw RevisionReads.publicError(error)
       }
     },
   })

@@ -607,11 +607,22 @@ const prepareMutation = async (
   }
 }
 
+/** Hands the user-written failure messages to the Client; others stay generic and are logged on the Host. */
+const userFacing =
+  <Args, Result>(handler: (args: Args) => Promise<Result>) =>
+  async (args: Args): Promise<Result> => {
+    try {
+      return await handler(args)
+    } catch (error) {
+      throw RevisionReads.publicError(error)
+    }
+  }
+
 const jujutsuHostApi = jujutsuApi.host({
-  registerRepository: async ({ input, ctx, signal }) => {
+  registerRepository: userFacing(async ({ input, ctx, signal }) => {
     const repo = await registerRepo(ctx, input.path, signal)
     return { repoId: repo.id, root: repo.root }
-  },
+  }),
   load: async ({ input, ctx, signal }) => {
     try {
       const repo = await resolveRepo(ctx, input.repoId, signal)
@@ -628,24 +639,24 @@ const jujutsuHostApi = jujutsuApi.host({
       return RevisionReads.failure(error, 'Could not load revision details.')
     }
   },
-  revisionFiles: async ({ input, ctx, signal }) => {
+  revisionFiles: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     return RevisionReads.fileStats(repoRun(ctx, repo, signal), [...new Set(input.commitIds)])
-  },
-  workingDiff: async ({ input, ctx, signal }) => {
+  }),
+  workingDiff: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', '@', '--git'], signal)
     return { patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout, truncated: patch.truncated }
-  },
-  prepare: async ({ input, ctx, signal }) => {
+  }),
+  prepare: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
     const prepared = await prepareMutation(ctx, repo, current, input.action, signal)
     const id = randomUUID()
     previews.put(id, prepared)
     return { id, kind: input.action.kind, title: prepared.title, summary: prepared.summary, detail: prepared.detail, expiresAt: prepared.expiresAt }
-  },
-  confirm: async ({ input, ctx, signal }) => {
+  }),
+  confirm: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     const current = await snapshot(ctx, repo, MAX_REVISIONS, signal)
     const prepared = previews.take(input.previewId, repo.root, repo.identity, current.fingerprint)
@@ -675,7 +686,7 @@ const jujutsuHostApi = jujutsuApi.host({
       output: output + (result.truncated ? '\n[command output truncated]' : ''),
       workspacePath,
     }
-  },
+  }),
 })
 
 export default defineHost({

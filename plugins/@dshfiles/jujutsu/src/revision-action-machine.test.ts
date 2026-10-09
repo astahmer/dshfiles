@@ -91,6 +91,17 @@ describe('revisionActionMachine', () => {
     expect(settled).toEqual(['repo'])
   })
 
+  it('names the action when an old Host sends only its generic failure', async () => {
+    const { actor } = startActions({
+      prepare: async () => {
+        throw Object.assign(new Error('API handler failed. See Host diagnostics.'), { name: 'ApiError', kind: 'remote', remoteCode: 'internal' })
+      },
+    })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase })
+    const failed = await waitFor(actor, snapshot => snapshot.context.error !== null)
+    expect(failed.context.error).toBe('Could not prepare this action.')
+  })
+
   it('aborts an in-flight prepare on reset', async () => {
     const signals: AbortSignal[] = []
     const { actor } = startActions({
