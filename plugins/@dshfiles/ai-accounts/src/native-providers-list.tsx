@@ -1,7 +1,8 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useCallback, useEffect, useState } from 'react'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type NativeProviders } from './api.js'
 
 type Provider = NativeProviders['providers'][number]
@@ -21,45 +22,22 @@ const statusOf = (provider: Provider, liveReload: boolean): string => {
  */
 export const NativeProvidersList = (props: { readonly compact?: boolean }): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
-  const [state, setState] = useState<NativeProviders | null>(null)
-  const [missing, setMissing] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(() => {
-    void accounts
-      .nativeProviders()
-      .then(next => {
-        setState(next)
-        setMissing(false)
-      })
-      .catch(() => setMissing(true))
-  }, [accounts])
-
-  useEffect(load, [load])
-
-  // A live reload lands a couple of seconds after the patch is written; read again once it has.
-  const pending = state?.providers.some(provider => provider.enabled !== provider.running && provider.lockedReason === null) === true
-  useEffect(() => {
-    if (!pending || state?.liveReload !== true) return
-    const timer = setTimeout(load, 3_500)
-    return () => clearTimeout(timer)
-  }, [pending, state, load])
+  const queryClient = useQueryClient()
+  const providersQuery = useQuery(aiAccountsQueries.nativeProviders(accounts))
+  const state = providersQuery.data ?? null
+  const missing = providersQuery.isError
+  const toggleMutation = useMutation({
+    mutationFn: (input: { readonly entryId: string; readonly enabled: boolean }) => accounts.setNativeProviderEnabled(input),
+    onSuccess: next => queryClient.setQueryData(aiAccountsKeys.nativeProviders, next),
+  })
+  const error = toggleMutation.isError ? errorMessage(toggleMutation.error, String(toggleMutation.error)) : null
 
   if (missing) return <p className="dshx:px-2 dshx:text-xs dshx:text-muted-foreground">Restart DSH to switch native providers from here.</p>
   if (state === null) return null
   if (!state.available) return <p className="dshx:px-2 dshx:text-xs dshx:text-muted-foreground">{state.reason}</p>
   if (state.providers.length === 0) return null
 
-  const toggle = (provider: Provider, enabled: boolean): void => {
-    setBusy(provider.entryId)
-    setError(null)
-    void accounts
-      .setNativeProviderEnabled({ entryId: provider.entryId, enabled })
-      .then(setState)
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
-      .finally(() => setBusy(null))
-  }
+  const toggle = (provider: Provider, enabled: boolean): void => toggleMutation.mutate({ entryId: provider.entryId, enabled })
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
@@ -81,7 +59,7 @@ export const NativeProvidersList = (props: { readonly compact?: boolean }): JSX.
             <Switch
               aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
               checked={provider.enabled}
-              disabled={busy !== null || provider.lockedReason !== null}
+              disabled={toggleMutation.isPending || provider.lockedReason !== null}
               onCheckedChange={enabled => toggle(provider, enabled)}
               size="sm"
             />

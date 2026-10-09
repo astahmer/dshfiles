@@ -4,64 +4,43 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { useCallback, useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useState } from 'react'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
-import type { QuotaContinuationSummary } from './quota-continuation-model.js'
 
 const formatTime = (timestamp: number): string =>
   new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(timestamp)
 
+type SnoozeDuration = 'one-hour' | 'four-hours' | 'one-day' | 'unsnooze'
+
 export const QuotaContinuations = (props: { readonly accountId: string | null }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
-  const [continuations, setContinuations] = useState<readonly QuotaContinuationSummary[]>([])
-  const [scheduleAvailable, setScheduleAvailable] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [notice, setNotice] = useState<string | null>(null)
+  const continuationsQuery = useQuery(aiAccountsQueries.quotaContinuations(accounts))
+  const continuations = continuationsQuery.data?.continuations ?? []
+  const scheduleAvailable = continuationsQuery.data?.scheduleAvailable ?? false
+  const loading = continuationsQuery.isFetching
 
-  const load = useCallback(async (): Promise<void> => {
-    setLoading(true)
-    try {
-      const result = await accounts.quotaContinuations()
-      setContinuations(result.continuations)
-      setScheduleAvailable(result.scheduleAvailable)
-      setNotice(null)
-    } catch {
-      setNotice('Quota recovery is unavailable right now.')
-    } finally {
-      setLoading(false)
-    }
-  }, [accounts])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const resume = async (continuationId: string): Promise<void> => {
-    setBusyId(continuationId)
-    try {
-      const result = await accounts.resumeQuotaContinuation({ continuationId })
-      setNotice(result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its Session is unavailable.')
-      await load()
-    } catch {
-      setNotice('Could not queue this recovery.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const snooze = async (continuationId: string, duration: 'one-hour' | 'four-hours' | 'one-day' | 'unsnooze'): Promise<void> => {
-    setBusyId(continuationId)
-    try {
-      const result = await accounts.snoozeQuotaContinuation({ continuationId, duration })
-      setNotice(result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.')
-      await load()
-    } catch {
-      setNotice('Could not update recovery timing.')
-    } finally {
-      setBusyId(null)
-    }
-  }
+  // The busy row stays disabled until the reread lands, so its state never flickers back.
+  const action = useMutation({
+    mutationFn: async (input: { readonly continuationId: string; readonly duration?: SnoozeDuration }): Promise<string> => {
+      if (input.duration === undefined) {
+        const result = await accounts.resumeQuotaContinuation({ continuationId: input.continuationId })
+        return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its Session is unavailable.'
+      }
+      const result = await accounts.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
+      return result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.'
+    },
+    onSuccess: message => setNotice(message),
+    onError: (_error, input) => setNotice(input.duration === undefined ? 'Could not queue this recovery.' : 'Could not update recovery timing.'),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.quotaContinuations }),
+  })
+  const busyId = action.isPending ? action.variables.continuationId : null
+  const resume = (continuationId: string): void => action.mutate({ continuationId })
+  const snooze = (continuationId: string, duration: SnoozeDuration): void => action.mutate({ continuationId, duration })
+  const shownNotice = notice ?? (continuationsQuery.isError ? 'Quota recovery is unavailable right now.' : null)
 
   const visible = continuations.filter(item => props.accountId === null || item.accountId === props.accountId)
 
@@ -74,14 +53,23 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
     >
       <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
         <h2 className="dshx:text-sm dshx:font-semibold">Quota recovery</h2>
-        <Button disabled={loading} onClick={() => void load()} size="xs" type="button" variant="ghost">
+        <Button
+          disabled={loading}
+          onClick={() => {
+            setNotice(null)
+            void continuationsQuery.refetch()
+          }}
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
           {loading ? <Spinner className="dshx:size-3" /> : <RefreshCwIcon />}
           {loading ? 'Checking…' : 'Refresh'}
         </Button>
       </div>
-      {notice === null ? null : (
+      {shownNotice === null ? null : (
         <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
-          {notice}
+          {shownNotice}
         </p>
       )}
       {visible.length === 0 ? (
@@ -124,14 +112,14 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                 </ItemContent>
                 {item.state === 'waiting' ? (
                   <ItemActions className="dshx:flex-wrap dshx:justify-end dshx:gap-1.5">
-                    <Button disabled={busyId !== null} onClick={() => void resume(item.continuationId)} size="xs" type="button">
+                    <Button disabled={busyId !== null} onClick={() => resume(item.continuationId)} size="xs" type="button">
                       {busy ? 'Queueing…' : 'Resume now'}
                     </Button>
                     {snoozes.map(snoozeOption => (
                       <Button
                         disabled={busyId !== null}
                         key={snoozeOption.duration}
-                        onClick={() => void snooze(item.continuationId, snoozeOption.duration)}
+                        onClick={() => snooze(item.continuationId, snoozeOption.duration)}
                         size="xs"
                         type="button"
                         variant="outline"
@@ -140,7 +128,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                       </Button>
                     ))}
                     {item.snoozedUntil === null ? null : (
-                      <Button disabled={busyId !== null} onClick={() => void snooze(item.continuationId, 'unsnooze')} size="xs" type="button" variant="ghost">
+                      <Button disabled={busyId !== null} onClick={() => snooze(item.continuationId, 'unsnooze')} size="xs" type="button" variant="ghost">
                         Unsnooze
                       </Button>
                     )}
