@@ -409,6 +409,11 @@ export interface SessionEventMap {
    */
   'request/context': RequestContext
   /**
+   * dshfiles fork: an `agent/request-messages` listener replaced the derived
+   * messages of this step's request. Log-only; reconstruction ignores it.
+   */
+  'request/messages-override': { turn: number; step: number; originalCount: number; sentCount: number }
+  /**
    * Separates inherited or restored history from later lifecycle-owned work.
    * This log-only marker need not be at {@link Session.firstLiveSeq}: a fork
    * seed can already contain its tagged marker and child-owned synthetic

@@ -678,7 +678,7 @@ export class ReactLoopAgent implements Agent {
         }
       }
       firstAttempt = false
-      const request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)
+      const request = await this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)
       const live = new AssistantStreamAttempt(
         this.session.id,
         ++this.assistantAttemptCounter,
@@ -852,14 +852,14 @@ export class ReactLoopAgent implements Agent {
   }
 
   /** Log the resolved envelope and derive a frozen request from the admitted surface. */
-  private buildRequest(
+  private async buildRequest(
     config: LlmCallConfig,
     preparedCall: PreparedLlmCall | undefined,
     tools: GenerateOptions['tools'] & object,
     position: { turn: number; step: number },
     startsRequestSeries: boolean,
     signal: AbortSignal,
-  ): GenerateOptions {
+  ): Promise<GenerateOptions> {
     const { session } = this
     const surfaceGeneration = session.surface.contentGeneration
     const header = canonicalHeader({
@@ -931,10 +931,36 @@ export class ReactLoopAgent implements Agent {
       this.frozenMessages.add(message)
     }
     Object.freeze(boundaryMessages)
+    const toolHistory = session.toolHistory()
+    const sentMessages = await this.dispatch.waterfall('agent/request-messages', {
+      ...position,
+      isFirstStepOfTurn: position.step === 1,
+      messages: boundaryMessages,
+      toolHistory,
+      signal,
+    }, () => Promise.resolve(boundaryMessages))
+    signal.throwIfAborted()
+    let messages: Message[] = boundaryMessages
+    const overridden = sentMessages.length !== boundaryMessages.length
+      || sentMessages.some((message, index) => message !== boundaryMessages[index])
+    if (overridden) {
+      messages = [...sentMessages]
+      for (const message of messages) {
+        if (this.frozenMessages.has(message)) continue
+        deepFreeze(message)
+        this.frozenMessages.add(message)
+      }
+      Object.freeze(messages)
+      session.append('request/messages-override', {
+        ...position,
+        originalCount: boundaryMessages.length,
+        sentCount: messages.length,
+      })
+    }
     const request = markAgentLoopRequest(Object.freeze({
       ...header.config,
-      messages: boundaryMessages,
-      toolHistory: session.toolHistory(),
+      messages,
+      toolHistory,
       ...header.tools !== undefined ? { tools: header.tools } : {},
       sessionId: this.session.id,
       signal,

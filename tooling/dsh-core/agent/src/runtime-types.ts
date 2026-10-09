@@ -8,7 +8,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type {
-  LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
+  LlmAttemptId, LlmCallConfig, LlmFailure, Message, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
+  ToolHistory,
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 import type { RuntimeDriverEvent } from './runtime-driver.ts'
@@ -336,6 +337,23 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
     */
     'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
+    /**
+     * dshfiles fork: replace the messages of one frozen model request. Runs in
+     * `step()` right after the request is built from the session surface; the
+     * session log is not rewritten. `await next()` yields the derived messages;
+     * return a different array to send it instead. The loop then logs one
+     * `request/messages-override` event with the original and sent counts.
+     * @param payload.agent - the agent making the model call.
+     * @param payload.turn - the open turn number.
+     * @param payload.step - the step whose request this is.
+     * @param payload.isFirstStepOfTurn - whether this is the first step of the turn.
+     * @param payload.messages - the frozen derived messages the loop would send.
+     * @param payload.toolHistory - the session's tool history for this request.
+     * @param payload.signal - the current turn's explicit abort signal.
+     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+     * @mode waterfall
+     */
+    'agent/request-messages'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; isFirstStepOfTurn: boolean; messages: readonly Message[]; toolHistory: ToolHistory; signal: AbortSignal }, next: () => Promise<readonly Message[]>): Promise<readonly Message[]>
     /**
      * Handle one failed model-request attempt before the loop retries or closes
      * its step. A listener returns `{ kind: 'retry' }` without calling `next()`
