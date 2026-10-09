@@ -54,6 +54,7 @@ import { isMacPlatform, type ContentHit, type ThreadCandidate } from './palette.
 import { usePaletteState, useSidebarState } from './sidebar-state.js'
 import { ThreadPalette } from './thread-palette.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { projectTextTone } from './project-tone.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, visibleChildren } from './thread-children.js'
@@ -145,6 +146,7 @@ interface RowActions {
 interface RowStyle {
   readonly density: ThreadRowDensity
   readonly project: boolean
+  readonly projectColor: boolean
   readonly title: boolean
   readonly machine: boolean
   readonly path: boolean
@@ -323,6 +325,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:truncate dshx:font-medium',
+                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle),
                         (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0',
                       )}
                     >
@@ -740,6 +743,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     () => ({
       density: preferences.threadRowDensity,
       project: preferences.threadRowProject,
+      projectColor: preferences.threadRowProjectColor,
       title: preferences.threadRowTitle,
       machine: preferences.threadRowMachine,
       path: preferences.threadRowPath,
@@ -753,6 +757,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       preferences.threadRowMachine,
       preferences.threadRowPath,
       preferences.threadRowProject,
+      preferences.threadRowProjectColor,
       preferences.threadRowStatusDot,
       preferences.threadRowTime,
       preferences.threadRowTitle,

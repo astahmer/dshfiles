@@ -108,6 +108,7 @@ const DRAG_THRESHOLD_PX = 5
 
 const rowFieldKeys = [
   ['threadRowProject', 'threadSidebarRowProject'],
+  ['threadRowProjectColor', 'threadSidebarRowProjectColor'],
   ['threadRowTitle', 'threadSidebarRowTitle'],
   ['threadRowMachine', 'threadSidebarRowMachine'],
   ['threadRowPath', 'threadSidebarRowPath'],

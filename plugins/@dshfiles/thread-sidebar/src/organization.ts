@@ -37,6 +37,7 @@ export interface SidebarPreferences {
   paletteRecentLimit: number
   threadRowDensity: ThreadRowDensity
   threadRowProject: boolean
+  threadRowProjectColor: boolean
   threadRowTitle: boolean
   threadRowMachine: boolean
   threadRowPath: boolean
@@ -75,6 +76,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   paletteRecentLimit: 20,
   threadRowDensity: 'compact',
   threadRowProject: true,
+  threadRowProjectColor: true,
   threadRowTitle: true,
   threadRowMachine: true,
   threadRowPath: false,

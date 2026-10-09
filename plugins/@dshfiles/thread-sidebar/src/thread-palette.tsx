@@ -8,6 +8,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 import { frecencyBoosts, paletteFrecency, recordUse } from './frecency.js'
+import { projectGlyphTone } from './project-tone.js'
 import {
   GO_TO_LINE_EVENT,
   indexFiles,
@@ -173,20 +174,6 @@ const useWorkspaceFiles = (enabled: boolean): FilesState => {
     return () => controller.abort()
   }, [enabled])
   return state
-}
-
-const projectGlyphTones = [
-  'dshx:bg-chart-1/15 dshx:text-chart-1',
-  'dshx:bg-chart-2/15 dshx:text-chart-2',
-  'dshx:bg-chart-3/15 dshx:text-chart-3',
-  'dshx:bg-chart-4/15 dshx:text-chart-4',
-  'dshx:bg-chart-5/15 dshx:text-chart-5',
-] as const
-
-const glyphTone = (project: string): string => {
-  let hash = 0
-  for (const character of project) hash = (hash * 31 + character.charCodeAt(0)) | 0
-  return projectGlyphTones[Math.abs(hash) % projectGlyphTones.length] ?? projectGlyphTones[0]
 }
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
@@ -428,7 +415,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             <span className="dshx:truncate">{notice ?? props.copy.prefixHint}</span>
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
-            <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">{filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty)}
+            <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
+              {filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty)}
             </CommandEmpty>
             {helpRows.length > 0 ? (
               <CommandGroup heading={props.copy.viewHelp}>
@@ -508,7 +496,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span
                         className={cn(
                           'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
-                          thread.project.length > 0 ? glyphTone(project) : 'dshx:bg-muted dshx:text-muted-foreground',
+                          thread.project.length > 0 ? projectGlyphTone(project) : 'dshx:bg-muted dshx:text-muted-foreground',
                         )}
                         aria-hidden="true"
                       >

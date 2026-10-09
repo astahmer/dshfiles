@@ -32,6 +32,7 @@ const preferencesSchema = z
     paletteRecentLimit: z.number().int().min(5).max(100).default(DEFAULT_PREFERENCES.paletteRecentLimit),
     threadRowDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.threadRowDensity),
     threadRowProject: z.boolean().default(DEFAULT_PREFERENCES.threadRowProject),
+    threadRowProjectColor: z.boolean().default(DEFAULT_PREFERENCES.threadRowProjectColor),
     threadRowTitle: z.boolean().default(DEFAULT_PREFERENCES.threadRowTitle),
     threadRowMachine: z.boolean().default(DEFAULT_PREFERENCES.threadRowMachine),
     threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),

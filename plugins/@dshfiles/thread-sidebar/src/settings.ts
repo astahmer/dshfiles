@@ -25,6 +25,9 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.threadRowDensity)
       .description('Thread row size: compact fits more threads, comfortable adds spacing and larger titles.'),
     threadRowProject: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowProject).description('Show the project name under each thread title.'),
+    threadRowProjectColor: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.threadRowProjectColor)
+      .description('Tint each project name with a stable colour of its own.'),
     threadRowTitle: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTitle).description('Show the thread title.'),
     threadRowMachine: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowMachine).description('Show the machine the DSH Host runs on.'),
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
