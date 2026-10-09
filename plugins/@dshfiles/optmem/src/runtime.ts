@@ -54,6 +54,7 @@ export type FullModeRequest = {
   readonly step: number
   readonly originalCount: number
   readonly sentCount: number
+  readonly sentBytes: number
   readonly carriedCount: number
   readonly viewVersion: number
   readonly viewBytes: number
@@ -458,6 +459,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         step: input.step,
         originalCount: input.messages.length,
         sentCount: sent.length,
+        sentBytes: new TextEncoder().encode(JSON.stringify(sent)).byteLength,
         carriedCount: carried.length,
         viewVersion: snapshot?.viewVersion ?? lastFullRequest?.viewVersion ?? -1,
         viewBytes: snapshot?.bytes ?? lastFullRequest?.viewBytes ?? 0,

@@ -14,7 +14,7 @@ Commands: `pnpm --dir tooling/dsh-core/agent install`, then `build`, `test`, and
   frozen surface is derived): payload `{ agent, turn, step, isFirstStepOfTurn, messages, toolHistory, signal }`,
   `next()` yields the derived messages. Returning a list that differs (length or element identity) sends it
   instead, deep-frozen, and appends one log-only `request/messages-override { turn, step, originalCount,
-  sentCount }` session event; the session surface is never rewritten. Abort is checked after the waterfall.
+  sentCount, originalBytes, sentBytes }` session event; the session surface is never rewritten. Abort is checked after the waterfall.
   Used by OptMem full mode (`plans/optmem`). Tests: `agent-loop/tests/request-messages.spec.ts`.
 - `AgentLoop.forkFeatures` (`ReadonlySet`, contains `agent/request-messages`) lets plugins detect the hook at runtime.
 - `request/messages-override` is added to the session `SessionEventMap` and to `known-event-types.ts` by hand (the

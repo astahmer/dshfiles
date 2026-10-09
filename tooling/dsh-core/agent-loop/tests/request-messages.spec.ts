@@ -44,8 +44,10 @@ describe('agent/request-messages', () => {
     const ctx = await harness(adapter)
     const agent = await ctx.agentLoop.create(SessionId('request-messages-replace'), { provider: 'mock', model: 'mock' })
     const seen: { turn: number; step: number; isFirstStepOfTurn: boolean; count: number }[] = []
+    let original: readonly unknown[] = []
     ctx.on('agent/request-messages', async ({ turn, step, isFirstStepOfTurn, messages }, next) => {
       const derived = await next()
+      original = derived
       seen.push({ turn, step, isFirstStepOfTurn, count: messages.length })
       return [...derived.slice(0, 1), ...derived.slice(-1)]
     })
@@ -64,7 +66,14 @@ describe('agent/request-messages', () => {
     expect(agent.session.deriveMessages()).toHaveLength(5)
     expect(agent.session.snapshotEvents().flatMap(event =>
       event.type === 'request/messages-override' ? [event.data] : [])).toEqual([
-      { turn: 2, step: 1, originalCount: 4, sentCount: 2 },
+      {
+        turn: 2,
+        step: 1,
+        originalCount: 4,
+        sentCount: 2,
+        originalBytes: new TextEncoder().encode(JSON.stringify(original)).byteLength,
+        sentBytes: new TextEncoder().encode(JSON.stringify(sent)).byteLength,
+      },
     ])
     expect(agent.session.snapshotEvents().filter(event => event.type === 'request/messages-override')
       .every(event => event.ignorable === true)).toBe(true)

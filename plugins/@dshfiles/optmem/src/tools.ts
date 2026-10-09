@@ -120,7 +120,7 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
       `capabilities ${capabilities}`,
       ...(host.lastFullRequest
         ? [
-            `last full-mode request: turn ${host.lastFullRequest.turn} step ${host.lastFullRequest.step}, ${host.lastFullRequest.originalCount} → ${host.lastFullRequest.sentCount} messages (${host.lastFullRequest.carriedCount} carried), view v${host.lastFullRequest.viewVersion} ${host.lastFullRequest.viewBytes} B, ${host.lastFullRequest.pendingCount} pending${host.lastFullRequest.reusedView ? ', view reused' : ''}`,
+            `last full-mode request: turn ${host.lastFullRequest.turn} step ${host.lastFullRequest.step}, ${host.lastFullRequest.originalCount} → ${host.lastFullRequest.sentCount} messages (${host.lastFullRequest.sentBytes} B sent, ${host.lastFullRequest.carriedCount} carried), view v${host.lastFullRequest.viewVersion} ${host.lastFullRequest.viewBytes} B, ${host.lastFullRequest.pendingCount} pending${host.lastFullRequest.reusedView ? ', view reused' : ''}`,
           ]
         : []),
       `captured ${host.captured} event(s), skipped ${host.skipped}, queued ${host.queued}${host.lastCaptureError ? `, last capture error: ${host.lastCaptureError}` : ''}`,

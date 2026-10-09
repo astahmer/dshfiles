@@ -87,7 +87,7 @@ model `gpt-6-luna` for the 2.5 KB paste and long code answers, some level ≥1 n
 > `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Terse report.
 
 Then re-run only the full long run from S1 to get byte numbers.
-- [ ] S3 done
+- [x] S3 done
 
 ## S4 — why the codex route returns empty replies from an isolated DSH_HOME — paste to an agent
 > Read-only investigation first, in /Users/astahmer/dev/dshfiles. Context: plans/optmem/runtime-evidence.md (Stage 4,

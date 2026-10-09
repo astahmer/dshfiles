@@ -955,6 +955,8 @@ export class ReactLoopAgent implements Agent {
         ...position,
         originalCount: boundaryMessages.length,
         sentCount: messages.length,
+        originalBytes: new TextEncoder().encode(JSON.stringify(boundaryMessages)).byteLength,
+        sentBytes: new TextEncoder().encode(JSON.stringify(messages)).byteLength,
       })
     }
     const request = markAgentLoopRequest(Object.freeze({

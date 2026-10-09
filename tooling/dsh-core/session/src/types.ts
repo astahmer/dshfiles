@@ -412,7 +412,14 @@ export interface SessionEventMap {
    * dshfiles fork: an `agent/request-messages` listener replaced the derived
    * messages of this step's request. Log-only; reconstruction ignores it.
    */
-  'request/messages-override': { turn: number; step: number; originalCount: number; sentCount: number }
+  'request/messages-override': {
+    turn: number
+    step: number
+    originalCount: number
+    sentCount: number
+    originalBytes: number
+    sentBytes: number
+  }
   /**
    * Separates inherited or restored history from later lifecycle-owned work.
    * This log-only marker need not be at {@link Session.firstLiveSeq}: a fork

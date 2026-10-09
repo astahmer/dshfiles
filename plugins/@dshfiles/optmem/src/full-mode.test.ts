@@ -132,7 +132,8 @@ describe('full mode requests', () => {
     expect(textOf(recalled[1])).toContain('user: The staging database port is 6543.')
     expect(textOf(recalled[1])).toContain('Which port did I mention?')
     const status = await createMemoryToolHandlers(() => runtime).status(undefined)
-    expect(status.summary).toContain('last full-mode request: turn 1 step 1, 2 → 3 messages (1 carried)')
+    const recalledBytes = new TextEncoder().encode(JSON.stringify(recalled)).byteLength
+    expect(status.summary).toContain(`last full-mode request: turn 1 step 1, 2 → 3 messages (${recalledBytes} B sent, 1 carried)`)
     expect(runtime.status().lastFullRequest?.conversationId).toBe('session-second')
     expect(runtime.promptText({ id: 'session-second', session: { header: second.fixture.session.header } })).toBe('')
     await runtime.stop()
