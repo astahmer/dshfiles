@@ -27,7 +27,7 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOp
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
 import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
-import { createAccountPool, isRateLimitFailure } from './account-pool.js'
+import { createAccountPool, creditServedAttempt, isRateLimitFailure } from './account-pool.js'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
@@ -395,20 +395,7 @@ export default definePlugin({
           // A conversation's account is bound before the call and credited only
           // after the upstream answers, so a failed attempt is never "used".
           const account = pool.acquire(options.sessionId)
-          return (async function* pass(): AsyncIterable<StreamChunk> {
-            let failed = false
-            const used = account?.id
-            for await (const chunk of next()) {
-              if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
-                failed = true
-                continue
-              }
-              if (!failed && chunk.type === 'usage' && used !== undefined) {
-                pool.noteServed(used)
-              }
-              yield chunk
-            }
-          })()
+          return creditServedAttempt(next(), { pool, accountId: account?.id })
         }),
       )
 

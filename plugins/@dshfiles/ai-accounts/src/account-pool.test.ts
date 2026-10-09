@@ -1,5 +1,6 @@
+import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
-import { createAccountPool } from './account-pool.js'
+import { createAccountPool, creditServedAttempt } from './account-pool.js'
 
 describe('account pool route reconciliation', () => {
   it('updates account metadata while preserving live cooldown and conversation affinity', () => {
@@ -40,5 +41,37 @@ describe('account pool route reconciliation', () => {
     pool.replace([{ id: 'commandcode-one', kind: 'commandcode', label: 'Command Code One' }])
     expect(pool.describe().map(account => account.id)).toEqual(['commandcode-one'])
     expect(pool.describe()[0]?.state).toBe('cooling')
+  })
+})
+
+describe('creditServedAttempt', () => {
+  const drain = async (chunks: readonly StreamChunk[], accountId: string | undefined) => {
+    const served: string[] = []
+    const seen: StreamChunk[] = []
+    async function* source(): AsyncIterable<StreamChunk> {
+      yield* chunks
+    }
+    for await (const chunk of creditServedAttempt(source(), { pool: { noteServed: id => served.push(id) }, accountId })) seen.push(chunk)
+    return { served, seen }
+  }
+
+  it('forwards an error finish so the agent loop retries instead of completing a reasoning-only step', async () => {
+    const timedOut: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'reasoning' },
+      { type: 'finish', reason: { kind: 'error', failure: { code: 'TIMEOUT', message: 'pi-ai stream idle timeout after 120000ms' } } },
+    ]
+    const { served, seen } = await drain(timedOut, 'codex-a')
+    expect(seen.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: 'TIMEOUT' } } })
+    expect(served).toEqual([])
+  })
+
+  it('credits the account once a reported attempt finishes', async () => {
+    const answered: StreamChunk[] = [
+      { type: 'usage', usage: { inputTokens: 10, outputTokens: 2, totalTokens: 12 } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ]
+    const { served, seen } = await drain(answered, 'codex-a')
+    expect(seen).toHaveLength(2)
+    expect(served).toEqual(['codex-a'])
   })
 })

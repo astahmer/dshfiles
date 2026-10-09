@@ -1,3 +1,4 @@
+import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 /**
  * Account pool and distribution, after `dsh-workbuddy-xdpool`.
  *
@@ -257,4 +258,25 @@ export const isRateLimitFailure = (failure: RateLimitFailure | undefined | null)
   if (failure === undefined || failure === null) return false
   if (failure.status === 429 || failure.status === 403) return true
   return failure.code !== undefined && RATE_LIMIT_CODES.has(failure.code)
+}
+
+/**
+ * Pass one attempt's chunks through untouched and credit the account only once
+ * the attempt finishes without an error. The terminal `finish` must always reach
+ * the agent loop: a stream that ends without one reads as a completed step, so
+ * an idle timeout or quota error would end the turn silently instead of being
+ * retried or failed over.
+ */
+export async function* creditServedAttempt(
+  chunks: AsyncIterable<StreamChunk>,
+  credit: { readonly pool: Pick<AccountPool, 'noteServed'>; readonly accountId: string | undefined },
+): AsyncIterable<StreamChunk> {
+  let usageSeen = false
+  for await (const chunk of chunks) {
+    if (chunk.type === 'usage') usageSeen = true
+    if (chunk.type === 'finish' && chunk.reason.kind !== 'error' && usageSeen && credit.accountId !== undefined) {
+      credit.pool.noteServed(credit.accountId)
+    }
+    yield chunk
+  }
 }
