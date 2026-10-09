@@ -26,8 +26,8 @@ queue-reorder. optmem has no UI.
 | 14 | multi-host | client.tsx:335-391 (view lease + setInterval poll) | spawned lease actor per runtime view | med | M | [ ] |
 | 15 | jujutsu | session-fork-panel.tsx:42-117 | mutation(fork) + useInfiniteQuery (history) | med | M | [x] mutations for fork + loadOlder; history stays the Host-retained event window (no fetchable pages for useInfiniteQuery) |
 | 16 | jujutsu | client.tsx:228-229,260-276,356-399 (drag→preview→confirm) | machine (same shape as #7) | med | M | [ ] |
-| 17 | thread-sidebar | sidebar-shell.tsx:338-340,659-667 (restart dialog) | mutation | med | S | [ ] |
-| 18 | thread-sidebar | client.tsx:187-229,300-312 (snooze/markRead) | mutations with onError notice | low | S | [ ] |
+| 17 | thread-sidebar | sidebar-shell.tsx:338-340,659-667 (restart dialog) | mutation | med | S | [skip] restart.test.ts guards sidebar-shell against plugin-ui/query after a QueryClient crash; useApiQuery stays |
+| 18 | thread-sidebar | client.tsx:187-229,300-312 (snooze/markRead) | mutations with onError notice | low | S | [skip] same sidebar no-QueryClient guard as #17 |
 | 19 | multi-host | client.tsx:118,206-328,395-411 (global error mirror) | per-mutation error + invalidate | low | S | [ ] |
 | 20 | diff-viewed | viewed-toggle.tsx:13-27 | useQuery | low | S | [ ] |
 | 21 | prompt-stash | prompt-stash-action.tsx:27,145-295 | useAppForm | low | S | [ ] |
