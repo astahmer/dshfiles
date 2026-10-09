@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isIgnored, parseGitignore, type IgnoreRule } from './gitignore.js'
 
 /**
  * Cross-plugin file listing for fuzzy open (command-palette ⌘P): dispatch
@@ -35,24 +36,51 @@ interface DirectoryEntry {
   readonly type: string
 }
 type ListDirectory = (path: string, signal: AbortSignal) => Promise<{ readonly entries: readonly DirectoryEntry[] }>
+type ReadText = (path: string, signal: AbortSignal) => Promise<string>
 type WatchFrame = { readonly kind: 'ready' } | { readonly kind: 'change' }
 
 interface DirectoryListing {
   readonly files: readonly string[]
   readonly directories: readonly string[]
+  /** Rules of this directory's own `.gitignore`. */
+  readonly rules: readonly IgnoreRule[]
 }
 type Directories = Map<string, DirectoryListing>
 
 const joinPath = (parent: string, name: string): string => (parent === '' ? name : `${parent}/${name}`)
 
-const classify = (parent: string, entries: readonly DirectoryEntry[]): DirectoryListing => {
+const ancestorsOf = (path: string): string[] => {
+  if (path === '') return []
+  const parts = path.split('/')
+  return ['', ...parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))]
+}
+
+/** List one directory and keep what neither the fixed skip list nor the `.gitignore` files from the root down drop. */
+const readDirectory = async (options: {
+  readonly list: ListDirectory
+  readonly readText?: ReadText
+  readonly directories: Directories
+  readonly path: string
+  readonly signal: AbortSignal
+}): Promise<DirectoryListing | null> => {
+  const listing = await options.list(options.path, options.signal).catch(() => null)
+  if (listing === null) return null
+  const hasGitignore = listing.entries.some(entry => entry.name === '.gitignore' && entry.type === 'file')
+  const text =
+    hasGitignore && options.readText !== undefined ? await options.readText(joinPath(options.path, '.gitignore'), options.signal).catch(() => '') : ''
+  const rules = text === '' ? [] : parseGitignore({ text, base: options.path })
+  const chain = [...ancestorsOf(options.path).flatMap(ancestor => options.directories.get(ancestor)?.rules ?? []), ...rules]
   const files: string[] = []
   const directories: string[] = []
-  for (const entry of entries) {
-    if (entry.type === 'directory' && !IGNORED_DIRECTORIES.has(entry.name)) directories.push(joinPath(parent, entry.name))
-    else if (entry.type === 'file') files.push(joinPath(parent, entry.name))
+  for (const entry of listing.entries) {
+    const path = joinPath(options.path, entry.name)
+    const directory = entry.type === 'directory'
+    if ((!directory && entry.type !== 'file') || (directory && IGNORED_DIRECTORIES.has(entry.name))) continue
+    if (chain.length > 0 && isIgnored({ rules: chain, path, directory })) continue
+    if (directory) directories.push(path)
+    else files.push(path)
   }
-  return { files, directories }
+  return { files, directories, rules }
 }
 
 /** Directories in breadth-first order from the listed ones, so caps keep the shallow files people open most. */
@@ -77,6 +105,7 @@ const flatten = (directories: Directories): { readonly files: readonly string[];
  */
 const walkInto = async (options: {
   readonly list: ListDirectory
+  readonly readText?: ReadText
   readonly signal: AbortSignal
   readonly directories: Directories
   readonly roots: readonly string[]
@@ -90,15 +119,13 @@ const walkInto = async (options: {
     const next: string[] = []
     for (let start = 0; start < level.length && !truncated; start += PARALLEL_LISTS) {
       const batch = level.slice(start, start + PARALLEL_LISTS)
-      const listings = await Promise.all(batch.map(path => options.list(path, options.signal).catch(() => null)))
+      const listings = await Promise.all(batch.map(path => readDirectory({ ...options, path })))
       options.signal.throwIfAborted()
       listings.forEach((listing, index) => {
-        const parent = batch[index] ?? ''
         if (listing === null) return
-        const classified = classify(parent, listing.entries)
-        options.directories.set(parent, classified)
-        fileCount += classified.files.length
-        next.push(...classified.directories)
+        options.directories.set(batch[index] ?? '', listing)
+        fileCount += listing.files.length
+        next.push(...listing.directories)
       })
       if (fileCount >= MAX_FILES || options.directories.size + next.length > MAX_DIRECTORIES) truncated = true
       if (Date.now() - progressAt < PROGRESS_INTERVAL_MS) continue
@@ -112,6 +139,7 @@ const walkInto = async (options: {
 
 export const walkWorkspaceFiles = async (options: {
   readonly list: ListDirectory
+  readonly readText?: ReadText
   readonly signal: AbortSignal
   readonly onProgress: (files: readonly string[]) => void
 }): Promise<{ readonly files: readonly string[]; readonly truncated: boolean }> => {
@@ -142,6 +170,8 @@ interface SessionIndex {
  */
 export const createWorkspaceFileIndex = <SessionId extends string>(options: {
   readonly list: (sessionId: SessionId, path: string, signal: AbortSignal) => ReturnType<ListDirectory>
+  /** Reads `.gitignore` files; without it the walk only skips .git/.jj/node_modules. */
+  readonly readText?: (sessionId: SessionId, path: string, signal: AbortSignal) => Promise<string>
   readonly watch?: (sessionId: SessionId, path: string, signal: AbortSignal) => AsyncIterable<WatchFrame>
   readonly now?: () => number
 }) => {
@@ -159,10 +189,13 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     if (disposed.signal.aborted) return
     for (const listener of index.listeners) listener(reply(sessionId, index))
   }
-  const listOf =
-    (sessionId: SessionId): ListDirectory =>
-    (path, signal) =>
-      options.list(sessionId, path === '' ? '.' : path, signal)
+  const walkSource = (sessionId: SessionId): { readonly list: ListDirectory; readonly readText?: ReadText } => {
+    const readText = options.readText
+    return {
+      list: (path, signal) => options.list(sessionId, path === '' ? '.' : path, signal),
+      ...(readText === undefined ? {} : { readText: (path: string, signal: AbortSignal) => readText(sessionId, path, signal) }),
+    }
+  }
 
   const stopWatches = (index: SessionIndex): void => {
     // A fully watched index was exact until now; the TTL starts counting from here.
@@ -181,18 +214,17 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
   }
 
   const relist = async (sessionId: SessionId, index: SessionIndex, path: string): Promise<void> => {
-    const listing = await listOf(sessionId)(path, disposed.signal).catch(() => null)
+    const next = await readDirectory({ ...walkSource(sessionId), directories: index.directories, path, signal: disposed.signal })
     if (disposed.signal.aborted || index.walking) return
     const previous = index.directories.get(path)
-    if (listing === null) {
+    if (next === null) {
       removeSubtree(index.directories, path)
     } else {
-      const next = classify(path, listing.entries)
       for (const child of previous?.directories ?? []) if (!next.directories.includes(child)) removeSubtree(index.directories, child)
       index.directories.set(path, next)
       const added = next.directories.filter(child => !index.directories.has(child))
       if (added.length > 0) {
-        await walkInto({ list: listOf(sessionId), signal: disposed.signal, directories: index.directories, roots: added }).catch(() => undefined)
+        await walkInto({ ...walkSource(sessionId), signal: disposed.signal, directories: index.directories, roots: added }).catch(() => undefined)
       }
     }
     const result = flatten(index.directories)
@@ -247,7 +279,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     index.walking = true
     const directories: Directories = new Map()
     void walkInto({
-      list: listOf(sessionId),
+      ...walkSource(sessionId),
       signal: disposed.signal,
       directories,
       roots: [''],

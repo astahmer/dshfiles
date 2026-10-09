@@ -275,7 +275,8 @@ Status (2026-10-10): P3.1–P3.3 landed without a new cross-plugin registry.
   `@dshfiles/editor` (`dshfiles:workspace-files`: breadth-first walk, skips .git/.jj/node_modules, 20k files / 4k dirs,
   30 s cache, live through Host `changes` on the 64 shallowest directories, which then skips the TTL when they cover the
   whole index; watches stop 30 s after ⌘P closes) and opens them with `dshfiles:open-file`. The editor tree relists
-  each expanded folder on `changes`. Not ignore-aware yet (needs Host `rg --files`).
+  each expanded folder on `changes`. Honours root and nested `.gitignore` files (own matcher,
+  `editor/src/gitignore.ts`; no `.git/info/exclude` or global excludes).
 - Prefixes: `>` commands, `#` thread content (Host `session.search`, off when the index is disabled), `:` line in
   the open editor file (`dshfiles:editor-go-to-line`), `?` help. `@` symbols skipped: no Monaco symbol provider.
 - Frecency (`createStoredValue`, 200 entries) ranks actions, commands and files; threads keep `rankThreads`.
@@ -291,7 +292,7 @@ disposer; cross-plugin transport via a typed `window` CustomEvent or a dshx-shar
 
 ### [x] P3.2 Fuzzy file open ⌘P (M) — deps: P3.1, P2.5
 
-File index per session: walk `workspaceFiles.list` (respect .gitignore — needs Host or host-part `rg --files`),
+File index per session: walk `workspaceFiles.list` (respects .gitignore through the editor's own matcher),
 incremental via `changes`; fuzzy rank in a time-sliced loop (no worker); ≤ 50 ms for 50k paths.
 
 ### [x] P3.3 Frecency + keyboard-first (S) — deps: P3.1

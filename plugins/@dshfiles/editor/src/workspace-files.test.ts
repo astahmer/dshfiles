@@ -138,3 +138,31 @@ describe('createWorkspaceFileIndex with Host changes', () => {
     }
   })
 })
+
+describe('walkWorkspaceFiles with .gitignore', () => {
+  it('drops paths the root and nested .gitignore files ignore, re-including negated ones', async () => {
+    const tree: Tree = {
+      '.gitignore': 'file',
+      'README.md': 'file',
+      'debug.log': 'file',
+      dist: { 'bundle.js': 'file' },
+      packages: {
+        app: { '.gitignore': 'file', 'keep.log': 'file', 'index.ts': 'file', generated: { 'types.ts': 'file' } },
+      },
+    }
+    const gitignores: Record<string, string> = {
+      '.gitignore': '# build output\n/dist/\n*.log\n',
+      'packages/app/.gitignore': 'generated/\n!keep.log\n',
+    }
+    const { list, listed } = lister(tree)
+    const result = await walkWorkspaceFiles({
+      list,
+      readText: async path => gitignores[path] ?? '',
+      signal: new AbortController().signal,
+      onProgress: () => undefined,
+    })
+    expect(result.files).toEqual(['.gitignore', 'README.md', 'packages/app/.gitignore', 'packages/app/keep.log', 'packages/app/index.ts'])
+    expect(listed).not.toContain('dist')
+    expect(listed).not.toContain('packages/app/generated')
+  })
+})

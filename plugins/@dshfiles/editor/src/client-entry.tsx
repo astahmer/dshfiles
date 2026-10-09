@@ -158,6 +158,11 @@ export default defineClient({
           if (!result.ok) throw result.error
           return result.value
         },
+        readText: async (sessionId, path, signal) => {
+          const result = await ctx.remote.workspaceFiles.read(sessionId, path, {}, signal)
+          if (!result.ok) throw result.error
+          return result.value.text
+        },
         watch: (sessionId, path, signal) => ctx.remote.workspaceFiles.changes(sessionId, path, signal),
       })
       const onFilesRequest = (event: Event): void => {
