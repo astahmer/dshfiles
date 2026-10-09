@@ -209,6 +209,47 @@ describe('generic API runtime', () => {
     expect(call).not.toHaveBeenCalled()
   })
 
+  it('sends a PluginApiError message to the Client and keeps other failures generic but logged', async () => {
+    const fixture = connectionFixture()
+    const logged = vi.fn()
+    const context = { ...fixture.context, logger: (name: string) => (name === 'dshx:api' ? { error: logged } : undefined) }
+    const contract = defineApi({
+      id: 'failing',
+      version: 1,
+      methods: { prepare: method<{ readonly secret: string }, string>(), confirm: method<void, string>(), reserved: method<void, string>() },
+    })
+    await registerApi(
+      context as never,
+      '@scope/plugin',
+      contract.host({
+        prepare() {
+          throw new Error('jj exited 1 with token=abc123secret')
+        },
+        confirm() {
+          throw new publicApi.PluginApiError('The working copy changed; review it again.', { code: 'stale-review' })
+        },
+        reserved() {
+          throw new publicApi.PluginApiError('Refused.', { code: 'internal' })
+        },
+      }),
+    )
+    const client = createApiClient(context as never, contract, '@scope/plugin')
+    await expect(client.prepare({ secret: 'input-value' })).rejects.toMatchObject({
+      kind: 'remote',
+      remoteCode: 'internal',
+      message: 'API handler failed. See Host diagnostics.',
+    })
+    expect(logged).toHaveBeenCalledOnce()
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(line).toContain('API handler @scope/plugin failing.prepare failed: Error: jj exited 1 with token=[redacted]')
+    expect(line).not.toContain('abc123secret')
+    expect(line).not.toContain('input-value')
+
+    await expect(client.confirm()).rejects.toMatchObject({ kind: 'remote', remoteCode: 'stale-review', message: 'The working copy changed; review it again.' })
+    await expect(client.reserved()).rejects.toMatchObject({ kind: 'remote', remoteCode: 'plugin', message: 'Refused.' })
+    expect(logged).toHaveBeenCalledOnce()
+  })
+
   it('maps Host and Client API version mismatches to contract errors', async () => {
     const fixture = connectionFixture()
     const host = defineApi({ id: 'versioned', version: 1, methods: { get: method<void, string>() } })

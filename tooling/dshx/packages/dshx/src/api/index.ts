@@ -1,5 +1,5 @@
 export { defineApi, method } from './define.js'
-export { isApiError } from './runtime.js'
+export { isApiError, PluginApiError } from './runtime.js'
 export type {
   AnyApiMethodDefinition,
   ApiCallOptions,

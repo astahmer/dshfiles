@@ -214,6 +214,12 @@ type ApiQueryResult<T> =
 
 Public fields are `name`, `message`, `kind`, `apiId`, `method`, `retryable`, and optional `remoteCode`.
 
+### Host failures the user should read
+
+A handler that throws `new PluginApiError(message, { code })` (from `@dshfiles/dshx/api`) reaches the Client as an `ApiError` with `kind: 'remote'`, that `message` (up to 500 characters) and `remoteCode: code`. Codes match `[a-z][a-z0-9-]*`; a reserved code (`internal`, `contract`, `aborted`, `bad-request`) or a malformed one becomes `plugin`. Write the message for the person using the plugin; never put secrets or raw command output in it.
+
+Any other thrown value stays generic on the Client (`remoteCode: 'internal'`, "API handler failed. See Host diagnostics.") and is logged once on the Host through the `dshx:api` logger with the package, API id and method, the error's name, message and first stack frames, bounded to 2000 characters with common credential shapes redacted. The request input is never logged.
+
 ## Automatic Client wiring
 
 If `useApi` or `useApiQuery` survives final tree-shaking, compiler module metadata enables the Client `connection` service. The project must also declare `@deepseek-ai/dsh-client-connection` in `dsh.client.inject`; `dshx check` reports the edge early and `build` is authoritative.

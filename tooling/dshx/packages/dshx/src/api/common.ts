@@ -7,6 +7,33 @@ export class ContractViolation extends Error {
   override readonly name = 'ContractViolation'
 }
 
+const PLUGIN_API_ERROR = Symbol.for('dshx.plugin-api-error')
+const PLUGIN_API_ERROR_CODE = /^[a-z][a-z0-9-]{0,63}$/
+const RESERVED_REMOTE_CODES = new Set(['aborted', 'bad-request', 'contract', 'internal'])
+const MAX_PLUGIN_ERROR_MESSAGE = 500
+
+/**
+ * A failure a Host API handler means the user to read. Its message and code
+ * reach the Client as an ApiError with kind `remote`; any other thrown value
+ * stays a generic internal failure and is only logged on the Host.
+ */
+export class PluginApiError extends Error {
+  override readonly name = 'PluginApiError'
+  readonly [PLUGIN_API_ERROR] = true
+  /** Stable machine code the Client reads as `ApiError.remoteCode`; reserved or malformed codes become `plugin`. */
+  readonly code: string
+
+  constructor(message: string, options: { readonly code?: string; readonly cause?: unknown } = {}) {
+    super(message.slice(0, MAX_PLUGIN_ERROR_MESSAGE), options.cause === undefined ? undefined : { cause: options.cause })
+    const code = options.code
+    this.code = code !== undefined && PLUGIN_API_ERROR_CODE.test(code) && !RESERVED_REMOTE_CODES.has(code) ? code : 'plugin'
+  }
+}
+
+export function isPluginApiError(value: unknown): value is PluginApiError {
+  return value instanceof PluginApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[PLUGIN_API_ERROR] === true)
+}
+
 class InternalApiError extends Error {
   override readonly name = 'ApiError' as const
   readonly [API_ERROR] = true

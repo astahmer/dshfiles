@@ -3,7 +3,7 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiContract, ApiError } from './types.js'
 import { aborted, apiChannel, ContractViolation, error, isApiError, jsonBytes, throwIfAborted } from './common.js'
 
-export { apiChannel, isApiError } from './common.js'
+export { apiChannel, isApiError, PluginApiError } from './common.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
