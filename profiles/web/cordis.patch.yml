@@ -5,8 +5,6 @@
   name: "@deepseek-ai/dsh-client-ui-settings-general"
   config:
     welcomeNoticeVersion: 2026-09-28.1
-- id: llm-openai-codex
-  disabled: false
 - id: llm-commandcode
   name: "@mars-sea/dsh-commandcode-provider"
   config:
