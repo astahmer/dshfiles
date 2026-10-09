@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CodexHomeError, describeCodexAuth, resolveCodexHomeLayout } from './codex-home.js'
 
 const layoutFor = (homePath: string) => resolveCodexHomeLayout({ homePath })
@@ -26,6 +26,20 @@ describe('resolveCodexHomeLayout', () => {
   it.each(['/etc', '~/../../etc', homedir(), `${homedir()}-sibling/.codex`])('refuses %s', homePath => {
     expect(() => resolveCodexHomeLayout({ homePath })).toThrow(CodexHomeError)
     expect(() => resolveCodexHomeLayout({ shadowHomePath: homePath })).toThrow(CodexHomeError)
+  })
+
+  it('keeps the real account home when an isolated host overrides HOME', () => {
+    const accountHome = homedir()
+    vi.stubEnv('HOME', '/tmp/isolated-dsh-home')
+    try {
+      expect(resolveCodexHomeLayout({ homePath: join(accountHome, '.codex'), shadowHomePath: '~/.codex-dshx/work' })).toEqual({
+        mode: 'authOverlay',
+        sharedHomePath: join(accountHome, '.codex'),
+        effectiveHomePath: join(accountHome, '.codex-dshx', 'work'),
+      })
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
 

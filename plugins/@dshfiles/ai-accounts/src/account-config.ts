@@ -1,7 +1,7 @@
 import z from '@deepseek-ai/schemastery'
-import { homedir } from 'node:os'
 import type { readAccountFileSync } from './account-store.js'
 import { DEFAULT_DISTRIBUTION, type Distribution } from './account-pool.js'
+import { codexAccountHome } from './codex-home.js'
 import { readKeyFromEnv } from './credentials.js'
 export interface CodexAccountConfig {
   readonly instanceId: string
@@ -116,6 +116,6 @@ export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSy
     opencodeApiKey: readKeyFromEnv('OPENCODE_API_KEY') ?? '',
     distribution: file.distribution,
     cooldownMs: file.cooldownMs,
-    codexShadowRoot: file.shadowRoot || `${homedir()}/.codex-dshx`,
+    codexShadowRoot: file.shadowRoot || `${codexAccountHome()}/.codex-dshx`,
   }
 }

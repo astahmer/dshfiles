@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
-import { describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
+import { codexAccountHome, describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { readKeyFromEnv } from './credentials.js'
 import { KIND_LABEL } from './account-labels.js'
@@ -25,7 +25,7 @@ import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 
 const STORE_PATH = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
 
-const DEFAULT_SHADOW_ROOT = join(homedir(), '.codex-dshx')
+const DEFAULT_SHADOW_ROOT = join(codexAccountHome(), '.codex-dshx')
 
 /** Stored shape: only what a user may author or toggle. */
 interface AccountStoreFile {

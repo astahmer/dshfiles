@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 
 const repoRoot = '/Users/astahmer/dev/dshfiles'
 // Usage: node drive.mjs <out.json> <full|compat> <scenario.json>
-// Env: REAL_HOME=1 (recommended: codex route returns empty replies from an isolated DSH_HOME), STOCK=1 (no fork),
+// Env: REAL_HOME=1 (host on the real ~/.dsh instead of the isolated scratch home), STOCK=1 (no fork),
 //      ACCOUNTS_FILE (default ~/.dsh/plugins/ai-accounts/accounts.json), PROVIDER/MODEL/EFFORT overrides.
 const out = process.argv[2]
 const compatMode = process.argv[3] === 'compat'
@@ -23,7 +23,7 @@ const scratch = await createScratchProfile({
   profileName: 'optmem-full',
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
   bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...(process.env.STOCK === '1' ? [] : ['@dshfiles/dsh-core-runtime']), '@dshfiles/ai-accounts', '@dshfiles/optmem'],
-  excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket'],
+  excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies: {
     '@dshfiles/dsh-core-runtime': plugin('dsh-core-runtime'),
     '@dshfiles/ai-accounts': plugin('ai-accounts'),
@@ -70,7 +70,7 @@ const environment = process.env.REAL_HOME === '1'
   ? { ...inherited, DSHX_BOOT_PROFILE_ROOT: scratch.profileRoot }
   : process.env.FULL_ENV === '1'
   ? { ...process.env, DSH_HOME: isolated.DSH_HOME, DSHX_BOOT_PROFILE_ROOT: isolated.DSHX_BOOT_PROFILE_ROOT }
-  : { ...isolated, HOME: homedir() }
+  : isolated
 let output = ''
 const child = spawn('dsh', ['optmem-full', '--patch', overlay, '--port', '0', '--no-open'], { cwd: project, env: environment, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
 const collect = chunk => (output = `${output}${chunk.toString('utf8')}`.slice(-400_000))

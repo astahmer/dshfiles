@@ -9,7 +9,7 @@ Tools (in `plans/optmem/tools/`):
 - `drive.mjs <out.json> <full|compat> <scenario.json>` — creates a throwaway `optmem-full` scratch profile (fork core +
   ai-accounts + optmem), boots `dsh` on a free port, runs the scenario's conversations turn by turn through the dshx
   platform client, writes per-turn evidence (`usage`, `request/messages-override` counts, tool calls) + host log, then
-  kills the host. Env: `REAL_HOME=1` (required for now, see S4), `STOCK=1` (stock core, no fork → compat only),
+  kills the host. Env: `REAL_HOME=1` (optional: host on the real `~/.dsh` instead of the isolated scratch home), `STOCK=1` (stock core, no fork → compat only),
   `PROVIDER/MODEL/EFFORT`.
 - `summarize.mjs <run.json>…` — per-turn table + totals (input incl. cache, cache read %, output).
 - `read-log.mjs <session.v5.jsonl> [type-filter] [width]` — dump events of a session log.
@@ -23,28 +23,24 @@ fnm use 22.23.3
 pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir tooling/dshx --filter @dshfiles/dshx build
 pnpm --dir plugins/@dshfiles/dsh-core-runtime run build
 pnpm --dir plugins/@dshfiles/optmem run build
+pnpm --dir plugins/@dshfiles/ai-accounts run build
 ```
-Because `REAL_HOME=1` uses `~/.dsh/plugins/optmem/optmem.db` (shared with `probe`), park it before each run:
-```bash
-mv ~/.dsh/plugins/optmem ~/.dsh/plugins/optmem.parked-$(date +%s) 2>/dev/null; true
-```
-(Restore the probe DB afterwards by moving the newest `optmem.parked-*` back if you care about it.)
 
 - [ ] S0 done
 
 ## S1 — long-conversation comparison (stock vs compat vs full)
 Smoke first (≈2 cheap turns) to confirm the route answers:
 ```bash
-REAL_HOME=1 node plans/optmem/tools/drive.mjs /tmp/optmem-smoke.json full plans/optmem/tools/scenario-smoke.json
+node plans/optmem/tools/drive.mjs /tmp/optmem-smoke.json full plans/optmem/tools/scenario-smoke.json
 node plans/optmem/tools/summarize.mjs /tmp/optmem-smoke.json
 ```
-Then the three long runs (park the DB between runs so each starts from empty memory):
+Then the three long runs (each gets a fresh scratch home, so memory starts empty):
 ```bash
-mv ~/.dsh/plugins/optmem ~/.dsh/plugins/optmem.parked-$(date +%s) 2>/dev/null; STOCK=1 REAL_HOME=1 node plans/optmem/tools/drive.mjs /tmp/optmem-stock.json compat plans/optmem/tools/scenario-long.json
-mv ~/.dsh/plugins/optmem ~/.dsh/plugins/optmem.parked-$(date +%s) 2>/dev/null; REAL_HOME=1 node plans/optmem/tools/drive.mjs /tmp/optmem-compat.json compat plans/optmem/tools/scenario-long.json
-cp -R ~/.dsh/plugins/optmem /tmp/optmem-db-compat
-mv ~/.dsh/plugins/optmem ~/.dsh/plugins/optmem.parked-$(date +%s) 2>/dev/null; REAL_HOME=1 node plans/optmem/tools/drive.mjs /tmp/optmem-full.json full plans/optmem/tools/scenario-long.json
-cp -R ~/.dsh/plugins/optmem /tmp/optmem-db-full
+STOCK=1 node plans/optmem/tools/drive.mjs /tmp/optmem-stock.json compat plans/optmem/tools/scenario-long.json
+node plans/optmem/tools/drive.mjs /tmp/optmem-compat.json compat plans/optmem/tools/scenario-long.json
+cp -R "$(node -p 'require("/tmp/optmem-compat.json").home')/plugins/optmem" /tmp/optmem-db-compat
+node plans/optmem/tools/drive.mjs /tmp/optmem-full.json full plans/optmem/tools/scenario-long.json
+cp -R "$(node -p 'require("/tmp/optmem-full.json").home')/plugins/optmem" /tmp/optmem-db-full
 node plans/optmem/tools/summarize.mjs /tmp/optmem-stock.json /tmp/optmem-compat.json /tmp/optmem-full.json > /tmp/optmem-s1.md
 ```
 Note: "stock" = no fork + optmem compat; for a true no-OptMem baseline, run once more with `STOCK=1` after
@@ -100,7 +96,9 @@ Then re-run only the full long run from S1 to get byte numbers.
 > (likely: resolve the codex auth home from the account config, not from DSH_HOME), implement it with a regression
 > test in ai-accounts, verify the isolated run answers, then make REAL_HOME optional in the runbook. One path-scoped
 > jj revision. Terse report.
-- [ ] S4 done → afterwards drop `REAL_HOME=1` from all S1 commands (isolated runs no longer touch the probe DB).
+- [x] S4 done — cause: `codex-home.ts` anchored the credential guard on `$HOME`; an isolated `HOME` rejected the
+  account's real `~/.codex` paths, so the route was dropped and turns ended empty. Now anchored on the OS account home
+  (`userInfo().homedir`); `drive.mjs` runs fully isolated by default and `REAL_HOME=1` is optional.
 
 ## S5 — hardening checklist (agent prompt, after S1–S4)
 > In /Users/astahmer/dev/dshfiles, for plugins/@dshfiles/optmem{,-core,-sqlite}: (1) run the 100k bench again

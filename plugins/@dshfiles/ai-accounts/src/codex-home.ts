@@ -1,5 +1,5 @@
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { userInfo } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 
 /**
@@ -31,12 +31,18 @@ export interface CodexHomeLayout {
 
 export class CodexHomeError extends Error {}
 
-const expandHome = (value: string): string => (value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
+/**
+ * The OS account's home, not `$HOME`: an isolated host (scratch `HOME`/`DSH_HOME`) must still reach the user's real
+ * Codex logins, and the containment guard must not move with an environment variable.
+ */
+export const codexAccountHome = (): string => userInfo().homedir
+
+const expandHome = (value: string): string => (value.startsWith('~/') ? join(codexAccountHome(), value.slice(2)) : value)
 
 /** Codex homes hold credentials, so a configured path may never leave the user's home. */
 const containedHome = (value: string): string => {
   const path = resolve(expandHome(value))
-  const owner = homedir()
+  const owner = codexAccountHome()
   if (path === owner || !path.startsWith(`${owner}${sep}`)) {
     throw new CodexHomeError(`Codex home '${path}' must be a directory inside '${owner}'.`)
   }
@@ -45,7 +51,7 @@ const containedHome = (value: string): string => {
 
 export const resolveCodexHomeLayout = (input: CodexHomeInput): CodexHomeLayout => {
   const configured = input.homePath?.trim() ?? ''
-  const shared = containedHome(configured.length > 0 ? configured : join(homedir(), '.codex'))
+  const shared = containedHome(configured.length > 0 ? configured : join(codexAccountHome(), '.codex'))
   const shadow = input.shadowHomePath?.trim() ?? ''
   if (shadow.length === 0) {
     return { mode: 'direct', sharedHomePath: shared, effectiveHomePath: shared }
