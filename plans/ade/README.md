@@ -132,7 +132,7 @@ builds; assert one `style[data-plugin]` Tailwind sheet. Fails CI on regression b
 | [x] P1.1 xstate pilot: `@dshfiles/plugin-ui/machine` + jujutsu workspace restore | #7 | M | — | restore flow is one machine; tests drive states, not effects |
 | [x] P1.2 jujutsu drag → preview → confirm machine | #16 (+ optional L9) | M | P1.1 | same machine shape as #7; drag cancel/escape covered |
 | [x] P1.3 ai-accounts auto-save machine (both editors), then draft out of useState | #13, finishes #1 | M | P1.1 | one auto-saver; no lost edits on fast typing |
-| P1.4 multi-host lease actor per runtime view | #14, #19 | M | P1.1 | no global error mirror; lease poll stops when view closes |
+| [x] P1.4 multi-host lease actor per runtime view | #14, #19 | M | P1.1 | no global error mirror; lease poll stops when view closes |
 | [x] P1.5 Host utility swaps | L4, L5, L6 | S | — | one relative-time fn, Host clipboard, `rankByName` for label filter |
 | [x] P1.6 `createStoredValue(key, zodSchema)` in plugin-ui + 5 stores | L7 | S | — | storage-event sync across tabs; invalid JSON falls back |
 | [x] P1.7 Query/Form leftovers (#17 #18 #21 #22 skipped, see audit) | #9, #10, #15, #17, #18, #20, #21, #22, #23 | M | — | no hand-rolled loading/error state left in those files |

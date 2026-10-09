@@ -23,12 +23,12 @@ queue-reorder. optmem has no UI.
 | 11 | ai-accounts | quota-continuations.tsx:17-62 | query + mutation (variables = busy id) | med | S | [x] |
 | 12 | ai-accounts | native-providers-list.tsx:24-47 | query refetchInterval while pending + mutation | med | S | [x] |
 | 13 | ai-accounts | models-page-accounts.tsx:30-56 + auto-save.ts | auto-save machine shared by both editors | med | M | [x] auto-save.ts is an xstate machine; both editors use useAutoSaver (latest save/delay via ref) |
-| 14 | multi-host | client.tsx:335-391 (view lease + setInterval poll) | spawned lease actor per runtime view | med | M | [ ] |
+| 14 | multi-host | client.tsx:335-391 (view lease + setInterval poll) | spawned lease actor per runtime view | med | M | [x] runtime-view-machine.ts spawns one lease actor per view |
 | 15 | jujutsu | session-fork-panel.tsx:42-117 | mutation(fork) + useInfiniteQuery (history) | med | M | [x] mutations for fork + loadOlder; history stays the Host-retained event window (no fetchable pages for useInfiniteQuery) |
 | 16 | jujutsu | client.tsx:228-229,260-276,356-399 (drag→preview→confirm) | machine (same shape as #7) | med | M | [x] revision-action-machine.ts (menus share it) |
 | 17 | thread-sidebar | sidebar-shell.tsx:338-340,659-667 (restart dialog) | mutation | med | S | [skip] restart.test.ts guards sidebar-shell against plugin-ui/query after a QueryClient crash; useApiQuery stays |
 | 18 | thread-sidebar | client.tsx:187-229,300-312 (snooze/markRead) | mutations with onError notice | low | S | [skip] same sidebar no-QueryClient guard as #17 |
-| 19 | multi-host | client.tsx:118,206-328,395-411 (global error mirror) | per-mutation error + invalidate | low | S | [ ] |
+| 19 | multi-host | client.tsx:118,206-328,395-411 (global error mirror) | per-mutation error + invalidate | low | S | [x] each mutation owns its error (Host !ok results throw in mutationFn); a new action clears the previous failure |
 | 20 | diff-viewed | viewed-toggle.tsx:13-27 | useQuery | low | S | [x] |
 | 21 | prompt-stash | prompt-stash-action.tsx:27,145-295 | useAppForm | low | S | [skip] kit fields lack maxLength/counter; save logic is storage-conflict checks, not field validation |
 | 22 | prompt-stash | prompt-stash.tsx:39-40 | useAppForm | low | S | [skip] same as #21 |

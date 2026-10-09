@@ -19,10 +19,12 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { z } from 'zod'
 import { multiHostApi, type HostSummary, type RuntimeSummary, type RuntimeStatus } from './api.js'
+import { releaseHeldViews, runtimeViewsMachine } from './runtime-view-machine.js'
 
 const SectionHeading = (props: { readonly id: string; readonly title: string; readonly meta: string }): JSX.Element => (
   <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-4">
@@ -51,7 +53,6 @@ const BorderedList = (props: { readonly children: ReactNode; readonly label?: st
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`
 
 type Directory = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
-type ViewWindow = { readonly popup: Window; readonly timer: number; readonly runtimeId: string }
 
 const emptyDirectory: Directory = { hosts: [], runtimes: [] }
 const directoryQueryKey = ['multi-host', 'directory'] as const
@@ -114,11 +115,8 @@ export const MultiHostPanel = (): JSX.Element => {
   const api = useApi(multiHostApi)
   const queryClient = useQueryClient()
   const [preferredRuntimeId, setPreferredRuntimeId] = useState('')
-  const [openViewRuntimeIds, setOpenViewRuntimeIds] = useState<ReadonlySet<string>>(new Set())
-  const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [removingHost, setRemovingHost] = useState<HostSummary | null>(null)
-  const viewWindows = useRef(new Map<string, ViewWindow>())
   const requestControllers = useRef(new Set<AbortController>())
   const directoryQuery = useQuery({
     queryKey: directoryQueryKey,
@@ -154,13 +152,27 @@ export const MultiHostPanel = (): JSX.Element => {
   })
   const hostUpsertMutation = useMutation({ mutationFn: (input: Parameters<typeof api.hostUpsert>[0]) => api.hostUpsert(input) })
   const runtimeUpsertMutation = useMutation({
-    mutationFn: (args: Parameters<typeof api.runtimeUpsert>) => api.runtimeUpsert(...args),
+    mutationFn: async (input: { readonly value: z.infer<ReturnType<typeof runtimeFormSchema>>; readonly signal: AbortSignal }) => {
+      const host = directory.hosts.find(item => item.id === input.value.hostId)
+      if (host === undefined) throw new Error('Choose a recorded host first.')
+      const locator =
+        host.connector.kind === 'local'
+          ? { kind: 'local' as const, launchUrl: input.value.launchUrl }
+          : { kind: 'ssh' as const, unit: input.value.unit, remoteHome: input.value.remoteHome }
+      const registration = await api.runtimeUpsert({ hostId: host.id, name: input.value.name, locator }, { signal: input.signal })
+      if (!registration.ok) throw new Error(`${registration.code}: ${registration.message}`)
+      return registration
+    },
   })
   const workspaceOpenMutation = useMutation({
     mutationFn: (args: Parameters<typeof api.workspaceOpen>) => api.workspaceOpen(...args),
   })
   const sessionCreateMutation = useMutation({
-    mutationFn: (args: Parameters<typeof api.runtimeCall>) => api.runtimeCall(...args),
+    mutationFn: async (args: Parameters<typeof api.runtimeCall>) => {
+      const result = await api.runtimeCall(...args)
+      if (!result.ok) throw new Error(result.message)
+      return sessionCreatedSchema.parse(result.value)
+    },
   })
   const hostRemoveMutation = useMutation({ mutationFn: (input: Parameters<typeof api.hostRemove>[0]) => api.hostRemove(input) })
   const saving =
@@ -171,12 +183,37 @@ export const MultiHostPanel = (): JSX.Element => {
     hostRemoveMutation.isPending
   const status = selectedRuntime === undefined ? null : (runtimeStatusQuery.data ?? null)
   const loading = directoryQuery.isFetching
-  const visibleError = error ?? (directoryQuery.isFetching || directoryQuery.error === null ? null : errorMessage(directoryQuery.error))
+  const viewPort = useMemo(
+    () => ({
+      openView: (input: { readonly runtimeId: string }, options: { readonly signal: AbortSignal }) => api.runtimeOpenView(input, options),
+      closeView: (input: { readonly leaseId: string }) => api.runtimeCloseView(input),
+    }),
+    [api],
+  )
+  const [viewsSnapshot, sendViews, viewsActor] = useMachine(runtimeViewsMachine, { input: { port: viewPort } })
+  const openViewRuntimeIds = new Set(Object.values(viewsSnapshot.context.views).map(view => view.runtimeId))
+  const failedMutation = [hostUpsertMutation, runtimeUpsertMutation, workspaceOpenMutation, sessionCreateMutation, hostRemoveMutation].find(
+    mutation => mutation.isError,
+  )
+  const visibleError =
+    viewsSnapshot.context.error ??
+    (failedMutation === undefined ? null : errorMessage(failedMutation.error)) ??
+    (directoryQuery.isFetching || directoryQuery.error === null ? null : errorMessage(directoryQuery.error))
+
+  /** A new action replaces the previous failure, as each mutation owns its own error. */
+  const clearErrors = (): void => {
+    for (const mutation of [hostUpsertMutation, runtimeUpsertMutation, workspaceOpenMutation, sessionCreateMutation, hostRemoveMutation]) mutation.reset()
+    sendViews({ type: 'error.clear' })
+  }
 
   const refresh = useCallback(async (): Promise<void> => {
-    setError(null)
     await queryClient.invalidateQueries({ queryKey: directoryQueryKey })
   }, [queryClient])
+
+  useEffect(() => {
+    const subscription = viewsActor.on('notice', event => setNotice(event.message))
+    return () => subscription.unsubscribe()
+  }, [viewsActor])
 
   useEffect(
     () => () => {
@@ -186,34 +223,24 @@ export const MultiHostPanel = (): JSX.Element => {
     [],
   )
 
-  useEffect(
-    () => () => {
-      for (const [leaseId, view] of viewWindows.current) {
-        clearInterval(view.timer)
-        view.popup.close()
-        void api.runtimeCloseView({ leaseId }).catch(() => undefined)
-      }
-      viewWindows.current.clear()
-    },
-    [api],
-  )
+  useEffect(() => () => releaseHeldViews(viewsActor.getSnapshot().context.views, viewPort), [viewsActor, viewPort])
 
   const hostForm = useAppForm({
     defaultValues: { id: '', name: '', kind: 'ssh' as 'local' | 'ssh', sshTarget: '' },
     validationLogic: revalidateLogic(),
     validators: { onDynamic: hostFormSchema },
     onSubmit: async ({ value }) => {
-      setError(null)
+      clearErrors()
       setNotice(null)
-      try {
-        const connector = value.kind === 'local' ? { kind: 'local' as const } : { kind: 'ssh' as const, sshTarget: value.sshTarget }
-        await hostUpsertMutation.mutateAsync({ id: value.id, name: value.name, connector })
-        hostForm.reset()
-        setNotice('Host recorded. Add one or more DSH runtimes to it.')
-        await refresh()
-      } catch (reason) {
-        setError(errorMessage(reason))
-      }
+      const connector = value.kind === 'local' ? { kind: 'local' as const } : { kind: 'ssh' as const, sshTarget: value.sshTarget }
+      const recorded = await hostUpsertMutation.mutateAsync({ id: value.id, name: value.name, connector }).then(
+        () => true,
+        () => false,
+      )
+      if (!recorded) return
+      hostForm.reset()
+      setNotice('Host recorded. Add one or more DSH runtimes to it.')
+      await refresh()
     },
   })
 
@@ -223,30 +250,18 @@ export const MultiHostPanel = (): JSX.Element => {
     validationLogic: revalidateLogic(),
     validators: { onDynamic: runtimeSchema },
     onSubmit: async ({ value }) => {
-      const host = directory.hosts.find(item => item.id === value.hostId)
-      if (host === undefined) {
-        setError('Choose a recorded host first.')
-        return
-      }
-      setError(null)
+      clearErrors()
       setNotice(null)
       const controller = createRequestController(requestControllers.current)
-      try {
-        const locator =
-          host.connector.kind === 'local'
-            ? { kind: 'local' as const, launchUrl: value.launchUrl }
-            : { kind: 'ssh' as const, unit: value.unit, remoteHome: value.remoteHome }
-        const registration = await runtimeUpsertMutation.mutateAsync([{ hostId: host.id, name: value.name, locator }, { signal: controller.signal }])
-        if (!registration.ok) throw new Error(`${registration.code}: ${registration.message}`)
-        setPreferredRuntimeId(registration.runtime.id)
-        runtimeForm.reset()
-        setNotice(`Runtime ${registration.runtime.id} authenticated and identity pinned.`)
-        await refresh()
-      } catch (reason) {
-        if (!controller.signal.aborted) setError(errorMessage(reason))
-      } finally {
-        releaseRequestController(requestControllers.current, controller)
-      }
+      const registration = await runtimeUpsertMutation
+        .mutateAsync({ value, signal: controller.signal })
+        .catch(() => null)
+        .finally(() => releaseRequestController(requestControllers.current, controller))
+      if (registration === null) return
+      setPreferredRuntimeId(registration.runtime.id)
+      runtimeForm.reset()
+      setNotice(`Runtime ${registration.runtime.id} authenticated and identity pinned.`)
+      await refresh()
     },
   })
 
@@ -265,7 +280,7 @@ export const MultiHostPanel = (): JSX.Element => {
     validators: { onDynamic: workspaceFormSchema },
     onSubmit: async ({ value }) => {
       if (selectedRuntime === undefined) return
-      setError(null)
+      clearErrors()
       setNotice(null)
       const controller = createRequestController(requestControllers.current)
       try {
@@ -278,8 +293,8 @@ export const MultiHostPanel = (): JSX.Element => {
             ? { ...current, workspaces: [...current.workspaces.filter(item => item.workspaceId !== workspace.workspaceId), workspace] }
             : current,
         )
-      } catch (reason) {
-        if (!controller.signal.aborted) setError(errorMessage(reason))
+      } catch {
+        // workspaceOpenMutation.error carries the failure.
       } finally {
         releaseRequestController(requestControllers.current, controller)
       }
@@ -292,19 +307,17 @@ export const MultiHostPanel = (): JSX.Element => {
     validators: { onDynamic: sessionFormSchema },
     onSubmit: async ({ value }) => {
       if (selectedRuntime === undefined) return
-      setError(null)
+      clearErrors()
       setNotice(null)
       const controller = createRequestController(requestControllers.current)
       try {
-        const result = await sessionCreateMutation.mutateAsync([
+        const created = await sessionCreateMutation.mutateAsync([
           {
             runtimeId: selectedRuntime.id,
             request: { namespace: 'session', method: 'create', args: { request: value.cwd === '' ? {} : { cwd: value.cwd } } },
           },
           { signal: controller.signal },
         ])
-        if (!result.ok) throw new Error(result.message)
-        const created = sessionCreatedSchema.parse(result.value)
         setNotice(`Created Session ${created.sessionId} on ${selectedRuntime.id}.`)
         queryClient.setQueryData<RuntimeStatus>(runtimeStatusQueryKey(selectedRuntime.id), current =>
           current?.ok === true
@@ -324,92 +337,37 @@ export const MultiHostPanel = (): JSX.Element => {
               }
             : current,
         )
-      } catch (reason) {
-        if (!controller.signal.aborted) setError(errorMessage(reason))
+      } catch {
+        // sessionCreateMutation.error carries the failure.
       } finally {
         releaseRequestController(requestControllers.current, controller)
       }
     },
   })
 
-  const openRuntimeView = async (): Promise<void> => {
+  const openRuntimeView = (): void => {
     if (selectedRuntime === undefined) return
     const popup = window.open('about:blank', '_blank')
-    if (popup === null) {
-      setError('Allow pop-ups to open the native runtime view.')
-      return
-    }
-    popup.opener = null
-    setError(null)
+    if (popup !== null) popup.opener = null
+    clearErrors()
     setNotice(null)
-    let leaseId: string | undefined
-    const controller = createRequestController(requestControllers.current)
-    try {
-      const lease = await api.runtimeOpenView({ runtimeId: selectedRuntime.id }, { signal: controller.signal })
-      leaseId = lease.leaseId
-      const timer = window.setInterval(() => {
-        if (!popup.closed) return
-        const view = viewWindows.current.get(lease.leaseId)
-        if (view !== undefined) clearInterval(view.timer)
-        viewWindows.current.delete(lease.leaseId)
-        setOpenViewRuntimeIds(current => {
-          const next = new Set(current)
-          next.delete(view?.runtimeId ?? selectedRuntime.id)
-          return next
-        })
-        void api
-          .runtimeCloseView({ leaseId: lease.leaseId })
-          .catch(() => setError('Runtime view closed. Its tunnel will expire automatically if the host is unreachable.'))
-      }, 1_000)
-      viewWindows.current.set(lease.leaseId, { popup, timer, runtimeId: selectedRuntime.id })
-      setOpenViewRuntimeIds(current => new Set(current).add(selectedRuntime.id))
-      popup.location.replace(lease.launchUrl)
-      setNotice(`Opened an isolated browser origin for ${selectedRuntime.id}. Close its tab to release the connection.`)
-    } catch (reason) {
-      if (leaseId !== undefined) {
-        const view = viewWindows.current.get(leaseId)
-        if (view !== undefined) clearInterval(view.timer)
-        viewWindows.current.delete(leaseId)
-        await api.runtimeCloseView({ leaseId }).catch(() => undefined)
-      }
-      popup.close()
-      if (!controller.signal.aborted) setError(errorMessage(reason))
-    } finally {
-      releaseRequestController(requestControllers.current, controller)
-    }
+    sendViews({ type: 'view.open', runtimeId: selectedRuntime.id, popup })
   }
 
-  const closeRuntimeViews = async (): Promise<void> => {
-    const openViews = [...viewWindows.current.entries()]
-    viewWindows.current.clear()
-    try {
-      await Promise.all(
-        openViews.map(async ([leaseId, view]) => {
-          clearInterval(view.timer)
-          view.popup.close()
-          await api.runtimeCloseView({ leaseId })
-        }),
-      )
-      setOpenViewRuntimeIds(new Set())
-      setNotice('Closed all native runtime views and released their tunnels.')
-    } catch (reason) {
-      setOpenViewRuntimeIds(new Set())
-      setError(errorMessage(reason))
-    }
-  }
+  const closeRuntimeViews = (): void => sendViews({ type: 'views.closeAll' })
 
   const removeHost = async (): Promise<void> => {
     if (removingHost === null) return
     const host = removingHost
-    setError(null)
-    try {
-      await hostRemoveMutation.mutateAsync({ id: host.id, removeDirectory: true })
-      setRemovingHost(null)
-      setNotice(`Removed ${host.name} and its local directory references. Remote runtime data remains intact.`)
-      await refresh()
-    } catch (reason) {
-      setError(errorMessage(reason))
-    }
+    clearErrors()
+    const removed = await hostRemoveMutation.mutateAsync({ id: host.id, removeDirectory: true }).then(
+      () => true,
+      () => false,
+    )
+    if (!removed) return
+    setRemovingHost(null)
+    setNotice(`Removed ${host.name} and its local directory references. Remote runtime data remains intact.`)
+    await refresh()
   }
 
 
@@ -662,10 +620,10 @@ export const MultiHostPanel = (): JSX.Element => {
                           ))}
                         </dl>
                         <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-                          <Button disabled={openViewRuntimeIds.has(selectedRuntime.id)} onClick={() => void openRuntimeView()} type="button">
+                          <Button disabled={openViewRuntimeIds.has(selectedRuntime.id)} onClick={openRuntimeView} type="button">
                             {openViewRuntimeIds.has(selectedRuntime.id) ? 'Runtime view open' : 'Open native runtime view'}
                           </Button>
-                          <Button disabled={openViewRuntimeIds.size === 0} onClick={() => void closeRuntimeViews()} type="button" variant="outline">
+                          <Button disabled={openViewRuntimeIds.size === 0} onClick={closeRuntimeViews} type="button" variant="outline">
                             Close runtime views
                           </Button>
                         </div>
