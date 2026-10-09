@@ -43,10 +43,12 @@ bundles and are not installed on their own.
 
 ### Web profile
 
-The checked-in web profile manifest and Cordis patch live in `profiles/web/`.
-Nixfiles seeds them into DSH's writable profile and reconciles the managed
-plugin declarations; runtime edits outside that managed region stay under
-`~/.dsh/profiles/web/`.
+The checked-in web profile lives in `profiles/web/` and contains the package
+manifest, Cordis patch, pnpm workspace policy, and portable AI-account metadata
+(`ai-accounts.json`). Nixfiles seeds writable runtime copies, reconciles managed
+plugin declarations, and copies account metadata only when the runtime account
+store is absent. Credentials, provider auth, lockfiles, sessions, and other
+runtime state stay local and are not copied.
 
 ### Toolchain
 

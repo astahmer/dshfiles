@@ -19,8 +19,9 @@
 - id: agent-default-model
   name: "@deepseek-ai/dsh-agent-default-model"
   config:
-    provider: opencode-go-alex
-    model: deepseek-v4.1-flash
+    provider: codex-alex2
+    model: gpt-6-luna
+    reasoningEffort: max
 
 # dsh-client-connection's rpc.register() calls owner.webServer.register(route),
 # but the row declares only webRuntime. Any plugin registering a Host API then
@@ -42,25 +43,11 @@
     mode: timed
     timeout: 300
 
-# AI Accounts: one LLM route per account. Each Codex account gets a shadow home
-# whose non-private entries are symlinks back into the shared CODEX_HOME, so
-# sessions, skills and plugins stay shared while auth.json stays private.
+# Account identities and model preferences are in ai-accounts.json; credentials
+# stay in the provider's local auth store.
 - id: ai-accounts
   config:
-    codexShadowRoot: ~/.codex-dshx
-    distribution: sticky
-    cooldownMs: 300000
-    codexAccounts:
-      - instanceId: codex
-        displayName: Codex (primary)
-        homePath: ~/.codex
-        shadowHomePath: ~/.codex-dshx/primary
-        enabled: true
-      - instanceId: codex_alt
-        displayName: Codex (second)
-        homePath: ~/.codex
-        shadowHomePath: ~/.codex-dshx/second
-        enabled: true
+    edgeWidget: false
 - id: permission
   name: "@deepseek-ai/dsh-permission-presets"
   config:
@@ -79,10 +66,24 @@
   name: "@deepseek-ai/dsh-client-ui-theme"
   config:
     preference: light
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers: {}
+- id: llm-deepseek
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: ui-chat
+  name: "@deepseek-ai/dsh-client-ui-chat"
+  config:
+    transcriptView: detailed
+- id: dshfiles-jujutsu
+  name: "@dshfiles/jujutsu"
+  config:
+    hideImmutable: false
+    fileView: flat
 # BEGIN NIX-MANAGED DSH PLUGINS
-- insert:
-    - id: dshfiles-multi-host
-      name: '@dshfiles/multi-host'
 - id: our-free-model
   config:
     distribution: managed
