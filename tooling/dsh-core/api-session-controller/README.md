@@ -19,7 +19,7 @@ The source and package build configuration match DSH 0.2.0-rc.2 at commit `639ed
 ```sh
 pnpm run build:lib
 DSH_SOURCE_ROOT=/path/to/deepseek-harness pnpm --dir /path/to/dshfiles run sync:core-api-session-controller
-DSH_SOURCE_ROOT=/path/to/deepseek-harness pnpm --dir /path/to/dshfiles run verify:core-runtime-scratch
+pnpm --dir /path/to/dshfiles run verify:core-runtime-scratch
 ```
 
 The sync command checks the controller source/config against the pinned source, regenerates the Host Typert model in memory, verifies the checked-in Remote artifacts byte-for-byte, and copies the matching `lib/` output into this package. The DSH source checkout is read-only to the sync step. This repository ignores `lib/`; rerun the sync after a clean checkout before linking this package into a scratch profile.
