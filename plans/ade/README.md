@@ -38,7 +38,7 @@ Targets (measured in the live web UI, production build, 4× CPU throttle off, M-
 | Idle CPU with sidebar + jujutsu pane open | no recurring task > 5 ms more often than once per 2 s |
 | Total injected plugin CSS | 1 Tailwind sheet, not ~15 |
 
-### P0.1 Profile and baseline (S) — deps: none
+### [x] P0.1 Profile and baseline (S) — deps: none
 
 How: start the web profile, open it in the built-in Browser pane (or Chrome with React DevTools). Record a
 Performance trace of: open ⌘P, type 6 chars, close; open ⌘K; scroll the thread list; idle 10 s with the jujutsu
