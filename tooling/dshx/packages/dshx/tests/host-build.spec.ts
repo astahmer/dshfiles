@@ -190,6 +190,24 @@ describe('host compiler', () => {
     expect(await readFile(output, 'utf8')).not.toContain('@dshfiles/dshx/api')
   })
 
+  it('lets a Host handler throw PluginApiError from the public API module', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineApi, method, PluginApiError } from '@dshfiles/dshx/api'",
+        "import { defineHost } from '@dshfiles/dshx/host'",
+        "const api = defineApi({ id: 'failing', version: 1, methods: { get: method() } })",
+        "export default defineHost({ apis: [api.host({ get() { throw new PluginApiError('Refresh and try again.', { code: 'stale' }) } })] })",
+        '',
+      ].join('\n'),
+    )
+    await buildHost({ packageId: '@dshx/fixture-plugin', root, entry: 'src/host.ts', outDir: 'dist' })
+    const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(code).toContain('dshx.plugin-api-error')
+    expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
+  })
+
   it('inlines the public Host platform API helpers into Host artifacts', async () => {
     const root = await temporaryProject()
     await writeFile(

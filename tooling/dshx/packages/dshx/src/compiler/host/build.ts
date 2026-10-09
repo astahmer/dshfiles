@@ -105,7 +105,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       if (id === `${VIRTUAL_HOST_PUBLIC}-api`) {
         return [
           `export { defineApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
-          `export { isApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          `export { isApiError, PluginApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           '',
         ].join('\n')
       }
