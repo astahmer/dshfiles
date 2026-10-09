@@ -64,6 +64,7 @@ import {
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -125,36 +126,13 @@ const DISCLOSURE_TRIGGER =
   'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground dshx:hover:text-foreground'
 const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
 
-const repoHistorySchema = z.array(z.string()).catch([])
+const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.array(z.string()), fallback: [] })
+const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: z.string(), fallback: '' })
 
 const jujutsuKeys = {
   repository: (repoId: string) => ['jujutsu', repoId] as const,
   state: (repoId: string, limit: number) => ['jujutsu', repoId, 'state', limit] as const,
   details: (repoId: string, commitId: string) => ['jujutsu', repoId, 'details', commitId] as const,
-}
-
-const readStorage = (key: string): string | null => {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-const writeStorage = (key: string, value: string): void => {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // Storage can be disabled; the panel still works for this session.
-  }
-}
-
-const readRepoHistory = (): readonly string[] => {
-  try {
-    return repoHistorySchema.parse(JSON.parse(readStorage(REPO_HISTORY_KEY) ?? '[]')).slice(0, REPO_HISTORY_LIMIT)
-  } catch {
-    return []
-  }
 }
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
@@ -205,9 +183,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
-  const [path, setPath] = useState(() => readStorage(SELECTED_REPO_KEY) ?? '')
+  const [path, setPath] = useState(storedRepoPath.get)
   const [repoId, setRepoId] = useState<string | null>(null)
-  const [repoHistory, setRepoHistory] = useState(readRepoHistory)
+  const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = useState<View | null>(null)
   const view = chosenView ?? preferences.defaultView
@@ -220,7 +198,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [collapsedDays, setCollapsedDays] = useState<ReadonlySet<string>>(() => new Set())
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
-  const [reviewStore, setReviewStore] = useState<ReviewStore>(() => readReviewStore(readStorage(REVIEW_PROGRESS_KEY)))
+  const [reviewStore, setReviewStore] = useState<ReviewStore>(() => {
+    try {
+      return readReviewStore(localStorage.getItem(REVIEW_PROGRESS_KEY))
+    } catch {
+      return readReviewStore(null)
+    }
+  })
   const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
   const [reviewNotice, setReviewNotice] = useState('')
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
@@ -259,8 +243,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setFullDiff(null)
       const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
       setRepoHistory(nextHistory)
-      writeStorage(REPO_HISTORY_KEY, JSON.stringify(nextHistory))
-      writeStorage(SELECTED_REPO_KEY, registered.root)
+      storedRepoHistory.set(nextHistory)
+      storedRepoPath.set(registered.root)
       void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(registered.repoId) })
     },
   })
