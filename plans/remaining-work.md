@@ -13,14 +13,20 @@ read + `gpt-reserve` routing (fixture-tested only); one-click jj toggle (header,
 ADE Phase 3 palette hub (Host commands, ⌘P files → editor, frecency, `>` `#` `:` `?` prefixes); workbench as a
 right side-panel tab + header toggle + command; missing turn summary fix; 300 s stream idle timeout.
 
-In flight (agent tasks; on resume check `jj log` for their revisions before redoing):
-- [ ] jujutsu: intermittent "API handler failed" + revision stuck on "Loading revision details…" (root cause + fix)
-- [ ] dshx: every plugin's settings editable on its Host plugin page (generic seam); then typed `inject` lists
-- [ ] thread-sidebar: proper slot above Settings for the usage strip; ai-accounts meter shows %/reset/both
-  (default both); recent page history next to ← →; hide-DeepSeek-logo setting; "restart DSH to apply updates"
-  indicator + restart action in `>` palette
-- [ ] docs: dock-everything feasibility in [ade/docking.md](ade/docking.md) (two modes: full dock vs workbench
-  only; plugin-registered panel kinds with multiple instances, e.g. several editors)
+Landed 2026-10-10 (later): jj details race fix (`ywumusqy`, reads by commit id with `--ignore-working-copy`, inline
+Retry); dshx settings forms on every plugin's Host Plugins page (`wmuzpmyk`), `DSHX1207` inject typo check
+(`lvlrznvq`), API handler error logging + `PluginApiError` (`yvtxnpyu`); sidebar `sidebar.footer.above` slot for
+the usage strip, meter label setting, history menu next to ← →, `hideBrandLogo`, "Restart DSH to apply updates"
+indicator; dock-everything plan in [ade/docking.md](ade/docking.md) (feasible without a fork; D0 probe first).
+
+Small follow-ups:
+- [ ] jujutsu prepare/confirm: throw `PluginApiError` so real messages reach the panel
+- [ ] ai-accounts Settings: price catalog line shows "fetched [object Object]"
+- [ ] dshx `tests/config.spec.ts:51` unused `@ts-expect-error` (typecheck error)
+- [ ] restart indicator misses host-only plugins (e.g. optmem) — Host client registry doesn't list them
+- [ ] optmem settings can't show on its Plugins page (no client half)
+- [ ] palette-perf tests flaky under machine load (thresholds or isolate)
+- [ ] 423 old `conflicts()` revisions in dshfiles from shared-working-copy agents — tidy (abandon/resolve)
 
 Next, in order (workbench/dock work last):
 1. Luna Reserve live check when a Codex weekly limit is next spent
