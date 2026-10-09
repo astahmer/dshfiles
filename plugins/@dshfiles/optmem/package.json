@@ -1,0 +1,67 @@
+{
+  "name": "@dshfiles/optmem",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OptMem persistent memory for DSH: captures sessions into a per-project memory tree, adds memory tools and a compact injected view.",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/optmem-core": "link:../optmem-core",
+    "@dshfiles/optmem-sqlite": "link:../optmem-sqlite"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-commands": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-compaction": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-home-paths": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session-query": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-workspace": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-commands": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-home-paths": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session-query": ">=0.2.0-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
