@@ -107,6 +107,8 @@ Acceptance: ≤ 1 commit per unrelated session update; only changed rows in the 
 - Polling: `jujutsu/auto-refresh.ts`, `multi-host/client.tsx` lease poll (#14), `thread-sidebar/client.tsx`
   interval, ai-accounts `refetchInterval`s: pause when `document.hidden` or the pane is closed; prefer Host
   `changes` streams over polling where they exist.
+  - [x] jujutsu: refetchInterval and focus refetch pause while the tab is hidden or the pane is off screen /
+    zero-size (IntersectionObserver + ResizeObserver); interval mode refreshes at once on return.
 
 Acceptance: idle-CPU target met; total client JS down ≥ 25 %; no feature regressions in smoke e2e.
 

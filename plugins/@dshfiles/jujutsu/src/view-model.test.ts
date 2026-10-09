@@ -1,7 +1,7 @@
 import { parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { describe, expect, it } from 'vitest'
 import { buildFileTree, splitFilePath } from './file-tree.ts'
-import { refreshQueryOptions } from './auto-refresh.ts'
+import { refreshesOnReturn, refreshQueryOptions } from './auto-refresh.ts'
 import { decodePreferences, legacyPreferences } from './preferences.ts'
 import { descendantCommitIds, emptyAncestorCandidates, sourceControlGroups } from './source-control.ts'
 
@@ -149,6 +149,16 @@ describe('refreshQueryOptions', () => {
       refetchOnWindowFocus: true,
     })
     expect(refreshQueryOptions({ preferences, visible: false, paused: false }).refetchInterval).toBe(false)
+  })
+
+  it('skips focus refetch while the pane is closed or the tab hidden', () => {
+    expect(refreshQueryOptions({ preferences, visible: false, paused: false }).refetchOnWindowFocus).toBe(false)
+  })
+
+  it('catches up immediately on return in interval mode even without refreshOnVisible', () => {
+    expect(refreshesOnReturn({ preferences: { ...preferences, refreshOnVisible: false }, paused: false })).toBe(true)
+    expect(refreshesOnReturn({ preferences: { ...preferences, refreshMode: 'manual', refreshOnVisible: false }, paused: false })).toBe(false)
+    expect(refreshesOnReturn({ preferences, paused: true })).toBe(false)
   })
 
   it('holds every refresh while a confirm or mutation is in flight', () => {
