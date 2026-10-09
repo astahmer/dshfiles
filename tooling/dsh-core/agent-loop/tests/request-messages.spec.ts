@@ -66,6 +66,8 @@ describe('agent/request-messages', () => {
       event.type === 'request/messages-override' ? [event.data] : [])).toEqual([
       { turn: 2, step: 1, originalCount: 4, sentCount: 2 },
     ])
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'request/messages-override')
+      .every(event => event.ignorable === true)).toBe(true)
   })
 
   it('stops the request when the turn is cancelled inside the waterfall', async () => {

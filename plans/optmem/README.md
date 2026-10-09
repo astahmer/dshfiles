@@ -28,3 +28,10 @@ Design: [design.md](design.md).
 
 ## Rules
 - dshfiles is a jj repo; one described revision per chunk; never restart the live DSH (`web`); verify in `probe`.
+
+## Post-Stage-4 notes (2026-10-09)
+- Fork-only `request/messages-override` events are now written with `ignorable: true`, so stock DSH can still
+  read session logs produced in full mode (fork session package + dsh-core-runtime rebuilt).
+- Remaining (Stage 5): long-conversation token/cache comparison compat vs full; real summaries in full mode;
+  capture actual request bytes; why the codex route returns empty replies from an isolated DSH_HOME; oxfmt on
+  optmem packages (22 files failed `--check` before Stage 4).

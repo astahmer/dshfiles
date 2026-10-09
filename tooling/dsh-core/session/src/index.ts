@@ -25,6 +25,10 @@ import { sessionRuntimeBindingSchema } from './runtime-binding.ts'
 
 import { buildForkSeed } from './fork.ts'
 
+
+// Event types only this fork writes; marked ignorable so stock DSH can still read these session logs.
+const FORK_ONLY_EVENT_TYPES: ReadonlySet<string> = new Set(['request/messages-override'])
+
 export { buildForkSeed } from './fork.ts'
 export * from './types.ts'
 export { SessionPreparation } from './preparation.ts'
@@ -817,6 +821,7 @@ export class Session {
       time: Date.now(),
       data: dataSnapshot,
       ...(surfaceMetadataSnapshot as { surfaceOp?: unknown; sourceEventSeqs?: unknown }),
+      ...(FORK_ONLY_EVENT_TYPES.has(type) ? { ignorable: true } : {}),
     } as unknown as SessionEvent<T>)
     validateSessionEventData(event, `session event "${type}" at seq ${event.seq}`)
     this.surfaceManager.validateNext(event as SessionEvent)
