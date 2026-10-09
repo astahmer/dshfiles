@@ -469,7 +469,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
 export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, closePalette, setSelectedThreadId } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, closePalette, setSelectedThreadId, threadTitle } = useSidebarState()
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
@@ -523,6 +523,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
+  threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   useEffect(() => {
     if (sessionState.phase !== 'ready') return

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { canStep, currentLocation, emptyNavigationHistory, stepHistory, visitLocation, type NavigationLocation } from './navigation-history.js'
+import { canStep, currentLocation, emptyNavigationHistory, jumpHistory, stepHistory, visitLocation, type NavigationLocation } from './navigation-history.js'
 
 const thread = (id: string): NavigationLocation => ({ kind: 'thread', id })
 const panel = (id: string): NavigationLocation => ({ kind: 'panel', id })
@@ -42,4 +42,14 @@ test('history keeps only the newest entries past its limit', () => {
   const history = ['a', 'b', 'c', 'd'].reduce((current, id) => visitLocation(current, thread(id), 3), emptyNavigationHistory())
   assert.deepEqual(history.entries, [thread('b'), thread('c'), thread('d')])
   assert.equal(history.index, 2)
+})
+
+test('the history menu jumps to any visited entry and keeps the rest for back and forward', () => {
+  const history = visitAll([thread('a'), panel('settings'), thread('b'), thread('c')])
+  const jump = jumpHistory(history, 0)
+  assert.deepEqual(jump?.target, thread('a'))
+  assert.equal(jump?.history.entries, history.entries)
+  assert.equal(jump === null ? true : canStep(jump.history, 1), true)
+  assert.equal(jumpHistory(history, history.index), null)
+  assert.equal(jumpHistory(history, 9), null)
 })

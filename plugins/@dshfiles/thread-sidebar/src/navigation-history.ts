@@ -41,12 +41,17 @@ export const visitLocation = <Location extends NavigationLocation>(
 export const canStep = (history: NavigationHistory<NavigationLocation>, direction: -1 | 1): boolean =>
   history.entries[history.index + direction] !== undefined && history.index >= 0
 
+/** Jump to any visited entry, as a browser's history menu does; null for the current entry or an unknown index. */
+export const jumpHistory = <Location extends NavigationLocation>(
+  history: NavigationHistory<Location>,
+  index: number,
+): { readonly history: NavigationHistory<Location>; readonly target: Location } | null => {
+  const target = history.entries[index]
+  if (target === undefined || index === history.index || history.index < 0) return null
+  return { history: { entries: history.entries, index }, target }
+}
+
 export const stepHistory = <Location extends NavigationLocation>(
   history: NavigationHistory<Location>,
   direction: -1 | 1,
-): { readonly history: NavigationHistory<Location>; readonly target: Location } | null => {
-  if (!canStep(history, direction)) return null
-  const index = history.index + direction
-  const target = history.entries[index]
-  return target === undefined ? null : { history: { entries: history.entries, index }, target }
-}
+): { readonly history: NavigationHistory<Location>; readonly target: Location } | null => jumpHistory(history, history.index + direction)

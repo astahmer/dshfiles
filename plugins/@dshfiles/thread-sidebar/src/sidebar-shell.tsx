@@ -21,7 +21,7 @@ import {
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -33,6 +33,7 @@ import {
   CommandIcon,
   EllipsisVerticalIcon,
   GripVerticalIcon,
+  MessageSquareIcon,
   PanelLeftIcon,
   RefreshCwIcon,
   SlidersHorizontalIcon,
@@ -69,9 +70,9 @@ import {
   canStep,
   currentLocation,
   emptyNavigationHistory,
+  jumpHistory,
   NAVIGATION_EVENT,
   sameLocation,
-  stepHistory,
   visitLocation,
   type NavigationHistory,
   type NavigationLocation,
@@ -105,6 +106,8 @@ type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMeta
 
 /** A Back/Forward step waits this long for its own navigation before treating a new location as a fresh visit. */
 const NAVIGATION_SETTLE_MS = 1500
+/** Holding Back or Forward this long opens the history menu, as browsers do. */
+const HISTORY_HOLD_MS = 450
 const DRAG_THRESHOLD_PX = 5
 
 const rowFieldKeys = [
@@ -447,9 +450,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
-  const { preferences, updatePreferences, openPalette, setDestinations, selectedThreadId } = useSidebarState()
+  const { preferences, updatePreferences, openPalette, setDestinations, selectedThreadId, threadTitle } = useSidebarState()
   const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(emptyNavigationHistory)
   const pendingStep = useRef<{ target: SidebarLocation; until: number } | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const historyGroupRef = useRef<HTMLDivElement>(null)
+  const historyHold = useRef<{ timer: number | undefined; opened: boolean }>({ timer: undefined, opened: false })
   const restartApi = useApi(threadSidebarRestartApi)
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
@@ -622,8 +628,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     setHistory(current => visitLocation(current, location))
   }, [activePanelId, selectedThreadId])
 
-  const stepNavigation = (direction: -1 | 1): void => {
-    const step = stepHistory(history, direction)
+  const goToHistoryEntry = (index: number): void => {
+    const step = jumpHistory(history, index)
     if (step === null) return
     pendingStep.current = { target: step.target, until: Date.now() + NAVIGATION_SETTLE_MS }
     setHistory(step.history)
@@ -634,6 +640,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     const panelId = step.target.id
     if (panels.some(panel => panel.id === panelId)) props.selectPanel(panelId)
   }
+  const stepNavigation = (direction: -1 | 1): void => goToHistoryEntry(history.index + direction)
   const latestStepNavigation = useRef(stepNavigation)
   latestStepNavigation.current = stepNavigation
 
@@ -1008,28 +1015,113 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           ) : null}
           {wide ? (
             <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:text-muted-foreground"
-                aria-label={text(props.t, 'threadSidebarBack')}
-                title={withChordHint(text(props.t, 'threadSidebarBack'), preferences.backChord)}
-                disabled={!canStep(history, -1)}
-                onClick={() => stepNavigation(-1)}
-              >
-                <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:text-muted-foreground"
-                aria-label={text(props.t, 'threadSidebarForward')}
-                title={withChordHint(text(props.t, 'threadSidebarForward'), preferences.forwardChord)}
-                disabled={!canStep(history, 1)}
-                onClick={() => stepNavigation(1)}
-              >
-                <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
-              </Button>
+              <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+                <PopoverAnchor asChild>
+                  <div ref={historyGroupRef} className="dshx:flex dshx:items-center">
+                    {([-1, 1] as const).map(direction => {
+                      const label = text(props.t, direction === -1 ? 'threadSidebarBack' : 'threadSidebarForward')
+                      return (
+                        <Button
+                          key={direction}
+                          variant="ghost"
+                          size="icon-xs"
+                          className="dshx:text-muted-foreground"
+                          aria-label={label}
+                          title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
+                          disabled={!canStep(history, direction)}
+                          onPointerDown={event => {
+                            if (event.button !== 0) return
+                            window.clearTimeout(historyHold.current.timer)
+                            historyHold.current = {
+                              opened: false,
+                              timer: window.setTimeout(() => {
+                                historyHold.current.opened = true
+                                setHistoryOpen(true)
+                              }, HISTORY_HOLD_MS),
+                            }
+                          }}
+                          onPointerUp={() => window.clearTimeout(historyHold.current.timer)}
+                          onPointerLeave={() => window.clearTimeout(historyHold.current.timer)}
+                          onContextMenu={event => {
+                            event.preventDefault()
+                            setHistoryOpen(true)
+                          }}
+                          onClick={() => {
+                            if (historyHold.current.opened) {
+                              historyHold.current.opened = false
+                              return
+                            }
+                            stepNavigation(direction)
+                          }}
+                        >
+                          {direction === -1 ? (
+                            <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
+                          ) : (
+                            <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
+                          )}
+                        </Button>
+                      )
+                    })}
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="dshx:w-4 dshx:text-muted-foreground"
+                      aria-label={text(props.t, 'threadSidebarHistory')}
+                      aria-expanded={historyOpen}
+                      title={text(props.t, 'threadSidebarHistory')}
+                      disabled={history.entries.length < 2}
+                      onClick={() => setHistoryOpen(open => !open)}
+                    >
+                      <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </PopoverAnchor>
+                <PopoverContent
+                  align="start"
+                  sideOffset={6}
+                  className="dshx-root dshx:flex dshx:max-h-[min(420px,calc(100vh-96px))] dshx:w-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
+                  aria-label={text(props.t, 'threadSidebarHistory')}
+                  onInteractOutside={event => {
+                    if (event.target instanceof Node && historyGroupRef.current?.contains(event.target) === true) event.preventDefault()
+                  }}
+                >
+                  {history.entries
+                    .map((entry, index) => ({ entry, index }))
+                    .reverse()
+                    .map(({ entry, index }) => {
+                      const current = index === history.index
+                      const label =
+                        entry.kind === 'thread'
+                          ? (threadTitle.current(entry.id) ?? text(props.t, 'threadSidebarHistoryThread'))
+                          : (panels.find(panel => panel.id === entry.id)?.label ?? entry.id)
+                      return (
+                        <Button
+                          key={`${String(index)}:${entry.kind}:${entry.id}`}
+                          variant="ghost"
+                          size="sm"
+                          className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-normal', current && 'dshx:bg-accent dshx:font-medium')}
+                          aria-current={current ? 'page' : undefined}
+                          onClick={() => {
+                            setHistoryOpen(false)
+                            goToHistoryEntry(index)
+                          }}
+                        >
+                          <span
+                            className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                            aria-hidden="true"
+                          >
+                            {entry.kind === 'thread' ? (
+                              <MessageSquareIcon className="dshx:size-3.5" />
+                            ) : (
+                              props.renderSlot('sidebar.panellist', { size: 14, active: false }, { only: entry.id })
+                            )}
+                          </span>
+                          <span className="dshx:truncate">{label}</span>
+                        </Button>
+                      )
+                    })}
+                </PopoverContent>
+              </Popover>
               <Button
                 variant="ghost"
                 size="icon-sm"

@@ -31,6 +31,11 @@ Expanded mode is a labelled list with a trailing Customize row; density is
 Compact (30px rows) or Comfortable (34px). Dragging the splitter past 76px from
 the icon row switches to expanded.
 
+**Back / Forward.** The header ← → walk visited threads and panels (⌘[ / ⌘]).
+Right-click or hold either arrow, or click the ▾ beside them, for the recent
+history menu (newest first, current entry marked); picking an entry jumps there
+and keeps the rest for Back and Forward.
+
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,
 project, path, and ID prefix, recent threads when the query is empty,
