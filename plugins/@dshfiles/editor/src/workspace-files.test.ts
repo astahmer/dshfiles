@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createWorkspaceFileIndex, walkWorkspaceFiles, type WorkspaceFilesReply } from './workspace-files.js'
 
-type Tree = { readonly [name: string]: Tree | 'file' }
+type Tree = { [name: string]: Tree | 'file' }
 
 const lister = (tree: Tree, failing: ReadonlySet<string> = new Set()) => {
   const listed: string[] = []
@@ -71,5 +71,70 @@ describe('createWorkspaceFileIndex', () => {
     index.request('ses_1', reply => stale.push(reply))
     expect(stale[0]).toMatchObject({ status: 'indexing', files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'] })
     index.dispose()
+  })
+})
+
+/** Host `changes` stand-in: one stream per watched directory; `emit` sends that directory a change frame. */
+const watcher = () => {
+  const streams = new Map<string, (frame: { kind: 'change' }) => void>()
+  const watch = (_sessionId: string, path: string, signal: AbortSignal): AsyncIterable<{ readonly kind: 'ready' | 'change' }> => ({
+    [Symbol.asyncIterator]: () => {
+      const queue: { kind: 'change' }[] = []
+      let wake: (() => void) | null = null
+      streams.set(path, frame => {
+        queue.push(frame)
+        wake?.()
+      })
+      signal.addEventListener('abort', () => {
+        streams.delete(path)
+        wake?.()
+      })
+      return {
+        next: async () => {
+          while (queue.length === 0 && !signal.aborted) await new Promise<void>(resolve => (wake = resolve))
+          const frame = queue.shift()
+          return frame === undefined ? { done: true, value: undefined } : { done: false, value: frame }
+        },
+      }
+    },
+  })
+  return { watch, watched: () => [...streams.keys()].sort(), emit: (path: string) => streams.get(path)?.({ kind: 'change' }) }
+}
+
+describe('createWorkspaceFileIndex with Host changes', () => {
+  it('relists a watched directory on change, so new and removed files show up before the TTL', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const tree: Tree = { 'README.md': 'file', src: { 'index.ts': 'file' } }
+      const { list } = lister(tree)
+      const { watch, watched, emit } = watcher()
+      const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), watch, now: () => 0 })
+      const replies: WorkspaceFilesReply[] = []
+      const stop = index.request('ses_1', reply => replies.push(reply))
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready' }))
+      expect(watched()).toEqual(['.', 'src'])
+
+      const src = tree.src
+      if (src === undefined || src === 'file') throw new Error('fixture')
+      src['new.ts'] = 'file'
+      src.lib = { 'deep.ts': 'file' }
+      emit('src')
+      await vi.advanceTimersByTimeAsync(200)
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: ['README.md', 'src/index.ts', 'src/new.ts', 'src/lib/deep.ts'] }))
+      expect(watched()).toEqual(['.', 'src', 'src/lib'])
+
+      delete tree.src
+      emit('.')
+      await vi.advanceTimersByTimeAsync(200)
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: ['README.md'] }))
+      expect(watched()).toEqual(['.'])
+
+      stop()
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(watched()).toEqual([])
+      index.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

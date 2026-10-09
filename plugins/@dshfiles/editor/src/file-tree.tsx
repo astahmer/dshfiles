@@ -2,8 +2,8 @@ import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ChevronRightIcon, FileIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useEffect, useState } from 'react'
 
 interface TreeProps {
   readonly remote: Pick<ClientRemote, 'workspaceFiles'>
@@ -15,11 +15,30 @@ interface TreeProps {
 const ROW =
   'dshx:flex dshx:h-6 dshx:w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:pr-1 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 
-/** One lazily listed directory; children are fetched only while it is expanded. */
+/**
+ * One lazily listed directory; children are fetched only while it is expanded, and relisted on Host `changes` frames
+ * for as long as it stays expanded (collapsing aborts the watch).
+ */
 const Directory = (props: TreeProps & { readonly path: string; readonly depth: number }): JSX.Element => {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const queryClient = useQueryClient()
+  const queryKey = ['dshfiles-editor', 'list', props.sessionId, props.path]
+  useEffect(() => {
+    const controller = new AbortController()
+    const watchPath = props.path === '' ? '.' : props.path
+    void (async () => {
+      try {
+        for await (const frame of props.remote.workspaceFiles.changes(props.sessionId, watchPath, controller.signal)) {
+          if (frame.kind === 'change') void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', props.sessionId, props.path], exact: true })
+        }
+      } catch {
+        // No watch (unsupported, or the Host dropped it): the Refresh button and staleTime still apply.
+      }
+    })()
+    return () => controller.abort()
+  }, [props.remote, props.sessionId, props.path, queryClient])
   const listing = useQuery({
-    queryKey: ['dshfiles-editor', 'list', props.sessionId, props.path],
+    queryKey,
     queryFn: async ({ signal }) => {
       const result = await props.remote.workspaceFiles.list(props.sessionId, props.path === '' ? '.' : props.path, signal)
       if (!result.ok) throw result.error

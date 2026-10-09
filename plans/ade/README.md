@@ -273,7 +273,9 @@ Status (2026-10-10): P3.1–P3.3 landed without a new cross-plugin registry.
   without it just leaves Host commands out. A public `shortcuts.invoke` is the Host gap behind that.
 - ⌘P (`fileSearchChord`, thread search moved off ⌘P to ⌥⌘K/⌘K) lists files of the thread on screen through
   `@dshfiles/editor` (`dshfiles:workspace-files`: breadth-first walk, skips .git/.jj/node_modules, 20k files / 4k dirs,
-  30 s cache) and opens them with `dshfiles:open-file`. Not ignore-aware yet (needs Host `rg --files`).
+  30 s cache, live through Host `changes` on the 64 shallowest directories, which then skips the TTL when they cover the
+  whole index; watches stop 30 s after ⌘P closes) and opens them with `dshfiles:open-file`. The editor tree relists
+  each expanded folder on `changes`. Not ignore-aware yet (needs Host `rg --files`).
 - Prefixes: `>` commands, `#` thread content (Host `session.search`, off when the index is disabled), `:` line in
   the open editor file (`dshfiles:editor-go-to-line`), `?` help. `@` symbols skipped: no Monaco symbol provider.
 - Frecency (`createStoredValue`, 200 entries) ranks actions, commands and files; threads keep `rankThreads`.

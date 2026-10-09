@@ -158,6 +158,7 @@ export default defineClient({
           if (!result.ok) throw result.error
           return result.value
         },
+        watch: (sessionId, path, signal) => ctx.remote.workspaceFiles.changes(sessionId, path, signal),
       })
       const onFilesRequest = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
