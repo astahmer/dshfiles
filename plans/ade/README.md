@@ -115,7 +115,7 @@ Acceptance: idle-CPU target met; total client JS down ≥ 25 %; no feature regre
 > hidden or the pane is closed (jujutsu auto-refresh, multi-host lease, thread-sidebar, ai-accounts). Report
 > before/after sizes and idle trace."
 
-### P0.6 Perf regression check (S) — deps: P0.3, P0.4
+### [~] P0.6 Perf regression check (S) — deps: P0.3, P0.4
 
 A Playwright journey in the existing e2e harness ([dsh-e2e-testing](../dsh-e2e-testing.md)): seed 2,000 threads,
 open the palette, type, assert `performance.measure` durations and a React render counter exposed only in test

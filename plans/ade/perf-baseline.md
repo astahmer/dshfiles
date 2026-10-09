@@ -85,3 +85,11 @@ Not verified live: per-row commit counts (the scratch home lists 0 threads); P0.
   per-plugin copies of React-adjacent deps (Radix, TanStack Query, tailwind-merge, zod) that the one-chunk dshx
   contract cannot share. Reaching −25 % needs a shared vendor runtime (Host-provided module table entries, like React)
   or `zod/mini`; both are out of P0 scope.
+
+## P0.6 (regression check) — partial
+
+`tooling/dshx/e2e/features/palette-performance.feature` boots the `web` scratch profile and asserts, at 2× the Phase 0
+targets: exactly one non-empty `@dshfiles`/shared sheet, palette open → commit p50 < 100 ms, keystroke → commit p95 <
+32 ms. Both scenarios pass locally (58.6 s, 52.6 s; Host boot dominates). The 2,000-thread scale is covered by the
+Vitest guard `thread-sidebar/src/palette-perf.test.ts`. Not done: seeding 2,000 real sessions into the scratch home
+(sessions are zstd JSONL plus workspace membership; needs a seeding helper) and a test-build React render counter.
