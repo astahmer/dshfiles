@@ -17,7 +17,7 @@ queue-reorder. optmem has no UI.
 | 5 | secret-catalog | secret-catalog-panel.tsx:89-131,229-261 | query(list) + 3 mutations + invalidate | high | M | [x] |
 | 6 | secret-catalog | secret-mutation-dialog.tsx:75-86 (10 fields) | useAppForm + zod | high | M | [x] |
 | 7 | jujutsu | workspace-restore-panel.tsx:31-158 (select→prepare→confirm→receipt) | machine (pilot for /machine) | high | M | [ ] |
-| 8 | settings-search | settings-field-editor.tsx:52-110 | useAppForm + 2 mutations | high | M | [ ] |
+| 8 | settings-search | settings-field-editor.tsx:52-110 | useAppForm + 2 mutations | high | M | [x] |
 | 9 | project-checks | client.tsx:110-147 | Query ×3 (enabled: open) + mutation(run) | med | S | [ ] |
 | 10 | project-folder-picker | project-folder-picker.tsx:84-176 | query(browse) + 3 mutations | med | M | [ ] |
 | 11 | ai-accounts | quota-continuations.tsx:17-62 | query + mutation (variables = busy id) | med | S | [ ] |

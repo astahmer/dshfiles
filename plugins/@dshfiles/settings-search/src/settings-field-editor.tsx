@@ -1,4 +1,6 @@
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { useAppForm, useStore } from '@dshfiles/plugin-ui/form'
+import { PluginQueryProvider, errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   formatSettingsDraft,
@@ -32,7 +34,7 @@ export interface SettingsFieldEditorProps {
 
 const snapshotFor = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> => form.getSnapshot()
 
-export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => {
+const SettingsFieldEditorContent = (props: SettingsFieldEditorProps): JSX.Element => {
   const form = props.form
   const t = props.t
   const snapshot = useSyncExternalStore(
@@ -49,71 +51,77 @@ export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Elemen
   const value = readSettingsPath(snapshot.value, path)
   const kind = settingsEditorKind(schema, value, choices)
   const overridden = hasSettingsPath(snapshot.user, path)
-  const [draft, setDraft] = useState(() => formatSettingsDraft(value, kind, choices))
   const [draftRevision, setDraftRevision] = useState(snapshot.revision)
-  const [dirty, setDirty] = useState(false)
-  const [pending, setPending] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const saveMutation = useMutation({
+    mutationFn: (input: { readonly draft: string; readonly revision: number }): Promise<boolean> => {
+      const parsed = parseSettingsDraft(input.draft, kind, choices)
+      if (!parsed.ok) throw new Error(t(parsed.messageKey))
+      return form.mutate(setOperationForSettingsTarget(props.result.target, parsed.value), input.revision)
+    },
+    onMutate: () => setMessage(null),
+    onSuccess: accepted => {
+      setMessage(accepted ? t('saved') : t('hostRefusedKeepDraft'))
+      setConflict(!accepted)
+      if (accepted) draftForm.reset()
+    },
+    onError: error => setMessage(errorMessage(error, t('saveFailed'))),
+  })
+  const resetMutation = useMutation({
+    mutationFn: (revision: number | undefined): Promise<boolean> => form.mutate(unsetOperationForSettingsTarget(props.result.target), revision),
+    onMutate: () => setMessage(null),
+    onSuccess: accepted => {
+      setMessage(accepted ? t('restored') : t('hostRefused'))
+      setConflict(!accepted)
+      if (accepted) draftForm.reset()
+    },
+    onError: error => setMessage(errorMessage(error, t('resetFailed'))),
+  })
+  const pending = saveMutation.isPending || resetMutation.isPending
+  const draftForm = useAppForm({
+    defaultValues: { draft: formatSettingsDraft(value, kind, choices) },
+    onSubmit: ({ value: submitted }) => {
+      if (draftRevision === undefined) return
+      saveMutation.mutate({ draft: submitted.draft, revision: draftRevision })
+    },
+  })
+  const draft = useStore(draftForm.store, state => state.values.draft)
+  const dirty = useStore(draftForm.store, state => state.isDirty)
   const canWrite = snapshot.status === 'ready' && snapshot.writable && snapshot.revision !== undefined && !pending
   const parsed = parseSettingsDraft(draft, kind, choices)
   const valueId = useId()
   const titleId = useId()
 
   useEffect(() => {
-    if (!dirty) {
-      setDraft(formatSettingsDraft(value, kind, choices))
-      setDraftRevision(snapshot.revision)
-    }
-  }, [choices, dirty, kind, snapshot.revision, value])
+    if (dirty) return
+    draftForm.reset({ draft: formatSettingsDraft(value, kind, choices) })
+    setDraftRevision(snapshot.revision)
+  }, [choices, dirty, draftForm, kind, snapshot.revision, value])
 
-  const save = async (): Promise<void> => {
-    if (!canWrite || draftRevision === undefined) return
+  const save = (): void => {
+    if (!canWrite) return
     if (!parsed.ok) {
       setMessage(t(parsed.messageKey))
       return
     }
-    setPending(true)
-    setMessage(null)
-    try {
-      const accepted = await form.mutate(setOperationForSettingsTarget(props.result.target, parsed.value), draftRevision)
-      setMessage(accepted ? t('saved') : t('hostRefusedKeepDraft'))
-      setConflict(!accepted)
-      if (accepted) setDirty(false)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t('saveFailed'))
-    } finally {
-      setPending(false)
-    }
+    void draftForm.handleSubmit()
   }
 
-  const reset = async (): Promise<void> => {
+  const reset = (): void => {
     if (!canWrite || !overridden) return
-    setPending(true)
-    setMessage(null)
-    try {
-      const accepted = await form.mutate(unsetOperationForSettingsTarget(props.result.target), snapshot.revision)
-      setMessage(accepted ? t('restored') : t('hostRefused'))
-      setConflict(!accepted)
-      if (accepted) setDirty(false)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : t('resetFailed'))
-    } finally {
-      setPending(false)
-    }
+    resetMutation.mutate(snapshot.revision)
   }
 
   const updateDraft = (next: string): void => {
     if (!dirty) setDraftRevision(snapshot.revision)
-    setDraft(next)
-    setDirty(true)
+    draftForm.setFieldValue('draft', next)
     setMessage(null)
   }
 
   const reloadLatest = (): void => {
-    setDraft(formatSettingsDraft(value, kind, choices))
+    draftForm.reset({ draft: formatSettingsDraft(value, kind, choices) })
     setDraftRevision(snapshot.revision)
-    setDirty(false)
     setConflict(false)
     setMessage(null)
   }
@@ -151,13 +159,7 @@ export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Elemen
           <Field className="dshx:flex-col dshx:gap-2">
             <FieldLabel htmlFor={valueId}>{t('currentValue')}</FieldLabel>
             {kind === 'boolean' && (
-              <Switch
-                autoFocus
-                checked={draft === 'true'}
-                disabled={!canWrite}
-                id={valueId}
-                onCheckedChange={checked => updateDraft(String(checked))}
-              />
+              <Switch autoFocus checked={draft === 'true'} disabled={!canWrite} id={valueId} onCheckedChange={checked => updateDraft(String(checked))} />
             )}
             {kind === 'choice' && (
               <Select disabled={!canWrite} name="settings-search-value" onValueChange={updateDraft} value={draft}>
@@ -209,25 +211,10 @@ export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Elemen
             </p>
           )}
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <Button
-              disabled={!canWrite || !dirty || !parsed.ok}
-              onClick={() => {
-                void save()
-              }}
-              size="sm"
-              type="button"
-            >
+            <Button disabled={!canWrite || !dirty || !parsed.ok} onClick={save} size="sm" type="button">
               {pending ? t('saving') : t('saveSetting')}
             </Button>
-            <Button
-              disabled={!canWrite || !overridden}
-              onClick={() => {
-                void reset()
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
+            <Button disabled={!canWrite || !overridden} onClick={reset} size="sm" type="button" variant="outline">
               {t('restoreInherited')}
             </Button>
             {conflict && (
@@ -242,3 +229,9 @@ export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Elemen
     </section>
   )
 }
+
+export const SettingsFieldEditor = (props: SettingsFieldEditorProps): JSX.Element => (
+  <PluginQueryProvider>
+    <SettingsFieldEditorContent {...props} />
+  </PluginQueryProvider>
+)
