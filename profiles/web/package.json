@@ -32,6 +32,7 @@
         "@deepseek-ai/dsh-web-app",
         "dshmarket",
         "dsh-our-free-model",
+        "@mars-sea/dsh-commandcode-provider",
         "@dshfiles/queue-reorder",
         "@dshfiles/shortcuts",
         "@dshfiles/jujutsu",
