@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,7 +19,7 @@ import { tightestRemaining } from './usage-overview-model.js'
  * opens. Position persists in localStorage, and the settings toggle turns it off.
  */
 
-export const EDGE_USAGE_STORAGE_KEY = 'ai-accounts-edge-usage-position'
+const EDGE_USAGE_STORAGE_KEY = 'ai-accounts-edge-usage-position'
 
 type Edge = 'left' | 'right' | 'top' | 'bottom'
 
@@ -48,14 +49,11 @@ const clamp = (position: EdgePosition, viewport: { readonly innerWidth: number; 
 
 const viewport = (): { readonly innerWidth: number; readonly innerHeight: number } => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
 
+const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: positionSchema, fallback: null })
+
 const readPosition = (): EdgePosition => {
-  try {
-    const raw = localStorage.getItem(EDGE_USAGE_STORAGE_KEY)
-    if (raw !== null) return clamp(positionSchema.parse(JSON.parse(raw)), viewport())
-  } catch {
-    // Corrupt or absent state falls through to the default edge.
-  }
-  return { edge: 'right', x: window.innerWidth - 40, y: Math.round(window.innerHeight / 2) }
+  const stored = storedPosition.get()
+  return stored === null ? { edge: 'right', x: window.innerWidth - 40, y: Math.round(window.innerHeight / 2) } : clamp(stored, viewport())
 }
 
 const nearestEdge = (rect: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }): Edge => {
@@ -85,11 +83,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
   const dragMovedRef = useRef(false)
 
   useEffect(() => {
-    try {
-      localStorage.setItem(EDGE_USAGE_STORAGE_KEY, JSON.stringify(position))
-    } catch {
-      // Best-effort persistence; the overlay still works without it.
-    }
+    storedPosition.set(position)
   }, [position])
 
   useEffect(() => {
