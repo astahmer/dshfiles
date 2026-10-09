@@ -18,6 +18,10 @@ export const aiAccountsSettings = defineSettings({
     usageRefreshSeconds: Schema.natural().min(15).max(3_600).default(60),
     /** The compact usage button in the sidebar footer. */
     footerButton: Schema.boolean().default(true),
+    /** Account ids the footer button summarizes; empty means every enabled account. */
+    footerAccounts: Schema.array(Schema.string()).default([]),
+    /** How many accounts the footer button lists before collapsing the rest into "+N". */
+    footerMaxItems: Schema.natural().min(1).max(6).default(3),
     /** The draggable usage tab pinned to a window edge. */
     edgeWidget: Schema.boolean().default(true),
     /** Show the accounts block on Settings › Models. */
@@ -41,6 +45,7 @@ export const DEFAULT_CLIENT_SETTINGS = {
   autoSaveDelayMs: 800,
   usageRefreshSeconds: 60,
   footerButton: true,
+  footerMaxItems: 3,
   edgeWidget: true,
   modelsPageAccounts: true,
   costEstimates: true,
@@ -50,6 +55,7 @@ export const DEFAULT_CLIENT_SETTINGS = {
   readonly autoSaveDelayMs: number
   readonly usageRefreshSeconds: number
   readonly footerButton: boolean
+  readonly footerMaxItems: number
   readonly edgeWidget: boolean
   readonly modelsPageAccounts: boolean
   readonly costEstimates: boolean

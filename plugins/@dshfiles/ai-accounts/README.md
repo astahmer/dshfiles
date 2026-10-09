@@ -36,10 +36,14 @@ Accounts can also be listed, enabled and edited at the bottom of
 
 ## Usage
 
-The sidebar footer has a compact usage button. Its popover filters by
-provider and lists one card per enabled account, each showing its machine,
-session, weekly and monthly bars, reset times and snapshot age. Banked Codex
-resets can be expanded. The draggable edge overlay opens the same popover.
+The sidebar footer has a compact usage button: one meter per account (its
+binding window's percent left over the time to its reset), most critical
+first, the rest folded into "+N". A spent limit draws as a red "Limit reached"
+pill. Settings › AI Accounts picks which accounts it summarizes and how many it
+lists. Its popover filters by provider and lists one card per enabled account,
+each showing its machine, session, weekly and monthly bars, reset times and
+snapshot age; accounts with a spent window carry a "Limit reached" badge and
+sink below the usable ones. Banked Codex resets can be expanded. The draggable edge overlay opens the same popover.
 Every open surface shares one Host reading, cached for 30 seconds; **Refresh**
 bypasses the cache.
 

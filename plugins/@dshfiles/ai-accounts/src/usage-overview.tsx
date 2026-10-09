@@ -1,3 +1,4 @@
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
@@ -9,10 +10,10 @@ import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
-import { bankedExpiries, formatAge, formatResetIn, overviewCards, overviewProviders, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
+import { bankedExpiries, formatAge, formatResetIn, isExhausted, overviewCards, overviewProviders, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
 /** Ticks every second while the page is visible; a hidden tab stops re-rendering and catches up on return. */
-const useNow = (): number => {
+export const useNow = (): number => {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined
@@ -63,11 +64,22 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
 
 const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostName: string; readonly readAt: number; readonly now: number }): JSX.Element => {
   const usage = props.card.usage
+  const limited = usage.status === 'ok' && usage.windows.some(window => isExhausted(window.percentRemaining))
   return (
-    <article className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3">
+    <article
+      className={cn(
+        'dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3',
+        limited && 'dshx:border-destructive/50 dshx:bg-destructive/5',
+      )}
+    >
       <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
         <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.card.displayName}</strong>
+        {limited ? (
+          <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-[10px]" variant="destructive">
+            Limit reached
+          </Badge>
+        ) : null}
         <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground" title={props.hostName}>
           {props.hostName}
         </span>
@@ -75,11 +87,14 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
       {usage.status === 'ok' && usage.windows.length > 0 ? (
         usage.windows.map(window => {
           const tone = quotaTone(window.percentRemaining)
+          const spent = isExhausted(window.percentRemaining)
           return (
             <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
               <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-xs">
-                <span className="dshx:truncate dshx:text-muted-foreground">{window.label}</span>
-                <strong className={cn('dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>{Math.round(window.percentRemaining)}% left</strong>
+                <span className={cn('dshx:truncate', spent ? 'dshx:font-medium dshx:text-destructive' : 'dshx:text-muted-foreground')}>{window.label}</span>
+                <strong className={cn('dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>
+                  {spent ? '0% left · limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
+                </strong>
               </div>
               <Progress
                 aria-label={`${props.card.displayName} ${window.label} remaining`}
@@ -87,7 +102,10 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
               <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
-                <span title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}>
+                <span
+                  className={spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}
+                  title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}
+                >
                   {formatResetIn(window.resetsAt, props.now)}
                 </span>
                 <span title="Age of this usage snapshot">Age {formatAge(props.readAt, props.now)}</span>

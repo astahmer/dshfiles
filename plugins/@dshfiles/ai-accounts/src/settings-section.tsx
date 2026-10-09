@@ -1,6 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@dshfiles/plugin-ui/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
@@ -20,6 +21,7 @@ const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
 const INTERVAL_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const
 const RETENTION_DAYS = [30, 90, 180, 365] as const
 const PRICING_REFRESH_HOURS = [6, 12, 24, 48, 168] as const
+const FOOTER_MAX_ITEMS = [1, 2, 3, 4, 5, 6] as const
 
 const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
 
@@ -238,6 +240,26 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
           )}
         </Row>
+        <Row hint="How many accounts the button lists before folding the rest into +N; a narrow sidebar shows one." label="Accounts in the button">
+          {id => (
+            <NumberSelect
+              disabled={readOnly || !preferences.footerButton}
+              format={value => String(value)}
+              id={id}
+              onChange={value => write(settings.set('footerMaxItems', value))}
+              options={FOOTER_MAX_ITEMS}
+              value={preferences.footerMaxItems}
+            />
+          )}
+        </Row>
+        {file === null ? null : (
+          <FooterAccountsPicker
+            accounts={file.accounts.filter(account => account.enabled)}
+            disabled={readOnly || !preferences.footerButton}
+            onChange={ids => write(settings.set('footerAccounts', ids))}
+            selected={preferences.footerAccounts}
+          />
+        )}
         <Row hint="Draggable tab pinned to a window edge." label="Edge overlay">
           {id => <Switch checked={preferences.edgeWidget} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('edgeWidget', value))} />}
         </Row>
@@ -294,6 +316,42 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Row>
       </Group>
     </div>
+  )
+}
+
+/** Which accounts the footer button summarizes; every box checked is stored as "all" so new accounts join it. */
+const FooterAccountsPicker = (props: {
+  readonly accounts: readonly AccountsFile['accounts'][number][]
+  readonly selected: readonly string[]
+  readonly disabled: boolean
+  readonly onChange: (ids: string[]) => void
+}): JSX.Element | null => {
+  if (props.accounts.length < 2) return null
+  const allIds = props.accounts.map(account => account.instanceId)
+  const picked = props.selected.filter(id => allIds.includes(id))
+  const checked = new Set(picked.length > 0 ? picked : allIds)
+  const toggle = (id: string, on: boolean): void => {
+    const next = allIds.filter(candidate => (candidate === id ? on : checked.has(candidate)))
+    if (next.length === 0) return
+    props.onChange(next.length === allIds.length ? [] : next)
+  }
+  return (
+    <fieldset className="dshx:flex dshx:flex-col dshx:gap-1.5">
+      <legend className="dshx:text-sm">Accounts summarized in the button</legend>
+      <p className="dshx:text-xs dshx:text-muted-foreground">The popover still lists every enabled account.</p>
+      <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
+        {props.accounts.map(account => (
+          <Label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-normal" key={account.instanceId}>
+            <Checkbox
+              checked={checked.has(account.instanceId)}
+              disabled={props.disabled || (checked.size === 1 && checked.has(account.instanceId))}
+              onCheckedChange={value => toggle(account.instanceId, value === true)}
+            />
+            {account.displayName}
+          </Label>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 

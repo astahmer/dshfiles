@@ -12,6 +12,8 @@ export const usePreferences = () => {
     autoSaveDelayMs: value?.autoSaveDelayMs ?? DEFAULT_CLIENT_SETTINGS.autoSaveDelayMs,
     usageRefreshMs: (value?.usageRefreshSeconds ?? DEFAULT_CLIENT_SETTINGS.usageRefreshSeconds) * 1000,
     footerButton: value?.footerButton ?? DEFAULT_CLIENT_SETTINGS.footerButton,
+    footerAccounts: Array.isArray(value?.footerAccounts) ? value.footerAccounts.filter(id => typeof id === 'string') : [],
+    footerMaxItems: typeof value?.footerMaxItems === 'number' ? value.footerMaxItems : DEFAULT_CLIENT_SETTINGS.footerMaxItems,
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,

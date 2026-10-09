@@ -8,7 +8,7 @@ import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 import { UsageOverview } from './usage-overview.js'
-import { tightestRemaining } from './usage-overview-model.js'
+import { footerSummary } from './usage-overview-model.js'
 
 /**
  * Draggable edge usage overlay.
@@ -67,7 +67,7 @@ const nearestEdge = (rect: { readonly left: number; readonly right: number; read
 }
 
 export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { edgeWidget } = usePreferences()
+  const { edgeWidget, footerAccounts } = usePreferences()
   const { usage, refreshing, failed, refresh } = useAccountsUsage({ enabled: edgeWidget })
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<EdgePosition>(readPosition)
@@ -93,7 +93,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     return () => window.removeEventListener('resize', resize)
   }, [])
 
-  const primary = tightestRemaining(usage)
+  const primary = footerSummary({ usage, accountIds: footerAccounts, maxItems: 1 }).shown[0]?.percentRemaining
 
   if (!edgeWidget) return null
 
