@@ -18,7 +18,9 @@ interface SettingsTabProps {
   readonly hostShortcuts: ObservableSnapshot<readonly ShortcutCatalogEntry[]>
 }
 
-type ChordKey = 'paletteChord' | 'threadSearchChord' | 'backChord' | 'forwardChord'
+/** Capture order: when two actions share a chord, the one listed first wins. */
+const CHORD_KEYS = ['paletteChord', 'fileSearchChord', 'threadSearchChord', 'backChord', 'forwardChord'] as const
+type ChordKey = (typeof CHORD_KEYS)[number]
 
 export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning } = usePreferences()
@@ -29,7 +31,7 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   const chordRow = (key: ChordKey, label: string): JSX.Element => {
     const chord = parseChord(preferences[key])
     const hostOwned = chord !== null && hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
-    const duplicate = chord !== null && key === 'threadSearchChord' && preferences.paletteChord === preferences.threadSearchChord
+    const duplicate = chord !== null && CHORD_KEYS.slice(0, CHORD_KEYS.indexOf(key)).some(earlier => preferences[earlier] === preferences[key])
     return (
       <Field orientation="horizontal" className="dshx:items-start">
         <FieldContent>
@@ -103,6 +105,7 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
         <FieldDescription>{props.t('threadSidebarChordHint')}</FieldDescription>
         <FieldGroup className="dshx:gap-4">
           {chordRow('paletteChord', props.t('threadSidebarPaletteChord'))}
+          {chordRow('fileSearchChord', props.t('threadSidebarFileSearchChord'))}
           {chordRow('threadSearchChord', props.t('threadSidebarThreadSearchChord'))}
           {chordRow('backChord', props.t('threadSidebarNavigateBack'))}
           {chordRow('forwardChord', props.t('threadSidebarNavigateForward'))}

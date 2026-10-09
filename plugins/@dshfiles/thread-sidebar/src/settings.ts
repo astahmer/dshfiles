@@ -45,6 +45,9 @@ export const threadSidebarSettings = defineSettings({
     paletteChord: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.paletteChord)
       .hidden(),
+    fileSearchChord: Schema.union([Schema.const(null), Schema.string()])
+      .default(DEFAULT_PREFERENCES.fileSearchChord)
+      .hidden(),
     threadSearchChord: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.threadSearchChord)
       .hidden(),

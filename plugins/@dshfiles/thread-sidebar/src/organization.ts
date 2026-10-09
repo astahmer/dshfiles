@@ -30,6 +30,7 @@ export interface SidebarPreferences {
   navigationOverflow: NavigationOverflow
   /** Capture-phase chords in `primary+shift+KeyP` form; null disables the chord. */
   paletteChord: string | null
+  fileSearchChord: string | null
   threadSearchChord: string | null
   backChord: string | null
   forwardChord: string | null
@@ -66,7 +67,9 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   navigationDensity: 'compact',
   navigationOverflow: 'scroll-menu',
   paletteChord: 'primary+KeyK',
-  threadSearchChord: 'primary+KeyP',
+  fileSearchChord: 'primary+KeyP',
+  // Thread search stays on the Host's session.search (⌥⌘K) and in ⌘K; ⌘P opens files.
+  threadSearchChord: null,
   backChord: 'primary+BracketLeft',
   forwardChord: 'primary+BracketRight',
   paletteRecentLimit: 20,

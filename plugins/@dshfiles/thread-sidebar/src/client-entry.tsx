@@ -222,12 +222,28 @@ export default defineClient({
       },
     })
 
+    // The public Shortcuts service lists commands but only runs them from a key press; its registry's `invoke` is what
+    // the Desktop menu uses. Read it defensively so a Host without it simply leaves Host commands out of the palette.
+    const hostRegistry: unknown = Reflect.get(ctx.shortcuts, 'registry')
+    const hostInvoke: unknown = typeof hostRegistry === 'object' && hostRegistry !== null ? Reflect.get(hostRegistry, 'invoke') : undefined
+    const runCommand =
+      typeof hostInvoke === 'function'
+        ? (commandId: string): void => {
+            try {
+              Reflect.apply(hostInvoke, hostRegistry, [commandId, { region: 'page', modal: null, target: document.activeElement }])
+            } catch (error) {
+              console.warn(`thread-sidebar: the ${commandId} command failed`, error)
+            }
+          }
+        : null
+
     const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => (
       <SidebarRoot
         {...props}
         readFooterSnapshot={readFooterSnapshot}
         subscribeFooterSnapshot={subscribeFooterSnapshot}
         openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+        runCommand={runCommand}
       />
     )
 

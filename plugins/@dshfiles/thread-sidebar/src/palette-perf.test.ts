@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { indexThreads, rankThreads, type ThreadCandidate } from './palette.js'
+import { frecencyBoosts, recordUse, type FrecencyEntries } from './frecency.js'
+import { indexFiles, indexThreads, rankActions, rankFiles, rankThreads, type ThreadCandidate } from './palette.js'
 
 const WORDS = ['sidebar', 'footer', 'palette', 'jujutsu', 'migration', 'review', 'refactor', 'billing', 'nix', 'theme']
 
@@ -13,20 +14,74 @@ const syntheticThreads = (count: number): ThreadCandidate[] =>
     updatedAt: 1_700_000_000_000 + index * 1000,
   }))
 
-test('ranking 2,000 threads per keystroke stays within one frame budget', () => {
-  const index = indexThreads(syntheticThreads(2000))
-  const query = 'sidfoo'
-  for (let warmup = 0; warmup < 5; warmup++) rankThreads({ index, query, limit: 50 })
+// The editor caps a workspace walk at 20,000 files.
+const syntheticPaths = (count: number): string[] =>
+  Array.from(
+    { length: count },
+    (_, index) => `packages/${WORDS[index % WORDS.length]}/src/${WORDS[(index * 3) % WORDS.length]}/${WORDS[(index * 7) % WORDS.length]}-${index}.ts`,
+  )
+
+const syntheticActions = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `command:plugin${index % 25}.${WORDS[index % WORDS.length]}${index}`,
+    label: `${WORDS[(index * 3) % WORDS.length]} ${WORDS[(index * 7) % WORDS.length]} command ${index}`,
+    aliases: [WORDS[(index * 5) % WORDS.length] ?? '', `alias ${index}`],
+  }))
+
+const p95 = (durations: number[]): number => [...durations].sort((left, right) => left - right)[Math.floor(durations.length * 0.95)] ?? Infinity
+
+/** Every prefix of the query, as typed, five times each after a warm-up. */
+const keystrokeDurations = (query: string, rank: (query: string) => unknown): number[] => {
+  for (let warmup = 0; warmup < 5; warmup++) rank(query)
   const durations: number[] = []
   for (let length = 1; length <= query.length; length++) {
     for (let run = 0; run < 5; run++) {
       const started = performance.now()
-      const ranked = rankThreads({ index, query: query.slice(0, length), limit: 50 })
+      rank(query.slice(0, length))
       durations.push(performance.now() - started)
-      assert.ok(ranked.length <= 50)
     }
   }
-  durations.sort((left, right) => left - right)
-  const p95 = durations[Math.floor(durations.length * 0.95)] ?? Infinity
-  assert.ok(p95 < 8, `p95 ${p95.toFixed(2)}ms exceeds half of a 16 ms frame`)
+  return durations
+}
+
+test('ranking 2,000 threads per keystroke stays within one frame budget', () => {
+  const index = indexThreads(syntheticThreads(2000))
+  const worst = p95(keystrokeDurations('sidfoo', query => assert.ok(rankThreads({ index, query, limit: 50 }).length <= 50)))
+  assert.ok(worst < 8, `p95 ${worst.toFixed(2)}ms exceeds half of a 16 ms frame`)
+})
+
+test('ranking 20,000 file paths per keystroke stays within one frame budget', () => {
+  const index = indexFiles(syntheticPaths(20_000))
+  const boosts = frecencyBoosts(
+    Array.from({ length: 200 }, (_, order) => ({ id: `file:/repo:${syntheticPaths(200)[order] ?? ''}`, count: 3, lastUsedAt: Date.now() })),
+    Date.now(),
+  )
+  const boost = (path: string): number => boosts.get(`file:/repo:${path}`) ?? 0
+  const worst = p95(keystrokeDurations('palrev', query => assert.ok(rankFiles({ index, query, limit: 50, boost }).length <= 50)))
+  assert.ok(worst < 16, `p95 ${worst.toFixed(2)}ms exceeds a 16 ms frame`)
+})
+
+test('ranking 500 actions per keystroke stays well inside one frame', () => {
+  const actions = syntheticActions(500)
+  const worst = p95(keystrokeDurations('jujmig', query => rankActions({ actions, query, boost: () => 0 })))
+  assert.ok(worst < 4, `p95 ${worst.toFixed(2)}ms exceeds a quarter of a 16 ms frame`)
+})
+
+test('opening the palette prepares 2,000 threads, 20,000 files and 200 frecency entries in under 50 ms', () => {
+  const threads = syntheticThreads(2000)
+  const paths = syntheticPaths(20_000)
+  let frecency: FrecencyEntries = []
+  for (let use = 0; use < 200; use++) frecency = recordUse(frecency, `command:${use}`, Date.now())
+  const durations: number[] = []
+  for (let run = 0; run < 5; run++) {
+    const started = performance.now()
+    const threadIndex = indexThreads(threads)
+    rankThreads({ index: threadIndex, query: '', limit: 20 })
+    const fileIndex = indexFiles(paths)
+    const boosts = frecencyBoosts(frecency, Date.now())
+    rankFiles({ index: fileIndex, query: '', limit: 50, boost: path => boosts.get(path) ?? 0 })
+    durations.push(performance.now() - started)
+  }
+  const median = [...durations].sort((left, right) => left - right)[2] ?? Infinity
+  assert.ok(median < 50, `median ${median.toFixed(2)}ms exceeds the 50 ms open budget`)
 })

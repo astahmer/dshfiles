@@ -1,6 +1,9 @@
-export type PaletteMode = 'all' | 'threads'
+export type PaletteMode = 'all' | 'threads' | 'files'
 
 export const PALETTE_EVENT = 'dshfiles:command-palette'
+/** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
+export const OPEN_FILE_EVENT = 'dshfiles:open-file'
+export const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
 
 export interface ThreadCandidate {
   readonly id: string
@@ -85,6 +88,73 @@ export const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query
     .sort((left, right) => right.best - left.best || right.thread.updatedAt - left.thread.updatedAt)
     .slice(0, limit)
     .map(({ thread }) => thread)
+}
+
+/** Lowercased paths and basenames, built once per file list. */
+export interface FileIndex {
+  readonly paths: readonly string[]
+  readonly lowered: readonly string[]
+  readonly basenames: readonly string[]
+}
+
+export const indexFiles = (paths: readonly string[]): FileIndex => ({
+  paths,
+  lowered: paths.map(path => path.toLocaleLowerCase()),
+  basenames: paths.map(path => path.slice(path.lastIndexOf('/') + 1).toLocaleLowerCase()),
+})
+
+/** Frecent files first for an empty query; otherwise basename matches outrank matches spread over the path. */
+export const rankFiles = ({ index, query, limit, boost }: { index: FileIndex; query: string; limit: number; boost: (path: string) => number }): string[] => {
+  const needle = query.trim().toLocaleLowerCase()
+  const matches: Array<{ readonly path: string; readonly score: number; readonly order: number }> = []
+  index.paths.forEach((path, order) => {
+    const bonus = boost(path)
+    if (needle.length === 0) {
+      if (bonus > 0) matches.push({ path, score: bonus, order })
+      return
+    }
+    const best = Math.max(weighted(scoreLowered(needle, index.basenames[order] ?? ''), 3), weighted(scoreLowered(needle, index.lowered[order] ?? ''), 1))
+    if (best !== -Infinity) matches.push({ path, score: best + bonus - path.length / 100, order })
+  })
+  const ranked = matches.sort((left, right) => right.score - left.score || left.order - right.order).map(({ path }) => path)
+  if (needle.length > 0 || ranked.length >= limit) return ranked.slice(0, limit)
+  const seen = new Set(ranked)
+  for (const path of index.paths) {
+    if (ranked.length >= limit) break
+    if (!seen.has(path)) ranked.push(path)
+  }
+  return ranked
+}
+
+export interface RankableAction {
+  readonly id: string
+  readonly label: string
+  readonly aliases?: readonly string[]
+}
+
+/** Labels weigh more than aliases; frecency breaks ties and lifts habits, and keeps source order otherwise. */
+export const rankActions = <Action extends RankableAction>({
+  actions,
+  query,
+  boost,
+}: {
+  actions: readonly Action[]
+  query: string
+  boost: (id: string) => number
+}): Action[] => {
+  const needle = query.trim().toLocaleLowerCase()
+  const matches: Array<{ readonly action: Action; readonly score: number; readonly order: number }> = []
+  actions.forEach((action, order) => {
+    const bonus = boost(action.id)
+    if (needle.length === 0) {
+      matches.push({ action, score: bonus, order })
+      return
+    }
+    let best = weighted(scoreLowered(needle, action.label.toLocaleLowerCase()), 3)
+    for (const alias of action.aliases ?? []) best = Math.max(best, weighted(scoreLowered(needle, alias.toLocaleLowerCase()), 1))
+    if (best !== -Infinity) matches.push({ action, score: best + bonus, order })
+  })
+  return matches.sort((left, right) => right.score - left.score || left.order - right.order).map(({ action }) => action)
 }
 
 type ChordModifier = 'primary' | 'control' | 'alt' | 'shift'

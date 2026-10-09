@@ -4,9 +4,12 @@ import {
   chordFromEvent,
   formatChord,
   fuzzyScore,
+  indexFiles,
   indexThreads,
   matchesChord,
   parseChord,
+  rankActions,
+  rankFiles,
   rankThreads,
   sameAsHostBinding,
   serializeChord,
@@ -62,6 +65,43 @@ test('thread search matches title, project, and id prefix, best title match firs
   assert.deepEqual(
     rankThreads({ index: indexThreads(threads), query: 'nix', limit: 10 }).map(item => item.id),
     ['thr_abc'],
+  )
+})
+
+test('file search prefers basename matches, then shorter paths, and lifts frecent files', () => {
+  const index = indexFiles(['docs/palette-notes.md', 'src/palette.ts', 'src/deep/nested/palette.ts', 'src/sidebar-state.tsx', 'README.md'])
+  const none = (): number => 0
+  assert.deepEqual(rankFiles({ index, query: 'palette', limit: 10, boost: none }), ['src/palette.ts', 'docs/palette-notes.md', 'src/deep/nested/palette.ts'])
+  assert.deepEqual(rankFiles({ index, query: 'sidst', limit: 10, boost: none }), ['src/sidebar-state.tsx'])
+  assert.deepEqual(
+    rankFiles({ index, query: 'palette', limit: 10, boost: path => (path === 'src/deep/nested/palette.ts' ? 800 : 0) })[0],
+    'src/deep/nested/palette.ts',
+  )
+})
+
+test('an empty file query lists frecent files first, then the walk order, up to the limit', () => {
+  const index = indexFiles(['a.ts', 'b.ts', 'c.ts', 'd.ts'])
+  assert.deepEqual(rankFiles({ index, query: '', limit: 3, boost: path => (path === 'c.ts' ? 20 : 0) }), ['c.ts', 'a.ts', 'b.ts'])
+})
+
+test('actions match labels and aliases, keep source order on ties, and rise with frecency', () => {
+  const actions = [
+    { id: 'command:jujutsu.toggleSessionRepository', label: 'Toggle Jujutsu on this thread’s repository', aliases: ['jj', 'source control'] },
+    { id: 'action:toggle-sidebar', label: 'Toggle sidebar' },
+    { id: 'action:customize-sidebar', label: 'Customize sidebar' },
+  ]
+  const none = (): number => 0
+  assert.deepEqual(
+    rankActions({ actions, query: 'jj', boost: none }).map(action => action.id),
+    ['command:jujutsu.toggleSessionRepository'],
+  )
+  assert.deepEqual(
+    rankActions({ actions, query: 'sidebar', boost: none }).map(action => action.id),
+    ['action:toggle-sidebar', 'action:customize-sidebar'],
+  )
+  assert.deepEqual(
+    rankActions({ actions, query: '', boost: id => (id === 'action:customize-sidebar' ? 80 : 0) }).map(action => action.id),
+    ['action:customize-sidebar', 'command:jujutsu.toggleSessionRepository', 'action:toggle-sidebar'],
   )
 })
 

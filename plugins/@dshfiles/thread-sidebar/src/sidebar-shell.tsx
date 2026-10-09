@@ -96,6 +96,8 @@ interface SidebarShellExtras {
   readFooterSnapshot: () => FooterSnapshot
   subscribeFooterSnapshot: (listener: () => void) => () => void
   openSession: (sessionId: SessionSummary['id']) => void
+  /** Runs a Host shortcut command by id; null when this Host cannot run commands outside a key press. */
+  runCommand: ((commandId: string) => void) | null
 }
 
 type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMetadata['id']>
@@ -148,7 +150,10 @@ const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTran
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
-const isPaletteMode = (value: unknown): value is PaletteMode => value === 'all' || value === 'threads'
+const isPaletteMode = (value: unknown): value is PaletteMode => value === 'all' || value === 'threads' || value === 'files'
+
+/** Commands that only reopen this palette are left out of its command list. */
+const SELF_COMMAND_IDS = new Set(['threadSidebar.commandPalette'])
 
 const focusComposer = (): void => {
   const composer = document.querySelector<HTMLElement>('[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])')
@@ -641,6 +646,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     // ⌘[ / ⌘] are browser-reserved for Host web shortcuts, so on the web they are claimed here before the browser.
     const chords = [
       { chord: parseChord(preferences.paletteChord), run: () => openPalette('all') },
+      { chord: parseChord(preferences.fileSearchChord), run: () => openPalette('files') },
       { chord: parseChord(preferences.threadSearchChord), run: () => openPalette('threads') },
       { chord: parseChord(preferences.backChord), run: () => latestStepNavigation.current(-1) },
       { chord: parseChord(preferences.forwardChord), run: () => latestStepNavigation.current(1) },
@@ -669,7 +675,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener(PALETTE_EVENT, onPaletteRequest)
     }
-  }, [hostShortcuts, mac, openPalette, preferences.backChord, preferences.forwardChord, preferences.paletteChord, preferences.threadSearchChord])
+  }, [
+    hostShortcuts,
+    mac,
+    openPalette,
+    preferences.backChord,
+    preferences.fileSearchChord,
+    preferences.forwardChord,
+    preferences.paletteChord,
+    preferences.threadSearchChord,
+  ])
 
   const headerEntries = useMemo<HeaderEntry[]>(
     () => [
@@ -819,25 +834,35 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       .finally(() => setRestartRequestPending(false))
   }
 
+  const runCommand = props.runCommand
   const paletteDestinations = useMemo<PaletteDestination[]>(
     () => [
       ...orderedHeaderEntries
         .filter(entry => entry.kind !== 'search')
-        .map(entry => ({ id: entry.id, label: entry.label, icon: headerIconFor(entry, 16), run: () => activateHeaderEntry(entry) })),
+        .map((entry): PaletteDestination => ({
+          id: entry.id,
+          group: 'destination',
+          label: entry.label,
+          icon: headerIconFor(entry, 16),
+          run: () => activateHeaderEntry(entry),
+        })),
       {
         id: 'action:toggle-sidebar',
+        group: 'destination',
         label: text(props.t, 'threadSidebarToggleSidebar'),
         icon: <PanelLeftIcon className="dshx:size-4" />,
         run: props.toggleSidebar,
       },
       {
         id: 'action:focus-composer',
+        group: 'destination',
         label: text(props.t, 'threadSidebarFocusComposer'),
         icon: <TextCursorInputIcon className="dshx:size-4" />,
         run: () => window.setTimeout(focusComposer, 0),
       },
       {
         id: 'action:customize-sidebar',
+        group: 'destination',
         label: text(props.t, 'threadSidebarCustomize'),
         icon: <SlidersHorizontalIcon className="dshx:size-4" />,
         run: openCustomize,
@@ -846,17 +871,32 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         ? [
             {
               id: 'action:restart-dsh',
+              group: 'destination',
               label: text(props.t, 'threadSidebarRestart'),
               icon: <RefreshCwIcon className="dshx:size-4" />,
               run: () => {
                 setRestartRequestFailed(false)
                 setRestartDialogOpen(true)
               },
-            },
+            } satisfies PaletteDestination,
           ]
         : []),
+      ...(runCommand === null
+        ? []
+        : hostShortcuts
+            .filter(entry => !SELF_COMMAND_IDS.has(entry.id))
+            .map((entry): PaletteDestination => ({
+              id: `command:${entry.id}`,
+              group: 'command',
+              label: entry.label,
+              aliases: entry.aliases,
+              keys: entry.binding === null ? [] : entry.keys,
+              icon: <CommandIcon className="dshx:size-4" />,
+              // After the palette dialog has closed, so the command resolves against the page, not the dialog.
+              run: () => window.setTimeout(() => runCommand(entry.id), 0),
+            }))),
     ],
-    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, setRestartDialogOpen, setRestartRequestFailed],
+    [orderedHeaderEntries, activePanelId, props.t, props.collapsed, restartAvailable, setRestartDialogOpen, setRestartRequestFailed, hostShortcuts, runCommand],
   )
 
   useEffect(() => setDestinations(paletteDestinations), [paletteDestinations, setDestinations])

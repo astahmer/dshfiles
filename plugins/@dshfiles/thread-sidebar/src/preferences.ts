@@ -25,6 +25,7 @@ const preferencesSchema = z
     navigationDensity: z.enum(['compact', 'comfortable']).default(DEFAULT_PREFERENCES.navigationDensity),
     navigationOverflow: z.enum(['scroll', 'menu', 'scroll-menu']).default(DEFAULT_PREFERENCES.navigationOverflow),
     paletteChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.paletteChord),
+    fileSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.fileSearchChord),
     threadSearchChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.threadSearchChord),
     backChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.backChord),
     forwardChord: z.string().max(64).nullable().default(DEFAULT_PREFERENCES.forwardChord),

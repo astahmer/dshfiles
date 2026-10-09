@@ -9,7 +9,12 @@ import { threadSidebarSettings } from './settings.js'
 
 export interface PaletteDestination {
   readonly id: string
+  /** Host shortcut commands are listed apart from the sidebar's own destinations and actions. */
+  readonly group: 'destination' | 'command'
   readonly label: string
+  readonly aliases?: readonly string[]
+  /** Keycaps of the bound shortcut, shown as a hint. */
+  readonly keys?: readonly string[]
   readonly icon: ReactNode
   readonly run: () => void
 }
