@@ -2,6 +2,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from './models-page-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -10,6 +11,7 @@ import { QuotaFooter } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
+import { SessionCostDockEntry } from './session-cost.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 import './client.css'
@@ -62,8 +64,16 @@ export default defineClientPlugin({
         <ModelsPageAccounts />
       </PluginQueryProvider>
     )
+    // Dock entries share the bundle's query client, so every open composer reads one quote cache.
+    const SessionCostView = (props: { readonly useProjection?: unknown }): JSX.Element => (
+      <PluginQueryProvider>
+        <SessionCostDockEntry useProjection={props.useProjection} />
+      </PluginQueryProvider>
+    )
     const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
-      <AiAccountsSettingsSection close={props.close} openAccounts={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+      <PluginQueryProvider>
+        <AiAccountsSettingsSection close={props.close} openAccounts={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+      </PluginQueryProvider>
     )
     // A settings page of its own, beside Models and Command Code in the nav.
     api.ui.register({ name: 'settings.section', id: 'ai-accounts', order: 40, label, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SettingsSectionView)
@@ -92,6 +102,9 @@ export default defineClientPlugin({
       },
       EdgeUsageHostView,
     )
+
+    // Its own id beside the shipped `stats` cell: reusing `stats` would replace the token readout.
+    api.ui.register({ name: 'conversation.composer.dock', id: 'ai-accounts-session-cost', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SessionCostView)
 
     api.ui.register(
       {

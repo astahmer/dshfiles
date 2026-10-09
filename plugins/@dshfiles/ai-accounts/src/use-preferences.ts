@@ -14,5 +14,8 @@ export const usePreferences = () => {
     footerButton: value?.footerButton ?? DEFAULT_CLIENT_SETTINGS.footerButton,
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
+    costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,
+    pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,
+    pricingOverrides: value?.pricingOverrides ?? {},
   }
 }

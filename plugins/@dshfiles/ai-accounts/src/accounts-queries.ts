@@ -19,7 +19,13 @@ export const aiAccountsKeys = {
   identity: (instanceId: string) => ['ai-accounts', 'identity', instanceId] as const,
   quotaContinuations: ['ai-accounts', 'quota-continuations'] as const,
   nativeProviders: ['ai-accounts', 'native-providers'] as const,
+  pricing: ['ai-accounts', 'pricing'] as const,
+  pricingStatus: ['ai-accounts', 'pricing', 'status'] as const,
+  routeQuotes: (routeKeys: string, overrides: string) => ['ai-accounts', 'pricing', 'quotes', routeKeys, overrides] as const,
 }
+
+/** Quotes change only when the catalog refreshes or an override is edited, both of which invalidate them. */
+const QUOTE_STALE_MS = 15 * 60_000
 
 /**
  * A Host older than this Client answers without the card labels or the
@@ -97,6 +103,24 @@ export const aiAccountsQueries = {
 
   quotaContinuations: (accounts: Pick<AccountsClient, 'quotaContinuations'>) =>
     queryOptions({ queryKey: aiAccountsKeys.quotaContinuations, queryFn: ({ signal }) => accounts.quotaContinuations(undefined, { signal }) }),
+
+  /** `null` from a Host older than cost estimates, so surfaces hide instead of failing. */
+  pricingStatus: (accounts: Pick<AccountsClient, 'pricingStatus'>) =>
+    queryOptions({
+      queryKey: aiAccountsKeys.pricingStatus,
+      queryFn: ({ signal }) => accounts.pricingStatus(undefined, { signal }).catch(() => null),
+    }),
+
+  routeQuotes: (
+    accounts: Pick<AccountsClient, 'quoteRoutes'>,
+    input: { readonly routes: readonly { readonly provider: string; readonly model: string }[]; readonly overrides: Readonly<Record<string, string>> },
+  ) =>
+    queryOptions({
+      queryKey: aiAccountsKeys.routeQuotes(input.routes.map(route => `${route.provider}/${route.model}`).join('|'), JSON.stringify(input.overrides)),
+      queryFn: ({ signal }) => accounts.quoteRoutes({ routes: [...input.routes] }, { signal }).catch(() => null),
+      staleTime: QUOTE_STALE_MS,
+      retry: false,
+    }),
 
   /** A Host older than this Client lacks the method; it fails once and the list explains a restart. */
   nativeProviders: (accounts: Pick<AccountsClient, 'nativeProviders'>) =>

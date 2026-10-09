@@ -5,8 +5,12 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@dshfiles/plugin-ui/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { ArrowUpRightIcon } from '@dshfiles/plugin-ui/icons'
+import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
+import { ArrowUpRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useEffect, useId, useState, type ReactNode } from 'react'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { DISTRIBUTION_HINT, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
 import { usePreferences } from './use-preferences.js'
@@ -15,6 +19,27 @@ const DELAYS = [400, 800, 1_500, 3_000] as const
 const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
 const INTERVAL_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const
 const RETENTION_DAYS = [30, 90, 180, 365] as const
+const PRICING_REFRESH_HOURS = [6, 12, 24, 48, 168] as const
+
+const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
+
+const overridesToText = (overrides: Readonly<Record<string, string>>): string =>
+  Object.entries(overrides)
+    .map(([route, value]) => `${route} = ${value}`)
+    .join('\n')
+
+/** One `provider/model = value` rule per line; blank and malformed lines are dropped. */
+const textToOverrides = (text: string): { readonly overrides: Record<string, string>; readonly skipped: number } => {
+  const overrides: Record<string, string> = {}
+  let skipped = 0
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue
+    const match = OVERRIDE_LINE.exec(line)
+    if (match?.[1] === undefined || match[2] === undefined) skipped += 1
+    else overrides[match[1]] = match[2]
+  }
+  return { overrides, skipped }
+}
 
 const Group = (props: { readonly title: string; readonly description?: string; readonly children: ReactNode }): JSX.Element => (
   <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
@@ -240,6 +265,8 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Row>
       </Group>
 
+      <CostEstimatesGroup readOnly={readOnly} write={write} />
+
       <Group description="The Host records one quota snapshot per enabled account on this schedule." title="Usage history">
         <Row label="Record every">
           {id => (
@@ -267,5 +294,102 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Row>
       </Group>
     </div>
+  )
+}
+
+const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write: (task: Promise<unknown>) => void }): JSX.Element => {
+  const accounts = useApi(aiAccountsApi)
+  const queryClient = useQueryClient()
+  const preferences = usePreferences()
+  const settings = preferences.settings
+  const status = useQuery(aiAccountsQueries.pricingStatus(accounts))
+  const refresh = useMutation({
+    mutationFn: () => accounts.refreshPricing(),
+    onSuccess: next => {
+      queryClient.setQueryData(aiAccountsKeys.pricingStatus, next)
+      void queryClient.invalidateQueries({ queryKey: aiAccountsKeys.pricing })
+    },
+  })
+  const savedText = overridesToText(preferences.pricingOverrides)
+  const [draft, setDraft] = useState<string | null>(null)
+  const parsed = textToOverrides(draft ?? savedText)
+  const pricing = status.data ?? null
+
+  const saveOverrides = (): void => {
+    if (draft === null || draft === savedText) return
+    props.write(
+      settings.set('pricingOverrides', parsed.overrides).then(() => {
+        setDraft(null)
+        void queryClient.invalidateQueries({ queryKey: aiAccountsKeys.pricing })
+      }),
+    )
+  }
+
+  return (
+    <Group description="Estimated cost per session beside the composer stats, priced from models.dev. An estimate, never an invoice." title="Cost estimates">
+      <Row hint="Shows ≈$ beside the token stats; hover it for the breakdown." label="Show session cost">
+        {id => (
+          <Switch
+            checked={preferences.costEstimates}
+            disabled={props.readOnly}
+            id={id}
+            onCheckedChange={value => props.write(settings.set('costEstimates', value))}
+          />
+        )}
+      </Row>
+      <Row label="Refresh prices every">
+        {id => (
+          <NumberSelect
+            disabled={props.readOnly}
+            format={value => (value < 48 ? `${String(value)} h` : `${String(value / 24)} days`)}
+            id={id}
+            onChange={value => props.write(settings.set('pricingRefreshHours', value))}
+            options={PRICING_REFRESH_HOURS}
+            value={preferences.pricingRefreshHours}
+          />
+        )}
+      </Row>
+      <Row
+        hint={
+          pricing === null
+            ? 'This Host predates cost estimates; restart DSH to load them.'
+            : pricing.fetchedAt === null
+              ? (pricing.lastError ?? 'No catalog yet.')
+              : `${String(pricing.modelCount)} models priced, fetched ${relativeTime(pricing.fetchedAt, Date.now())}${pricing.lastError === null ? '' : ` · last refresh failed: ${pricing.lastError}`}`
+        }
+        label="Price catalog"
+      >
+        {() => (
+          <Button disabled={pricing === null || refresh.isPending} onClick={() => refresh.mutate()} size="sm" type="button" variant="outline">
+            <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} />
+            Refresh now
+          </Button>
+        )}
+      </Row>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-pricing-overrides">
+          Price overrides
+        </Label>
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          One rule per line: <code>route/model = value</code>, or <code>route/*</code> for every model of a route. The value is a models.dev id (
+          <code>openai/gpt-6-luna</code>), <code>free</code>, or USD per million tokens (<code>input=3 output=15 cacheRead=0.3 cacheWrite=3.75</code>).
+        </p>
+        <Textarea
+          className="dshx:min-h-20 dshx:font-mono! dshx:text-xs"
+          disabled={props.readOnly}
+          id="ai-accounts-pricing-overrides"
+          onBlur={saveOverrides}
+          onChange={event => setDraft(event.target.value)}
+          placeholder="commandcode_work/* = openai/gpt-6-luna"
+          spellCheck={false}
+          value={draft ?? savedText}
+        />
+        {parsed.skipped === 0 ? null : (
+          <p className="dshx:text-xs dshx:text-destructive">
+            {String(parsed.skipped)} line{parsed.skipped === 1 ? '' : 's'} not in <code>route/model = value</code> form will be dropped.
+          </p>
+        )}
+      </div>
+    </Group>
   )
 }
