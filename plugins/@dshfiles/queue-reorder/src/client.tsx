@@ -108,6 +108,60 @@ const RowAction = (props: {
   </Tooltip>
 )
 
+interface QueueMessageEditorProps {
+  readonly text: string
+  readonly disabled: boolean
+  readonly onCancel: () => void
+  readonly onSave: (text: string) => void
+}
+
+const QueueMessageEditor = (props: QueueMessageEditorProps): JSX.Element => {
+  const [draft, setDraft] = useState(props.text)
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    const node = editorRef.current
+    node?.focus()
+    node?.setSelectionRange(node.value.length, node.value.length)
+  }, [])
+
+  useEffect(() => {
+    setDraft(props.text)
+  }, [props.text])
+
+  const save = (): void => props.onSave(draft)
+
+  return (
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1.5">
+      <Textarea
+        ref={editorRef}
+        aria-label="Queued message"
+        className="dshx:max-h-40 dshx:min-h-14 dshx:resize-none dshx:bg-background dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:md:text-sm"
+        value={draft}
+        onChange={event => setDraft(event.target.value)}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            save()
+          }
+          if (event.key === 'Escape') props.onCancel()
+        }}
+      />
+      <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
+        <span className="dshx:mr-auto dshx:text-xs dshx:text-muted-foreground">Enter to save · Esc to cancel</span>
+        <Button type="button" variant="ghost" size="xs" aria-label="Cancel editing" disabled={props.disabled} onClick={props.onCancel}>
+          <XIcon />
+          Cancel
+        </Button>
+        <Button type="button" size="xs" aria-label="Save queued message" disabled={props.disabled || draft.trim().length === 0} onClick={save}>
+          <CheckIcon />
+          Save
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
   readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
@@ -140,7 +194,6 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
   const [editing, setEditing] = useState<MessageId | null>(null)
-  const [draft, setDraft] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default (the `expandByDefault` setting): the list is the point of the
@@ -148,7 +201,6 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const [collapsed, setCollapsed] = useState(!expandByDefault)
   const previousRowCount = useRef(rowCount)
   const listId = useId()
-  const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     // Emptying the queue folds the dock, and a new arrival must unfold it again:
@@ -159,15 +211,6 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     previousRowCount.current = rowCount
     if (editing !== null && (!queueMutable || !rows.some(row => row.id === editing))) setEditing(null)
   }, [editing, expandByDefault, queueMutable, rowCount, rows])
-
-  useEffect(() => {
-    if (editing === null) return
-    const text = textOf(rows.find(row => row.id === editing)?.content ?? []) ?? ''
-    setDraft(text)
-    const node = editorRef.current
-    node?.focus()
-    node?.setSelectionRange(node.value.length, node.value.length)
-  }, [editing, rows])
 
   const queueAction = useMutation({
     mutationFn: (request: { readonly itemId: MessageId; readonly action: QueueAction }) => props.updateQueue(request.itemId, request.action),
@@ -189,9 +232,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     for (let step = 0; step < steps; step += 1) await move(sourceId, direction)
   }
 
-  const saveEdit = (): void => {
-    if (editing === null || draft.trim().length === 0) return
-    void queueAction.mutateAsync({ itemId: editing, action: { kind: 'edit', content: [{ type: 'text', text: draft }] } }).then(
+  const saveEdit = (itemId: MessageId, draft: string): void => {
+    if (draft.trim().length === 0) return
+    void queueAction.mutateAsync({ itemId, action: { kind: 'edit', content: [{ type: 'text', text: draft }] } }).then(
       () => setEditing(null),
       () => undefined,
     )
@@ -209,7 +252,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
 
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="dshx-root dshx:w-full dshx:flex-none" data-queue-dock="">
+      <div className="dshx-root" data-queue-dock="">
         <div className="dshx:w-full dshx:overflow-hidden dshx:rounded-t-lg dshx:border dshx:border-b-0 dshx:bg-popover dshx:py-0.5 dshx:text-popover-foreground">
           {rowCount > 1 ? (
             <button
@@ -285,33 +328,12 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                         <GripVerticalIcon className="dshx:size-3.5" />
                       </span>
                       {isEditing ? (
-                        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1.5">
-                          <Textarea
-                            ref={editorRef}
-                            aria-label="Queued message"
-                            className="dshx:max-h-40 dshx:min-h-14 dshx:resize-none dshx:bg-background dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:md:text-sm"
-                            value={draft}
-                            onChange={event => setDraft(event.target.value)}
-                            onKeyDown={event => {
-                              if (event.key === 'Enter' && !event.shiftKey) {
-                                event.preventDefault()
-                                saveEdit()
-                              }
-                              if (event.key === 'Escape') setEditing(null)
-                            }}
-                          />
-                          <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
-                            <span className="dshx:mr-auto dshx:text-xs dshx:text-muted-foreground">Enter to save · Esc to cancel</span>
-                            <Button type="button" variant="ghost" size="xs" aria-label="Cancel editing" disabled={busy !== null} onClick={() => setEditing(null)}>
-                              <XIcon />
-                              Cancel
-                            </Button>
-                            <Button type="button" size="xs" aria-label="Save queued message" disabled={busy !== null || draft.trim().length === 0} onClick={saveEdit}>
-                              <CheckIcon />
-                              Save
-                            </Button>
-                          </div>
-                        </div>
+                        <QueueMessageEditor
+                          text={text ?? ''}
+                          disabled={busy !== null}
+                          onCancel={() => setEditing(null)}
+                          onSave={draft => saveEdit(row.id, draft)}
+                        />
                       ) : (
                         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
                           {previewOf(row.content, previewLength) || files || '—'}
