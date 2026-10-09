@@ -26,3 +26,17 @@ Top client bundles: jujutsu 1.88 MB, ai-accounts 686 KB, multi-host 614 KB, secr
 
 Not captured: React Profiler render counts (no DevTools hook in the Browser pane); P0.4 measures them with a render
 counter in tests instead.
+
+## After P0.2 (shared sheet)
+
+dshx folds each plugin's CSS into one `style[data-plugin="dshx:shared-css"][data-dshx-shared-css=<sha256/16>]`
+injected once per content hash; each plugin keeps an empty owned marker `style[data-plugin][data-dshx-css]` so the
+Host's HMR/disposal removal still works, and a MutationObserver drops the shared sheet once no marker references it.
+queue-reorder's dock rule moved inline so its sheet is byte-identical.
+
+| Metric | Before | After |
+|---|---|---|
+| Non-empty `@dshfiles` sheets | 12 (1.39 MB) | 1 (115,980 B) + 12 empty markers |
+| Full style recalc, idle / palette open | 15.3 / 21.2 ms | 0.4 / 0.2 ms |
+| Thread-sidebar HMR rebuild | — | 12 markers, 1 sheet kept |
+| Remove 11 of 12 markers / all 12 | — | sheet kept / sheet removed |

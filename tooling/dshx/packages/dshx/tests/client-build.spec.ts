@@ -77,7 +77,11 @@ describe('client compiler', () => {
       textContent: string
     }> = []
     const document = {
-      querySelector: () => null,
+      querySelector: (selector: string) => {
+        const match = /^style\[data-([\w-]+)="(.*)"\]$/.exec(selector)
+        const key = match?.[1]?.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())
+        return styles.find(style => key !== undefined && style.dataset[key] === match?.[2]) ?? null
+      },
       createElement: () => ({ dataset: {}, textContent: '' }),
       head: {
         appendChild: (style: { dataset: Record<string, string>; textContent: string }) => styles.push(style),
@@ -96,7 +100,7 @@ describe('client compiler', () => {
     expect(registration?.id).toBe('@dshx/fixture-plugin')
     expect(styles).toHaveLength(0)
 
-    const plugin = registration?.factory(id => {
+    const requireModule = (id: string): unknown => {
       if (id === 'react') {
         const context = { Provider: 'provider' }
         return {
@@ -118,11 +122,17 @@ describe('client compiler', () => {
         }
       }
       throw new Error(`unexpected require: ${id}`)
-    })
-    expect(styles).toHaveLength(1)
-    expect(styles[0]?.dataset.plugin).toBe('@dshx/fixture-plugin')
-    expect(styles[0]?.dataset.pluginCss).toBe('@dshx/fixture-plugin/client.css')
-    expect(styles[0]?.textContent).toContain('background: #101b2a')
+    }
+    const plugin = registration?.factory(requireModule)
+    registration?.factory(requireModule)
+    expect(styles).toHaveLength(2)
+    const [marker, sheet] = styles
+    expect(marker?.dataset.plugin).toBe('@dshx/fixture-plugin')
+    expect(marker?.dataset.pluginCss).toBe('@dshx/fixture-plugin/client.css')
+    expect(marker?.textContent).toBe('')
+    expect(sheet?.dataset.plugin).toBe('dshx:shared-css')
+    expect(sheet?.dataset.dshxSharedCss).toBe(marker?.dataset.dshxCss)
+    expect(sheet?.textContent).toContain('background: #101b2a')
     const registered: unknown[] = []
     const clientPlugin = plugin as unknown as {
       name: string

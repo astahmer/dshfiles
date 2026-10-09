@@ -52,7 +52,7 @@ Acceptance: baseline table with every metric above, the top 5 long tasks by owne
 > P0.1. Count `style[data-plugin]` elements and their bytes. Write plans/ade/perf-baseline.md with the numbers and the
 > top 5 long tasks with their source plugin/component. No code changes."
 
-### P0.2 One shared Tailwind sheet (M) — deps: P0.1
+### [x] P0.2 One shared Tailwind sheet (M) — deps: P0.1
 
 Every plugin injects the same ~115 KB sheet (README "Shared stylesheet and stacking" makes them identical on
 purpose). ~15 copies multiply style-recalc and selector-matching cost. Options:
