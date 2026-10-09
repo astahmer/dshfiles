@@ -76,6 +76,17 @@ Field components: `TextField`, `TextAreaField`, `SelectField` (shadcn Select), `
 
 `@dshfiles/plugin-ui/chart` re-exports TanStack Charts 1.0.0 and `ChartFrame`, which maps `--ts-chart-*` onto DSH tokens.
 
+## Diff
+
+`@dshfiles/plugin-ui/diff` wraps `@pierre/diffs` 1.5.2 (Shiki-based, Apache-2.0). `PatchView` takes a git patch
+string (`patch`) or pre-parsed `files` (`parsePatchFiles(patch).flatMap(p => p.files)`), a `layout` of `unified`
+(default) or `split`, an optional `focusPath` to scroll to, and `empty` content. It virtualizes files and lines, so
+megabyte patches stay responsive; give it a bounded height through `className`. Light/dark follows
+`body[data-ds-dark-theme]` with the `pierre-light`/`pierre-dark` themes. Every file renders in its own shadow root
+with adopted stylesheets, so no library CSS leaks into the page; style it only through inherited `--diffs-*`
+custom properties. Patch-parsed diffs carry only the patch lines, so collapsed context shows as a count and cannot
+expand without full file contents (`loadDiffFiles`).
+
 ## Tests
 
 Radix parts run in jsdom. A Radix `Select` renders a hidden native `<select name=…>`; drive it with `fireEvent.change`. Host primitives still cannot be imported under Node — alias them to `./testing/host-primitives.tsx` in `vitest.config.ts` when a plugin keeps any.
