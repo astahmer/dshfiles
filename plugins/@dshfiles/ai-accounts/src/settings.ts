@@ -18,6 +18,8 @@ export const aiAccountsSettings = defineSettings({
     usageRefreshSeconds: Schema.natural().min(15).max(3_600).default(60),
     /** The usage strip above the sidebar foot (a compact button on the collapsed rail). */
     footerButton: Schema.boolean().default(true),
+    /** What each sidebar usage meter shows: percent left, time to its reset, or both stacked. */
+    meterLabel: Schema.union(['both', 'percent', 'reset']).default('both'),
     /** Account ids in the order the usage strip and popover list them; unlisted accounts follow. */
     usageOrder: Schema.array(Schema.string()).default([]),
     /** Account ids the usage strip and popover leave out. */

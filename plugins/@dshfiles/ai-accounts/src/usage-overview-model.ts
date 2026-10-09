@@ -177,6 +177,22 @@ export const formatResetShort = (resetsAt: number | null, now: number): string |
   return `${String(Math.max(1, minutes))}m`
 }
 
+/**
+ * The lines of one sidebar meter for the chosen label. A meter never goes
+ * blank: asking for the reset alone falls back to the percent while no reset
+ * is known.
+ */
+export const meterLines = (
+  item: QuotaSummaryItem,
+  now: number,
+  label: 'both' | 'percent' | 'reset',
+): { readonly percent: string | null; readonly reset: string | null } => {
+  const short = formatResetShort(item.resetsAt, now)
+  const reset = short === null || label === 'percent' ? null : short === 'now' ? 'resetting' : `↻ ${short}`
+  const percent = item.exhausted ? 'Limit reached' : `${item.onReserve ? '☾ ' : ''}${String(Math.round(item.percentRemaining))}%`
+  return { percent: label === 'reset' && reset !== null ? null : percent, reset }
+}
+
 /** "Resets in 1h 11m", "Resets in 5d 20h", or a plain fallback. */
 export const formatResetIn = (resetsAt: number | null, now: number): string => {
   const short = formatResetShort(resetsAt, now)

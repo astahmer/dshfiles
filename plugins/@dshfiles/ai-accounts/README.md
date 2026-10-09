@@ -41,7 +41,9 @@ A usage strip sits above the sidebar foot (the thread sidebar's
 the footer actions): one meter per account (its binding
 window's percent left over the time to its reset), wrapping onto more lines as
 accounts grow; the collapsed rail shows one button with the most critical
-account. A spent limit draws as a red "Limit reached" pill. Clicking a meter
+account. A spent limit draws as a red "Limit reached" pill. Settings › AI Accounts
+› Meter shows picks percent left, time to reset, or both (the default) for the
+strip and the rail button. Clicking a meter
 opens the popover, which filters by provider and lists one card per enabled
 account with quota, each showing its machine, session, weekly and monthly bars,
 reset times and snapshot age; accounts with a spent window carry a "Limit

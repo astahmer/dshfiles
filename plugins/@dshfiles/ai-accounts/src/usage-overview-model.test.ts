@@ -7,6 +7,7 @@ import {
   formatAge,
   formatResetIn,
   formatResetShort,
+  meterLines,
   moveAccount,
   mostCritical,
   overviewProviders,
@@ -78,6 +79,24 @@ describe('usage overview', () => {
     expect(formatResetIn(10, 20)).toBe('Resetting now')
     expect(formatAge(0, (4 * 60 + 38) * 1000)).toBe('00:04:38')
     expect(bankedExpiries([3, null, 1])).toEqual([1, 3, null])
+  })
+
+  it('shows percent, reset or both on a meter, never neither', () => {
+    const item = {
+      instanceId: 'codex',
+      displayName: 'Codex',
+      kind: 'codex',
+      windowLabel: 'Weekly',
+      percentRemaining: 41.6,
+      resetsAt: 2 * 3_600_000,
+      exhausted: false,
+      onReserve: false,
+    } as const
+    expect(meterLines(item, 0, 'both')).toEqual({ percent: '42%', reset: '↻ 2h 0m' })
+    expect(meterLines(item, 0, 'percent')).toEqual({ percent: '42%', reset: null })
+    expect(meterLines(item, 0, 'reset')).toEqual({ percent: null, reset: '↻ 2h 0m' })
+    expect(meterLines({ ...item, resetsAt: null }, 0, 'reset')).toEqual({ percent: '42%', reset: null })
+    expect(meterLines({ ...item, exhausted: true }, 3 * 3_600_000, 'both')).toEqual({ percent: 'Limit reached', reset: 'resetting' })
   })
 })
 

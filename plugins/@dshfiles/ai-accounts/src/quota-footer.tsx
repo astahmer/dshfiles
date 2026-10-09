@@ -6,9 +6,9 @@ import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
-import { usePreferences } from './use-preferences.js'
+import { usePreferences, type MeterLabel } from './use-preferences.js'
 import { UsageOverview, useNow } from './usage-overview.js'
-import { formatResetShort, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
+import { formatResetShort, meterLines, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
 
 const describeItem = (item: QuotaSummaryItem, now: number): string => {
   const reset = formatResetShort(item.resetsAt, now)
@@ -18,9 +18,9 @@ const describeItem = (item: QuotaSummaryItem, now: number): string => {
   return `${item.displayName}: ${String(Math.round(item.percentRemaining))}% left on ${item.windowLabel}${reserve}${resetText}`
 }
 
-/** Glyph, then percent left over the time to its reset, stacked like a menubar meter. */
-const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: number }): JSX.Element => {
-  const reset = formatResetShort(props.item.resetsAt, props.now)
+/** Glyph, then percent left over the time to its reset, stacked like a menubar meter; the setting may keep one line. */
+const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: number; readonly label: MeterLabel }): JSX.Element => {
+  const lines = meterLines(props.item, props.now, props.label)
   const tone = props.item.exhausted ? 'critical' : quotaTone(props.item.percentRemaining)
   return (
     <span
@@ -32,12 +32,20 @@ const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: num
     >
       <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
       <span className="dshx:flex dshx:flex-col dshx:items-start dshx:leading-none">
-        <span className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', props.item.onReserve ? 'dshx:text-info' : QUOTA_TONE_TEXT[tone])}>
-          {props.item.exhausted ? 'Limit reached' : `${props.item.onReserve ? '☾ ' : ''}${String(Math.round(props.item.percentRemaining))}%`}
-        </span>
-        {reset === null ? null : (
-          <span className={cn('dshx:text-[10px] dshx:tabular-nums', props.item.exhausted ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
-            {reset === 'now' ? 'resetting' : `↻ ${reset}`}
+        {lines.percent === null ? null : (
+          <span className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', props.item.onReserve ? 'dshx:text-info' : QUOTA_TONE_TEXT[tone])}>
+            {lines.percent}
+          </span>
+        )}
+        {lines.reset === null ? null : (
+          <span
+            className={cn(
+              'dshx:tabular-nums',
+              lines.percent === null ? 'dshx:text-[11px] dshx:font-semibold' : 'dshx:text-[10px]',
+              props.item.exhausted ? 'dshx:text-destructive' : lines.percent === null ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground',
+            )}
+          >
+            {lines.reset}
           </span>
         )}
       </span>
@@ -88,7 +96,7 @@ const UsagePopoverContent = (props: {
  * actions above Settings, so there it renders in place.
  */
 export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { footerButton } = usePreferences()
+  const { footerButton, meterLabel } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage({ enabled: footerButton })
@@ -125,7 +133,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
                   title={describeItem(item, now)}
                   type="button"
                 >
-                  <SummaryItem item={item} now={now} />
+                  <SummaryItem item={item} label={meterLabel} now={now} />
                 </button>
               </ArrangeableAccount>
             ))
@@ -139,6 +147,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
 
 /** Collapsed rail: one button with the most critical account, opening the usage popover. */
 const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+  const { meterLabel } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
@@ -155,7 +164,7 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
           title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
-          {critical === undefined ? <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" /> : <SummaryItem item={critical} now={now} />}
+          {critical === undefined ? <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" /> : <SummaryItem item={critical} label={meterLabel} now={now} />}
         </button>
       </PopoverTrigger>
       <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} />

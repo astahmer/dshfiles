@@ -21,6 +21,11 @@ const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
 const INTERVAL_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const
 const RETENTION_DAYS = [30, 90, 180, 365] as const
 const PRICING_REFRESH_HOURS = [6, 12, 24, 48, 168] as const
+const METER_LABELS = [
+  { value: 'both', label: '% left and reset' },
+  { value: 'percent', label: '% left' },
+  { value: 'reset', label: 'Time to reset' },
+] as const
 
 const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
 
@@ -250,6 +255,29 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         <Row hint="Meters above the sidebar foot (one button on the collapsed rail); click one for the account cards." label="Sidebar usage">
           {id => (
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
+          )}
+        </Row>
+        <Row hint="What each sidebar meter shows, on the strip and the collapsed rail button." label="Meter shows">
+          {id => (
+            <Select
+              disabled={readOnly || !preferences.footerButton}
+              onValueChange={value => {
+                const meterLabel = METER_LABELS.find(candidate => candidate.value === value)?.value
+                if (meterLabel !== undefined) write(settings.set('meterLabel', meterLabel))
+              }}
+              value={preferences.meterLabel}
+            >
+              <SelectTrigger className="dshx:w-44" id={id} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {METER_LABELS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </Row>
         {file === null ? null : (
