@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -156,15 +157,13 @@ const readRepoHistory = (): readonly string[] => {
   }
 }
 
-const relativeTime = (value: string): string => {
+const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
+
+const formatAge = (value: string): string => {
   const time = Date.parse(value)
   if (!Number.isFinite(time)) return 'unknown time'
-  const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000))
-  if (seconds < 60) return 'now'
-  if (seconds < 3600) return Math.floor(seconds / 60) + 'm'
-  if (seconds < 86_400) return Math.floor(seconds / 3600) + 'h'
-  if (seconds < 604_800) return Math.floor(seconds / 86_400) + 'd'
-  return new Date(time).toLocaleDateString()
+  const age = relativeTime(time, Date.now())
+  return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
 const dayLabel = (value: string): string => {
@@ -440,7 +439,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     state === undefined
       ? ''
       : state.lastPushAt
-        ? relativeTime(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
+        ? formatAge(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
         : state.lastPushHistoryTruncated
           ? 'not found before the operation-history limit'
           : 'not found in the latest 1,000 operations'
@@ -1481,7 +1480,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               )}
             </button>
             <time className="dshx:flex-none dshx:pl-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground" dateTime={revision.authorTime}>
-              {relativeTime(revision.authorTime)}
+              {formatAge(revision.authorTime)}
             </time>
             <span
               className="dshx:min-w-[2ch] dshx:flex-none dshx:text-right dshx:font-mono dshx:text-xs dshx:font-semibold dshx:text-info"

@@ -12,6 +12,7 @@ import {
   IconPinOutlineRegular,
   IconPlayOutlineRegular,
   IconUnarchiveOutlineRegular,
+  relativeTime,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -114,20 +115,12 @@ const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string,
   return map
 }
 
-/**
- * The reference carries the age of a thread on the right of its row ("22h"), so it
- * is read off updatedAt rather than repeated as an absolute date the row already
- * exposes in its title. Units stay inside the reference's own scale: nothing below
- * a minute, and nothing long enough to push the title off its line.
- */
-const relativeTime = (updatedAt: number): string => {
-  const elapsedMinutes = Math.max(0, Math.round((Date.now() - updatedAt) / 60000))
-  if (elapsedMinutes < 1) return 'now'
-  if (elapsedMinutes < 60) return `${elapsedMinutes}m`
-  const hours = Math.round(elapsedMinutes / 60)
-  if (hours < 24) return `${hours}h`
-  const days = Math.round(hours / 24)
-  return days < 100 ? `${days}d` : `${Math.round(days / 30)}mo`
+const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
+
+/** Row age ("22h") read off updatedAt; Host buckets keep it in step with other session surfaces. */
+const formatAge = (updatedAt: number): string => {
+  const age = relativeTime(updatedAt, Date.now())
+  return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
 type RowOperation = 'pin' | 'unpin' | 'archive' | 'unarchive'
@@ -829,7 +822,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                           parentTitle={lineage.parentTitle}
                           workspaceId={workspaceId}
                           workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
-                          age={relativeTime(session.updatedAt)}
+                          age={formatAge(session.updatedAt)}
                           actions={rowActions}
                         />
                       )
