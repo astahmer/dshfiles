@@ -5,7 +5,8 @@ import { canStep, currentLocation, emptyNavigationHistory, jumpHistory, stepHist
 const thread = (id: string): NavigationLocation => ({ kind: 'thread', id })
 const panel = (id: string): NavigationLocation => ({ kind: 'panel', id })
 
-const visitAll = (locations: readonly NavigationLocation[]) => locations.reduce((history, location) => visitLocation(history, location), emptyNavigationHistory())
+const visitAll = (locations: readonly NavigationLocation[]) =>
+  locations.reduce((history, location) => visitLocation(history, location), emptyNavigationHistory())
 
 test('an open panel is the location; otherwise the selected thread is', () => {
   assert.deepEqual(currentLocation({ panelId: 'settings', threadId: 'a' }), panel('settings'))

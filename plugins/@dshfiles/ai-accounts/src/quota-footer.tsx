@@ -124,7 +124,14 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
             </button>
           ) : (
             items.map(item => (
-              <ArrangeableAccount arrangement={arrangement} direction="row" id={item.instanceId} key={item.instanceId} name={item.displayName} shownIds={shownIds}>
+              <ArrangeableAccount
+                arrangement={arrangement}
+                direction="row"
+                id={item.instanceId}
+                key={item.instanceId}
+                name={item.displayName}
+                shownIds={shownIds}
+              >
                 <button
                   aria-expanded={open}
                   aria-label={describeItem(item, now)}
@@ -177,11 +184,7 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
  * strip in place unless a seat above the foot already holds it. The "Sidebar
  * usage" switch hides both.
  */
-export const QuotaFooter = (props: {
-  readonly wide: boolean
-  readonly stripSeated: boolean
-  readonly onOpenUsageHistory: () => void
-}): JSX.Element | null => {
+export const QuotaFooter = (props: { readonly wide: boolean; readonly stripSeated: boolean; readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
   const { footerButton } = usePreferences()
   if (!footerButton) return null
   if (!props.wide) return <QuotaRailButton onOpenUsageHistory={props.onOpenUsageHistory} />
