@@ -1,0 +1,89 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+- id: ui-settings-general
+  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
+- id: llm-openai-codex
+  disabled: false
+- id: llm-commandcode
+  name: "@mars-sea/dsh-commandcode-provider"
+  config:
+    apiKeyEnv: COMMANDCODE_API_KEY
+    visibleModels:
+      - stealth/space-bunny-alpha
+      - gpt-6-luna
+    modelVisibility: {}
+    showSidebarQuota: true
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: opencode-go-alex
+    model: deepseek-v4.1-flash
+
+# dsh-client-connection's rpc.register() calls owner.webServer.register(route),
+# but the row declares only webRuntime. Any plugin registering a Host API then
+# dies at boot with "cannot get property webServer without inject". Declaring
+# the missing edge here is the smallest fix until DSH ships it.
+- id: connection
+  inject:
+    - webRuntime
+    - webServer
+
+# Async questions: the shipped `tool-ask-user` row declares no config, so it
+# defaults to the blocking legacy schema. Selecting timed mode lets a model call
+# ask_user_question with `timeout: -1` to block until answered, or any positive
+# seconds to keep working while the question stays answerable; a later answer is
+# steered in as a user-question-reply message. The row lives inside the preset's
+# plugins list, so it is addressed by the nested preset-scoped id.
+- id: 'preset-standard:tool-ask-user'
+  config:
+    mode: timed
+    timeout: 300
+
+# AI Accounts: one LLM route per account. Each Codex account gets a shadow home
+# whose non-private entries are symlinks back into the shared CODEX_HOME, so
+# sessions, skills and plugins stay shared while auth.json stays private.
+- id: ai-accounts
+  config:
+    codexShadowRoot: ~/.codex-dshx
+    distribution: sticky
+    cooldownMs: 300000
+    codexAccounts:
+      - instanceId: codex
+        displayName: Codex (primary)
+        homePath: ~/.codex
+        shadowHomePath: ~/.codex-dshx/primary
+        enabled: true
+      - instanceId: codex_alt
+        displayName: Codex (second)
+        homePath: ~/.codex
+        shadowHomePath: ~/.codex-dshx/second
+        enabled: true
+- id: permission
+  name: "@deepseek-ai/dsh-permission-presets"
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+    defaultPreset: danger-full-access
+- id: ui-theme
+  name: "@deepseek-ai/dsh-client-ui-theme"
+  config:
+    preference: light
+# BEGIN NIX-MANAGED DSH PLUGINS
+- insert:
+    - id: dshfiles-multi-host
+      name: '@dshfiles/multi-host'
+- id: our-free-model
+  config:
+    distribution: managed
+# END NIX-MANAGED DSH PLUGINS

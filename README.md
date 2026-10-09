@@ -41,6 +41,13 @@ capabilities where the DSH APIs or product workflow need a focused extension.
 Bundles are Cordis packages with a `cordis.patch.yml`. Libraries are imported by
 bundles and are not installed on their own.
 
+### Web profile
+
+The checked-in web profile manifest and Cordis patch live in `profiles/web/`.
+Nixfiles seeds them into DSH's writable profile and reconciles the managed
+plugin declarations; runtime edits outside that managed region stay under
+`~/.dsh/profiles/web/`.
+
 ### Toolchain
 
 `tooling/dshx` is the locally owned `@dshfiles/dshx` fork for DSH 0.2. It

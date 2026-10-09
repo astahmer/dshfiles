@@ -194,9 +194,13 @@ Profiles live in `~/.dsh/profiles/<name>/`. Registry packages go through
 `dsh plugin --profile <name> add <package>`; owned bundles go through
 `pnpm profile:sync --profile <name>`, because `pnpm add <path>` cannot express a
 local bundle. `docs/profile-installs.md` has the pnpm and peer-dependency traps
-behind that rule; read it before touching a profile manifest. A profile's
-`cordis.patch.yml` may be edited by hand only outside the Nix-managed marked
-block, which `~/.config/nixfiles/modules/dsh.nix` reconciles on every apply.
+behind that rule; read it before touching a profile manifest.
+
+The checked-in web profile seed lives in `profiles/web/`. Home Manager reads
+it from `$HOME/dev/dshfiles/profiles/web` and seeds missing files into the
+writable `~/.dsh/profiles/web/` profile. On apply, it reconciles the plugin
+dependencies and marked Cordis region. Active DSH files remain writable;
+runtime edits outside that marked region stay local to the profile.
 
 ### Experiment in a scratch profile, promote on evidence
 
