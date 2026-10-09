@@ -2,17 +2,12 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { test } from 'vitest'
 
-test('editing a queued message keeps draft state out of the list component', async () => {
+test('queue edit delegates draft ownership to the shared composer', async () => {
   const source = await readFile(new URL('./client.tsx', import.meta.url), 'utf8')
-  const editorStart = source.indexOf('const QueueMessageEditor =')
-  const dockStart = source.indexOf('export const DraggableQueueDock =')
 
-  assert.ok(editorStart >= 0)
-  assert.ok(dockStart > editorStart)
-  const editorSource = source.slice(editorStart, dockStart)
-  const dockSource = source.slice(dockStart)
-  assert.match(editorSource, /const \[draft, setDraft\] = useState\(props\.text\)/u)
-  assert.match(editorSource, /onChange=\{event => setDraft\(event\.target\.value\)\}/u)
-  assert.match(dockSource, /<QueueMessageEditor/u)
-  assert.doesNotMatch(dockSource, /const \[draft, setDraft\]/u)
+  assert.match(source, /props\.useInput\(state => state\.queueEdit\)/u)
+  assert.match(source, /inputActions\.beginQueueEdit\(row\.id\)/u)
+  assert.match(source, /hasQueueEditInputActions\(inputActions\)/u)
+  assert.doesNotMatch(source, /QueueMessageEditor|<Textarea/u)
+  assert.doesNotMatch(source, /const \[draft, setDraft\]/u)
 })

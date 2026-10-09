@@ -1,10 +1,10 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation } from '@dshfiles/plugin-ui/query'
@@ -21,9 +21,10 @@ import { queueReorderSettings } from './settings.js'
  * shipped one, which is what produced two stacked queues.
  *
  * Everything the shipped dock does is preserved — the same structure, spacing and
- * tokens, the same edit/remove/steer actions still mutating through `updateQueue`,
- * the same collapse behaviour, and the same session-derived gating that decides
- * whether steer is offered at all. `running` and `queueMutable` come from the
+ * tokens, the same remove/steer actions still mutating through `updateQueue`, and
+ * queue editing enters the shared composer through `inputActions`. The same
+ * collapse behaviour and session-derived gating decide whether steer is offered.
+ * `running` and `queueMutable` come from the
  * live session rather than being pinned, because a dock whose steer button is
  * permanently disabled is worse than no dock.
  *
@@ -63,16 +64,6 @@ const asQueuedMessage = (value: unknown): QueuedMessage | null => {
 
 type Direction = 'up' | 'down'
 
-export type QueueAction = { readonly kind: 'edit'; readonly content: readonly TextBlock[] } | { readonly kind: 'remove' } | { readonly kind: 'steer' }
-
-const textOf = (content: readonly TextBlock[]): string | null => {
-  const text = content
-    .filter(block => block.type === 'text')
-    .map(block => block.text ?? '')
-    .join('')
-  return text.trim().length === 0 ? null : text
-}
-
 const attachmentsOf = (content: readonly TextBlock[]): string | null => {
   const files = content.filter(block => block.type !== 'text')
   if (files.length === 0) return null
@@ -108,60 +99,6 @@ const RowAction = (props: {
   </Tooltip>
 )
 
-interface QueueMessageEditorProps {
-  readonly text: string
-  readonly disabled: boolean
-  readonly onCancel: () => void
-  readonly onSave: (text: string) => void
-}
-
-const QueueMessageEditor = (props: QueueMessageEditorProps): JSX.Element => {
-  const [draft, setDraft] = useState(props.text)
-  const editorRef = useRef<HTMLTextAreaElement | null>(null)
-
-  useEffect(() => {
-    const node = editorRef.current
-    node?.focus()
-    node?.setSelectionRange(node.value.length, node.value.length)
-  }, [])
-
-  useEffect(() => {
-    setDraft(props.text)
-  }, [props.text])
-
-  const save = (): void => props.onSave(draft)
-
-  return (
-    <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1.5">
-      <Textarea
-        ref={editorRef}
-        aria-label="Queued message"
-        className="dshx:max-h-40 dshx:min-h-14 dshx:resize-none dshx:bg-background dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:md:text-sm"
-        value={draft}
-        onChange={event => setDraft(event.target.value)}
-        onKeyDown={event => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            save()
-          }
-          if (event.key === 'Escape') props.onCancel()
-        }}
-      />
-      <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
-        <span className="dshx:mr-auto dshx:text-xs dshx:text-muted-foreground">Enter to save · Esc to cancel</span>
-        <Button type="button" variant="ghost" size="xs" aria-label="Cancel editing" disabled={props.disabled} onClick={props.onCancel}>
-          <XIcon />
-          Cancel
-        </Button>
-        <Button type="button" size="xs" aria-label="Save queued message" disabled={props.disabled || draft.trim().length === 0} onClick={save}>
-          <CheckIcon />
-          Save
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
   readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
@@ -173,6 +110,13 @@ export interface QueueDockInjected {
  * and `updateQueue` from this slot's `inject`, so neither is restated here.
  */
 export type DockProps = ComposedProps<'conversation.input.dock', string, never, undefined, QueueDockInjected, never, undefined>
+
+type QueueEditInputActions = NonNullable<DockProps['inputActions']> & {
+  readonly beginQueueEdit: (itemId: MessageId) => boolean
+}
+
+const hasQueueEditInputActions = (actions: DockProps['inputActions']): actions is QueueEditInputActions =>
+  actions !== undefined && 'beginQueueEdit' in actions && typeof actions.beginQueueEdit === 'function'
 
 export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const inbox = props.useProjection('inbox')
@@ -193,7 +137,8 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const running = props.useSession((state: SessionState) => state.running)
   const queueMutable = props.useSession((state: SessionState) => state.subagent === null || state.subagent.address.mode === 'continuable')
 
-  const [editing, setEditing] = useState<MessageId | null>(null)
+  const queueEditActive = props.useInput(state => 'queueEdit' in state && state.queueEditActive)
+  const [editError, setEditError] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default (the `expandByDefault` setting): the list is the point of the
@@ -209,8 +154,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     if (rowCount === 0) setCollapsed(true)
     else if (previousRowCount.current === 0) setCollapsed(!expandByDefault)
     previousRowCount.current = rowCount
-    if (editing !== null && (!queueMutable || !rows.some(row => row.id === editing))) setEditing(null)
-  }, [editing, expandByDefault, queueMutable, rowCount, rows])
+  }, [expandByDefault, rowCount])
 
   const queueAction = useMutation({
     mutationFn: (request: { readonly itemId: MessageId; readonly action: QueueAction }) => props.updateQueue(request.itemId, request.action),
@@ -232,23 +176,15 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     for (let step = 0; step < steps; step += 1) await move(sourceId, direction)
   }
 
-  const saveEdit = (itemId: MessageId, draft: string): void => {
-    if (draft.trim().length === 0) return
-    void queueAction.mutateAsync({ itemId, action: { kind: 'edit', content: [{ type: 'text', text: draft }] } }).then(
-      () => setEditing(null),
-      () => undefined,
-    )
-  }
-
   if (rowCount === 0) return null
 
-  const interactionActive = queueMutable && (editing !== null || busy !== null)
+  const interactionActive = queueEditActive || (queueMutable && busy !== null)
   const expanded = !collapsed || interactionActive
   // The shipped dock shows a lone row without a header, so a single queued
   // message is always visible rather than hidden behind a collapsed panel.
   const listVisible = rowCount === 1 || expanded
 
-  const dragEnabled = queueMutable && editing === null && busy === null
+  const dragEnabled = queueMutable && !queueEditActive && busy === null
 
   return (
     <TooltipProvider delayDuration={500}>
@@ -276,15 +212,12 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           <ul className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-px dshx:overflow-y-auto dshx:px-1 dshx:pb-0.5" id={listId} hidden={!listVisible}>
             {listVisible
               ? rows.map((row, index) => {
-                  const text = textOf(row.content)
                   const files = attachmentsOf(row.content)
-                  const isEditing = editing === row.id
                   const isBusy = busy === row.id
                   return (
                     <li
                       className={cn(
                         'dshx:group/row dshx:flex dshx:min-h-8 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1 dshx:py-0.5 dshx:hover:bg-accent/50',
-                        isEditing && 'dshx:items-start dshx:bg-accent/40 dshx:py-1.5',
                         dragId === row.id && 'dshx:opacity-50',
                         dropIndex === index && dragId !== row.id && 'dshx:bg-accent dshx:shadow-[inset_0_2px_0_var(--color-primary)]',
                       )}
@@ -327,38 +260,44 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                       >
                         <GripVerticalIcon className="dshx:size-3.5" />
                       </span>
-                      {isEditing ? (
-                        <QueueMessageEditor
-                          text={text ?? ''}
-                          disabled={busy !== null}
-                          onCancel={() => setEditing(null)}
-                          onSave={draft => saveEdit(row.id, draft)}
-                        />
-                      ) : (
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
-                          {previewOf(row.content, previewLength) || files || '—'}
-                        </span>
-                      )}
-                      {queueMutable && !isEditing ? (
+                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
+                        {previewOf(row.content, previewLength) || files || '—'}
+                      </span>
+                      {queueMutable ? (
                         <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
-                          <RowAction label={`Move queued message ${index + 1} up`} tooltip="Move up" disabled={index === 0 || busy !== null} onClick={() => void move(row.id, 'up')}>
+                          <RowAction label={`Move queued message ${index + 1} up`} tooltip="Move up" disabled={queueEditActive || index === 0 || busy !== null} onClick={() => void move(row.id, 'up')}>
                             <ChevronUpIcon />
                           </RowAction>
                           <RowAction
                             label={`Move queued message ${index + 1} down`}
                             tooltip="Move down"
-                            disabled={index === rowCount - 1 || busy !== null}
+                            disabled={queueEditActive || index === rowCount - 1 || busy !== null}
                             onClick={() => void move(row.id, 'down')}
                           >
                             <ChevronDownIcon />
                           </RowAction>
-                          <RowAction label="Edit queued message" tooltip="Edit" disabled={busy !== null || text === null} onClick={() => setEditing(row.id)}>
+                          <RowAction
+                            label="Edit queued message"
+                            tooltip="Edit"
+                            disabled={busy !== null || queueEditActive}
+                            onClick={() => {
+                              setEditError(null)
+                              const inputActions = props.inputActions
+                              if (!hasQueueEditInputActions(inputActions)) {
+                                setEditError('This DSH version does not support composer-based queue editing.')
+                                return
+                              }
+                              if (!inputActions.beginQueueEdit(row.id)) {
+                                setEditError('Could not start editing this queued message.')
+                              }
+                            }}
+                          >
                             <PencilIcon />
                           </RowAction>
-                          <RowAction label="Remove queued message" tooltip="Remove" disabled={isBusy} onClick={() => applyAction(row.id, { kind: 'remove' })}>
+                          <RowAction label="Remove queued message" tooltip="Remove" disabled={busy !== null || queueEditActive || isBusy} onClick={() => applyAction(row.id, { kind: 'remove' })}>
                             <Trash2Icon />
                           </RowAction>
-                          <RowAction label="Steer with queued message" tooltip="Steer" disabled={busy !== null || !running} onClick={() => applyAction(row.id, { kind: 'steer' })}>
+                          <RowAction label="Steer with queued message" tooltip="Steer" disabled={busy !== null || queueEditActive || !running} onClick={() => applyAction(row.id, { kind: 'steer' })}>
                             <SendIcon />
                           </RowAction>
                         </span>
@@ -368,6 +307,14 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                 })
               : null}
           </ul>
+          {queueEditActive ? (
+            <div className="dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+              Editing in the composer; save or cancel there to continue.
+            </div>
+          ) : null}
+          {editError !== null ? (
+            <div className="dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-destructive" role="alert">{editError}</div>
+          ) : null}
         </div>
       </div>
     </TooltipProvider>

@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -27,7 +28,7 @@ import './client.css'
  * `API "…" is unavailable outside a DSHX Client Slot component` on first render.
  */
 interface ConversationService {
-  updateQueue(itemId: MessageId, action: unknown): Promise<void>
+  updateQueue(itemId: MessageId, action: QueueAction): Promise<void>
 }
 
 const QueueDockSlot = (props: DockProps): JSX.Element => (
@@ -64,7 +65,7 @@ export default defineClient({
               throw new Error('queue dock: conversation service unavailable')
             }
             return {
-              updateQueue: (itemId: MessageId, action: unknown): Promise<void> => conversation.updateQueue(itemId, action),
+              updateQueue: (itemId: MessageId, action: QueueAction): Promise<void> => conversation.updateQueue(itemId, action),
             }
           },
         },
