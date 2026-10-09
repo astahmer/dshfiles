@@ -13,7 +13,7 @@ import { z } from 'zod'
 import './client.css'
 import { createEditorStore } from './editor-store.js'
 import { EditorPanel } from './editor-panel.js'
-import { OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
+import { GO_TO_LINE_EVENT, goToLineRequestSchema, OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
 import { editorSettings } from './settings.js'
 import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
 
@@ -96,6 +96,10 @@ export default defineClient({
     )
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, Panel))
 
+    const showEditor = (): void => {
+      if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
+      else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+    }
     ctx.effect(() => {
       const onOpenFile = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
@@ -104,12 +108,27 @@ export default defineClient({
         if (!request.success || sessionId === undefined) return
         event.preventDefault()
         store.open(sessionId, request.data)
-        if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
-        else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+        showEditor()
+      }
+      const onGoToLine = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = goToLineRequestSchema.safeParse(event.detail)
+        const sessionId = currentSession()
+        if (!request.success || sessionId === undefined) return
+        const state = store.getSnapshot()
+        const active = state.documents.find(document => document.id === state.activeBySession[sessionId])
+        if (active === undefined) return
+        event.preventDefault()
+        store.open(sessionId, { path: active.path, line: request.data.line })
+        showEditor()
       }
       window.addEventListener(OPEN_FILE_EVENT, onOpenFile)
-      return () => window.removeEventListener(OPEN_FILE_EVENT, onOpenFile)
-    }, 'dshfiles-editor: open-file requests')
+      window.addEventListener(GO_TO_LINE_EVENT, onGoToLine)
+      return () => {
+        window.removeEventListener(OPEN_FILE_EVENT, onOpenFile)
+        window.removeEventListener(GO_TO_LINE_EVENT, onGoToLine)
+      }
+    }, 'dshfiles-editor: open-file and go-to-line requests')
 
     ctx.effect(() => {
       const fileIndex = createWorkspaceFileIndex<SessionId>({

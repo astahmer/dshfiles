@@ -15,6 +15,11 @@ export const openFileRequestSchema = z.object({
   cwd: z.string().min(1).max(4096).optional(),
 })
 
+/** Moves the editor's active file of the session on screen to a line; handled (preventDefault) only when a file is open. */
+export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
+
+export const goToLineRequestSchema = z.object({ line: z.number().int().positive() })
+
 export type OpenFileRequest = z.infer<typeof openFileRequestSchema>
 
 export const resolveRequestedPath = (request: OpenFileRequest): string => {
