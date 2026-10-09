@@ -21,6 +21,7 @@ export interface SecretUpdateForm {
   readonly alias: string
   readonly scope: SecretMutationScope
   readonly environment: string
+  readonly newAlias?: string
   readonly value: string | null
   readonly name?: string
   readonly source?: string
@@ -50,10 +51,10 @@ export const secretCreateFormSchema = createMetadataSchema
 
 export type SecretCreateFormValues = z.input<typeof secretCreateFormSchema>
 
-export const secretCreateFormDefaults = (scope: SecretMutationScope): SecretCreateFormValues => ({
+export const secretCreateFormDefaults = (input: { readonly scope: SecretMutationScope; readonly environment: string }): SecretCreateFormValues => ({
   alias: '',
-  scope,
-  environment: 'prod',
+  scope: input.scope,
+  environment: input.environment,
   valueMode: 'generate',
   value: '',
   name: '',
@@ -76,14 +77,26 @@ export const toSecretCreateInput = (form: SecretCreateFormValues): SecretCreateF
   ...(form.field.length === 0 ? {} : { field: form.field }),
 })
 
-export const secretUpdateFormSchema = updateMetadataSchema.required().extend({ clearTags: z.boolean(), value: secretValueSchema })
+export const secretUpdateFormSchema = updateMetadataSchema.required().extend({ renameTo: aliasSchema, clearTags: z.boolean(), value: secretValueSchema })
 
 export type SecretUpdateFormValues = z.input<typeof secretUpdateFormSchema>
 
-export const secretUpdateFormDefaults: SecretUpdateFormValues = { name: '', source: '', tags: '', clearTags: false, value: '' }
+export const secretUpdateFormDefaults = (alias: string): SecretUpdateFormValues => ({
+  renameTo: alias,
+  name: '',
+  source: '',
+  tags: '',
+  clearTags: false,
+  value: '',
+})
 
-export const hasSecretUpdate = (form: SecretUpdateFormValues): boolean =>
-  form.name.length > 0 || form.source.length > 0 || form.tags.length > 0 || form.clearTags || form.value.length > 0
+export const hasSecretUpdate = (input: { readonly alias: string; readonly form: SecretUpdateFormValues }): boolean =>
+  input.form.name.length > 0 ||
+  input.form.source.length > 0 ||
+  input.form.tags.length > 0 ||
+  input.form.clearTags ||
+  input.form.value.length > 0 ||
+  input.form.renameTo.trim() !== input.alias
 
 export const toSecretUpdateInput = (input: {
   readonly target: { readonly alias: string; readonly scope: SecretMutationScope; readonly environment: string }
@@ -92,6 +105,7 @@ export const toSecretUpdateInput = (input: {
   alias: input.target.alias,
   scope: input.target.scope,
   environment: input.target.environment,
+  ...(input.form.renameTo.trim().length > 0 && input.form.renameTo.trim() !== input.target.alias ? { newAlias: input.form.renameTo.trim() } : {}),
   value: input.form.value.length === 0 ? null : input.form.value,
   ...(input.form.name.length === 0 ? {} : { name: input.form.name }),
   ...(input.form.source.length === 0 ? {} : { source: input.form.source }),

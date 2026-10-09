@@ -8,15 +8,28 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
+import { Field, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useId, useState, type FormEvent } from 'react'
+import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
+import {
+  hasSecretUpdate,
+  isSecretScope,
+  needsProjectFolder,
+  secretCreateFormDefaults,
+  secretCreateFormSchema,
+  secretUpdateFormDefaults,
+  secretUpdateFormSchema,
+  toSecretCreateInput,
+  toSecretUpdateInput,
+  type SecretCreateForm,
+  type SecretMutationScope,
+  type SecretRemoveTarget,
+  type SecretUpdateForm,
+} from './secret-mutation-form.js'
 import {
   chooseRemovalTarget,
   confirmedRemovalTarget,
@@ -25,33 +38,6 @@ import {
   type RemovalDialogState,
   type ValueReplacementStage,
 } from './secret-mutation-model.js'
-
-export type SecretMutationScope = 'global' | 'project' | 'local'
-export type SecretRemoveTarget = 'alias' | 'vault-item'
-
-export interface SecretCreateForm {
-  readonly alias: string
-  readonly scope: SecretMutationScope
-  readonly environment: string
-  readonly valueMode: 'generate' | 'manual'
-  readonly value: string | null
-  readonly name?: string
-  readonly source?: string
-  readonly tags?: string
-  readonly type?: string
-  readonly field?: string
-}
-
-export interface SecretUpdateForm {
-  readonly alias: string
-  readonly scope: SecretMutationScope
-  readonly environment: string
-  readonly newAlias?: string
-  readonly value: string | null
-  readonly name?: string
-  readonly source?: string
-  readonly tags?: string
-}
 
 interface SecretMutationDialogProps {
   readonly mode: 'create' | 'edit' | 'remove'
@@ -68,26 +54,206 @@ interface SecretMutationDialogProps {
   readonly t: SecretCatalogTranslate
 }
 
-const optionalText = (value: string): string | undefined => (value.length === 0 ? undefined : value)
-const isSecretScope = (value: string): value is SecretMutationScope => value === 'global' || value === 'project' || value === 'local'
+const submitWith =
+  (handleSubmit: () => Promise<void>) =>
+  (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault()
+    void handleSubmit()
+  }
+
+const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: (submit: ReactNode) => ReactNode }): JSX.Element => {
+  const t = props.t
+  const form = useAppForm({
+    defaultValues: secretCreateFormDefaults({ scope: props.initialCreateScope, environment: props.defaultEnvironment }),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: secretCreateFormSchema },
+    onSubmit: ({ value }) => {
+      if (needsProjectFolder({ scope: value.scope, hasProjectFolder: props.hasProjectFolder })) return
+      props.onCreate(toSecretCreateInput(value))
+    },
+  })
+  return (
+    <form className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2" noValidate onSubmit={submitWith(form.handleSubmit)}>
+      <form.AppField name="alias">{field => <field.TextField label={t('fieldAlias')} monospace required />}</form.AppField>
+      <form.AppField name="environment">{field => <field.TextField label={t('fieldEnvironment')} required />}</form.AppField>
+      <form.Subscribe selector={state => state.values.scope}>
+        {scope => (
+          <form.AppField name="scope">
+            {field => (
+              <field.SelectField
+                description={
+                  needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) ? (
+                    <span className="dshx:text-destructive">{t('needsProjectFolder')}</span>
+                  ) : undefined
+                }
+                label={t('fieldTargetScope')}
+                options={[
+                  { value: 'global', label: t('targetGlobal') },
+                  { value: 'project', label: t('targetProject') },
+                  { value: 'local', label: t('targetLocal'), disabled: !props.hasProjectFolder },
+                ]}
+              />
+            )}
+          </form.AppField>
+        )}
+      </form.Subscribe>
+      <form.AppField
+        listeners={{
+          onChange: ({ value }) => {
+            if (value === 'generate') form.setFieldValue('value', '')
+          },
+        }}
+        name="valueMode"
+      >
+        {field => (
+          <field.SelectField
+            label={t('fieldValueCreation')}
+            options={[
+              { value: 'generate', label: t('valueGenerate') },
+              { value: 'manual', label: t('valueManual') },
+            ]}
+          />
+        )}
+      </form.AppField>
+      <form.Subscribe selector={state => state.values.valueMode}>
+        {valueMode =>
+          valueMode === 'generate' ? (
+            <p className="dshx:text-xs dshx:text-muted-foreground dshx:sm:col-span-2">{t('generateHint')}</p>
+          ) : (
+            <form.AppField name="value">
+              {field => (
+                <field.TextField autoComplete="new-password" className="dshx:sm:col-span-2" label={t('fieldSecretValue')} monospace required type="password" />
+              )}
+            </form.AppField>
+          )
+        }
+      </form.Subscribe>
+      <form.AppField name="name">{field => <field.TextField label={t('fieldItemName')} />}</form.AppField>
+      <form.AppField name="source">{field => <field.TextField label={t('fieldSourceUrl')} />}</form.AppField>
+      <form.AppField name="tags">{field => <field.TextField label={t('fieldTags')} placeholder={t('tagsPlaceholder')} />}</form.AppField>
+      <form.AppField name="type">
+        {field => (
+          <field.SelectField
+            label={t('fieldItemType')}
+            options={[
+              { value: 'login', label: t('itemTypeLogin') },
+              { value: 'secure-note', label: t('itemTypeSecureNote') },
+            ]}
+          />
+        )}
+      </form.AppField>
+      <form.AppField name="field">
+        {field => <field.TextField className="dshx:sm:col-span-2" label={t('fieldField')} placeholder={t('fieldPlaceholder')} />}
+      </form.AppField>
+      {props.footer(
+        <form.Subscribe selector={state => [state.values.scope, state.values.valueMode, state.values.value] as const}>
+          {([scope, valueMode, value]) => (
+            <Button
+              disabled={
+                props.pending || needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) || (valueMode === 'manual' && value.length === 0)
+              }
+              type="submit"
+            >
+              {props.pending ? t('adding') : t('addAlias')}
+            </Button>
+          )}
+        </form.Subscribe>,
+      )}
+    </form>
+  )
+}
+
+const EditSecretForm = (
+  props: SecretMutationDialogProps & { readonly row: SecretMetadata; readonly footer: (submit: ReactNode) => ReactNode },
+): JSX.Element => {
+  const t = props.t
+  const row = props.row
+  const clearTagsId = useId()
+  const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
+  const form = useAppForm({
+    defaultValues: secretUpdateFormDefaults(row.alias),
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: secretUpdateFormSchema },
+    onSubmit: ({ value }) => {
+      if (value.value.length > 0 && !maySubmitValueReplacement(valueReplacementStage)) {
+        setValueReplacementStage(requestValueReplacement(valueReplacementStage))
+        return
+      }
+      if (!isSecretScope(row.scope)) return
+      props.onUpdate(toSecretUpdateInput({ target: { alias: row.alias, scope: row.scope, environment: row.environment }, form: value }))
+    },
+  })
+  return (
+    <form className="dshx:grid dshx:gap-4" noValidate onSubmit={submitWith(form.handleSubmit)}>
+      <form.AppField name="renameTo">{field => <field.TextField description={t('renameHint')} label={t('fieldAlias')} monospace required />}</form.AppField>
+      <form.AppField name="name">{field => <field.TextField label={t('fieldItemName')} placeholder={row.item || t('keepCurrent')} />}</form.AppField>
+      <form.AppField name="source">{field => <field.TextField label={t('fieldSourceUrl')} placeholder={row.service || t('keepCurrent')} />}</form.AppField>
+      <form.Subscribe selector={state => state.values.clearTags}>
+        {clearTags => (
+          <form.Field name="tags">
+            {field => (
+              <Field className="dshx:flex-col dshx:gap-1.5">
+                <FieldLabel htmlFor={`${clearTagsId}-tags`}>{t('fieldTags')}</FieldLabel>
+                <Input
+                  autoComplete="off"
+                  disabled={clearTags}
+                  id={`${clearTagsId}-tags`}
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onChange={event => field.handleChange(event.currentTarget.value)}
+                  placeholder={t('tagsPlaceholder')}
+                  value={field.state.value}
+                />
+              </Field>
+            )}
+          </form.Field>
+        )}
+      </form.Subscribe>
+      <form.AppField name="clearTags">{field => <field.CheckboxField label={t('clearAllTags')} />}</form.AppField>
+      <form.AppField listeners={{ onChange: () => setValueReplacementStage('editing') }} name="value">
+        {field => (
+          <field.TextField
+            autoComplete="new-password"
+            description={
+              field.state.value.length > 0 && valueReplacementStage === 'confirming' ? (
+                <span className="dshx:text-warning">{t('confirmReplacementHint')}</span>
+              ) : undefined
+            }
+            label={t('replaceValue')}
+            monospace
+            type="password"
+          />
+        )}
+      </form.AppField>
+      {props.footer(
+        <form.Subscribe selector={state => state.values}>
+          {values => {
+            const replacing = values.value.length > 0
+            return (
+              <Button
+                disabled={props.pending || !hasSecretUpdate({ alias: row.alias, form: values })}
+                type="submit"
+                variant={replacing && valueReplacementStage === 'confirming' ? 'destructive' : 'default'}
+              >
+                {props.pending
+                  ? t('saving')
+                  : replacing
+                    ? valueReplacementStage === 'editing'
+                      ? t('reviewReplacement')
+                      : t('confirmReplacement')
+                    : t('saveChanges')}
+              </Button>
+            )
+          }}
+        </form.Subscribe>,
+      )}
+    </form>
+  )
+}
 
 export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Element => {
-  const [alias, setAlias] = useState('')
-  const [scope, setScope] = useState<SecretMutationScope>(props.initialCreateScope)
-  const [environment, setEnvironment] = useState(props.defaultEnvironment)
-  const [renameTo, setRenameTo] = useState(props.row?.alias ?? '')
-  const [valueMode, setValueMode] = useState<'generate' | 'manual'>('generate')
-  const [value, setValue] = useState('')
-  const [name, setName] = useState('')
-  const [source, setSource] = useState('')
-  const [tags, setTags] = useState('')
-  const [clearTags, setClearTags] = useState(false)
-  const [type, setType] = useState('')
-  const [field, setField] = useState('')
   const [removeState, setRemoveState] = useState<RemovalDialogState>({ stage: 'choose' })
-  const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
   const row = props.row
-  const fieldId = useId()
   const t = props.t
   const titleAlias = row?.alias ?? t('aliasFallback')
 
@@ -97,46 +263,6 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
       : props.mode === 'edit'
         ? t('dialogEditTitle', { alias: titleAlias })
         : t('dialogRemoveTitle', { alias: titleAlias })
-
-  const submitCreate = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault()
-    if (props.mode !== 'create') return
-    if (scope !== 'global' && !props.hasProjectFolder) return
-    if (valueMode === 'manual' && value.length === 0) return
-    props.onCreate({
-      alias,
-      scope,
-      environment,
-      valueMode,
-      value: valueMode === 'manual' ? value : null,
-      ...(optionalText(name) === undefined ? {} : { name }),
-      ...(optionalText(source) === undefined ? {} : { source }),
-      ...(optionalText(tags) === undefined ? {} : { tags }),
-      ...(type.length === 0 ? {} : { type }),
-      ...(optionalText(field) === undefined ? {} : { field }),
-    })
-  }
-
-  const submitUpdate = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault()
-    if (props.mode !== 'edit' || row === undefined) return
-    if (value.length > 0 && !maySubmitValueReplacement(valueReplacementStage)) {
-      setValueReplacementStage(requestValueReplacement(valueReplacementStage))
-      return
-    }
-    if (!isSecretScope(row.scope)) return
-    const nextAlias = renameTo.trim()
-    props.onUpdate({
-      alias: row.alias,
-      scope: row.scope,
-      environment: row.environment,
-      ...(nextAlias.length > 0 && nextAlias !== row.alias ? { newAlias: nextAlias } : {}),
-      value: value.length === 0 ? null : value,
-      ...(optionalText(name) === undefined ? {} : { name }),
-      ...(optionalText(source) === undefined ? {} : { source }),
-      ...(clearTags ? { tags: '' } : optionalText(tags) === undefined ? {} : { tags }),
-    })
-  }
 
   const finishRemove = (): void => {
     if (props.mode !== 'remove' || row === undefined) return
@@ -220,230 +346,50 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
     )
   }
 
-  const fieldClassName = 'dshx:flex-col dshx:gap-1.5'
+  const cancelButton = (
+    <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
+      {t('cancel')}
+    </Button>
+  )
 
   return (
     <Dialog onOpenChange={closeUnlessPending} open>
-      <DialogContent {...(props.mode === 'create' ? { 'aria-describedby': undefined } : {})} className="dshx-root dshx:max-h-[calc(100%-2rem)] dshx:overflow-y-auto dshx:sm:max-w-xl">
+      <DialogContent
+        {...(props.mode === 'create' ? { 'aria-describedby': undefined } : {})}
+        className="dshx-root dshx:max-h-[calc(100%-2rem)] dshx:overflow-y-auto dshx:sm:max-w-xl"
+      >
         <DialogHeader>
           <DialogTitle className="dshx:text-base">{title}</DialogTitle>
           {props.mode === 'edit' && row !== undefined && (
             <DialogDescription>
-              {t('editAliasLabel')} <strong className="dshx:font-mono dshx:text-foreground">{row.alias}</strong> · {row.scope} · {row.environment}. {t('editKeepHint')}
+              {t('editAliasLabel')} <strong className="dshx:font-mono dshx:text-foreground">{row.alias}</strong> · {row.scope} · {row.environment}.{' '}
+              {t('editKeepHint')}
             </DialogDescription>
           )}
         </DialogHeader>
         {errorAlert}
         {props.mode === 'create' && (
-          <form className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2" onSubmit={submitCreate}>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-alias`}>{t('fieldAlias')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                className="dshx:font-mono!"
-                id={`${fieldId}-alias`}
-                maxLength={128}
-                onChange={event => setAlias(event.currentTarget.value)}
-                pattern="[A-Za-z_][A-Za-z0-9_-]*"
-                required
-                value={alias}
-              />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-environment`}>{t('fieldEnvironment')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                id={`${fieldId}-environment`}
-                maxLength={256}
-                onChange={event => setEnvironment(event.currentTarget.value)}
-                pattern="[A-Za-z0-9_-]+"
-                required
-                value={environment}
-              />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-scope`}>{t('fieldTargetScope')}</FieldLabel>
-              <Select
-                onValueChange={next => {
-                  if (isSecretScope(next)) setScope(next)
-                }}
-                value={scope}
-              >
-                <SelectTrigger className="dshx:w-full" id={`${fieldId}-scope`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="global">{t('targetGlobal')}</SelectItem>
-                  <SelectItem value="project">{t('targetProject')}</SelectItem>
-                  <SelectItem disabled={!props.hasProjectFolder} value="local">
-                    {t('targetLocal')}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {scope !== 'global' && !props.hasProjectFolder && <FieldDescription className="dshx:text-xs dshx:text-destructive">{t('needsProjectFolder')}</FieldDescription>}
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-value-mode`}>{t('fieldValueCreation')}</FieldLabel>
-              <Select
-                onValueChange={next => {
-                  const nextMode = next === 'manual' ? 'manual' : 'generate'
-                  setValueMode(nextMode)
-                  if (nextMode === 'generate') setValue('')
-                }}
-                value={valueMode}
-              >
-                <SelectTrigger className="dshx:w-full" id={`${fieldId}-value-mode`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="generate">{t('valueGenerate')}</SelectItem>
-                  <SelectItem value="manual">{t('valueManual')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            {valueMode === 'generate' ? (
-              <p className="dshx:text-xs dshx:text-muted-foreground dshx:sm:col-span-2">{t('generateHint')}</p>
-            ) : (
-              <Field className={cn(fieldClassName, 'dshx:sm:col-span-2')}>
-                <FieldLabel htmlFor={`${fieldId}-value`}>{t('fieldSecretValue')}</FieldLabel>
-                <Input
-                  autoComplete="new-password"
-                  className="dshx:font-mono!"
-                  id={`${fieldId}-value`}
-                  onChange={event => setValue(event.currentTarget.value)}
-                  required
-                  type="password"
-                  value={value}
-                />
-              </Field>
+          <CreateSecretForm
+            {...props}
+            footer={submit => (
+              <DialogFooter className="dshx:sm:col-span-2">
+                {cancelButton}
+                {submit}
+              </DialogFooter>
             )}
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-name`}>{t('fieldItemName')}</FieldLabel>
-              <Input autoComplete="off" id={`${fieldId}-name`} onChange={event => setName(event.currentTarget.value)} value={name} />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-source`}>{t('fieldSourceUrl')}</FieldLabel>
-              <Input autoComplete="off" id={`${fieldId}-source`} onChange={event => setSource(event.currentTarget.value)} value={source} />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-tags`}>{t('fieldTags')}</FieldLabel>
-              <Input autoComplete="off" id={`${fieldId}-tags`} onChange={event => setTags(event.currentTarget.value)} placeholder={t('tagsPlaceholder')} value={tags} />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-type`}>{t('fieldItemType')}</FieldLabel>
-              <Select onValueChange={setType} value={type || 'login'}>
-                <SelectTrigger className="dshx:w-full" id={`${fieldId}-type`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="login">{t('itemTypeLogin')}</SelectItem>
-                  <SelectItem value="secure-note">{t('itemTypeSecureNote')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field className={cn(fieldClassName, 'dshx:sm:col-span-2')}>
-              <FieldLabel htmlFor={`${fieldId}-field`}>{t('fieldField')}</FieldLabel>
-              <Input autoComplete="off" id={`${fieldId}-field`} onChange={event => setField(event.currentTarget.value)} placeholder={t('fieldPlaceholder')} value={field} />
-            </Field>
-            <DialogFooter className="dshx:sm:col-span-2">
-              <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
-                {t('cancel')}
-              </Button>
-              <Button disabled={props.pending || (scope !== 'global' && !props.hasProjectFolder) || (valueMode === 'manual' && value.length === 0)} type="submit">
-                {props.pending ? t('adding') : t('addAlias')}
-              </Button>
-            </DialogFooter>
-          </form>
+          />
         )}
         {props.mode === 'edit' && row !== undefined && (
-          <form className="dshx:grid dshx:gap-4" onSubmit={submitUpdate}>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-rename`}>{t('fieldAlias')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                className="dshx:font-mono!"
-                id={`${fieldId}-rename`}
-                maxLength={128}
-                onChange={event => setRenameTo(event.currentTarget.value)}
-                pattern="[A-Za-z_][A-Za-z0-9_-]*"
-                required
-                value={renameTo}
-              />
-              <FieldDescription className="dshx:text-xs">{t('renameHint')}</FieldDescription>
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-name`}>{t('fieldItemName')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                id={`${fieldId}-name`}
-                onChange={event => setName(event.currentTarget.value)}
-                placeholder={row.item || t('keepCurrent')}
-                value={name}
-              />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-source`}>{t('fieldSourceUrl')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                id={`${fieldId}-source`}
-                onChange={event => setSource(event.currentTarget.value)}
-                placeholder={row.service || t('keepCurrent')}
-                value={source}
-              />
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-tags`}>{t('fieldTags')}</FieldLabel>
-              <Input
-                autoComplete="off"
-                disabled={clearTags}
-                id={`${fieldId}-tags`}
-                onChange={event => setTags(event.currentTarget.value)}
-                placeholder={t('tagsPlaceholder')}
-                value={tags}
-              />
-            </Field>
-            <Field className="dshx:flex-row dshx:items-center dshx:gap-2" orientation="horizontal">
-              <Checkbox checked={clearTags} id={`${fieldId}-clear-tags`} onCheckedChange={checked => setClearTags(checked === true)} />
-              <FieldLabel className="dshx:font-normal" htmlFor={`${fieldId}-clear-tags`}>
-                {t('clearAllTags')}
-              </FieldLabel>
-            </Field>
-            <Field className={fieldClassName}>
-              <FieldLabel htmlFor={`${fieldId}-value`}>{t('replaceValue')}</FieldLabel>
-              <Input
-                autoComplete="new-password"
-                className="dshx:font-mono!"
-                id={`${fieldId}-value`}
-                onChange={event => {
-                  setValue(event.currentTarget.value)
-                  setValueReplacementStage('editing')
-                }}
-                type="password"
-                value={value}
-              />
-              {value.length > 0 && valueReplacementStage === 'confirming' && (
-                <FieldDescription className="dshx:text-xs dshx:text-warning">{t('confirmReplacementHint')}</FieldDescription>
-              )}
-            </Field>
-            <DialogFooter>
-              <Button disabled={props.pending} onClick={props.onClose} type="button" variant="outline">
-                {t('cancel')}
-              </Button>
-              <Button
-                disabled={props.pending || (name.length + source.length + tags.length === 0 && !clearTags && value.length === 0 && renameTo.trim() === row.alias)}
-                type="submit"
-                variant={value.length > 0 && valueReplacementStage === 'confirming' ? 'destructive' : 'default'}
-              >
-                {props.pending
-                  ? t('saving')
-                  : value.length > 0
-                    ? valueReplacementStage === 'editing'
-                      ? t('reviewReplacement')
-                      : t('confirmReplacement')
-                    : t('saveChanges')}
-              </Button>
-            </DialogFooter>
-          </form>
+          <EditSecretForm
+            {...props}
+            footer={submit => (
+              <DialogFooter>
+                {cancelButton}
+                {submit}
+              </DialogFooter>
+            )}
+            row={row}
+          />
         )}
       </DialogContent>
     </Dialog>

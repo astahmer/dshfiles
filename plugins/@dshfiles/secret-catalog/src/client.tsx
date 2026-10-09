@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
@@ -36,12 +37,14 @@ export default defineClient({
       ctx.slots.register(
         { name: 'main', key: PANEL_ID, locale: SECRET_CATALOG_LOCALE_NAMESPACE },
         decorate(props => (
-          <SecretCatalogPanel
-            directoryPicker={pickerPorts.directoryPicker}
-            workspaces={workspaces()}
-            registerWorkspace={pickerPorts.registerWorkspace}
-            t={props.t}
-          />
+          <PluginQueryProvider>
+            <SecretCatalogPanel
+              directoryPicker={pickerPorts.directoryPicker}
+              workspaces={workspaces()}
+              registerWorkspace={pickerPorts.registerWorkspace}
+              t={props.t}
+            />
+          </PluginQueryProvider>
         )),
       ),
     )

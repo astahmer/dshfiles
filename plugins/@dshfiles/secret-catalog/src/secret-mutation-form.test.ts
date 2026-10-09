@@ -17,21 +17,36 @@ const issuePaths = (result: {
 
 describe('Secret Catalog create form', () => {
   it('rejects an invalid alias and a manual value that was never entered', () => {
-    const result = secretCreateFormSchema.safeParse({ ...secretCreateFormDefaults('global'), alias: '1BAD', valueMode: 'manual' })
+    const result = secretCreateFormSchema.safeParse({
+      ...secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
+      alias: '1BAD',
+      valueMode: 'manual',
+    })
     expect(issuePaths(result)).toEqual(['alias', 'value'])
   })
 
   it('accepts a generated value with the default environment', () => {
-    expect(secretCreateFormSchema.safeParse({ ...secretCreateFormDefaults('global'), alias: 'SYNTHETIC_TOKEN' }).success).toBe(true)
+    expect(secretCreateFormSchema.safeParse({ ...secretCreateFormDefaults({ scope: 'global', environment: 'prod' }), alias: 'SYNTHETIC_TOKEN' }).success).toBe(
+      true,
+    )
   })
 
   it('rejects metadata that the CLI would read as another flag', () => {
-    const result = secretCreateFormSchema.safeParse({ ...secretCreateFormDefaults('global'), alias: 'SYNTHETIC', tags: '--force' })
+    const result = secretCreateFormSchema.safeParse({
+      ...secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
+      alias: 'SYNTHETIC',
+      tags: '--force',
+    })
     expect(issuePaths(result)).toEqual(['tags'])
   })
 
   it('keeps a generated value out of the request and omits blank metadata', () => {
-    const input = toSecretCreateInput({ ...secretCreateFormDefaults('project'), alias: 'SYNTHETIC', value: 'stale', name: 'Synthetic item' })
+    const input = toSecretCreateInput({
+      ...secretCreateFormDefaults({ scope: 'project', environment: 'prod' }),
+      alias: 'SYNTHETIC',
+      value: 'stale',
+      name: 'Synthetic item',
+    })
     expect(input).toEqual({
       alias: 'SYNTHETIC',
       scope: 'project',
@@ -44,7 +59,12 @@ describe('Secret Catalog create form', () => {
   })
 
   it('passes a manual value through unchanged', () => {
-    const input = toSecretCreateInput({ ...secretCreateFormDefaults('global'), alias: 'SYNTHETIC', valueMode: 'manual', value: 'synthetic-value' })
+    const input = toSecretCreateInput({
+      ...secretCreateFormDefaults({ scope: 'global', environment: 'prod' }),
+      alias: 'SYNTHETIC',
+      valueMode: 'manual',
+      value: 'synthetic-value',
+    })
     expect(input.value).toBe('synthetic-value')
   })
 
@@ -58,23 +78,35 @@ describe('Secret Catalog create form', () => {
 describe('Secret Catalog edit form', () => {
   const target = { alias: 'SYNTHETIC', scope: 'project', environment: 'prod' } as const
 
+  const defaults = secretUpdateFormDefaults(target.alias)
+
   it('has nothing to submit until a field changes', () => {
-    expect(hasSecretUpdate(secretUpdateFormDefaults)).toBe(false)
-    expect(hasSecretUpdate({ ...secretUpdateFormDefaults, clearTags: true })).toBe(true)
-    expect(hasSecretUpdate({ ...secretUpdateFormDefaults, value: 'x' })).toBe(true)
+    expect(hasSecretUpdate({ alias: target.alias, form: defaults })).toBe(false)
+    expect(hasSecretUpdate({ alias: target.alias, form: { ...defaults, clearTags: true } })).toBe(true)
+    expect(hasSecretUpdate({ alias: target.alias, form: { ...defaults, value: 'x' } })).toBe(true)
+    expect(hasSecretUpdate({ alias: target.alias, form: { ...defaults, renameTo: 'RENAMED' } })).toBe(true)
+  })
+
+  it('renames only when the trimmed alias differs', () => {
+    expect(toSecretUpdateInput({ target, form: { ...defaults, renameTo: ' SYNTHETIC ' } })).toEqual({ ...target, value: null })
+    expect(toSecretUpdateInput({ target, form: { ...defaults, renameTo: 'RENAMED' } })).toEqual({ ...target, value: null, newAlias: 'RENAMED' })
+  })
+
+  it('rejects an invalid rename', () => {
+    expect(issuePaths(secretUpdateFormSchema.safeParse({ ...defaults, renameTo: '1BAD' }))).toEqual(['renameTo'])
   })
 
   it('sends an empty tag list when clearing tags, whatever was typed', () => {
-    const input = toSecretUpdateInput({ target, form: { ...secretUpdateFormDefaults, tags: 'kept', clearTags: true } })
+    const input = toSecretUpdateInput({ target, form: { ...defaults, tags: 'kept', clearTags: true } })
     expect(input).toEqual({ ...target, value: null, tags: '' })
   })
 
   it('omits blank metadata and forwards a replacement value', () => {
-    const input = toSecretUpdateInput({ target, form: { ...secretUpdateFormDefaults, source: 'https://example.invalid', value: 'synthetic-value' } })
+    const input = toSecretUpdateInput({ target, form: { ...defaults, source: 'https://example.invalid', value: 'synthetic-value' } })
     expect(input).toEqual({ ...target, value: 'synthetic-value', source: 'https://example.invalid' })
   })
 
   it('rejects metadata that starts with a dash', () => {
-    expect(issuePaths(secretUpdateFormSchema.safeParse({ ...secretUpdateFormDefaults, name: '-x' }))).toEqual(['name'])
+    expect(issuePaths(secretUpdateFormSchema.safeParse({ ...defaults, name: '-x' }))).toEqual(['name'])
   })
 })

@@ -11,13 +11,9 @@ import { useApi, useSettings } from '@dshfiles/dshx/client'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
-import {
-  SecretMutationDialog,
-  type SecretCreateForm,
-  type SecretMutationScope,
-  type SecretRemoveTarget,
-  type SecretUpdateForm,
-} from './secret-mutation-dialog.js'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { SecretMutationDialog } from './secret-mutation-dialog.js'
+import type { SecretCreateForm, SecretMutationScope, SecretRemoveTarget, SecretUpdateForm } from './secret-mutation-form.js'
 import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex, type SecretScopeFilter } from './secret-catalog-model.js'
 import { secretCatalogSettings } from './settings.js'
 import { nextSecretRevealStage, type SecretRevealStage } from './secret-reveal-model.js'
@@ -60,6 +56,9 @@ const focusRowFromKey = (event: KeyboardEvent<HTMLDivElement>): void => {
   target.focus()
 }
 
+const secretListQueryKey = (cwd: string | null): readonly ['secret-catalog', 'list', string | null] => ['secret-catalog', 'list', cwd]
+const secretMachineQueryKey = ['secret-catalog', 'machine'] as const
+
 type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'remove'; readonly row: SecretMetadata }
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
@@ -83,22 +82,16 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const workspaceSnapshot = useSyncExternalStore(subscribe, getSnapshot, emptyWorkspaceSnapshot)
   const [selection, setSelection] = useState<ProjectFolderSelection | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [rows, setRows] = useState<readonly SecretMetadata[]>([])
   const [scope, setScope] = useState<SecretScopeFilter>('all')
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [revealed, setRevealed] = useState<{ readonly id: string; readonly value: string; readonly stage: SecretRevealStage } | null>(null)
   const [busyRow, setBusyRow] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
-  const [mutationPending, setMutationPending] = useState(false)
-  const [mutationError, setMutationError] = useState<string | null>(null)
-  const [machineName, setMachineName] = useState<string | null>(null)
-  const [refreshGeneration, setRefreshGeneration] = useState(0)
-  const requestGeneration = useRef(0)
   const revealGeneration = useRef(0)
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const queryClient = useQueryClient()
   const cwd = selection?.canonicalPath ?? null
   const projects: readonly RegisteredProject[] = workspaceSnapshot.items.map(workspace => ({
     workspaceId: workspace.workspaceId,
@@ -114,26 +107,21 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     setBusyRow(null)
   }, [])
 
-  useEffect(() => {
-    const generation = ++requestGeneration.current
-    setLoading(true)
-    setError(null)
-    clearRevealed()
-    void api
-      .list({ cwd })
-      .then(result => {
-        if (generation === requestGeneration.current) setRows(result)
-      })
-      .catch(() => {
-        if (generation === requestGeneration.current) setError(t('loadFailed'))
-      })
-      .finally(() => {
-        if (generation === requestGeneration.current) setLoading(false)
-      })
-    return () => {
-      requestGeneration.current += 1
-    }
-  }, [api, clearRevealed, cwd, refreshGeneration, t])
+  const listQuery = useQuery({
+    queryKey: secretListQueryKey(cwd),
+    queryFn: ({ signal }) => api.list({ cwd }, { signal }),
+    placeholderData: keepPreviousData,
+  })
+  const machineQuery = useQuery({
+    queryKey: secretMachineQueryKey,
+    queryFn: ({ signal }) => api.machine({}, { signal }),
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+  const rows = listQuery.data ?? []
+  const loading = listQuery.isFetching
+  const error = actionError ?? (listQuery.isError && !listQuery.isFetching ? t('loadFailed') : null)
+  const machineName = machineQuery.data?.name ?? null
 
   useEffect(() => {
     if (appliedDefaultScope.current || configuredScope === undefined) return
@@ -162,19 +150,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   useEffect(
     () => () => {
-      requestGeneration.current += 1
       revealGeneration.current += 1
       if (revealTimer.current !== null) clearTimeout(revealTimer.current)
     },
     [],
   )
-
-  useEffect(() => {
-    void api
-      .machine({})
-      .then(machine => setMachineName(machine.name))
-      .catch(() => setMachineName(null))
-  }, [api])
 
   const filteredRows = useMemo(() => filterSecretMetadata(rows, scope, search), [rows, scope, search])
   const canActOnRow = useMemo(() => createSecretActionPolicy(rows, cwd !== null), [rows, cwd])
@@ -196,14 +176,14 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     clearRevealed()
     const generation = ++revealGeneration.current
     setBusyRow(row.id)
-    setError(null)
+    setActionError(null)
     try {
       const value = await api.reveal({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
       if (generation !== revealGeneration.current || (hideOnBlur && document.visibilityState === 'hidden')) return
       setRevealed({ id: row.id, value, stage: 'preview' })
       revealTimer.current = setTimeout(clearRevealed, revealMs)
     } catch {
-      if (generation === revealGeneration.current) setError(t('revealFailed'))
+      if (generation === revealGeneration.current) setActionError(t('revealFailed'))
     } finally {
       if (generation === revealGeneration.current) setBusyRow(null)
     }
@@ -215,78 +195,74 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     if (rowScope === null) return
     setBusyRow(row.id)
     setNotice(null)
-    setError(null)
+    setActionError(null)
     try {
       await api.copy({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
       setNotice(t('copied', { alias: row.alias }))
     } catch {
-      setError(t('copyFailed'))
+      setActionError(t('copyFailed'))
     } finally {
       setBusyRow(null)
     }
   }
 
-  const onCreate = async (input: SecretCreateForm): Promise<void> => {
-    setMutationPending(true)
-    setMutationError(null)
-    clearRevealed()
-    try {
-      await api.create({ ...input, cwd })
-      setNotice(t('added', { alias: input.alias }))
-      setDialog(null)
-      setRefreshGeneration(value => value + 1)
-    } catch {
-      setMutationError(t('addFailed'))
-    } finally {
-      setMutationPending(false)
-    }
+  const afterMutation = async (message: string): Promise<void> => {
+    setNotice(message)
+    setDialog(null)
+    await queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+  }
+  const createMutation = useMutation({
+    mutationFn: (input: SecretCreateForm) => api.create({ ...input, cwd }),
+    onMutate: clearRevealed,
+    onSuccess: (_result, input) => afterMutation(t('added', { alias: input.alias })),
+  })
+  const updateMutation = useMutation({
+    mutationFn: (input: SecretUpdateForm) => api.update({ ...input, cwd }),
+    onMutate: clearRevealed,
+    onSuccess: (_result, input) => afterMutation(t('updated', { alias: input.alias })),
+  })
+  const removeMutation = useMutation({
+    mutationFn: async (input: { readonly target: SecretRemoveTarget; readonly row: SecretMetadata; readonly scope: SecretMutationScope }): Promise<void> => {
+      if (input.target === 'alias') await api.removeAlias({ alias: input.row.alias, cwd, scope: input.scope })
+      if (input.target === 'vault-item') await api.deleteItem({ alias: input.row.alias, cwd, scope: input.scope, environment: input.row.environment })
+    },
+    onMutate: clearRevealed,
+    onSuccess: (_result, input) =>
+      afterMutation(input.target === 'alias' ? t('removedAlias', { alias: input.row.alias }) : t('deletedItem', { alias: input.row.alias })),
+  })
+  const mutationPending = createMutation.isPending || updateMutation.isPending || removeMutation.isPending
+  const mutationError = createMutation.isError
+    ? t('addFailed')
+    : updateMutation.isError
+      ? t('updateFailed')
+      : removeMutation.isError
+        ? removeMutation.variables.target === 'alias'
+          ? t('removeAliasFailed')
+          : t('deleteItemFailed')
+        : null
+  const resetMutations = (): void => {
+    createMutation.reset()
+    updateMutation.reset()
+    removeMutation.reset()
   }
 
-  const onUpdate = async (input: SecretUpdateForm): Promise<void> => {
-    setMutationPending(true)
-    setMutationError(null)
-    clearRevealed()
-    try {
-      await api.update({ ...input, cwd })
-      setNotice(t('updated', { alias: input.alias }))
-      setDialog(null)
-      setRefreshGeneration(value => value + 1)
-    } catch {
-      setMutationError(t('updateFailed'))
-    } finally {
-      setMutationPending(false)
-    }
-  }
-
-  const onRemove = async (target: SecretRemoveTarget, row: SecretMetadata): Promise<void> => {
+  const onRemove = (target: SecretRemoveTarget, row: SecretMetadata): void => {
     const rowScope = mutationScopeFor(row)
     if (rowScope === null || !canActOnRow(row)) return
-    setMutationPending(true)
-    setMutationError(null)
-    clearRevealed()
-    try {
-      if (target === 'alias') await api.removeAlias({ alias: row.alias, cwd, scope: rowScope })
-      if (target === 'vault-item') await api.deleteItem({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      setNotice(target === 'alias' ? t('removedAlias', { alias: row.alias }) : t('deletedItem', { alias: row.alias }))
-      setDialog(null)
-      setRefreshGeneration(value => value + 1)
-    } catch {
-      setMutationError(target === 'alias' ? t('removeAliasFailed') : t('deleteItemFailed'))
-    } finally {
-      setMutationPending(false)
-    }
+    removeMutation.mutate({ target, row, scope: rowScope })
   }
 
   const displayedMachineName = machineName ?? t('currentHost')
 
   const openDialog = (next: ActiveDialog): void => {
     clearRevealed()
-    setMutationError(null)
+    resetMutations()
     setDialog(next)
   }
 
   const selectFolder = (next: ProjectFolderSelection): void => {
     clearRevealed()
+    setActionError(null)
     setSelection(next)
     setPickerOpen(false)
   }
@@ -307,7 +283,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               disabled={loading}
               onClick={() => {
                 clearRevealed()
-                setRefreshGeneration(value => value + 1)
+                setActionError(null)
+                void listQuery.refetch()
               }}
               type="button"
               variant="outline"
@@ -320,8 +297,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </Button>
           </div>
         </header>
-        <section aria-label={t('catalogFilters')} className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3">
-          <Select disabled onValueChange={setMachineName} value={displayedMachineName}>
+        <section
+          aria-label={t('catalogFilters')}
+          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3"
+        >
+          <Select disabled value={displayedMachineName}>
             <SelectTrigger aria-label={t('machine')} className="dshx:w-56" title={t('machineSelectorHint')}>
               <SelectValue />
             </SelectTrigger>
@@ -391,7 +371,14 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           {notice !== null && (
             <Alert className="dshx:pr-10" role="status" variant="success">
               <AlertDescription>{notice}</AlertDescription>
-              <Button aria-label={t('dismissNotice')} className="dshx:absolute dshx:top-1.5 dshx:right-1.5" onClick={() => setNotice(null)} size="icon-xs" type="button" variant="ghost">
+              <Button
+                aria-label={t('dismissNotice')}
+                className="dshx:absolute dshx:top-1.5 dshx:right-1.5"
+                onClick={() => setNotice(null)}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
                 <XIcon aria-hidden />
               </Button>
             </Alert>
@@ -437,17 +424,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             mode={dialog.mode}
             onClose={() => {
               setDialog(null)
-              setMutationError(null)
+              resetMutations()
             }}
-            onCreate={input => {
-              void onCreate(input)
-            }}
-            onRemove={(target, row) => {
-              void onRemove(target, row)
-            }}
-            onUpdate={input => {
-              void onUpdate(input)
-            }}
+            onCreate={input => createMutation.mutate(input)}
+            onRemove={onRemove}
+            onUpdate={input => updateMutation.mutate(input)}
             pending={mutationPending}
             row={'row' in dialog ? dialog.row : undefined}
             t={t}

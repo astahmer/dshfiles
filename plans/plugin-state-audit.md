@@ -14,8 +14,8 @@ queue-reorder. optmem has no UI.
 | 2 | ai-accounts | use-accounts-panel-state.ts:212-225 (sign-in setInterval poll) | query refetchInterval until signed in | high | S | [ ] |
 | 3 | ai-accounts | usage-history-panel.tsx:139-272 | Query ×3 (refetchInterval) + mutations | high | M | [ ] |
 | 4 | ai-accounts | use-accounts-usage.ts:41-74 | query + mutation(refreshUsage) → setQueryData | high | S | [ ] |
-| 5 | secret-catalog | secret-catalog-panel.tsx:89-131,229-261 | query(list) + 3 mutations + invalidate | high | M | [ ] |
-| 6 | secret-catalog | secret-mutation-dialog.tsx:75-86 (10 fields) | useAppForm + zod | high | M | [ ] |
+| 5 | secret-catalog | secret-catalog-panel.tsx:89-131,229-261 | query(list) + 3 mutations + invalidate | high | M | [x] |
+| 6 | secret-catalog | secret-mutation-dialog.tsx:75-86 (10 fields) | useAppForm + zod | high | M | [x] |
 | 7 | jujutsu | workspace-restore-panel.tsx:31-158 (select→prepare→confirm→receipt) | machine (pilot for /machine) | high | M | [ ] |
 | 8 | settings-search | settings-field-editor.tsx:52-110 | useAppForm + 2 mutations | high | M | [ ] |
 | 9 | project-checks | client.tsx:110-147 | Query ×3 (enabled: open) + mutation(run) | med | S | [ ] |
