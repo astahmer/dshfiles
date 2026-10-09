@@ -66,6 +66,7 @@ import {
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
@@ -77,6 +78,7 @@ import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
+import { revisionActionMachine } from './revision-action-machine.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
@@ -212,29 +214,31 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [bookmark, setBookmark] = useState('')
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
-  const [dragSource, setDragSource] = useState<string | null>(null)
-  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const mineOnly = preferences.mineOnly
   const hideImmutable = preferences.hideImmutable
 
-  const prepareMutation = useMutation({
-    mutationFn: (input: { readonly repoId: string; readonly action: Mutation }) => api.prepare(input),
-  })
-  const preview = prepareMutation.data
+  const [actionSnapshot, sendAction, actionActor] = useMachine(revisionActionMachine, { input: { client: api } })
+  const preview = actionSnapshot.matches('previewing') ? (actionSnapshot.context.preview ?? undefined) : undefined
+  const confirmResult = actionSnapshot.context.result
+  const actionBusy = actionSnapshot.hasTag('busy')
+  const { dragSource, dropTarget } = actionSnapshot.context
 
-  const confirmMutation = useMutation({
-    mutationFn: (input: { readonly repoId: string; readonly previewId: string }) => api.confirm(input),
-    onSuccess: result => {
-      if (result.workspacePath !== null) setProvisionedPath(result.workspacePath)
-    },
-    onSettled: (_result, _error, input) => queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(input.repoId) }),
-  })
+  useEffect(() => {
+    const confirmed = actionActor.on('confirmed', event => {
+      if (event.workspacePath !== null) setProvisionedPath(event.workspacePath)
+    })
+    const settled = actionActor.on('settled', event => void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(event.repoId) }))
+    return () => {
+      confirmed.unsubscribe()
+      settled.unsubscribe()
+    }
+  }, [actionActor, queryClient])
 
   const registerMutation = useMutation({
     mutationFn: (repositoryPath: string) => api.registerRepository({ path: repositoryPath }),
     onSuccess: registered => {
-      prepareMutation.reset()
+      sendAction({ type: 'reset' })
       setProvisionedPath(null)
       setRepoId(registered.repoId)
       setPath(registered.root)
@@ -251,7 +255,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const autoRefresh = useAutoRefresh({
     preferences,
-    paused: registerMutation.isPending || prepareMutation.isPending || confirmMutation.isPending || preview !== undefined,
+    paused: registerMutation.isPending || actionBusy || preview !== undefined,
     onBecameVisible: () => {
       if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
     },
@@ -297,7 +301,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
   }, [state])
 
-  const busy = registerMutation.isPending || stateQuery.isFetching || confirmMutation.isPending || prepareMutation.isPending
+  const busy = registerMutation.isPending || stateQuery.isFetching || actionBusy
   const loadingRepository = registerMutation.isPending || (repoId !== null && state === undefined && stateQuery.isFetching)
 
   const remoteNames = state?.remoteNames ?? []
@@ -341,24 +345,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
     detailsQuery.error && errorMessage(detailsQuery.error, 'Could not load revision details.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
-    prepareMutation.error && errorMessage(prepareMutation.error, 'Could not prepare this action.'),
-    confirmMutation.error && errorMessage(confirmMutation.error, 'Action was not completed.'),
+    actionSnapshot.context.error,
   ].filter((message): message is string => Boolean(message))
 
   const askForConfirmation = (action: Mutation): void => {
     if (repoId === null) return
     if (action.kind === 'workspace-add') setProvisionedPath(null)
     registerMutation.reset()
-    confirmMutation.reset()
-    prepareMutation.mutate({ repoId, action })
+    sendAction({ type: 'prepare', repoId, action })
   }
 
-  const confirmPreview = (): void => {
-    if (repoId === null || preview === undefined) return
-    const previewId = preview.id
-    prepareMutation.reset()
-    confirmMutation.mutate({ repoId, previewId })
-  }
+  const confirmPreview = (): void => sendAction({ type: 'confirm' })
 
   const refreshRepository = (): void => {
     if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
@@ -390,24 +387,24 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     }
   }
 
-  const endDrag = (): void => {
-    setDragSource(null)
-    setDropTarget(null)
+  const endDrag = (): void => sendAction({ type: 'drag.end' })
+
+  const dropAction = (event: DragEvent, revision: Revision): Mutation | null => {
+    const draggedBookmark = event.dataTransfer.getData(BOOKMARK_MIME)
+    const draggedRevision = event.dataTransfer.getData(REVISION_MIME)
+    if (draggedBookmark) {
+      return revision.localBookmarks.includes(draggedBookmark) ? null : { kind: 'bookmark-move', bookmark: draggedBookmark, destinationId: revision.commitId }
+    }
+    if (draggedRevision && draggedRevision !== revision.commitId && !descendantCommitIds(state?.revisions ?? [], draggedRevision).has(revision.commitId)) {
+      return { kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId }
+    }
+    return null
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
     event.preventDefault()
-    const draggedBookmark = event.dataTransfer.getData(BOOKMARK_MIME)
-    const draggedRevision = event.dataTransfer.getData(REVISION_MIME)
-    endDrag()
-    if (draggedBookmark) {
-      if (!revision.localBookmarks.includes(draggedBookmark))
-        askForConfirmation({ kind: 'bookmark-move', bookmark: draggedBookmark, destinationId: revision.commitId })
-      return
-    }
-    if (draggedRevision && draggedRevision !== revision.commitId && !descendantCommitIds(state?.revisions ?? [], draggedRevision).has(revision.commitId)) {
-      askForConfirmation({ kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId })
-    }
+    registerMutation.reset()
+    sendAction({ type: 'drop', repoId, action: dropAction(event, revision) })
   }
 
   const toggleRevision = (revision: Revision): void => {
@@ -802,9 +799,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                         key={revision.commitId}
                         menu={revisionMenu(revision)}
                         onDragEnter={event => {
-                          if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) setDropTarget(revision.commitId)
+                          if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) sendAction({ type: 'drag.enter', targetId: revision.commitId })
                         }}
-                        onDragStart={() => setDragSource(revision.commitId)}
+                        onDragStart={() => sendAction({ type: 'drag.start', sourceId: revision.commitId })}
                         onDrop={event => dropOn(event, revision)}
                         onToggle={() => toggleRevision(revision)}
                         revision={revision}
@@ -1021,18 +1018,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
-          {(errorMessages.length > 0 || (confirmMutation.data !== undefined && confirmMutation.data.output.length > 0)) && (
+          {(errorMessages.length > 0 || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => (
                 <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                   <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
                 </Alert>
               ))}
-              {confirmMutation.data !== undefined && confirmMutation.data.output.length > 0 && (
+              {confirmResult !== null && confirmResult.output.length > 0 && (
                 <Alert className="dshx:px-3 dshx:py-2">
                   <AlertDescription>
                     <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-[11px] dshx:whitespace-pre-wrap dshx:text-foreground">
-                      {confirmMutation.data.output}
+                      {confirmResult.output}
                     </pre>
                   </AlertDescription>
                 </Alert>
@@ -1142,7 +1139,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
         <AlertDialog
           onOpenChange={open => {
-            if (!open) prepareMutation.reset()
+            if (!open) sendAction({ type: 'cancel' })
           }}
           open={preview !== undefined}
         >
@@ -1156,7 +1153,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <AlertDialogFooter>
                 <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={confirmMutation.isPending}
+                  disabled={actionBusy}
                   onClick={confirmPreview}
                   size="sm"
                   variant={preview.kind === 'abandon' || preview.kind === 'restore' || preview.kind === 'bookmark-delete' ? 'destructive' : 'default'}
