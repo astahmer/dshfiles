@@ -353,6 +353,8 @@ export class AgentLoop extends Service implements AgentFactory {
     })).default([]),
   }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config>
 
+  /** dshfiles fork: extension events this loop dispatches beyond upstream, for plugin capability detection. */
+  readonly forkFeatures: ReadonlySet<string> = new Set(['agent/request-messages'])
   /** Validated configuration owned by the agent-loop service. */
   readonly config: Config
   private readonly ownership: FactoryOwnership

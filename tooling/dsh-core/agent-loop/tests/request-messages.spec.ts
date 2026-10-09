@@ -85,3 +85,10 @@ describe('agent/request-messages', () => {
       .toMatchObject({ reason: { kind: 'aborted' } })
   })
 })
+
+describe('agentLoop.forkFeatures', () => {
+  it('advertises the request-messages hook', async () => {
+    const ctx = await harness(new MockAdapter([]))
+    expect(ctx.get('agentLoop')?.forkFeatures.has('agent/request-messages')).toBe(true)
+  })
+})

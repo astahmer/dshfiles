@@ -82,6 +82,10 @@ const hostServices = (ctx: Context): HostServices => {
   })
   return {
     has: service => ctx.get(service) !== undefined,
+    requestMessagesHook: () => {
+      const loop: unknown = ctx.get('agentLoop')
+      return typeof loop === 'object' && loop !== null && 'forkFeatures' in loop && loop.forkFeatures instanceof Set && loop.forkFeatures.has('agent/request-messages')
+    },
     workspaceId: async path => (await ctx.get('workspaceRegistry')?.resolveByPath(path))?.id,
     sessionLogs: () => {
       const sessionQuery = ctx.get('sessionQuery')

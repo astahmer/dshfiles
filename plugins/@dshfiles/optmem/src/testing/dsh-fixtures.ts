@@ -106,11 +106,13 @@ export const createTestRuntime = (request: {
   readonly workspaces?: Readonly<Record<string, string>>
   readonly sessionLogs?: SessionLogSource
   readonly summarizer?: Summarizer
+  readonly requestMessagesHook?: boolean
 }) => {
   let settings: OptmemSettings = { ...defaultSettings, ...request.settings }
   const warnings: string[] = []
   const services: HostServices = {
     has: () => true,
+    requestMessagesHook: () => request.requestMessagesHook ?? false,
     workspaceId: async path => request.workspaces?.[path],
     sessionLogs: () => request.sessionLogs,
     createSummarizer: () => request.summarizer ?? fakeSummarizer(),

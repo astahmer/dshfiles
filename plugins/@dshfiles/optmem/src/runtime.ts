@@ -67,6 +67,8 @@ export type SessionLogSource = {
 /** The DSH services OptMem uses, each optional at runtime; the Host adapts them from its Cordis context. */
 export type HostServices = {
   has(service: 'sessions' | 'tools' | 'systemPrompt'): boolean
+  /** The dshfiles fork agent loop dispatches `agent/request-messages` (per-request message replacement). */
+  requestMessagesHook(): boolean
   workspaceId(path: string): Promise<string | undefined>
   sessionLogs(): SessionLogSource | undefined
   createSummarizer(): Summarizer
@@ -108,8 +110,8 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     captureEvents: services.has('sessions'),
     registerTools: services.has('tools'),
     injectContext: services.has('systemPrompt'),
-    replaceContext: false,
-    resetPerTurn: false,
+    replaceContext: services.requestMessagesHook(),
+    resetPerTurn: services.requestMessagesHook(),
   })
 
   const modeCheck = (): CapabilityCheck => Capabilities.validate(options.settings().mode === 'full' ? 'full' : 'compatibility', capabilities())

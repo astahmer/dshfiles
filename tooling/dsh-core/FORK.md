@@ -16,6 +16,7 @@ Commands: `pnpm --dir tooling/dsh-core/agent install`, then `build`, `test`, and
   instead, deep-frozen, and appends one log-only `request/messages-override { turn, step, originalCount,
   sentCount }` session event; the session surface is never rewritten. Abort is checked after the waterfall.
   Used by OptMem full mode (`plans/optmem`). Tests: `agent-loop/tests/request-messages.spec.ts`.
+- `AgentLoop.forkFeatures` (`ReadonlySet`, contains `agent/request-messages`) lets plugins detect the hook at runtime.
 - `request/messages-override` is added to the session `SessionEventMap` and to `known-event-types.ts` by hand (the
   upstream generator script is not part of this fork). Stock DSH builds do not know this type, so a log written
   with an override is readable only by this fork.
