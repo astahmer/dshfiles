@@ -3,6 +3,15 @@
 Personal DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
 plugins we own.
 
+## Skills
+
+Load the matching skill from `.agents/skills/` before the work it covers:
+
+- `plugin-ui` — any plugin UI or styling; adding shadcn components to the kit.
+- `plugin-state` — Query / Form / xstate / localStorage in plugin clients.
+- `dsh-plugin-verify` — after changing a plugin, before saying it works.
+- `jj-shared-workspace` — committing, conflicts, and long runs in the shared `@`.
+
 ## What this repo is for
 
 Two kinds of work live here, and the distinction matters:
@@ -104,10 +113,14 @@ by importing the built entry, not by looking at it.
 This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
 
 - `jj status` before starting; `jj diff` to review; `jj describe` then `jj new`
-  for a change. Never `git`-only commands, never `jj git push` without asking.
+  for a change only when `@` holds nothing but your work. Never `git`-only commands, never `jj git push` without asking.
 - The working copy is always a commit — there is no separate staging area.
 - Shared checkout: if another agent's files are in `jj status`, they are not
-  yours. Commit only your own paths.
+  yours. Commit only your own paths with `jj split -m "…" <paths>` (one
+  described revision per logical change, `Co-Authored-By` trailer); check
+  `jj log -r 'conflicts()'` after rebases. Skill: `jj-shared-workspace`.
+- Long runs: commit and tick the plan's checkboxes after each milestone, and
+  keep a `plans/<topic>/README.md` progress table with a "Resume here" line.
 
 ### T3 threads and JJ workspaces
 
@@ -181,7 +194,9 @@ Profiles live in `~/.dsh/profiles/<name>/`. Registry packages go through
 `dsh plugin --profile <name> add <package>`; owned bundles go through
 `pnpm profile:sync --profile <name>`, because `pnpm add <path>` cannot express a
 local bundle. `docs/profile-installs.md` has the pnpm and peer-dependency traps
-behind that rule; read it before touching a profile manifest.
+behind that rule; read it before touching a profile manifest. A profile's
+`cordis.patch.yml` may be edited by hand only outside the Nix-managed marked
+block, which `~/.config/nixfiles/modules/dsh.nix` reconciles on every apply.
 
 ### Experiment in a scratch profile, promote on evidence
 
@@ -231,6 +246,23 @@ is `dshx inspect` — read the real runtime instead of guessing whether a slot o
 service exists. Every plugin joins the workspace contract
 (`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
 `typecheck` scripts, `strict` and `noUncheckedIndexedAccess`.
+
+### Plugin UI and state
+
+Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4), not hand-rolled
+components or local Tailwind setups. Skills `plugin-ui` and `plugin-state` hold
+the details; the rules that break things silently:
+
+- Every utility is `dshx:`-prefixed, written as a complete static string, merged
+  with `cn`; `dshx-root` on each surface root; semantic colors only.
+- After **any** class change in **any** plugin, rebuild every plugin that
+  depends on plugin-ui, or the shared stylesheet stops deduping and variants
+  get overridden.
+- Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
+  `/machine`, localStorage → `createStoredValue`. See
+  `plans/plugin-state-audit.md`.
+- Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
+  `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
 
 ### We maintain a local dshx hard fork
 
@@ -285,7 +317,9 @@ half. That part is stable regardless of which build tool produced it.
 Top-level Loader ids share one namespace across every bundle in a profile.
 Keep a package's scope in its inserted row id (`@dshfiles/shortcuts` becomes
 `dshfiles-shortcuts`); using only the package leaf can silently replace the
-profile's index for a native row. DSHX scaffolds preserve the scope, and profile
+profile's index for a native row. A dshx `defineSettings.namespace` must equal
+that row id, and one Host entry cannot declare both native `Config` and dshx
+`settings`. DSHX scaffolds preserve the scope, and profile
 inspection runs DSH's offline `--dump-config` composition check before plugin
 development or a runtime check so duplicate top-level ids fail before boot.
 Point an owned plugin's `dshx.config.ts` at `profile: 'vanilla'` when debugging
@@ -365,8 +399,19 @@ server keeps serving the manifest it booted with. Confirmed by editing a served
 bundle twice on one server and reading the same `rev` back both times.
 
 So the workflow is: rebuild, let the client receive the graph frame, and only
-restart when the change is to `cordis.patch.yml`, `package.json`, or the profile
-composition — anything the server resolves at boot rather than per request.
+restart when the change is to `cordis.patch.yml`, `package.json`, host code, a
+settings namespace, or the profile composition — anything the server resolves
+at boot rather than per request. That restart is the user's call.
+
+Until then the live DSH runs the **old host** under the **new client**. Clients
+must tolerate it: decode Host snapshots once at the boundary with defaults,
+never assume a new field or method exists, and fall back to defaults when the
+settings namespace is unregistered — never throw. After every build,
+import-check the host bundle with the DSH Node
+(`fnm exec --using=22.23.3 node -e "import('./dist/index.js')"`); a failure there
+is a "did not activate" at boot. Full checklist (probe/scratch profiles,
+`plans/optmem/tools/drive.mjs`, console checks, perf budget in
+`plans/ade/perf-baseline.md`): skill `dsh-plugin-verify`.
 
 ### Client boot failures are cross-plugin
 
