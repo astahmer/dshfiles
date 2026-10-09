@@ -866,6 +866,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               onRefresh={refreshRepository}
               refreshOptions={autoRefresh.queryOptions}
               repoId={repoId}
+              repositoryRoot={state.root}
               revisions={state.revisions}
             />
           ))}

@@ -13,6 +13,7 @@ import {
   CheckIcon,
   ChevronRightIcon,
   FileDiffIcon,
+  FilePenLineIcon,
   PencilIcon,
   PencilLineIcon,
   PlusIcon,
@@ -33,6 +34,7 @@ import { sourceControlGroups } from './source-control.js'
 
 interface SourceControlViewProps {
   readonly repoId: string
+  readonly repositoryRoot: string
   readonly revisions: readonly Revision[]
   readonly ancestorCount: number
   readonly onAncestorCountChange: (count: number) => void
@@ -310,6 +312,19 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                           <IconAction label="Open diff" onClick={() => props.onOpenDiff(revision, file.path)}>
                             <FileDiffIcon />
                           </IconAction>
+                          {file.status !== 'D' && (
+                            <IconAction
+                              label="Open file"
+                              onClick={() =>
+                                // Handled by @dshfiles/editor when installed; see its open-file.ts contract.
+                                window.dispatchEvent(
+                                  new CustomEvent('dshfiles:open-file', { detail: { path: file.path, cwd: props.repositoryRoot }, cancelable: true }),
+                                )
+                              }
+                            >
+                              <FilePenLineIcon />
+                            </IconAction>
+                          )}
                           {editable && (
                             <IconAction
                               disabled={props.busy}
