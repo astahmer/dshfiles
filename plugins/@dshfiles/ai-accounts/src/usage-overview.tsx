@@ -11,11 +11,24 @@ import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { bankedExpiries, formatAge, formatResetIn, overviewCards, overviewProviders, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
+/** Ticks every second while the page is visible; a hidden tab stops re-rendering and catches up on return. */
 const useNow = (): number => {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
+    let timer: ReturnType<typeof setInterval> | undefined
+    const sync = (): void => {
+      clearInterval(timer)
+      timer = undefined
+      if (document.hidden) return
+      setNow(Date.now())
+      timer = setInterval(() => setNow(Date.now()), 1_000)
+    }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [])
   return now
 }

@@ -99,7 +99,7 @@ Acceptance: ≤ 1 commit per unrelated session update; only changed rows in the 
 > client.tsx). Use React Profiler in the live UI to confirm the cause first. Split state/action contexts, cache
 > useSyncExternalStore snapshots, memoize rows. Acceptance per plans/ade/README.md P0.4."
 
-### P0.5 Bundle and polling diet (M) — deps: P0.1
+### [~] P0.5 Bundle and polling diet (M) — deps: P0.1
 
 - Minify client bundles if dshx builds unminified; report gz before/after.
 - jujutsu 1.88 MB: keep `@pierre/diffs` but lazy-materialize the diff view (render only when opened), check the

@@ -69,3 +69,19 @@ primitive props and one stable ref-backed actions object, memoized `preferences`
 | Keystroke → commit (p50 / p95) | 1.1 / 4.2 ms | 2.2 / 4.9 ms |
 
 Not verified live: per-row commit counts (the scratch home lists 0 threads); P0.6 should seed sessions and count.
+
+## P0.5 (bundle and polling) — partial
+
+- Minification: already on (`build.minify: true`); nothing to gain there.
+- jujutsu `client.js` by source (sourcemap `sourcesContent`): `@shikijs/langs` 785 K (already the slim 20-language
+  set), `@pierre/diffs` 548 K, `zod` 359 K, own src 243 K, `@tanstack/query-core` 116 K, `tailwind-merge` 103 K.
+  Lazy-materializing the diff view saves parse time only: dshx rejects extra chunks, so the bytes stay in the file.
+- Polling: TanStack `refetchInterval`s already default to `refetchIntervalInBackground: false`; jujutsu auto-refresh
+  already gates on visibility; the multi-host 1 s timer only runs while a runtime popup is open; the thread-sidebar
+  timer is a minutes-long auto-archive scan. Fixed: ai-accounts `useNow` re-rendered the usage overview every second
+  even in a hidden tab; it now stops while hidden and catches up on `visibilitychange`.
+- Idle: no long tasks in 10 s (before and after).
+- Total client JS: 7.34 MB / 1.77 MB gz → 7.35 MB / 1.78 MB gz. The −25 % target is not met: the remaining bulk is
+  per-plugin copies of React-adjacent deps (Radix, TanStack Query, tailwind-merge, zod) that the one-chunk dshx
+  contract cannot share. Reaching −25 % needs a shared vendor runtime (Host-provided module table entries, like React)
+  or `zod/mini`; both are out of P0 scope.
