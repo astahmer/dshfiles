@@ -1,3 +1,5 @@
+import { isSeq, parseDocument } from 'yaml'
+
 /**
  * Switching a native provider row off in the profile patch, without touching
  * the row's own configuration.
@@ -36,27 +38,29 @@ export const managedDisabledRows = (text: string): Map<string, string> => {
 }
 
 /**
- * A block sequence can take an appended item; a flow sequence (`[...]`) or a
- * document that is not a sequence cannot, so those are refused rather than
- * corrupted.
+ * Items in a top-level block sequence, or null for anything an appended `- id:` item could corrupt: a parse error, a
+ * flow sequence (`[...]`), or a document that is not a sequence.
  */
-const appendable = (text: string): boolean => {
-  const content = text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line !== '' && !line.startsWith('#'))
-  if (content.length === 0) return true
-  return content[0]?.startsWith('- ') === true && text.split('\n').every(line => !/^\S/.test(line) || line.startsWith('- ') || line.startsWith('#'))
+const blockSequenceLength = (text: string): number | null => {
+  const document = parseDocument(text)
+  if (document.errors.length > 0) return null
+  if (document.contents === null) return 0
+  return isSeq(document.contents) && document.contents.flow !== true ? document.contents.items.length : null
 }
+
+const NOT_A_LIST = 'The profile patch is not a plain YAML list, so it was left unchanged. Disable the row by hand.'
 
 export const withRowDisabled = (text: string, row: { readonly id: string; readonly label: string }): string => {
   if (!isPatchRowId(row.id)) throw new Error(`Refusing to disable row '${row.id}'.`)
   if (managedDisabledRows(text).has(row.id)) return text
   const normalized = text.trim() === '[]' ? '' : text
-  if (!appendable(normalized)) throw new Error('The profile patch is not a plain YAML list, so it was left unchanged. Disable the row by hand.')
+  const itemCount = blockSequenceLength(normalized)
+  if (itemCount === null) throw new Error(NOT_A_LIST)
   const label = row.label.replaceAll('\n', ' ').trim()
   const separator = normalized === '' || normalized.endsWith('\n') ? '' : '\n'
-  return `${normalized}${separator}${MARKER}${label === '' ? '' : ` — ${label}`}\n- id: ${row.id}\n  disabled: true\n`
+  const next = `${normalized}${separator}${MARKER}${label === '' ? '' : ` — ${label}`}\n- id: ${row.id}\n  disabled: true\n`
+  if (blockSequenceLength(next) !== itemCount + 1) throw new Error(NOT_A_LIST)
+  return next
 }
 
 export const withRowEnabled = (text: string, id: string): string => {

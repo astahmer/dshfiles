@@ -38,6 +38,8 @@ describe('native provider switch in the profile patch', () => {
     expect(withRowDisabled('[]\n', { id: 'llm-deepseek', label: '' })).toContain('- id: llm-deepseek\n')
     expect(() => withRowDisabled('[{ id: x }]\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
     expect(() => withRowDisabled('root:\n  - id: x\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
+    expect(() => withRowDisabled('- id: x\n  config: [unclosed\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
+    expect(() => withRowDisabled('  - id: x\n', { id: 'llm-deepseek', label: '' })).toThrow(/not a plain YAML list/)
     expect(() => withRowDisabled(userPatch, { id: 'bad id\n- id: x', label: '' })).toThrow(/Refusing/)
   })
 })
