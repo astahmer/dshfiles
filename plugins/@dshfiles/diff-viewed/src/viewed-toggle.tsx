@@ -1,8 +1,9 @@
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { changesSummaryUrl, parseChangesSummaryFiles, parseReviewCoordinates, type ChangesSummaryFiles } from './review-file.js'
 import { viewedKey, type ViewedMarks } from './viewed-marks.js'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 
 interface ViewedToggleProps {
   readonly actionUrl: string
@@ -10,22 +11,16 @@ interface ViewedToggleProps {
   readonly t: Translate<'viewed' | 'markViewed' | 'markUnviewed' | 'progress'>
 }
 
-const useSummaryFiles = (summaryUrl: string | undefined): ChangesSummaryFiles | undefined => {
-  const [loaded, setLoaded] = useState<{ readonly url: string; readonly files: ChangesSummaryFiles } | undefined>(undefined)
-  useEffect(() => {
-    if (summaryUrl === undefined) return
-    const controller = new AbortController()
-    fetch(summaryUrl, { signal: controller.signal })
-      .then(response => (response.ok ? response.json() : undefined))
-      .then(body => {
-        const files = parseChangesSummaryFiles(body)
-        if (files !== undefined) setLoaded({ url: summaryUrl, files })
-      })
-      .catch(() => undefined)
-    return () => controller.abort()
-  }, [summaryUrl])
-  return loaded?.url === summaryUrl ? loaded?.files : undefined
-}
+const useSummaryFiles = (summaryUrl: string | undefined): ChangesSummaryFiles | undefined =>
+  useQuery({
+    queryKey: ['diff-viewed', 'summary', summaryUrl],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(summaryUrl ?? '', { signal })
+      return response.ok ? (parseChangesSummaryFiles(await response.json()) ?? null) : null
+    },
+    enabled: summaryUrl !== undefined,
+    retry: false,
+  }).data ?? undefined
 
 const RING_RADIUS = 5
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS

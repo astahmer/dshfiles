@@ -1,6 +1,8 @@
 import type {} from '@deepseek-ai/dsh-client-ui-deliverables/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, defineSlot } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import type { ComponentProps } from 'react'
 import { diffViewedLocale } from './locales.js'
 import { createViewedMarks } from './viewed-marks.js'
 import { ViewedToggle } from './viewed-toggle.js'
@@ -13,7 +15,11 @@ const reviewFileAction = defineSlot('deliverables.review.file.actions', {
   order: 10,
   locale: diffViewedLocale,
   inject: () => ({ marks }),
-  component: ViewedToggle,
+  component: (props: ComponentProps<typeof ViewedToggle>) => (
+    <PluginQueryProvider>
+      <ViewedToggle {...props} />
+    </PluginQueryProvider>
+  ),
 })
 
 export default defineClient({

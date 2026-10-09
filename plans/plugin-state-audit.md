@@ -29,7 +29,7 @@ queue-reorder. optmem has no UI.
 | 17 | thread-sidebar | sidebar-shell.tsx:338-340,659-667 (restart dialog) | mutation | med | S | [skip] restart.test.ts guards sidebar-shell against plugin-ui/query after a QueryClient crash; useApiQuery stays |
 | 18 | thread-sidebar | client.tsx:187-229,300-312 (snooze/markRead) | mutations with onError notice | low | S | [skip] same sidebar no-QueryClient guard as #17 |
 | 19 | multi-host | client.tsx:118,206-328,395-411 (global error mirror) | per-mutation error + invalidate | low | S | [ ] |
-| 20 | diff-viewed | viewed-toggle.tsx:13-27 | useQuery | low | S | [ ] |
+| 20 | diff-viewed | viewed-toggle.tsx:13-27 | useQuery | low | S | [x] |
 | 21 | prompt-stash | prompt-stash-action.tsx:27,145-295 | useAppForm | low | S | [ ] |
 | 22 | prompt-stash | prompt-stash.tsx:39-40 | useAppForm | low | S | [ ] |
 | 23 | mcp-servers/marketplace | catalog-browser.tsx:91-102, mcp-quick-panel.tsx:79-82, MarketplaceTab.tsx:402 | shared `useDebouncedValue` in the kit | low | S | [ ] |
