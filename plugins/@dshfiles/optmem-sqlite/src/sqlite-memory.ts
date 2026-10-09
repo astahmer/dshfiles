@@ -235,6 +235,22 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
 
     streamLength: async streamId => streamLength(streamId),
 
+    moveStream: async request =>
+      transaction('IMMEDIATE', () => {
+        const eventIds = prepare('SELECT event_id FROM stream_entries WHERE stream = ? ORDER BY pos')
+          .all(request.from)
+          .map(row => integer(row, 'event_id'))
+        const base = streamLength(request.to)
+        const insert = prepare('INSERT INTO stream_entries (stream, pos, event_id) VALUES (?, ?, ?)')
+        const entries = eventIds.map((eventId, offset): StreamEntry => {
+          insert.run(request.to, base + offset, eventId)
+          return { stream: request.to, pos: base + offset }
+        })
+        prepare('UPDATE events SET project_id = ? WHERE id IN (SELECT event_id FROM stream_entries WHERE stream = ?)').run(request.projectId, request.from)
+        for (const table of ['stream_entries', 'nodes', 'views', 'cursors']) prepare(`DELETE FROM ${table} WHERE stream = ?`).run(request.from)
+        return entries
+      }),
+
     listStreams: async () =>
       prepare('SELECT stream, MAX(pos) + 1 AS length FROM stream_entries GROUP BY stream ORDER BY stream')
         .all()

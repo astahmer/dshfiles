@@ -118,6 +118,11 @@ export interface MemoryStore {
   readSnapshot(stream: StreamId): Promise<StoreSnapshot>
   /** Conversation id of every position in [fromPos, toPos), in order. */
   streamConversations(stream: StreamId, fromPos: number, toPos: number): Promise<readonly string[]>
+  /**
+   * Appends every entry of `from` to the end of `to` in stream order, retags those events with `projectId`, then
+   * deletes `from` with its nodes, views and cursors. Returns the new entries of `to`.
+   */
+  moveStream(request: { readonly from: StreamId; readonly to: StreamId; readonly projectId: string }): Promise<readonly StreamEntry[]>
 }
 
 export type SummaryRequest = {

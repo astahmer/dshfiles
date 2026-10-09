@@ -192,6 +192,33 @@ describe('tools', () => {
   })
 })
 
+describe('project id switch', () => {
+  it('folds memory recorded under the path id into the workspace stream once the workspace is registered', async () => {
+    const path = freshDatabase()
+    const before = createTestRuntime({ databasePath: path })
+    await before.runtime.start()
+    const early = createSessionFixture({ id: 'session-early', cwd: projectA })
+    before.runtime.onSessionEvent(early.session, early.user('Decision recorded before the workspace existed'))
+    await before.runtime.settle()
+    await before.runtime.stop()
+
+    const after = createTestRuntime({ databasePath: path, workspaces })
+    await after.runtime.start()
+    const late = createSessionFixture({ id: 'session-late', cwd: projectA })
+    after.runtime.onSessionEvent(late.session, late.user('Question asked after registration'))
+    await after.runtime.settle()
+    await after.runtime.stop()
+
+    const reader = openSqliteMemory({ path })
+    const streams = await reader.store.listStreams()
+    const workspaceStream = await reader.store.readStream('project:workspace:ws-a', 0, 10)
+    reader.close()
+    expect(streams.map(summary => summary.stream).filter(stream => stream.startsWith('project:'))).toEqual(['project:workspace:ws-a'])
+    expect(workspaceStream.map(entry => entry.event.text)).toEqual(['Decision recorded before the workspace existed', 'Question asked after registration'])
+    expect(storedEvents(path).map(event => event.project)).toEqual(['workspace:ws-a', 'workspace:ws-a'])
+  })
+})
+
 describe('injection', () => {
   const waitFor = async (condition: () => boolean): Promise<void> => {
     for (let attempt = 0; attempt < 200 && !condition(); attempt++) await new Promise(resolve => setTimeout(resolve, 5))

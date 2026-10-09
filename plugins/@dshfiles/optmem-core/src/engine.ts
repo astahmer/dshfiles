@@ -165,6 +165,8 @@ export type MemoryEngine = {
     readonly limit?: number | undefined
   }): Promise<readonly MemorySearchHit[]>
   status(): Promise<MemoryStatus>
+  /** Folds stream `from` into the end of `to` (see `MemoryStore.moveStream`) and schedules the moved leaves. */
+  moveStream(request: { readonly from: StreamId; readonly to: StreamId; readonly projectId: string }): Promise<number>
   /** Resolves once queues, view maintenance and indexing are idle; failed jobs wait for the next append. */
   drain(): Promise<void>
   /** Stops scheduling and waits for in-flight work; queued work resumes on the next `start`. */
@@ -599,6 +601,15 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     return { events, inserted: events.filter(event => event.inserted).length }
   }
 
+  const moveStream: MemoryEngine['moveStream'] = async request => {
+    if (closed) throw new MemoryError('closed', 'memory engine is closed')
+    const entries = await store.moveStream(request)
+    for (const kind of viewKinds) views.delete(viewKey(request.from, kind))
+    for (const entry of entries) enqueue({ kind: 'leaf', stream: entry.stream, pos: entry.pos })
+    pump()
+    return entries.length
+  }
+
   const snapshot: MemoryEngine['snapshot'] = async request => {
     const length = Math.min(await store.streamLength(request.stream), request.endPos ?? Number.POSITIVE_INFINITY)
     const { view: current } = await loadView(request.stream)
@@ -797,5 +808,5 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     return isQuiet() ? Promise.resolve() : new Promise(resolve => quietWaiters.push(resolve))
   }
 
-  return { start, append, snapshot, readView, zoom, context, search, status, drain, close }
+  return { start, append, snapshot, readView, zoom, context, search, status, drain, close, moveStream }
 }

@@ -201,9 +201,19 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       const cwd = header.cwd
       if (cwd === undefined || cwd.length === 0) return null
       const real = await realpath(cwd).catch(() => resolve(cwd))
+      const pathProject = `path:${createHash('sha256').update(real).digest('hex').slice(0, 16)}`
       const workspaceId = await services.workspaceId(real).catch(() => undefined)
-      if (workspaceId !== undefined) return `workspace:${workspaceId}`
-      return `path:${createHash('sha256').update(real).digest('hex').slice(0, 16)}`
+      if (workspaceId === undefined) return pathProject
+      const workspaceProject = `workspace:${workspaceId}`
+      // Memory recorded before the workspace was registered lives under the path id; fold it in so it is not split.
+      const engine = ready?.engine
+      if (engine && (await ready?.memory.store.streamLength(StreamIds.project(pathProject))) !== 0) {
+        const moved = await engine.moveStream({ from: StreamIds.project(pathProject), to: StreamIds.project(workspaceProject), projectId: workspaceProject })
+        if (moved > 0) logger.info('optmem: moved %d memory event(s) from %s to %s', moved, pathProject, workspaceProject)
+        injectedStreams.delete(StreamIds.project(pathProject))
+        if (injectedStreams.has(StreamIds.project(workspaceProject))) refreshStream(StreamIds.project(workspaceProject))
+      }
+      return workspaceProject
     })()
       .catch((error: unknown) => {
         logger.warn('optmem: project resolution failed for %s: %s', header.id, errorMessage(error))
