@@ -19,7 +19,7 @@ queue-reorder. optmem has no UI.
 | 7 | jujutsu | workspace-restore-panel.tsx:31-158 (select→prepare→confirm→receipt) | machine (pilot for /machine) | high | M | [x] workspace-restore-machine.ts |
 | 8 | settings-search | settings-field-editor.tsx:52-110 | useAppForm + 2 mutations | high | M | [x] |
 | 9 | project-checks | client.tsx:110-147 | Query ×3 (enabled: open) + mutation(run) | med | S | [x] |
-| 10 | project-folder-picker | project-folder-picker.tsx:84-176 | query(browse) + 3 mutations | med | M | [ ] |
+| 10 | project-folder-picker | project-folder-picker.tsx:84-176 | query(browse) + 3 mutations | med | M | [x] |
 | 11 | ai-accounts | quota-continuations.tsx:17-62 | query + mutation (variables = busy id) | med | S | [x] |
 | 12 | ai-accounts | native-providers-list.tsx:24-47 | query refetchInterval while pending + mutation | med | S | [x] |
 | 13 | ai-accounts | models-page-accounts.tsx:30-56 + auto-save.ts | auto-save machine shared by both editors | med | M | [ ] |

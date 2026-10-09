@@ -6,6 +6,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { folderSelection, movePickerSelection, pickerEntries, pickerEntrySelection, type PickerEntry } from './project-folder-picker-model.js'
 
@@ -78,109 +79,97 @@ const emptyClassName = 'dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-
 
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
   const [query, setQuery] = useState('')
-  const [listing, setListing] = useState<DirectoryListing | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [newDirectoryName, setNewDirectoryName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const activeRequest = useRef<AbortController | null>(null)
-  const generation = useRef(0)
+  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(null)
+  const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const pathMode = query.startsWith('/')
   const recentFolders = props.recentFolders
   const entries = useMemo(() => pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
+
+  const listingQuery = useQuery({
+    queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
+    queryFn: ({ signal }) => props.directoryPicker.list(browseTarget?.path, signal),
+    enabled: browseTarget !== null,
+    placeholderData: keepPreviousData,
+    retry: false,
+  })
+  const listing = browseTarget === null ? null : (listingQuery.data ?? null)
   const folderEntries = pathMode ? (listing?.entries ?? []) : []
   const itemCount = pathMode ? folderEntries.length : entries.length
-
-  useEffect(
-    () => () => {
-      generation.current += 1
-      activeRequest.current?.abort()
+  const pickMutation = useMutation({
+    mutationFn: () => {
+      pickRequest.current?.abort()
+      pickRequest.current = new AbortController()
+      return props.directoryPicker.pick(pickRequest.current.signal)
     },
-    [],
-  )
+  })
+  const registerMutation = useMutation({ mutationFn: (path: string) => props.onRegisterWorkspace(path) })
+  const createMutation = useMutation({
+    mutationFn: (variables: { readonly parent: string; readonly name: string }) => props.directoryPicker.createDirectory(variables.parent, variables.name),
+  })
+  const busy = listingQuery.isFetching || pickMutation.isPending || registerMutation.isPending || createMutation.isPending
+  const error = pickMutation.isError
+    ? 'The folder picker is unavailable on this Host.'
+    : registerMutation.isError
+      ? 'This folder could not be registered as a project.'
+      : createMutation.isError
+        ? 'This folder could not be created.'
+        : listingQuery.isError
+          ? 'This folder could not be opened.'
+          : null
+
+  useEffect(() => () => pickRequest.current?.abort(), [])
 
   useEffect(() => setSelectedIndex(0), [query, listing?.path])
 
-  const browse = async (path: string | undefined): Promise<void> => {
-    const requestId = ++generation.current
-    activeRequest.current?.abort()
-    const controller = new AbortController()
-    activeRequest.current = controller
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await props.directoryPicker.list(path, controller.signal)
-      if (requestId !== generation.current) return
-      setListing(result)
-      setQuery(result.path)
-    } catch {
-      if (requestId === generation.current && !controller.signal.aborted) {
-        setError('This folder could not be opened.')
-      }
-    } finally {
-      if (requestId === generation.current) setBusy(false)
-    }
+  useEffect(() => {
+    if (listingQuery.data !== undefined && !listingQuery.isPlaceholderData) setQuery(listingQuery.data.path)
+  }, [listingQuery.data, listingQuery.isPlaceholderData])
+
+  const browse = (path: string | undefined): void => {
+    pickMutation.reset()
+    registerMutation.reset()
+    createMutation.reset()
+    setBrowseTarget({ path })
   }
 
-  const chooseWithSystemPicker = async (): Promise<void> => {
-    const requestId = ++generation.current
-    activeRequest.current?.abort()
-    const controller = new AbortController()
-    activeRequest.current = controller
-    setBusy(true)
-    setError(null)
-    try {
-      const pickedPath = await props.directoryPicker.pick(controller.signal)
-      if (requestId !== generation.current || pickedPath === null) return
-      await browse(pickedPath)
-    } catch {
-      if (requestId === generation.current && !controller.signal.aborted) {
-        setError('The folder picker is unavailable on this Host.')
-      }
-    } finally {
-      if (requestId === generation.current) setBusy(false)
-    }
+  const chooseWithSystemPicker = (): void => {
+    registerMutation.reset()
+    createMutation.reset()
+    pickMutation.mutate(undefined, {
+      onSuccess: pickedPath => {
+        if (pickedPath !== null) browse(pickedPath)
+      },
+    })
   }
 
-  const registerCurrentFolder = async (): Promise<void> => {
+  const registerCurrentFolder = (): void => {
     if (listing === null) return
-    setBusy(true)
-    setError(null)
-    try {
-      const project = await props.onRegisterWorkspace(listing.path)
-      props.onSelect({
-        kind: 'workspace',
-        workspaceId: project.workspaceId,
-        canonicalPath: project.canonicalPath,
-        title: project.title,
-      })
-    } catch {
-      setError('This folder could not be registered as a project.')
-    } finally {
-      setBusy(false)
-    }
+    registerMutation.mutate(listing.path, {
+      onSuccess: project =>
+        props.onSelect({ kind: 'workspace', workspaceId: project.workspaceId, canonicalPath: project.canonicalPath, title: project.title }),
+    })
   }
 
-  const createFolder = async (): Promise<void> => {
+  const createFolder = (): void => {
     if (listing === null || newDirectoryName.trim().length === 0) return
-    setBusy(true)
-    setError(null)
-    try {
-      const createdPath = await props.directoryPicker.createDirectory(listing.path, newDirectoryName.trim())
-      setNewDirectoryName('')
-      await browse(createdPath)
-    } catch {
-      setError('This folder could not be created.')
-    } finally {
-      setBusy(false)
-    }
+    createMutation.mutate(
+      { parent: listing.path, name: newDirectoryName.trim() },
+      {
+        onSuccess: createdPath => {
+          setNewDirectoryName('')
+          browse(createdPath)
+        },
+      },
+    )
   }
 
   const selectVisibleItem = (): void => {
     if (pathMode) {
       const entry = folderEntries[selectedIndex]
-      if (entry !== undefined) void browse(entry.path)
+      if (entry !== undefined) browse(entry.path)
       return
     }
     const entry = entries[selectedIndex]
@@ -206,7 +195,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     if (event.key === 'Enter') {
       event.preventDefault()
       if (pathMode && query.trim().length > 0 && listing?.path !== query.trim()) {
-        void browse(query.trim())
+        browse(query.trim())
       } else {
         selectVisibleItem()
       }
@@ -244,8 +233,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               className="dshx:h-9 dshx:pl-8"
               onChange={event => {
                 setQuery(event.currentTarget.value)
-                if (!event.currentTarget.value.startsWith('/')) setListing(null)
-                setError(null)
+                if (!event.currentTarget.value.startsWith('/')) setBrowseTarget(null)
+                pickMutation.reset()
+                registerMutation.reset()
+                createMutation.reset()
               }}
               onKeyDown={onKeyDown}
               placeholder={props.placeholder ?? 'Search projects or type / for a folder…'}
@@ -253,7 +244,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               value={query}
             />
           </div>
-          <Button disabled={busy} onClick={() => void chooseWithSystemPicker()} type="button" variant="outline">
+          <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
             <FolderOpenIcon aria-hidden />
             Browse…
           </Button>
@@ -269,7 +260,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   aria-selected={index === selectedIndex}
                   className={optionClassName(index === selectedIndex)}
                   key={entry.path}
-                  onClick={() => void browse(entry.path)}
+                  onClick={() => browse(entry.path)}
                   onMouseEnter={() => setSelectedIndex(index)}
                   role="option"
                   type="button"
@@ -290,14 +281,14 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} size="sm" type="button">
                   Select this folder
                 </Button>
-                <Button disabled={busy} onClick={() => void registerCurrentFolder()} size="sm" type="button" variant="outline">
+                <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
                   Register project
                 </Button>
                 <form
                   className="dshx:flex dshx:min-w-60 dshx:flex-1 dshx:items-center dshx:gap-2"
                   onSubmit={event => {
                     event.preventDefault()
-                    void createFolder()
+                    createFolder()
                   }}
                 >
                   <Input
