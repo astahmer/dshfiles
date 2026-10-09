@@ -52,6 +52,7 @@ import { isMacPlatform, type ThreadCandidate } from './palette.js'
 import { usePaletteState, useSidebarState } from './sidebar-state.js'
 import { ThreadPalette } from './thread-palette.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 
 type InjectedActions = {
@@ -69,13 +70,6 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
-
-type NoticeTone = 'danger' | 'warning' | 'success'
-
-interface SidebarNotice {
-  tone: NoticeTone
-  message: string
-}
 
 const ALL_PROJECTS = '__all__'
 const UNASSIGNED_PROJECT = '__unassigned__'
@@ -307,6 +301,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
+  useEffect(() => {
+    if (notice === null) return
+    return scheduleSuccessNoticeDismissal(notice, setNotice)
+  }, [notice])
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
@@ -766,12 +764,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           <div className="dshx:grid dshx:gap-2 dshx:px-2 dshx:pb-2">
             {notice !== null ? (
               <Alert variant={notice.tone === 'danger' ? 'destructive' : notice.tone} className={noticeClass}>
-                {notice.message}
+                <SidebarNoticeMessage message={notice.message} />
               </Alert>
             ) : null}
             {storageWarning ? (
               <Alert variant="warning" className={noticeClass}>
-                {props.tSidebar('threadSidebarStorageFailure')}
+                <SidebarNoticeMessage message={props.tSidebar('threadSidebarStorageFailure')} />
               </Alert>
             ) : null}
           </div>
