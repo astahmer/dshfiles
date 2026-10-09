@@ -56,6 +56,7 @@ export const createSessionFixture = (header: CaptureHeader) => {
         data: { turn: 1, step: 1, message: createToolResultMessage({ callId: ToolCallId(callId), content: [{ type: 'text', text }], isError: false }) },
         surfaceOp: 'append',
       })),
+    turnStart: (turn: number): SessionEvent => next(base => ({ ...base, type: 'turn/start', data: { turn } })),
     requestHeader: (provider: string, model: string): SessionEvent =>
       next(base => ({ ...base, type: 'request/header', data: { header: { config: { provider, model } }, reason: 'initial' } })),
   }

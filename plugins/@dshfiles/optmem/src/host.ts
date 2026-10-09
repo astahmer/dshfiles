@@ -11,10 +11,23 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { defineCommand, defineHost, definePromptContext } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
+
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
 import { createLlmSummarizer, createRouteResolver } from './summarizer.ts'
 import { createMemoryTools } from './tools.ts'
+
+/** Dispatched only by the dshfiles fork agent loop (tooling/dsh-core/FORK.md); stock DSH never fires it. */
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'agent/request-messages'(
+      payload: { agent: Agent; turn: number; step: number; isFirstStepOfTurn: boolean; messages: readonly Message[]; toolHistory: ToolHistory; signal: AbortSignal },
+      next: () => Promise<readonly Message[]>,
+    ): Promise<readonly Message[]>
+  }
+}
 
 let runtime: OptmemRuntime | undefined
 let settingsScope: SettingsScope<OptmemSettings> | undefined
@@ -116,6 +129,10 @@ const setup = (ctx: Context): void => {
   })
   runtime = active
   ctx.on('session/event', (session, event) => active.onSessionEvent(session, event))
+  ctx.on('agent/request-messages', async (payload, next) => {
+    const derived = await next()
+    return (await active.requestMessages({ ...payload, messages: derived })) ?? derived
+  })
   ctx.on('agent/created', ({ agent }) => {
     void active.resolveProject(agent.session.header)
     return undefined

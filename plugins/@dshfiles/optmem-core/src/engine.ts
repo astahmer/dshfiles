@@ -142,8 +142,11 @@ export type MemoryEngine = {
   /** Recovery: resumes every pipeline from persisted cursors and views. */
   start(): Promise<void>
   append(inputs: readonly MemoryEventInput[]): Promise<AppendResult>
-  /** Next-turn barrier: waits up to `barrierMs` for leaves, then renders anything still pending raw. */
-  snapshot(request: { readonly stream: StreamId; readonly barrierMs?: number | undefined }): Promise<Snapshot>
+  /**
+   * Next-turn barrier: waits up to `barrierMs` for leaves, then renders anything still pending raw. `endPos` takes the
+   * snapshot as of that stream length, leaving later positions (the turn being answered) out of the pending tail.
+   */
+  snapshot(request: { readonly stream: StreamId; readonly barrierMs?: number | undefined; readonly endPos?: number | undefined }): Promise<Snapshot>
   /** The persisted view of one kind, without waiting for pending leaves. */
   readView(request: { readonly stream: StreamId; readonly kind: ViewKind }): Promise<ViewSnapshot>
   zoom(request: { readonly stream: StreamId; readonly address: string; readonly page?: number | undefined; readonly access: MemoryAccess }): Promise<ZoomResult>
@@ -595,7 +598,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   }
 
   const snapshot: MemoryEngine['snapshot'] = async request => {
-    const length = await store.streamLength(request.stream)
+    const length = Math.min(await store.streamLength(request.stream), request.endPos ?? Number.POSITIVE_INFINITY)
     const { view: current } = await loadView(request.stream)
     let barrierTimedOut = false
     if (current.throughPos < length) {
@@ -606,20 +609,22 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     }
     const stored = await store.readSnapshot(request.stream)
     const view = stored.view ?? ViewMath.empty(request.stream)
-    const tail = await store.readStream(request.stream, view.throughPos, stored.length)
+    const end = Math.min(stored.length, request.endPos ?? stored.length)
+    const tail = end > view.throughPos ? await store.readStream(request.stream, view.throughPos, end) : []
+    const viewText = end >= view.throughPos ? view.rendered : ViewMath.render(ViewMath.lines(view.rendered).filter((_line, index) => TreeMath.start(view.nodes[index] ?? { level: 0, idx: end }) < end))
     const builtLeaves = new Map((await store.listNodes(request.stream, 0, view.throughPos, stored.length)).map(node => [node.address.idx, node.text]))
     const pendingLines = tail.map(entry => {
       const built = builtLeaves.get(entry.pos)
       return built === undefined ? pendingLine(entry.pos, entry.event) : ViewMath.line({ level: 0, idx: entry.pos }, built)
     })
     const pending = ViewMath.render(capPendingTail(pendingLines, view.throughPos))
-    const text = view.rendered + pending
+    const text = viewText + pending
     return {
       stream: request.stream,
-      length: stored.length,
+      length: end,
       viewVersion: view.version,
       viewThroughPos: view.throughPos,
-      view: view.rendered,
+      view: viewText,
       pending,
       text,
       bytes: Utf8.byteLength(text),

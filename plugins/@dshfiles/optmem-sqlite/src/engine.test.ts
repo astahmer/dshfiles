@@ -174,6 +174,21 @@ describe('snapshot barrier', () => {
     expect(settled.view.startsWith(pending.view)).toBe(true)
     memory.close()
   })
+
+  it('leaves positions at or past endPos out of the snapshot', async () => {
+    const { engine, memory } = await openEngine({ path: dbPath('end-pos'), summarizer: createFakeSummarizer({ gated: true }) })
+    await engine.append(turns(3))
+    const snapshot = await engine.snapshot({ stream: conversation, barrierMs: 0, endPos: 2 })
+    expect(snapshot.length).toBe(2)
+    expect(ViewMath.lines(snapshot.text).map(line => line.split('|')[0])).toEqual(['0+1', '1+1'])
+    const built = await openEngine({ path: dbPath('end-pos-built'), summarizer: createFakeSummarizer() })
+    await built.engine.append(turns(3))
+    expect((await built.engine.snapshot({ stream: conversation, barrierMs: 5_000 })).viewThroughPos).toBe(3)
+    const truncated = await built.engine.snapshot({ stream: conversation, barrierMs: 0, endPos: 2 })
+    expect(ViewMath.lines(truncated.text).map(line => line.split('|')[0])).toEqual(['0+1', '1+1'])
+    built.memory.close()
+    memory.close()
+  })
 })
 
 describe('recovery', () => {
