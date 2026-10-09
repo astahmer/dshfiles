@@ -28,6 +28,11 @@ export const jujutsuSettings = defineSettings({
       .description('How the revision graph and Source Control reload repository data.'),
     refreshIntervalSeconds: Schema.natural().min(10).default(60).description('Seconds between automatic refreshes while the panel is visible.'),
     refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
+    composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
+    composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
+    composerBarBase: Schema.string()
+      .default('parent')
+      .description('Default base of the composer bar: `parent` (working copy vs @-), `trunk` (since trunk()), or a local bookmark name.'),
   }),
   applies: 'live',
 })

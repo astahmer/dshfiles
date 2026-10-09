@@ -11,6 +11,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { JujutsuPanel } from './client.js'
+import { ComposerChangesBar, ComposerChips, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
@@ -20,7 +21,7 @@ const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 export default defineClient({
   name: '@dshfiles/jujutsu',
   // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
-  inject: ['slots', 'sidebarRightTabs', 'sessions', 'uiWorkspace', 'workspaces'],
+  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'uiWorkspace', 'workspaces'],
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
@@ -69,6 +70,28 @@ export default defineClient({
           ],
         }),
       'dshfiles-jujutsu: right pane tab type',
+    )
+    const composerServices: ComposerJujutsuServices = {
+      sessions: ctx.sessions,
+      openJujutsu: () => ctx.sidebarRight.openTab(RIGHT_PANE_KIND),
+    }
+    const composerSlot = (Component: (props: ComposerSlotProps) => JSX.Element | null) =>
+      decorate((props: ComposerSlotProps) => (
+        <PluginQueryProvider>
+          <Component {...props} />
+        </PluginQueryProvider>
+      ))
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'dshfiles-jujutsu-changes', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        composerSlot(ComposerChangesBar),
+      ),
+    )
+    ctx.slots.inject('conversation.composer.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.composer.dock', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        composerSlot(ComposerChips),
+      ),
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))

@@ -18,6 +18,9 @@ const preferencesSchema = z.object({
   refreshMode: z.enum(['interval', 'manual']).catch('interval'),
   refreshIntervalSeconds: z.number().int().min(10).catch(60),
   refreshOnVisible: z.boolean().catch(true),
+  composerBar: z.boolean().catch(true),
+  composerChips: z.boolean().catch(true),
+  composerBarBase: z.string().max(256).catch('parent'),
 })
 
 export type JujutsuPreferences = z.infer<typeof preferencesSchema>
