@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { chordFromEvent, filterByLabel, formatChord, fuzzyScore, matchesChord, parseChord, rankThreads, sameAsHostBinding, serializeChord, type ThreadCandidate } from './palette.js'
+import {
+  chordFromEvent,
+  filterByLabel,
+  formatChord,
+  fuzzyScore,
+  indexThreads,
+  matchesChord,
+  parseChord,
+  rankThreads,
+  sameAsHostBinding,
+  serializeChord,
+  type ThreadCandidate,
+} from './palette.js'
 
 const thread = (overrides: Partial<ThreadCandidate> & { id: string }): ThreadCandidate => ({
   title: overrides.id,
@@ -29,7 +41,7 @@ test('fuzzy matching accepts ordered subsequences and ranks substrings and word 
 test('an empty thread query lists the most recent threads up to the limit', () => {
   const threads = [thread({ id: 'a', updatedAt: 1 }), thread({ id: 'b', updatedAt: 3 }), thread({ id: 'c', updatedAt: 2 })]
   assert.deepEqual(
-    rankThreads({ threads, query: '', limit: 2 }).map(item => item.id),
+    rankThreads({ index: indexThreads(threads), query: '', limit: 2 }).map(item => item.id),
     ['b', 'c'],
   )
 })
@@ -41,15 +53,15 @@ test('thread search matches title, project, and id prefix, best title match firs
     thread({ id: 'thr_abc', title: 'Other', project: 'nixfiles', updatedAt: 2 }),
   ]
   assert.deepEqual(
-    rankThreads({ threads, query: 'footer', limit: 10 }).map(item => item.id),
+    rankThreads({ index: indexThreads(threads), query: 'footer', limit: 10 }).map(item => item.id),
     ['thr_1', 'thr_2'],
   )
   assert.deepEqual(
-    rankThreads({ threads, query: 'thr_ab', limit: 10 }).map(item => item.id),
+    rankThreads({ index: indexThreads(threads), query: 'thr_ab', limit: 10 }).map(item => item.id),
     ['thr_abc'],
   )
   assert.deepEqual(
-    rankThreads({ threads, query: 'nix', limit: 10 }).map(item => item.id),
+    rankThreads({ index: indexThreads(threads), query: 'nix', limit: 10 }).map(item => item.id),
     ['thr_abc'],
   )
 })

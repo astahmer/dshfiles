@@ -40,3 +40,17 @@ queue-reorder's dock rule moved inline so its sheet is byte-identical.
 | Full style recalc, idle / palette open | 15.3 / 21.2 ms | 0.4 / 0.2 ms |
 | Thread-sidebar HMR rebuild | — | 12 markers, 1 sheet kept |
 | Remove 11 of 12 markers / all 12 | — | sheet kept / sheet removed |
+
+## After P0.3 (palette)
+
+cmdk filtering was already off and rows were already capped at 50; ranking is not the bottleneck. Search keys are now
+lowercased once per thread list (`indexThreads`) and the query goes through `useDeferredValue`.
+
+| Metric | Before | After |
+|---|---|---|
+| `rankThreads`, 2,000 threads, per keystroke (Node bench, 1,200 runs) | 0.56 ms | 0.40 ms |
+| Palette open → `[cmdk-input]` committed (MutationObserver, pane hidden, 7 runs p50/max) | — | 21.2 / 21.7 ms |
+| Keystroke → commit (42 keys p50/p95) | — | 1.1 / 4.2 ms |
+
+The Browser pane was hidden for this run, so `requestAnimationFrame` numbers are not comparable with P0.1; commit
+latency excludes paint. Regression guard: `thread-sidebar/src/palette-perf.test.ts` (p95 < 8 ms at 2,000 threads).

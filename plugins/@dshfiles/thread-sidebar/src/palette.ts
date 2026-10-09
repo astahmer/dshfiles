@@ -12,14 +12,8 @@ export interface ThreadCandidate {
 
 const WORD_BOUNDARY = /[\s\-_/.·:]/
 
-/**
- * Subsequence score: every query character must appear in order. Consecutive
- * runs, word starts and an exact substring score higher; null means no match.
- */
-export const fuzzyScore = (query: string, text: string): number | null => {
-  const needle = query.trim().toLocaleLowerCase()
+const scoreLowered = (needle: string, haystack: string): number | null => {
   if (needle.length === 0) return 0
-  const haystack = text.toLocaleLowerCase()
   const substringAt = haystack.indexOf(needle)
   if (substringAt >= 0) return 1000 - substringAt + (substringAt === 0 || WORD_BOUNDARY.test(haystack[substringAt - 1] ?? '') ? 200 : 0)
 
@@ -40,21 +34,54 @@ export const fuzzyScore = (query: string, text: string): number | null => {
   return score
 }
 
+/**
+ * Subsequence score: every query character must appear in order. Consecutive
+ * runs, word starts and an exact substring score higher; null means no match.
+ */
+export const fuzzyScore = (query: string, text: string): number | null => scoreLowered(query.trim().toLocaleLowerCase(), text.toLocaleLowerCase())
+
+interface IndexedThread {
+  readonly thread: ThreadCandidate
+  readonly title: string
+  readonly project: string
+  readonly cwd: string
+  readonly id: string
+}
+
+/** Lowercased search keys, built once per thread list instead of once per keystroke. */
+export interface ThreadIndex {
+  readonly recent: readonly ThreadCandidate[]
+  readonly entries: readonly IndexedThread[]
+}
+
+export const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
+  recent: [...threads].sort((left, right) => right.updatedAt - left.updatedAt),
+  entries: threads.map(thread => ({
+    thread,
+    title: thread.title.toLocaleLowerCase(),
+    project: thread.project.toLocaleLowerCase(),
+    cwd: thread.cwd.toLocaleLowerCase(),
+    id: thread.id.toLocaleLowerCase(),
+  })),
+})
+
+const weighted = (score: number | null, weight: number): number => (score === null ? -Infinity : score * weight)
+
 /** Recent threads for an empty query; otherwise the best title, project, path or id matches. */
-export const rankThreads = ({ threads, query, limit }: { threads: readonly ThreadCandidate[]; query: string; limit: number }): ThreadCandidate[] => {
-  if (query.trim().length === 0) return [...threads].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, limit)
-  const normalizedId = query.trim().toLocaleLowerCase()
-  return threads
-    .flatMap(thread => {
-      const scores = [
-        (fuzzyScore(query, thread.title) ?? -Infinity) * 3,
-        (fuzzyScore(query, thread.project) ?? -Infinity) * 2,
-        fuzzyScore(query, thread.cwd) ?? -Infinity,
-        thread.id.toLocaleLowerCase().startsWith(normalizedId) ? 2500 : -Infinity,
-      ]
-      const best = Math.max(...scores)
-      return best === -Infinity ? [] : [{ thread, best }]
-    })
+export const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => {
+  const needle = query.trim().toLocaleLowerCase()
+  if (needle.length === 0) return index.recent.slice(0, limit)
+  const matches: Array<{ readonly thread: ThreadCandidate; readonly best: number }> = []
+  for (const entry of index.entries) {
+    const best = Math.max(
+      weighted(scoreLowered(needle, entry.title), 3),
+      weighted(scoreLowered(needle, entry.project), 2),
+      weighted(scoreLowered(needle, entry.cwd), 1),
+      entry.id.startsWith(needle) ? 2500 : -Infinity,
+    )
+    if (best !== -Infinity) matches.push({ thread: entry.thread, best })
+  }
+  return matches
     .sort((left, right) => right.best - left.best || right.thread.updatedAt - left.thread.updatedAt)
     .slice(0, limit)
     .map(({ thread }) => thread)

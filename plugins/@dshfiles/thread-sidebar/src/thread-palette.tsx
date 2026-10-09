@@ -1,18 +1,10 @@
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from '@dshfiles/plugin-ui/components/ui/command'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useMemo, useState, type KeyboardEvent } from 'react'
-import { filterByLabel, rankThreads, type PaletteMode, type ThreadCandidate } from './palette.js'
+import { useDeferredValue, useMemo, useState, type KeyboardEvent } from 'react'
+import { filterByLabel, indexThreads, rankThreads, type PaletteMode, type ThreadCandidate } from './palette.js'
 import type { PaletteDestination } from './sidebar-state.js'
 
 export interface ThreadPaletteCopy {
@@ -60,12 +52,17 @@ const glyphTone = (project: string): string => {
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
   const [selected, setSelected] = useState('')
+  const threadIndex = useMemo(() => indexThreads(props.threads), [props.threads])
   const threadRows = useMemo(
-    () => rankThreads({ threads: props.threads, query, limit: query.trim().length === 0 ? props.recentLimit : 50 }),
-    [props.recentLimit, props.threads, query],
+    () => rankThreads({ index: threadIndex, query: deferredQuery, limit: deferredQuery.trim().length === 0 ? props.recentLimit : 50 }),
+    [props.recentLimit, threadIndex, deferredQuery],
   )
-  const destinationRows = useMemo(() => (props.mode === 'all' ? filterByLabel(props.destinations, query) : []), [props.destinations, props.mode, query])
+  const destinationRows = useMemo(
+    () => (props.mode === 'all' ? filterByLabel(props.destinations, deferredQuery) : []),
+    [props.destinations, props.mode, deferredQuery],
+  )
   const rows: PaletteRow[] = useMemo(
     () => [
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
@@ -129,7 +126,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const row: PaletteRow = { kind: 'destination', destination }
                   return (
                     <CommandItem key={destination.id} value={rowValue(row)} className={itemClass} onSelect={() => activate(row)}>
-                      <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+                      <span
+                        className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                        aria-hidden="true"
+                      >
                         {destination.icon}
                       </span>
                       <span className="dshx:truncate dshx:text-sm">{destination.label}</span>
@@ -141,7 +141,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             ) : null}
             {destinationRows.length > 0 && threadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
             {threadRows.length > 0 ? (
-              <CommandGroup heading={query.trim().length === 0 ? props.copy.recent : props.copy.threads}>
+              <CommandGroup heading={deferredQuery.trim().length === 0 ? props.copy.recent : props.copy.threads}>
                 {threadRows.map(thread => {
                   const row: PaletteRow = { kind: 'thread', thread }
                   const project = thread.project.length > 0 ? thread.project : props.copy.unassigned

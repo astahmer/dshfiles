@@ -72,7 +72,7 @@ under target; plugin uninstall/HMR still clean.
 > first-loading `@dshfiles/theme` plugin if dshx supports load order; otherwise a plugin-ui singleton keyed by a
 > hashed style id. Verify in the web UI that exactly one sheet exists and panels look unchanged. One jj revision."
 
-### P0.3 Palette: debounce-free fast filter + virtualization (M) — deps: P0.1
+### [x] P0.3 Palette: debounce-free fast filter + virtualization (M) — deps: P0.1
 
 Check in `thread-sidebar/src/palette.ts` + `thread-palette.tsx`: cmdk's built-in `filter` runs on every item per
 keystroke and mounts every row. Fix: `shouldFilter={false}`, rank once with the existing weighted `rankThreads`
