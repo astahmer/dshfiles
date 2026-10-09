@@ -1008,9 +1008,13 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
             onClick={props.toggleSidebar}
           >
-            {props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>}
+            {preferences.hideBrandLogo ? (
+              <PanelLeftIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />
+            ) : (
+              (props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>)
+            )}
           </Button>
-          {wide ? (
+          {wide && !preferences.hideBrandLogo ? (
             <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}</span>
           ) : null}
           {wide ? (
@@ -1281,6 +1285,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 <ToggleGroupItem value="compact">{text(props.t, 'threadSidebarCompact')}</ToggleGroupItem>
                 <ToggleGroupItem value="expanded">{text(props.t, 'threadSidebarExpanded')}</ToggleGroupItem>
               </ToggleGroup>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
+                <Checkbox checked={!preferences.hideBrandLogo} onCheckedChange={checked => updatePreferences({ hideBrandLogo: checked !== true })} />
+                {text(props.t, 'threadSidebarShowBrandLogo')}
+              </label>
             </div>
             <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>
               <h3 id={`${headerRegionId}-rows`} className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">

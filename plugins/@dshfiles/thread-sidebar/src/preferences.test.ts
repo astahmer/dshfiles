@@ -43,3 +43,10 @@ test('Host settings values decode through the sidebar contract', () => {
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, headerMode: 'diagonal' }), null)
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, headerRegionHeight: 200 })?.headerRegionHeight, 200)
 })
+
+test('a Host namespace from before the brand-logo setting keeps the logo shown', () => {
+  const { hideBrandLogo, ...older } = DEFAULT_PREFERENCES
+  assert.equal(hideBrandLogo, false)
+  assert.equal(decodePreferences(older)?.hideBrandLogo, false)
+  assert.equal(decodePreferences({ ...older, hideBrandLogo: true })?.hideBrandLogo, true)
+})

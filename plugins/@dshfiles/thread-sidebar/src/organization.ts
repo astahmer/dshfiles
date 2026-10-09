@@ -21,6 +21,8 @@ export interface SidebarPreferences {
   collapsedSections: SidebarSection[]
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
+  /** Drop the Host brand mark and name from the header; the collapse button stays. */
+  hideBrandLogo: boolean
   headerRegionHeight: number | null
   headerOrder: string[]
   hiddenHeaderIds: string[]
@@ -60,6 +62,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   collapsedSections: ['archived'],
   workspaceFilter: null,
   headerMode: 'compact',
+  hideBrandLogo: false,
   headerRegionHeight: null,
   headerOrder: [],
   hiddenHeaderIds: [],

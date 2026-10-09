@@ -10,6 +10,9 @@ export const threadSidebarSettings = defineSettings({
     headerMode: Schema.union(['compact', 'expanded'] as const)
       .default(DEFAULT_PREFERENCES.headerMode)
       .description('Compact shows one scrollable icon row; expanded shows labels and folds into the icon row at 76px or less.'),
+    hideBrandLogo: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.hideBrandLogo)
+      .description('Hide the brand logo and name in the sidebar header to make room; the collapse button stays.'),
     navigationDensity: Schema.union(['compact', 'comfortable'] as const)
       .default(DEFAULT_PREFERENCES.navigationDensity)
       .description('Row height of the expanded navigation list.'),

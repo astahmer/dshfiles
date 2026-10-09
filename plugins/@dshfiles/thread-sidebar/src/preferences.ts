@@ -17,6 +17,7 @@ const preferencesSchema = z
     collapsedSections: z.array(sidebarSectionSchema).max(5),
     workspaceFilter: z.string().max(256).nullable(),
     headerMode: z.enum(['compact', 'expanded']),
+    hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),
     headerRegionHeight: z.number().int().min(40).max(10000).nullable().default(null),
     headerOrder: z.array(z.string().min(1).max(256)).max(300),
     hiddenHeaderIds: z.array(z.string().min(1).max(256)).max(300),

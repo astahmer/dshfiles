@@ -31,6 +31,11 @@ Expanded mode is a labelled list with a trailing Customize row; density is
 Compact (30px rows) or Comfortable (34px). Dragging the splitter past 76px from
 the icon row switches to expanded.
 
+**Brand logo.** Customize › Show brand logo (setting `hideBrandLogo`, off by
+default) drops the Host brand mark and name from the header to make room; the
+collapse button stays, drawn as a panel icon. With the setting off the header
+renders the Host's `sidebar.brand.*` slots unchanged.
+
 **Back / Forward.** The header ← → walk visited threads and panels (⌘[ / ⌘]).
 Right-click or hold either arrow, or click the ▾ beside them, for the recent
 history menu (newest first, current entry marked); picking an entry jumps there
