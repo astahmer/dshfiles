@@ -21,6 +21,7 @@ import {
   type PreparedMutation,
 } from './core.js'
 import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { composerContextHost } from './composer-context-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 
@@ -739,6 +740,6 @@ const jujutsuHostApi = jujutsuApi.host({
 export default defineHost({
   name: '@dshfiles/jujutsu',
   inject: ['subprocess', 'webServer'],
-  apis: [jujutsuHostApi],
+  apis: [jujutsuHostApi, composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options))],
   settings: [jujutsuSettings],
 })
