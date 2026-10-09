@@ -48,7 +48,7 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 
 | # | Where | Swap | Value | Size | Done |
 |---|---|---|---|---|---|
-| L1 | mcp-servers/src/oauth.ts:100-216 | `oauth4webapi` (adds issuer check RFC 8414 §3.3, correct OIDC discovery URL, `WWW-Authenticate` resource_metadata hint) | high (security) | M | [ ] |
+| L1 | mcp-servers/src/oauth.ts:100-216 | `oauth4webapi` (adds issuer check RFC 8414 §3.3, correct OIDC discovery URL, `WWW-Authenticate` resource_metadata hint) | high (security) | M | [x] |
 | L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | `@tanstack/react-virtual` wrapper in plugin-ui + Host `useCodeHighlighter(languageForPath)` | high | M | [ ] |
 | L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [ ] |
 | L4 | thread-sidebar/client.tsx:129, jujutsu/client.tsx:158 (two disagreeing relative-time fns) | Host `relativeTime` | med | S | [ ] |

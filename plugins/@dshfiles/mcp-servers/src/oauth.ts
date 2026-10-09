@@ -1,9 +1,9 @@
-import { createHash, randomBytes } from 'node:crypto'
+import * as oauth from 'oauth4webapi'
 import { z } from 'zod'
 
 /** OAuth 2.1 client flow for remote MCP servers: discovery, dynamic registration, PKCE, and refresh. */
 
-type Fetch = (input: URL, init?: RequestInit) => Promise<Response>
+type Fetch = (url: string, init: RequestInit) => Promise<Response>
 
 const REQUEST_TIMEOUT_MS = 10_000
 const REFRESH_MARGIN_MS = 60_000
@@ -11,6 +11,7 @@ const REFRESH_MARGIN_MS = 60_000
 export const oauthGrantSchema = z.object({
   clientId: z.string().min(1),
   clientSecret: z.string().optional(),
+  issuer: z.string().url().optional(),
   tokenEndpoint: z.string().url(),
   resource: z.string().url(),
   accessToken: z.string().min(1),
@@ -23,75 +24,85 @@ export type OAuthGrant = z.infer<typeof oauthGrantSchema>
 
 export interface OAuthEndpoints {
   readonly resource: string
-  readonly authorizationEndpoint: string
-  readonly tokenEndpoint: string
-  readonly registrationEndpoint: string | undefined
+  readonly authorizationServer: oauth.AuthorizationServer
   readonly scopes: readonly string[]
 }
 
 export interface PendingAuthorization {
   readonly serverId: string
+  readonly state: string
   readonly verifier: string
   readonly redirectUri: string
   readonly clientId: string
   readonly clientSecret: string | undefined
-  readonly tokenEndpoint: string
+  readonly authorizationServer: oauth.AuthorizationServer
   readonly resource: string
   readonly createdAt: number
 }
 
-const protectedResourceSchema = z.object({
-  resource: z.string().url().optional(),
-  authorization_servers: z.array(z.string().url()).optional(),
-  scopes_supported: z.array(z.string()).optional(),
-})
-
-const authorizationServerSchema = z.object({
-  authorization_endpoint: z.string().url(),
-  token_endpoint: z.string().url(),
-  registration_endpoint: z.string().url().optional(),
-  scopes_supported: z.array(z.string()).optional(),
-  code_challenge_methods_supported: z.array(z.string()).optional(),
-})
-
-const registrationSchema = z.object({ client_id: z.string().min(1), client_secret: z.string().optional() })
-
-const tokenSchema = z.object({
-  access_token: z.string().min(1),
-  token_type: z.string().optional(),
-  refresh_token: z.string().optional(),
-  expires_in: z.number().optional(),
-})
-
 const isLoopback = (hostname: string): boolean => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 
 /** Endpoints must be HTTPS; plain HTTP is accepted only for loopback development servers. */
-const trustedEndpoint = (value: string): string => {
+const trustedEndpoint = (value: string | undefined): void => {
+  if (value === undefined) return
   const url = new URL(value)
   if (url.username !== '' || url.password !== '') throw new Error('OAuth endpoints must not embed credentials.')
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback(url.hostname))) throw new Error('OAuth endpoints must use HTTPS.')
-  return url.href
 }
 
-const fetchJson = async (fetcher: Fetch, url: URL, init?: RequestInit): Promise<unknown | undefined> => {
-  const response = await fetcher(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), headers: { accept: 'application/json', ...init?.headers } })
-  if (response.status === 404) return undefined
-  if (!response.ok) throw new Error(`OAuth request to ${url.host} failed with HTTP ${response.status}.`)
-  return response.json()
+const requestOptions = (fetcher: Fetch, target: string) => {
+  const url = new URL(target)
+  return {
+    [oauth.customFetch]: fetcher,
+    signal: () => AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    ...(url.protocol === 'http:' && isLoopback(url.hostname) ? { [oauth.allowInsecureRequests]: true } : {}),
+  }
 }
 
-const wellKnownCandidates = (base: URL, suffix: string): URL[] => {
-  const path = base.pathname.replace(/\/+$/, '')
-  const candidates = path.length > 0 && path !== '/' ? [new URL(`/.well-known/${suffix}${path}`, base.origin)] : []
-  return [...candidates, new URL(`/.well-known/${suffix}`, base.origin)]
+/** RFC 9728 §5.1: an unauthenticated request may answer 401 with a `resource_metadata` hint. */
+const resourceMetadataHint = async (fetcher: Fetch, server: URL): Promise<URL | undefined> => {
+  const response = await fetcher(server.href, {
+    method: 'GET',
+    headers: { accept: 'application/json, text/event-stream' },
+    redirect: 'manual',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }).catch(() => undefined)
+  await response?.body?.cancel().catch(() => undefined)
+  if (response?.status !== 401) return undefined
+  const hint = /resource_metadata="([^"]+)"/i.exec(response.headers.get('www-authenticate') ?? '')?.[1]
+  if (hint === undefined || !URL.canParse(hint)) return undefined
+  const url = new URL(hint)
+  trustedEndpoint(url.href)
+  return url
 }
 
-const firstMetadata = async <T>(fetcher: Fetch, urls: readonly URL[], schema: z.ZodType<T>): Promise<T | undefined> => {
-  for (const url of urls) {
-    const body = await fetchJson(fetcher, url).catch(() => undefined)
-    if (body === undefined) continue
-    const parsed = schema.safeParse(body)
-    if (parsed.success) return parsed.data
+const protectedResource = async (fetcher: Fetch, server: URL): Promise<oauth.ResourceServer | undefined> => {
+  const options = requestOptions(fetcher, server.href)
+  const hint = await resourceMetadataHint(fetcher, server)
+  const attempts: (() => Promise<Response>)[] = [
+    ...(hint === undefined ? [] : [() => fetcher(hint.href, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })]),
+    () => oauth.resourceDiscoveryRequest(server, options),
+    ...(server.pathname === '/' ? [] : [() => oauth.resourceDiscoveryRequest(new URL(server.origin), options)]),
+  ]
+  for (const attempt of attempts) {
+    const response = await attempt().catch(() => undefined)
+    if (response === undefined) continue
+    for (const expected of [server, new URL(server.origin)]) {
+      const metadata = await oauth.processResourceDiscoveryResponse(expected, response.clone()).catch(() => undefined)
+      if (metadata !== undefined) return metadata
+    }
+  }
+  return undefined
+}
+
+/** RFC 8414 then OpenID discovery; the published `issuer` must match the one asked for (mix-up defence). */
+const authorizationServerMetadata = async (fetcher: Fetch, issuer: URL): Promise<oauth.AuthorizationServer | undefined> => {
+  for (const algorithm of ['oauth2', 'oidc'] as const) {
+    const metadata = await oauth
+      .discoveryRequest(issuer, { ...requestOptions(fetcher, issuer.href), algorithm })
+      .then(response => oauth.processDiscoveryResponse(issuer, response))
+      .catch(() => undefined)
+    if (metadata !== undefined) return metadata
   }
   return undefined
 }
@@ -99,51 +110,53 @@ const firstMetadata = async <T>(fetcher: Fetch, urls: readonly URL[], schema: z.
 /** RFC 9728 protected-resource metadata, then RFC 8414 (or OpenID) authorization-server metadata. */
 export const discoverOAuth = async (serverUrl: string, fetcher: Fetch = fetch): Promise<OAuthEndpoints> => {
   const server = new URL(serverUrl)
-  const resourceMetadata = await firstMetadata(fetcher, wellKnownCandidates(server, 'oauth-protected-resource'), protectedResourceSchema)
+  const resourceMetadata = await protectedResource(fetcher, server)
   const issuer = new URL(resourceMetadata?.authorization_servers?.[0] ?? server.origin)
-  const metadata =
-    (await firstMetadata(fetcher, wellKnownCandidates(issuer, 'oauth-authorization-server'), authorizationServerSchema)) ??
-    (await firstMetadata(fetcher, wellKnownCandidates(issuer, 'openid-configuration'), authorizationServerSchema))
-  if (metadata === undefined) throw new Error('This MCP server does not publish OAuth authorization metadata.')
+  trustedEndpoint(issuer.href)
+  const metadata = await authorizationServerMetadata(fetcher, issuer)
+  if (metadata?.authorization_endpoint === undefined || metadata.token_endpoint === undefined) {
+    throw new Error('This MCP server does not publish OAuth authorization metadata.')
+  }
   const methods = metadata.code_challenge_methods_supported
   if (methods !== undefined && !methods.includes('S256')) throw new Error('The authorization server does not support PKCE S256.')
+  trustedEndpoint(metadata.authorization_endpoint)
+  trustedEndpoint(metadata.token_endpoint)
+  trustedEndpoint(metadata.registration_endpoint)
   return {
     resource: resourceMetadata?.resource ?? server.href,
-    authorizationEndpoint: trustedEndpoint(metadata.authorization_endpoint),
-    tokenEndpoint: trustedEndpoint(metadata.token_endpoint),
-    registrationEndpoint: metadata.registration_endpoint === undefined ? undefined : trustedEndpoint(metadata.registration_endpoint),
+    authorizationServer: metadata,
     scopes: resourceMetadata?.scopes_supported ?? metadata.scopes_supported ?? [],
   }
 }
 
 /** RFC 7591 dynamic client registration as a public client. */
 export const registerClient = async (
-  input: { readonly registrationEndpoint: string; readonly redirectUri: string; readonly clientName: string },
+  input: { readonly authorizationServer: oauth.AuthorizationServer; readonly redirectUri: string; readonly clientName: string },
   fetcher: Fetch = fetch,
 ): Promise<{ readonly clientId: string; readonly clientSecret: string | undefined }> => {
-  const body = await fetchJson(fetcher, new URL(input.registrationEndpoint), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
+  const endpoint = input.authorizationServer.registration_endpoint
+  if (endpoint === undefined) throw new Error('The authorization server does not support dynamic client registration.')
+  const response = await oauth.dynamicClientRegistrationRequest(
+    input.authorizationServer,
+    {
       client_name: input.clientName,
       redirect_uris: [input.redirectUri],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'none',
-    }),
-  })
-  const parsed = registrationSchema.parse(body)
-  return { clientId: parsed.client_id, clientSecret: parsed.client_secret }
+    },
+    requestOptions(fetcher, endpoint),
+  )
+  const client = await oauth.processDynamicClientRegistrationResponse(response)
+  return { clientId: client.client_id, clientSecret: typeof client.client_secret === 'string' ? client.client_secret : undefined }
 }
 
-const base64Url = (bytes: Buffer): string => bytes.toString('base64url')
-
-export const createPkcePair = (): { readonly verifier: string; readonly challenge: string } => {
-  const verifier = base64Url(randomBytes(32))
-  return { verifier, challenge: base64Url(createHash('sha256').update(verifier).digest()) }
+export const createPkcePair = async (): Promise<{ readonly verifier: string; readonly challenge: string }> => {
+  const verifier = oauth.generateRandomCodeVerifier()
+  return { verifier, challenge: await oauth.calculatePKCECodeChallenge(verifier) }
 }
 
-export const createState = (): string => base64Url(randomBytes(24))
+export const createState = (): string => oauth.generateRandomState()
 
 export const authorizationUrl = (input: {
   readonly endpoints: OAuthEndpoints
@@ -152,7 +165,9 @@ export const authorizationUrl = (input: {
   readonly challenge: string
   readonly state: string
 }): string => {
-  const url = new URL(input.endpoints.authorizationEndpoint)
+  const endpoint = input.endpoints.authorizationServer.authorization_endpoint
+  if (endpoint === undefined) throw new Error('The authorization server has no authorization endpoint.')
+  const url = new URL(endpoint)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('client_id', input.clientId)
   url.searchParams.set('redirect_uri', input.redirectUri)
@@ -164,23 +179,11 @@ export const authorizationUrl = (input: {
   return url.href
 }
 
-const requestToken = async (
-  input: { readonly tokenEndpoint: string; readonly clientId: string; readonly clientSecret: string | undefined; readonly params: Record<string, string> },
-  fetcher: Fetch,
-): Promise<z.infer<typeof tokenSchema>> => {
-  const form = new URLSearchParams({ ...input.params, client_id: input.clientId })
-  if (input.clientSecret !== undefined) form.set('client_secret', input.clientSecret)
-  const body = await fetchJson(fetcher, new URL(input.tokenEndpoint), {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: form.toString(),
-  })
-  return tokenSchema.parse(body)
-}
+const clientAuth = (clientSecret: string | undefined): oauth.ClientAuth => (clientSecret === undefined ? oauth.None() : oauth.ClientSecretPost(clientSecret))
 
 const grantFromToken = (
-  token: z.infer<typeof tokenSchema>,
-  client: Pick<OAuthGrant, 'clientId' | 'clientSecret' | 'tokenEndpoint' | 'resource'>,
+  token: oauth.TokenEndpointResponse,
+  client: Pick<OAuthGrant, 'clientId' | 'clientSecret' | 'issuer' | 'tokenEndpoint' | 'resource'>,
   now: number,
   previousRefreshToken?: string,
 ): OAuthGrant => {
@@ -188,6 +191,7 @@ const grantFromToken = (
   return {
     clientId: client.clientId,
     ...(client.clientSecret === undefined ? {} : { clientSecret: client.clientSecret }),
+    ...(client.issuer === undefined ? {} : { issuer: client.issuer }),
     tokenEndpoint: client.tokenEndpoint,
     resource: client.resource,
     accessToken: token.access_token,
@@ -197,17 +201,19 @@ const grantFromToken = (
   }
 }
 
-export const exchangeCode = async (pending: PendingAuthorization, code: string, fetcher: Fetch = fetch, now = Date.now()): Promise<OAuthGrant> => {
-  const token = await requestToken(
-    {
-      tokenEndpoint: pending.tokenEndpoint,
-      clientId: pending.clientId,
-      clientSecret: pending.clientSecret,
-      params: { grant_type: 'authorization_code', code, redirect_uri: pending.redirectUri, code_verifier: pending.verifier, resource: pending.resource },
-    },
-    fetcher,
-  )
-  return grantFromToken(token, pending, now)
+/** Validates the callback (state, RFC 9207 `iss`) and exchanges its code with the PKCE verifier. */
+export const exchangeCode = async (pending: PendingAuthorization, callbackParameters: URLSearchParams, fetcher: Fetch = fetch, now = Date.now()): Promise<OAuthGrant> => {
+  const as = pending.authorizationServer
+  const tokenEndpoint = as.token_endpoint
+  if (tokenEndpoint === undefined) throw new Error('The authorization server has no token endpoint.')
+  const client: oauth.Client = { client_id: pending.clientId }
+  const parameters = oauth.validateAuthResponse(as, client, callbackParameters, pending.state)
+  const response = await oauth.authorizationCodeGrantRequest(as, client, clientAuth(pending.clientSecret), parameters, pending.redirectUri, pending.verifier, {
+    ...requestOptions(fetcher, tokenEndpoint),
+    additionalParameters: { resource: pending.resource },
+  })
+  const token = await oauth.processAuthorizationCodeResponse(as, client, response)
+  return grantFromToken(token, { clientId: pending.clientId, clientSecret: pending.clientSecret, issuer: as.issuer, tokenEndpoint, resource: pending.resource }, now)
 }
 
 export const needsRefresh = (grant: OAuthGrant, now = Date.now()): boolean => grant.expiresAt !== undefined && grant.expiresAt - now < REFRESH_MARGIN_MS
@@ -215,17 +221,14 @@ export const needsRefresh = (grant: OAuthGrant, now = Date.now()): boolean => gr
 /** Refreshes an expiring grant; `undefined` means the user must sign in again. */
 export const refreshGrant = async (grant: OAuthGrant, fetcher: Fetch = fetch, now = Date.now()): Promise<OAuthGrant | undefined> => {
   if (grant.refreshToken === undefined) return undefined
+  const as: oauth.AuthorizationServer = { issuer: grant.issuer ?? new URL(grant.tokenEndpoint).origin, token_endpoint: grant.tokenEndpoint }
+  const client: oauth.Client = { client_id: grant.clientId }
   try {
-    const token = await requestToken(
-      {
-        tokenEndpoint: grant.tokenEndpoint,
-        clientId: grant.clientId,
-        clientSecret: grant.clientSecret,
-        params: { grant_type: 'refresh_token', refresh_token: grant.refreshToken, resource: grant.resource },
-      },
-      fetcher,
-    )
-    return grantFromToken(token, grant, now, grant.refreshToken)
+    const response = await oauth.refreshTokenGrantRequest(as, client, clientAuth(grant.clientSecret), grant.refreshToken, {
+      ...requestOptions(fetcher, grant.tokenEndpoint),
+      additionalParameters: { resource: grant.resource },
+    })
+    return grantFromToken(await oauth.processRefreshTokenResponse(as, client, response), grant, now, grant.refreshToken)
   } catch {
     return undefined
   }

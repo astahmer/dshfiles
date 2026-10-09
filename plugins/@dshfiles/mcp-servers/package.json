@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "oauth4webapi": "3.8.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {

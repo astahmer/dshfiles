@@ -478,7 +478,7 @@ const handleOAuthCallback = async (ctx: Context, request: IncomingMessage, respo
   if (code === null || code.length === 0 || code.length > 4096) return callbackPage(response, 400, 'The provider returned no authorization code.')
   try {
     const server = oauthServer(ctx, pending.serverId)
-    const grant = await exchangeCode(pending, code)
+    const grant = await exchangeCode(pending, url.searchParams)
     await ctx.credentials.modifyRecord(grantKey(server), async () => ({ kind: 'grant', payload: grant }))
     await reconnect(ctx, server.id)
     callbackPage(response, 200, 'Signed in. The MCP server is reconnecting.')
@@ -524,19 +524,20 @@ const hostApi = mcpServersApi.host({
     const server = oauthServer(ctx, input.id)
     const redirectUri = callbackRedirectUri(input.origin, OAUTH_CALLBACK_PATH)
     const endpoints = await discoverOAuth(server.url)
-    if (endpoints.registrationEndpoint === undefined) {
+    if (endpoints.authorizationServer.registration_endpoint === undefined) {
       throw new Error('This provider requires a pre-registered OAuth client. Store its token as a credential reference header instead.')
     }
-    const client = await registerClient({ registrationEndpoint: endpoints.registrationEndpoint, redirectUri, clientName: settingsFor().oauthClientName })
-    const pkce = createPkcePair()
+    const client = await registerClient({ authorizationServer: endpoints.authorizationServer, redirectUri, clientName: settingsFor().oauthClientName })
+    const pkce = await createPkcePair()
     const state = createState()
     pendingAuthorizations.set(state, {
       serverId: server.id,
+      state,
       verifier: pkce.verifier,
       redirectUri,
       clientId: client.clientId,
       clientSecret: client.clientSecret,
-      tokenEndpoint: endpoints.tokenEndpoint,
+      authorizationServer: endpoints.authorizationServer,
       resource: endpoints.resource,
       createdAt: Date.now(),
     })

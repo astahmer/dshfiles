@@ -1158,6 +1158,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: link:../plugin-ui
         version: link:../plugin-ui
+      oauth4webapi:
+        specifier: 3.8.8
+        version: 3.8.8
       zod:
         specifier: ^4.4.3
         version: 4.6.5
@@ -7799,6 +7802,9 @@ packages:
 
   nwsapi@2.2.28:
     resolution: {integrity: sha512-IlVB7OS7qrOsVYlpnFIkETjMwT9jwvmocJmmM+GZU/PAB3uGi9Ezd7vcWhWBUnSc0ya4ppmQITOyP1ez9gg8cg==}
+
+  oauth4webapi@3.8.8:
+    resolution: {integrity: sha512-8N28E+a/oxfXWBgOMt+ZP/JUf/XR+IFbvkAEPP3gznXOMv9BpAAwiIj0TFNz3tGTPc0ZQ8zmWBNgN1nAys0gng==}
 
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
@@ -16234,6 +16240,8 @@ snapshots:
       unicorn-magic: 0.3.0
 
   nwsapi@2.2.28: {}
+
+  oauth4webapi@3.8.8: {}
 
   obug@2.2.1: {}
 
