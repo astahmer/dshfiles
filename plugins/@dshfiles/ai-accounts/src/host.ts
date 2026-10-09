@@ -7,7 +7,9 @@ import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } fr
 import { createUsageCache } from './account-usage.js'
 import { resolveClaudeInferenceToken } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { aiAccountsSettings } from './settings.js'
+import { aiAccountsHostSettings, readPricingSettings } from './settings.js'
+import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
+import { installCostProjection } from './cost-projection.js'
 export { accountsSnapshot } from './accounts-host-api.js'
 import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
@@ -60,12 +62,16 @@ export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './prov
  * `provider/Drivers/CodexHomeLayout.ts`.
  */
 
+const HOUR_MS = 3_600_000
+/** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
+const PRICING_CHECK_MS = 30 * 60_000
+
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController'],
   apis: [accountsHostApi],
   tools: [aiAccountsTool],
-  settings: [aiAccountsSettings],
+  settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
     const runtime = activateAccountRuntime(ctx)
@@ -80,6 +86,21 @@ export default definePlugin({
       void closeUsageDomain(ctx).catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
     })
     runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => readAccountsUsage(ctx) })
+    const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
+    runtime.pricing = pricing
+    const refreshStalePricing = (): void => {
+      const settings = readPricingSettings()
+      if (settings.costEstimates) void pricing.ensureFresh(settings.pricingRefreshHours * HOUR_MS)
+    }
+    ctx.effect(() => {
+      void pricing.load().then(refreshStalePricing)
+      const timer = setInterval(refreshStalePricing, PRICING_CHECK_MS)
+      return () => {
+        clearInterval(timer)
+        if (runtime.pricing === pricing) delete runtime.pricing
+      }
+    })
+    installCostProjection(ctx)
     const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => readQuotaResetAt(ctx, accountId) })
     runtime.quotaContinuations = quotaContinuations
     ctx.effect(() => {

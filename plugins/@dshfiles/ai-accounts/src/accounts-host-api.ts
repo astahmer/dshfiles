@@ -8,6 +8,8 @@ import { readAccountUsage } from './account-usage.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
+import { resolveRouteQuote } from './pricing-catalog.js'
+import { readPricingSettings } from './settings.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -18,6 +20,12 @@ export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
   buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [])
 
 export const accountsSnapshot = accountsFile
+
+const pricingFor = (ctx: Context) => {
+  const pricing = accountRuntime(ctx)?.pricing
+  if (pricing === undefined) throw new Error('The pricing catalog is unavailable')
+  return pricing
+}
 
 const quotaContinuationServiceFor = (ctx: Context) => {
   const service = accountRuntime(ctx)?.quotaContinuations
@@ -89,6 +97,20 @@ export const accountsHostApi = aiAccountsApi.host({
   historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
   saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
+  pricingStatus: async ({ ctx }) => pricingFor(ctx).status(),
+  refreshPricing: async ({ ctx }) => pricingFor(ctx).refresh(),
+  quoteRoutes: async ({ input, ctx }) => {
+    const pricing = pricingFor(ctx)
+    const settings = readPricingSettings()
+    if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
+    const file = await readAccountFile()
+    const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
+    const cache = pricing.current()
+    return {
+      fetchedAt: cache?.fetchedAt ?? null,
+      quotes: input.routes.map(route => resolveRouteQuote({ route, cache, accountKind: kinds.get(route.provider), overrides: settings.pricingOverrides })),
+    }
+  },
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
   resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),

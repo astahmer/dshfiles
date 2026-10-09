@@ -1,5 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
+import { z } from 'zod'
 
 /**
  * Preferences for the accounts page and its quota surfaces. Account profiles
@@ -21,6 +22,14 @@ export const aiAccountsSettings = defineSettings({
     edgeWidget: Schema.boolean().default(true),
     /** Show the accounts block on Settings › Models. */
     modelsPageAccounts: Schema.boolean().default(true),
+    /** Estimated session cost beside the composer stats, priced from models.dev. */
+    costEstimates: Schema.boolean().default(true),
+    /** How often the Host refetches models.dev prices. */
+    pricingRefreshHours: Schema.natural().min(1).max(720).default(24),
+    /** `provider/model` or `provider/*` → a models.dev id, `free`, or `input=… output=… cacheRead=… cacheWrite=…` (USD per 1M tokens). */
+    pricingOverrides: Schema.dict(Schema.string()).default({}),
+    /** Display currency; models.dev publishes USD only. */
+    currency: Schema.union(['USD']).default('USD'),
   }),
   applies: 'live',
 })
@@ -34,6 +43,8 @@ export const DEFAULT_CLIENT_SETTINGS = {
   footerButton: true,
   edgeWidget: true,
   modelsPageAccounts: true,
+  costEstimates: true,
+  pricingRefreshHours: 24,
 } as const satisfies {
   readonly saveMode: SaveMode
   readonly autoSaveDelayMs: number
@@ -41,4 +52,38 @@ export const DEFAULT_CLIENT_SETTINGS = {
   readonly footerButton: boolean
   readonly edgeWidget: boolean
   readonly modelsPageAccounts: boolean
+  readonly costEstimates: boolean
+  readonly pricingRefreshHours: number
+}
+
+const pricingSettingsSchema = z.object({
+  costEstimates: z.boolean().catch(true),
+  pricingRefreshHours: z.number().min(1).catch(24),
+  pricingOverrides: z.record(z.string(), z.string()).catch({}),
+})
+
+export type PricingSettings = z.infer<typeof pricingSettingsSchema>
+
+let readHostSettings: (() => unknown) | undefined
+
+/** The Host half of the namespace: it only remembers its scope so the pricing service reads live values. */
+export const aiAccountsHostSettings = aiAccountsSettings.host({
+  setup: scope => {
+    const read = (): unknown => scope.get()
+    readHostSettings = read
+    return () => {
+      if (readHostSettings === read) readHostSettings = undefined
+    }
+  },
+})
+
+/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
+export const readPricingSettings = (): PricingSettings => {
+  let value: unknown
+  try {
+    value = readHostSettings?.()
+  } catch {
+    value = undefined
+  }
+  return pricingSettingsSchema.parse(typeof value === 'object' && value !== null ? value : {})
 }

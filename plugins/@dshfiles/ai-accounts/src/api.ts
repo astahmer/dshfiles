@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { routeQuoteSchema } from './cost-estimate.js'
 import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
@@ -216,6 +217,18 @@ export const nativeProvidersSchema = z.object({
 
 export type NativeProviders = z.infer<typeof nativeProvidersSchema>
 
+export const pricingStatusSchema = z.object({
+  fetchedAt: z.number().nullable(),
+  source: z.string().max(512),
+  modelCount: z.number().int().min(0),
+  refreshing: z.boolean(),
+  lastError: z.string().max(500).nullable(),
+})
+
+export type PricingStatus = z.infer<typeof pricingStatusSchema>
+
+const pricedRouteSchema = z.object({ provider: z.string().max(128), model: z.string().max(200) })
+
 export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
@@ -346,6 +359,15 @@ export const aiAccountsApi = defineApi({
     resumeQuotaContinuation: method({
       input: z.object({ continuationId: z.string().uuid() }),
       output: z.object({ accepted: z.boolean() }),
+    }),
+    /** The cached models.dev price catalog: when it was fetched and how many models it prices. */
+    pricingStatus: method({ input: z.void(), output: pricingStatusSchema }),
+    /** Refetch models.dev now; a failure keeps the last catalog and reports why. */
+    refreshPricing: method({ input: z.void(), output: pricingStatusSchema }),
+    /** Price the routes a session used, after overrides and models.dev id mapping. */
+    quoteRoutes: method({
+      input: z.object({ routes: z.array(pricedRouteSchema).max(64) }),
+      output: z.object({ fetchedAt: z.number().nullable(), quotes: z.array(routeQuoteSchema).max(64) }),
     }),
     /** Snooze only the continuation's recovery timing; it does not change quota reset evidence. */
     snoozeQuotaContinuation: method({

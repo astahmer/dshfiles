@@ -4,6 +4,7 @@ import type { createAccountPool } from './account-pool.js'
 import type { UsageHistoryScheduler } from './usage-recorder.js'
 import type { QuotaContinuationService } from './quota-continuation.js'
 import type { AccountsUsage } from './api.js'
+import type { PricingCatalog } from './pricing-catalog.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
@@ -14,6 +15,7 @@ interface AccountRuntime {
   rejectedRoutes?: readonly string[]
   refreshModelCatalog?: (instanceId: string) => Promise<void>
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; invalidate(): void }
+  pricing?: PricingCatalog
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()
