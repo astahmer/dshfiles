@@ -1,25 +1,26 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
-import { decodePreferences, parseStoredPreferences, preferencesToMigrate } from './preferences.js'
+import { decodePreferences, preferencesToMigrate } from './preferences.js'
 
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
   assert.ok(stored)
-  assert.equal(parseStoredPreferences(stored).headerRegionHeight, null)
+  assert.equal(decodePreferences(JSON.parse(stored))?.headerRegionHeight, null)
 })
 
-test('valid saved split heights persist and invalid heights fall back to defaults', () => {
+test('valid saved split heights persist and invalid heights are rejected', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 384 })
   const invalidStored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 24 })
 
-  assert.equal(parseStoredPreferences(stored).headerRegionHeight, 384)
-  assert.equal(parseStoredPreferences(invalidStored).headerRegionHeight, DEFAULT_PREFERENCES.headerRegionHeight)
+  assert.equal(decodePreferences(JSON.parse(stored))?.headerRegionHeight, 384)
+  assert.equal(decodePreferences(JSON.parse(invalidStored)), null)
 })
 
 test('preferences saved before navigation and palette settings existed gain their defaults', () => {
   const { navigationDensity, navigationOverflow, paletteChord, threadSearchChord, paletteRecentLimit, ...older } = DEFAULT_PREFERENCES
-  const parsed = parseStoredPreferences(JSON.stringify({ ...older, headerMode: 'expanded' }))
+  const parsed = decodePreferences({ ...older, headerMode: 'expanded' })
+  assert.ok(parsed)
   assert.equal(parsed.headerMode, 'expanded')
   assert.deepEqual(
     [parsed.navigationDensity, parsed.navigationOverflow, parsed.paletteChord, parsed.threadSearchChord, parsed.paletteRecentLimit],
@@ -28,7 +29,7 @@ test('preferences saved before navigation and palette settings existed gain thei
 })
 
 test('a disabled chord persists as null', () => {
-  assert.equal(parseStoredPreferences(JSON.stringify({ ...DEFAULT_PREFERENCES, paletteChord: null })).paletteChord, null)
+  assert.equal(decodePreferences(JSON.parse(JSON.stringify({ ...DEFAULT_PREFERENCES, paletteChord: null })))?.paletteChord, null)
 })
 
 test('migration copies browser values only into Host keys still at their default', () => {

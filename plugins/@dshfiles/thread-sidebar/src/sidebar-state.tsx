@@ -1,19 +1,9 @@
 import { useSettings } from '@dshfiles/dshx/client'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { type SidebarPreferences } from './organization.js'
+import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
 import type { PaletteMode } from './palette.js'
-import {
-  clearStoredPreferences,
-  decodePreferences,
-  isPreferenceKey,
-  loadPreferences,
-  parseStoredPreferences,
-  preferencesToMigrate,
-  PREFERENCES_STORAGE_KEY,
-  readStoredPreferences,
-  savePreferences,
-} from './preferences.js'
+import { decodePreferences, isPreferenceKey, preferencesToMigrate, storedPreferences } from './preferences.js'
 import { threadSidebarSettings } from './settings.js'
 
 export interface PaletteDestination {
@@ -26,37 +16,6 @@ export interface PaletteDestination {
 interface PreferencesSnapshot {
   readonly preferences: SidebarPreferences
   readonly storageWarning: boolean
-}
-
-const listeners = new Set<() => void>()
-let snapshot: PreferencesSnapshot | null = null
-
-const readSnapshot = (): PreferencesSnapshot => {
-  snapshot ??= { preferences: loadPreferences(), storageWarning: false }
-  return snapshot
-}
-
-const publish = (next: PreferencesSnapshot): void => {
-  snapshot = next
-  listeners.forEach(listener => listener())
-}
-
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener)
-  const syncFromStorage = (event: StorageEvent): void => {
-    if (event.key !== PREFERENCES_STORAGE_KEY) return
-    publish({ preferences: parseStoredPreferences(event.newValue), storageWarning: false })
-  }
-  if (listeners.size === 1) window.addEventListener('storage', syncFromStorage)
-  return () => {
-    listeners.delete(listener)
-    if (listeners.size === 0) window.removeEventListener('storage', syncFromStorage)
-  }
-}
-
-const updateStoredPreferences = (patch: Partial<SidebarPreferences>): void => {
-  const preferences = { ...readSnapshot().preferences, ...patch }
-  publish({ preferences, storageWarning: !savePreferences(preferences) })
 }
 
 /**
@@ -86,7 +45,8 @@ export const usePreferences = (): PreferencesSnapshot & {
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
 } => {
   const settings = useOptionalSettings()
-  const local = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
+  const localPreferences = storedPreferences.useValue() ?? DEFAULT_PREFERENCES
+  const [localWriteFailed, setLocalWriteFailed] = useState(false)
   const [pending, setPending] = useState<Partial<SidebarPreferences>>({})
   const [writeFailed, setWriteFailed] = useState(false)
   const hostPreferences = useMemo(() => (settings?.value === undefined ? null : decodePreferences(settings.value)), [settings?.value])
@@ -97,7 +57,7 @@ export const usePreferences = (): PreferencesSnapshot & {
   const updatePreferences = useCallback(
     (patch: Partial<SidebarPreferences>) => {
       if (!hostBacked) {
-        updateStoredPreferences(patch)
+        setLocalWriteFailed(!storedPreferences.set({ ...(storedPreferences.get() ?? DEFAULT_PREFERENCES), ...patch }))
         return
       }
       setPending(current => ({ ...current, ...patch }))
@@ -123,18 +83,18 @@ export const usePreferences = (): PreferencesSnapshot & {
 
   useEffect(() => {
     if (!hostBacked || hostPreferences === null) return
-    const stored = readStoredPreferences()
+    const stored = storedPreferences.get()
     if (stored === null) return
-    clearStoredPreferences()
+    storedPreferences.remove()
     const patch = preferencesToMigrate(stored, hostPreferences)
     if (Object.keys(patch).length > 0) updatePreferences(patch)
   }, [hostBacked, hostPreferences, updatePreferences])
 
   const preferences = useMemo(
-    () => (hostBacked ? { ...hostPreferences, ...pending } : local.preferences),
-    [hostBacked, hostPreferences, pending, local.preferences],
+    () => (hostBacked ? { ...hostPreferences, ...pending } : localPreferences),
+    [hostBacked, hostPreferences, pending, localPreferences],
   )
-  return { preferences, storageWarning: hostBacked ? writeFailed : local.storageWarning, hostBacked, updatePreferences }
+  return { preferences, storageWarning: hostBacked ? writeFailed : localWriteFailed, hostBacked, updatePreferences }
 }
 
 interface SidebarState {

@@ -18,7 +18,7 @@ import {
   type SidebarSection,
   workspaceForLineage,
 } from './organization.js'
-import { loadPreferences, parseStoredPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences.js'
+import { decodePreferences, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
   id: string
@@ -150,21 +150,19 @@ test('child threads inherit the nearest known workspace through the parent chain
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {
   const raw = '{"session":"private-session-id","newerVersion":true}'
-  assert.deepEqual(parseStoredPreferences(raw), DEFAULT_PREFERENCES)
-  assert.deepEqual(parseStoredPreferences(null), DEFAULT_PREFERENCES)
+  assert.equal(decodePreferences(JSON.parse(raw)), null)
 })
 
 test('navigation preferences preserve independent order, visibility, and header mode', () => {
-  const stored = parseStoredPreferences(
-    JSON.stringify({
-      ...DEFAULT_PREFERENCES,
-      headerMode: 'expanded',
-      headerOrder: ['panel:files', 'search'],
-      hiddenHeaderIds: ['new-thread'],
-      footerOrder: ['footer:tasks', 'settings'],
-      hiddenFooterIds: ['footer:tasks'],
-    }),
-  )
+  const stored = decodePreferences({
+    ...DEFAULT_PREFERENCES,
+    headerMode: 'expanded',
+    headerOrder: ['panel:files', 'search'],
+    hiddenHeaderIds: ['new-thread'],
+    footerOrder: ['footer:tasks', 'settings'],
+    hiddenFooterIds: ['footer:tasks'],
+  })
+  assert.ok(stored)
   assert.equal(stored.headerMode, 'expanded')
   assert.deepEqual(stored.headerOrder, ['panel:files', 'search'])
   assert.deepEqual(stored.hiddenHeaderIds, ['new-thread'])
@@ -174,7 +172,7 @@ test('navigation preferences preserve independent order, visibility, and header 
 
 test('parked ids, settlement settings, and navigation choices round-trip through browser storage', () => {
   const localStorage = new MemoryStorage()
-  vi.stubGlobal('window', { localStorage })
+  vi.stubGlobal('localStorage', localStorage)
 
   try {
     const saved: SidebarPreferences = {
@@ -187,9 +185,10 @@ test('parked ids, settlement settings, and navigation choices round-trip through
       footerOrder: ['footer:tasks', 'settings'],
       hiddenFooterIds: ['footer:tasks'],
     }
-    assert.equal(savePreferences(saved), true)
+    assert.equal(storedPreferences.set(saved), true)
     assert.notEqual(localStorage.getItem(PREFERENCES_STORAGE_KEY), null)
-    assert.deepEqual(loadPreferences(), saved)
+    storedPreferences.reload()
+    assert.deepEqual(storedPreferences.get(), saved)
   } finally {
     vi.unstubAllGlobals()
   }

@@ -1,3 +1,4 @@
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import { DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
 
@@ -50,55 +51,8 @@ export const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPre
 
 export const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
 
-export const readStoredPreferences = (): SidebarPreferences | null => {
-  try {
-    const stored = window.localStorage.getItem(PREFERENCES_STORAGE_KEY)
-    return stored === null ? null : parseStoredPreferences(stored)
-  } catch {
-    return null
-  }
-}
-
-export const clearStoredPreferences = (): void => {
-  try {
-    window.localStorage.removeItem(PREFERENCES_STORAGE_KEY)
-  } catch {
-    return
-  }
-}
-
-export const parseStoredPreferences = (stored: string | null): SidebarPreferences => {
-  if (stored === null) return DEFAULT_PREFERENCES
-
-  try {
-    const parsed: unknown = JSON.parse(stored)
-    const checked = preferencesSchema.safeParse(parsed)
-    if (!checked.success) return DEFAULT_PREFERENCES
-    return checked.data
-  } catch {
-    return DEFAULT_PREFERENCES
-  }
-}
-
-export const loadPreferences = (): SidebarPreferences => {
-  try {
-    return parseStoredPreferences(window.localStorage.getItem(PREFERENCES_STORAGE_KEY))
-  } catch {
-    return DEFAULT_PREFERENCES
-  }
-}
-
-export const savePreferences = (preferences: SidebarPreferences): boolean => {
-  const checked = preferencesSchema.safeParse(preferences)
-  if (!checked.success) return false
-
-  try {
-    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(checked.data))
-    return true
-  } catch {
-    return false
-  }
-}
+/** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
+export const storedPreferences = createStoredValue({ key: PREFERENCES_STORAGE_KEY, schema: preferencesSchema, fallback: null })
 
 export const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
   collapsedSections.includes(section) ? collapsedSections.filter(item => item !== section) : [...collapsedSections, section]
