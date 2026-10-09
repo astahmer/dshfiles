@@ -1,0 +1,40 @@
+{
+  "conversations": [
+    {
+      "name": "A \u2014 long build-up (24 turns)",
+      "prompts": [
+        "We are designing a tiny key-value store called 'kvlite'. Remember: the project codename is 'amber-heron-17'. Reply in one sentence.",
+        "Decision 1: kvlite stores data in a single append-only file named data.kvl. Acknowledge briefly.",
+        "Decision 2: every record is length-prefixed with a 4-byte little-endian u32. Acknowledge briefly.",
+        "Write a TypeScript function encodeRecord(key: string, value: string): Uint8Array following decisions 1-2. Code only.",
+        "Decision 3: compaction runs when the file exceeds 64 MiB and keeps only the latest value per key. Acknowledge briefly.",
+        "Write decodeRecords(bytes: Uint8Array): Array<[string, string]> matching encodeRecord. Code only.",
+        "Obscure fact to remember: the on-call engineer for kvlite is named Petronella Okonkwo-Szabo. Acknowledge briefly.",
+        "Decision 4: keys are case-sensitive UTF-8, max 256 bytes. Acknowledge briefly.",
+        "Explain in 5 bullet points the trade-offs of an append-only log vs an in-place B-tree for kvlite.",
+        "Decision 5: tombstones are records with an empty value. Update decodeRecords accordingly. Code only.",
+        "Paste of a long design note (keep it in mind, reply 'noted'): Design note: Section 1: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 2: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 3: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 4: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 5: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 6: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 7: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed. Section 8: kvlite must handle concurrent readers via immutable segment snapshots; writers serialize through a single queue; crash recovery truncates a torn tail record detected by a CRC32 trailer; segment files rotate at 16 MiB; metrics expose write latency p50/p95/p99, compaction duration and bytes reclaimed.",
+        "Decision 6: the index is an in-memory Map<string, number> of key \u2192 byte offset rebuilt on startup. Acknowledge briefly.",
+        "Write the startup routine rebuildIndex(path) using decodeRecords offsets. Code only.",
+        "What happens to the index during compaction? 3 sentences.",
+        "Decision 7: writes are fsync'ed every 100 ms in a background timer (group commit). Acknowledge briefly.",
+        "List the 7 decisions so far in one line each.",
+        "Write a vitest test for encodeRecord/decodeRecords round trip including a tombstone. Code only.",
+        "Decision 8: maximum value size is 1 MiB; larger values are rejected with error code KV_TOO_LARGE. Acknowledge briefly.",
+        "Summarize the error codes we defined so far.",
+        "Refactor encodeRecord to throw KV_TOO_LARGE per decision 8. Code only.",
+        "Without calling tools: what is the project codename and who is on call?",
+        "Without calling tools: what is the exact name of the data file and the compaction threshold?",
+        "Use memory_search to find where we defined tombstones, then answer in one sentence citing it.",
+        "Final: produce a 10-line README for kvlite consistent with all decisions."
+      ]
+    },
+    {
+      "name": "B \u2014 new conversation, same project (recall)",
+      "prompts": [
+        "New session. Using persistent memory only (view or memory_search): what is kvlite's codename, its data file name, and the error code for oversized values? One line each.",
+        "Who is the on-call engineer for kvlite? One short answer."
+      ]
+    }
+  ]
+}
