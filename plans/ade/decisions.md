@@ -19,3 +19,7 @@ Answers to the open questions in [README.md](README.md). These override the plan
    stays minimal and isolated (one package, documented in `tooling/dsh-core/FORK.md`) so upgrading to new DSH
    releases remains a rebase of a small patch set.
 4. **No upstream proposals** to the DSH maintainers; capability gaps are solved locally.
+5. **Editor upgrade path:** keep the editor behind a small `openFile`/editor interface in `@dshfiles/editor`, so it can
+   move to `@codingame/monaco-vscode-api` + `monaco-languageclient` (VS Code themes/keybindings/extensions, LSP) when
+   language-server features land, or down to CodeMirror 6 if weight ever matters more than DX. No lighter editor
+   matches Monaco's VS Code DX today.
