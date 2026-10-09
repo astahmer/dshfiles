@@ -258,19 +258,34 @@ Line change markers from `jj diff` for the open file; click → hunk in `/diff`.
 
 ## Phase 3 — Command palette as the hub
 
-### P3.1 Action registry (M) — deps: P0.3
+Status (2026-10-10): P3.1–P3.3 landed without a new cross-plugin registry.
+
+- ⌘K lists the Host shortcut catalog (any plugin's `ctx.shortcuts.register`, e.g. `jujutsu.toggleSessionRepository`,
+  `workbench.toggleSidePanel`) with keybinding hints. The public `Shortcuts` service lists but cannot run a command
+  outside a key press, so the palette calls the registry's `invoke` (the Desktop menu path) read defensively; a Host
+  without it just leaves Host commands out. A public `shortcuts.invoke` is the Host gap behind that.
+- ⌘P (`fileSearchChord`, thread search moved off ⌘P to ⌥⌘K/⌘K) lists files of the thread on screen through
+  `@dshfiles/editor` (`dshfiles:workspace-files`: breadth-first walk, skips .git/.jj/node_modules, 20k files / 4k dirs,
+  30 s cache) and opens them with `dshfiles:open-file`. Not ignore-aware yet (needs Host `rg --files`).
+- Prefixes: `>` commands, `#` thread content (Host `session.search`, off when the index is disabled), `:` line in
+  the open editor file (`dshfiles:editor-go-to-line`), `?` help. `@` symbols skipped: no Monaco symbol provider.
+- Frecency (`createStoredValue`, 200 entries) ranks actions, commands and files; threads keep `rankThreads`.
+- Rows cap at 50 instead of virtualizing. Perf (palette-perf.test.ts, idle machine): 20k paths rank in 3–6 ms per
+  keystroke, 500 actions < 1 ms, open prep < 50 ms; probe open → commit 14–41 ms.
+
+### [x] P3.1 Action registry (M) — deps: P0.3
 
 plugin-ui service `commands.register({ id, title, category, keywords, shortcut?, when?, run })` returning a
 disposer; cross-plugin transport via a typed `window` CustomEvent or a dshx-shared service if available. Palette
 (thread-sidebar) renders categories: Threads, Files (⌘P fuzzy open), jj actions, Plugin pages, Settings
 (settings-search), MCP, Explorer. Absorb `sidebar-commands/go-to.ts`.
 
-### P3.2 Fuzzy file open ⌘P (M) — deps: P3.1, P2.5
+### [x] P3.2 Fuzzy file open ⌘P (M) — deps: P3.1, P2.5
 
 File index per session: walk `workspaceFiles.list` (respect .gitignore — needs Host or host-part `rg --files`),
 incremental via `changes`; fuzzy rank in a time-sliced loop (no worker); ≤ 50 ms for 50k paths.
 
-### P3.3 Frecency + keyboard-first (S) — deps: P3.1
+### [x] P3.3 Frecency + keyboard-first (S) — deps: P3.1
 
 Recent/frecent items per category stored with `createStoredValue` (P1.6); every action reachable without the
 mouse; virtualized result list (from P0.3).
