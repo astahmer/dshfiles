@@ -81,38 +81,43 @@ describe('full mode requests', () => {
     first.commit(first.fixture.turnStart(1))
     first.commit(first.fixture.injected('Project instructions: use pnpm.', 'agent-instructions'))
     first.commit(first.fixture.user('The staging database port is 6543.'))
+    first.commit(first.fixture.injected('Runtime context v1.', 'runtime-context'))
     const turn1 = (await first.request(1, 1)) ?? []
-    expect(turn1.map(message => message.role)).toEqual(['system', 'user', 'user', 'user'])
-    expect(textOf(turn1[1])).toBe('Project instructions: use pnpm.')
-    expect(textOf(turn1[2])).toContain('Persistent memory (OptMem), full mode')
-    expect(textOf(turn1[2])).toContain('(no memory yet)')
-    expect(textOf(turn1[3])).toBe('The staging database port is 6543.')
+    expect(turn1.map(textOf).map(text => text.slice(0, 40))).toEqual([
+      'You are a test agent.',
+      'Project instructions: use pnpm.',
+      'Runtime context v1.',
+      expect.stringContaining('Persistent memory (OptMem), full mode'),
+      'The staging database port is 6543.',
+    ])
+    expect(textOf(turn1[3])).toContain('(no memory yet)')
 
     first.commit(first.fixture.assistant([{ type: 'text', text: 'Reading the config.' }]))
     first.commit(first.fixture.toolCall('call-1', 'read', { path: '/work/project-a/config.yml' }))
     first.commit(first.fixture.toolResult('call-1', 'port: 6543'))
     const step2 = (await first.request(1, 2)) ?? []
-    expect(step2.slice(0, 3)).toEqual(turn1.slice(0, 3))
-    expect(step2[2]).toBe(turn1[2])
-    expect(step2.slice(3).map(message => message.role)).toEqual(['user', 'assistant', 'tool'])
+    expect(step2.slice(0, 4)).toEqual(turn1.slice(0, 4))
+    expect(step2[3]).toBe(turn1[3])
+    expect(step2.slice(4).map(message => message.role)).toEqual(['user', 'assistant', 'tool'])
     first.commit(first.fixture.assistant([{ type: 'text', text: 'Staging uses 6543.' }]))
 
     first.commit(first.fixture.turnStart(2))
     first.commit(first.fixture.user('Which port did I mention?'))
     const turn2 = (await first.request(2, 1)) ?? []
-    expect(turn2.map(message => message.role)).toEqual(['system', 'user', 'user', 'user'])
-    expect(turn2.slice(0, 2)).toEqual(turn1.slice(0, 2))
-    expect(textOf(turn2[2])).toContain('user: The staging database port is 6543.')
-    expect(textOf(turn2[2])).toContain('port: 6543')
-    expect(textOf(turn2[2])).not.toContain('Which port did I mention?')
+    expect(turn2.map(message => message.role)).toEqual(['system', 'user', 'user', 'user', 'user'])
+    expect(turn2.slice(0, 3)).toEqual(turn1.slice(0, 3))
+    expect(textOf(turn2[3])).toContain('user: The staging database port is 6543.')
+    expect(textOf(turn2[3])).toContain('port: 6543')
+    expect(textOf(turn2[3])).not.toContain('Which port did I mention?')
     expect(turn2.some(message => textOf(message) === 'The staging database port is 6543.')).toBe(false)
-    expect(textOf(turn2[3])).toBe('Which port did I mention?')
-    expect(first.messages).toHaveLength(7)
+    expect(textOf(turn2[4])).toBe('Which port did I mention?')
+    expect(first.messages).toHaveLength(8)
 
     first.commit(first.fixture.turnStart(3))
     first.commit(first.fixture.injected('Scheduled wake-up.', 'runtime-context'))
     const turn3 = (await first.request(3, 1)) ?? []
-    expect(textOf(turn3[3])).toBe('Scheduled wake-up.')
+    expect(turn3.map(textOf).at(-1)).toBe('Scheduled wake-up.')
+    expect(turn3.map(textOf)).toContain('Runtime context v1.')
 
     const second = createConversation(runtime, 'session-second')
     second.commit(second.fixture.turnStart(1))
@@ -122,6 +127,7 @@ describe('full mode requests', () => {
     expect(textOf(recalled[1])).toContain('Which port did I mention?')
     const status = await createMemoryToolHandlers(() => runtime).status(undefined)
     expect(status.summary).toContain('last full-mode request: turn 1 step 1, 2 → 3 messages (1 carried)')
+    expect(runtime.status().lastFullRequest?.conversationId).toBe('session-second')
     expect(runtime.promptText({ id: 'session-second', session: { header: second.fixture.session.header } })).toBe('')
     await runtime.stop()
   })
@@ -131,10 +137,10 @@ describe('full mode requests', () => {
     await runtime.start()
     const conversation = createConversation(runtime, 'session-stable')
     conversation.commit(conversation.fixture.turnStart(1))
-    conversation.commit(conversation.fixture.injected('Wake-up one.', 'runtime-context'))
+    conversation.commit(conversation.fixture.user('Checkpoint one.', 'compact-checkpoint'))
     const turn1 = (await conversation.request(1, 1)) ?? []
     conversation.commit(conversation.fixture.turnStart(2))
-    conversation.commit(conversation.fixture.injected('Wake-up two.', 'runtime-context'))
+    conversation.commit(conversation.fixture.user('Checkpoint two.', 'compact-checkpoint'))
     const turn2 = (await conversation.request(2, 1)) ?? []
     expect(turn2[1]).toBe(turn1[1])
     expect(JSON.stringify(turn2.slice(0, 2))).toBe(JSON.stringify(turn1.slice(0, 2)))

@@ -61,11 +61,11 @@ export type FullModeRequest = {
   readonly reusedView: boolean
 }
 
-/**
- * User-role sources that belong to one turn: conversation content (memory holds it) and per-turn runtime context. Full
- * mode drops them from older turns; other user-role sources (instructions, skill catalog, goal) stay ahead of the view.
- */
-const turnSources = new Set(['user', 'agent-message', 'subagent-settled', 'compact-checkpoint', 'runtime-context'])
+/** Conversation content: memory holds it, so full mode drops it from older turns. */
+const turnSources = new Set(['user', 'agent-message', 'subagent-settled', 'compact-checkpoint'])
+
+/** Each snapshot supersedes the previous one (DSH runtime context), so only the latest is carried. */
+const supersedingSources = new Set(['runtime-context'])
 
 const memoryPreamble = 'Persistent memory (OptMem)'
 
@@ -401,15 +401,23 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       if (!fullModeActive() || !ready || input.agent.session.header.origin === 'subagent') return undefined
       const events = input.agent.session.snapshotEvents()
       const turnStart = events.findLastIndex(event => event.type === 'turn/start')
-      const firstUser = turnStart < 0 ? undefined : events.slice(turnStart).find(event => event.type === 'user/message' && turnSources.has(event.data.source.kind))
+      const turnEvents = turnStart < 0 ? [] : events.slice(turnStart)
+      const firstUser =
+        turnEvents.find(event => event.type === 'user/message' && turnSources.has(event.data.source.kind)) ?? turnEvents.find(event => event.type === 'user/message')
       const cut = firstUser?.type === 'user/message' ? input.messages.findIndex(message => message.id === firstUser.data.id) : -1
       if (cut < 0) return undefined
-      const carried = input.messages.slice(0, cut).filter(message => {
-        if (message.role === 'system') return true
+      let leadEnd = cut + 1
+      while (input.messages[leadEnd]?.role === 'user') leadEnd++
+      const isContext = (message: Message): boolean => {
         if (message.role !== 'user' || turnSources.has(message.source.kind)) return false
         const first = message.content[0]
         return !(first?.type === 'text' && first.text.startsWith(memoryPreamble))
-      })
+      }
+      // Contexts DSH adds next to the turn's first message move ahead of the view.
+      const head = [...input.messages.slice(0, cut), ...input.messages.slice(cut + 1, leadEnd)]
+      const latestRuntime = head.findLastIndex(message => isContext(message) && supersedingSources.has(message.source.kind))
+      const carried = head.filter((message, index) => message.role === 'system' || (isContext(message) && (!supersedingSources.has(message.source.kind) || index === latestRuntime)))
+      const current = [...input.messages.slice(cut, cut + 1), ...input.messages.slice(cut + 1, leadEnd).filter(message => !isContext(message)), ...input.messages.slice(leadEnd)]
       let view = turnViews.get(input.agent.id)
       const reusedView = view?.turn === input.turn
       let snapshot: { readonly viewVersion: number; readonly bytes: number; readonly pendingCount: number } | undefined
@@ -424,7 +432,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         turnViews.set(input.agent.id, view)
         snapshot = taken
       }
-      const sent = [...carried, view.message, ...input.messages.slice(cut)]
+      const sent = [...carried, view.message, ...current]
       lastFullRequest = {
         conversationId: input.agent.id,
         turn: input.turn,
@@ -437,6 +445,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         pendingCount: snapshot?.pendingCount ?? lastFullRequest?.pendingCount ?? 0,
         reusedView,
       }
+      logger.info('optmem: full-mode request %o', lastFullRequest)
       return sent
     } catch (error) {
       if (input.signal.aborted) throw error
