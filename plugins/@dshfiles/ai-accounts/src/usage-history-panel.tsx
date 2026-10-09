@@ -11,14 +11,17 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
 import { ChevronDownIcon, ChevronLeftIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { aiAccountsApi, type AccountsFile, type AccountsUsage, type UsageHistoryMeta, type UsageHistoryPoint } from './api.js'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useId, useMemo, useState, type ReactNode } from 'react'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
+import { aiAccountsApi, type AccountsUsage, type UsageHistoryMeta } from './api.js'
 import { MAX_USAGE_HISTORY_POINTS } from './usage-history-model.js'
 import { changedBankedResetSnapshots, forecastQuotaWindow } from './usage-history-analysis.js'
 import { QuotaMeter } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { formatResetIn } from './usage-overview-model.js'
+import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 
 const RANGE_OPTIONS = [1, 3, 7, 14, 30, 90, 180, 365] as const
@@ -133,102 +136,68 @@ const LabelledSelect = (props: {
 
 export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
-  const [file, setFile] = useState<AccountsFile | null>(null)
-  const [usage, setUsage] = useState<AccountsUsage | null>(null)
-  const [settings, setSettings] = useState<UsageHistoryMeta | null>(null)
-  const [selectedId, setSelectedId] = useState('')
-  const [days, setDays] = useState(7)
-  const [points, setPoints] = useState<readonly UsageHistoryPoint[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [savingSettings, setSavingSettings] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const selectedQueryRef = useRef({ selectedId, days })
+  const queryClient = useQueryClient()
   const { usageRefreshMs } = usePreferences()
+  const { usage, refresh: refreshUsage } = useAccountsUsage()
+  const [chosenId, setChosenId] = useState('')
+  const [days, setDays] = useState(7)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    selectedQueryRef.current = { selectedId, days }
-  }, [selectedId, days])
+  // Usage and history settings fail independently of the account list (an
+  // older Host can lack either), so one failure does not blank the page.
+  const fileQuery = useQuery(aiAccountsQueries.file(accounts))
+  const file = fileQuery.data ?? null
+  const settings = useQuery(aiAccountsQueries.historySettings(accounts)).data ?? null
+  const selectedId = chosenId || file?.accounts.find(account => account.enabled)?.instanceId || file?.accounts[0]?.instanceId || ''
+  const historyQuery = useQuery({
+    ...aiAccountsQueries.history(accounts, { instanceId: selectedId, days, refetchInterval: usageRefreshMs }),
+    enabled: selectedId !== '',
+  })
+  const points = selectedId === '' ? [] : (historyQuery.data?.points ?? [])
+  const loading = fileQuery.isLoading || historyQuery.isLoading
+  const loadNotice = fileQuery.isError
+    ? 'Usage data could not be loaded.'
+    : historyQuery.isError && historyQuery.data === undefined
+      ? 'Quota history could not be loaded.'
+      : null
 
-  useEffect(() => {
-    let live = true
-    // Usage and history settings fail independently of the account list (an
-    // older Host can lack either), so one failure does not blank the page.
-    void Promise.all([accounts.read(), accounts.usage().catch(() => null), accounts.historySettings().catch(() => null)])
-      .then(([nextFile, nextUsage, nextSettings]) => {
-        if (!live) return
-        setFile(nextFile)
-        setUsage(nextUsage)
-        setSettings(nextSettings)
-        setSelectedId(current => current || nextFile.accounts.find(account => account.enabled)?.instanceId || nextFile.accounts[0]?.instanceId || '')
-      })
-      .catch(() => {
-        if (live) setNotice('Usage data could not be loaded.')
-      })
-      .finally(() => {
-        if (live) setLoading(false)
-      })
-    return () => {
-      live = false
-    }
-  }, [accounts])
+  const recordNow = useMutation({
+    mutationFn: async () => {
+      const result = await accounts.collectUsage()
+      await Promise.all([
+        refreshUsage(),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.historySettings }),
+        queryClient.invalidateQueries({ queryKey: aiAccountsKeys.history }),
+      ])
+      return result
+    },
+    onMutate: () => setNotice(null),
+    onSuccess: result =>
+      setNotice(
+        result.recorded > 0
+          ? `Recorded quota for ${String(result.recorded)} account${result.recorded === 1 ? '' : 's'}.`
+          : 'No new quota readings were available.',
+      ),
+    onError: () => setNotice('Could not record usage right now. Check the provider sign-in and try again.'),
+  })
 
-  useEffect(() => {
-    let live = true
-    if (selectedId === '') {
-      setPoints([])
-      return () => {
-        live = false
-      }
-    }
-    setPoints([])
-    setLoading(true)
-    void accounts
-      .history({ instanceId: selectedId, days })
-      .then(result => {
-        if (live) setPoints(result.points)
-      })
-      .catch(() => {
-        if (live) {
-          setPoints([])
-          setNotice('Quota history could not be loaded.')
-        }
-      })
-      .finally(() => {
-        if (live) setLoading(false)
-      })
-    return () => {
-      live = false
-    }
-  }, [accounts, selectedId, days])
-
-  // Stored history grows on the Host's schedule, so reread it with the live
-  // quota rather than only when the selection changes.
-  useEffect(() => {
-    let live = true
-    const refresh = () => {
-      void accounts
-        .usage()
-        .then(next => {
-          if (live) setUsage(next)
-        })
-        .catch(() => undefined)
-      const query = selectedQueryRef.current
-      if (query.selectedId === '') return
-      void accounts
-        .history({ instanceId: query.selectedId, days: query.days })
-        .then(result => {
-          const latest = selectedQueryRef.current
-          if (live && latest.selectedId === query.selectedId && latest.days === query.days) setPoints(result.points)
-        })
-        .catch(() => undefined)
-    }
-    const timer = setInterval(refresh, usageRefreshMs)
-    return () => {
-      live = false
-      clearInterval(timer)
-    }
-  }, [accounts, usageRefreshMs])
+  const saveSettings = useMutation({
+    mutationFn: (input: Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>) => accounts.saveHistorySettings(input),
+    onMutate: () => setNotice(null),
+    onSuccess: next => {
+      queryClient.setQueryData(aiAccountsKeys.historySettings, next)
+      setNotice('Usage history settings saved.')
+    },
+    onError: () => setNotice('Usage history settings could not be saved.'),
+  })
+  const changeSettings = (patch: Partial<Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>>): void => {
+    if (settings === null) return
+    saveSettings.mutate({
+      intervalMinutes: patch.intervalMinutes ?? settings.intervalMinutes,
+      retentionDays: patch.retentionDays ?? settings.retentionDays,
+    })
+  }
+  const shownNotice = notice ?? loadNotice
 
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId), [file, selectedId])
   const current = usage?.cards.find(card => card.instanceId === selectedId)?.usage
@@ -247,52 +216,6 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
     }))
   }, [current, points])
   const bankChanges = useMemo(() => changedBankedResetSnapshots(points).slice(-BANK_EVENT_LIMIT).reverse(), [points])
-
-  const recordNow = async (): Promise<void> => {
-    const query = { selectedId, days }
-    setRefreshing(true)
-    setNotice(null)
-    try {
-      const result = await accounts.collectUsage()
-      const [nextUsage, nextSettings, nextHistory] = await Promise.all([
-        accounts.refreshUsage().catch(() => accounts.usage()),
-        accounts.historySettings(),
-        query.selectedId === '' ? Promise.resolve({ points: [] as UsageHistoryPoint[] }) : accounts.history({ instanceId: query.selectedId, days: query.days }),
-      ])
-      setUsage(nextUsage)
-      setSettings(nextSettings)
-      if (selectedQueryRef.current.selectedId === query.selectedId && selectedQueryRef.current.days === query.days) {
-        setPoints(nextHistory.points)
-      }
-      setNotice(
-        result.recorded > 0
-          ? `Recorded quota for ${String(result.recorded)} account${result.recorded === 1 ? '' : 's'}.`
-          : 'No new quota readings were available.',
-      )
-    } catch {
-      setNotice('Could not record usage right now. Check the provider sign-in and try again.')
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  const saveSettings = async (patch: Partial<Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>>): Promise<void> => {
-    if (settings === null) return
-    setSavingSettings(true)
-    setNotice(null)
-    try {
-      const next = await accounts.saveHistorySettings({
-        intervalMinutes: patch.intervalMinutes ?? settings.intervalMinutes,
-        retentionDays: patch.retentionDays ?? settings.retentionDays,
-      })
-      setSettings(next)
-      setNotice('Usage history settings saved.')
-    } catch {
-      setNotice('Usage history settings could not be saved.')
-    } finally {
-      setSavingSettings(false)
-    }
-  }
 
   const resetCount = points.at(-1)?.bankedResets ?? 0
 
@@ -314,8 +237,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
             ariaLabel="Usage history account"
             label="Account"
             onChange={nextId => {
-              selectedQueryRef.current = { ...selectedQueryRef.current, selectedId: nextId }
-              setSelectedId(nextId)
+              setChosenId(nextId)
             }}
             options={(file?.accounts ?? []).map(account => ({ value: account.instanceId, label: account.displayName || account.instanceId }))}
             value={selectedId}
@@ -325,22 +247,21 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
             label="Range"
             onChange={value => {
               const nextDays = Number(value)
-              selectedQueryRef.current = { ...selectedQueryRef.current, days: nextDays }
               setDays(nextDays)
             }}
             options={RANGE_OPTIONS.map(option => ({ value: String(option), label: `${String(option)} days` }))}
             value={String(days)}
           />
-          <Button disabled={refreshing || selectedId === ''} onClick={() => void recordNow()} size="sm" type="button" variant="outline">
-            {refreshing ? <Spinner /> : <RefreshCwIcon />}
-            {refreshing ? 'Recording…' : 'Record now'}
+          <Button disabled={recordNow.isPending || selectedId === ''} onClick={() => recordNow.mutate()} size="sm" type="button" variant="outline">
+            {recordNow.isPending ? <Spinner /> : <RefreshCwIcon />}
+            {recordNow.isPending ? 'Recording…' : 'Record now'}
           </Button>
         </div>
       </header>
 
-      {notice === null ? null : (
+      {shownNotice === null ? null : (
         <Alert className="dshx:mx-auto dshx:max-w-[1500px]" role="status" variant="info">
-          <AlertDescription>{notice}</AlertDescription>
+          <AlertDescription>{shownNotice}</AlertDescription>
         </Alert>
       )}
       {loading && points.length === 0 ? (
@@ -365,16 +286,16 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
             <CollapsibleContent className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-t dshx:px-4 dshx:py-3">
               <div className="dshx:flex dshx:flex-wrap dshx:gap-3">
                 <LabelledSelect
-                  disabled={savingSettings || settings === null}
+                  disabled={saveSettings.isPending || settings === null}
                   label="Provider polling"
-                  onChange={value => void saveSettings({ intervalMinutes: Number(value) })}
+                  onChange={value => changeSettings({ intervalMinutes: Number(value) })}
                   options={INTERVAL_OPTIONS.map(value => ({ value: String(value), label: `Every ${String(value)} minute${value === 1 ? '' : 's'}` }))}
                   value={String(settings?.intervalMinutes ?? 5)}
                 />
                 <LabelledSelect
-                  disabled={savingSettings || settings === null}
+                  disabled={saveSettings.isPending || settings === null}
                   label="Keep quota snapshots"
-                  onChange={value => void saveSettings({ retentionDays: Number(value) })}
+                  onChange={value => changeSettings({ retentionDays: Number(value) })}
                   options={RETENTION_OPTIONS.map(value => ({ value: String(value), label: `${String(value)} days` }))}
                   value={String(settings?.retentionDays ?? 90)}
                 />
