@@ -235,7 +235,9 @@ const ChildThreadList = (props: {
             <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', child.attention?.unread && 'dshx:font-semibold')}>
               {child.displayTitle}
             </span>
-            {props.rowStyle.time ? <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span> : null}
+            {props.rowStyle.time ? (
+              <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
+            ) : null}
           </button>
         </li>
       ))}
@@ -270,139 +272,154 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <article
-          className="dshx:group/row dshx:relative dshx:min-w-0"
-          data-selected={props.selected}
-        >
+        <article className="dshx:group/row dshx:relative dshx:min-w-0" data-selected={props.selected}>
           <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
-          <button
-            type="button"
-            className={cn(
-              'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
-              compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
-            )}
-            disabled={archived}
-            title={new Date(session.updatedAt).toLocaleString()}
-            onClick={() => props.actions.open(session.id)}
-          >
-            {headLine ? (
-              <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} /> : null}
-                <span
-                  className={cn(
-                    'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
-                    compact ? 'dshx:text-sm' : 'dshx:text-base',
-                    unread && 'dshx:font-semibold',
-                  )}
-                >
-                  {rowStyle.title ? session.displayTitle : null}
-                </span>
-                {rowStyle.time ? (
-                  <span className={cn('dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground', session.running && 'dshx:font-medium dshx:text-info')}>
-                    {session.running ? `${t('threadSidebarWorking')} · ` : ''}
-                    {props.age}
-                  </span>
-                ) : null}
-              </span>
-            ) : null}
-            {metaLine ? (
-              <span
-                className={cn(
-                  'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                  rowStyle.statusDot && 'dshx:pl-4',
-                  childCount > 0 && 'dshx:pr-16',
-                )}
-              >
-                {showProject ? (
-                  <span className={cn('dshx:truncate dshx:font-medium', (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0')}>
-                    {props.workspaceTitle ?? t('threadSidebarUnassigned')}
-                  </span>
-                ) : null}
-                {props.parentTitle === undefined ? null : (
-                  <span className="dshx:min-w-0 dshx:truncate">
-                    {t('threadSidebarChildOf')} {props.parentTitle}
-                  </span>
-                )}
-                {showMachine ? (
-                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
-                    <MonitorIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />
-                    <span className="dshx:truncate">{props.machine}</span>
-                  </span>
-                ) : null}
-                {showPath ? <span className="dshx:min-w-0 dshx:truncate" title={session.cwd}>{session.cwd}</span> : null}
-              </span>
-            ) : null}
-          </button>
-          {childCount > 0 ? (
             <button
               type="button"
-              className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-              aria-expanded={props.childrenOpen}
-              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
-              onClick={() => props.actions.toggleChildren(session.id)}
+              className={cn(
+                'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+              )}
+              disabled={archived}
+              title={new Date(session.updatedAt).toLocaleString()}
+              onClick={() => props.actions.open(session.id)}
             >
-              <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
-                {props.childThreads.slice(0, 3).map(child => (
-                  <span key={child.id} className={cn('dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background', statusDotClass(child))} />
-                ))}
-              </span>
-              <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
-              {props.childrenOpen ? <ChevronUpIcon className="dshx:size-3" aria-hidden="true" /> : <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />}
-            </button>
-          ) : null}
-          <div className="dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
-            {!archived ? (
-              <>
-                {withTooltip(
-                  t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                    onClick={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}
+              {headLine ? (
+                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                  {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} /> : null}
+                  <span
+                    className={cn(
+                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
+                      compact ? 'dshx:text-sm' : 'dshx:text-base',
+                      unread && 'dshx:font-semibold',
+                    )}
                   >
-                    {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
-                  </Button>,
-                )}
-                {withTooltip(
-                  t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                    disabled={session.running}
-                    onClick={() => props.actions.toggleParked(session.id)}
-                  >
-                    {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
-                  </Button>,
-                )}
-                {withTooltip(
-                  t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t('threadSidebarArchive')}
-                    disabled={session.running}
-                    onClick={() => void props.actions.mutate(session.id, 'archive')}
-                  >
-                    <IconArchiveOutlineRegular size={14} />
-                  </Button>,
-                )}
-              </>
-            ) : (
-              withTooltip(
-                t('threadSidebarRestore'),
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={t('threadSidebarRestore')}
-                  onClick={() => void props.actions.mutate(session.id, 'unarchive')}
+                    {rowStyle.title ? session.displayTitle : null}
+                  </span>
+                  {rowStyle.time ? (
+                    <span
+                      className={cn(
+                        'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                        session.running && 'dshx:font-medium dshx:text-info',
+                      )}
+                    >
+                      {session.running ? `${t('threadSidebarWorking')} · ` : ''}
+                      {props.age}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+              {metaLine ? (
+                <span
+                  className={cn(
+                    'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
+                    rowStyle.statusDot && 'dshx:pl-4',
+                    childCount > 0 && 'dshx:pr-16',
+                  )}
                 >
-                  <IconUnarchiveOutlineRegular size={14} />
-                </Button>,
-              )
-            )}
-          </div>
+                  {showProject ? (
+                    <span
+                      className={cn(
+                        'dshx:truncate dshx:font-medium',
+                        (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0',
+                      )}
+                    >
+                      {props.workspaceTitle ?? t('threadSidebarUnassigned')}
+                    </span>
+                  ) : null}
+                  {props.parentTitle === undefined ? null : (
+                    <span className="dshx:min-w-0 dshx:truncate">
+                      {t('threadSidebarChildOf')} {props.parentTitle}
+                    </span>
+                  )}
+                  {showMachine ? (
+                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                      <MonitorIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />
+                      <span className="dshx:truncate">{props.machine}</span>
+                    </span>
+                  ) : null}
+                  {showPath ? (
+                    <span className="dshx:min-w-0 dshx:truncate" title={session.cwd}>
+                      {session.cwd}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+            </button>
+            {childCount > 0 ? (
+              <button
+                type="button"
+                className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                aria-expanded={props.childrenOpen}
+                aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
+                onClick={() => props.actions.toggleChildren(session.id)}
+              >
+                <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
+                  {props.childThreads.slice(0, 3).map(child => (
+                    <span key={child.id} className={cn('dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background', statusDotClass(child))} />
+                  ))}
+                </span>
+                <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
+                {props.childrenOpen ? (
+                  <ChevronUpIcon className="dshx:size-3" aria-hidden="true" />
+                ) : (
+                  <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
+                )}
+              </button>
+            ) : null}
+            <div className="dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+              {!archived ? (
+                <>
+                  {withTooltip(
+                    t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+                      onClick={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}
+                    >
+                      {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+                    </Button>,
+                  )}
+                  {withTooltip(
+                    t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+                      disabled={session.running}
+                      onClick={() => props.actions.toggleParked(session.id)}
+                    >
+                      {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
+                    </Button>,
+                  )}
+                  {withTooltip(
+                    t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarArchive')}
+                      disabled={session.running}
+                      onClick={() => void props.actions.mutate(session.id, 'archive')}
+                    >
+                      <IconArchiveOutlineRegular size={14} />
+                    </Button>,
+                  )}
+                </>
+              ) : (
+                withTooltip(
+                  t('threadSidebarRestore'),
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={t('threadSidebarRestore')}
+                    onClick={() => void props.actions.mutate(session.id, 'unarchive')}
+                  >
+                    <IconUnarchiveOutlineRegular size={14} />
+                  </Button>,
+                )
+              )}
+            </div>
           </div>
           {childCount > 0 && props.childrenOpen ? (
             <ChildThreadList

@@ -263,7 +263,17 @@ export const sectionForSession = (
  * Which items stay inline, in order. An item too wide for the remaining space overflows on its own,
  * so one wide third-party footer card cannot push every later entry into the More menu.
  */
-export const fitItems = ({ widths, available, gap, reserve }: { widths: readonly number[]; available: number; gap: number; reserve: number }): readonly boolean[] => {
+export const fitItems = ({
+  widths,
+  available,
+  gap,
+  reserve,
+}: {
+  widths: readonly number[]
+  available: number
+  gap: number
+  reserve: number
+}): readonly boolean[] => {
   const total = widths.reduce((sum, width, index) => sum + width + (index === 0 ? 0 : gap), 0)
   if (total <= available) return widths.map(() => true)
   let used = reserve

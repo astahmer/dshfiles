@@ -233,10 +233,20 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
         }).filter(Boolean).length
       : props.items.length
   const fittingItems = props.items.slice(0, fitting)
-  const rowItems = drag === null ? fittingItems : reorderSidebarEntry(fittingItems.map(item => item.id), drag.from, drag.to).flatMap(id => fittingItems.filter(item => item.id === id))
+  const rowItems =
+    drag === null
+      ? fittingItems
+      : reorderSidebarEntry(
+          fittingItems.map(item => item.id),
+          drag.from,
+          drag.to,
+        ).flatMap(id => fittingItems.filter(item => item.id === id))
   const menuItems = props.overflow === 'menu' ? props.items.slice(fitting) : props.items
   const showMenu = props.overflow === 'scroll-menu' || (props.overflow === 'menu' && menuItems.length > 0)
-  const filteredMenuItems = rankByName(menuItems.map(item => ({ name: item.label, item })), filter.trim()).map(entry => entry.item)
+  const filteredMenuItems = rankByName(
+    menuItems.map(item => ({ name: item.label, item })),
+    filter.trim(),
+  ).map(entry => entry.item)
 
   useLayoutEffect(() => {
     const scroller = scrollRef.current
@@ -617,7 +627,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
   useEffect(() => {
     const onNavigate = (event: Event): void => {
-      const direction: unknown = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null ? Reflect.get(event.detail, 'direction') : undefined
+      const direction: unknown =
+        event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null ? Reflect.get(event.detail, 'direction') : undefined
       if (direction === -1 || direction === 1) latestStepNavigation.current(direction)
     }
     window.addEventListener(NAVIGATION_EVENT, onNavigate)
@@ -625,7 +636,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }, [])
 
   useEffect(() => {
-    const ownedByHost = (chord: NonNullable<ReturnType<typeof parseChord>>): boolean => hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
+    const ownedByHost = (chord: NonNullable<ReturnType<typeof parseChord>>): boolean =>
+      hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
     // ⌘[ / ⌘] are browser-reserved for Host web shortcuts, so on the web they are claimed here before the browser.
     const chords = [
       { chord: parseChord(preferences.paletteChord), run: () => openPalette('all') },

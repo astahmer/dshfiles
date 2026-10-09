@@ -61,7 +61,13 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
               {props.t('threadSidebarRecording')}
             </Button>
           ) : (
-            <Button size="sm" variant="outline" className="dshx:min-w-32" onClick={() => setRecording(key)} aria-label={`${props.t('threadSidebarRecord')}: ${label}`}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="dshx:min-w-32"
+              onClick={() => setRecording(key)}
+              aria-label={`${props.t('threadSidebarRecord')}: ${label}`}
+            >
               {chord === null ? (
                 <span className="dshx:text-muted-foreground">{props.t('threadSidebarChordDisabled')}</span>
               ) : (
@@ -76,7 +82,12 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
           <Button size="sm" variant="ghost" disabled={preferences[key] === null} onClick={() => updatePreferences({ [key]: null })}>
             {props.t('threadSidebarChordDisable')}
           </Button>
-          <Button size="sm" variant="ghost" disabled={preferences[key] === DEFAULT_PREFERENCES[key]} onClick={() => updatePreferences({ [key]: DEFAULT_PREFERENCES[key] })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={preferences[key] === DEFAULT_PREFERENCES[key]}
+            onClick={() => updatePreferences({ [key]: DEFAULT_PREFERENCES[key] })}
+          >
             {props.t('threadSidebarChordReset')}
           </Button>
         </div>
@@ -97,7 +108,6 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
           {chordRow('forwardChord', props.t('threadSidebarNavigateForward'))}
         </FieldGroup>
       </FieldSet>
-
     </div>
   )
 }
