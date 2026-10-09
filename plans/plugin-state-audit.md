@@ -43,3 +43,22 @@ Agent prompt template (one plugin per agent, parallel-safe across plugins):
 > behaviour, a11y names and old-host tolerance. Tests for behaviour; typecheck/test/build; host dist import check
 > (node 22.23.3). Tick the items here; path-scoped jj revision with trailer
 > `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Terse report.
+
+## Library / Host-utility swaps (audit 2026-10-09)
+
+| # | Where | Swap | Value | Size | Done |
+|---|---|---|---|---|---|
+| L1 | mcp-servers/src/oauth.ts:100-216 | `oauth4webapi` (adds issuer check RFC 8414 §3.3, correct OIDC discovery URL, `WWW-Authenticate` resource_metadata hint) | high (security) | M | [ ] |
+| L2 | jujutsu/src/full-diff-dialog.tsx:78-94 (up to ~1.1 MB patch, all rows mounted) | `@tanstack/react-virtual` wrapper in plugin-ui + Host `useCodeHighlighter(languageForPath)` | high | M | [ ] |
+| L3 | jujutsu/src/client.tsx:763 revision list (≤500 rows) | same VirtualList | med | M | [ ] |
+| L4 | thread-sidebar/client.tsx:129, jujutsu/client.tsx:158 (two disagreeing relative-time fns) | Host `relativeTime` | med | S | [ ] |
+| L5 | thread-sidebar/client.tsx:297, ai-accounts/use-accounts-panel-state.ts:180 | Host `writeClipboard` | low | S | [ ] |
+| L6 | thread-sidebar/palette.ts:62 `filterByLabel` | Host `rankByName` (keep weighted `rankThreads`) | low | S | [ ] |
+| L7 | 5 localStorage stores (sidebar-state.tsx:31, viewed-marks.ts:44, jujutsu client.tsx:134 + preferences.ts:58, edge-usage.tsx:53) | plugin-ui `createStoredValue(key, zodSchema)` (useSyncExternalStore + storage event) | med | S | [ ] |
+| L8 | thread-sidebar/sidebar-shell.tsx:729 customize drag | add move up/down buttons (keyboard a11y); pragmatic-drag-and-drop only if reused with L9 | med | S | [ ] |
+| L9 | jujutsu drag (client.tsx:198,414,821) | `@atlaskit/pragmatic-drag-and-drop` + auto-scroll (optional) | low-med | M | [ ] |
+| L10 | ai-accounts/native-provider-patch.ts:43 heuristic | `yaml` parseDocument check (host side) | low-med | S | [ ] |
+| L11 | jujutsu/core.ts:180 second +/- pass | reuse `parseGitPatch` | low | S | [ ] |
+
+Skipped (small/clear or lib not worth it): debounces (@tanstack/pacer still 0.x), optmem backoff, auto-save.ts,
+command-line.ts quoting, file-tree/graph, keychain wrapper, sidebar splitter, parse-diff/react-diff-view.
