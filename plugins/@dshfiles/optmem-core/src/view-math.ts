@@ -1,5 +1,5 @@
 import { TreeMath } from './tree-math.ts'
-import type { NodeAddress, StreamId, ViewState } from './types.ts'
+import type { NodeAddress, StreamId, ViewKind, ViewState } from './types.ts'
 import { Utf8 } from './utf8.ts'
 
 export type ViewLines = {
@@ -32,8 +32,8 @@ export class ViewMath {
     return rendered === '' ? [] : rendered.slice(0, -1).split('\n')
   }
 
-  static empty(stream: StreamId): ViewState {
-    return { stream, throughPos: 0, nodes: [], rendered: '', bytes: 0, version: 0, mergePending: false }
+  static empty(stream: StreamId, kind: ViewKind = 'main'): ViewState {
+    return { stream, kind, throughPos: 0, nodes: [], rendered: '', bytes: 0, version: 0, mergePending: false }
   }
 
   /**

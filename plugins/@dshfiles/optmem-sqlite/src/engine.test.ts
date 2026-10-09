@@ -230,7 +230,8 @@ describe('recovery', () => {
     await broken.engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
     await broken.engine.drain()
     const status = await broken.engine.status()
-    expect(status.failures).toEqual({ count: 1, lastError: 'summarizer unavailable' })
+    expect(status.failures).toMatchObject({ count: 1, lastError: 'summarizer unavailable' })
+    expect(status.failures.retryInMs).toBeGreaterThan(0)
     expect((await broken.engine.snapshot({ stream: conversation, barrierMs: 0 })).pendingCount).toBe(1)
     await broken.engine.close()
     broken.memory.close()
@@ -239,5 +240,136 @@ describe('recovery', () => {
     await fixed.engine.drain()
     expect((await fixed.engine.snapshot({ stream: conversation, barrierMs: 0 })).viewThroughPos).toBe(2)
     fixed.memory.close()
+  })
+
+  it('retries failed summaries on a backoff timer without waiting for another append', async () => {
+    let failures = 2
+    const flaky = createFakeSummarizer()
+    const summarizer = {
+      model: 'flaky',
+      summarize: async (request: Parameters<typeof flaky.summarize>[0]) => {
+        if (failures-- > 0) throw new Error('transient')
+        return flaky.summarize(request)
+      },
+    }
+    const { engine, memory } = await openEngine({ path: dbPath('backoff'), summarizer, config: { retryBaseMs: 5, retryMaxMs: 20 } })
+    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
+    const snapshot = await engine.snapshot({ stream: conversation, barrierMs: 2_000 })
+    expect([snapshot.pendingCount, snapshot.barrierTimedOut]).toEqual([0, false])
+    expect((await engine.status()).failures.retryInMs).toBeNull()
+    await engine.close()
+    memory.close()
+  })
+
+  it('times out a hung summarizer and frees its concurrency slot', async () => {
+    const hung = { model: 'hung', summarize: () => new Promise<string>(() => {}) }
+    const { engine, memory } = await openEngine({ path: dbPath('hung'), summarizer: hung, config: { summaryTimeoutMs: 20, summaryRetries: 0, concurrency: 1, retryBaseMs: 60_000 } })
+    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) }), ...turns(2)])
+    await engine.drain()
+    const status = await engine.status()
+    expect(status.failures.lastError).toContain('timed out after 20 ms')
+    expect(status.queue.running).toBe(0)
+    await engine.close()
+    memory.close()
+  })
+})
+
+describe('compact view', () => {
+  it('keeps a second, smaller view over the same tree and persists it like the main one', async () => {
+    const committed: string[] = []
+    const path = dbPath('compact')
+    const memory = openSqliteMemory({ path })
+    const { createMemoryEngine } = await import('@dshfiles/optmem-core')
+    const engine = createMemoryEngine({
+      store: memory.store,
+      summarizer: createFakeSummarizer(),
+      config: { ...smallView, compactUpperBytes: 900, compactLowerBytes: 450 },
+      onViewCommitted: event => committed.push(event.kind),
+    })
+    await engine.start()
+    await engine.append(turns(64))
+    await engine.drain()
+    const main = await engine.readView({ stream: conversation, kind: 'main' })
+    const compact = await engine.readView({ stream: conversation, kind: 'compact' })
+    expect(compact.throughPos).toBe(64)
+    expect(compact.bytes).toBeLessThanOrEqual(900)
+    expect(compact.lines.length).toBeLessThan(main.lines.length)
+    expect(compact.nodes.reduce((sum, node) => sum + TreeMath.length(node), 0)).toBe(64)
+    expect(committed).toContain('compact')
+    const stored = await memory.store.getView(conversation, 'compact')
+    expect(stored?.rendered).toBe(ViewMath.render(compact.lines))
+    expect((await memory.store.getView(conversation))?.kind).toBe('main')
+    await engine.close()
+    memory.close()
+  })
+
+  it('migrates a version-1 database by keeping its views as the main kind', async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const path = dbPath('migrate-v1')
+    const first = openSqliteMemory({ path })
+    first.database.exec(`DROP TABLE views; CREATE TABLE views (stream TEXT PRIMARY KEY, through_pos INTEGER NOT NULL, nodes TEXT NOT NULL, rendered TEXT NOT NULL, bytes INTEGER NOT NULL, version INTEGER NOT NULL, merge_pending INTEGER NOT NULL) STRICT;
+      INSERT INTO views VALUES ('conversation:c1', 1, '[[0,0]]', '0+1| user: old\n', 16, 3, 0); PRAGMA user_version = 1;`)
+    first.close()
+    const raw = new DatabaseSync(path)
+    expect(raw.prepare('PRAGMA user_version').get()?.['user_version']).toBe(1)
+    raw.close()
+    const migrated = openSqliteMemory({ path })
+    const view = await migrated.store.getView(conversation, 'main')
+    expect([view?.kind, view?.version, view?.rendered]).toEqual(['main', 3, '0+1| user: old\n'])
+    expect(await migrated.store.getView(conversation, 'compact')).toBeUndefined()
+    migrated.close()
+  })
+
+  it('caps the pending tail and names the collapsed positions explicitly', async () => {
+    const summarizer = createFakeSummarizer({ gated: true })
+    const { engine, memory } = await openEngine({ path: dbPath('pending-cap'), summarizer, config: { pendingTailBytes: 1_200 } })
+    await engine.append(Array.from({ length: 12 }, () => event({ conversationId: 'c1', text: 'large '.repeat(200) })))
+    const snapshot = await engine.snapshot({ stream: conversation, barrierMs: 0 })
+    const lines = ViewMath.lines(snapshot.pending)
+    expect(lines[0]).toMatch(/^\d+ more pending events \(positions 0\.\.\d+\) — use memory_context$/)
+    expect(Utf8.byteLength(snapshot.pending)).toBeLessThanOrEqual(1_200 + Utf8.byteLength(`${lines[0]}\n`))
+    expect(lines.at(-1)?.startsWith('11+1| [pending summary]')).toBe(true)
+    summarizer.release()
+    await engine.close()
+    memory.close()
+  })
+
+  it('builds parents before backlog leaves while a merge batch waits on them', async () => {
+    const fake = createFakeSummarizer()
+    const summarizer = {
+      model: 'slow',
+      summarize: async (request: Parameters<typeof fake.summarize>[0]) => {
+        await new Promise(resolve => setTimeout(resolve, 1))
+        return fake.summarize(request)
+      },
+    }
+    const config = { maxNodeBytes: 64, viewUpperBytes: 500, viewLowerBytes: 250, compactUpperBytes: 500, compactLowerBytes: 250, concurrency: 1 }
+    const { engine, memory } = await openEngine({ path: dbPath('priority'), summarizer, config })
+    await engine.append(Array.from({ length: 48 }, (_unused, index) => event({ conversationId: 'c1', text: `event ${index} ${'body '.repeat(30)}` })))
+    await engine.drain()
+    const kinds = fake.requests.map(request => request.kind)
+    expect(kinds.indexOf('merge')).toBeLessThan(kinds.lastIndexOf('leaf'))
+    await engine.close()
+    memory.close()
+  })
+
+  it('records the model the summarizer reports when each node is written', async () => {
+    const fake = createFakeSummarizer()
+    let model = 'unresolved'
+    const summarizer = {
+      get model() {
+        return model
+      },
+      summarize: async (request: Parameters<typeof fake.summarize>[0]) => {
+        model = 'route/late-bound'
+        return fake.summarize(request)
+      },
+    }
+    const { engine, memory } = await openEngine({ path: dbPath('late-model'), summarizer })
+    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
+    await engine.drain()
+    expect((await memory.store.listNodes(conversation, 0, 0, 1))[0]?.model).toBe('route/late-bound')
+    await engine.close()
+    memory.close()
   })
 })

@@ -60,6 +60,23 @@ const migrations: readonly string[] = [
 
   CREATE VIRTUAL TABLE events_fts USING fts5 (text, content = 'events', content_rowid = 'id', tokenize = 'unicode61');
   `,
+  `
+  CREATE TABLE views_by_kind (
+    stream TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    through_pos INTEGER NOT NULL,
+    nodes TEXT NOT NULL,
+    rendered TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    merge_pending INTEGER NOT NULL,
+    PRIMARY KEY (stream, kind)
+  ) STRICT, WITHOUT ROWID;
+  INSERT INTO views_by_kind (stream, kind, through_pos, nodes, rendered, bytes, version, merge_pending)
+    SELECT stream, 'main', through_pos, nodes, rendered, bytes, version, merge_pending FROM views;
+  DROP TABLE views;
+  ALTER TABLE views_by_kind RENAME TO views;
+  `,
 ]
 
 export const migrate = (database: DatabaseSync): void => {

@@ -10,6 +10,7 @@ export type {
   MemorySearchHit,
   MemoryStatus,
   StreamStatus,
+  ViewSnapshot,
   ZoomResult,
 } from './engine.ts'
 export { MemoryError } from './memory-error.ts'

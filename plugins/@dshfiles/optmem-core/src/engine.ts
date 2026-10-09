@@ -20,6 +20,7 @@ import type {
   Snapshot,
   StreamId,
   Summarizer,
+  ViewKind,
   ViewState,
 } from './types.ts'
 import { Utf8 } from './utf8.ts'
@@ -34,6 +35,12 @@ export const defaultMemoryConfig: MemoryConfig = {
   barrierMs: 5_000,
   toolResultMaxBytes: 16_384,
   eventMaxBytes: 262_144,
+  compactUpperBytes: 8_192,
+  compactLowerBytes: 4_096,
+  pendingTailBytes: 16_384,
+  summaryTimeoutMs: 60_000,
+  retryBaseMs: 1_000,
+  retryMaxMs: 60_000,
   zoomPageBytes: 8_192,
   contextEventBytes: 1_024,
   redactLiterals: [],
@@ -47,6 +54,20 @@ export type MemoryEngineOptions = {
   readonly clock?: Clock | undefined
   readonly logger?: MemoryLogger | undefined
   readonly config?: Partial<MemoryConfig> | undefined
+  /** Called after every committed view write; must not throw. */
+  readonly onViewCommitted?: ((event: { readonly stream: StreamId; readonly kind: ViewKind; readonly version: number }) => void) | undefined
+}
+
+export type ViewSnapshot = {
+  readonly stream: StreamId
+  readonly kind: ViewKind
+  readonly version: number
+  readonly throughPos: number
+  readonly bytes: number
+  readonly mergePending: boolean
+  /** One rendered line per view node, aligned with `nodes`. */
+  readonly nodes: readonly NodeAddress[]
+  readonly lines: readonly string[]
 }
 
 export type AppendResult = { readonly events: readonly AppendedEvent[]; readonly inserted: number }
@@ -103,12 +124,14 @@ export type StreamStatus = {
   readonly viewLines: number
   readonly viewVersion: number
   readonly mergePending: boolean
+  readonly compactBytes: number
+  readonly compactLines: number
 }
 
 export type MemoryStatus = {
   readonly streams: readonly StreamStatus[]
-  readonly queue: { readonly leaves: number; readonly parents: number; readonly running: number }
-  readonly failures: { readonly count: number; readonly lastError: string | null }
+  readonly queue: { readonly leaves: number; readonly parents: number; readonly running: number; readonly parentsFirst: boolean }
+  readonly failures: { readonly count: number; readonly lastError: string | null; readonly retryInMs: number | null }
   readonly summarizer: { readonly model: string; readonly calls: number; readonly clips: number }
   readonly merges: number
   readonly search: { readonly cursor: number; readonly lag: number; readonly error: string | null } | null
@@ -121,6 +144,8 @@ export type MemoryEngine = {
   append(inputs: readonly MemoryEventInput[]): Promise<AppendResult>
   /** Next-turn barrier: waits up to `barrierMs` for leaves, then renders anything still pending raw. */
   snapshot(request: { readonly stream: StreamId; readonly barrierMs?: number | undefined }): Promise<Snapshot>
+  /** The persisted view of one kind, without waiting for pending leaves. */
+  readView(request: { readonly stream: StreamId; readonly kind: ViewKind }): Promise<ViewSnapshot>
   zoom(request: { readonly stream: StreamId; readonly address: string; readonly page?: number | undefined; readonly access: MemoryAccess }): Promise<ZoomResult>
   context(request: {
     readonly stream: StreamId
@@ -173,6 +198,9 @@ class Fifo<Item> {
 type CachedView = { readonly view: ViewState; readonly lines: readonly string[] }
 type ViewRunner = { running: boolean; dirty: boolean }
 
+const viewKinds: readonly ViewKind[] = ['main', 'compact']
+const viewKey = (stream: StreamId, kind: ViewKind): string => `${kind}|${stream}`
+
 const appendBatchSize = 4_096
 const indexBatchSize = 1_000
 const maxSearchLimit = 50
@@ -181,10 +209,30 @@ const jobKey = (job: Job): string => (job.kind === 'leaf' ? `L|${job.stream}|${j
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
+const withTimeout = <Value>(work: Promise<Value>, milliseconds: number, label: string): Promise<Value> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${milliseconds} ms`)), milliseconds)
+    work.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+
 export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine => {
   const config: MemoryConfig = { ...defaultMemoryConfig, ...options.config }
   const store = options.store
-  const summarizer = options.summarizer
+  const summarizer: Summarizer = {
+    get model(): string {
+      return options.summarizer.model
+    },
+    summarize: request => withTimeout(options.summarizer.summarize(request), config.summaryTimeoutMs, `${request.kind} summary ${request.address}`),
+  }
   const searchIndex = options.search
   const clock: Clock = options.clock ?? { now: () => Date.now() }
   const logger: MemoryLogger = options.logger ?? { warn: () => {} }
@@ -193,7 +241,8 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const parentQueue = new Fifo<Job>()
   const queued = new Set<string>()
   const failed = new Map<string, Job>()
-  const views = new Map<StreamId, CachedView>()
+  const views = new Map<string, CachedView>()
+  const pendingMerges = new Set<string>()
   const runners = new Map<StreamId, ViewRunner>()
   const leafTexts = new Map<number, Promise<{ readonly text: string; readonly model: string }>>()
   const viewWaiters: { readonly stream: StreamId; readonly pos: number; readonly resolve: () => void }[] = []
@@ -208,6 +257,21 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   let indexing: Promise<void> | undefined
   let indexDirty = false
   let searchError: string | null = null
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let retryAt: number | null = null
+  let consecutiveFailures = 0
+
+  const cacheView = (cached: CachedView): void => {
+    const key = viewKey(cached.view.stream, cached.view.kind)
+    views.set(key, cached)
+    if (cached.view.mergePending) pendingMerges.add(key)
+    else pendingMerges.delete(key)
+  }
+
+  const forgetView = (stream: StreamId, kind: ViewKind): void => {
+    views.delete(viewKey(stream, kind))
+    pendingMerges.delete(viewKey(stream, kind))
+  }
 
   const isQuiet = (): boolean => running === 0 && indexing === undefined && ![...runners.values()].some(runner => runner.running)
   const isIdle = (): boolean => isQuiet() && leafQueue.size === 0 && parentQueue.size === 0
@@ -221,6 +285,22 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     lastError = errorMessage(error)
     if (job) failed.set(jobKey(job), job)
     logger.warn('optmem pipeline step failed', { job: job ? jobKey(job) : 'view', error: lastError })
+    if (job) scheduleRetry()
+  }
+
+  /** Failed jobs come back on an exponential backoff timer, not only on the next append. */
+  const scheduleRetry = (): void => {
+    if (retryTimer !== undefined || closed) return
+    const delay = Math.min(config.retryMaxMs, config.retryBaseMs * 2 ** consecutiveFailures)
+    consecutiveFailures++
+    retryAt = clock.now() + delay
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined
+      retryAt = null
+      if (closed) return
+      retryFailed()
+      pump()
+    }, delay)
   }
 
   const enqueue = (job: Job): void => {
@@ -237,10 +317,14 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
 
   const pump = (): void => {
     while (!closed && running < config.concurrency) {
-      const job = leafQueue.shift() ?? parentQueue.shift()
+      // A blocked merge batch waits on parents, so they jump ahead of backlog leaves until it resolves.
+      const job = pendingMerges.size > 0 ? (parentQueue.shift() ?? leafQueue.shift()) : (leafQueue.shift() ?? parentQueue.shift())
       if (!job) return
       running++
       runJob(job)
+        .then(() => {
+          consecutiveFailures = 0
+        })
         .catch(error => recordFailure(job, error))
         .finally(() => {
           running--
@@ -282,8 +366,11 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   }
 
   const afterNodeSaved = async (stream: StreamId, address: NodeAddress): Promise<void> => {
-    const cached = views.get(stream)
-    if (address.level === 0 || !cached || cached.view.mergePending) markViewDirty(stream)
+    const waitingOnParents = viewKinds.some(kind => {
+      const cached = views.get(viewKey(stream, kind))
+      return !cached || cached.view.mergePending
+    })
+    if (address.level === 0 || waitingOnParents) markViewDirty(stream)
     const [sibling] = await store.getNodes(stream, [TreeMath.sibling(address)])
     if (sibling) enqueue({ kind: 'parent', stream, address: TreeMath.parent(address) })
   }
@@ -321,17 +408,21 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     return { text: summary.text, model: summary.model, eventId: null }
   }
 
-  const loadView = async (stream: StreamId): Promise<CachedView> => {
-    const cached = views.get(stream)
+  const loadView = async (stream: StreamId, kind: ViewKind = 'main'): Promise<CachedView> => {
+    const cached = views.get(viewKey(stream, kind))
     if (cached) return cached
-    const view = (await store.getView(stream)) ?? ViewMath.empty(stream)
+    const view = (await store.getView(stream, kind)) ?? ViewMath.empty(stream, kind)
     const loaded = { view, lines: ViewMath.lines(view.rendered) }
-    views.set(stream, loaded)
+    cacheView(loaded)
     return loaded
   }
 
-  const maintainView = async (stream: StreamId, runner: ViewRunner): Promise<void> => {
-    const { view, lines: previousLines } = await loadView(stream)
+  const bounds = (kind: ViewKind): { readonly upper: number; readonly lower: number } =>
+    kind === 'main' ? { upper: config.viewUpperBytes, lower: config.viewLowerBytes } : { upper: config.compactUpperBytes, lower: config.compactLowerBytes }
+
+  const maintainView = async (stream: StreamId, kind: ViewKind, runner: ViewRunner): Promise<void> => {
+    const { view, lines: previousLines } = await loadView(stream, kind)
+    const { upper, lower } = bounds(kind)
     const leaves = await store.listNodes(stream, 0, view.throughPos, view.throughPos + appendBatchSize)
     const appended: MemoryNode[] = []
     for (const leaf of leaves) {
@@ -346,7 +437,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     let bytes = view.bytes + newLines.reduce((sum, line) => sum + ViewMath.lineBytes(line), 0)
     let mergePending = view.mergePending
     let merged = 0
-    if (bytes > config.viewUpperBytes || (mergePending && bytes > config.viewLowerBytes)) {
+    if (bytes > upper || (mergePending && bytes > lower)) {
       const ancestors = await store.getNodes(stream, ViewMath.mergeAncestors(nodes, throughPos))
       const texts = new Map(ancestors.map(node => [TreeMath.key(node.address), node.text]))
       const plan = ViewMath.planMergeBatch({
@@ -354,7 +445,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
         lines,
         bytes,
         throughPos,
-        lowerBytes: config.viewLowerBytes,
+        lowerBytes: lower,
         nodeText: address => texts.get(TreeMath.key(address)),
       })
       merged = plan.merges
@@ -367,14 +458,21 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       }
     }
     if (appended.length === 0 && merged === 0 && mergePending === view.mergePending) return
-    const next: ViewState = { stream, throughPos, nodes, rendered, bytes, version: view.version + 1, mergePending }
+    const next: ViewState = { stream, kind, throughPos, nodes, rendered, bytes, version: view.version + 1, mergePending }
     if (!(await store.commitView(next, view.version))) {
-      views.delete(stream)
+      forgetView(stream, kind)
       runner.dirty = true
       return
     }
     merges += merged
-    views.set(stream, { view: next, lines })
+    cacheView({ view: next, lines })
+    try {
+      options.onViewCommitted?.({ stream, kind, version: next.version })
+    } catch (error) {
+      logger.warn('optmem view listener failed', { stream, kind, error: errorMessage(error) })
+    }
+    if (leaves.length === appendBatchSize) runner.dirty = true
+    if (kind !== 'main') return
     for (let index = viewWaiters.length - 1; index >= 0; index--) {
       const waiter = viewWaiters[index]
       if (waiter && waiter.stream === stream && waiter.pos <= throughPos) {
@@ -382,7 +480,6 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
         waiter.resolve()
       }
     }
-    if (leaves.length === appendBatchSize) runner.dirty = true
   }
 
   const markViewDirty = (stream: StreamId): void => {
@@ -397,10 +494,10 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
         await new Promise<void>(resolve => setTimeout(resolve, 0))
         while (runner.dirty && !closed) {
           runner.dirty = false
-          await maintainView(stream, runner)
+          for (const kind of viewKinds) await maintainView(stream, kind, runner)
         }
       } catch (error) {
-        views.delete(stream)
+        for (const kind of viewKinds) forgetView(stream, kind)
         recordFailure(undefined, error)
       } finally {
         runner.running = false
@@ -431,7 +528,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   }
 
   const waitForView = (stream: StreamId, pos: number, timeoutMs: number): Promise<boolean> => {
-    if ((views.get(stream)?.view.throughPos ?? 0) >= pos) return Promise.resolve(true)
+    if ((views.get(viewKey(stream, 'main'))?.view.throughPos ?? 0) >= pos) return Promise.resolve(true)
     if (timeoutMs <= 0) return Promise.resolve(false)
     return new Promise(resolve => {
       const waiter = {
@@ -454,6 +551,21 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const pendingLine = (pos: number, event: MemoryEvent): string =>
     `${pos}+1| [pending summary] ${ViewMath.escape(Utf8.clip(`${event.role}: ${event.text}`, config.maxNodeBytes))}`
 
+  /** Keeps the newest lines within `pendingTailBytes`; older ones collapse into one explicit line, never silently. */
+  const capPendingTail = (lines: readonly string[], firstPos: number): readonly string[] => {
+    let bytes = 0
+    let keepFrom = lines.length
+    while (keepFrom > 0) {
+      const lineBytes = ViewMath.lineBytes(lines[keepFrom - 1] ?? '')
+      if (bytes + lineBytes > config.pendingTailBytes) break
+      bytes += lineBytes
+      keepFrom--
+    }
+    if (keepFrom === 0) return lines
+    const marker = `${keepFrom} more pending events (positions ${firstPos}..${firstPos + keepFrom - 1}) — use memory_context`
+    return [marker, ...lines.slice(keepFrom)]
+  }
+
   const assertReadable = async (stream: StreamId, access: MemoryAccess): Promise<void> => {
     const conversationProject = stream.startsWith('conversation:') ? await store.conversationProject(stream.slice('conversation:'.length)) : undefined
     if (!Scopes.canRead(stream, access, conversationProject)) throw new MemoryError('scope-denied', `${stream} is outside this conversation's memory scope`)
@@ -463,9 +575,10 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     closed = false
     for (const { stream, length } of await store.listStreams()) {
       const { view } = await loadView(stream)
+      const { view: compact } = await loadView(stream, 'compact')
       for (const pos of await store.listMissingLeaves(stream, view.throughPos)) enqueue({ kind: 'leaf', stream, pos })
       for (const address of await store.listBuildableParents(stream)) enqueue({ kind: 'parent', stream, address })
-      if (view.throughPos < length || view.mergePending) markViewDirty(stream)
+      if (view.throughPos < length || view.mergePending || compact.throughPos < length || compact.mergePending) markViewDirty(stream)
     }
     scheduleIndex()
     pump()
@@ -499,7 +612,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       const built = builtLeaves.get(entry.pos)
       return built === undefined ? pendingLine(entry.pos, entry.event) : ViewMath.line({ level: 0, idx: entry.pos }, built)
     })
-    const pending = ViewMath.render(pendingLines)
+    const pending = ViewMath.render(capPendingTail(pendingLines, view.throughPos))
     const text = view.rendered + pending
     return {
       stream: request.stream,
@@ -512,6 +625,20 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       bytes: Utf8.byteLength(text),
       pendingCount: tail.filter(entry => !builtLeaves.has(entry.pos)).length,
       barrierTimedOut,
+    }
+  }
+
+  const readView: MemoryEngine['readView'] = async request => {
+    const { view, lines } = await loadView(request.stream, request.kind)
+    return {
+      stream: view.stream,
+      kind: view.kind,
+      version: view.version,
+      throughPos: view.throughPos,
+      bytes: view.bytes,
+      mergePending: view.mergePending,
+      nodes: view.nodes,
+      lines,
     }
   }
 
@@ -616,6 +743,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     const streams = await Promise.all(
       (await store.listStreams()).map(async ({ stream, length }) => {
         const { view, lines } = await loadView(stream)
+        const compact = await loadView(stream, 'compact')
         return {
           stream,
           length,
@@ -624,14 +752,16 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
           viewLines: lines.length,
           viewVersion: view.version,
           mergePending: view.mergePending,
+          compactBytes: compact.view.bytes,
+          compactLines: compact.lines.length,
         }
       }),
     )
     const searchStatus = searchIndex ? await searchIndex.status().catch(() => ({ cursor: -1, lag: -1 })) : undefined
     return {
       streams,
-      queue: { leaves: leafQueue.size, parents: parentQueue.size, running },
-      failures: { count: failed.size, lastError },
+      queue: { leaves: leafQueue.size, parents: parentQueue.size, running, parentsFirst: pendingMerges.size > 0 },
+      failures: { count: failed.size, lastError, retryInMs: retryAt === null ? null : Math.max(0, retryAt - clock.now()) },
       summarizer: { model: summarizer.model, calls: summaryCalls, clips: summaryClips },
       merges,
       search: searchStatus ? { ...searchStatus, error: searchError } : null,
@@ -643,8 +773,11 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
 
   const close = (): Promise<void> => {
     closed = true
+    if (retryTimer !== undefined) clearTimeout(retryTimer)
+    retryTimer = undefined
+    retryAt = null
     return isQuiet() ? Promise.resolve() : new Promise(resolve => quietWaiters.push(resolve))
   }
 
-  return { start, append, snapshot, zoom, context, search, status, drain, close }
+  return { start, append, snapshot, readView, zoom, context, search, status, drain, close }
 }

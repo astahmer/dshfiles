@@ -106,7 +106,7 @@ describe('sqlite store', () => {
     openSqliteMemory({ path }).close()
     const reopened = openSqliteMemory({ path })
     expect(statSync(path).mode & 0o777).toBe(0o600)
-    expect(reopened.database.prepare('PRAGMA user_version').get()?.['user_version']).toBe(1)
+    expect(reopened.database.prepare('PRAGMA user_version').get()?.['user_version']).toBe(2)
     expect(reopened.database.prepare('PRAGMA journal_mode').get()?.['journal_mode']).toBe('wal')
     reopened.close()
   })

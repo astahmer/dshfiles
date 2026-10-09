@@ -60,8 +60,12 @@ export type MemoryNode = {
   readonly createdAt: number
 }
 
+/** `main` is the full-size view; `compact` is a smaller view over the same tree for bounded injection. */
+export type ViewKind = 'main' | 'compact'
+
 export type ViewState = {
   readonly stream: StreamId
+  readonly kind: ViewKind
   readonly throughPos: number
   readonly nodes: readonly NodeAddress[]
   /** Persisted byte-for-byte; one `<start>+<len>| <text>\n` line per node. */
@@ -107,10 +111,13 @@ export interface MemoryStore {
   findLeafByEvent(eventId: number): Promise<MemoryNode | undefined>
   listMissingLeaves(stream: StreamId, fromPos: number): Promise<readonly number[]>
   listBuildableParents(stream: StreamId): Promise<readonly NodeAddress[]>
-  getView(stream: StreamId): Promise<ViewState | undefined>
-  /** Optimistic: writes only when the stored version equals `expectedVersion`; also moves the `leaf` cursor. */
+  getView(stream: StreamId, kind?: ViewKind): Promise<ViewState | undefined>
+  /** Optimistic: writes only when the stored version equals `expectedVersion`; a `main` view also moves the `leaf` cursor. */
   commitView(view: ViewState, expectedVersion: number): Promise<boolean>
+  /** Reads the `main` view and the stream length in one read transaction. */
   readSnapshot(stream: StreamId): Promise<StoreSnapshot>
+  /** Conversation id of every position in [fromPos, toPos), in order. */
+  streamConversations(stream: StreamId, fromPos: number, toPos: number): Promise<readonly string[]>
 }
 
 export type SummaryRequest = {
@@ -160,6 +167,13 @@ export type MemoryConfig = {
   readonly barrierMs: number
   readonly toolResultMaxBytes: number
   readonly eventMaxBytes: number
+  readonly compactUpperBytes: number
+  readonly compactLowerBytes: number
+  /** Bytes of pending-tail lines a snapshot renders before collapsing the older ones into one marker line. */
+  readonly pendingTailBytes: number
+  readonly summaryTimeoutMs: number
+  readonly retryBaseMs: number
+  readonly retryMaxMs: number
   readonly zoomPageBytes: number
   readonly contextEventBytes: number
   readonly redactLiterals: readonly string[]

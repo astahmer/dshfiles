@@ -15,6 +15,7 @@ import {
   type StoredSearchHit,
   type StreamEntry,
   type StreamId,
+  type ViewKind,
   type ViewState,
 } from '@dshfiles/optmem-core'
 
@@ -96,8 +97,15 @@ const nodeFromRow = (row: Row): MemoryNode => ({
   createdAt: integer(row, 'created_at'),
 })
 
+const viewKind = (row: Row): ViewKind => {
+  const value = text(row, 'kind')
+  if (value === 'main' || value === 'compact') return value
+  throw new Error(`optmem-sqlite: unknown view kind ${value}`)
+}
+
 const viewFromRow = (row: Row): ViewState => ({
   stream: stream(row, 'stream'),
+  kind: viewKind(row),
   throughPos: integer(row, 'through_pos'),
   nodes: parseNodes(text(row, 'nodes')),
   rendered: text(row, 'rendered'),
@@ -172,8 +180,8 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
     return row ? nodeFromRow(row) : undefined
   }
 
-  const getView = (streamId: StreamId): ViewState | undefined => {
-    const row = prepare('SELECT * FROM views WHERE stream = ?').get(streamId)
+  const getView = (streamId: StreamId, kind: ViewKind): ViewState | undefined => {
+    const row = prepare('SELECT * FROM views WHERE stream = ? AND kind = ?').get(streamId, kind)
     return row ? viewFromRow(row) : undefined
   }
 
@@ -276,7 +284,7 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
         .all(streamId)
         .map(row => ({ level: integer(row, 'level'), idx: integer(row, 'idx') })),
 
-    getView: async streamId => getView(streamId),
+    getView: async (streamId, kind = 'main') => getView(streamId, kind),
 
     commitView: async (view, expectedVersion) =>
       transaction('IMMEDIATE', () => {
@@ -284,19 +292,28 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
         const changes =
           expectedVersion === 0
             ? prepare(
-                `INSERT INTO views (stream, through_pos, nodes, rendered, bytes, version, merge_pending) VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(stream) DO NOTHING`,
-              ).run(view.stream, ...values).changes
+                `INSERT INTO views (stream, kind, through_pos, nodes, rendered, bytes, version, merge_pending) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(stream, kind) DO NOTHING`,
+              ).run(view.stream, view.kind, ...values).changes
             : prepare(
                 `UPDATE views SET through_pos = ?, nodes = ?, rendered = ?, bytes = ?, version = ?, merge_pending = ?
-                 WHERE stream = ? AND version = ?`,
-              ).run(...values, view.stream, expectedVersion).changes
+                 WHERE stream = ? AND kind = ? AND version = ?`,
+              ).run(...values, view.stream, view.kind, expectedVersion).changes
         if (Number(changes) !== 1) return false
+        if (view.kind !== 'main') return true
         prepare('INSERT INTO cursors (name, stream, pos) VALUES (?, ?, ?) ON CONFLICT(name, stream) DO UPDATE SET pos = excluded.pos').run('leaf', view.stream, view.throughPos)
         return true
       }),
 
-    readSnapshot: async streamId => transaction('DEFERRED', () => ({ view: getView(streamId), length: streamLength(streamId) })),
+    readSnapshot: async streamId => transaction('DEFERRED', () => ({ view: getView(streamId, 'main'), length: streamLength(streamId) })),
+
+    streamConversations: async (streamId, fromPos, toPos) =>
+      prepare(
+        `SELECT e.conversation_id FROM stream_entries s JOIN events e ON e.id = s.event_id
+         WHERE s.stream = ? AND s.pos >= ? AND s.pos < ? ORDER BY s.pos`,
+      )
+        .all(streamId, fromPos, toPos)
+        .map(row => text(row, 'conversation_id')),
   }
 
   const ftsCursor = (): number => {
