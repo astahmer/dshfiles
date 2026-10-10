@@ -23,12 +23,16 @@ import {
 const OUTCOME_TIMEOUT_MS = 20_000
 const PRIVATE_URL = /http:\/\/127\.0\.0\.1:\d+\/\S*/g
 
-const isLocalUrl = (url: URL): boolean => ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+const browserOriginKey = (url: URL): string => {
+  const protocol = url.protocol === 'ws:' ? 'http:' : url.protocol === 'wss:' ? 'https:' : url.protocol
+  return `${protocol}//${url.host}`
+}
 
 /** Per-scenario state, keyed by the page playwright-bdd hands each scenario. */
 const profiles = new WeakMap<Page, BootedProfile>()
 const evidenceRuns = new WeakMap<Page, EvidenceRun>()
 const browserDiagnostics = new WeakMap<Page, string[]>()
+const allowedBrowserOrigins = new WeakMap<Page, Set<string>>()
 
 const evidenceRunFor = (page: Page): EvidenceRun => {
   const run = evidenceRuns.get(page)
@@ -77,7 +81,9 @@ Before(async ({ page, $testInfo }) => {
   })
   evidenceRuns.set(page, run)
   const diagnostics: string[] = []
+  const allowedOrigins = new Set<string>()
   browserDiagnostics.set(page, diagnostics)
+  allowedBrowserOrigins.set(page, allowedOrigins)
   await registerProviderSetupDismissal(page)
   page.context().on('page', newPage => {
     void registerProviderSetupDismissal(newPage).catch(() => {
@@ -92,9 +98,9 @@ Before(async ({ page, $testInfo }) => {
   page.on('response', response => {
     if (response.status() >= 400) diagnostics.push(`http ${response.status()}: ${response.request().resourceType()}`)
   })
-  await page.route('**/*', async route => {
+  await page.context().route('**/*', async route => {
     const url = new URL(route.request().url())
-    if (isLocalUrl(url) || url.protocol === 'data:' || url.protocol === 'blob:') {
+    if (allowedOrigins.has(browserOriginKey(url)) || url.protocol === 'data:' || url.protocol === 'blob:') {
       await route.continue()
       return
     }
@@ -102,7 +108,7 @@ Before(async ({ page, $testInfo }) => {
     await route.abort('blockedbyclient')
   })
   await page.context().routeWebSocket(
-    url => !isLocalUrl(url),
+    url => !allowedOrigins.has(browserOriginKey(url)),
     async route => {
       diagnostics.push('blocked outbound browser websocket')
       await route.close({ code: 1008, reason: 'External network is blocked in E2E' })
@@ -133,6 +139,9 @@ const readProfileOutcome = (page: Page, profile: BootedProfile) =>
   })
 
 const visitScratchProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
+  const allowedOrigins = allowedBrowserOrigins.get(page)
+  if (allowedOrigins === undefined) throw new Error('the browser network boundary was not initialized')
+  allowedOrigins.add(browserOriginKey(new URL(profile.url)))
   try {
     await page.goto(profile.url, { waitUntil: 'domcontentloaded' })
   } catch (error) {
