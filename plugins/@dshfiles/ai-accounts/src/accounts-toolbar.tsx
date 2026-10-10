@@ -2,7 +2,7 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useId } from 'react'
-import { DISTRIBUTIONS } from './account-labels.js'
+import { DISTRIBUTION_HINT, DISTRIBUTION_LABEL, DISTRIBUTIONS } from './account-labels.js'
 import type { AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
@@ -52,12 +52,15 @@ export const AccountsToolbar = (props: { readonly state: AccountsPanelState; rea
         value={props.file.distribution}
       >
         <SelectTrigger aria-label="Request distribution" className="dshx:h-6 dshx:text-xs" size="sm">
-          <SelectValue />
+          <SelectValue>{DISTRIBUTION_LABEL[props.file.distribution]}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="dshx:w-80 dshx:max-w-[calc(100vw-2rem)]">
           {DISTRIBUTIONS.map(value => (
-            <SelectItem key={value} value={value}>
-              {value}
+            <SelectItem className="dshx:items-start dshx:py-2" key={value} value={value}>
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+                <span>{DISTRIBUTION_LABEL[value]}</span>
+                <span className="dshx:whitespace-normal dshx:text-xs dshx:text-muted-foreground">{DISTRIBUTION_HINT[value]}</span>
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
