@@ -1,8 +1,8 @@
 Feature: Browser E2E network boundary
 
-  Browser requests to non-local origins must be stopped before external services are contacted.
+  Browser HTTP and WebSocket requests may reach only the isolated scratch profile origin.
 
-  Scenario: Reject fetches to external and unapproved loopback origins
+  Scenario: Reject unapproved external and loopback HTTP and WebSocket requests
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
-    When the browser fetches unapproved external and loopback origins
-    Then the E2E browser network boundary rejects both fetches
+    When the browser tries unapproved HTTP and WebSocket origins
+    Then the E2E browser network boundary rejects both transports
