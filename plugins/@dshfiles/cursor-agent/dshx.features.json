@@ -40,10 +40,6 @@
           "key": "instances[].credentialKind",
           "defaultValue": "required",
           "constraints": "One of api-key or auth-token.",
-          "choices": [
-            "api-key",
-            "auth-token"
-          ],
           "coveredBy": [
             "cursor-agent.instance-validation"
           ]

@@ -33,18 +33,6 @@
           "coveredBy": [
             "secret-catalog.scope-filter"
           ]
-        },
-        {
-          "key": "hideOnBlur",
-          "defaultValue": "true",
-          "constraints": "Boolean; clear revealed values when focus leaves the view.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "secret-catalog.reveal-expiry"
-          ]
         }
       ],
       "states": [
@@ -124,6 +112,18 @@
           "key": "noticeSeconds",
           "defaultValue": "4",
           "constraints": "Integer from 0 to 60 seconds; zero keeps the notice persistent.",
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
+        },
+        {
+          "key": "hideOnBlur",
+          "defaultValue": "true",
+          "constraints": "Boolean; clear revealed values when focus leaves the view.",
+          "choices": [
+            "true",
+            "false"
+          ],
           "coveredBy": [
             "secret-catalog.reveal-expiry"
           ]
