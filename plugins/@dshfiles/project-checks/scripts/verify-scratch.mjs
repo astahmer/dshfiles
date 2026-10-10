@@ -29,6 +29,15 @@ const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = awai
 const { connectDshPlatformClient } = await import(pathToFileURL(platformPath).href)
 const { createApiClient } = await import(pathToFileURL(apiRuntimePath).href)
 const { projectChecksApi } = await import(pathToFileURL(projectChecksApiPath).href)
+const createScratchEnvironment = (home, profileRoot) => {
+  const environment = isolatedHostEnvironment(home, profileRoot)
+  return {
+    ...environment,
+    PATH: environment.PATH?.split(delimiter)
+      .filter(entry => !entry.endsWith('/node_modules/.bin'))
+      .join(delimiter),
+  }
+}
 
 const profileName = 'project-checks'
 const cursorPluginPath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent')
@@ -36,7 +45,16 @@ const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
 const hooksCodexPath = resolve(repoRoot, 'plugins/node_modules/@deepseek-ai/dsh-hooks-codex')
 const cursorInstanceId = 'scratch-fixture'
 const cursorCredential = 'scratch-only-cursor-fixture'
-const corePackages = ['api-session-controller', 'agent', 'agent-loop', 'session', 'session-persistence', 'session-persistence-jsonl', 'session-format-catalog', 'session-format-v4-to-v5']
+const corePackages = [
+  'api-session-controller',
+  'agent',
+  'agent-loop',
+  'session',
+  'session-persistence',
+  'session-persistence-jsonl',
+  'session-format-catalog',
+  'session-format-v4-to-v5',
+]
 const extraDependencies = {
   '@dshfiles/project-checks': `link:${projectChecksPath}`,
   '@dshfiles/dsh-core-runtime': `link:${resolve(repoRoot, 'plugins/@dshfiles/dsh-core-runtime')}`,
@@ -160,7 +178,8 @@ const makeProjectChecksClient = (origin, cookie) =>
                   } catch {
                     return { ok: false, error: { code: 'rpc-unreachable', message: 'Scratch Project Checks RPC was unreachable.' } }
                   }
-                  if (!response.ok) return { ok: false, error: { code: 'rpc-http-error', message: `Scratch Project Checks RPC returned HTTP ${response.status}.` } }
+                  if (!response.ok)
+                    return { ok: false, error: { code: 'rpc-http-error', message: `Scratch Project Checks RPC returned HTTP ${response.status}.` } }
                   let envelope
                   try {
                     envelope = rpcResponseSchema.safeParse(await response.json())
@@ -190,7 +209,7 @@ const makeProjectChecksClient = (origin, cookie) =>
 const startHost = async () => {
   let output = ''
   let cookie
-  const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
+  const environment = createScratchEnvironment(scratch.home, scratch.profileRoot)
   const child = spawn(process.execPath, [resolve(repoRoot, 'scripts/core-runtime-scratch-host.mjs')], {
     cwd: repoRoot,
     env: {
@@ -240,7 +259,11 @@ const startHost = async () => {
   ])
 
   await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
-  await waitFor(() => Promise.resolve(output.match(/DSHFILES_PROFILE_READINESS (.+)/)?.[1]), value => value !== undefined, 'settled Loader readiness')
+  await waitFor(
+    () => Promise.resolve(output.match(/DSHFILES_PROFILE_READINESS (.+)/)?.[1]),
+    value => value !== undefined,
+    'settled Loader readiness',
+  )
   const readinessSchema = z.object({ inactive: z.array(z.object({ id: z.string(), name: z.string(), state: z.number().nullable() })) })
   const readinessText = output.match(/DSHFILES_PROFILE_READINESS (.+)/)?.[1]
   assert.ok(readinessText, 'Scratch Host did not report settled Loader readiness.')
@@ -302,14 +325,12 @@ try {
   await scratch.install()
   await initializeScratchProject()
   await writeScratchConfiguration()
-  const configEnvironment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
-  const composedConfig = spawnSync(
-    'dsh',
-    ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath],
-    { encoding: 'utf8', env: configEnvironment },
-  )
-  if (composedConfig.status !== 0)
-    throw new Error(`Scratch profile composition failed: ${redactHostOutput(composedConfig.stderr).slice(-2_000)}`)
+  const configEnvironment = createScratchEnvironment(scratch.home, scratch.profileRoot)
+  const composedConfig = spawnSync('dsh', ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath], {
+    encoding: 'utf8',
+    env: configEnvironment,
+  })
+  if (composedConfig.status !== 0) throw new Error(`Scratch profile composition failed: ${redactHostOutput(composedConfig.stderr).slice(-2_000)}`)
   for (const label of ['Scratch project check', 'Scratch ACP fixture', 'hooks-codex'])
     assert.ok(composedConfig.stdout.includes(label), `Scratch profile composition omitted ${label}.`)
 
@@ -324,7 +345,10 @@ try {
   } catch (cause) {
     throw new Error(`Project Checks actions API failed: ${cause instanceof Error ? cause.message : 'unknown failure'}`)
   }
-  assert.ok(actions.some(action => action.id === 'scratch-check'), 'Project Checks did not expose the configured action in the scratch JJ project.')
+  assert.ok(
+    actions.some(action => action.id === 'scratch-check'),
+    'Project Checks did not expose the configured action in the scratch JJ project.',
+  )
 
   const initialReceipt = await scratchHost.projectChecks.run({ sessionId: session.sessionId, actionId: 'scratch-check' })
   assert.equal(initialReceipt.status, 'passed', 'Project Checks action did not pass in the scratch JJ project.')
@@ -333,7 +357,8 @@ try {
 
   await writeFile(resolve(projectRootReal, 'edited.txt'), 'working-copy revision changed\n')
   const snapshotAfterEdit = spawnSync('jj', ['status'], { encoding: 'utf8', cwd: projectRootReal })
-  if (snapshotAfterEdit.status !== 0) throw new Error(`Could not snapshot the edited scratch JJ project: ${redactHostOutput(snapshotAfterEdit.stderr).slice(-1_000)}`)
+  if (snapshotAfterEdit.status !== 0)
+    throw new Error(`Could not snapshot the edited scratch JJ project: ${redactHostOutput(snapshotAfterEdit.stderr).slice(-1_000)}`)
   const staleReceipts = await scratchHost.projectChecks.receipts({ sessionId: session.sessionId })
   const staleReceipt = staleReceipts.find(receipt => receipt.id === initialReceipt.id)
   assert.equal(staleReceipt?.freshness, 'stale', 'An edited scratch JJ revision did not stale the earlier Project Checks receipt.')
@@ -372,7 +397,10 @@ try {
   assert.equal(hookEvents.length, 2, 'Project Checks exposed a durable event for a skipped hook that the Host did not record.')
   assert.equal((await readFile(hookMarkerPath, 'utf8')).trim(), 'Stop', 'The configured Codex hook command did not run exactly once.')
 
-  const cursorEvents = (await readFile(cursorEventsPath, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  const cursorEvents = (await readFile(cursorEventsPath, 'utf8'))
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line))
   assert.equal(cursorEvents.filter(event => event.type === 'new').length, 1, 'Scratch Cursor runtime did not create exactly one ACP session.')
   assert.equal(cursorEvents.filter(event => event.type === 'prompt').length, 1, 'Scratch Cursor runtime did not complete exactly one provider prompt.')
 
