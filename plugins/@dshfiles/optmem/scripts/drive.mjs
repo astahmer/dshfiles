@@ -75,9 +75,6 @@ ${
 - id: dshfiles-optmem
   config:
     mode: ${compatMode ? 'compat' : 'full'}
-    summarizerProvider: ${provider}
-    summarizerModel: ${model}
-    summarizerEffort: ${effort}
 `,
 )
 await mkdir(resolve(scratch.home, 'plugins/ai-accounts'), { recursive: true, mode: 0o700 })

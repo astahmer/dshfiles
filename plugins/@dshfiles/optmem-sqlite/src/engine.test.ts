@@ -269,7 +269,6 @@ describe('recovery', () => {
     let failures = 2
     const flaky = createFakeSummarizer()
     const summarizer = {
-      model: 'flaky',
       summarize: async (request: Parameters<typeof flaky.summarize>[0]) => {
         if (failures-- > 0) throw new Error('transient')
         return flaky.summarize(request)
@@ -285,7 +284,7 @@ describe('recovery', () => {
   })
 
   it('times out a hung summarizer and frees its concurrency slot', async () => {
-    const hung = { model: 'hung', summarize: () => new Promise<string>(() => {}) }
+    const hung = { summarize: () => new Promise<never>(() => {}) }
     const { engine, memory } = await openEngine({
       path: dbPath('hung'),
       summarizer: hung,
@@ -365,7 +364,6 @@ describe('compact view', () => {
   it('builds parents before backlog leaves while a merge batch waits on them', async () => {
     const fake = createFakeSummarizer()
     const summarizer = {
-      model: 'slow',
       summarize: async (request: Parameters<typeof fake.summarize>[0]) => {
         await new Promise(resolve => setTimeout(resolve, 1))
         return fake.summarize(request)
@@ -381,22 +379,25 @@ describe('compact view', () => {
     memory.close()
   })
 
-  it('records the model the summarizer reports when each node is written', async () => {
+  it('routes each summary by the thread whose event it covers, and records that route per node', async () => {
     const fake = createFakeSummarizer()
-    let model = 'unresolved'
     const summarizer = {
-      get model() {
-        return model
-      },
-      summarize: async (request: Parameters<typeof fake.summarize>[0]) => {
-        model = 'route/late-bound'
-        return fake.summarize(request)
-      },
+      summarize: async (request: Parameters<typeof fake.summarize>[0]) => ({
+        text: (await fake.summarize(request)).text,
+        model: `route-of-${request.conversationId}`,
+      }),
     }
-    const { engine, memory } = await openEngine({ path: dbPath('late-model'), summarizer })
-    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
+    const { engine, memory } = await openEngine({ path: dbPath('per-thread-model'), summarizer })
+    await engine.append([
+      event({ conversationId: 'c1', projectId: 'p1', text: 'first thread '.repeat(60) }),
+      event({ conversationId: 'c2', projectId: 'p1', text: 'second thread '.repeat(60) }),
+    ])
     await engine.drain()
-    expect((await memory.store.listNodes(conversation, 0, 0, 1))[0]?.model).toBe('route/late-bound')
+    const project = StreamIds.project('p1')
+    const nodes = await memory.store.listNodes(project, 0, 0, 2)
+    expect(nodes.map(node => node.model)).toEqual(['route-of-c1', 'route-of-c2'])
+    const merge = fake.requests.find(request => request.kind === 'merge' && request.stream === project)
+    expect(merge?.conversationId).toBe('c2')
     await engine.close()
     memory.close()
   })

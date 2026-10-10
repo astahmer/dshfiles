@@ -9,10 +9,9 @@ const scripted = (answers: readonly string[]) => {
   return {
     requests,
     summarizer: {
-      model: 'scripted',
       summarize: async (request: SummaryRequest) => {
         requests.push(request)
-        return answers[Math.min(request.attempt, answers.length - 1)] ?? ''
+        return { text: answers[Math.min(request.attempt, answers.length - 1)] ?? '', model: `scripted-${request.attempt}` }
       },
     },
   }
@@ -20,13 +19,13 @@ const scripted = (answers: readonly string[]) => {
 
 const warnings: string[] = []
 const logger = { warn: (message: string) => void warnings.push(message) }
-const base = { logger, kind: 'merge' as const, stream: 'global' as const, address: '0+2', input: ['a', 'b'], maxBytes: 100, retries: 3 }
+const base = { logger, kind: 'merge' as const, stream: 'global' as const, conversationId: 'c1', address: '0+2', input: ['a', 'b'], maxBytes: 100, retries: 3 }
 
 describe('boundedSummary', () => {
   it('retries with a stricter budget until the answer fits', async () => {
     const { summarizer, requests } = scripted(['x'.repeat(150), 'y'.repeat(120), 'z'.repeat(90)])
     const result = await boundedSummary({ ...base, summarizer })
-    expect(result).toEqual({ text: 'z'.repeat(90), model: 'scripted', clipped: false, calls: 3 })
+    expect(result).toEqual({ text: 'z'.repeat(90), model: 'scripted-2', clipped: false, calls: 3 })
     expect(requests.map(request => request.maxBytes)).toEqual([100, 80, 60])
     expect(requests.map(request => request.previousBytes)).toEqual([null, 150, 120])
   })
@@ -37,6 +36,7 @@ describe('boundedSummary', () => {
     expect(requests).toHaveLength(4)
     expect(result.clipped).toBe(true)
     expect(result.text.startsWith('bbb')).toBe(true)
+    expect(result.model).toBe('clipped:scripted-1')
     expect(Utf8.byteLength(result.text)).toBeLessThanOrEqual(100)
     expect(warnings).toContain('optmem summary clipped after retries')
   })

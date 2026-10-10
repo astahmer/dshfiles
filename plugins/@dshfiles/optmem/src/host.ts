@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
+import { readFile } from 'node:fs/promises'
 import type {} from '@deepseek-ai/dsh-agent'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
@@ -16,7 +18,7 @@ import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
 
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
-import { createLlmSummarizer, createRouteResolver } from './summarizer.ts'
+import { createLlmSummarizer, createRouteResolver, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
 import { createMemoryTools } from './tools.ts'
 
 /** Dispatched only by the dshfiles fork agent loop (tooling/dsh-core/FORK.md); stock DSH never fires it. */
@@ -89,20 +91,53 @@ const backfillCommand = defineCommand({
   },
 })
 
+const effortOf = (effort: OptmemSettings['summarizerEffort']): SummaryEffort | undefined => (effort === '' ? undefined : effort)
+
+const summarizerPolicy = (settings: OptmemSettings): SummarizerPolicy => ({
+  override:
+    settings.summarizerModel.length > 0
+      ? { provider: settings.summarizerProvider, model: settings.summarizerModel, effort: effortOf(settings.summarizerEffort) }
+      : undefined,
+  cheapModels: settings.cheapModels.map(entry => ({ kind: entry.kind, models: entry.models, effort: effortOf(entry.effort) })),
+  fallbacks: settings.summarizerFallbacks.map(entry => ({ provider: entry.provider, model: entry.model, effort: effortOf(entry.effort) })),
+})
+
+/** AI Accounts may be absent or a different version: anything undecodable means "kind unknown", matched by id prefix instead. */
+const accountsFile = Schema.object({
+  accounts: Schema.array(Schema.object({ kind: Schema.string().required(), instanceId: Schema.string().required() })).default([]),
+})
+
+const accountKind = async (provider: string): Promise<string | undefined> => {
+  try {
+    const raw: Parameters<typeof accountsFile>[0] = JSON.parse(await readFile(dshHomePath('plugins', 'ai-accounts', 'accounts.json'), 'utf8'))
+    return accountsFile(raw).accounts.find(account => account.instanceId === provider)?.kind
+  } catch {
+    return undefined
+  }
+}
+
+/** The thread's route, read the way DSH compaction does: the session's latest request header, else the agent's configured provider. */
+const sessionProviders = new Map<string, string>()
+
 const hostServices = (ctx: Context): HostServices => {
   const routes = createRouteResolver({
-    catalog: () => {
-      const llm = ctx.get('llm')
-      if (!llm) return undefined
-      return {
-        providers: () => llm.listProviders().map(provider => provider.id),
-        models: async provider => (await llm.listModels(provider)).map(model => model.id),
-      }
-    },
-    target: () => {
-      const settings = currentSettings()
-      return { provider: settings.summarizerProvider, model: settings.summarizerModel, effort: settings.summarizerEffort }
-    },
+    policy: () => summarizerPolicy(currentSettings()),
+    catalog: () => ({
+      sessionProvider: async conversationId => {
+        const live = sessionProviders.get(conversationId)
+        if (live !== undefined) return live
+        const sessionQuery = ctx.get('sessionQuery')
+        const log = await sessionQuery?.readSession(SessionId(conversationId)).catch(() => undefined)
+        const header = log?.events.findLast(event => event.type === 'request/header')
+        return header?.type === 'request/header' ? header.data.header.config.provider : undefined
+      },
+      providerKind: accountKind,
+      models: async provider => {
+        const llm = ctx.get('llm')
+        if (!llm) return []
+        return (await llm.listModels(provider).catch(() => [])).map(model => model.id)
+      },
+    }),
   })
   return {
     has: service => ctx.get(service) !== undefined,
@@ -145,12 +180,17 @@ const setup = (ctx: Context): void => {
     logger: ctx.logger('optmem'),
   })
   runtime = active
-  ctx.on('session/event', (session, event) => active.onSessionEvent(session, event))
+  ctx.on('session/event', (session, event) => {
+    if (event.type === 'request/header') sessionProviders.set(session.id, event.data.header.config.provider)
+    active.onSessionEvent(session, event)
+  })
   ctx.on('agent/request-messages', async (payload, next) => {
     const derived = await next()
     return (await active.requestMessages({ ...payload, messages: derived })) ?? derived
   })
   ctx.on('agent/created', ({ agent }) => {
+    const provider = agent.session.requestHeader()?.config.provider ?? agent.options.provider
+    if (provider !== undefined && provider.length > 0) sessionProviders.set(agent.session.id, provider)
     void active.resolveProject(agent.session.header)
     return undefined
   })

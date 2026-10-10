@@ -13,7 +13,6 @@ export const createFakeSummarizer = (
   let release = (): void => {}
   const gate = options.gated ? new Promise<void>(resolve => (release = resolve)) : Promise.resolve()
   return {
-    model: 'fake-summarizer',
     requests,
     release: () => release(),
     summarize: async request => {
@@ -22,8 +21,8 @@ export const createFakeSummarizer = (
       if (options.failing) throw new Error('summarizer unavailable')
       const body = request.input.map(text => text.replace(/\s+/g, ' ').slice(0, 400)).join(' / ')
       const text = `${request.kind === 'leaf' ? 'L' : 'M'}${request.address}: ${body}`
-      if (request.attempt < (options.overshootAttempts ?? 0)) return text.padEnd(request.maxBytes + 64, '~')
-      return Utf8.clip(text, request.maxBytes)
+      if (request.attempt < (options.overshootAttempts ?? 0)) return { text: text.padEnd(request.maxBytes + 64, '~'), model: 'fake-summarizer' }
+      return { text: Utf8.clip(text, request.maxBytes), model: 'fake-summarizer' }
     },
   }
 }

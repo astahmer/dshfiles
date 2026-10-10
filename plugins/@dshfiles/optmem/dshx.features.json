@@ -150,28 +150,45 @@
         {
           "key": "summarizerProvider",
           "defaultValue": "",
-          "constraints": "Provider identifier; empty means no configured summarizer.",
+          "constraints": "Override provider id; empty means the provider of the thread being summarized.",
           "coveredBy": [
             "optmem.summarizer-failure"
           ]
         },
         {
           "key": "summarizerModel",
-          "defaultValue": "gpt-6-luna",
-          "constraints": "Non-empty model identifier.",
+          "defaultValue": "",
+          "constraints": "Override model for every summary; empty uses the thread's provider with its cheap model.",
           "coveredBy": [
             "optmem.summarizer-failure"
           ]
         },
         {
           "key": "summarizerEffort",
-          "defaultValue": "low",
-          "constraints": "One of low, medium, or high.",
+          "defaultValue": "",
+          "constraints": "Empty (adapter default), low, medium, or high.",
           "choices": [
+            "",
             "low",
             "medium",
             "high"
           ],
+          "coveredBy": [
+            "optmem.summarizer-failure"
+          ]
+        },
+        {
+          "key": "cheapModels",
+          "defaultValue": "codex: gpt-6-luna (low); claude: claude-haiku-* (low); opencode-go: deepseek-v4.1-flash, deepseek-v4-flash, glm-5.3-flash; commandcode: deepseek-v4.1-flash, deepseek-v4-flash, gpt-6-luna; deepseek: deepseek-flash",
+          "constraints": "Entries keyed by AI Accounts provider kind or exact provider id; models in preference order, a trailing * takes the newest match; each must be offered by the thread's provider.",
+          "coveredBy": [
+            "optmem.summarizer-failure"
+          ]
+        },
+        {
+          "key": "summarizerFallbacks",
+          "defaultValue": "[]",
+          "constraints": "Ordered provider/model/effort routes; empty provider means the thread's provider. With none offered, summaries wait and retry.",
           "coveredBy": [
             "optmem.summarizer-failure"
           ]

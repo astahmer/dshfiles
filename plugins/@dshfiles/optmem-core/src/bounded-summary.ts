@@ -14,37 +14,39 @@ export const boundedSummary = async (request: {
   readonly logger: MemoryLogger
   readonly kind: 'leaf' | 'merge'
   readonly stream: StreamId
+  readonly conversationId: string
   readonly address: string
   readonly input: readonly string[]
   readonly maxBytes: number
   readonly retries: number
 }): Promise<BoundedSummary> => {
-  let shortest: string | undefined
+  let shortest: { readonly text: string; readonly model: string } | undefined
   let previousBytes: number | null = null
   for (let attempt = 0; attempt <= request.retries; attempt++) {
     const budget = Math.max(32, Math.floor(request.maxBytes * (1 - 0.2 * attempt)))
-    const raw = await request.summarizer.summarize({
+    const result = await request.summarizer.summarize({
       kind: request.kind,
       stream: request.stream,
+      conversationId: request.conversationId,
       address: request.address,
       maxBytes: budget,
       input: request.input,
       attempt,
       previousBytes,
     })
-    const text = raw.replace(addressHead, '').trim()
+    const text = result.text.replace(addressHead, '').trim()
     if (text.length === 0) throw new Error(`summarizer returned an empty ${request.kind} summary for ${request.address}`)
     const bytes = Utf8.byteLength(text)
-    if (shortest === undefined || bytes < Utf8.byteLength(shortest)) shortest = text
-    if (bytes <= request.maxBytes) return { text, model: request.summarizer.model, clipped: false, calls: attempt + 1 }
+    if (shortest === undefined || bytes < Utf8.byteLength(shortest.text)) shortest = { text, model: result.model }
+    if (bytes <= request.maxBytes) return { text, model: result.model, clipped: false, calls: attempt + 1 }
     previousBytes = bytes
   }
-  const best = shortest ?? ''
+  const best = shortest ?? { text: '', model: 'none' }
   request.logger.warn('optmem summary clipped after retries', {
     stream: request.stream,
     address: request.address,
-    bytes: Utf8.byteLength(best),
+    bytes: Utf8.byteLength(best.text),
     maxBytes: request.maxBytes,
   })
-  return { text: Utf8.clip(best, request.maxBytes), model: `clipped:${request.summarizer.model}`, clipped: true, calls: request.retries + 1 }
+  return { text: Utf8.clip(best.text, request.maxBytes), model: `clipped:${best.model}`, clipped: true, calls: request.retries + 1 }
 }

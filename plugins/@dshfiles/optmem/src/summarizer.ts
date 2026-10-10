@@ -1,7 +1,5 @@
 import { BlockAssembler, ReasoningEffortId, createUserMessage, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { Summarizer, SummaryRequest } from '@dshfiles/optmem-core'
-
-export type SummaryRoute = { readonly provider: string; readonly model: string }
+import type { Summarizer, SummaryRequest, SummaryResult } from '@dshfiles/optmem-core'
 
 const instructions = (request: SummaryRequest): string =>
   [
@@ -23,92 +21,153 @@ const framedInput = (request: SummaryRequest): string =>
 
 export type SummaryEffort = 'low' | 'medium' | 'high'
 
-export type SummarizerTarget = { readonly provider: string; readonly model: string; readonly effort: SummaryEffort }
+/** A fixed route; an empty provider means the provider of the thread being summarized. */
+export type RouteEntry = { readonly provider: string; readonly model: string; readonly effort?: SummaryEffort | undefined }
 
-/** Where summaries go: a resolved route, or why none is usable. Nothing falls back to the session's own model. */
+/**
+ * The cheap models of one provider kind (`codex`, `claude`, ...) or one exact provider id, in preference order. A model
+ * ending in `*` matches every offered id with that prefix and takes the newest.
+ */
+export type CheapModelEntry = { readonly kind: string; readonly models: readonly string[]; readonly effort?: SummaryEffort | undefined }
+
+export type SummarizerPolicy = {
+  readonly override: RouteEntry | undefined
+  readonly cheapModels: readonly CheapModelEntry[]
+  readonly fallbacks: readonly RouteEntry[]
+}
+
+export type SummaryRoute = { readonly provider: string; readonly model: string; readonly effort: SummaryEffort | undefined }
+
 export type SummarizerRouteState =
-  | { readonly kind: 'unresolved'; readonly target: SummarizerTarget }
-  | { readonly kind: 'ready'; readonly target: SummarizerTarget; readonly route: SummaryRoute }
-  | { readonly kind: 'unavailable'; readonly target: SummarizerTarget; readonly reason: string }
+  | { readonly kind: 'unresolved' }
+  | { readonly kind: 'ready'; readonly conversationId: string; readonly source: 'override' | 'account' | 'fallback'; readonly route: SummaryRoute }
+  | { readonly kind: 'unavailable'; readonly conversationId: string; readonly reason: string }
 
-export type ModelCatalog = {
-  readonly providers: () => readonly string[]
+/** What the Host knows about providers and threads; each lookup degrades to `undefined` / `[]` instead of throwing. */
+export type RouteCatalog = {
+  readonly sessionProvider: (conversationId: string) => Promise<string | undefined>
+  readonly providerKind: (provider: string) => Promise<string | undefined>
   readonly models: (provider: string) => Promise<readonly string[]>
 }
 
-const unavailableRetryMs = 60_000
+const offeredModel = (candidate: string, offered: readonly string[]): string | undefined => {
+  const matches = (id: string, wanted: string): boolean => id === wanted || id.endsWith(`/${wanted}`)
+  if (!candidate.endsWith('*')) return offered.find(id => matches(id, candidate))
+  const prefix = candidate.slice(0, -1)
+  const newestFirst = offered
+    .filter(id => id.startsWith(prefix) || id.includes(`/${prefix}`))
+    .toSorted((left, right) => right.localeCompare(left, 'en', { numeric: true }))
+  return newestFirst[0]
+}
+
+const cheapEntryFor = (entries: readonly CheapModelEntry[], provider: string, accountKind: string | undefined): CheapModelEntry | undefined =>
+  entries.find(entry => entry.kind === provider) ??
+  (accountKind === undefined ? undefined : entries.find(entry => entry.kind === accountKind)) ??
+  entries
+    .filter(entry => provider.startsWith(`${entry.kind}-`) || provider.startsWith(`${entry.kind}_`))
+    .toSorted((left, right) => right.kind.length - left.kind.length)[0]
 
 /**
- * Finds the provider route serving the configured model: the configured provider when set, else the first provider
- * listing that model. A miss is remembered for a minute so retried summaries do not rescan every provider.
+ * Picks the route for one summary: the override when set, else the thread's own provider with that provider's cheap
+ * model, then each fallback in order. Every candidate must be offered by its provider. It never uses the thread's own
+ * (possibly expensive) model: with no candidate left the summary is skipped and retried later.
  */
+export const selectSummaryRoute = async (request: {
+  readonly policy: SummarizerPolicy
+  readonly conversationId: string
+  readonly catalog: RouteCatalog
+}): Promise<SummarizerRouteState> => {
+  const { policy, conversationId, catalog } = request
+  const sessionProvider = await catalog.sessionProvider(conversationId)
+  const tried: string[] = []
+  const tryEntry = async (entry: RouteEntry): Promise<SummaryRoute | undefined> => {
+    const provider = entry.provider.length > 0 ? entry.provider : sessionProvider
+    if (provider === undefined) {
+      tried.push(`${entry.model} (thread provider unknown)`)
+      return undefined
+    }
+    const model = offeredModel(entry.model, await catalog.models(provider))
+    if (model !== undefined) return { provider, model, effort: entry.effort }
+    tried.push(`${provider}/${entry.model} (not offered)`)
+    return undefined
+  }
+
+  if (policy.override !== undefined) {
+    const route = await tryEntry(policy.override)
+    if (route) return { kind: 'ready', conversationId, source: 'override', route }
+  } else if (sessionProvider === undefined) tried.push('thread provider unknown')
+  else {
+    const cheap = cheapEntryFor(policy.cheapModels, sessionProvider, await catalog.providerKind(sessionProvider))
+    if (cheap === undefined) tried.push(`${sessionProvider} (no cheap model configured)`)
+    else {
+      const offered = await catalog.models(sessionProvider)
+      const model = cheap.models.map(candidate => offeredModel(candidate, offered)).find(found => found !== undefined)
+      if (model !== undefined) return { kind: 'ready', conversationId, source: 'account', route: { provider: sessionProvider, model, effort: cheap.effort } }
+      tried.push(`${sessionProvider}/${cheap.models.join('|')} (not offered)`)
+    }
+  }
+  for (const fallback of policy.fallbacks) {
+    const route = await tryEntry(fallback)
+    if (route) return { kind: 'ready', conversationId, source: 'fallback', route }
+  }
+  return { kind: 'unavailable', conversationId, reason: `no cheap summary route: ${tried.join(', ')}` }
+}
+
+const routeCacheMs = 60_000
+
+/** Remembers each thread's route for a minute, so a burst of summaries does not re-list provider models every call. */
 export const createRouteResolver = (options: {
-  readonly catalog: () => ModelCatalog | undefined
-  readonly target: () => SummarizerTarget
+  readonly catalog: () => RouteCatalog
+  readonly policy: () => SummarizerPolicy
   readonly now?: () => number
 }) => {
   const now = options.now ?? Date.now
-  let state: SummarizerRouteState = { kind: 'unresolved', target: options.target() }
-  let checkedAt = 0
+  const cache = new Map<string, { readonly policy: string; readonly at: number; readonly state: SummarizerRouteState }>()
+  let latest: SummarizerRouteState = { kind: 'unresolved' }
 
-  const sameTarget = (left: SummarizerTarget, right: SummarizerTarget): boolean =>
-    left.provider === right.provider && left.model === right.model && left.effort === right.effort
-
-  const resolve = async (): Promise<SummarizerRouteState> => {
-    const target = options.target()
-    const fresh = sameTarget(state.target, target)
-    if (fresh && state.kind === 'ready') return state
-    if (fresh && state.kind === 'unavailable' && now() - checkedAt < unavailableRetryMs) return state
-    checkedAt = now()
-    const catalog = options.catalog()
-    if (!catalog) return (state = { kind: 'unavailable', target, reason: 'the DSH llm service is unavailable' })
-    const candidates = target.provider.length > 0 ? [target.provider] : catalog.providers()
-    for (const provider of candidates) {
-      const models = await catalog.models(provider).catch((): readonly string[] => [])
-      if (models.includes(target.model)) return (state = { kind: 'ready', target, route: { provider, model: target.model } })
-    }
-    const where = target.provider.length > 0 ? `provider ${target.provider}` : 'any configured provider'
-    return (state = { kind: 'unavailable', target, reason: `model ${target.model} is not served by ${where}` })
+  const resolve = async (conversationId: string): Promise<SummarizerRouteState> => {
+    const policy = options.policy()
+    const policyKey = JSON.stringify(policy)
+    const cached = cache.get(conversationId)
+    if (cached && cached.policy === policyKey && now() - cached.at < routeCacheMs) return (latest = cached.state)
+    const state = await selectSummaryRoute({ policy, conversationId, catalog: options.catalog() })
+    cache.set(conversationId, { policy: policyKey, at: now(), state })
+    return (latest = state)
   }
 
-  return { resolve, current: (): SummarizerRouteState => state }
+  return { resolve, current: (): SummarizerRouteState => latest }
 }
 
 /** Summaries go through DSH's own LLM service, so provider credentials and routing stay DSH's. */
 export const createLlmSummarizer = (options: {
   readonly stream: (call: GenerateOptions) => AsyncIterable<StreamChunk>
-  readonly resolveRoute: () => Promise<SummarizerRouteState>
+  readonly resolveRoute: (conversationId: string) => Promise<SummarizerRouteState>
   readonly timeoutMs: () => number
-}): Summarizer & { model: string } => {
-  const summarizer = {
-    model: 'unresolved',
-    summarize: async (request: SummaryRequest): Promise<string> => {
-      const state = await options.resolveRoute()
-      if (state.kind !== 'ready') throw new Error(`summarizer unavailable: ${state.kind === 'unavailable' ? state.reason : 'route not resolved'}`)
-      summarizer.model = `${state.route.provider}/${state.route.model}`
-      const call: GenerateOptions = {
-        provider: state.route.provider,
-        model: state.route.model,
-        reasoningEffort: ReasoningEffortId(state.target.effort),
-        system: instructions(request),
-        messages: [createUserMessage({ content: [{ type: 'text', text: framedInput(request) }], source: { kind: 'user' } })],
-        maxTokens: Math.max(1_024, request.maxBytes * 2),
-        purpose: 'compaction',
-        signal: AbortSignal.timeout(options.timeoutMs()),
-      }
-      const assembler = new BlockAssembler()
-      for await (const chunk of options.stream(call)) assembler.push(chunk)
-      const finish = assembler.finish
-      if (finish.kind === 'error' || finish.kind === 'aborted') throw new Error(`summary call ended with ${finish.kind}: ${finish.failure.message}`)
-      if (finish.kind === 'tool-calls') throw new Error('summary model requested a tool')
-      const text = assembler
-        .blocks()
-        .flatMap(block => (block.type === 'text' ? [block.text] : []))
-        .join('')
-        .trim()
-      if (text.length === 0) throw new Error(`summary model returned no text (finish: ${finish.kind})`)
-      return text
-    },
-  }
-  return summarizer
-}
+}): Summarizer => ({
+  summarize: async (request: SummaryRequest): Promise<SummaryResult> => {
+    const state = await options.resolveRoute(request.conversationId)
+    if (state.kind !== 'ready') throw new Error(`summarizer unavailable: ${state.kind === 'unavailable' ? state.reason : 'route not resolved'}`)
+    const call: GenerateOptions = {
+      provider: state.route.provider,
+      model: state.route.model,
+      ...(state.route.effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(state.route.effort) }),
+      system: instructions(request),
+      messages: [createUserMessage({ content: [{ type: 'text', text: framedInput(request) }], source: { kind: 'user' } })],
+      maxTokens: Math.max(1_024, request.maxBytes * 2),
+      purpose: 'compaction',
+      signal: AbortSignal.timeout(options.timeoutMs()),
+    }
+    const assembler = new BlockAssembler()
+    for await (const chunk of options.stream(call)) assembler.push(chunk)
+    const finish = assembler.finish
+    if (finish.kind === 'error' || finish.kind === 'aborted') throw new Error(`summary call ended with ${finish.kind}: ${finish.failure.message}`)
+    if (finish.kind === 'tool-calls') throw new Error('summary model requested a tool')
+    const text = assembler
+      .blocks()
+      .flatMap(block => (block.type === 'text' ? [block.text] : []))
+      .join('')
+      .trim()
+    if (text.length === 0) throw new Error(`summary model returned no text (finish: ${finish.kind})`)
+    return { text, model: `${state.route.provider}/${state.route.model}` }
+  },
+})

@@ -132,7 +132,7 @@ export type MemoryStatus = {
   readonly streams: readonly StreamStatus[]
   readonly queue: { readonly leaves: number; readonly parents: number; readonly running: number; readonly parentsFirst: boolean }
   readonly failures: { readonly count: number; readonly lastError: string | null; readonly retryInMs: number | null }
-  readonly summarizer: { readonly model: string; readonly calls: number; readonly clips: number }
+  readonly summarizer: { readonly calls: number; readonly clips: number }
   readonly merges: number
   readonly search: { readonly cursor: number; readonly lag: number; readonly error: string | null } | null
   readonly closed: boolean
@@ -235,9 +235,6 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const config: MemoryConfig = { ...defaultMemoryConfig, ...options.config }
   const store = options.store
   const summarizer: Summarizer = {
-    get model(): string {
-      return options.summarizer.model
-    },
     summarize: request => withTimeout(options.summarizer.summarize(request), config.summaryTimeoutMs, `${request.kind} summary ${request.address}`),
   }
   const searchIndex = options.search
@@ -342,12 +339,20 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     }
   }
 
-  const summarize = async (kind: 'leaf' | 'merge', stream: StreamId, address: NodeAddress, input: readonly string[]) => {
+  const summarize = async (request: {
+    readonly kind: 'leaf' | 'merge'
+    readonly stream: StreamId
+    readonly conversationId: string
+    readonly address: NodeAddress
+    readonly input: readonly string[]
+  }) => {
+    const { kind, stream, conversationId, address, input } = request
     const summary = await boundedSummary({
       summarizer,
       logger,
       kind,
       stream,
+      conversationId,
       address: TreeMath.format(address),
       input,
       maxBytes: config.maxNodeBytes,
@@ -366,7 +371,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     const pending = (async () => {
       const reused = await store.findLeafByEvent(event.id)
       if (reused) return { text: reused.text, model: reused.model }
-      return summarize('leaf', stream, { level: 0, idx: pos }, [verbatim])
+      return summarize({ kind: 'leaf', stream, conversationId: event.conversationId, address: { level: 0, idx: pos }, input: [verbatim] })
     })()
     leafTexts.set(event.id, pending)
     return pending.finally(() => leafTexts.delete(event.id))
@@ -411,7 +416,9 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (!left || !right) return undefined
     const joined = `${left.text}\n${right.text}`
     if (Utf8.byteLength(joined) <= config.maxNodeBytes) return { text: joined, model: 'concat', eventId: null }
-    const summary = await summarize('merge', stream, address, [left.text, right.text])
+    const [newest] = await store.readStream(stream, TreeMath.lastPos(address), TreeMath.lastPos(address) + 1)
+    if (!newest) return undefined
+    const summary = await summarize({ kind: 'merge', stream, conversationId: newest.event.conversationId, address, input: [left.text, right.text] })
     return { text: summary.text, model: summary.model, eventId: null }
   }
 
@@ -791,7 +798,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       streams,
       queue: { leaves: leafQueue.size, parents: parentQueue.size, running, parentsFirst: pendingMerges.size > 0 },
       failures: { count: failed.size, lastError, retryInMs: retryAt === null ? null : Math.max(0, retryAt - clock.now()) },
-      summarizer: { model: summarizer.model, calls: summaryCalls, clips: summaryClips },
+      summarizer: { calls: summaryCalls, clips: summaryClips },
       merges,
       search: searchStatus ? { ...searchStatus, error: searchError } : null,
       closed,

@@ -128,6 +128,8 @@ export interface MemoryStore {
 export type SummaryRequest = {
   readonly kind: 'leaf' | 'merge'
   readonly stream: StreamId
+  /** The session whose event the summary covers; for a merge, the session of its newest event, which triggered it. */
+  readonly conversationId: string
   readonly address: string
   readonly maxBytes: number
   /** Leaf: one `role: text`; merge: the two child texts, oldest first. Untrusted data. */
@@ -136,9 +138,11 @@ export type SummaryRequest = {
   readonly previousBytes: number | null
 }
 
+/** `model` is the route that produced this text; concurrent summaries may use different routes. */
+export type SummaryResult = { readonly text: string; readonly model: string }
+
 export interface Summarizer {
-  readonly model: string
-  summarize(request: SummaryRequest): Promise<string>
+  summarize(request: SummaryRequest): Promise<SummaryResult>
 }
 
 export type StoredSearchHit = {

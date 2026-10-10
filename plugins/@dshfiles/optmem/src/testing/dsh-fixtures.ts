@@ -81,8 +81,10 @@ export const defaultSettings: OptmemSettings = {
   viewLowerBytes: 8_000,
   maxNodeBytes: 512,
   summarizerProvider: '',
-  summarizerModel: 'gpt-6-luna',
-  summarizerEffort: 'low',
+  summarizerModel: '',
+  summarizerEffort: '',
+  cheapModels: [],
+  summarizerFallbacks: [],
   summarizerConcurrency: 2,
   summarizerTimeoutMs: 5_000,
   barrierMs: 1_000,
@@ -97,11 +99,10 @@ export const defaultSettings: OptmemSettings = {
 export const fakeSummarizer = (): Summarizer & { readonly calls: string[] } => {
   const calls: string[] = []
   return {
-    model: 'fake',
     calls,
     summarize: async request => {
       calls.push(request.kind)
-      return Utf8.clip(`${request.kind === 'leaf' ? 'L' : 'M'}: ${request.input.join(' / ').replace(/\s+/g, ' ')}`, request.maxBytes)
+      return { text: Utf8.clip(`${request.kind === 'leaf' ? 'L' : 'M'}: ${request.input.join(' / ').replace(/\s+/g, ' ')}`, request.maxBytes), model: 'fake' }
     },
   }
 }
@@ -127,7 +128,7 @@ export const createTestRuntime = (request: {
     workspaceId: async path => request.workspaces?.[path],
     sessionLogs: () => request.sessionLogs,
     createSummarizer: () => request.summarizer ?? fakeSummarizer(),
-    summarizerRoute: () => ({ kind: 'ready', target: { provider: '', model: 'fake', effort: 'low' }, route: { provider: 'fake', model: 'fake' } }),
+    summarizerRoute: () => ({ kind: 'ready', conversationId: 'fake', source: 'account', route: { provider: 'fake', model: 'fake', effort: undefined } }),
   }
   const runtime = createOptmemRuntime({
     services,

@@ -124,7 +124,7 @@ export const createMemoryToolHandlers = (getRuntime: () => OptmemRuntime | undef
           ]
         : []),
       `captured ${host.captured} event(s), skipped ${host.skipped}, queued ${host.queued}${host.lastCaptureError ? `, last capture error: ${host.lastCaptureError}` : ''}`,
-      `summarizer ${host.summarizer.target.model} (effort ${host.summarizer.target.effort}): ${host.summarizer.kind === 'ready' ? `via ${host.summarizer.route.provider}` : host.summarizer.kind === 'unavailable' ? `UNAVAILABLE — ${host.summarizer.reason}; oversized events stay [pending summary]` : 'not resolved yet'}`,
+      `summarizer: ${host.summarizer.kind === 'ready' ? `${host.summarizer.route.provider}/${host.summarizer.route.model} (effort ${host.summarizer.route.effort ?? 'default'}, ${host.summarizer.source} route) for thread ${host.summarizer.conversationId}` : host.summarizer.kind === 'unavailable' ? `UNAVAILABLE for thread ${host.summarizer.conversationId} — ${host.summarizer.reason}; oversized events stay [pending summary] and retry` : 'no summary requested yet'}`,
       `database ${host.database}; settings from ${host.settings === 'entry' ? 'the dshfiles-optmem entry' : 'schema defaults (entry not readable yet)'}`,
     ]
     if (host.state === 'ready' && agent) {
