@@ -22,6 +22,9 @@ export const jujutsuSettings = defineSettings({
     hideImmutable: Schema.boolean().default(false).description('Hide immutable revisions in the graph.'),
     mineOnly: Schema.boolean().default(false).description('Show only your own revisions (and the working copy) in the graph.'),
     dateHeadings: Schema.boolean().default(true).description('Group graph revisions under day headings.'),
+    graphDensity: Schema.union([Schema.const('comfortable').description('Comfortable'), Schema.const('compact').description('Compact')])
+      .default('comfortable')
+      .description('Row height and lane spacing of the revision graph.'),
     revisionLimit: Schema.natural().min(50).max(500).default(300).description('Revisions loaded into the graph.'),
     refreshMode: Schema.union([Schema.const('interval').description('Every interval'), Schema.const('manual').description('Manual only')])
       .default('interval')
@@ -30,7 +33,9 @@ export const jujutsuSettings = defineSettings({
     refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
     composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
     composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
-    headerToggle: Schema.boolean().default(true).description('Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository.'),
+    headerToggle: Schema.boolean()
+      .default(true)
+      .description('Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository.'),
     composerBarBase: Schema.string()
       .default('parent')
       .description('Default base of the composer bar: `parent` (working copy vs @-), `trunk` (since trunk()), or a local bookmark name.'),

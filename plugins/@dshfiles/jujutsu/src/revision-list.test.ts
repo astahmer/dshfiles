@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import type { RevisionGraphRow } from './graph.ts'
 import { activeDayIndex, flattenRevisionGroups } from './revision-list.ts'
 
-const layout = (commitId: string, lane = 0) => ({ commitId, commitLane: lane, incoming: false, laneCount: 1, topLanes: [], bottomLanes: [], edges: [] })
+const layout = (commitId: string, lane = 0): RevisionGraphRow => ({
+  commitId,
+  commitLane: lane,
+  tone: 'trunk',
+  laneCount: 1,
+  incoming: [],
+  passing: [],
+  outgoing: [],
+  topLanes: [],
+  bottomLanes: [],
+  bends: false,
+})
 const layouts = new Map(['a', 'b', 'c'].map(id => [id, layout(id)]))
 
 describe('flattenRevisionGroups', () => {
@@ -28,6 +40,19 @@ describe('flattenRevisionGroups', () => {
       layouts,
     })
     expect(items.map(item => item.key)).toEqual(['day:Today', 'day:Yesterday', 'c'])
+  })
+
+  it('gives a day that heads several runs a distinct key per run', () => {
+    const items = flattenRevisionGroups({
+      groups: [
+        { day: 'Today', rows: [{ commitId: 'a' }] },
+        { day: 'Yesterday', rows: [{ commitId: 'b' }] },
+        { day: 'Today', rows: [{ commitId: 'c' }] },
+      ],
+      collapsedDays: new Set(),
+      layouts,
+    })
+    expect(items.map(item => item.key)).toEqual(['day:Today', 'a', 'day:Yesterday', 'b', 'day:Today#1', 'c'])
   })
 
   it('omits headings without date grouping and skips rows missing from the graph', () => {

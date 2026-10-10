@@ -52,16 +52,21 @@ import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ArrowDownIcon,
+  BookmarkIcon,
   CalendarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
   FolderGit2Icon,
   GripVerticalIcon,
+  LayersIcon,
   LocateFixedIcon,
+  PencilIcon,
   RefreshCwIcon,
   SearchIcon,
   Settings2Icon,
+  TagIcon,
+  TriangleAlertIcon,
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
@@ -77,13 +82,21 @@ import { z } from 'zod'
 import type { Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
-import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type RevisionGraphRow } from './graph.js'
+import {
+  describeDraftChanged,
+  groupRevisionsByBranch,
+  layoutRevisionGraph,
+  matchesRevisionSearch,
+  type GraphLane,
+  type GraphTone,
+  type RevisionGraphRow,
+} from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
 import { revisionActionMachine } from './revision-action-machine.js'
-import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences } from './preferences.js'
+import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
@@ -122,15 +135,12 @@ const REVIEW_PROGRESS_KEY = 'dshfiles.jujutsu.review-progress.v1'
 const REVISION_MIME = 'application/x-jujutsu-revision'
 const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
 const REPO_HISTORY_LIMIT = 12
-const LANE_GAP = 10
-const LANE_OFFSET = 8
-const LANE_STROKES = ['dshx:stroke-chart-1', 'dshx:stroke-chart-2', 'dshx:stroke-chart-3', 'dshx:stroke-chart-4', 'dshx:stroke-chart-5'] as const
-const LANE_FILLS = ['dshx:fill-chart-1', 'dshx:fill-chart-2', 'dshx:fill-chart-3', 'dshx:fill-chart-4', 'dshx:fill-chart-5'] as const
 
 const CODE_BLOCK =
   'dshx:max-h-80 dshx:overflow-auto dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:p-2 dshx:font-mono dshx:text-[11px] dshx:leading-snug dshx:whitespace-pre'
 const DISCLOSURE_TRIGGER =
   'dshx:group/disclosure dshx:flex dshx:items-center dshx:gap-1 dshx:py-1 dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground dshx:hover:text-foreground'
+
 const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:font-mono dshx:text-[10px] dshx:leading-none'
 
 const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.array(z.string()), fallback: [] })
@@ -163,25 +173,22 @@ const dayLabel = (value: string): string => {
     : 'Date unavailable'
 }
 
+/** Consecutive runs of one day, so headings never reorder the graph rows they sit between. */
 const groupRows = (revisions: readonly Revision[], byDay: boolean): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
   if (!byDay) return [{ day: '', rows: revisions }]
-  const groups = new Map<string, Revision[]>()
+  const groups: { day: string; rows: Revision[] }[] = []
   for (const revision of revisions) {
-    const key = dayLabel(revision.authorTime)
-    const rows = groups.get(key) ?? []
-    rows.push(revision)
-    groups.set(key, rows)
+    const day = dayLabel(revision.authorTime)
+    const current = groups.at(-1)
+    if (current?.day === day) current.rows.push(revision)
+    else groups.push({ day, rows: [revision] })
   }
-  return [...groups].map(([day, rows]) => ({ day, rows }))
+  return groups
 }
 
 const firstLine = (description: string): string => description.split('\n')[0] || '(no description)'
 
 const editableDescription = (description: string): string => description.replace(/\n+$/, '')
-
-const laneCenter = (lane: number): number => LANE_OFFSET + lane * LANE_GAP
-
-const laneStroke = (lane: number): string => LANE_STROKES[lane % LANE_STROKES.length] ?? LANE_STROKES[0]
 
 const repositoryName = (root: string): string => root.split('/').filter(Boolean).at(-1) ?? root
 
@@ -335,9 +342,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
 
+  const graphOrder = useMemo(() => groupRevisionsByBranch(state?.revisions ?? []), [state])
   const visibleRevisions = useMemo(() => {
     if (state === undefined) return []
-    return state.revisions.filter(revision => {
+    return graphOrder.filter(revision => {
       if (mineOnly && !revision.mine && !revision.workingCopy) return false
       if (hideImmutable && revision.immutable) return false
       if (authorFilter && !revision.author.toLocaleLowerCase().includes(authorFilter.toLocaleLowerCase())) return false
@@ -346,31 +354,30 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       if (toDate && Number.isFinite(timestamp) && timestamp > Date.parse(toDate + 'T23:59:59')) return false
       return matchesRevisionSearch(revision, textFilter)
     })
-  }, [state, mineOnly, hideImmutable, authorFilter, textFilter, fromDate, toDate])
+  }, [state, graphOrder, mineOnly, hideImmutable, authorFilter, textFilter, fromDate, toDate])
 
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
   const graphRows = useMemo(() => {
     if (state === undefined) return []
-    const graphRevisions = hideImmutable ? state.revisions.filter(revision => !revision.immutable) : state.revisions
+    const graphRevisions = hideImmutable ? graphOrder.filter(revision => !revision.immutable) : graphOrder
     return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
-  }, [state, revisionsByCommitId, hideImmutable])
+  }, [state, graphOrder, revisionsByCommitId, hideImmutable])
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
-  const graphLaneCount = graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1)
-  const graphWidth = laneCenter(graphLaneCount - 1) + LANE_OFFSET
+  const graphMetrics = GRAPH_DENSITY[preferences.graphDensity]
+  const graphWidth = graphWidthFor(
+    graphMetrics,
+    graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1),
+  )
   const groups = useMemo(() => groupRows(visibleRevisions, preferences.dateHeadings), [visibleRevisions, preferences.dateHeadings])
   const movingBranch = useMemo(
     () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
     [dragSource, state],
   )
 
-  const listItems = useMemo(
-    () => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }),
-    [groups, collapsedDays, graphRowsByCommitId],
-  )
+  const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingFocusIndex = useRef<number | null>(null)
   const scrolledToWorkingCopy = useRef<string | null>(null)
-  const revisionRowHeight = sidePanel ? 26 : 30
   const dragSourceIndex = dragSource === null ? -1 : listItems.findIndex(item => item.key === dragSource)
   const workingCopyIndex = listItems.findIndex(item => item.kind === 'revision' && item.revision.workingCopy)
   const listVirtualizer = useVirtualizer({
@@ -379,8 +386,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     getItemKey: index => listItems[index]?.key ?? index,
     estimateSize: index => {
       const item = listItems[index]
-      if (item?.kind === 'day') return 18
-      return item?.key === selectedRevision?.commitId ? revisionRowHeight + 320 : revisionRowHeight
+      if (item === undefined || item.kind === 'day') return 18
+      const rowHeight = rowHeightFor(graphMetrics, item.layout)
+      return item.key === selectedRevision?.commitId ? rowHeight + 320 : rowHeight
     },
     overscan: 12,
     paddingEnd: 16,
@@ -422,7 +430,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (!Number.isInteger(current)) return
     const last = listItems.length - 1
     const next =
-      event.key === 'ArrowDown' ? Math.min(current + 1, last) : event.key === 'ArrowUp' ? Math.max(current - 1, 0) : event.key === 'Home' ? 0 : event.key === 'End' ? last : null
+      event.key === 'ArrowDown'
+        ? Math.min(current + 1, last)
+        : event.key === 'ArrowUp'
+          ? Math.max(current - 1, 0)
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : null
     if (next === null) return
     event.preventDefault()
     pendingFocusIndex.current = next
@@ -614,8 +630,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Badge>
           )}
           {revision.conflict && (
-            <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:text-destructive')} variant="outline">
+            <Badge className={cn(COMPACT_BADGE, 'dshx:border-warning/40 dshx:text-warning')} variant="outline">
               conflict
+            </Badge>
+          )}
+          {revision.evolved && (
+            <Badge className={cn(COMPACT_BADGE, 'dshx:text-muted-foreground')} variant="outline">
+              rewritten
             </Badge>
           )}
         </div>
@@ -891,22 +912,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       }
                       type="button"
                     >
-                      <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={18} width={graphWidth}>
-                        {item.firstLayout !== undefined &&
-                          [...item.firstLayout.topLanes, ...(item.firstLayout.incoming ? [item.firstLayout.commitLane] : [])].map(lane => (
-                            <line
-                              className={laneStroke(lane)}
-                              key={lane}
-                              strokeOpacity={0.8}
-                              strokeWidth={1.25}
-                              x1={laneCenter(lane)}
-                              x2={laneCenter(lane)}
-                              y1={0}
-                              y2={18}
-                            />
-                          ))}
-                      </svg>
-                      <ChevronDownIcon className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', collapsedDays.has(item.day) && 'dshx:-rotate-90')} />
+                      <span className="dshx:relative dshx:h-full dshx:flex-none" style={{ width: graphWidth }}>
+                        <GraphLanes lanes={item.firstLayout?.topLanes ?? []} metrics={graphMetrics} width={graphWidth} />
+                      </span>
+                      <ChevronDownIcon
+                        className={cn('dshx:size-3 dshx:flex-none dshx:transition-transform', collapsedDays.has(item.day) && 'dshx:-rotate-90')}
+                      />
                       <span className="dshx:truncate">{item.day}</span>
                       <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{item.count}</span>
                     </button>
@@ -920,13 +931,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       graphWidth={graphWidth}
                       menu={revisionMenu(item.revision)}
                       onDragEnter={event => {
-                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
+                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME))
+                          sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
                       }}
                       onDragStart={() => sendAction({ type: 'drag.start', sourceId: item.revision.commitId })}
                       onDrop={event => dropOn(event, item.revision)}
                       onToggle={() => toggleRevision(item.revision)}
                       revision={item.revision}
-                      sidePanel={sidePanel}
+                      metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
                     </RevisionRow>
@@ -996,7 +1008,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   )
 
   return (
-    <main ref={autoRefresh.ref} className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground">
+    <main
+      ref={autoRefresh.ref}
+      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground"
+    >
       <TooltipProvider>
         <Tabs className="dshx:min-h-0 dshx:flex-1 dshx:gap-0" onValueChange={value => setView(value === 'source' ? 'source' : 'graph')} value={view}>
           <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
@@ -1381,6 +1396,22 @@ const PreferencesMenu = (): JSX.Element => {
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Graph density ({preferences.graphDensity})</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup
+              onValueChange={value => setPreference('graphDensity', value === 'compact' ? 'compact' : 'comfortable')}
+              value={preferences.graphDensity}
+            >
+              <DropdownMenuRadioItem className="dshx:text-xs" value="comfortable">
+                Comfortable
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="compact">
+                Compact
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuCheckboxItem
           checked={preferences.dateHeadings}
           className="dshx:text-xs"
@@ -1403,58 +1434,179 @@ const PreferencesMenu = (): JSX.Element => {
   )
 }
 
+interface GraphMetrics {
+  readonly rowHeight: number
+  readonly bendGap: number
+  readonly laneGap: number
+}
+
+const GRAPH_DENSITY = {
+  comfortable: { rowHeight: 28, bendGap: 12, laneGap: 14 },
+  compact: { rowHeight: 22, bendGap: 8, laneGap: 11 },
+} as const satisfies Record<GraphDensity, GraphMetrics>
+
+const TONE_STROKE = {
+  trunk: 'dshx:stroke-info',
+  current: 'dshx:stroke-info',
+  workspace: 'dshx:stroke-teal',
+  divergent: 'dshx:stroke-violet',
+  branch: 'dshx:stroke-muted-foreground',
+} as const satisfies Record<GraphTone, string>
+
+const TONE_FILL = {
+  trunk: 'dshx:fill-info',
+  current: 'dshx:fill-info',
+  workspace: 'dshx:fill-teal',
+  divergent: 'dshx:fill-violet',
+  branch: 'dshx:fill-muted-foreground',
+} as const satisfies Record<GraphTone, string>
+
+const laneX = (metrics: GraphMetrics, lane: number): number => metrics.laneGap * 0.75 + lane * metrics.laneGap
+
+const graphWidthFor = (metrics: GraphMetrics, laneCount: number): number => laneX(metrics, Math.max(laneCount, 1) - 1) + metrics.laneGap * 0.75
+
+const rowHeightFor = (metrics: GraphMetrics, layout: RevisionGraphRow): number => metrics.rowHeight + (layout.bends ? metrics.bendGap : 0)
+
+/** A lane that runs straight down, or turns once with rounded corners at `turn`. */
+const lanePath = (input: { readonly fromX: number; readonly toX: number; readonly top: number; readonly turn: number; readonly bottom: number }): string => {
+  if (input.fromX === input.toX) return `M ${input.fromX} ${input.top} V ${input.bottom}`
+  const direction = input.toX > input.fromX ? 1 : -1
+  const radius = Math.min(6, Math.abs(input.toX - input.fromX) / 2, input.turn - input.top, input.bottom - input.turn)
+  return [
+    `M ${input.fromX} ${input.top}`,
+    `V ${input.turn - radius}`,
+    `Q ${input.fromX} ${input.turn} ${input.fromX + direction * radius} ${input.turn}`,
+    `H ${input.toX - direction * radius}`,
+    `Q ${input.toX} ${input.turn} ${input.toX} ${input.turn + radius}`,
+    `V ${input.bottom}`,
+  ].join(' ')
+}
+
+interface GraphLanesProps {
+  readonly lanes: readonly GraphLane[]
+  readonly metrics: GraphMetrics
+  readonly width: number
+}
+
+/** Straight lane lines through a day heading or an expanded revision's details. */
+const GraphLanes = (props: GraphLanesProps): JSX.Element => (
+  <svg aria-hidden className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:h-full" width={props.width}>
+    {props.lanes.map(lane => (
+      <line
+        className={TONE_STROKE[lane.tone]}
+        key={lane.lane}
+        strokeLinecap="round"
+        strokeWidth={1.5}
+        x1={laneX(props.metrics, lane.lane)}
+        x2={laneX(props.metrics, lane.lane)}
+        y1="0"
+        y2="100%"
+      />
+    ))}
+  </svg>
+)
+
 interface RevisionGraphCellProps {
   readonly revision: Revision
   readonly layout: RevisionGraphRow
+  readonly metrics: GraphMetrics
   readonly width: number
-  readonly height: number
 }
 
 const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
-  const middle = props.height / 2
-  const commitX = laneCenter(props.layout.commitLane)
-  const stroke = props.revision.divergent || props.revision.conflict ? 'dshx:stroke-destructive' : laneStroke(props.layout.commitLane)
-  const nodeClass = props.revision.workingCopy
-    ? 'dshx:fill-primary dshx:stroke-primary'
-    : cn(props.revision.empty ? 'dshx:fill-background' : (LANE_FILLS[props.layout.commitLane % LANE_FILLS.length] ?? LANE_FILLS[0]), stroke)
-  return (
-    <svg aria-hidden className="dshx:flex-none dshx:overflow-visible" height={props.height} viewBox={`0 0 ${props.width} ${props.height}`} width={props.width}>
-      <g fill="none" strokeOpacity={0.8} strokeWidth={1.25}>
-        {props.layout.topLanes.map(lane => (
-          <line className={laneStroke(lane)} key={`top-${lane}`} x1={laneCenter(lane)} x2={laneCenter(lane)} y1={0} y2={middle} />
-        ))}
-        {props.layout.incoming && <line className={laneStroke(props.layout.commitLane)} x1={commitX} x2={commitX} y1={0} y2={middle} />}
-        {props.layout.bottomLanes.map(lane => (
-          <line className={laneStroke(lane)} key={`bottom-${lane}`} x1={laneCenter(lane)} x2={laneCenter(lane)} y1={middle} y2={props.height} />
-        ))}
-        {props.layout.edges.map((edge, index) => {
-          const toX = laneCenter(edge.toLane)
-          return (
-            <path
-              className={laneStroke(edge.toLane)}
-              d={
-                commitX === toX
-                  ? `M ${commitX} ${middle} V ${props.height}`
-                  : `M ${commitX} ${middle} C ${commitX} ${middle + 6}, ${toX} ${middle + 4}, ${toX} ${props.height}`
-              }
-              key={`${edge.fromLane}-${edge.toLane}-${index}`}
-              strokeDasharray={edge.dashed ? '2 3' : undefined}
-            />
-          )
-        })}
-      </g>
-      {props.revision.immutable && !props.revision.workingCopy ? (
+  const revision = props.revision
+  const layout = props.layout
+  const height = rowHeightFor(props.metrics, layout)
+  const middle = props.metrics.rowHeight / 2
+  const turn = props.metrics.rowHeight + props.metrics.bendGap / 2
+  const x = (lane: number): number => laneX(props.metrics, lane)
+  const commitX = x(layout.commitLane)
+  const tone = revision.divergent ? 'divergent' : layout.tone
+  const node = (() => {
+    if (revision.workingCopy) {
+      return (
+        <>
+          <circle className="dshx:fill-info/25" cx={commitX} cy={middle} r={7.5} />
+          <circle className="dshx:fill-info dshx:stroke-background" cx={commitX} cy={middle} r={4.5} strokeWidth={1.5} />
+        </>
+      )
+    }
+    if (revision.immutable) {
+      return (
         <path
-          className={cn('dshx:fill-background', stroke)}
-          d={`M ${commitX} ${middle - 4.5} L ${commitX + 4.5} ${middle} L ${commitX} ${middle + 4.5} L ${commitX - 4.5} ${middle} Z`}
-          strokeWidth={1.5}
+          className="dshx:fill-muted-foreground dshx:stroke-background"
+          d={`M ${commitX} ${middle - 3.5} L ${commitX + 3.5} ${middle} L ${commitX} ${middle + 3.5} L ${commitX - 3.5} ${middle} Z`}
+          fillOpacity={0.6}
+          strokeWidth={1}
         />
-      ) : (
-        <circle className={nodeClass} cx={commitX} cy={middle} r={props.revision.workingCopy ? 4.5 : 3.75} strokeWidth={1.5} />
-      )}
+      )
+    }
+    if (revision.workspaces.length > 0 && !revision.divergent) {
+      return <circle className="dshx:fill-background dshx:stroke-teal" cx={commitX} cy={middle} r={4.25} strokeWidth={2} />
+    }
+    return (
+      <circle
+        className={cn(revision.empty ? 'dshx:fill-background' : TONE_FILL[tone], TONE_STROKE[tone], !revision.empty && 'dshx:stroke-background')}
+        cx={commitX}
+        cy={middle}
+        r={revision.empty ? 3.5 : 4}
+        strokeWidth={revision.empty ? 1.5 : 1}
+      />
+    )
+  })()
+  return (
+    <svg
+      aria-hidden
+      className="dshx:flex-none dshx:self-start dshx:overflow-visible"
+      height={height}
+      viewBox={`0 0 ${props.width} ${height}`}
+      width={props.width}
+    >
+      <g fill="none" strokeLinecap="round" strokeWidth={1.5}>
+        {layout.passing.map(link => (
+          <path
+            className={TONE_STROKE[link.tone]}
+            d={lanePath({ fromX: x(link.fromLane), toX: x(link.toLane), top: 0, turn, bottom: height })}
+            key={`pass-${link.fromLane}`}
+          />
+        ))}
+        {layout.incoming.map(link => (
+          <path
+            className={TONE_STROKE[link.tone]}
+            d={lanePath({ fromX: x(link.fromLane), toX: commitX, top: 0, turn: middle / 2, bottom: middle })}
+            key={`in-${link.fromLane}`}
+          />
+        ))}
+        {layout.outgoing.map((link, index) =>
+          link.terminal ? (
+            <path
+              className={TONE_STROKE[link.tone]}
+              d={`M ${commitX} ${middle} V ${middle + (height - middle) * 0.75}`}
+              key={`stub-${index}`}
+              strokeDasharray="1 3"
+              strokeOpacity={0.6}
+            />
+          ) : (
+            <path
+              className={TONE_STROKE[link.tone]}
+              d={lanePath({ fromX: commitX, toX: x(link.toLane), top: middle, turn, bottom: height })}
+              key={`out-${link.toLane}-${index}`}
+              strokeDasharray={link.dashed ? '2 3' : undefined}
+              strokeOpacity={revision.immutable ? 0.5 : 1}
+            />
+          ),
+        )}
+      </g>
+      {node}
     </svg>
   )
 }
+
+const CHIP = 'dshx:inline-flex dshx:h-[18px] dshx:flex-none dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:px-1.5 dshx:text-[11px] dshx:leading-none'
+
+/** jj prints change IDs in "reverse hex" (0-f → z-k); the API carries the normal hex form. */
+const reverseHexChangeId = (changeId: string, length: number): string =>
+  [...changeId.slice(0, length)].map(digit => String.fromCharCode('z'.charCodeAt(0) - Number.parseInt(digit, 16))).join('')
 
 interface RevisionRowProps {
   readonly revision: Revision
@@ -1463,7 +1615,7 @@ interface RevisionRowProps {
   readonly dropTarget: boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
-  readonly sidePanel: boolean
+  readonly metrics: GraphMetrics
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly onToggle: () => void
@@ -1475,9 +1627,10 @@ interface RevisionRowProps {
 
 const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const revision = props.revision
-  const rowHeight = props.sidePanel ? 26 : 30
-  const continuingLanes = [...new Set([...props.graphLayout.bottomLanes, ...props.graphLayout.edges.map(edge => edge.toLane)])]
   const draggable = !revision.immutable
+  const described = revision.description.trim().length > 0
+  const changeId = reverseHexChangeId(revision.changeId, Math.max(8, revision.shortestChangeId.length))
+  const otherWorkspaces = revision.workingCopy && revision.workspaces.length === 1 ? [] : revision.workspaces
   return (
     <article
       className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]', props.dimmed && 'dshx:opacity-40')}
@@ -1494,7 +1647,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              'dshx:flex dshx:items-center dshx:gap-1 dshx:pr-3 dshx:hover:bg-accent',
+              'dshx:flex dshx:items-start dshx:pr-3 dshx:hover:bg-accent',
               props.dropTarget && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary dshx:ring-inset',
             )}
             draggable={draggable}
@@ -1503,124 +1656,137 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               event.dataTransfer.effectAllowed = 'move'
               props.onDragStart()
             }}
-            style={{ height: rowHeight }}
+            style={{ height: rowHeightFor(props.metrics, props.graphLayout) }}
             title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
           >
-            <RevisionGraphCell height={rowHeight} layout={props.graphLayout} revision={revision} width={props.graphWidth} />
-            <button
-              aria-expanded={props.expanded}
-              className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-              data-row-focus=""
-              onClick={props.onToggle}
-              type="button"
-            >
-              <ChevronRightIcon
-                className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', props.expanded && 'dshx:rotate-90')}
-              />
-              {revision.workingCopy && (
-                <Badge className="dshx:h-[18px] dshx:rounded-sm dshx:px-1.5 dshx:py-0 dshx:text-[11px] dshx:font-semibold">Editing</Badge>
-              )}
-              {revision.bookmarks.map(name => {
-                const local = revision.localBookmarks.includes(name)
-                return (
-                  <ContextMenu key={name}>
-                    <ContextMenuTrigger asChild>
-                      <span
-                        className={cn('dshx:flex dshx:flex-none', local && 'dshx:cursor-grab')}
-                        draggable={local}
-                        onContextMenu={event => event.stopPropagation()}
-                        onDragStart={event => {
-                          event.stopPropagation()
-                          event.dataTransfer.setData(BOOKMARK_MIME, name)
-                          event.dataTransfer.effectAllowed = 'move'
-                        }}
-                        title={local ? 'Drag onto a revision to move · right-click for actions' : 'Remote bookmark'}
-                      >
-                        <Badge
-                          className={cn(COMPACT_BADGE, local ? 'dshx:border-warning/40 dshx:bg-warning/10 dshx:text-foreground' : 'dshx:text-muted-foreground')}
-                          variant="outline"
-                        >
-                          {name}
-                        </Badge>
-                      </span>
-                    </ContextMenuTrigger>
-                    {props.bookmarkMenu(name, local)}
-                  </ContextMenu>
-                )
-              })}
-              <span
-                className={cn(
-                  'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
-                  revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
-                  revision.description.trim().length === 0 && 'dshx:font-normal dshx:text-muted-foreground dshx:italic',
-                )}
+            <RevisionGraphCell layout={props.graphLayout} metrics={props.metrics} revision={revision} width={props.graphWidth} />
+            <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5" style={{ height: props.metrics.rowHeight }}>
+              <button
+                aria-expanded={props.expanded}
+                className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                data-row-focus=""
+                onClick={props.onToggle}
+                type="button"
               >
-                {firstLine(revision.description)}
-              </span>
-              {revision.tags.map(name => (
-                <Badge className={COMPACT_BADGE} key={name} variant="outline">
-                  tag {name}
-                </Badge>
-              ))}
-              {revision.workspaces.map(workspace => (
-                <Badge className={COMPACT_BADGE} key={workspace} variant="success">
-                  {workspace}
-                </Badge>
-              ))}
-              {revision.evolved && (
-                <span
-                  aria-label="evolved"
-                  className="dshx:size-1.5 dshx:flex-none dshx:rounded-full dshx:bg-chart-4"
-                  role="img"
-                  title="Evolved: rewritten from an earlier commit"
+                <ChevronRightIcon
+                  className={cn(
+                    'dshx:size-3 dshx:flex-none dshx:text-muted-foreground/60 dshx:transition-transform dshx:group-hover/row:text-muted-foreground',
+                    props.expanded && 'dshx:rotate-90',
+                  )}
                 />
-              )}
-              {revision.conflict && (
-                <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
-                  conflict
-                </Badge>
-              )}
+                {revision.workingCopy && (
+                  <span
+                    className={cn(CHIP, 'dshx:rounded-full dshx:bg-info/15 dshx:font-semibold dshx:text-info')}
+                    title={revision.workspaces.length === 1 ? `Working copy of workspace ${revision.workspaces[0]}` : 'Working copy'}
+                  >
+                    <PencilIcon className="dshx:size-3" />
+                    Editing
+                  </span>
+                )}
+                {otherWorkspaces.map(workspace => (
+                  <span
+                    className={cn(CHIP, 'dshx:max-w-[45%] dshx:rounded-full dshx:bg-teal/15 dshx:font-medium dshx:text-teal')}
+                    key={workspace}
+                    title={`Workspace ${workspace}`}
+                  >
+                    <LayersIcon className="dshx:size-3 dshx:flex-none" />
+                    <span className="dshx:truncate">{workspace}</span>
+                  </span>
+                ))}
+                {revision.bookmarks.map(name => {
+                  const local = revision.localBookmarks.includes(name)
+                  return (
+                    <ContextMenu key={name}>
+                      <ContextMenuTrigger asChild>
+                        <span
+                          className={cn(
+                            CHIP,
+                            'dshx:max-w-[35%] dshx:border dshx:border-border dshx:bg-muted dshx:font-mono dshx:text-[10.5px]',
+                            local ? 'dshx:cursor-grab dshx:text-foreground' : 'dshx:text-muted-foreground',
+                          )}
+                          draggable={local}
+                          onContextMenu={event => event.stopPropagation()}
+                          onDragStart={event => {
+                            event.stopPropagation()
+                            event.dataTransfer.setData(BOOKMARK_MIME, name)
+                            event.dataTransfer.effectAllowed = 'move'
+                          }}
+                          title={local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
+                        >
+                          <BookmarkIcon className="dshx:size-2.5 dshx:flex-none" />
+                          <span className="dshx:truncate">{name}</span>
+                        </span>
+                      </ContextMenuTrigger>
+                      {props.bookmarkMenu(name, local)}
+                    </ContextMenu>
+                  )
+                })}
+                {revision.tags.map(name => (
+                  <span
+                    className={cn(CHIP, 'dshx:max-w-[30%] dshx:border dshx:border-border dshx:font-mono dshx:text-[10.5px] dshx:text-muted-foreground')}
+                    key={name}
+                    title={`Tag ${name}`}
+                  >
+                    <TagIcon className="dshx:size-2.5 dshx:flex-none" />
+                    <span className="dshx:truncate">{name}</span>
+                  </span>
+                ))}
+                {revision.conflict && <TriangleAlertIcon aria-label="Conflict" className="dshx:size-3.5 dshx:flex-none dshx:text-warning" role="img" />}
+                {described ? (
+                  <span
+                    className={cn(
+                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
+                      revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
+                      revision.immutable && 'dshx:font-normal dshx:text-muted-foreground',
+                    )}
+                  >
+                    {firstLine(revision.description)}
+                  </span>
+                ) : (
+                  <>
+                    <span className={cn(CHIP, 'dshx:border dshx:border-dashed dshx:border-border dshx:text-muted-foreground')} title="No description">
+                      Describe
+                    </span>
+                    <span className="dshx:flex-1" />
+                  </>
+                )}
+              </button>
               {revision.divergent && (
-                <Badge className={cn(COMPACT_BADGE, 'dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive')} variant="outline">
+                <span
+                  className={cn(CHIP, 'dshx:bg-violet/10 dshx:text-[10px] dshx:text-violet')}
+                  title="Divergent: several visible commits share this change ID"
+                >
                   divergent
-                </Badge>
+                </span>
               )}
-            </button>
-            <time className="dshx:flex-none dshx:pl-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground" dateTime={revision.authorTime}>
-              {formatAge(revision.authorTime)}
-            </time>
-            <span
-              className="dshx:min-w-[2ch] dshx:flex-none dshx:text-right dshx:font-mono dshx:text-xs dshx:font-semibold dshx:text-info"
-              title={revision.changeId}
-            >
-              {revision.shortestChangeId}
-            </span>
-            {draggable && (
+              <time className="dshx:flex-none dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground" dateTime={revision.authorTime}>
+                {formatAge(revision.authorTime)}
+              </time>
+              <span
+                className="dshx:flex-none dshx:font-mono dshx:text-[11px]"
+                title={revision.changeId + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
+              >
+                <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:text-foreground/80'}>
+                  {changeId.slice(0, revision.shortestChangeId.length)}
+                </span>
+                <span className="dshx:text-muted-foreground/50">{changeId.slice(revision.shortestChangeId.length)}</span>
+                {revision.divergent && <span className="dshx:text-violet">/{revision.changeOffset}</span>}
+              </span>
               <GripVerticalIcon
                 aria-hidden
-                className="dshx:size-3.5 dshx:flex-none dshx:cursor-grab dshx:text-muted-foreground dshx:opacity-0 dshx:group-hover/row:opacity-100"
+                className={cn(
+                  'dshx:size-3.5 dshx:flex-none dshx:text-muted-foreground dshx:opacity-0',
+                  draggable ? 'dshx:cursor-grab dshx:group-hover/row:opacity-100' : 'dshx:invisible',
+                )}
               />
-            )}
+            </div>
           </div>
         </ContextMenuTrigger>
         {props.menu}
       </ContextMenu>
       {props.expanded && (
         <div className="dshx:relative" style={{ paddingLeft: props.graphWidth + 18 }}>
-          <svg aria-hidden className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:h-full" width={props.graphWidth}>
-            {continuingLanes.map(lane => (
-              <line
-                className={laneStroke(lane)}
-                key={lane}
-                strokeOpacity={0.8}
-                strokeWidth={1.25}
-                x1={laneCenter(lane)}
-                x2={laneCenter(lane)}
-                y1="0"
-                y2="100%"
-              />
-            ))}
-          </svg>
+          <GraphLanes lanes={props.graphLayout.bottomLanes} metrics={props.metrics} width={props.graphWidth} />
           {props.children}
         </div>
       )}

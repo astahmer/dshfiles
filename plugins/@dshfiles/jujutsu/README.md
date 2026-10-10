@@ -6,10 +6,20 @@ contracts.
 
 ## What it provides
 
-- A revision graph with change IDs, author and relative time, bookmarks, tags,
-  workspace labels, working-copy marker, immutable (diamond), empty (hollow),
-  conflict, divergent, and evolved markers, collapsible day groups, and
-  author-name, text, mine, immutable, and date filters.
+- A revision graph modelled on jj-view: rows follow `jj log`'s branch-grouped
+  order (each side branch sits right above the commit it forks from), the trunk
+  line (from @ when it is built on `main`/`master`/`trunk`, else that bookmark)
+  stays straight in lane 0, new heads take the leftmost free lane, and lanes
+  bend with rounded corners in a spaced band under the row. One accent for the
+  trunk and @, teal for workspace heads, violet for divergent copies
+  (`changeid/N`), neutral for other branches; immutable revisions are small dim
+  diamonds and conflicts a warning glyph. Each row reads Editing / workspace
+  pills → bookmark and tag chips → description (or a muted Describe chip), with
+  relative time and the change ID on the right. Collapsible day groups,
+  author-name, text, mine, immutable and date filters, and a Comfortable /
+  Compact density setting. The ideas (straight first-parent lanes, turns in a
+  band between rows, rounded corners, node styles) come from studying the
+  jj-view VS Code extension (Apache-2.0); no code is copied from it.
 - Expanded revisions show the description, Describe / Full diff / Edit This
   Change / Squash into parent, and changed files as a Flat or Tree list with
   M/A/D status, +/- counts, folder counts, and per-file review marks.
@@ -33,7 +43,7 @@ contracts.
   panel) prepares a move/rebase preview while the moving branch is dimmed.
   Every mutation, fetch, and push needs a second explicit confirmation.
 - View settings (default tab, ancestor groups, file layout, raw patch expanded,
-  day grouping, hide immutable, mine only, revisions loaded) are saved in this
+  day grouping, graph density, hide immutable, mine only, revisions loaded) are saved in this
   browser and shared live by the main page and side panel.
 - Create an isolated JJ workspace at a listed revision, then explicitly open a
   DSH Session in that directory.
