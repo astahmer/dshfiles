@@ -4,7 +4,7 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 When('the AI Accounts settings section is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await page.getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
