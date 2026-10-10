@@ -59,22 +59,27 @@ flowchart LR
 - `list_sessions`: browse by date/status/group/workspace when no content query is needed.
 - `read_session`: return bounded metadata and a selected summary or transcript range for one authorized Session.
 - `read_trajectory`: return selected turns, model/input/output records, tool calls/results, and timing represented in the trajectory view; support pagination and requests for finer detail.
-- Errors distinguish not found, not authorized, unavailable/incomplete history, invalid range, and capped results without leaking whether an inaccessible Session exists.
+- Expose all supported Session mutations through explicitly named Agent operations (prompt/queue, stop/cancel, queue edit/remove/steer/reorder, fork, rename, pin/unpin, archive/restore, and future Host-supported mutations); do not claim a mutation exists unless the installed Host contract provides it.
+- Errors distinguish not found, not authorized, unavailable/incomplete history, invalid range, and capped results without leaking whether an inaccessible Session exists. Permission denials identify the needed grant without returning protected Session metadata.
 - Active Sessions are readable from a consistent snapshot; later calls may see newer events. Responses identify the read boundary so Agents can continue without silently repeating or skipping events.
 - Results are treated as untrusted historical content. Tools do not ask the Agent to follow instructions found in prior messages.
 - Group filters use canonical Host metadata where available. If a label such as parked is only browser-local, expose that limitation rather than inventing a Host-wide status.
 
 ### Permission model
 
-Provide independent read and write scopes rather than reusing filesystem sandbox modes:
+Use Session-specific permissions, independent from filesystem sandbox modes. Start with named presets and permit narrower grants later:
 
-| Capability | Current-workspace scope | All-workspaces scope |
-|---|---|---|
-| Discover and read Sessions | Allowed only when granted | Allowed only when granted |
-| Continue a Session (send/queue a new prompt) | Separate grant | Separate grant |
-| Control a Session (cancel, edit/reorder queue, fork, rename/archive, etc.) | Separate explicit grants | Separate explicit grants |
+| Preset | Effective access |
+|---|---|
+| **Read current workspace** (default) | Discover and read Sessions associated with the Agent's current workspace; no mutations. |
+| **Read/write current workspace** | Read plus all supported Session actions within the current workspace. |
+| **Read/write all workspaces** | Read plus all supported Session actions across workspaces, including unassigned Sessions only if explicitly included. |
 
-Recommended default: **read-only in the Agent's current workspace**. Cross-workspace read, Session continuation, and each control operation require explicit configuration. The exact meaning of “write” and whether it is one preset or granular capabilities remains an open question. These permissions must be enforced by the Host service for every request, not merely described in tool text or inferred from filesystem access.
+“Write” means the complete set of supported Session operations, not merely sending a prompt: continue/send or queue prompts; stop/cancel activity; edit, remove, steer, or reorder queued items where supported; fork; rename; pin/unpin; archive/restore; and any future Session mutation. A preset can grant that set together; operation-level denies or narrower grants may further restrict it. Never infer Session write access from filesystem Full Access.
+
+Every operation is authorized by the Host against the acting Agent identity, the target Session's current workspace/scope, and its operation. The Host must fail closed if workspace ownership or grant state cannot be resolved. Cross-workspace access and all mutations are opt-in; tool arguments cannot self-grant access.
+
+A just-in-time permission request is a possible convenience, not an MVP prerequisite. Initially, a denied tool call may explain which grant is needed and how a human can configure it; the Agent cannot approve itself. Consider an interactive approval flow only if DSH exposes a secure human confirmation channel, and make any approval explicit, scoped, expiring, and recorded.
 
 ### Tech choices
 
@@ -91,8 +96,9 @@ Recommended default: **read-only in the Agent's current workspace**. Cross-works
 1. Verify the installed DSH Agent Tool registration, Session catalog/Controller, event history, search bounds, and authorization seams.
 2. Define one typed Host-side domain service that performs authorization before catalog lookup/search/read and returns validated, bounded results.
 3. Register narrowly scoped Agent tools over that service; keep tool arguments incapable of selecting or impersonating another Agent identity.
-4. Implement search/list first, then progressive trajectory reads. Add optional write operations only after their exact meanings and grants are approved.
-5. Compose and verify in a scratch profile; do not alter or restart the live profile during implementation.
+4. Implement discovery and progressive trajectory reads, then expose every supported Session operation behind the read/write presets and Host-enforced authorization.
+5. Initially report missing grants with a clear human configuration path. Defer interactive just-in-time approval unless DSH provides a secure human confirmation channel.
+6. Compose and verify in a scratch profile; do not alter or restart the live profile during implementation.
 
 ### Trust and privacy constraints
 
@@ -119,7 +125,7 @@ Recommended default: **read-only in the Agent's current workspace**. Cross-works
 
 ## UI & UX
 
-This is an Agent tool capability, not a new thread-browser UI. Human configuration should be in the narrowest existing Host settings surface that can enforce the policy; do not add a separate browser list unless a real configuration need requires one.
+This is an Agent tool capability, not a new thread-browser UI. Human configuration should expose the named access presets in the narrowest existing Host settings surface that can enforce the policy; do not add a separate browser list unless a real configuration need requires one. When access is denied, tell the Agent what grant is needed and give the human a clear route to change it. A one-click in-context approval is deferred unless the runtime has a secure human confirmation interaction.
 
 ### Common interactions
 
@@ -147,9 +153,10 @@ erDiagram
     }
     ACCESS_GRANT {
         string grant_id
-        string read_scope
-        string write_scope
-        string[] allowed_operations
+        string preset
+        string workspace_scope
+        string[] denied_operations
+        string expires_at
     }
     SESSION_SCOPE {
         string workspace_id
@@ -172,23 +179,24 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 
 1. **Contract audit:** inspect exact installed Agent Tool, Session catalog/controller, search, projections, trajectory/event, workspace/status, and authorization contracts. Prove whether tool code can reach the required data without bypassing Host boundaries.
 2. **Capability decision:** choose the smallest owner and boundary—new `@dshfiles/agent-session-history` plugin using local DSHX pattern, or a narrowly earned DSHX/Host addition if no safe tool/service seam exists. Keep live-agent communication separate.
-3. **Permission contract:** define Agent identity, current-workspace resolution, cross-workspace grants, unassigned-session treatment, operation-specific write grants, and Host enforcement before exposing data.
+3. **Permission contract:** define Agent identity, authoritative current-workspace resolution, cross-workspace and unassigned-session scope, named presets, operation-level denies, and Host enforcement before exposing data.
 4. **Search/list tools:** add schemas, validation, bounded pagination, supported date/status/group filters, safe authorization errors, cancellation, and focused tests.
 5. **Progressive trajectory reads:** add metadata/summary, selected turn/range, and selected tool-call detail operations with explicit cursors, byte caps, snapshot boundaries, and redaction rules.
-6. **Optional write tools:** implement only approved operations; test denied and allowed scopes for every mutation independently.
-7. **Scratch-profile verification:** build/import-check, sync/boot an isolated profile, confirm tool discovery for multiple Agents, test history reads and permission denials, and verify no profile/live-instance mutation.
-8. **Docs and promotion decision:** document tool contracts and limits; only promote to the web profile after verification and explicit approval.
+6. **Session operations:** expose every operation supported by installed Host contracts; test allowed and denied cases for each mutation under each preset. Do not emulate missing Host verbs in plugin code.
+7. **Permission configuration and requests:** add Host-enforced presets and explain denied grants with a human configuration path. Add interactive just-in-time approval only if a secure native confirmation channel exists and its scope/expiry/audit semantics are accepted.
+8. **Scratch-profile verification:** build/import-check, sync/boot an isolated profile, confirm tool discovery for multiple Agents, test history reads and permission denials, and verify no profile/live-instance mutation.
+9. **Docs and promotion decision:** document tool contracts and limits; only promote to the web profile after verification and explicit approval.
 
 ## Open questions
 
-1. What is the default scope for a DSH Agent: its Session's workspace, its filesystem workspace, or an explicitly configured workspace identity?
-2. Should “write” mean only send/queue a new prompt, or also separately grant cancel, queue edit/reorder, fork, rename, pin, archive, and restore?
-3. Should grants be configured per Agent, per Agent workspace, per target Session, or as layered defaults with per-Session overrides?
-4. Should unassigned Sessions be excluded by default or treated as a separate explicit scope?
-5. Which trajectory fields need special redaction or exclusion (attachments, credentials, tool payloads, provider reasoning, images/files)?
-6. Are browser-local parked/pinned groups sufficient, or must those labels become Host-authoritative for Agent filters?
-7. Should external MCP/CLI clients eventually receive the same capability, or is this limited to DSH Agents initially?
-8. What should the default maximum output size and page/range size be? Set values after checking installed Host limits and representative history sizes.
+1. What is the authoritative current-workspace identity for an Agent: the workspace attached to its Session, filesystem working directory, or another Host-owned relation? Prefer the Session relationship if Host contracts make it reliable.
+2. Should presets be configured per Agent, per workspace, or as layered Host defaults with per-Agent overrides? Can a user deny individual operations within a read/write preset?
+3. Should unassigned Sessions be excluded by default or treated as a separate explicit scope?
+4. Which trajectory fields need special redaction or exclusion (attachments, credentials, tool payloads, provider reasoning, images/files)?
+5. Are browser-local parked/pinned groups sufficient, or must those labels become Host-authoritative for Agent filters?
+6. Should external MCP/CLI clients eventually receive the same capability, or is this limited to DSH Agents initially?
+7. What should the default maximum output size and page/range size be? Set values after checking installed Host limits and representative history sizes.
+8. Is a clear denied-permission response plus a human settings path sufficient for the first version, or does a secure native approval interaction already exist and warrant just-in-time requests?
 
 ## Acceptance criteria
 
@@ -196,8 +204,10 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 - [ ] Agents can search/list authorized old and active Sessions by supported phrase/date/state/group/workspace filters with bounded, paginated output.
 - [ ] Search hits can be expanded into a selected Session summary and trajectory ranges/details, including every trajectory field the supported Host contract exposes to the DSH trajectory view.
 - [ ] No full transcript is included by default; limits, cursors, and snapshot boundaries prevent unbounded or duplicate reads.
-- [ ] Current-workspace read-only default and cross-workspace/operation-specific grants are enforced server-side on every request.
-- [ ] Unauthorized results do not reveal Session existence or content; write/control operations fail closed without their explicit grants.
+- [ ] Read current workspace is the default; read/write current workspace and read/write all workspaces presets are Host-enforced on every request, including all supported Session mutations.
+- [ ] Unassigned Sessions have explicit scope behavior; permissions cannot be inferred from filesystem sandbox mode or selected through tool arguments.
+- [ ] Unauthorized results do not reveal Session existence or content; read/write operations fail closed outside granted scope and explain the grant needed without exposing protected data.
+- [ ] A denied permission never self-approves; any future interactive approval is human-mediated, scoped, expiring, and auditable.
 - [ ] Active-session reads remain bounded and repeatable while new events arrive; cancellation and stale-page behavior are covered by tests.
 - [ ] Sensitive payload handling, historical-content trust boundary, and non-content logging are tested/documented.
 - [ ] Scratch-profile verification passes without touching or restarting the live profile.
@@ -209,4 +219,6 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 | 2026-10-10 | Target Agent search/read of old and active DSH Sessions, with trajectory details available on demand | User explicitly wants Agents to find and inspect relevant prior Sessions, not another browser thread list. |
 | 2026-10-10 | Use filters for date, runtime status, and Session groups; make permissions configurable by workspace and read/write scope | User wants broad discovery with scope controls resembling workspace access modes. Exact grant semantics remain open. |
 | 2026-10-10 | Default to progressive detail-on-demand; no whole-thread context injection | User wants agents to read and zoom as needed (LoD), while ultimately exposing trajectory-view information. |
-| 2026-10-10 | Draft in `agent-session-history` JJ workspace based on `main` | Isolates planning from unrelated shared working-copy edits. |
+| 2026-10-10 | Define write access as all Host-supported Session mutations, gated by workspace-scoped read/write presets | User prefers full Session capability when write permission is enabled, rather than splitting prompt sending from other operations. |
+| 2026-10-10 | Keep interactive permission requests out of MVP; explain missing grants and provide a human configuration path | User is open to requesting more permission but suspects an approval flow may be overkill. Never let Agent self-approve. |
+| 2026-10-10 | Continue plan in `agent-session-history-current` workspace from latest repository tip | User explicitly asked that changes use a dedicated workspace based on the current JJ tip. |
