@@ -19,7 +19,16 @@ import {
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -35,7 +44,7 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ActivityIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, BellOffIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
@@ -60,6 +69,17 @@ import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
+import {
+  clearExpiredThreadMutes,
+  clearThreadMute,
+  completedSessionIds,
+  DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
+  isThreadMuted,
+  markThreadSeen,
+  setThreadMute,
+  snoozeDurations,
+  threadNotificationPreferences,
+} from './thread-notifications.js'
 
 type InjectedActions = {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -139,6 +159,8 @@ interface RowActions {
   readonly copy: (value: string, successMessage: string) => Promise<void>
   readonly toggleChildren: (sessionId: SessionSummary['id']) => void
   readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
+  readonly setNotificationMute: (sessionId: SessionSummary['id'], mutedUntil: number | null) => void
+  readonly clearNotificationMute: (sessionId: SessionSummary['id']) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -165,6 +187,8 @@ interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   readonly machine: string | undefined
   readonly age: string
+  readonly muted: boolean
+  readonly needsYou: boolean
   readonly rowStyle: RowStyle
   readonly childThreads: readonly SessionSummary[]
   readonly childrenOpen: boolean
@@ -299,6 +323,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   >
                     {rowStyle.title ? session.displayTitle : null}
                   </span>
+                  {props.muted ? (
+                    <BellOffIcon className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" aria-label={t('threadSidebarNotificationsMuted')} />
+                  ) : null}
+                  {props.needsYou ? <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:text-primary">{t('threadSidebarDone')}</span> : null}
                   {rowStyle.time ? (
                     <span
                       className={cn(
@@ -446,6 +474,22 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           {t('threadSidebarCopyLink')}
         </ContextMenuItem>
         <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>{t('threadSidebarNotifications')}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+            {snoozeDurations.map(duration => (
+              <ContextMenuItem key={duration.milliseconds} onSelect={() => props.actions.setNotificationMute(session.id, Date.now() + duration.milliseconds)}>
+                {t('threadSidebarSnoozeFor')} {t(duration.label)}
+              </ContextMenuItem>
+            ))}
+            <ContextMenuItem onSelect={() => props.actions.setNotificationMute(session.id, null)}>{t('threadSidebarMuteUntilEnabled')}</ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem disabled={!props.muted} onSelect={() => props.actions.clearNotificationMute(session.id)}>
+              {t('threadSidebarUnmute')}
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
         {archived ? (
           <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
         ) : (
@@ -470,6 +514,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
+  const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
@@ -487,6 +532,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const archiveInFlight = useRef(false)
   const legacyParkMigrationAttempts = useRef(new Set<SessionSummary['id']>())
   const readMarkAttempts = useRef(new Map<SessionSummary['id'], number>())
+  const previousRunning = useRef<Readonly<Record<string, boolean>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
   const latestAutoArchive = useRef<{
@@ -523,6 +569,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
+  useEffect(() => {
+    if (selectedSession === undefined) return
+    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+    threadNotificationPreferences.set(markThreadSeen(current, selectedSession.id))
+  }, [selectedSession?.id])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   useEffect(() => {
@@ -653,6 +704,30 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       })
   }
 
+  const changeDesktopNotifications = async (enabled: boolean): Promise<void> => {
+    if (!enabled) {
+      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+      threadNotificationPreferences.set({ ...current, enabled: false })
+      return
+    }
+    if (!('Notification' in window)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
+      return
+    }
+    try {
+      const permission = window.Notification.permission === 'granted' ? 'granted' : await window.Notification.requestPermission()
+      if (permission !== 'granted') {
+        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
+        return
+      }
+      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+      threadNotificationPreferences.set({ ...current, enabled: true })
+      setNotice(null)
+    } catch {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
+    }
+  }
+
   const toggleSection = (section: SidebarSection): void => {
     changePreferences({
       collapsedSections: toggleCollapsedSection(preferences.collapsedSections, section),
@@ -737,6 +812,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [threadTree],
   )
+  const nextMuteExpiry = useMemo(
+    () =>
+      Object.values(notificationPreferences.mutedUntil)
+        .flatMap(until => (until !== null && until > now ? [until] : []))
+        .sort((left, right) => left - right)[0] ?? null,
+    [notificationPreferences.mutedUntil, now],
+  )
   const nextIdleAt = useMemo(
     () =>
       nextIdleTransitionAt(
@@ -748,14 +830,33 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
 
   useEffect(() => {
-    if (nextIdleAt === null) return
-    const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextIdleAt - Date.now() + 1))
+    const nextBoundary = [nextIdleAt, nextMuteExpiry].filter((value): value is number => value !== null).sort((left, right) => left - right)[0]
+    if (nextBoundary === undefined) return
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextBoundary - Date.now() + 1))
     return () => window.clearTimeout(timer)
-  }, [nextIdleAt])
+  }, [nextIdleAt, nextMuteExpiry])
+
+  const needsYouRows = useMemo(
+    () =>
+      sessions
+        .filter(
+          session =>
+            !session.running &&
+            !session.blank &&
+            notificationPreferences.needsYouAt[session.id] !== undefined &&
+            !archivedSessionIds.has(session.id) &&
+            (preferences.workspaceFilter === null ||
+              (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter),
+        )
+        .sort((left, right) => (notificationPreferences.needsYouAt[right.id] ?? 0) - (notificationPreferences.needsYouAt[left.id] ?? 0)),
+    [archivedSessionIds, notificationPreferences.needsYouAt, preferences.workspaceFilter, sessionState.byId, sessions, workspaceBySession],
+  )
+  const needsYouIds = useMemo(() => new Set(needsYouRows.map(session => session.id)), [needsYouRows])
 
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
     for (const { session, activity } of sectionEntries) {
+      if (needsYouIds.has(session.id)) continue
       const section = sectionForSession({
         session: activity,
         archivedSessionIds,
@@ -772,7 +873,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
     )
     return rows
-  }, [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, sectionEntries, workspaceState.pinnedSessionIds])
+  }, [archivedSessionIds, needsYouIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, sectionEntries, workspaceState.pinnedSessionIds])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -891,9 +992,83 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
       toggleChildren: sessionId => setClosedParents(current => toggleSetMember(current, sessionId)),
       toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
+      setNotificationMute: (sessionId, mutedUntil) => {
+        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+        threadNotificationPreferences.set(setThreadMute(current, sessionId, mutedUntil))
+      },
+      clearNotificationMute: sessionId => {
+        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+        threadNotificationPreferences.set(clearThreadMute(current, sessionId))
+      },
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
+
+  const renderThreadRow = (session: SessionSummary, needsYou: boolean): JSX.Element => {
+    const lineage = sessionLineage(session, sessionState.byId)
+    const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    const childThreads = threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN
+    const selectedChildId = childThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
+    return (
+      <ThreadRow
+        key={session.id}
+        session={session}
+        archived={archivedSessionIds.has(session.id)}
+        pinned={pinnedSessionIds.has(session.id)}
+        parked={parkedSessionIds.has(session.id)}
+        selected={selectedSession?.id === session.id}
+        parentTitle={lineage.parentTitle}
+        workspaceId={workspaceId}
+        workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
+        machine={machine}
+        age={formatAge(session.updatedAt)}
+        muted={isThreadMuted(notificationPreferences, session.id, now)}
+        needsYou={needsYou}
+        rowStyle={rowStyle}
+        childThreads={childThreads}
+        childrenOpen={!closedParents.has(session.id)}
+        allChildrenShown={expandedParents.has(session.id)}
+        selectedChildId={selectedChildId}
+        actions={rowActions}
+      />
+    )
+  }
+
+  useEffect(() => {
+    if (sessionState.phase !== 'ready') return
+    const previous = previousRunning.current
+    previousRunning.current = Object.fromEntries(sessions.map(session => [session.id, session.running]))
+    if (previous === null) return
+    const completedIds = completedSessionIds(previous, sessions)
+    if (completedIds.length === 0) return
+    const now = Date.now()
+    const current = clearExpiredThreadMutes(threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES, now)
+    const needsYouAt = { ...current.needsYouAt }
+    let changed = false
+    for (const sessionId of completedIds) {
+      if (selectedSession?.id === sessionId) continue
+      needsYouAt[sessionId] = now
+      changed = true
+      const session = sessionState.byId[sessionId]
+      if (current.enabled && !isThreadMuted(current, sessionId, now) && 'Notification' in window && window.Notification.permission === 'granted') {
+        try {
+          const notification = new window.Notification(props.tSidebar('threadSidebarNotificationTitle'), {
+            body: session?.displayTitle ?? props.tSidebar('threadSidebarNotificationDone'),
+          })
+          notification.onclick = () => {
+            window.focus()
+            if (session !== undefined) openThread(sessionId)
+            notification.close()
+          }
+        } catch {
+          setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
+        }
+      }
+    }
+    if (changed || Object.keys(current.mutedUntil).length !== Object.keys((threadNotificationPreferences.get() ?? current).mutedUntil).length) {
+      threadNotificationPreferences.set({ ...current, needsYouAt })
+    }
+  }, [notificationPreferences.enabled, openThread, props.tSidebar, selectedSession?.id, sessionState.byId, sessionState.phase, sessions])
 
   return (
     <TooltipProvider delayDuration={500}>
@@ -940,6 +1115,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               <Checkbox checked={preferences.autoArchiveEnabled} onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
             </Label>
+            <Label className="dshx:font-normal dshx:leading-snug">
+              <Checkbox checked={notificationPreferences.enabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
+              {props.tSidebar('threadSidebarDesktopNotifications')}
+            </Label>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarNotificationPrivacy')}</p>
             <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2">
               <div className="dshx:grid dshx:content-start dshx:gap-1.5">
                 <Label htmlFor={`${settingsId}-idle`} className="dshx:text-xs dshx:font-normal dshx:leading-snug dshx:text-muted-foreground">
@@ -1036,6 +1216,16 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarLoading')}
             </div>
           ) : null}
+          {needsYouRows.length > 0 ? (
+            <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsYou')}>
+              <div className="dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-primary">
+                <span className="dshx:whitespace-nowrap dshx:font-medium">{props.tSidebar('threadSidebarNeedsYou')}</span>
+                <span className="dshx:text-xs dshx:tabular-nums">({needsYouRows.length})</span>
+                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+              </div>
+              {needsYouRows.map(session => renderThreadRow(session, true))}
+            </section>
+          ) : null}
           {sections.map(section => {
             const rows = rowsBySection.get(section) ?? []
             if (rows.length === 0 && section !== 'active') return null
@@ -1058,39 +1248,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                     {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
                   </span>
                 </button>
-                {!collapsed
-                  ? rows.map(session => {
-                      const lineage = sessionLineage(session, sessionState.byId)
-                      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-                      const childThreads = threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN
-                      const selectedChildId = childThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
-                      return (
-                        <ThreadRow
-                          key={session.id}
-                          session={session}
-                          archived={archivedSessionIds.has(session.id)}
-                          pinned={pinnedSessionIds.has(session.id)}
-                          parked={parkedSessionIds.has(session.id)}
-                          selected={selectedSession?.id === session.id}
-                          parentTitle={lineage.parentTitle}
-                          workspaceId={workspaceId}
-                          workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
-                          machine={machine}
-                          age={formatAge(session.updatedAt)}
-                          rowStyle={rowStyle}
-                          childThreads={childThreads}
-                          childrenOpen={!closedParents.has(session.id)}
-                          allChildrenShown={expandedParents.has(session.id)}
-                          selectedChildId={selectedChildId}
-                          actions={rowActions}
-                        />
-                      )
-                    })
-                  : null}
+                {!collapsed ? rows.map(session => renderThreadRow(session, false)) : null}
               </section>
             )
           })}
-          {sessionState.phase === 'ready' && [...rowsBySection.values()].every(rows => rows.length === 0) ? (
+          {sessionState.phase === 'ready' && needsYouRows.length === 0 && [...rowsBySection.values()].every(rows => rows.length === 0) ? (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">{props.tSidebar('threadSidebarEmpty')}</EmptyTitle>
             </Empty>

@@ -93,10 +93,20 @@ no such seat, so an occupant keeps a footer-action fallback and registers throug
 (record / disable / reset, with Host-conflict and duplicate warnings), which a
 generated text field cannot capture.
 
-Every thread row also exposes **Copy thread ID** and **Copy thread link** in
-its right-click menu. Child sessions render with increasing indentation and a
-direct “child of …” label. The sidebar follows DSH's durable `parentId` chain,
-so the presentation is not limited to parent/child pairs; a child link carries
+Every thread row also exposes **Copy thread ID**, **Copy thread link**, and a
+per-thread **Thread notifications** menu. Notifications can be snoozed for 15
+minutes, 1, 3, 8, or 24 hours, muted until manually re-enabled, or unmuted.
+Snoozes and mutes affect alerts only; they do not hide the thread or its
+**Needs you** status. Desktop notifications are opt-in in Sidebar settings and
+show the thread title. Mute, snooze, and unseen-completion state are saved in
+this browser. The sidebar raises a **Needs you** item when it observes a thread
+move from running to idle; opening that thread clears the item. This
+transition is observable only while the DSH page is connected, so offline
+completion notifications are not replayed after reconnect.
+
+Child sessions render with increasing indentation and a direct “child of …”
+label. The sidebar follows DSH's durable `parentId` chain, so the presentation
+is not limited to parent/child pairs; a child link carries
 the workspace found on the nearest ancestor when the child has no direct
 workspace membership.
 
