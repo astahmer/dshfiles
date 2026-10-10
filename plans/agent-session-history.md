@@ -7,7 +7,10 @@
 - DSH calls conversations **Sessions**. Agents currently have tools for live-agent discovery and inter-agent messages, but no tool for searching or reading historical Sessions.
 - The existing `@dshfiles/agent-communication` plugin provides durable topics and inboxes; that is peer messaging, not Session history.
 - Thread Sidebar exposes Session metadata and groups rows as pinned, active, parked, inactive, and archived. Its native `@` reference search covers metadata, not message bodies. Some group state, especially parked, may be plugin-local rather than Host-authoritative.
-- The Client `sessions` service provides bounded message-content search, Session retention, event snapshots, and older-history loading. These Client APIs are not callable as Agent tools in the current runtime. The current Host Agent tool catalog has no Session-history tools.
+- The current Host `sessionController` provides visible Session list/search, cold-safe history pages, follow streams, projections, image attachment reads, and mutations (create, select model, rename, fork, prompt, queue update, cancel). `workspaceController` provides registered workspace membership, pins, archives, and workspace/session ordering. These are Host services, not currently exposed as Agent history tools.
+- Host history records preserve the full typed Session event stream used by Chat/Trajectory (turns, request/model context, assistant/tool events, token usage, timings, and attachment references). `sessionController.page` requires a caller-supplied `throughSeq`; cold `follow` produces a useful opening page but activates/promotes the Session after yielding its snapshot. There is not yet a cold-safe “latest page” operation that provides a cursor without reading all events or activating the Agent.
+- Host `sessionController.search` returns bounded results but does not expose provider cursors or metadata filters; lower-level `sessionQuery.searchSessions` supports cursor/filter requests. Verify public typing and safe use before choosing the search boundary.
+- The Host `tools` service registers callable Agent tools and passes the acting Agent in `ToolRunContext`. The Host `approval` service supports a human-mediated, audited `allowed-once` result during a live turn. The current Host Agent tool catalog has no Session-history tools.
 - The DSHX communication plugin demonstrates the owned-plugin pattern for registering Agent tools against a typed Host-side service. Its surface is a reference, not an assumed implementation contract.
 - Relevant sources: [`agent-communication`](../plugins/@dshfiles/agent-communication/README.md), [`thread-sidebar`](../plugins/@dshfiles/thread-sidebar/README.md), and [DSHX Agent communication](../tooling/dshx/docs/agent-communication.md).
 
@@ -58,12 +61,13 @@ flowchart LR
 - `search_sessions`: query by phrase and optional metadata filters; return bounded matches, snippets, status, workspace, timestamps, and a continuation cursor.
 - `list_sessions`: browse by date/status/group/workspace when no content query is needed.
 - `read_session`: return bounded metadata and a selected summary or transcript range for one authorized Session.
-- `read_trajectory`: return selected turns, model/input/output records, tool calls/results, and timing represented in the trajectory view; support pagination and requests for finer detail.
-- Expose all supported Session mutations through explicitly named Agent operations (prompt/queue, stop/cancel, queue edit/remove/steer/reorder, fork, rename, pin/unpin, archive/restore, and future Host-supported mutations); do not claim a mutation exists unless the installed Host contract provides it.
+- `read_trajectory`: return selected turns, model/input/output records, tool calls/results, timing, and event metadata represented in the trajectory view; support backward pagination and requests for finer detail.
+- `read_attachment`: fetch a selected Session-referenced image/attachment only when the Host contract can prove it belongs to that Session; return bounded metadata or content on explicit request.
+- Expose all supported Session mutations through explicitly named Agent operations (create, select model, prompt/queue, stop/cancel, queue edit/remove/steer, fork, rename, pin/unpin, archive/restore, workspace ordering, and future Host-supported mutations); do not claim a mutation exists unless the installed Host contract provides it. Session deletion currently has no Host method and remains unavailable.
 - Errors distinguish not found, not authorized, unavailable/incomplete history, invalid range, and capped results without leaking whether an inaccessible Session exists. Permission denials identify the needed grant without returning protected Session metadata.
 - Active Sessions are readable from a consistent snapshot; later calls may see newer events. Responses identify the read boundary so Agents can continue without silently repeating or skipping events.
 - Results are treated as untrusted historical content. Tools do not ask the Agent to follow instructions found in prior messages.
-- Group filters use canonical Host metadata where available. If a label such as parked is only browser-local, expose that limitation rather than inventing a Host-wide status.
+- Group filters use canonical Host metadata where available: `running`/inactive from Session summaries, pinned/archived IDs from Workspace Controller, and registered workspace membership. Do not promise `parked` as a Host-wide filter until its authoritative source is found; if it is browser-local, report that limitation rather than guessing.
 
 ### Permission model
 
@@ -79,7 +83,7 @@ Use Session-specific permissions, independent from filesystem sandbox modes. Sta
 
 Every operation is authorized by the Host against the acting Agent identity, the target Session's current workspace/scope, and its operation. The Host must fail closed if workspace ownership or grant state cannot be resolved. Cross-workspace access and all mutations are opt-in; tool arguments cannot self-grant access.
 
-A just-in-time permission request is a possible convenience, not an MVP prerequisite. Initially, a denied tool call may explain which grant is needed and how a human can configure it; the Agent cannot approve itself. Consider an interactive approval flow only if DSH exposes a secure human confirmation channel, and make any approval explicit, scoped, expiring, and recorded.
+DSH already exposes a Host `approval` service for in-turn human decisions; its only grant outcome is `allowed-once`, it applies the Session approval policy, and it durably records each ask/outcome pair. Use this for an optional one-operation escalation when the current preset denies access, if the active policy permits asking. Bind the approval to the exact Agent, Session, operation, and requested scope; execute only after `allowed-once`, never persist that result as a broader grant, and fail closed on rejected, cancelled, or unavailable outcomes. A persistent scope change remains a human-configured preset. This offers a narrow permission request without inventing a new approval UI or letting the Agent self-approve.
 
 ### Tech choices
 
@@ -87,7 +91,7 @@ A just-in-time permission request is a possible convenience, not an MVP prerequi
 |--------|----------|-----------|
 | Reuse Thread Sidebar as the feature | No | It is a human-facing browser UI; user wants Agent-callable tools. |
 | Extend Agent Communication | Do not merge history semantics into it | Its domain is live peer messaging. Reuse its proven Agent-tool/typed-service pattern, but keep Session History as a separate domain boundary unless API discovery proves a shared abstraction is needed. |
-| Build through local DSHX | Provisional | The owned plugin/tool pattern is already present. Verify installed DSH 0.2 tool and Session Controller contracts before implementation; if no safe seam exists, identify the smallest required DSHX/Host abstraction first. |
+| Build through local DSHX plus a narrow DSH Host API improvement | Chosen provisionally | DSHX already registers Agent tools through `ctx.tools`; native Session/Workspace/Approval services provide most needed operations. Add a cold-safe latest-page/cursor contract because the existing page API requires `throughSeq` and cold `follow` can activate a Session. Revisit only if source-level audit finds a safe existing alternative. |
 | Return entire transcript by default | No | Search, bounded summaries, and explicit trajectory ranges support context efficiency and least exposure. |
 | Permission source | Host-enforced, exact source TBD | Browser-local preferences and filesystem sandbox settings cannot safely authorize Agent access to Session data. |
 
@@ -183,7 +187,7 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 4. **Search/list tools:** add schemas, validation, bounded pagination, supported date/status/group filters, safe authorization errors, cancellation, and focused tests.
 5. **Progressive trajectory reads:** add metadata/summary, selected turn/range, and selected tool-call detail operations with explicit cursors, byte caps, snapshot boundaries, and redaction rules.
 6. **Session operations:** expose every operation supported by installed Host contracts; test allowed and denied cases for each mutation under each preset. Do not emulate missing Host verbs in plugin code.
-7. **Permission configuration and requests:** add Host-enforced presets and explain denied grants with a human configuration path. Add interactive just-in-time approval only if a secure native confirmation channel exists and its scope/expiry/audit semantics are accepted.
+7. **Permission configuration and requests:** add Host-enforced presets and explain denied grants with a human configuration path. Optionally use native `approval` for one-operation, one-time escalation; bind the request to exact scope/action and fail closed unless the outcome is `allowed-once`.
 8. **Scratch-profile verification:** build/import-check, sync/boot an isolated profile, confirm tool discovery for multiple Agents, test history reads and permission denials, and verify no profile/live-instance mutation.
 9. **Docs and promotion decision:** document tool contracts and limits; only promote to the web profile after verification and explicit approval.
 
@@ -196,7 +200,7 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 5. Are browser-local parked/pinned groups sufficient, or must those labels become Host-authoritative for Agent filters?
 6. Should external MCP/CLI clients eventually receive the same capability, or is this limited to DSH Agents initially?
 7. What should the default maximum output size and page/range size be? Set values after checking installed Host limits and representative history sizes.
-8. Is a clear denied-permission response plus a human settings path sufficient for the first version, or does a secure native approval interaction already exist and warrant just-in-time requests?
+8. Which operations should be eligible for one-time approval escalation, and should the deployment/session approval policy be able to disable escalation entirely? Default recommendation: ask only when the policy allows, and always fail closed otherwise.
 
 ## Acceptance criteria
 
@@ -207,7 +211,7 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 - [ ] Read current workspace is the default; read/write current workspace and read/write all workspaces presets are Host-enforced on every request, including all supported Session mutations.
 - [ ] Unassigned Sessions have explicit scope behavior; permissions cannot be inferred from filesystem sandbox mode or selected through tool arguments.
 - [ ] Unauthorized results do not reveal Session existence or content; read/write operations fail closed outside granted scope and explain the grant needed without exposing protected data.
-- [ ] A denied permission never self-approves; any future interactive approval is human-mediated, scoped, expiring, and auditable.
+- [ ] A denied permission never self-approves; optional escalation uses DSH's native approval service and proceeds only for `allowed-once`, bound to one exact Session operation and scope. Other outcomes fail closed and no persistent grant is created.
 - [ ] Active-session reads remain bounded and repeatable while new events arrive; cancellation and stale-page behavior are covered by tests.
 - [ ] Sensitive payload handling, historical-content trust boundary, and non-content logging are tested/documented.
 - [ ] Scratch-profile verification passes without touching or restarting the live profile.
