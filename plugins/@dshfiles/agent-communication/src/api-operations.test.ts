@@ -45,7 +45,7 @@ describe('Agent communication API operations', () => {
   })
 
   it('returns only sender counts when saving an explicit steer allowlist', async () => {
-    const { service, operations } = await createTestOperations()
+    const { operations } = await createTestOperations()
     const request: AgentCommunicationSubscriptionInput = {
       agentId: 'agent-reader',
       topic: 'workspace/demo',

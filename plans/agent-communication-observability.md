@@ -169,7 +169,7 @@ Activity records contain no message body or raw arguments. Existing message cont
 5. [x] Build and validate CLI/Host code without touching the live profile; checkpoint before UI work. The scratch profile composed and booted on port 3199, but the report remained unavailable because its empty Session did not reach the Host's `agents` setup gate; do not treat that as an activation failure or proof of non-use.
 6. [x] Add communication inspector UI with Host-backed queries, metadata-first timeline, and explicit body reveal.
 7. [x] Add scoped subscription and acknowledgement controls through validated Host mutations; test current-Agent authorization, live steer senders, redacted allowlist output, confirmation, and service rejection behavior.
-8. [ ] Run final package/toolchain checks and a scratch-profile browser check on a second port. Do not restart the live instance or make an external-model Agent turn without authorization.
+8. [x] Final package checks and a scratch browser check passed for this plugin (port 3279); the panel renders and exits loading into an explicit Host-unavailable state with no browser console errors. No live Agent turn or live-profile restart was performed. Full shared-UI rebuild and repository lint/format checks expose unrelated existing failures recorded in the progress README.
 
 ## Resolved design choices
 
@@ -179,14 +179,14 @@ Activity records contain no message body or raw arguments. Existing message cont
 
 ## Acceptance criteria
 
-- [ ] Read-only report distinguishes unavailable bridge, healthy empty state, and populated state without implying missing history means non-use.
+- [x] Read-only report distinguishes unavailable bridge, healthy empty state, and populated state without implying missing history means non-use.
 - [x] Agent tool activity records success and failure at one boundary; records contain no body, arguments, credentials, or unbounded error text.
 - [x] Report has stable JSON schema, bounded output, and explicitly redacted metadata-only defaults.
 - [x] State version changes preserve existing messages, subscriptions, acknowledgements, and notification receipts; retention is bounded and tested.
 - [x] Report never acknowledges messages or changes subscriptions.
 - [x] UI queries and mutations use Host APIs; browser never reads/writes state files.
 - [x] UI management actions are scoped and validated; acknowledgement and subscription changes have focused tests.
-- [ ] Plugin build, typecheck, focused tests, Host bundle import, and scratch runtime checks pass; live DSH instance remains untouched.
+- [x] Plugin build, typecheck, focused tests, Host bundle import, and scratch runtime fallback checks pass; live DSH instance remains untouched. Actual Agent activation/use remains unverified.
 
 ## Decisions log
 

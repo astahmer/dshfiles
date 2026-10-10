@@ -298,9 +298,8 @@ const queueNotice = async (
   delivery: 'quiet' | 'queue' | 'steer',
   allowSteerFrom: readonly string[],
 ): Promise<void> => {
-  const context = hostContext
-  if (context === undefined || delivery === 'quiet') return
-  const agent = context.agents.list().find(item => item.id === agentId)
+  if (hostContext === undefined || delivery === 'quiet') return
+  const agent = hostContext.agents.list().find(item => item.id === agentId)
   if (agent === undefined) throw new Error(`DSH Agent ${agentId} is not live yet.`)
   const reference = messageReference(message)
   if (messageAlreadyQueued(agent, reference)) return

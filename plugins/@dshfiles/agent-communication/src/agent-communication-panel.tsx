@@ -22,6 +22,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { communicationDeliverySchema, type CommunicationDelivery } from '@dshfiles/dshx/communication/types'
 import { useState } from 'react'
 import { agentCommunicationApi } from './api.js'
+import { runHostRequest } from './host-request.js'
 import type { AgentCommunicationTranslate } from './locales.js'
 
 const diagnosticsKey = ['agent-communication', 'diagnostics'] as const
@@ -198,8 +199,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const [action, setAction] = useState<ManagementAction | null>(null)
   const diagnosticsQuery = useQuery({
     queryKey: diagnosticsKey,
-    queryFn: ({ signal }) => api.diagnostics({ limit: REPORT_LIMIT }, { signal }),
+    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.diagnostics({ limit: REPORT_LIMIT }, { signal: hostSignal }) }),
     refetchInterval: 30_000,
+    retry: false,
   })
   const diagnostics = diagnosticsQuery.data
   const liveAgentIds = new Set(diagnostics?.agents.map(agent => agent.id) ?? [])
@@ -208,26 +210,35 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     enabled: selectedMessageId !== null,
     queryFn: ({ signal }) => {
       if (selectedMessageId === null) throw new Error('Choose a message before loading its recipients.')
-      return api.messageRecipients({ messageId: selectedMessageId }, { signal })
+      return runHostRequest({ signal, request: hostSignal => api.messageRecipients({ messageId: selectedMessageId }, { signal: hostSignal }) })
     },
+    retry: false,
   })
-  const revealMutation = useMutation({ mutationFn: (messageId: string) => api.revealMessageBody({ messageId }) })
+  const revealMutation = useMutation({
+    mutationFn: (messageId: string) => runHostRequest({ request: signal => api.revealMessageBody({ messageId }, { signal }) }),
+  })
   const managementMutation = useMutation({
-    mutationFn: async (request: ManagementAction) => {
-      if (request.kind === 'subscription') {
-        return api.setSubscription({
-          agentId: request.agentId,
-          topic: request.topic,
-          delivery: request.delivery,
-          allowSteerFrom: request.allowSteerFrom,
-        })
-      }
-      if (request.kind === 'unsubscribe') return api.unsubscribe({ agentId: request.agentId, topic: request.topic })
-      if (request.kind === 'rejoin') {
-        return api.setSubscription({ agentId: request.agentId, topic: request.topic, delivery: 'queue', allowSteerFrom: [] })
-      }
-      return api.acknowledge({ agentId: request.agentId, messageId: request.messageId })
-    },
+    mutationFn: (request: ManagementAction) =>
+      runHostRequest({
+        request: async signal => {
+          if (request.kind === 'subscription') {
+            return api.setSubscription(
+              {
+                agentId: request.agentId,
+                topic: request.topic,
+                delivery: request.delivery,
+                allowSteerFrom: request.allowSteerFrom,
+              },
+              { signal },
+            )
+          }
+          if (request.kind === 'unsubscribe') return api.unsubscribe({ agentId: request.agentId, topic: request.topic }, { signal })
+          if (request.kind === 'rejoin') {
+            return api.setSubscription({ agentId: request.agentId, topic: request.topic, delivery: 'queue', allowSteerFrom: [] }, { signal })
+          }
+          return api.acknowledge({ agentId: request.agentId, messageId: request.messageId }, { signal })
+        },
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: diagnosticsKey })
       await queryClient.invalidateQueries({ queryKey: messageRecipientsKey })
