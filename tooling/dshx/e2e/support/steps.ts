@@ -154,17 +154,9 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
     await expect(previewNotice).toBeHidden()
 
     const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
-    const providerSetupAppeared = await providerSetup.waitFor({ state: 'visible', timeout: 5_000 }).then(
-      () => true,
-      error => {
-        if (error instanceof Error && error.name === 'TimeoutError') return false
-        throw error
-      },
-    )
-    if (providerSetupAppeared) {
-      await providerSetup.getByRole('button', { name: 'Configure later', exact: true }).click()
-      await expect(providerSetup).toBeHidden()
-    }
+    await page.addLocatorHandler(providerSetup, async dialog => {
+      await dialog.getByRole('button', { name: 'Configure later', exact: true }).click()
+    })
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {
