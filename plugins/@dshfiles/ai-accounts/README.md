@@ -87,6 +87,21 @@ window. It never replaces the ordinary gauges. While a weekly limit is spent,
 unreset, and the reserve lasts, requests on that account go out as
 `gpt-reserve` (Settings › AI Accounts › Codex Luna Reserve, on by default);
 the picker and transcript keep the model you chose.
+
+Failure recovery (Settings › AI Accounts › Failure recovery) decides what a
+failed request on an account route does, per kind: connection failure
+(resets, timeouts, 5xx, Envoy replay-buffer overflow), rate limit, usage
+exhausted, sign-in failure, request too large. The options run in order:
+retry the same account (count and doubling backoff), continue on Luna Reserve
+(Codex), fail over to the next account of the same provider that offers the
+model (usage-strip order, hidden accounts skipped), wait out a declared reset,
+resend earlier images as file placeholders, then fail the turn or hand the
+failure to DSH's own retry and compaction. Defaults: connection → retry twice,
+then fail over; exhausted → Luna Reserve, then fail over; rate limit → fail
+over, then wait up to a minute; sign-in and oversized stay with DSH. A
+fail-over swaps the account on the wire only, cools the failed account, and
+returns the conversation to it once it recovers. Each step shows as a retry
+row in the turn. Large tool outputs are never trimmed.
 Every open surface shares one Host reading, cached for 30 seconds; **Refresh**
 bypasses the cache.
 
