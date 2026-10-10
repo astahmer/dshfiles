@@ -5,37 +5,18 @@
       "id": "queue-ordering",
       "title": "Reorder pending messages",
       "summary": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [
         {
           "key": "expandByDefault",
           "defaultValue": "true",
           "constraints": "Boolean; choose the initial queue dock expansion state.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "queue-reorder.dock-preferences"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["queue-reorder.dock-preferences"]
         }
       ],
-      "states": [
-        "collapsed",
-        "expanded",
-        "moving",
-        "idle",
-        "busy",
-        "failed"
-      ],
-      "failureModes": [
-        "Move at the first/last boundary is a no-op.",
-        "A missing item or absent live agent rejects mutation without changing order."
-      ],
+      "states": ["collapsed", "expanded", "moving", "idle", "busy", "failed"],
+      "failureModes": ["Move at the first/last boundary is a no-op.", "A missing item or absent live agent rejects mutation without changing order."],
       "externalDependencies": [],
       "verification": [
         {
@@ -80,23 +61,18 @@
       ]
     },
     {
-      "id": "text-only-message-editing",
-      "title": "Edit pending text messages",
-      "summary": "Edit only non-empty text-only queue messages and refuse blank content or attachments.",
-      "surfaces": [
-        "client",
-        "host"
-      ],
+      "id": "composer-message-editing",
+      "title": "Edit queued messages in the composer",
+      "summary": "Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.",
+      "surfaces": ["client", "host"],
       "configuration": [],
-      "states": [
-        "viewing",
-        "editing",
-        "saving",
-        "failed"
-      ],
+      "states": ["viewing", "loading", "editing", "submitting", "restoring", "failed"],
       "failureModes": [
-        "An attachment or non-text payload prevents editing.",
-        "An empty draft is not saved."
+        "An attachment cannot be read back, so the message stays queued and unedited.",
+        "The message leaves the queue before editing starts, so nothing changes.",
+        "A composer submit is rejected, so the edit stays open with its draft.",
+        "Restoring the original fails, so the record stays recoverable with Retry or Discard.",
+        "A Host started before readFile existed cannot load file attachments; editing those messages reports it and leaves them queued."
       ],
       "externalDependencies": [],
       "verification": [
@@ -107,21 +83,63 @@
         },
         {
           "kind": "unit-test",
-          "id": "queue-reorder.text-only-message-editing-unit-editable-text-only",
+          "id": "queue-reorder.composer-message-editing-unit-hydrates-composer",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Edit moves the text and attachments into the composer and keeps the user draft aside"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-submit-same-position",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Submit queues the edited message, with its attachments, back at the same position"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-cancel-restores-original",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Cancel puts the original back unchanged at the same position and discards the composer edits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-drain-race",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "A finishing turn cannot run the message being edited, and Submit then delivers it exactly once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-already-left",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Editing a message that already left the queue changes nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-unreadable-attachment",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "An attachment that cannot be loaded keeps the message queued"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-rejected-submit",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "A rejected submit keeps the edit open with the draft in the composer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-reload",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "After a reload the saved record still offers Cancel, which restores the original once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-restore-retry",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "A restore that fails stays recoverable until retried"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-decode",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
           "testName": "decodeQueuedRows tolerates malformed rows and marks unknown blocks as not editable"
-        },
-        {
-          "kind": "unit-test",
-          "id": "queue-reorder.text-only-message-editing-unit-reject-attachments-and-empty",
-          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
-          "testName": "editableQueueText rejects attachments and blank content"
-        },
-        {
-          "kind": "unit-test",
-          "id": "queue-reorder.text-only-message-editing-unit-host-queue-edit-action",
-          "file": "plugins/@dshfiles/queue-reorder/src/queue-editor-rendering.test.ts",
-          "testName": "queue edit uses the Host queue action instead of composer-only APIs"
         }
       ]
     },
@@ -129,29 +147,17 @@
       "id": "queued-message-preview",
       "title": "Preview queued message text",
       "summary": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [
         {
           "key": "previewLength",
           "defaultValue": "200",
           "constraints": "Integer from 40 to 1000 characters.",
-          "coveredBy": [
-            "queue-reorder.message-preview"
-          ]
+          "coveredBy": ["queue-reorder.message-preview"]
         }
       ],
-      "states": [
-        "text-preview",
-        "truncated-preview",
-        "attachment-only",
-        "empty-preview"
-      ],
-      "failureModes": [
-        "Text previews split a Unicode code point during truncation.",
-        "Image or file payload data is rendered as message text."
-      ],
+      "states": ["text-preview", "truncated-preview", "attachment-only", "empty-preview"],
+      "failureModes": ["Text previews split a Unicode code point during truncation.", "Image or file payload data is rendered as message text."],
       "externalDependencies": [],
       "verification": [
         {

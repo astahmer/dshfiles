@@ -1,19 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { AttachmentIdType } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PromptContentPart } from '@deepseek-ai/dsh-api-session-controller/types'
-import type {
-  ComposerAttachment,
-  DraftAttachmentId,
-  DraftFileUploads,
-  SessionInput,
-  SubmitAttachment,
-} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, SessionInput, SubmitAttachment } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiClient } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { queueApi } from './api.js'
-import { createQueueEditor, decodeQueuedRows, queueEditRecordsSchema, type QueueEditor, type QueuedRow } from './queue-edit.js'
+import { createQueueEditor, decodeQueuedRows, queueEditRecordsSchema, type QueueEditor, type QueueEditRecord, type QueuedRow } from './queue-edit.js'
 
 /**
  * Binds the queue editor to one live DSH session: its inbox projection, its pending submissions, its composer
@@ -24,6 +17,7 @@ import { createQueueEditor, decodeQueuedRows, queueEditRecordsSchema, type Queue
  */
 
 type QueueApiClient = ApiClient<(typeof queueApi)['methods']>
+type AttachmentIdType = Parameters<SessionFace['readAttachment']>[0]
 type ReceiptId = Extract<PromptContentPart, { readonly type: 'file' }>['receiptId']
 
 interface DraftAttachmentApi {
@@ -71,7 +65,8 @@ const memoized = <Source, Value>(read: () => Source, derive: (source: Source) =>
   }
 }
 
-const storedEdits = createStoredValue({ key: 'dshfiles.queue-reorder.edits.v1', schema: queueEditRecordsSchema, fallback: {} })
+const noEdits: Record<string, QueueEditRecord> = {}
+const storedEdits = createStoredValue({ key: 'dshfiles.queue-reorder.edits.v1', schema: queueEditRecordsSchema, fallback: noEdits })
 
 /** The Host API client, set by the dock: dshx hands it out only inside a Client Slot component. */
 let queueClient: QueueApiClient | undefined
@@ -126,11 +121,12 @@ const createEditor = (input: {
   readonly drafts: DraftAttachmentApi
 }): QueueEditor => {
   const inbox = input.session.projections.faceOf('inbox')
+  const key: string = input.sessionId
   const records = {
-    load: () => storedEdits.get()[input.sessionId] ?? null,
-    save: (record: ReturnType<typeof records.load>) => {
-      const { [input.sessionId]: _previous, ...others } = storedEdits.get()
-      storedEdits.set(record === null ? others : { ...others, [input.sessionId]: record })
+    load: (): QueueEditRecord | null => storedEdits.get()[key] ?? null,
+    save: (record: QueueEditRecord | null): void => {
+      const { [key]: _previous, ...others } = storedEdits.get()
+      storedEdits.set(record === null ? others : { ...others, [key]: record })
     },
   }
   return createQueueEditor<DraftAttachmentId, SubmitAttachment>({

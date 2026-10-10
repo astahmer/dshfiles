@@ -2,8 +2,6 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { createQueueEditor, decodeQueuedRows, restoredIndex, type QueueEditRecord, type QueuedBlock } from './queue-edit.js'
 
-type WorldAttachment = { readonly type: 'image' | 'file'; readonly name: string }
-
 interface RawRow {
   readonly id: string
   readonly content: readonly QueuedBlock[]
