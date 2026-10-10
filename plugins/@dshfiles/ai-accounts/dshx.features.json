@@ -5,46 +5,24 @@
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
       "summary": "Add, edit, enable, and persist account profiles while preserving unsaved edits across validation and save failures.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
           "key": "saveMode",
           "defaultValue": "auto",
           "constraints": "One of auto or manual.",
-          "choices": [
-            "auto",
-            "manual"
-          ],
-          "coveredBy": [
-            "ai-accounts.save-policy"
-          ]
+          "choices": ["auto", "manual"],
+          "coveredBy": ["ai-accounts.save-policy"]
         },
         {
           "key": "autoSaveDelayMs",
           "defaultValue": "800",
           "constraints": "Integer from 200 to 10000 milliseconds; used only by auto save.",
-          "coveredBy": [
-            "ai-accounts.save-policy"
-          ]
+          "coveredBy": ["ai-accounts.save-policy"]
         }
       ],
-      "states": [
-        "clean",
-        "dirty",
-        "saving",
-        "saved",
-        "validation-error",
-        "save-error"
-      ],
-      "failureModes": [
-        "Invalid account path or environment alias is rejected.",
-        "A failed write preserves the draft and supports retry or revert."
-      ],
+      "states": ["clean", "dirty", "saving", "saved", "validation-error", "save-error"],
+      "failureModes": ["Invalid account path or environment alias is rejected.", "A failed write preserves the draft and supports retry or revert."],
       "externalDependencies": [],
       "verification": [
         {
@@ -63,54 +41,30 @@
       "id": "model-routing",
       "title": "Curate models and choose account routes",
       "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced account pools with cooldown-aware failover.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
           "key": "distribution",
           "defaultValue": "sticky",
           "constraints": "One of sticky, priority, round-robin, or balanced.",
-          "choices": [
-            "sticky",
-            "priority",
-            "round-robin",
-            "balanced"
-          ],
-          "coveredBy": [
-            "ai-accounts.pool-failover"
-          ]
+          "choices": ["sticky", "priority", "round-robin", "balanced"],
+          "coveredBy": ["ai-accounts.pool-failover"]
         },
         {
           "key": "cooldownMs",
           "defaultValue": "300000",
           "constraints": "Integer from 0 to 86400000 milliseconds.",
-          "coveredBy": [
-            "ai-accounts.pool-failover"
-          ]
+          "coveredBy": ["ai-accounts.pool-failover"]
         },
         {
           "key": "modelsPageAccounts",
           "defaultValue": "true",
           "constraints": "Boolean; show account routing controls on the models page.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "ai-accounts.model-curation"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.model-curation"]
         }
       ],
-      "states": [
-        "available",
-        "cooling-down",
-        "rebound",
-        "no-eligible-account"
-      ],
+      "states": ["available", "cooling-down", "rebound", "no-eligible-account"],
       "failureModes": [
         "A provider rate limit cools the selected account and may rebind the request.",
         "All eligible accounts are cooling down and no route can be selected."
@@ -139,86 +93,50 @@
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
       "summary": "Render account quota windows, reset times, status indicators, and configurable footer or edge meters with hidden and ordered accounts.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
           "key": "usageRefreshSeconds",
           "defaultValue": "60",
           "constraints": "Integer from 15 to 3600 seconds.",
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "coveredBy": ["ai-accounts.quota-display"]
         },
         {
           "key": "footerButton",
           "defaultValue": "true",
           "constraints": "Boolean; show the footer quota control.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.quota-display"]
         },
         {
           "key": "meterLabel",
           "defaultValue": "both",
           "constraints": "One of both, percent, or reset.",
-          "choices": [
-            "both",
-            "percent",
-            "reset"
-          ],
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "choices": ["both", "percent", "reset"],
+          "coveredBy": ["ai-accounts.quota-display"]
         },
         {
           "key": "usageOrder",
           "defaultValue": "[]",
           "constraints": "Ordered account ID list; unknown IDs are ignored.",
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "coveredBy": ["ai-accounts.quota-display"]
         },
         {
           "key": "hiddenUsageAccounts",
           "defaultValue": "[]",
           "constraints": "Account ID list hidden from usage meters.",
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "coveredBy": ["ai-accounts.quota-display"]
         },
         {
           "key": "edgeWidget",
           "defaultValue": "true",
           "constraints": "Boolean; enable the edge quota overlay.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "ai-accounts.quota-display"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.quota-display"]
         }
       ],
-      "states": [
-        "loading",
-        "available",
-        "limited",
-        "reset-known",
-        "failed",
-        "hidden"
-      ],
-      "failureModes": [
-        "A quota provider failure is displayed without persisting a fake success.",
-        "Missing or stale accounts do not crash the quota strip."
-      ],
+      "states": ["loading", "available", "limited", "reset-known", "failed", "hidden"],
+      "failureModes": ["A quota provider failure is displayed without persisting a fake success.", "Missing or stale accounts do not crash the quota strip."],
       "externalDependencies": [
         {
           "id": "provider-quota-apis",
@@ -238,52 +156,30 @@
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
       "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, and apply explicit price overrides without persisting provider response payloads.",
-      "surfaces": [
-        "client",
-        "host",
-        "storage",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {
           "key": "pricingRefreshHours",
           "defaultValue": "24",
           "constraints": "Integer from 1 to 720 hours.",
-          "coveredBy": [
-            "ai-accounts.pricing-cost"
-          ]
+          "coveredBy": ["ai-accounts.pricing-cost"]
         },
         {
           "key": "pricingOverrides",
           "defaultValue": "{}",
           "constraints": "Model ID to synthetic price override map; malformed entries are ignored safely.",
-          "coveredBy": [
-            "ai-accounts.pricing-cost"
-          ]
+          "coveredBy": ["ai-accounts.pricing-cost"]
         },
         {
           "key": "currency",
           "defaultValue": "USD",
           "constraints": "The only supported currency is USD.",
-          "choices": [
-            "USD"
-          ],
-          "coveredBy": [
-            "ai-accounts.pricing-cost"
-          ]
+          "choices": ["USD"],
+          "coveredBy": ["ai-accounts.pricing-cost"]
         }
       ],
-      "states": [
-        "snapshot-written",
-        "same-bucket-updated",
-        "provider-failure",
-        "history-trimmed",
-        "price-missing"
-      ],
-      "failureModes": [
-        "Failed quota reads write no history row.",
-        "Missing model price yields an unavailable estimate rather than an invented cost."
-      ],
+      "states": ["snapshot-written", "same-bucket-updated", "provider-failure", "history-trimmed", "price-missing"],
+      "failureModes": ["Failed quota reads write no history row.", "Missing model price yields an unavailable estimate rather than an invented cost."],
       "externalDependencies": [
         {
           "id": "models-dev-pricing",
@@ -308,48 +204,25 @@
       "id": "luna-reserve-routing",
       "title": "Route exhausted Luna accounts through Reserve",
       "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
           "key": "codexLunaReserve",
           "defaultValue": "true",
           "constraints": "Boolean; enable separate Luna Reserve routing and metering.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "ai-accounts.luna-reserve"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.luna-reserve"]
         },
         {
           "key": "costEstimates",
           "defaultValue": "true",
           "constraints": "Boolean; enable composer cost estimates.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "ai-accounts.luna-reserve"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.luna-reserve"]
         }
       ],
-      "states": [
-        "weekly-available",
-        "weekly-spent",
-        "reserve-available",
-        "reserve-spent",
-        "route-default"
-      ],
-      "failureModes": [
-        "Reserve exhaustion does not masquerade as weekly quota.",
-        "Disabled Reserve leaves the default route unchanged."
-      ],
+      "states": ["weekly-available", "weekly-spent", "reserve-available", "reserve-spent", "route-default"],
+      "failureModes": ["Reserve exhaustion does not masquerade as weekly quota.", "Disabled Reserve leaves the default route unchanged."],
       "externalDependencies": [
         {
           "id": "codex-quota-api",
@@ -369,30 +242,16 @@
       "id": "failure-recovery",
       "title": "Recover failed account requests per failure kind",
       "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
           "key": "failureRecovery",
           "defaultValue": "transport: retry 2x then fail over; rateLimit: fail over then wait 60 s; exhausted: Luna Reserve then fail over; auth and oversized: hand to DSH",
           "constraints": "Per kind (transport, rateLimit, exhausted, auth, oversized): retries 0-10, backoffMs 100-60000, lunaReserve, failover, waitSeconds 0-3600, shrink, then fail|dsh; malformed fields fall back to defaults.",
-          "coveredBy": [
-            "ai-accounts.failure-policy-ladder",
-            "ai-accounts.failure-recovery-pool"
-          ]
+          "coveredBy": ["ai-accounts.failure-policy-ladder", "ai-accounts.failure-recovery-pool"]
         }
       ],
-      "states": [
-        "retrying",
-        "luna-reserve",
-        "failed-over",
-        "waiting",
-        "shrunk",
-        "given-up"
-      ],
+      "states": ["retrying", "luna-reserve", "failed-over", "waiting", "shrunk", "given-up"],
       "failureModes": [
         "A fail-over never crosses provider kinds, skips hidden accounts and accounts without the model.",
         "A recovered account takes its conversations back after its cooldown.",
@@ -411,6 +270,11 @@
           "id": "ai-accounts.failure-recovery-pool",
           "file": "plugins/@dshfiles/ai-accounts/src/failure-recovery.test.ts",
           "testName": "moves a rate-limited conversation to the next healthy account and cools the spent one"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.failure-recovery",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]
     }
