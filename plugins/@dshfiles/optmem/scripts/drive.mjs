@@ -14,15 +14,32 @@ const scenario = JSON.parse(await (await import('node:fs/promises')).readFile(pr
 const provider = process.env.PROVIDER ?? 'codex-emialex'
 const model = process.env.MODEL ?? 'gpt-6-luna'
 const effort = process.env.EFFORT ?? 'low'
-const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = await import(pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')).href)
+const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = await import(
+  pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')).href
+)
 const { connectDshPlatformClient } = await import(pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/platform/index.js')).href)
 const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
-const corePackages = ['api-session-controller', 'agent', 'agent-loop', 'session', 'session-persistence', 'session-persistence-jsonl', 'session-format-catalog', 'session-format-v4-to-v5']
+const corePackages = [
+  'api-session-controller',
+  'agent',
+  'agent-loop',
+  'session',
+  'session-persistence',
+  'session-persistence-jsonl',
+  'session-format-catalog',
+  'session-format-v4-to-v5',
+]
 const plugin = name => `link:${resolve(repoRoot, 'plugins/@dshfiles', name)}`
 const scratch = await createScratchProfile({
   profileName: 'optmem-full',
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
-  bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...(process.env.STOCK === '1' ? [] : ['@dshfiles/dsh-core-runtime']), '@dshfiles/ai-accounts', '@dshfiles/optmem'],
+  bundleIds: [
+    '@deepseek-ai/dsh-base',
+    '@deepseek-ai/dsh-web-app',
+    ...(process.env.STOCK === '1' ? [] : ['@dshfiles/dsh-core-runtime']),
+    '@dshfiles/ai-accounts',
+    '@dshfiles/optmem',
+  ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies: {
     '@dshfiles/dsh-core-runtime': plugin('dsh-core-runtime'),
@@ -36,14 +53,20 @@ log('scratch home', scratch.home)
 await scratch.install()
 log('installed')
 const overlay = resolve(scratch.home, 'optmem-full.patch.yml')
-await writeFile(overlay, `- id: connection
+await writeFile(
+  overlay,
+  `- id: connection
   inject:
     - webRuntime
     - webServer
-${process.env.STOCK === '1' ? '' : `- id: dshfiles-core-runtime
+${
+  process.env.STOCK === '1'
+    ? ''
+    : `- id: dshfiles-core-runtime
   config:
     sessionPersistenceRoot: ${scratch.home}/sessions
-`}- id: agent-default-model
+`
+}- id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: ${provider}
@@ -55,9 +78,14 @@ ${process.env.STOCK === '1' ? '' : `- id: dshfiles-core-runtime
     summarizerProvider: ${provider}
     summarizerModel: ${model}
     summarizerEffort: ${effort}
-`)
+`,
+)
 await mkdir(resolve(scratch.home, 'plugins/ai-accounts'), { recursive: true, mode: 0o700 })
-await writeFile(resolve(scratch.home, 'plugins/ai-accounts/accounts.json'), await (await import('node:fs/promises')).readFile(process.env.ACCOUNTS_FILE ?? resolve(homedir(), '.dsh/plugins/ai-accounts/accounts.json')), { mode: 0o600 })
+await writeFile(
+  resolve(scratch.home, 'plugins/ai-accounts/accounts.json'),
+  await (await import('node:fs/promises')).readFile(process.env.ACCOUNTS_FILE ?? resolve(homedir(), '.dsh/plugins/ai-accounts/accounts.json')),
+  { mode: 0o600 },
+)
 const project = resolve(scratch.home, 'project')
 await mkdir(project, { recursive: true })
 const isolated = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
@@ -66,23 +94,34 @@ const { symlink, rm: remove } = await import('node:fs/promises')
 await remove(realProfileLink, { force: true })
 await symlink(scratch.profileRoot, realProfileLink)
 const { DSH_HOME: _ignored, ...inherited } = process.env
-const environment = process.env.REAL_HOME === '1'
-  ? { ...inherited, DSHX_BOOT_PROFILE_ROOT: scratch.profileRoot }
-  : process.env.FULL_ENV === '1'
-  ? { ...process.env, DSH_HOME: isolated.DSH_HOME, DSHX_BOOT_PROFILE_ROOT: isolated.DSHX_BOOT_PROFILE_ROOT }
-  : isolated
+const environment =
+  process.env.REAL_HOME === '1'
+    ? { ...inherited, DSHX_BOOT_PROFILE_ROOT: scratch.profileRoot }
+    : process.env.FULL_ENV === '1'
+      ? { ...process.env, DSH_HOME: isolated.DSH_HOME, DSHX_BOOT_PROFILE_ROOT: isolated.DSHX_BOOT_PROFILE_ROOT }
+      : isolated
 let output = ''
-const child = spawn('dsh', ['optmem-full', '--patch', overlay, '--port', '0', '--no-open'], { cwd: project, env: environment, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+const child = spawn('dsh', ['optmem-full', '--patch', overlay, '--port', '0', '--no-open'], {
+  cwd: project,
+  env: environment,
+  stdio: ['ignore', 'pipe', 'pipe'],
+  detached: true,
+})
 const collect = chunk => (output = `${output}${chunk.toString('utf8')}`.slice(-400_000))
 child.stdout.on('data', collect)
 child.stderr.on('data', collect)
 const urlPattern = /http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/
 const evidence = { home: scratch.home, mode: compatMode ? 'compat' : 'full', turns: [] }
 const finish = async code => {
-  evidence.hostLog = redactHostOutput(output).split('\n').filter(line => /optmem|did not activate|failed to import|dshfiles-core-runtime|error/i.test(line)).slice(-200)
+  evidence.hostLog = redactHostOutput(output)
+    .split('\n')
+    .filter(line => /optmem|did not activate|failed to import|dshfiles-core-runtime|error/i.test(line))
+    .slice(-200)
   await writeFile(out, JSON.stringify(evidence, null, 2))
   await writeFile(`${out}.host.log`, redactHostOutput(output))
-  try { process.kill(-child.pid, 'SIGTERM') } catch {}
+  try {
+    process.kill(-child.pid, 'SIGTERM')
+  } catch {}
   process.exit(code)
 }
 try {
@@ -111,12 +150,31 @@ try {
           turn: turnNumber,
           end: ends.at(-1).data.reason,
           overrides: all.filter(event => event.type === 'request/messages-override' && event.data.turn === turnNumber).map(event => event.data),
-          assistant: mine.filter(event => event.type === 'assistant/message').map(event => ({ step: event.data.step, usage: event.data.usage, text: event.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('').slice(0, 600), tools: event.data.message.content.filter(block => block.type === 'tool-call').map(block => block.name ?? block.toolName) })),
+          assistant: mine
+            .filter(event => event.type === 'assistant/message')
+            .map(event => ({
+              step: event.data.step,
+              usage: event.data.usage,
+              text: event.data.message.content
+                .filter(block => block.type === 'text')
+                .map(block => block.text)
+                .join('')
+                .slice(0, 600),
+              tools: event.data.message.content.filter(block => block.type === 'tool-call').map(block => block.name ?? block.toolName),
+            })),
           toolResults: mine.filter(event => event.type === 'tool/result').map(event => JSON.stringify(event.data.message.content).slice(0, 1500)),
           surfaceTypes: all.map(event => event.type).join(','),
         }
         evidence.turns.push(record)
-        log(JSON.stringify({ turn: record.turn, end: record.end?.kind, overrides: record.overrides, usage: record.assistant.map(a => a.usage), text: record.assistant.at(-1)?.text.slice(0, 200) }))
+        log(
+          JSON.stringify({
+            turn: record.turn,
+            end: record.end?.kind,
+            overrides: record.overrides,
+            usage: record.assistant.map(a => a.usage),
+            text: record.assistant.at(-1)?.text.slice(0, 200),
+          }),
+        )
         return record
       }
       await new Promise(done => setTimeout(done, 500))

@@ -4,6 +4,7 @@ Inputs: [requirements.md](requirements.md), [research-optmem.md](research-optmem
 Clean-room: the gist has no licence — no prompts, templates or code are copied; algorithms are re-derived.
 
 ## 1. Confirmed DSH extension points (see research-dsh.md for citations)
+
 - Capture: `session/event` (every committed append: user/assistant/tool/call/result/turn events) + backfill via
   `ctx.sessionQuery`. Session id, cwd, parentSession from the session header; project via cwd realpath.
 - Tools: `defineTool` in `defineHost({ tools })`; `exec.agent.id` = session id, `exec.signal` for cancellation.
@@ -18,6 +19,7 @@ Clean-room: the gist has no licence — no prompts, templates or code are copied
   `dshHomePath('plugins', 'optmem', 'optmem.db')`. WAL mode, one writer per process, `busy_timeout`.
 
 ## 2. Limitations to accept up front
+
 - Full mode works only where the fork agent-loop is active (probe/scratch profile via dsh-core-runtime) until the
   waterfall is upstreamed. Stock `web` runs compatibility mode only; startup validation reports this.
 - Runtime drivers (cursor-acp) get no system prompt/tools from DSH → OptMem can capture their events but cannot
@@ -28,17 +30,21 @@ Clean-room: the gist has no licence — no prompts, templates or code are copied
 ## 3. Data model
 
 ### Events (source of truth, append-only)
+
 `events(id INTEGER PRIMARY KEY, event_key TEXT UNIQUE, harness TEXT, conversation_id TEXT, project_id TEXT NULL,
  parent_conversation_id TEXT NULL, role TEXT, created_at INTEGER, text TEXT, bytes INTEGER, truncated INTEGER,
  meta TEXT)`
+
 - `event_key` = harness-stable id (DSH: `dsh:<sessionId>:<seq>`) → idempotent ingestion (`INSERT … ON CONFLICT DO
-  NOTHING`).
+NOTHING`).
 - `role` ∈ `user | assistant | tool_call | tool_result | note`. Text is normalized, **redacted**, bounded
   (tool results capped, default 16 KB, with an explicit `…[truncated N bytes]` marker).
 - `id` is a global insertion order, never reused.
 
 ### Memory streams (the OptMem trees)
+
 `stream_entries(stream TEXT, pos INTEGER, event_id INTEGER, PRIMARY KEY(stream, pos))`
+
 - A stream is a dense, contiguous, chronological sequence (pos 0..T−1) — the tree invariant.
 - Streams: `conversation:<id>` (always), `project:<id>` (when the conversation has a project), `global` (only
   events explicitly scoped global; nothing is auto-promoted). Events are stored once and referenced per stream.
@@ -46,31 +52,39 @@ Clean-room: the gist has no licence — no prompts, templates or code are copied
   are append-only, so concurrent conversations interleave deterministically in the project stream).
 
 ### Tree nodes (derived)
+
 `nodes(stream TEXT, level INTEGER, idx INTEGER, text TEXT, bytes INTEGER, model TEXT, created_at INTEGER,
  PRIMARY KEY(stream, level, idx))`
+
 - Node (l, i) covers positions [i·2^l, (i+1)·2^l). Address string `"<start>+<len>"` (e.g. `128+64`).
 - Level 0: event text if ≤ `maxNodeBytes` (512), else a model summary. Level ≥1: summary of the two children,
   ≤ 512 bytes, built only when both children exist and are complete (len = 2^l fully present).
 
 ### Views (derived, persisted byte-for-byte)
+
 `views(stream TEXT PRIMARY KEY, through_pos INTEGER, nodes TEXT /* JSON [[l,i],…] */, rendered TEXT, bytes INTEGER,
  version INTEGER)`
+
 - A view is an ordered partition of [0, through_pos) into nodes. Rendering = one line per node:
   `<start>+<len>| <text>` (newlines escaped). The rendered string is stored and only ever extended at the tail
   (append) or rewritten by a merge batch — never re-serialized otherwise.
 
 ### Cursors (independent pipelines)
+
 `cursors(name TEXT, stream TEXT, pos INTEGER, PRIMARY KEY(name, stream))` with names `leaf` (leaf summaries done),
 `fts` (search indexed), `view` (= views.through_pos). Each pipeline resumes from its cursor after a crash.
 
 ### Search (derived)
+
 `events_fts` FTS5 (`text`, content=events, content_rowid=id, tokenize unicode61) maintained by the `fts`
 pipeline, not by triggers, so an FTS failure never blocks ingestion.
 
 ### Migrations
+
 `PRAGMA user_version` + ordered SQL migrations in `optmem-sqlite`.
 
 ## 4. Algorithms (clean-room from research-optmem.md)
+
 1. **Append** (transaction): insert event, assign stream positions, return positions. Nothing else on the hot path.
 2. **Leaf pipeline** (background, bounded concurrency): for each stream pos ≥ cursor `leaf`, create level-0 node
    (verbatim if ≤512 B, else `Summarizer`). Advance cursor only over a contiguous completed prefix.
@@ -88,6 +102,7 @@ pipeline, not by triggers, so an FTS failure never blocks ingestion.
    exist; restart pipelines from cursors. No step deletes events.
 
 ## 5. Next-turn consistency barrier (full mode)
+
 Before building turn N+1's context: (1) previous-turn events flushed + appended (DSH flushes at pre-step);
 (2) wait up to `barrierMs` (default 5 s) for `leaf` cursor ≥ T; (3) any position still without a leaf node is
 rendered with its raw text clipped to 512 B and an explicit `[pending summary]` tag — **recent events are never
@@ -96,6 +111,7 @@ omitted**; (4) snapshot. Deviation from the gist (unbounded wait), recorded deli
 ## 6. Modes and lifecycle
 
 ### Compatibility mode (stock DSH)
+
 - Capture every committed session event → `append`.
 - Tools: `memory_search`, `memory_zoom`, `memory_context`, `memory_status`.
 - Injection: one `definePromptContext` "Persistent memory" ≤ `injectBytes` (8 KB): the top of the **project** view
@@ -103,6 +119,7 @@ omitted**; (4) snapshot. Deviation from the gist (unbounded wait), recorded deli
   duplication); changes only when the view changes (cache-friendly). Background compaction as above.
 
 ### Full mode (fork waterfall)
+
 Per user turn (first step of `turn/start`): messages = `[system node 0 (unchanged)]` + `[memory view message]` +
 `[messages of the current turn only]`. Later steps of the same turn keep the identical prefix. The view message is
 the project view (fallback: conversation view) rendered byte-for-byte; between turns it only grows at the tail
@@ -110,11 +127,13 @@ except after a merge batch → stable prefix. The DSH session/log stays untouche
 no history replay). Tools/permissions/streaming/cancellation are DSH's own.
 
 ### Capabilities
+
 `HarnessCapabilities { captureEvents, registerTools, injectContext, replaceContext, resetPerTurn }`.
 DSH stock = {T, T, T, F, F}; DSH + fork waterfall = all T. Mode startup validates and reports missing ones.
 Producers (capture) and consumers (tools/injection) are separate adapter parts.
 
 ## 7. Scopes and multi-conversation
+
 - Every conversation has its own stream; same-project conversations share the project stream; global only by
   explicit scope. New conversation = new conversation stream + the existing project view.
 - Retrieval tools take `scope: conversation | project | global | all-projects` (default project);
@@ -122,6 +141,7 @@ Producers (capture) and consumers (tools/injection) are separate adapter parts.
 - Concurrency: single writer connection per process (serialized appends), readers use WAL snapshots.
 
 ## 8. Packages (inside the plugins pnpm workspace, extractable)
+
 - `plugins/@dshfiles/optmem-core` — types, tree math, view render/merge, engine orchestration, interfaces
   (`MemoryStore`, `Summarizer`, `MemorySearch`, `Clock`). No deps.
 - `plugins/@dshfiles/optmem-sqlite` — `node:sqlite` store + FTS search + migrations. Depends on core.
@@ -132,11 +152,13 @@ Producers (capture) and consumers (tools/injection) are separate adapter parts.
 - Fork change for full mode: `tooling/dsh-core/agent/src/runtime-types.ts` + `agent-loop/src/agent.ts`.
 
 ## 9. Security
+
 Redaction before persistence (API-key/token/JWT/private-key/password patterns + configured secret aliases),
 excluded tools/paths (config), bounded tool results, history labelled as untrusted data in the injected block,
 DB file mode 600, no network listener.
 
 ## 10. Risks / trade-offs
+
 - `node:sqlite` is experimental in Node 22 (works; DSH already uses it).
 - Summaries cost model calls ≈ one per event + one per internal node; mitigated by the 512 B verbatim rule and a
   cheap model; budget visible in `memory_status`.
@@ -144,5 +166,6 @@ DB file mode 600, no network listener.
 - Full mode depends on the fork; upstreaming the waterfall is the long-term fix.
 
 ## 11. Stage plan
+
 2 core + sqlite (tests + bench, no DSH) → 3 DSH compat plugin, verified in `probe` → 4 fork waterfall + full mode,
 runtime-proven in `probe` → 5 evals (plain vs compat vs full) + hardening.

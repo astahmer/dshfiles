@@ -7,7 +7,7 @@
 
 ## Context
 
-- The owned [AI Accounts plugin](../../plugins/@dshfiles/ai-accounts) already
+- The owned [AI Accounts plugin](../plugins/@dshfiles/ai-accounts) already
   speaks Command Code. `src/commandcode-provider.ts` points pi-ai's own OpenAI
   transport at `https://api.commandcode.ai`, declares per-model which API serves
   it (`openai-completions`, `openai-responses`, `anthropic-messages`), and

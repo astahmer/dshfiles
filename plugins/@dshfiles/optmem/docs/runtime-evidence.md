@@ -66,16 +66,16 @@ Prompts were entered through the hidden browser pane (DOM input, no files writte
 
 ## Proven / not proven
 
-| Claim | Status | How |
-|---|---|---|
-| Plugin activates in a real DSH host | proven | profile:boot, plugins page, two overlay boots |
-| Live `session/event` capture, idempotent keys, workspace project | proven | rows of both live threads |
-| 4 memory tools in the live tool list and callable by the model | proven | `request/header.tools`, captured tool calls/results |
-| Compact view injected, own-conversation lines omitted | proven | `runtime-context` message in the second thread |
-| Real LLM summaries (leaf + merge) at effort low | proven | nodes with model `codex-emialex/gpt-6-luna` |
-| Command registration, backfill through `sessionQuery`, subagent parent links | proven | first pass above |
-| Summarizer unavailable path (`[pending summary]`, status message) | tests only | route resolver tests |
-| Cross-turn cache-read % / prompt size | not measured | Stage 5 |
+| Claim                                                                        | Status       | How                                                 |
+| ---------------------------------------------------------------------------- | ------------ | --------------------------------------------------- |
+| Plugin activates in a real DSH host                                          | proven       | profile:boot, plugins page, two overlay boots       |
+| Live `session/event` capture, idempotent keys, workspace project             | proven       | rows of both live threads                           |
+| 4 memory tools in the live tool list and callable by the model               | proven       | `request/header.tools`, captured tool calls/results |
+| Compact view injected, own-conversation lines omitted                        | proven       | `runtime-context` message in the second thread      |
+| Real LLM summaries (leaf + merge) at effort low                              | proven       | nodes with model `codex-emialex/gpt-6-luna`         |
+| Command registration, backfill through `sessionQuery`, subagent parent links | proven       | first pass above                                    |
+| Summarizer unavailable path (`[pending summary]`, status message)            | tests only   | route resolver tests                                |
+| Cross-turn cache-read % / prompt size                                        | not measured | Stage 5                                             |
 
 # Stage 4 — full mode through the fork (2026-10-09)
 
@@ -96,12 +96,12 @@ into the probe memory DB `~/.dsh/plugins/optmem/optmem.db` under a `project:path
 
 ## Turns (full mode)
 
-| Conversation | Turn/step | Request (derived → sent) | Notes |
-|---|---|---|---|
-| A | 1/1 | 5 → 6 | view `(no memory yet)`; reply acknowledged codename `teal-otter-42` |
-| A | 2/1, 2/2 | 7 → 6, 9 → 8 | model called `memory_status`: `mode full`, `replaceContext=yes resetPerTurn=yes`, `last full-mode request: turn 2 step 1, 7 → 6 messages (4 carried), view v2 196 B, 0 pending` |
-| A | 3/1 | 11 → 6 | prompt forbade tools; answered `teal-otter-42` — turn 1 was only reachable through the memory view |
-| B (new session, same cwd) | 1/1, 1/2 | 5 → 6, 7 → 8 | called `memory_search` (4 project hits incl. conversation A), answered `teal-otter-42` |
+| Conversation              | Turn/step | Request (derived → sent) | Notes                                                                                                                                                                           |
+| ------------------------- | --------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A                         | 1/1       | 5 → 6                    | view `(no memory yet)`; reply acknowledged codename `teal-otter-42`                                                                                                             |
+| A                         | 2/1, 2/2  | 7 → 6, 9 → 8             | model called `memory_status`: `mode full`, `replaceContext=yes resetPerTurn=yes`, `last full-mode request: turn 2 step 1, 7 → 6 messages (4 carried), view v2 196 B, 0 pending` |
+| A                         | 3/1       | 11 → 6                   | prompt forbade tools; answered `teal-otter-42` — turn 1 was only reachable through the memory view                                                                              |
+| B (new session, same cwd) | 1/1, 1/2  | 5 → 6, 7 → 8             | called `memory_search` (4 project hits incl. conversation A), answered `teal-otter-42`                                                                                          |
 
 Every request carried a `request/messages-override` session event with these counts; 6 sent = system prompt + 3
 carried contexts (runtime context, instructions, skill catalog) + memory view + the current user message. The session
@@ -111,16 +111,16 @@ tool result`).
 
 ## Proven / not proven
 
-| Claim | Status | How |
-|---|---|---|
-| Fork hook active in a real Host; plugin detects it | proven | `memory_status` capabilities, override events |
-| Turn N request has no prior-turn raw messages | proven (by count) | override events 11 → 6; message bodies are not logged |
-| Memory view present and used | proven | A/3 answered without tools; status line view v2 196 B |
-| Tools and tool round trips inside a full-mode turn | proven | `memory_status` / `memory_search` steps 2 |
-| Cross-conversation recall | proven | B/1 via `memory_search` (view also contained it) |
-| Byte-identical prefix across steps/turns | tests only | `full-mode.test.ts`; runtime shows equal cache reads, not bytes |
-| Cancellation during the barrier | tests only | abort test |
-| Real summaries in full mode | not exercised | summarizer route `not resolved yet`; events were short (verbatim leaves) |
+| Claim                                              | Status            | How                                                                      |
+| -------------------------------------------------- | ----------------- | ------------------------------------------------------------------------ |
+| Fork hook active in a real Host; plugin detects it | proven            | `memory_status` capabilities, override events                            |
+| Turn N request has no prior-turn raw messages      | proven (by count) | override events 11 → 6; message bodies are not logged                    |
+| Memory view present and used                       | proven            | A/3 answered without tools; status line view v2 196 B                    |
+| Tools and tool round trips inside a full-mode turn | proven            | `memory_status` / `memory_search` steps 2                                |
+| Cross-conversation recall                          | proven            | B/1 via `memory_search` (view also contained it)                         |
+| Byte-identical prefix across steps/turns           | tests only        | `full-mode.test.ts`; runtime shows equal cache reads, not bytes          |
+| Cancellation during the barrier                    | tests only        | abort test                                                               |
+| Real summaries in full mode                        | not exercised     | summarizer route `not resolved yet`; events were short (verbatim leaves) |
 
 # Stage 5 — real summaries in full mode (S2, 2026-10-09)
 

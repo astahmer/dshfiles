@@ -21,6 +21,7 @@ Labels: **CONFIRMED** = stated in the text (cited). **ASSUMPTION** = unspecified
 ## 1. Append-only conversation history
 
 CONFIRMED
+
 - Layout: `main/YYYY-MM-DD.jsonl` holds one message per line as `{i, kind, text, size, date}`. `tree/YYYY-MM-DD.jsonl`
   holds tree nodes as `{l, i, text, size}`. `view.json` holds the view as `[l, i]` pairs (C L27-31).
 - `i` is the permanent message id. Files are split by day "only to stay small" (C L33). Ids are global and dense: 0, 1,
@@ -41,6 +42,7 @@ CONFIRMED
 - Mid-run user messages are delivered between tool calls and logged as `user` (C L429, P L546).
 
 ASSUMPTION / unspecified
+
 - The split size for "several messages in a row" is not given, and neither is whether the pieces are marked as a
   continuation.
 - Whether images are stored inline: C L347 says `zoom(id,1)` returns "its images", but the record format has only
@@ -50,16 +52,18 @@ ASSUMPTION / unspecified
 ## 2. Binary chronological memory tree
 
 CONFIRMED
+
 - `node(0,i)` = message `i` in at most 512 bytes. `node(l,i)` = merge of `node(l-1,2i)` and `node(l-1,2i+1)` (C L55-57).
   It covers the `2^l` messages starting at `i·2^l` (C L60).
 - "Free" nodes need no model call: A source of at most 512 bytes is its own node. At level 0 that is `kind + ": " +
-  text`, verbatim. At level >0 the node is `childA + "\n" + childB` when that fits (C L64-66, P L150-155).
+text`, verbatim. At level >0 the node is `childA + "\n" + childB` when that fits (C L64-66, P L150-155).
 - Each node is built once, logged, and never rebuilt (C L67). Purely binary, with no 16-leaf raw blocks (P L145-148, P
   L777).
 - A merge requires both halves to be built (C L304). A parent enters the view only once it is built, so only level-0
   parts can be unbuilt (P L491-492).
 
 ASSUMPTION / unspecified
+
 - Right-edge nodes: a node exists only when all `2^l` children exist (P L195: `(i+1)·2^l <= T`). There is no partial
   node at the right edge.
 - A failed or empty compaction fails the node (P L277). Nothing else is defined.
@@ -67,6 +71,7 @@ ASSUMPTION / unspecified
 ## 3. Node addressing and zoom
 
 CONFIRMED
+
 - A node is named `id+n`: its first message id, plus `n = 2^l` messages covered. `node(3,5)` = `40+8` → the call is
   `zoom(40, 8)` (C L60-62). The names use real message ids, not tree coordinates (P L162-165).
 - `zoom(id, n)` opens line `id+n` into the two lines it was made from, each covering `n/2`. `zoom(id, 1)` returns
@@ -75,13 +80,14 @@ CONFIRMED
 - `zoom("Name")` returns a subagent's whole chat (C L349, C L452).
 - `date(id)` returns the date and time of message `id` (C L350, L448). The view has no dates (C L86).
 - Return format, as of P L559-564: Checks: `n` is a power of 2, `id % n == 0`, `id + n <= T`. `n == 1` returns `id +
-  "+0|" + kind + ": " + text` (sic, `+0`). Otherwise it returns the two child lines rendered as `id+n|text`. An invalid
+"+0|" + kind + ": " + text` (sic, `+0`). Otherwise it returns the two child lines rendered as `id+n|text`. An invalid
   id returns "No line id+n."
 - Reaching a message takes `log2(n)` zooms. The author reports 3-5 in practice (P L577-578).
 - The system prompt forbids other retrieval: "zoom is your only allowed mechanism ... Never grep or search memories
   manually" (C L361-362).
 
 ASSUMPTION / unspecified
+
 - C does not define the page size for long messages, or how the next page is requested.
 - Whether zoom on a node that is not built yet returns the placeholder or an error. It should be unreachable, because
   parents enter the view only once built, and leaves are guaranteed by the wait barrier.
@@ -89,11 +95,12 @@ ASSUMPTION / unspecified
 ## 4. Summary generation
 
 CONFIRMED
+
 - Limit: 512 UTF-8 bytes, "about 70 words" (C L265-266). "Sizes are UTF-8 bytes, never tokens" (C L23).
 - A **ruler** of 512 dashes shows the length. Using a real sample line as the ruler made the model copy its content (C
   L262, L285-286). P used a realistic 512-byte SCALE line instead (P L230-244). C replaced it.
 - Task templates, verbatim in C L264-283: Leaf: "compress message {id} into one line…", with `<input>{kind}: {whole
-  message}</input>`. Merge: "merge lines {a} and {b}…", which also tells the model that `<chat>` may hold messages
+message}</input>`. Merge: "merge lines {a} and {b}…", which also tells the model that `<chat>` may hold messages
   `{id}`..`{end}` in more detail.
 - Overshoot handling (C L287-298): The retry stays in the same conversation: "Too long: your line is {N} bytes…",
   followed by the first 512 bytes and `| ← LIMIT`. At most 5 tries. The shortest is kept. A few bytes over the limit is
@@ -115,6 +122,7 @@ CONFIRMED
   is the rendered view with `id+n|` heads. To prevent copying, C now says "without an id+n| head" (C L390).
 
 ASSUMPTION / unspecified
+
 - Whether `{a}`/`{b}` are `id+n` names or raw texts. The templates show the line texts in `<input>`, so `{a}`/`{b}` are
   probably names.
 - What "a failed call" means: a transport error, an empty reply, or a refusal. C L297-298 says it is retried at the next
@@ -124,6 +132,7 @@ ASSUMPTION / unspecified
 ## 5. Persisted views
 
 CONFIRMED
+
 - A view is an ordered list of tree nodes `[l, i]` that tiles the whole chat `[0, T)`, oldest first (C L73, L30).
 - Rendering (C L76-87): The view is wrapped in `<chat>` … `</chat>`, one line per node, as `id+n|text`. Newlines become
   spaces. There are no dates. The view holds only summaries: never a whole message, not even the last one.
@@ -136,6 +145,7 @@ CONFIRMED
   immutable (C L67). This is ASSUMPTION-level, but it follows directly from the text.
 
 ASSUMPTION / unspecified
+
 - When `view.json` is written: after every change, after each batch, or at the end of a turn. Whether the write is
   atomic (temp file + rename).
 - What happens when `view.json` lags the log after a crash. The natural repair is to append the missing leaves, which
@@ -146,28 +156,30 @@ ASSUMPTION / unspecified
 ## 6. Incremental compaction (merge order and the 64–128 KB rule)
 
 CONFIRMED
+
 - Origin: Taelin's 2022 rollback `push` works as a binary counter: the newest lines churn and old ones rarely change (C
   L92-151, code at L99-116).
 - **Which pair merges** (C L156-169): For sibling lines `(l,i)` and `(l,i+1)`, `due = (T - last) / 2^l`, where `last` is
   the pair's last message. Merge the most due pair **whose parent is built**. Ties go to the **oldest** pair. Repeat.
   The code writes this as `(T+1)/2^l - i`, the same order shifted by 2. Siblings must be at the same level, with `a.i`
   even and `b.i = a.i+1` (P L428).
-- **Bug fixed in C**: measuring from the pair's *first* message (P L429-430: `(T - start)/2^(l+2)`) churns old lines. It
+- **Bug fixed in C**: measuring from the pair's _first_ message (P L429-430: `(T - start)/2^(l+2)`) churns old lines. It
   matches push at only 481 of 20,001 steps (C L177-182, mistake #1).
 - **VERIFIED** with our own simulation (`scratchpad/optmem-sim/sim.py`, line budget = length of the push list, T =
   1..3000): The `last` rule reproduced push's line starts at **3000/3000** steps. The `first` rule matched at 241/3000.
 - **When** (C L184-193): Each new message appends its leaf line. Nothing else changes. Once the view **passes 128,000
   bytes**, one batch merges the most due pairs until it is **at most 64,000 bytes**. The result is a sawtooth that
   averages about 96 KB. When unbuilt parents block the batch from reaching 64 KB, it
-    "merges what it can at each new message until it does".
+  "merges what it can at each new message until it does".
 - Merges never split. The view only appends and coarsens (P L441-442).
 - Cost claim: batching rewrites about 2 lines per message, against about 53 when merging at every message. A 30k-message
   simulation gives 21 vs 80 line-inputs per message (C L213-221). These are claims; we did not verify them.
 - **Determinism**: The merge order is a pure function of `T` and the set of built parents. The set of built parents
-  depends on compactor timing, so the live view is *not* reproducible from the log alone. That is the stated reason to
+  depends on compactor timing, so the live view is _not_ reproducible from the log alone. That is the stated reason to
   persist it (C L196-197).
 
 ASSUMPTION / unspecified
+
 - Whether "merges what it can at each new message" also continues when a node finishes building. P re-ran `fit()` on
   node built (P L419-420). C says "at each new message" only. We should decide this explicitly.
 - Limits are written as decimal 128,000/64,000 (not KiB); 'passes' read as strictly `>`.
@@ -175,6 +187,7 @@ ASSUMPTION / unspecified
 ## 7. Background summarization
 
 CONFIRMED
+
 - Concurrency: up to 8 calls at once (C L302).
 - Readiness: A leaf starts "once fewer than 8 lines before it are still unbuilt". A merge starts once both halves are
   built (C L303-304). P required strictly in-order leaves (rule 3, P L176-184).
@@ -186,7 +199,7 @@ CONFIRMED
   sawtooth. It is merged down to 16 KB once, then grows by appending. It merges again past 32 KB, "or when the chat's
   view merges". It ends at the node: for a leaf, lines before the message; for a merge, lines up to the merge's last
   message. It
-    contains built lines only.
+  contains built lines only.
 - Request shape: the same system prompt and tools as turns, with the tools never called. The layout is
   `[tools][system][<chat>compaction view</chat>][task]` (C L245-251).
 - Retry: C: "A failed call is tried again at the next message" (C L297-298). P: wait a fixed 10 s, retry forever, report
@@ -194,11 +207,12 @@ CONFIRMED
 - Fallback if summaries are not ready: **There is no raw fallback.** A turn waits until every message before it is
   summarized (C L430). The wait "takes seconds" (C L440-441). Never show a cut message or raw text (C L463-465, P
   L477-479). In P, the user can cancel the wait, and the message
-    stays in the log unanswered (P L499-500).
+  stays in the log unanswered (P L499-500).
 - Thrash guard: a call whose marked prefix another call is currently writing waits until that call's response starts, so
   both don't pay for the write (C L230-232).
 
 ASSUMPTION / unspecified
+
 - How one 16-32 KB compaction view is shared when 8 jobs end at different points. It probably is one sawtooth list
   truncated per job at the job's end. C L256-260 implies this but does not specify it.
 - The wait has no timeout. If the compactor is down (outage, quota), turns block forever. This is unaddressed.
@@ -207,6 +221,7 @@ ASSUMPTION / unspecified
 ## 8. Stable-prefix prompt caching
 
 CONFIRMED
+
 - The layout is `[tools][system prompt][view][new message]`, followed by the turn's own steps (C L205-206, P L643-648).
   The view and the message are two text blocks of the first user message (P L528).
 - Tools and the system prompt never change: no dates, no state (C L208-209, mistake #10). Per-turn state (the date, the
@@ -219,15 +234,17 @@ CONFIRMED
 - TTL (C L233-237): Use the 5-minute default. Don't buy 1-hour entries, which cost 2x to write, and send no keep-alive
   pings. The cache misses after a pause longer than the TTL, after a batch, and after a switch of model or account.
 - Claimed results: turns read 98.6% of their prefix from the cache, compactions 96.2%. These come from a replay against
-  a *model* of the cache, not live usage (C L239-241).
+  a _model_ of the cache, not live usage (C L239-241).
 
 ASSUMPTION / unspecified
+
 - How 4-line blocks interact with the 4-breakpoint limit when tools or system also need marks. C uses 2 marks (the last
   whole view block and the request end), plus auto/implicit caching of the head.
 
 ## 9. Per-turn context reset and turn lifecycle
 
 CONFIRMED (C L427-441, P L515-554)
+
 ```
 on user message m:
   if a call is running: deliver m between tool calls; log it as user
@@ -238,6 +255,7 @@ on user message m:
         log each reply / tool call / tool result as it streams (not thoughts)
         messages the call never took go back to the queue (P)
 ```
+
 - Nothing carries over between turns. The view is the only continuity (C L437). Carrying a conversation over is mistake
   #11.
 - The prompt tells the model to "say in your reply what you learned", because the next turn starts fresh (C L362-363).
@@ -246,6 +264,7 @@ on user message m:
   in its own log. Its report returns as one `work` message. The master never polls for it.
 
 ASSUMPTION / unspecified
+
 - How a cancelled turn's partial assistant text is logged. P says untaken messages stay unanswered, and nothing about
   partial streams.
 - Whether pending tool results are logged when a turn aborts mid-tool.
@@ -253,11 +272,13 @@ ASSUMPTION / unspecified
 ## 10. Failure recovery and concurrency
 
 CONFIRMED
+
 - Single writer per chat with a process lock (C L45-46). P uses a socket lock (P L120-125).
 - Append + flush (C) or fsync (P). Torn-line skip at load (P L117-119).
 - The tree is a rebuildable cache in principle, but it is never recomputed because of model cost (P L126-127).
 
 ASSUMPTION / unspecified
+
 - Recovering `view.json` against the log and tree after a crash between the append and the view save.
 - Duplicate tree lines after a crash mid-build: two writes for the same `(l,i)`. The text implies first-wins, but does
   not say so.
@@ -266,6 +287,7 @@ ASSUMPTION / unspecified
 ## 11. Tools exposed to the model
 
 CONFIRMED
+
 - `zoom(id:int|string, n?:int) -> text` (§3).
 - `date(id) -> "date and time"`.
 - Optional subagent tools (P L698-733): `spawn(tasks) -> ids`. `tell(id, message)`. `computer(task)`, one at a time.
@@ -367,4 +389,3 @@ CONFIRMED
 9. Whether to keep the leaf look-ahead of up to 8 unbuilt (C) or strict in-order leaves (P). Look-ahead gives more
    parallelism, but a leaf then sees a shorter context.
 10. The licence. We could ask the author. Until then, clean-room only.
-

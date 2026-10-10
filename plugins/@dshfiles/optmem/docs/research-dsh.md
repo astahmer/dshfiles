@@ -5,12 +5,14 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
 [C] confirmed in code, [I] inferred. Full helper reports were not saved; re-derive details from the citations.
 
 ## Versions / install
+
 - Installed DSH 0.2.0-rc.2 (global pnpm). Fork session format v5 vs installed v4 (only adds `runtimeBinding`). [C]
 - Profiles `~/.dsh/profiles/<name>/{package.json,cordis.patch.yml}`; layers: bundle patches → profile patch →
   `$DSH_HOME/cordis.patch.yml` → `--patch` (dsh profile-boot). `pnpm profile:sync --profile probe` links owned bundles.
   `web` profile is reconciled by nixfiles (only its marked block). Verify in `probe`, never restart `web`. [C]
 
 ## Agent loop and context assembly (F/agent-loop/src/agent.ts)
+
 - Per step: `preStep` :278 assembles the system prompt (`systemPrompt.assemble` :283), runs the `agent/pre-step`
   waterfall :287; `step` :593 → `buildRequest` :855 with `messages: session.deriveMessages()` (:927) — the FULL
   session surface every call; only `surfaceOp:'replace'` (compaction) trims it. Requests are deep-frozen. [C]
@@ -22,13 +24,15 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
   (anthropic) / `prompt_cache_key` (openai) from `sessionId` + `cacheRetention`. [C]
 
 ## Seams (none replaces messages per request)
-| Seam | Can do | Cite |
-|---|---|---|
-| `agent/pre-step` (waterfall) | replace/reject NEW step messages, `startsRequestSeries:true` | F/agent/src/runtime-types.ts:113-120 |
-| `agent/request` (waterfall) | config only, cannot mutate messages | runtime-types.ts:322-338 |
-| `system-prompt/assemble` | sections/contexts/tools/variables | dsh-system-prompt index.js:355 |
-| `llm/stream` (waterfall) | wrap/short-circuit every model call; `next()` ignores args, so must call `ctx.llm.stream({...opts, messages})` itself (log won't reflect sent messages) | dsh-llm index.d.ts:32-46; cordis waterfall index.js:317 |
-| `session.append(type, data, {surfaceOp:{op:'replace',startSeq,endSeq}, sourceEventSeqs})` | DURABLE history replacement (compaction pattern) | dsh-compaction-basic index.js:596-662 |
+
+| Seam                                                                                      | Can do                                                                                                                                                  | Cite                                                    |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `agent/pre-step` (waterfall)                                                              | replace/reject NEW step messages, `startsRequestSeries:true`                                                                                            | F/agent/src/runtime-types.ts:113-120                    |
+| `agent/request` (waterfall)                                                               | config only, cannot mutate messages                                                                                                                     | runtime-types.ts:322-338                                |
+| `system-prompt/assemble`                                                                  | sections/contexts/tools/variables                                                                                                                       | dsh-system-prompt index.js:355                          |
+| `llm/stream` (waterfall)                                                                  | wrap/short-circuit every model call; `next()` ignores args, so must call `ctx.llm.stream({...opts, messages})` itself (log won't reflect sent messages) | dsh-llm index.d.ts:32-46; cordis waterfall index.js:317 |
+| `session.append(type, data, {surfaceOp:{op:'replace',startSeq,endSeq}, sourceEventSeqs})` | DURABLE history replacement (compaction pattern)                                                                                                        | dsh-compaction-basic index.js:596-662                   |
+
 - **Full-mode options:** (a) durable replace via `agent/pre-step` (no fork; persists in log); (b) `llm/stream`
   short-circuit (no fork; log mismatch, loses prepared-call binding); (c) **fork change** (preferred, ~10 lines):
   new waterfall `agent/request-messages` in F/agent/src/runtime-types.ts Events, called in `step()` right after
@@ -38,6 +42,7 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
   loses reasoning replay across adapters. [I]
 
 ## Tools, prompts, events (plugin side)
+
 - Tools: `defineTool({name, description, parameters: ValueSchemaSpec, output:{schema, render}, execute(args, exec)})`
   in `defineHost({tools})` (global). `exec` has callId, agent?, signal, deferContext, concludeTurn — no session id;
   use `exec.agent.id`, cwd `agent.session.header.cwd`, parent `ctx.sessions.get(id)?.header.parentSession`.
@@ -46,10 +51,11 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
 - Events: `session/event` (every committed append; goal-stall-guard host.ts:66-104 switches on turn/start,
   user/message, assistant/message, turn/end), `agent/created|disposed|pre-step|request-error|turn-stopping`,
   `tools/pre-execute|execute|post-execute|result`, `subagent/start|end`, `llm/stream`. Cancellation = `exec.signal`
-  + `turn/end{reason.kind:'aborted'}`. [C]
+  - `turn/end{reason.kind:'aborted'}`. [C]
 - Tool permissions: `tools/pre-execute` → allow|deny|ask|cancel; `ask` → approval service. Don't touch. [C]
 
 ## Persistence
+
 - One append-only event log per session: `~/.dsh/sessions/<projectKey(cwd)>/<id>/session.v4.jsonl.zstd`,
   header line `{id, createdAt, cwd, parentSession, origin, delegationDepth, agentPreset, isSeeded}`, then events
   `{type, seq (contiguous from 0), time, data, surfaceOp?, sourceEventSeqs?}`. fsync per append batch. zstd is
@@ -67,6 +73,7 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
   `dshHomePath('plugins', '<name>')` (no per-plugin dir API). For SQLite: `dshHomePath('plugins','optmem','optmem.db')`. [C/I]
 
 ## Ranked integration seams
+
 - **Compat mode:** host plugin; capture via `session/event` (+ backfill via `sessionQuery`); tools via `defineTool`;
   bounded injection via a `definePromptContext` (changes only when its text changes → cache-friendly) or a tool-only
   approach; SQLite via `node:sqlite`. No fork needed.
@@ -74,6 +81,7 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
   durable `agent/pre-step` replace. Must prove fresh-turn replacement at runtime before claiming support.
 
 ## Blockers / unknowns
+
 - Not yet run: `node -e` FTS5 probe with the exact node DSH uses (fnm official build) — likely fine since
   dsh-session-query-sqlite uses it.
 - Whether the installed agent-loop matches the fork exactly (not diffed).

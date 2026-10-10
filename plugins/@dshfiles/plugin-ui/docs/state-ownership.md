@@ -2,13 +2,13 @@
 
 Use the narrowest state owner that matches the lifetime and source of the data:
 
-| State | Owner | Guidance |
-|---|---|---|
-| Host or other async data | `@dshfiles/plugin-ui/query` | Use queries and mutations; forward `AbortSignal`, scope keys by plugin, invalidate or update after writes. Prefer `refetchInterval` over component timers. |
-| Multi-field validated form | `@dshfiles/plugin-ui/form` | Use `useAppForm` with Standard Schema validators. Keep drafts local only when they intentionally synchronize with another owner, such as an autosaver. |
-| Multi-step flow with three or more states | `@dshfiles/plugin-ui/machine` | Machine owns transition state; async data stays in Query. Use promise actors with cancellation. |
-| Small persisted preference | `createStoredValue` | Validate persisted data and keep storage scoped to the owning plugin. |
-| Ephemeral presentation state | React state | Keep truly local UI state local; do not mirror Host state into component state without a specific synchronization rule. |
+| State                                     | Owner                         | Guidance                                                                                                                                                   |
+| ----------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host or other async data                  | `@dshfiles/plugin-ui/query`   | Use queries and mutations; forward `AbortSignal`, scope keys by plugin, invalidate or update after writes. Prefer `refetchInterval` over component timers. |
+| Multi-field validated form                | `@dshfiles/plugin-ui/form`    | Use `useAppForm` with Standard Schema validators. Keep drafts local only when they intentionally synchronize with another owner, such as an autosaver.     |
+| Multi-step flow with three or more states | `@dshfiles/plugin-ui/machine` | Machine owns transition state; async data stays in Query. Use promise actors with cancellation.                                                            |
+| Small persisted preference                | `createStoredValue`           | Validate persisted data and keep storage scoped to the owning plugin.                                                                                      |
+| Ephemeral presentation state              | React state                   | Keep truly local UI state local; do not mirror Host state into component state without a specific synchronization rule.                                    |
 
 ## Established exceptions
 

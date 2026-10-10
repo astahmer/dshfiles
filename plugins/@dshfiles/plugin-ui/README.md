@@ -29,8 +29,10 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
-<section className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-6">
-  <Button variant="outline" size="sm"><RefreshCwIcon /> Refresh</Button>
+;<section className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-6">
+  <Button variant="outline" size="sm">
+    <RefreshCwIcon /> Refresh
+  </Button>
   <Badge variant="secondary">6 secrets</Badge>
 </section>
 ```
@@ -60,14 +62,14 @@ Wrap each slot root once (inside dshx `decorate(...)`). Prefix every key with th
 
 ```tsx
 import { DataTable, createColumnHelper, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
-<DataTable table={table} empty="No rows" />   // shadcn Table in a bordered card, uppercase headers, aria-sort
+;<DataTable table={table} empty="No rows" /> // shadcn Table in a bordered card, uppercase headers, aria-sort
 ```
 
 ## Form (TanStack Form)
 
 ```tsx
 import { useAppForm } from '@dshfiles/plugin-ui/form'
-<form.AppField name="alias">{field => <field.TextField label="Alias" required />}</form.AppField>
+;<form.AppField name="alias">{field => <field.TextField label="Alias" required />}</form.AppField>
 ```
 
 Field components: `TextField`, `TextAreaField`, `SelectField` (shadcn Select), `CheckboxField`, `SwitchField`; `form.SubmitButton`. Validators are Standard Schema (zod 4).
