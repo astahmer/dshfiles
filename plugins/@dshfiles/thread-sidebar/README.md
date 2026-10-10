@@ -96,13 +96,20 @@ generated text field cannot capture.
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, and a
 per-thread **Thread notifications** menu. Notifications can be snoozed for 15
 minutes, 1, 3, 8, or 24 hours, muted until manually re-enabled, or unmuted.
-Snoozes and mutes affect alerts only; they do not hide the thread or its
-**Needs you** status. Desktop notifications are opt-in in Sidebar settings and
-show the thread title. Mute, snooze, and unseen-completion state are saved in
-this browser. The sidebar raises a **Needs you** item when it observes a thread
-move from running to idle; opening that thread clears the item. This
-transition is observable only while the DSH page is connected, so offline
-completion notifications are not replayed after reconnect.
+Snoozes and mutes affect alerts only; they do not hide attention rows.
+Desktop notifications are opt-in in Sidebar settings and show the thread title.
+Mute, snooze, and unseen-completion state are saved in this browser. The sidebar
+separates **Approval needed**, **Input needed**, and **Turn finished**.
+Permission approvals and plan-review decisions use **Approval needed**;
+structured user-question requests use **Input needed**. Both use the Client's
+explicit Session pending-interaction status. Unknown interaction kinds and
+generic unstructured questions remain unclassified. **Turn finished**
+marks a completed turn not yet opened from the sidebar. An unresolved request
+stays available in its conversation composer and returns to the attention group
+when that thread is no longer selected. Opening a finished thread clears its
+local completion marker. Completion alerts are observable only while the DSH
+page is connected, so offline completion notifications are not replayed after
+reconnect.
 
 Child sessions render with increasing indentation and a direct “child of …”
 label. The sidebar follows DSH's durable `parentId` chain, so the presentation

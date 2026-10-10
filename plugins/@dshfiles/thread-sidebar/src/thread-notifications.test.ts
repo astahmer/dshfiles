@@ -3,19 +3,63 @@ import { test } from 'vitest'
 import {
   clearExpiredThreadMutes,
   clearThreadMute,
-  completedSessionIds,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
   isThreadMuted,
   markThreadSeen,
   setThreadMute,
+  threadAttentionTransitions,
 } from './thread-notifications.js'
-test('running-to-idle creates attention; initial idle does not', () => {
+test('structured question and completed turn have distinct transitions', () => {
   assert.deepEqual(
-    completedSessionIds({ first: true, second: false }, [
-      { id: 'first', running: false },
-      { id: 'second', running: false },
+    threadAttentionTransitions(
+      {
+        question: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: false },
+        finished: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: false },
+      },
+      [
+        { sessionId: 'question', status: { pendingInteractionKey: 'question-1', pendingInteractionKind: 'question', completionUnread: false } },
+        { sessionId: 'finished', status: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: true } },
+      ],
+    ),
+    { approvalNeeded: [], inputNeeded: ['question'], turnFinished: ['finished'] },
+  )
+})
+test('approval and plan-review requests share their own state and take precedence over turn-finished', () => {
+  const previous = {
+    approval: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: false },
+    review: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: false },
+  }
+  const approval = {
+    sessionId: 'approval',
+    status: { pendingInteractionKey: 'approval-1', pendingInteractionKind: 'approval', completionUnread: true },
+  }
+  const review = {
+    sessionId: 'review',
+    status: { pendingInteractionKey: 'review-1', pendingInteractionKind: 'plan-review', completionUnread: true },
+  }
+  const current = [approval, review]
+  assert.deepEqual(threadAttentionTransitions(previous, current), { approvalNeeded: ['approval', 'review'], inputNeeded: [], turnFinished: [] })
+  assert.deepEqual(threadAttentionTransitions({ approval: approval.status, review: review.status }, current), {
+    approvalNeeded: [],
+    inputNeeded: [],
+    turnFinished: [],
+  })
+})
+test('unknown interaction kinds remain unclassified and do not suppress completion', () => {
+  assert.deepEqual(
+    threadAttentionTransitions({ thread: { pendingInteractionKey: undefined, pendingInteractionKind: undefined, completionUnread: false } }, [
+      { sessionId: 'thread', status: { pendingInteractionKey: 'opaque-request', pendingInteractionKind: 'other', completionUnread: true } },
     ]),
-    ['first'],
+    { approvalNeeded: [], inputNeeded: [], turnFinished: ['thread'] },
+  )
+})
+test('initial status does not replay desktop attention alerts', () => {
+  assert.deepEqual(
+    threadAttentionTransitions(null, [
+      { sessionId: 'question', status: { pendingInteractionKey: 'question-1', pendingInteractionKind: 'question', completionUnread: true } },
+      { sessionId: 'approval', status: { pendingInteractionKey: 'approval-1', pendingInteractionKind: 'approval', completionUnread: true } },
+    ]),
+    { approvalNeeded: [], inputNeeded: [], turnFinished: [] },
   )
 })
 test('timed snooze expires, while permanent mute lasts until cleared', () => {

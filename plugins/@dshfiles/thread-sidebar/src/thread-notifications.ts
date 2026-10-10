@@ -30,10 +30,37 @@ export const snoozeDurations = [
   { label: 'threadSidebarSnooze24Hours', milliseconds: 24 * 60 * 60_000 },
 ] as const
 
-export const completedSessionIds = (
-  previousRunning: Readonly<Record<string, boolean>>,
-  sessions: readonly { readonly id: string; readonly running: boolean }[],
-): string[] => sessions.flatMap(session => (previousRunning[session.id] === true && !session.running ? [session.id] : []))
+export interface ThreadAttentionStatus {
+  readonly pendingInteractionKey: string | undefined
+  readonly pendingInteractionKind: string | undefined
+  readonly completionUnread: boolean
+}
+
+export interface ThreadAttentionTransitions<SessionIdentifier extends string = string> {
+  readonly approvalNeeded: SessionIdentifier[]
+  readonly inputNeeded: SessionIdentifier[]
+  readonly turnFinished: SessionIdentifier[]
+}
+
+export const threadAttentionTransitions = <SessionIdentifier extends string>(
+  previous: Readonly<Record<string, ThreadAttentionStatus>> | null,
+  current: readonly { readonly sessionId: SessionIdentifier; readonly status: ThreadAttentionStatus }[],
+): ThreadAttentionTransitions<SessionIdentifier> => {
+  if (previous === null) return { approvalNeeded: [], inputNeeded: [], turnFinished: [] }
+  const newInteractions = current.flatMap(({ sessionId, status }) =>
+    status.pendingInteractionKey !== undefined && previous[sessionId]?.pendingInteractionKey !== status.pendingInteractionKey
+      ? [{ sessionId, kind: status.pendingInteractionKind }]
+      : [],
+  )
+  const approvalNeeded = newInteractions.flatMap(({ sessionId, kind }) => (kind === 'approval' || kind === 'plan-review' ? [sessionId] : []))
+  const inputNeeded = newInteractions.flatMap(({ sessionId, kind }) => (kind === 'question' ? [sessionId] : []))
+  const turnFinished = current.flatMap(({ sessionId, status }) => {
+    const classifiedInteraction =
+      status.pendingInteractionKind === 'approval' || status.pendingInteractionKind === 'question' || status.pendingInteractionKind === 'plan-review'
+    return status.completionUnread && !classifiedInteraction && previous[sessionId]?.completionUnread !== true ? [sessionId] : []
+  })
+  return { approvalNeeded, inputNeeded, turnFinished }
+}
 
 export const isThreadMuted = (preferences: ThreadNotificationPreferences, sessionId: string, now: number): boolean => {
   const mutedUntil = preferences.mutedUntil[sessionId]
