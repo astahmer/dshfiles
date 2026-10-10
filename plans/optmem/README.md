@@ -12,6 +12,7 @@ Stages 1–5 are implemented. Existing test, build, import, scratch-profile, and
 
 | Remaining check | State | Evidence / gate |
 |---|---|---|
+| Add OptMem to the `web` profile | done 2026-10-10, live after the user restarts | Seed `profiles/web/package.json` lists `@dshfiles/optmem`; `pnpm profile:sync --profile web --bundle @dshfiles/optmem` linked it into `~/.dsh/profiles/web` without a restart. Compat mode: `web` runs the stock core (no `@dshfiles/dsh-core-runtime`). Defaults: summarizer `gpt-6-luna`, effort `low`, provider empty (first provider serving the model; with `@mars-sea/dsh-commandcode-provider` composed that is `commandcode`). Host Node is 22.23.3, which ships `node:sqlite` unflagged. A scratch copy of the post-`nixapply` `web` profile on :3199 booted clean; `memory_status` reported compatibility mode, ready capture and events in `optmem.db`. |
 | Rerun the 100k-event storage benchmark on a quiet machine | pending | Prior run was deferred because system load exceeded the recorded threshold. Append new measurements to [`benchmarks.md`](../../plugins/@dshfiles/optmem/docs/benchmarks.md); do not replace prior results. |
 
 ## Resume here

@@ -12,6 +12,7 @@
     "@dshfiles/jujutsu": "link:../../../dev/dshfiles/plugins/@dshfiles/jujutsu",
     "@dshfiles/mcp-servers": "link:../../../dev/dshfiles/plugins/@dshfiles/mcp-servers",
     "@dshfiles/multi-host": "link:../../../dev/dshfiles/plugins/@dshfiles/multi-host",
+    "@dshfiles/optmem": "link:../../../dev/dshfiles/plugins/@dshfiles/optmem",
     "@dshfiles/plugin-marketplace": "link:../../../dev/dshfiles/plugins/@dshfiles/plugin-marketplace",
     "@dshfiles/project-checks": "link:../../../dev/dshfiles/plugins/@dshfiles/project-checks",
     "@dshfiles/prompt-stash": "link:../../../dev/dshfiles/plugins/@dshfiles/prompt-stash",
@@ -53,7 +54,8 @@
         "@dshfiles/thread-sidebar",
         "@dshfiles/ai-accounts",
         "@dshfiles/editor",
-        "@dshfiles/workbench"
+        "@dshfiles/workbench",
+        "@dshfiles/optmem"
       ]
     }
   }
