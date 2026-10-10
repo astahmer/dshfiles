@@ -29,15 +29,6 @@ const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = awai
 const { connectDshPlatformClient } = await import(pathToFileURL(platformPath).href)
 const { createApiClient } = await import(pathToFileURL(apiRuntimePath).href)
 const { projectChecksApi } = await import(pathToFileURL(projectChecksApiPath).href)
-const createScratchEnvironment = (home, profileRoot) => {
-  const environment = isolatedHostEnvironment(home, profileRoot)
-  return {
-    ...environment,
-    PATH: environment.PATH?.split(delimiter)
-      .filter(entry => !entry.endsWith('/node_modules/.bin'))
-      .join(delimiter),
-  }
-}
 
 const profileName = 'project-checks'
 const cursorPluginPath = resolve(repoRoot, 'plugins/@dshfiles/cursor-agent')
@@ -209,7 +200,7 @@ const makeProjectChecksClient = (origin, cookie) =>
 const startHost = async () => {
   let output = ''
   let cookie
-  const environment = createScratchEnvironment(scratch.home, scratch.profileRoot)
+  const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const child = spawn(process.execPath, [resolve(repoRoot, 'scripts/core-runtime-scratch-host.mjs')], {
     cwd: repoRoot,
     env: {
@@ -325,7 +316,7 @@ try {
   await scratch.install()
   await initializeScratchProject()
   await writeScratchConfiguration()
-  const configEnvironment = createScratchEnvironment(scratch.home, scratch.profileRoot)
+  const configEnvironment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const composedConfig = spawnSync('dsh', ['--profile', profileName, '--dump-config', '--patch', cursorOverlayPath], {
     encoding: 'utf8',
     env: configEnvironment,

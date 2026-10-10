@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 
@@ -161,8 +161,14 @@ export const isolatedHostEnvironment = (home: string, profileRoot: string, sourc
       return value === undefined ? [] : [[name, value]]
     }),
   )
+  // `pnpm run` prepends workspace `node_modules/.bin`, whose `dsh` resolves this repo's overridden fork packages
+  // instead of the installed Host the live profile runs.
+  const path = source.PATH?.split(delimiter)
+    .filter(entry => !entry.endsWith('/node_modules/.bin'))
+    .join(delimiter)
   return {
     ...environment,
+    ...(path === undefined ? {} : { PATH: path }),
     ...(source.DSHX_SCRATCH_TRACE_IMPORT_ERRORS === '1' ? { DSHX_SCRATCH_TRACE_IMPORT_ERRORS: '1' } : {}),
     HOME: home,
     DSH_HOME: home,

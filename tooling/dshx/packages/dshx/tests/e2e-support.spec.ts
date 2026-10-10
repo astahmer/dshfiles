@@ -59,7 +59,7 @@ describe('E2E scratch profile provisioning', () => {
 
   it('gives the Host a scratch home without inheriting process credentials', () => {
     const environment = isolatedHostEnvironment('/scratch/home', '/scratch/profile', {
-      PATH: '/toolchain/bin',
+      PATH: '/repo/plugins/@dshfiles/sample/node_modules/.bin:/repo/node_modules/.bin:/toolchain/bin',
       HOME: '/real/home',
       DSH_HOME: '/real/dsh',
       OPENAI_API_KEY: 'never copied',
