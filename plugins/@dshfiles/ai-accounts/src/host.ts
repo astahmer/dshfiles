@@ -158,6 +158,7 @@ export default definePlugin({
             baseUrl: route.apiBaseUrl,
             keyEnv: route.apiKeyEnv,
             resolveCredential,
+            readFallbackKey: () => readCommandCodeKey(route.apiKeyEnv, resolveCredential),
           })
         : opencodeUpstream
     // Per-account, per-model default efforts, read from the same file as the

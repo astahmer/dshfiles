@@ -1,4 +1,12 @@
-import { createProvider, type Model } from '@earendil-works/pi-ai'
+import {
+  createAssistantMessageEventStream,
+  createProvider,
+  type AssistantMessage,
+  type AssistantMessageEventStream,
+  type Model,
+  type ProviderStreams,
+} from '@earendil-works/pi-ai'
+import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -34,6 +42,8 @@ export interface CommandCodeProviderOptions {
   readonly baseUrl?: string
   readonly keyEnv?: string
   readonly resolveCredential?: CredentialValueResolver
+  /** Last resort when neither a stored credential nor the key variable holds a key, e.g. `~/.commandcode/auth.json`. */
+  readonly readFallbackKey?: () => Promise<string>
 }
 
 export interface CommandCodeCatalogOptions {
@@ -57,7 +67,14 @@ const FALLBACK: readonly CatalogEntry[] = [
 ]
 
 const commandCodeCatalogResponseSchema = z.object({
-  data: z.array(z.object({ id: z.string().trim().min(1).max(200) })).max(500),
+  data: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(200),
+        supported_endpoints: z.array(z.string()).max(20).optional(),
+      }),
+    )
+    .max(500),
 })
 
 export class CommandCodeConfigError extends Error {}
@@ -78,8 +95,12 @@ const resolveKeyEnv = (keyEnv: string | undefined): string => {
   return name
 }
 
-/** Command Code serves its OpenAI-compatible routes under a provider prefix. */
-const providerBase = (baseUrl: string | undefined): string => `${resolveCommandCodeBase(baseUrl)}/provider`
+/**
+ * The Provider API lives under `/provider/v1`. The OpenAI SDK appends
+ * `/chat/completions` to its base and the Anthropic SDK appends `/v1/messages`,
+ * so the two shapes need different bases; a bare `/provider` base answers 404.
+ */
+const baseFor = (root: string, api: CommandCodeApi): string => (api === 'anthropic-messages' ? `${root}/provider` : `${root}/provider/v1`)
 
 /**
  * Read the live catalog so the picker offers what the plan actually serves.
@@ -97,20 +118,23 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
   if (!response.ok) return FALLBACK
   const parsed = commandCodeCatalogResponseSchema.safeParse(await response.json())
   if (!parsed.success) return FALLBACK
-  const entries: CatalogEntry[] = parsed.data.data.map(({ id }) => ({
-    id,
-    api: id.startsWith('anthropic/') ? 'anthropic-messages' : 'openai-completions',
-  }))
+  // The catalog names the endpoints that serve each model; Claude ids no longer
+  // carry an `anthropic/` prefix, so the prefix is only the fallback signal.
+  const entries: CatalogEntry[] = parsed.data.data.map(({ id, supported_endpoints }) => {
+    const messagesOnly =
+      supported_endpoints === undefined ? id.startsWith('anthropic/') : supported_endpoints.includes('/messages') && !supported_endpoints.includes('/chat/completions')
+    return { id, api: messagesOnly ? 'anthropic-messages' : 'openai-completions' }
+  })
   return entries.length === 0 ? FALLBACK : entries
 }
 
-const modelsFor = (entries: readonly CatalogEntry[], baseUrl: string): readonly Model<CommandCodeApi>[] =>
+const modelsFor = (entries: readonly CatalogEntry[], root: string): readonly Model<CommandCodeApi>[] =>
   entries.map(entry => ({
     id: entry.id,
     name: entry.id,
     api: entry.api,
     provider: COMMANDCODE_KIND,
-    baseUrl,
+    baseUrl: baseFor(root, entry.api),
     reasoning: false,
     // Annotated, because an inline literal widens `string[]` and no longer satisfies
     // the tuple the contract declares.
@@ -168,13 +192,50 @@ const rejectEmptyCompletion = <Streams extends { stream: (...args: never[]) => A
   } as Streams
 }
 
+const GO_PLAN_REFUSAL = /upgrade_required|plan doesn't include API access/i
+
+/**
+ * Say what to do about the two refusals this route can meet, instead of
+ * surfacing a bare status line. A Go plan has no Provider API access at all:
+ * only the Command Code CLI transport serves it, which
+ * `@mars-sea/dsh-commandcode-provider` implements and this route does not.
+ */
+export const explainCommandCodeFailure = (message: string): string => {
+  if (GO_PLAN_REFUSAL.test(message)) {
+    return `${message} — Command Code's Provider API, which the AI Accounts route uses, is not included in this plan. Serve Command Code through @mars-sea/dsh-commandcode-provider instead: run \`nixapply\` so the web profile composes it, then restart DSH.`
+  }
+  if (/^404\b/.test(message)) {
+    return `${message} — Command Code has no such route; check the account's API base URL (expected ${DEFAULT_COMMANDCODE_BASE_URL}).`
+  }
+  return message
+}
+
+const explainSettlement = (message: AssistantMessage): AssistantMessage =>
+  message.stopReason === 'error' && message.errorMessage !== undefined ? { ...message, errorMessage: explainCommandCodeFailure(message.errorMessage) } : message
+
+const explainStream = (source: AssistantMessageEventStream): AssistantMessageEventStream => {
+  const target = createAssistantMessageEventStream()
+  void (async () => {
+    for await (const event of source) target.push(event.type === 'error' ? { ...event, error: explainSettlement(event.error) } : event)
+    target.end()
+  })().catch(() => target.end())
+  return target
+}
+
+/** DSH streams through `streamSimple`, so both entry points carry the explanation. */
+const explainFailures = (api: ProviderStreams): ProviderStreams => ({
+  ...api,
+  stream: (model, context, options) => explainStream(api.stream(model, context, options)),
+  streamSimple: (model, context, options) => explainStream(api.streamSimple(model, context, options)),
+})
+
 export const createCommandCodeProvider = (options: CommandCodeProviderOptions = {}) => {
-  const base = providerBase(options.baseUrl)
+  const root = resolveCommandCodeBase(options.baseUrl)
   const keyEnv = resolveKeyEnv(options.keyEnv)
   return createProvider({
     id: COMMANDCODE_KIND,
     name: 'Command Code',
-    baseUrl: base,
+    baseUrl: baseFor(root, 'openai-completions'),
     auth: {
       apiKey: {
         name: 'Command Code API key',
@@ -194,20 +255,25 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
           }
           const value = await ctx.env(keyEnv)
           signal.throwIfAborted()
-          return value === undefined || value.length === 0 ? undefined : { auth: { apiKey: value }, source: keyEnv }
+          if (value !== undefined && value.length > 0) return { auth: { apiKey: value }, source: keyEnv }
+          const fallback = (await options.readFallbackKey?.()) ?? ''
+          signal.throwIfAborted()
+          return fallback.length === 0 ? undefined : { auth: { apiKey: fallback }, source: 'Command Code CLI login' }
         },
       },
     },
-    models: modelsFor(FALLBACK, base),
+    models: modelsFor(FALLBACK, root),
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
     fetchModels: async () => {
-      const apiKey = options.resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
-      return modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey }), base)
+      const named = options.resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
+      const apiKey = named.length > 0 ? named : ((await options.readFallbackKey?.()) ?? '')
+      return modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey }), root)
     },
     api: {
-      'openai-completions': rejectEmptyCompletion(openAICompletionsApi()),
-      'openai-responses': rejectEmptyCompletion(openAIResponsesApi()),
+      'openai-completions': rejectEmptyCompletion(explainFailures(openAICompletionsApi())),
+      'openai-responses': rejectEmptyCompletion(explainFailures(openAIResponsesApi())),
+      'anthropic-messages': rejectEmptyCompletion(explainFailures(anthropicMessagesApi())),
     },
   })
 }
