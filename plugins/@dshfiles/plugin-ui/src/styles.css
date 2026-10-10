@@ -54,11 +54,25 @@
   --color-chart-3: var(--dsw-alias-state-warn-primary);
   --color-chart-4: var(--dsw-alias-state-error-primary);
   --color-chart-5: var(--dsw-alias-label-tertiary);
+  /* Categorical hues the Host theme lacks (graph lanes, workspace and divergence chips). */
+  --color-teal: var(--dshx-kit-teal);
+  --color-violet: var(--dshx-kit-violet);
 
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+}
+
+@layer base {
+  :root {
+    --dshx-kit-teal: oklch(0.58 0.1 185);
+    --dshx-kit-violet: oklch(0.55 0.19 295);
+  }
+  body[data-ds-dark-theme] {
+    --dshx-kit-teal: oklch(0.76 0.11 182);
+    --dshx-kit-violet: oklch(0.72 0.15 300);
+  }
 }
 
 /*

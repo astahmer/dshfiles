@@ -3,7 +3,7 @@
 shadcn/ui for dshfiles DSH plugins, plus TanStack Query, Table, Form, Machine, Chart, Diff, and Virtual bindings. This package guide is the current source of truth for components and integration; [state ownership](docs/state-ownership.md) covers the async-data, form, flow, and persistence boundaries.
 
 - **Tailwind v4, `dshx:` prefix, no global Preflight** — the dshx client-CSS contract. A scoped Preflight applies under `.dshx-root` and inside shadcn portal content (`[data-slot$="-content"]`); never bare `[data-slot]`, which DSH also uses for its own outlets.
-- **shadcn semantic colors are the DSH theme.** `src/styles.css` maps `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`, `info`, `success`, `warning`, `chart-1..5` inline onto `--dsw-*`, so light/dark follow the Host. `dark:` matches `body[data-ds-dark-theme]`.
+- **shadcn semantic colors are the DSH theme.** `src/styles.css` maps `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`, `info`, `success`, `warning`, `chart-1..5` inline onto `--dsw-*`, so light/dark follow the Host. `teal` and `violet` are categorical hues the Host theme lacks (graph lanes, workspace and divergence chips), with their own light and dark values. `dark:` matches `body[data-ds-dark-theme]`.
 - **BB density.** `text-sm` is 13px, controls are 32px (`sm` 28px, `xs` 24px), radius 6px.
 
 ## Wire a plugin
