@@ -29,21 +29,43 @@ export const requestThreadMentionInsertion = (sessionId: string): void => {
   window.dispatchEvent(new CustomEvent(THREAD_MENTION_INSERT_EVENT, { detail: { sessionId } }))
 }
 
-export type ThreadMentionFailurePhase = 'remote-result' | 'exception'
+export type ThreadMentionFailurePhase = 'remote-result' | 'resolver-exception' | 'candidate-processing-exception' | 'insertion-exception'
+export type ThreadMentionFailureKind =
+  | 'argument-count-mismatch'
+  | 'method-unmounted'
+  | 'connection-unavailable'
+  | 'context-adapter-unavailable'
+  | 'context-identity-required'
+  | 'unclassified'
 
 export type ThreadMentionFailureDiagnosticInput = {
   phase: ThreadMentionFailurePhase
   errorName: string
   errorCode?: string
+  failureKind?: ThreadMentionFailureKind
 }
 
 export type ThreadMentionFailureDiagnostic = {
   phase: ThreadMentionFailurePhase
   errorName: string
   errorCode?: string
+  failureKind?: ThreadMentionFailureKind
 }
 
 export const threadMentionFailureCodeSchema = z.object({ code: z.string() })
+const threadMentionFailureMessageSchema = z.object({ message: z.string().max(512) })
+
+export const classifyThreadMentionFailure = (failure: unknown): ThreadMentionFailureKind => {
+  const parsedFailure = threadMentionFailureMessageSchema.safeParse(failure)
+  if (!parsedFailure.success) return 'unclassified'
+  const message = parsedFailure.data.message
+  if (message.includes('expected') && message.includes(' argument(s)')) return 'argument-count-mismatch'
+  if (message.includes('Remote method is no longer mounted')) return 'method-unmounted'
+  if (message.includes('has no active Connection')) return 'connection-unavailable'
+  if (message.includes('has no Client Context adapter')) return 'context-adapter-unavailable'
+  if (message.includes('requires a "agent" Context')) return 'context-identity-required'
+  return 'unclassified'
+}
 
 export const summarizeThreadMentionFailure = (input: ThreadMentionFailureDiagnosticInput): ThreadMentionFailureDiagnostic => {
   const diagnostic: ThreadMentionFailureDiagnostic = {
@@ -51,5 +73,6 @@ export const summarizeThreadMentionFailure = (input: ThreadMentionFailureDiagnos
     errorName: input.errorName,
   }
   if (input.errorCode !== undefined) diagnostic.errorCode = input.errorCode
+  if (input.failureKind !== undefined) diagnostic.failureKind = input.failureKind
   return diagnostic
 }

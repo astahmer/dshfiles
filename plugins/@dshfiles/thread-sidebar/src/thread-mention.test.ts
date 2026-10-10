@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { buildThreadReferenceInsert, decodeThreadMentionSessionId, summarizeThreadMentionFailure, threadMentionFailureCodeSchema } from './thread-mention.js'
+import {
+  buildThreadReferenceInsert,
+  classifyThreadMentionFailure,
+  decodeThreadMentionSessionId,
+  summarizeThreadMentionFailure,
+  threadMentionFailureCodeSchema,
+} from './thread-mention.js'
 
 test('thread reference keeps the native session mention and title presentation', () => {
   const mention = '@[Explore Agent Questions Plugin Features](dsh-session:InNlc3Npb24tZXhhbXBsZSI)'
@@ -50,8 +56,27 @@ test('thread mention failure diagnostics expose only safe identity fields', () =
   )
 
   const thrownFailure = new TypeError('private session id')
-  assert.deepEqual(summarizeThreadMentionFailure({ phase: 'exception', errorName: thrownFailure.name }), {
-    phase: 'exception',
+  assert.deepEqual(summarizeThreadMentionFailure({ phase: 'resolver-exception', errorName: thrownFailure.name }), {
+    phase: 'resolver-exception',
     errorName: 'TypeError',
   })
+})
+
+test('thread mention classifies Remote preflight errors without logging their messages', () => {
+  const arityFailure = new Error('client api: sessionReferenceResolver/candidates expected 1 business argument(s) plus an optional AbortSignal, got 3')
+  const failureKind = classifyThreadMentionFailure(arityFailure)
+  const diagnostic = summarizeThreadMentionFailure({
+    phase: 'resolver-exception',
+    errorName: arityFailure.name,
+    failureKind,
+  })
+
+  assert.equal(failureKind, 'argument-count-mismatch')
+  assert.deepEqual(diagnostic, {
+    phase: 'resolver-exception',
+    errorName: 'Error',
+    failureKind: 'argument-count-mismatch',
+  })
+  assert.equal(JSON.stringify(diagnostic).includes(arityFailure.message), false)
+  assert.equal(classifyThreadMentionFailure(new Error('client api: candidates has no active Connection')), 'connection-unavailable')
 })

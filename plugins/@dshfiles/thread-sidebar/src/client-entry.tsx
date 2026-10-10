@@ -22,6 +22,7 @@ import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
 import {
   buildThreadReferenceInsert,
+  classifyThreadMentionFailure,
   decodeThreadMentionSessionId,
   summarizeThreadMentionFailure,
   threadMentionFailureCodeSchema,
@@ -158,8 +159,9 @@ export default defineClient({
           const controller = new AbortController()
           pending.current.add(controller)
           void (async () => {
+            let failurePhase: ThreadMentionFailureDiagnosticInput['phase'] = 'resolver-exception'
             try {
-              const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
+              const result = await sessionContext.remote.sessionReferenceResolver.candidates(targetSessionId, controller.signal)
               if (controller.signal.aborted) return
               if (!result.ok) {
                 console.warn(
@@ -173,11 +175,13 @@ export default defineClient({
                 input.notify('error', translate('threadSidebarMentionFailure'))
                 return
               }
+              failurePhase = 'candidate-processing-exception'
               const candidate = result.value.find(item => item.sessionId === targetSessionId)
               if (candidate === undefined) {
                 input.notify('info', translate('threadSidebarMentionUnavailable'))
                 return
               }
+              failurePhase = 'insertion-exception'
               if (!input.insertReference(buildThreadReferenceInsert(candidate), span)) {
                 input.notify('info', translate('threadSidebarMentionDraftChanged'))
               }
@@ -185,10 +189,11 @@ export default defineClient({
               if (!controller.signal.aborted) {
                 const parsedFailure = threadMentionFailureCodeSchema.safeParse(failure)
                 const diagnostic: ThreadMentionFailureDiagnosticInput = {
-                  phase: 'exception',
+                  phase: failurePhase,
                   errorName: failure instanceof Error ? failure.name : 'unknown',
                 }
                 if (parsedFailure.success) diagnostic.errorCode = parsedFailure.data.code
+                diagnostic.failureKind = classifyThreadMentionFailure(failure)
                 console.warn('thread-sidebar: mention resolution failed', summarizeThreadMentionFailure(diagnostic))
                 input.notify('error', translate('threadSidebarMentionFailure'))
               }
