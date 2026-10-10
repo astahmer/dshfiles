@@ -31,3 +31,7 @@ The process uses direct argv, the session directory as `cwd`, and DSH's scrubbed
 Actions marked `verifyBeforeComplete` run at the native awaited `agent/turn-stopping` event. Failed checks steer the same turn once, then the configured attempt limit (maximum two) stops that turn with a failure. Cancellation aborts and cleans up the subprocess. Pass receipts are bound to the current Jujutsu working-copy commit id and become stale when that id changes.
 
 The panel reads hook events from the native session query service. DSH 0.2 records `hook/invoked` and `hook/result`; it does not emit durable skipped/unsupported-hook events, so the panel states that gap instead of inventing per-hook skip records. Hook stderr content and raw subprocess output are not exposed.
+
+## Verify
+
+Run `pnpm typecheck`, `pnpm test`, and `pnpm build` from this package. `pnpm verify:scratch` exercises trusted actions, completion receipts, and native hook results in an isolated scratch DSH profile; it does not modify the active profile.

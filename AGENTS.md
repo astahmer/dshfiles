@@ -164,18 +164,14 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `main`, and retain the source workspace until tree equality and status prove
   it safe to forget.
 
-### Required integration closeout
+### Integration closeout
 
-Every completed consolidation must reduce its own JJ noise in the same task.
-Record completed work, exact remaining gates, source commit IDs, tree-preservation
-proof, and the recovery operation in `docs/unification-status-2026-10-07.md`.
-After moving `main` and making default an empty child, forget accounted-for,
-finished workspace registrations and delete temporary integration bookmarks.
-Retain physical source directories, one recovery bookmark per source tip, and
-an inventory of removed targets. Keep active writers and unrelated refs intact.
-Do not create a permanent bookmark for every attempted rewrite. Validation
-failures remain explicit in the ledger; history cleanup does not imply release
-or live-profile acceptance.
+For a repository integration or history-consolidation task, record completed work,
+remaining acceptance gates, source revisions, tree-preservation proof, and the
+recovery operation in a focused, current closeout document. Preserve active
+writers and unrelated refs. Do not create permanent bookmarks for every attempted
+rewrite. Validation failures remain explicit; history cleanup does not imply
+release or live-profile acceptance.
 
 ## Environment
 
@@ -271,7 +267,7 @@ the details; the rules that break things silently:
   get overridden.
 - Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
   `/machine`, localStorage → `createStoredValue`. See
-  `plans/plugin-state-audit.md`.
+  `plugins/@dshfiles/plugin-ui/README.md`.
 - Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
   `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
 
@@ -337,7 +333,7 @@ Point an owned plugin's `dshx.config.ts` at `profile: 'vanilla'` when debugging
 it without the rest of the adopted plugin set.
 
 Creator mode (DSH's in-app plugin authoring preset) is not declared on this
-profile; `docs/creator-mode.md` says how to check and where its skills live.
+profile.
 
 ## Shell command batching
 
@@ -421,7 +417,7 @@ settings namespace is unregistered — never throw. After every build,
 import-check the host bundle with the DSH Node
 (`fnm exec --using=22.23.3 node -e "import('./dist/index.js')"`); a failure there
 is a "did not activate" at boot. Full checklist (probe/scratch profiles,
-`plans/optmem/tools/drive.mjs`, console checks, perf budget in
+`plugins/@dshfiles/optmem/scripts/drive.mjs`, console checks, perf budget in
 `plans/ade/perf-baseline.md`): skill `dsh-plugin-verify`.
 
 ### Client boot failures are cross-plugin

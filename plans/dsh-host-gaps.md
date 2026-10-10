@@ -1,8 +1,8 @@
 # DSH Host gaps — features waiting on a DSH patch or upstream
 
 BB behaviours our DSH plugins cannot reproduce because the Host (or dshx) lacks a capability. Each is a
-candidate for a local DSH patch (`tooling/dsh-core`, dshx fork) or an upstream request. Found during the
-2026-10-08 plugin UI rebuild ([plugin-ui-handoff.md](plugin-ui-handoff.md)).
+candidate for a local DSH patch (`tooling/dsh-core`, dshx fork) or an upstream request. The product behavior
+and current workarounds are documented in each owning plugin's README.
 
 | Feature | Plugin | Missing capability | Possible route |
 |---|---|---|---|

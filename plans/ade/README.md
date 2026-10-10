@@ -4,10 +4,7 @@ Goal: one app for agent work, built out from the harness: browse any file or fol
 fuzzy ⌘P file open, many more ⌘K actions, same BB-like shadcn UI (`@dshfiles/plugin-ui`). Performance comes first
 because the ⌘P palette and other panels already lag.
 
-Sizes: S ≤ ½ day, M ≈ 1–2 days, L ≈ 3+ days. Each step lists its dependencies, acceptance criteria and a prompt
-to paste into an agent. Related plans: [plugin-ui-handoff](../plugin-ui-handoff.md),
-[plugin-state-audit](../plugin-state-audit.md) (`#n` and `Ln` ids below), [remaining-work](../remaining-work.md),
-[dsh-host-gaps](../dsh-host-gaps.md).
+Sizes: S ≤ ½ day, M ≈ 1–2 days, L ≈ 3+ days. Each step lists its dependencies and acceptance criteria. Related records: [plugin UI guide](../../plugins/@dshfiles/plugin-ui/README.md), [state ownership decisions](../../plugins/@dshfiles/plugin-ui/docs/state-ownership.md), and [Host gaps](../dsh-host-gaps.md).
 
 ## What the Host gives us today (0.2.0-rc.2 types)
 
@@ -137,21 +134,10 @@ builds; assert one `style[data-plugin]` Tailwind sheet. Fails CI on regression b
 | [x] P1.4 multi-host lease actor per runtime view | #14, #19 | M | P1.1 | no global error mirror; lease poll stops when view closes |
 | [x] P1.5 Host utility swaps | L4, L5, L6 | S | — | one relative-time fn, Host clipboard, `rankByName` for label filter |
 | [x] P1.6 `createStoredValue(key, zodSchema)` in plugin-ui + 5 stores | L7 | S | — | storage-event sync across tabs; invalid JSON falls back |
-| [x] P1.7 Query/Form leftovers (#17 #18 #21 #22 skipped, see audit) | #9, #10, #15, #17, #18, #20, #21, #22, #23 | M | — | no hand-rolled loading/error state left in those files |
+| [x] P1.7 Query/Form leftovers | #9, #10, #15, #17, #18, #20, #21, #22, #23 | M | — | behavior-based exceptions recorded in [state ownership decisions](../../plugins/@dshfiles/plugin-ui/docs/state-ownership.md) |
 | [x] P1.8 Customize: move up/down buttons | L8 | S | — | keyboard-only reorder works |
 | [x] P1.9 yaml parseDocument check | L10 | S | — | malformed provider patch rejected on host side |
 | P1.10 jujutsu revision list VirtualList [x] | L3 | M | P0.5 | 500 rows scroll at 60 fps (scratch probe: ~35–50 rows mounted, ~1–2 ms JS per scroll step) |
-
-> Prompt (P1.1): "Implement the xstate pilot from plans/plugin-state-audit.md #7: add `@dshfiles/plugin-ui/machine`
-> (thin xstate v5 + React helpers, pinned in plugin-ui) and rewrite jujutsu/src/workspace-restore-panel.tsx as a
-> select→prepare→confirm→receipt machine. Tests over machine transitions. Tick #7 in the audit."
->
-> Prompt (P1.5–P1.6): "Do plans/plugin-state-audit.md L4, L5, L6, L7 in dshfiles: swap to Host relativeTime,
-> writeClipboard, rankByName; add plugin-ui `createStoredValue(key, zodSchema)` and migrate the 5 listed stores.
-> One jj revision per id."
->
-> Prompt (P1.7): "Finish plans/plugin-state-audit.md items #9 #10 #15 #17 #18 #20 #21 #22 #23 with TanStack
-> Query/useAppForm via @dshfiles/plugin-ui. One jj revision per plugin; tick each in the audit."
 
 ## Phase 2 — ADE foundations (files, editor)
 

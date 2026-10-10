@@ -2,7 +2,7 @@
 
 | Phase | Status | Evidence boundary |
 |---|---|---|
-| P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see `validation.md`. |
+| P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see [package validation receipts](../../plugins/@dshfiles/multi-host/docs/validation.md). |
 | P2 — identity, directory, CLI | Complete | Local x2, Pi, and VPS; distinct native IDs for identical workspace paths; remote CLI session creation, ambiguity rejection, wrong-token rejection, and restart persistence. |
 | P3 — reliability | Complete | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, one-host outage isolation, and an admitted Pi session-create whose reply was dropped through the real SSH connector passed without replay. |
 | P4 — first-class UI | Partial | Online host switching/session creation and the Pi native runtime view passed; a prior report said the persistent view closed and reopened. Later collaborative preview showed offline stale-card/reconnect and a Pi runtimeOpenView lease in a distinct loopback origin with a scratch workspace and zero console errors. The OpenCode Go profile and 30-model catalog rendered. After the replacement credential was installed for the Pi deployment, its Go models request was reported as HTTP 200 and the runtime check found the key loaded; a separate local alias probe returned HTTP 401. Those scopes remain unreconciled, so provider acceptance and a model turn remain unverified. Approval, upload, terminal interaction, and popup close/reopen as a distinct flow also remain unverified. |
@@ -14,7 +14,7 @@
 
 | Phase | Status | Evidence boundary |
 |---|---|---|
-| P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see `validation.md`. |
+| P1 — VPS acceptance | Complete | Real SSH-tunnelled native API, PTY, workspace placement, restart, one bounded free-model turn, and MCP fixture; see [package validation receipts](../../plugins/@dshfiles/multi-host/docs/validation.md). |
 | P2 — identity, directory, CLI | Complete | Local x2, Pi, and VPS; distinct native IDs for identical workspace paths; remote CLI session creation, ambiguity rejection, wrong-token rejection, and restart persistence. |
 | P3 — reliability | Complete | Wrong token, protocol pinning, live wrong-host-key rejection, reconnect, one-host outage isolation, and an admitted Pi session-create whose reply was dropped through the real SSH connector passed without replay. |
 | P4 — first-class UI | Partial | Online host switching/session creation, offline stale-card/reconnect, and the Pi native runtime view in a distinct browser origin passed in the collaborative preview. Approval, upload, terminal interaction, and the UI popup's close/reopen cycle still lack browser proof. |

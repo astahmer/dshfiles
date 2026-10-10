@@ -1,6 +1,6 @@
 # OptMem — technical design (Stage 1 output)
 
-Inputs: [task.md](task.md), [research-optmem.md](research-optmem.md), [research-dsh.md](research-dsh.md).
+Inputs: [requirements.md](requirements.md), [research-optmem.md](research-optmem.md), [research-dsh.md](research-dsh.md).
 Clean-room: the gist has no licence — no prompts, templates or code are copied; algorithms are re-derived.
 
 ## 1. Confirmed DSH extension points (see research-dsh.md for citations)

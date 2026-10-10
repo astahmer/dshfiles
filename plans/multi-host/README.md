@@ -1,8 +1,9 @@
 # Multi-host execution plan
 
-The [implementation plan](implementation.md) defines the current phase sequence,
+The [implementation plan](implementation.md) defines current phase sequence,
 Pi/VPS test targets, model budget and acceptance gates. This document retains the
-source assessment and architecture rationale.
+source assessment and architecture rationale; completed runtime receipts live
+with the [Multi-host package](../../plugins/@dshfiles/multi-host/docs/validation.md).
 
 Research date: 2026-10-05. Recommendation: **H — runtime federation, using stock
 DSH runtimes, a narrow DSHX API extension, and an owned host-management plugin.**
@@ -515,7 +516,7 @@ admitted-but-response-lost case. No physical remote host, agent/model turn,
 filesystem/process operation, native PTY, LSP, browser UI, or supervisor was tested.
 
 Focused platform suite: **17 tests passed**. Wider validation results are recorded
-in [validation.md](validation.md). The transport's exported `rpc` argument type
+in the [package validation receipts](../../plugins/@dshfiles/multi-host/docs/validation.md). The transport's exported `rpc` argument type
 changes from positional array to named object; custom transport adapters must
 follow the installed native wire contract. In-repository callers were checked.
 

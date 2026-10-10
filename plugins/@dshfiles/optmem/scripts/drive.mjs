@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const repoRoot = '/Users/astahmer/dev/dshfiles'
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../')
 // Usage: node drive.mjs <out.json> <full|compat> <scenario.json>
 // Env: REAL_HOME=1 (host on the real ~/.dsh instead of the isolated scratch home), STOCK=1 (no fork),
 //      ACCOUNTS_FILE (default ~/.dsh/plugins/ai-accounts/accounts.json), PROVIDER/MODEL/EFFORT overrides.

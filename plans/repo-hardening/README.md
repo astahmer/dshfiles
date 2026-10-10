@@ -250,7 +250,7 @@ settings, so it is a decision, not a fix.
 - [x] Root README with a plugin inventory table
 - [x] AGENTS.md: `pnpm add <path>` contradiction resolved, upstream create
       command, `node --test` and `lib/` corrected; pnpm traps in
-      `docs/profile-installs.md`, creator mode in `docs/creator-mode.md`
+      `docs/profile-installs.md`; creator mode is not enabled in the current profile
 - [x] `scripts/dsh-session-status.mjs` removed (one session title hardcoded)
 - [x] Flake outputs for aarch64-darwin, aarch64-linux and x86_64-linux
       (pinned nixpkgs dropped x86_64-darwin)

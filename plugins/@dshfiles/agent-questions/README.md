@@ -46,3 +46,7 @@ and the feedback must be re-anchored before the child acts. Feedback is never
 applied automatically. Cold-session revision checks read the persisted Session
 header through `dsh-session-query`; feedback rows keep only the workspace-relative
 path and hash. Element anchors still require a browser/evidence provider.
+
+## Verify
+
+Run `pnpm typecheck`, `pnpm test`, and `pnpm build` from this package. `pnpm verify:scratch` composes the package with its cold-resume fixture in an isolated scratch DSH profile; it does not change the active profile.

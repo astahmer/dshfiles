@@ -55,7 +55,7 @@ fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe   # re
 Real agent turns, headless, on an isolated scratch home copied from `probe`:
 
 ```sh
-node plans/optmem/tools/drive.mjs <out.json> <full|compat> <scenario.json>
+node plugins/@dshfiles/optmem/scripts/drive.mjs <out.json> <full|compat> <scenario.json>
 # REAL_HOME=1 uses the real ~/.dsh; STOCK=1 runs without the fork
 ```
 

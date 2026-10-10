@@ -5,7 +5,7 @@ description: Pick and write client state in DSH plugins with the plugin-ui bindi
 
 # Plugin state
 
-Rule of thumb (full audit and per-plugin decisions: `plans/plugin-state-audit.md`):
+Rule of thumb (current audit decisions: `plugins/@dshfiles/plugin-ui/docs/state-ownership.md`):
 
 | State | Use | Import |
 |---|---|---|
