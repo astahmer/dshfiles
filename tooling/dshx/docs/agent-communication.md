@@ -74,6 +74,19 @@ subscription, message-lifecycle, and tool-activity data. It is read-only and
 never prints message bodies. A missing bridge or an empty event history is not
 proof that Agents never used the capability.
 
+The owned `@dshfiles/agent-communication` bundle adds a sidebar inspector for
+live Agents, topics, subscriptions, recent tool activity, and message-recipient
+status. It uses the Host API; the browser never reads the state file. Message
+bodies stay hidden in reports and lists until a per-message reveal action.
+Delivery changes, unsubscribe/rejoin, and acknowledgements are scoped and
+confirmed. `steer` requires selecting live sender Agents; current sender IDs are
+not returned by diagnostics, so an edit requires selecting the desired set
+again. The UI intentionally adds no publish, send, or bulk-delete controls.
+
+The bridge setup is gated on DSH supplying live Agents to the Host plugin. An
+empty Session or unavailable report is not evidence that the integration is
+broken or that communication was not used.
+
 ## Commands
 
 ```sh

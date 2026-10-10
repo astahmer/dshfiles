@@ -78,6 +78,10 @@
       "types": "./dist/communication/index.d.ts",
       "default": "./dist/communication/index.js"
     },
+    "./communication/types": {
+      "types": "./dist/communication/types.d.ts",
+      "default": "./dist/communication/types.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"

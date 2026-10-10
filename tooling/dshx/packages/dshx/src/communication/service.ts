@@ -7,7 +7,11 @@ import { z } from 'zod'
 import {
   communicationActivityEventSchema,
   communicationAgentSchema,
+  communicationDiagnosticAgentSchema,
+  communicationDiagnosticRecipientSchema,
   communicationDiagnosticsSchema,
+  communicationMessageBodySchema,
+  communicationMessageRecipientsSchema,
   communicationDiagnosticMessageSchema,
   communicationDiagnosticSubscriptionSchema,
   communicationMessageSchema,
@@ -22,6 +26,8 @@ import {
   type CommunicationDelivery,
   type CommunicationDiagnostics,
   type CommunicationMessage,
+  type CommunicationMessageBody,
+  type CommunicationMessageRecipients,
   type CommunicationPrincipal,
   type CommunicationState,
   type CommunicationStateV1,
@@ -299,7 +305,14 @@ export class CommunicationService {
     return communicationDiagnosticsSchema.parse({
       generatedAt: this.#now(),
       agentCount: agents.length,
-      agents: agents.slice(0, limit),
+      agents: agents.slice(0, limit).map(agent =>
+        communicationDiagnosticAgentSchema.parse({
+          id: agent.id,
+          status: agent.status,
+          workspaceTopic: agent.workspaceTopic ?? null,
+          workspaceOptedOut: state.workspaceOptOuts.includes(agent.id),
+        }),
+      ),
       topicCount: topics.length,
       topics: topics.slice(0, limit),
       subscriptionCount: state.subscriptions.length,
@@ -317,6 +330,32 @@ export class CommunicationService {
       },
       historyNote: 'Activity history starts when the first tool-call event is recorded; earlier use cannot be inferred.',
     })
+  }
+
+  async messageRecipients(messageIdInput: string): Promise<CommunicationMessageRecipients> {
+    const { state, message } = await this.#readMessage(messageIdInput)
+    const acknowledgements = new Map(
+      state.acknowledgements.filter(entry => entry.messageId === message.id).map(entry => [principalKey(entry.principal), entry.acknowledgedAt]),
+    )
+    const notifications = new Map(state.notifications.filter(entry => entry.messageId === message.id).map(entry => [entry.agentId, entry.notifiedAt]))
+    return communicationMessageRecipientsSchema.parse({
+      messageId: message.id,
+      recipientCount: message.recipients.length,
+      recipients: message.recipients.map(recipient =>
+        communicationDiagnosticRecipientSchema.parse({
+          principal: recipient.principal,
+          delivery: recipient.delivery,
+          notifiedAt: recipient.principal.kind === 'agent' ? (notifications.get(recipient.principal.id) ?? null) : null,
+          acknowledgedAt: acknowledgements.get(principalKey(recipient.principal)) ?? null,
+          allowSteerFromCount: recipient.allowSteerFrom.length,
+        }),
+      ),
+    })
+  }
+
+  async revealMessageBody(messageIdInput: string): Promise<CommunicationMessageBody> {
+    const { message } = await this.#readMessage(messageIdInput)
+    return communicationMessageBodySchema.parse({ messageId: message.id, text: message.text })
   }
 
   async subscribe(
@@ -524,6 +563,14 @@ export class CommunicationService {
         this.#inFlightNotifications.delete(notificationKey)
       }
     }
+  }
+
+  async #readMessage(messageIdInput: string): Promise<{ readonly state: CommunicationState; readonly message: CommunicationMessage }> {
+    const messageId = z.string().uuid().parse(messageIdInput)
+    const state = await this.#readState()
+    const message = state.messages.find(item => item.id === messageId)
+    if (message === undefined) throw new CommunicationError('message-not-found', 'Message is no longer retained.')
+    return { state, message }
   }
 
   async #readState(): Promise<CommunicationState> {

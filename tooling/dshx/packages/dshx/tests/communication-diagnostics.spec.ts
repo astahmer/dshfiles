@@ -69,6 +69,21 @@ describe('communication diagnostics', () => {
     })
     expect(JSON.stringify(report)).not.toContain('private-message-body')
     expect(report.recentMessages[0]).not.toHaveProperty('text')
+    const firstMessage = report.recentMessages[0]
+    if (firstMessage === undefined) throw new Error('Expected a recent message.')
+    const messageId = firstMessage.id
+    const recipients = await service.messageRecipients(messageId)
+    expect(recipients).toMatchObject({
+      messageId,
+      recipientCount: 1,
+      recipients: [{ principal: reader, delivery: 'queue', notifiedAt: null, acknowledgedAt: null, allowSteerFromCount: 0 }],
+    })
+    expect(await service.revealMessageBody(messageId)).toEqual({ messageId, text: 'private-message-body' })
+    expect(await readFile(path, 'utf8')).toBe(beforeReport)
+
+    await service.acknowledge(reader, messageId)
+    expect((await service.messageRecipients(messageId)).recipients[0]?.acknowledgedAt).toBe(now)
+    await expect(service.revealMessageBody('11111111-1111-4111-8111-111111111111')).rejects.toMatchObject({ code: 'message-not-found' })
   })
 
   it('reads legacy version-one state without writing and upgrades it on the next mutation', async () => {
@@ -114,6 +129,20 @@ describe('communication diagnostics', () => {
     expect(upgraded.subscriptions).toHaveLength(2)
     expect(upgraded.acknowledgements).toHaveLength(1)
     expect(upgraded.notifications).toHaveLength(1)
+  })
+
+  it('reports workspace opt-out state and clears it when the Agent rejoins', async () => {
+    const service = new CommunicationService({ statePath: await statePath(), now: () => 1_800_000_000_000 })
+    const agent: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-reader' }
+    await service.subscribe(agent, { topic: 'workspace/demo' })
+    await service.unsubscribe(agent, 'workspace/demo')
+
+    const optedOut = await service.diagnostics({ agents: [{ id: agent.id, workspaceTopic: 'workspace/demo' }] })
+    expect(optedOut.agents).toMatchObject([{ id: agent.id, workspaceTopic: 'workspace/demo', workspaceOptedOut: true }])
+
+    await service.subscribe(agent, { topic: 'workspace/demo' })
+    const rejoined = await service.diagnostics({ agents: [{ id: agent.id, workspaceTopic: 'workspace/demo' }] })
+    expect(rejoined.agents).toMatchObject([{ id: agent.id, workspaceTopic: 'workspace/demo', workspaceOptedOut: false }])
   })
 
   it('excludes activity older than the 30-day retention window without writing during diagnostics', async () => {

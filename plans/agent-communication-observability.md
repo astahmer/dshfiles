@@ -102,19 +102,18 @@ flowchart LR
 ### Desktop
 
 ```text
-Agent communication                         Host: connected
+Agent communication                         Host connected  [Refresh]
+Live Agents | Topics | Subscriptions | Pending messages
 
-Activity     24h: 18 calls   5 messages   2 pending   1 failed notice
-
-Recent activity
-16:42  agent:worker-a   inbox read       2 items
-16:40  agent:worker-b   publish           3 recipients
-16:38  agent:worker-a   acknowledge        success
-
-Topics / subscriptions                         Pending messages
-workspace/…   3 Agents   queue               2 messages
-release-notes  1 Agent    quiet               [Inspect]
+Activity            Messages            Subscriptions
+Recent tool calls   Metadata-first list  Agent/topic controls
+                    Select a message     quiet / queue / steer
+                    [Reveal body]        [Save] [Unsubscribe]
+                                        [Rejoin workspace]
 ```
+
+The panel polls the bounded report every 30 seconds. Counts represent the
+current report window; activity coverage starts at the first recorded tool call.
 
 Selecting an event opens metadata first. Message body requires an explicit reveal. Controls are local, scoped to the selected Agent/message, and show confirmation before changing subscription state.
 
@@ -168,9 +167,9 @@ Activity records contain no message body or raw arguments. Existing message cont
 3. [x] Implement bounded activity recording and a metadata-only diagnostic projection, with tests for success/failure, redaction, limits, 30-day expiry, and state compatibility.
 4. [x] Add read-only `dshx comm report` output and focused CLI tests. Verify no command path mutates state.
 5. [x] Build and validate CLI/Host code without touching the live profile; checkpoint before UI work. The scratch profile composed and booted on port 3199, but the report remained unavailable because its empty Session did not reach the Host's `agents` setup gate; do not treat that as an activation failure or proof of non-use.
-6. [ ] Add communication inspector UI with Host-backed queries, metadata-first timeline, and explicit body reveal.
-7. [ ] Add scoped subscription and acknowledgement controls through validated Host mutations; test authorization, stale data, confirmation, and failure behavior.
-8. [ ] Build/test/typecheck/lint the affected packages, exercise Host setup with an actual scratch Agent on a second port if possible, and capture operator-facing evidence. Do not restart the live instance.
+6. [x] Add communication inspector UI with Host-backed queries, metadata-first timeline, and explicit body reveal.
+7. [x] Add scoped subscription and acknowledgement controls through validated Host mutations; test current-Agent authorization, live steer senders, redacted allowlist output, confirmation, and service rejection behavior.
+8. [ ] Run final package/toolchain checks and a scratch-profile browser check on a second port. Do not restart the live instance or make an external-model Agent turn without authorization.
 
 ## Resolved design choices
 
@@ -181,12 +180,12 @@ Activity records contain no message body or raw arguments. Existing message cont
 ## Acceptance criteria
 
 - [ ] Read-only report distinguishes unavailable bridge, healthy empty state, and populated state without implying missing history means non-use.
-- [ ] Agent tool activity records success and failure at one boundary; records contain no body, arguments, credentials, or unbounded error text.
-- [ ] Report has stable JSON schema, bounded output, and explicitly redacted metadata-only defaults.
-- [ ] State version changes preserve existing messages, subscriptions, acknowledgements, and notification receipts; retention is bounded and tested.
-- [ ] Report never acknowledges messages or changes subscriptions.
-- [ ] UI queries and mutations use Host APIs; browser never reads/writes state files.
-- [ ] UI management actions are scoped and validated; acknowledgement and subscription changes have focused tests.
+- [x] Agent tool activity records success and failure at one boundary; records contain no body, arguments, credentials, or unbounded error text.
+- [x] Report has stable JSON schema, bounded output, and explicitly redacted metadata-only defaults.
+- [x] State version changes preserve existing messages, subscriptions, acknowledgements, and notification receipts; retention is bounded and tested.
+- [x] Report never acknowledges messages or changes subscriptions.
+- [x] UI queries and mutations use Host APIs; browser never reads/writes state files.
+- [x] UI management actions are scoped and validated; acknowledgement and subscription changes have focused tests.
 - [ ] Plugin build, typecheck, focused tests, Host bundle import, and scratch runtime checks pass; live DSH instance remains untouched.
 
 ## Decisions log

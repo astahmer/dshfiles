@@ -58,9 +58,18 @@ export const communicationAgentSchema = z
   .object({
     id: z.string().min(1).max(256),
     status: z.enum(['idle', 'running']).optional(),
+    workspaceTopic: z.string().min(1).max(128).nullable().optional(),
   })
   .strict()
 export type CommunicationAgent = z.infer<typeof communicationAgentSchema>
+
+export const communicationDiagnosticAgentSchema = communicationAgentSchema
+  .extend({
+    workspaceTopic: z.string().min(1).max(128).nullable(),
+    workspaceOptedOut: z.boolean(),
+  })
+  .strict()
+export type CommunicationDiagnosticAgent = z.infer<typeof communicationDiagnosticAgentSchema>
 
 export const communicationTopicSchema = z
   .object({
@@ -146,6 +155,34 @@ export const communicationStateSchema = z
   .strict()
 export type CommunicationState = z.infer<typeof communicationStateSchema>
 
+export const communicationDiagnosticRecipientSchema = z
+  .object({
+    principal: communicationPrincipalSchema,
+    delivery: communicationDeliverySchema,
+    notifiedAt: z.number().int().nonnegative().nullable(),
+    acknowledgedAt: z.number().int().nonnegative().nullable(),
+    allowSteerFromCount: z.number().int().nonnegative().max(64),
+  })
+  .strict()
+export type CommunicationDiagnosticRecipient = z.infer<typeof communicationDiagnosticRecipientSchema>
+
+export const communicationMessageRecipientsSchema = z
+  .object({
+    messageId: z.string().uuid(),
+    recipientCount: z.number().int().nonnegative().max(512),
+    recipients: z.array(communicationDiagnosticRecipientSchema).max(512),
+  })
+  .strict()
+export type CommunicationMessageRecipients = z.infer<typeof communicationMessageRecipientsSchema>
+
+export const communicationMessageBodySchema = z
+  .object({
+    messageId: z.string().uuid(),
+    text: z.string().max(12_000),
+  })
+  .strict()
+export type CommunicationMessageBody = z.infer<typeof communicationMessageBodySchema>
+
 export const communicationDiagnosticSubscriptionSchema = z
   .object({
     principal: communicationPrincipalSchema,
@@ -175,7 +212,7 @@ export const communicationDiagnosticsSchema = z
   .object({
     generatedAt: z.number().int().nonnegative(),
     agentCount: z.number().int().nonnegative(),
-    agents: z.array(communicationAgentSchema).max(100),
+    agents: z.array(communicationDiagnosticAgentSchema).max(100),
     topicCount: z.number().int().nonnegative(),
     topics: z.array(communicationTopicSchema).max(100),
     subscriptionCount: z.number().int().nonnegative(),

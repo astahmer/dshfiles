@@ -27,6 +27,17 @@ dshx comm topics --json
 dshx comm mcp --principal editor
 ```
 
+The sidebar inspector shows live Agents, topics, subscriptions, bounded tool
+activity, and message-recipient status. Message bodies are excluded from the
+report and list; reveal is an explicit per-message action. Subscription changes,
+workspace rejoin, and per-recipient acknowledgement require confirmation.
+Enabling `steer` requires selecting currently live sender Agents; existing sender
+IDs are intentionally not returned, so edit requires selecting the desired set
+again. The inspector does not publish, send, or bulk-delete messages.
+
+An unavailable report or empty activity history is not proof of non-use. The
+Host bridge starts only after DSH supplies live Agents to the plugin.
+
 Add this package to a DSH profile as a local `link:` dependency and list it in
 `dsh.profile.bundles`, then build the package and restart that DSH Host. See
 the [full communication design and activation guide](../../../tooling/dshx/docs/agent-communication.md).

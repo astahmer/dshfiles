@@ -11,12 +11,14 @@ import { hostPeerDependencyPlugin, isHostExternal, singleHostChunkPlugin } from 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
 const VIRTUAL_HOST_COMMUNICATION_PUBLIC = '\0virtual:dshx-host-communication-public'
+const VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC = '\0virtual:dshx-host-communication-types-public'
 const VIRTUAL_HOST_PLATFORM_API_PUBLIC = '\0virtual:dshx-host-platform-api-public'
 const VIRTUAL_HOST_NATIVE_RPC_PUBLIC = '\0virtual:dshx-host-native-rpc-public'
 const DSHX_HOST_PUBLIC = '@dshfiles/dshx/host'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
 const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
 const DSHX_COMMUNICATION_PUBLIC = '@dshfiles/dshx/communication'
+const DSHX_COMMUNICATION_TYPES_PUBLIC = '@dshfiles/dshx/communication/types'
 const DSHX_PLATFORM_HOST_API_PUBLIC = '@dshfiles/dshx/platform/host-api'
 const DSHX_PLATFORM_NATIVE_RPC_PUBLIC = '@dshfiles/dshx/platform/native-rpc'
 const HOST_RUNTIME_PATH = fileURLToPath(new URL('../../host/runtime.js', import.meta.url))
@@ -27,6 +29,7 @@ const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
+const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/types.js', import.meta.url))
 const PLATFORM_HOST_API_PATH = fileURLToPath(new URL('../../platform/host-api.js', import.meta.url))
 const NATIVE_RPC_SCHEMA_PATH = fileURLToPath(new URL('../../platform/native-rpc.js', import.meta.url))
 
@@ -70,6 +73,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         source === DSHX_API_PUBLIC ||
         source === DSHX_SETTINGS_PUBLIC ||
         source === DSHX_COMMUNICATION_PUBLIC ||
+        source === DSHX_COMMUNICATION_TYPES_PUBLIC ||
         source === DSHX_PLATFORM_HOST_API_PUBLIC ||
         source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
       ) {
@@ -81,11 +85,13 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
               ? `${VIRTUAL_HOST_PUBLIC}-settings`
               : source === DSHX_COMMUNICATION_PUBLIC
                 ? VIRTUAL_HOST_COMMUNICATION_PUBLIC
-                : source === DSHX_PLATFORM_HOST_API_PUBLIC
-                  ? VIRTUAL_HOST_PLATFORM_API_PUBLIC
-                  : source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
-                    ? VIRTUAL_HOST_NATIVE_RPC_PUBLIC
-                    : VIRTUAL_HOST_ENTRY
+                : source === DSHX_COMMUNICATION_TYPES_PUBLIC
+                  ? VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC
+                  : source === DSHX_PLATFORM_HOST_API_PUBLIC
+                    ? VIRTUAL_HOST_PLATFORM_API_PUBLIC
+                    : source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
+                      ? VIRTUAL_HOST_NATIVE_RPC_PUBLIC
+                      : VIRTUAL_HOST_ENTRY
       }
       return null
     },
@@ -114,6 +120,9 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       if (id === VIRTUAL_HOST_COMMUNICATION_PUBLIC) {
         return `export * from ${JSON.stringify(COMMUNICATION_RUNTIME_PATH)}\n`
+      }
+      if (id === VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC) {
+        return `export * from ${JSON.stringify(COMMUNICATION_TYPES_PATH)}\n`
       }
       if (id === VIRTUAL_HOST_PLATFORM_API_PUBLIC) {
         return `export * from ${JSON.stringify(PLATFORM_HOST_API_PATH)}\n`
@@ -183,6 +192,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     DSHX_API_PUBLIC,
     DSHX_SETTINGS_PUBLIC,
     DSHX_COMMUNICATION_PUBLIC,
+    DSHX_COMMUNICATION_TYPES_PUBLIC,
     DSHX_PLATFORM_HOST_API_PUBLIC,
     DSHX_PLATFORM_NATIVE_RPC_PUBLIC,
   ]

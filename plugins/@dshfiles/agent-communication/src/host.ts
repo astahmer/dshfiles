@@ -8,11 +8,14 @@ import {
   createCommunicationService,
   startHostCommunicationBridge,
   type CommunicationActivityOperation,
+  type CommunicationAgent,
   type CommunicationMessage,
   type CommunicationPrincipal,
 } from '@dshfiles/dshx/communication'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
+import { agentCommunicationApi } from './api.js'
+import { createAgentCommunicationOperations } from './api-operations.js'
 import { formatInbox, messageReference, notificationText } from './messages.js'
 
 const summaryOutputSchema = {
@@ -236,6 +239,25 @@ const requireService = (): ReturnType<typeof createCommunicationService> => {
   return communicationService
 }
 
+const communicationOperations = createAgentCommunicationOperations({
+  service: requireService,
+  listAgents: () =>
+    hostContext?.agents.list().map((agent): CommunicationAgent => ({
+      id: agent.id,
+      status: agent.status,
+      workspaceTopic: workspaceTopic(agent) ?? null,
+    })) ?? [],
+})
+
+const api = agentCommunicationApi.host({
+  diagnostics: ({ input }) => communicationOperations.diagnostics(input.limit),
+  messageRecipients: ({ input }) => communicationOperations.messageRecipients(input.messageId),
+  revealMessageBody: ({ input }) => communicationOperations.revealMessageBody(input.messageId),
+  setSubscription: ({ input }) => communicationOperations.setSubscription(input),
+  unsubscribe: ({ input }) => communicationOperations.unsubscribe(input),
+  acknowledge: ({ input }) => communicationOperations.acknowledge(input),
+})
+
 type ToolActivityResult<Value> = { readonly outcome: 'success'; readonly value: Value } | { readonly outcome: 'failure'; readonly error: unknown }
 
 const trackToolActivity = async <Value>(input: {
@@ -314,7 +336,12 @@ const setupHost = (context: Context): Effect<void> => ({
 
     try {
       const activeBridge = await startHostCommunicationBridge(service, {
-        listAgents: () => context.agents.list().map(agent => ({ id: agent.id, status: agent.status })),
+        listAgents: () =>
+          context.agents.list().map(agent => ({
+            id: agent.id,
+            status: agent.status,
+            workspaceTopic: workspaceTopic(agent) ?? null,
+          })),
       })
       bridge = activeBridge
       yield async () => {
@@ -343,6 +370,7 @@ const setupHost = (context: Context): Effect<void> => ({
 const host = defineHost({
   name: 'agent-communication',
   inject: ['agents'],
+  apis: [api],
   tools: [agentListTool, topicListTool, subscribeTool, unsubscribeTool, publishTool, sendTool, inboxTool, acknowledgeTool],
   setup: setupHost,
 })
