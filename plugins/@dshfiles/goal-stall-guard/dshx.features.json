@@ -45,6 +45,60 @@
           "kind": "gherkin",
           "id": "goal-stall-guard.unavailable-goal",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-third-empty-round",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "pauses the goal on the third consecutive empty round"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-two-round-control",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "the control: two empty rounds are not enough"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-spoken-round-control",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "the control: a round that spoke never pauses the goal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-non-goal-control",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "the control: empty turns that are not goal rounds never pause the goal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-tool-progress",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "a tool-only round counts as progress"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-custom-threshold",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "honours a configured threshold of two"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-no-goal",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "ignores an agent with no goal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-inactive-goal",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "does not pause a goal that is not active"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.pause-stalled-goals-unit-pause-rejection",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "a pause rejection is logged, not thrown at the session loop"
         }
       ]
     }

@@ -215,6 +215,66 @@
           "kind": "gherkin",
           "id": "mcp-servers.oauth-lifecycle",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-protected-resource-discovery",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "follows protected-resource metadata to the authorization server"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-401-resource-hint",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "honours the resource_metadata hint from a 401 challenge"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-issuer-mismatch",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "rejects metadata whose issuer differs from the advertised authorization server"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-https-and-pkce",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "falls back to the server origin and rejects plain-HTTP remote endpoints"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-pkce-s256-required",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "refuses a server without PKCE S256"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-client-registration-pkce-url",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "registers a public client and builds a PKCE authorization URL"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-code-exchange-expiry",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "exchanges the code with the verifier and records expiry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-callback-issuer",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "rejects a callback from another issuer before exchanging the code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-refresh-failure",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "refreshes near expiry, keeps the refresh token, and reports a failed refresh as sign-in needed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.oauth-authorization-unit-callback-origin",
+          "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
+          "testName": "accepts only a bare HTTP(S) origin for the callback"
         }
       ]
     }

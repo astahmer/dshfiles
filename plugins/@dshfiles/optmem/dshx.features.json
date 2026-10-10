@@ -74,6 +74,30 @@
           "kind": "gherkin",
           "id": "optmem.exclusions",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.conversation-capture-unit-event-deduplication",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "stores user, assistant text, tool calls and results once, even when DSH re-delivers them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.conversation-capture-unit-injected-context-exclusion",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "skips injected context (runtime, instructions, skills) and compaction checkpoints"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.conversation-capture-unit-subagent-scope",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "maps a subagent to its own conversation linked to the parent, and can leave subagents out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.conversation-capture-unit-sensitive-exclusion-markers",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "keeps only a marker for excluded tools and for calls naming an excluded path, results included"
         }
       ]
     },
@@ -217,6 +241,54 @@
           "kind": "gherkin",
           "id": "optmem.barrier-cancel",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-stock-host-fallback",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "stays in compatibility mode on stock DSH"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-fork-mode",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "reports full mode when the fork request-messages hook is present"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-current-turn-context",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "sends system, instructions, the memory view and only the current turn, with a stable prefix inside a turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-pending-summary-lines",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "renders events still waiting for a summary as pending lines after the barrier"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-barrier-cancellation",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "rejects with the abort reason when the turn is cancelled during the barrier"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-stock-request-identity",
+          "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
+          "testName": "leaves requests untouched without the fork hook"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-compact-project-view",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "injects the compact project view without lines that only repeat the reading conversation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-view-budget",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "keeps the injected view within its budget once the project outgrows it"
         }
       ]
     },
@@ -299,6 +371,42 @@
           "kind": "gherkin",
           "id": "optmem.database-failure",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-same-project-recall",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "recalls another conversation of the same project, then zooms and shows context"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-cross-project-denied",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "hides other projects unless all-projects retrieval is enabled"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-disabled-memory-error",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "reports a disabled or missing memory as a clear tool error"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-store-failure-isolation",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "never throws into DSH when the store breaks under it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-database-open-failure",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "degrades to a failed state when the database cannot be opened"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.scoped-memory-tools-unit-read-only-storage",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "survives a read-only memory directory"
         }
       ]
     }

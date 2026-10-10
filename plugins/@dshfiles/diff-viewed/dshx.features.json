@@ -30,6 +30,42 @@
           "kind": "gherkin",
           "id": "diff-viewed.change-scope",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-route-coordinates",
+          "file": "plugins/@dshfiles/diff-viewed/src/review-file.test.ts",
+          "testName": "reads the session, sequence and index from the review tab action route"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-malformed-route",
+          "file": "plugins/@dshfiles/diff-viewed/src/review-file.test.ts",
+          "testName": "refuses a route without a query or with a malformed index"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-summary-files",
+          "file": "plugins/@dshfiles/diff-viewed/src/review-file.test.ts",
+          "testName": "keeps the listed files of a served summary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-invalid-summary",
+          "file": "plugins/@dshfiles/diff-viewed/src/review-file.test.ts",
+          "testName": "refuses a body that is not a summary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-persisted-toggle",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "toggles a file and persists the mark"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.review-file-markers-unit-turn-scope",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "keeps a mark to its own turn"
         }
       ]
     },
@@ -63,6 +99,30 @@
           "kind": "gherkin",
           "id": "diff-viewed.cross-tab",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.cross-tab-view-state-unit-corrupt-storage",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "starts empty when the stored value is corrupt"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.cross-tab-view-state-unit-retention-cap",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "evicts the oldest marks beyond the cap"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.cross-tab-view-state-unit-cross-window-reload",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "adopts marks another window wrote when reloaded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.cross-tab-view-state-unit-subscriber-snapshot",
+          "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
+          "testName": "notifies subscribers with a new snapshot identity"
         }
       ]
     }

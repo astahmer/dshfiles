@@ -65,6 +65,54 @@
           "kind": "gherkin",
           "id": "editor.placement",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-atomic-new-file",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "creates a new file without leaving temp siblings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-hash-checked-save",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "replaces a file whose disk content still matches what the editor loaded, keeping its mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-disk-conflict",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "reports a conflict and leaves the file alone when it changed on disk"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-explicit-overwrite",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "overwrites a conflicting file once the user chose to"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-outside-root-rejected",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "refuses an absolute path outside the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-symlink-escape-rejected",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "refuses a symlinked directory that leads outside the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-write-limits",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "refuses directories, missing parents, oversized content and version-control internals"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-editor-unit-symlink-prefix-root",
+          "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
+          "testName": "accepts a root reached through a symlinked prefix"
         }
       ]
     },
@@ -93,6 +141,24 @@
           "kind": "gherkin",
           "id": "editor.file-index-bounds",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-file-index-unit-breadth-first-exclusions",
+          "file": "plugins/@dshfiles/editor/src/workspace-files.test.ts",
+          "testName": "lists files breadth-first, skips .git/.jj/node_modules and directories it cannot list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-file-index-unit-truncation-cap",
+          "file": "plugins/@dshfiles/editor/src/workspace-files.test.ts",
+          "testName": "stops at the file cap and reports truncation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "editor.workspace-file-index-unit-fresh-cache",
+          "file": "plugins/@dshfiles/editor/src/workspace-files.test.ts",
+          "testName": "answers indexing, then ready, and serves a fresh index without walking again"
         }
       ]
     }
