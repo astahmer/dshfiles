@@ -24,6 +24,8 @@ import {
 const OUTCOME_TIMEOUT_MS = 20_000
 const PRIVATE_URL = /http:\/\/127\.0\.0\.1:\d+\/\S*/g
 
+const isLocalUrl = (url: URL): boolean => ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+
 /** Per-scenario state, keyed by the page playwright-bdd hands each scenario. */
 const profiles = new WeakMap<Page, BootedProfile>()
 const evidenceRuns = new WeakMap<Page, EvidenceRun>()
@@ -78,6 +80,22 @@ Before(async ({ page, $testInfo }) => {
   page.on('response', response => {
     if (response.status() >= 400) diagnostics.push(`http ${response.status()}: ${response.request().resourceType()}`)
   })
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url())
+    if (isLocalUrl(url) || url.protocol === 'data:' || url.protocol === 'blob:') {
+      await route.continue()
+      return
+    }
+    diagnostics.push(`blocked outbound browser request: ${route.request().resourceType()}`)
+    await route.abort('blockedbyclient')
+  })
+  await page.context().routeWebSocket(
+    url => !isLocalUrl(url),
+    async route => {
+      diagnostics.push('blocked outbound browser websocket')
+      await route.close({ code: 1008, reason: 'External network is blocked in E2E' })
+    },
+  )
 })
 
 const profileFor = (page: Page): BootedProfile => {
@@ -224,7 +242,10 @@ After(async ({ page, $testInfo }) => {
               alerts: Array.from(dialog.querySelectorAll<HTMLElement>('[role="alert"]'), alert => alert.innerText.trim()),
               buttons: Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'), button => button.getAttribute('aria-label') ?? button.innerText.trim()),
             })),
-          settingsTarget: settingsTarget === null ? null : { tag: settingsTarget.tagName, role: settingsTarget.getAttribute('role'), className: String(settingsTarget.className) },
+          settingsTarget:
+            settingsTarget === null
+              ? null
+              : { tag: settingsTarget.tagName, role: settingsTarget.getAttribute('role'), className: String(settingsTarget.className) },
         }
       })
       .catch(error => ({ evaluationError: error instanceof Error ? error.message : String(error) }))
@@ -332,4 +353,3 @@ Then(
     completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   },
 )
-

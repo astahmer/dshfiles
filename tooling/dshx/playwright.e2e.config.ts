@@ -30,6 +30,7 @@ export default defineConfig({
     ? [['github'], ['html', { open: 'never' }], ['./e2e/support/evidence-reporter.ts']]
     : [['list'], ['./e2e/support/evidence-reporter.ts']],
   use: {
+    serviceWorkers: 'block',
     trace: 'off',
     screenshot: 'only-on-failure',
     viewport: E2E_VIEWPORT,
