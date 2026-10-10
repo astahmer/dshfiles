@@ -4,7 +4,7 @@ import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { prepareComposedBootProfile, type BootProfileBundle, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
+import { prepareBootProfile, prepareComposedBootProfile, type BootProfileBundle, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
@@ -211,6 +211,20 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
+  } catch (error) {
+    await prepared.dispose()
+    throw error
+  }
+}
+
+export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> => {
+  const bundle = (await listLocalBootBundles()).find(candidate => candidate.packageId === packageId)
+  if (bundle === undefined) throw new Error(`Owned plugin bundle ${packageId} was not found.`)
+  await buildPlugin(bundle.projectRoot, bundle.packageId)
+  const prepared = await prepareBootProfile(bundle.projectRoot, bundle.packageId)
+  const expectedClientEntries = bundle.hasClient ? [bundle.packageId] : []
+  try {
+    return await startScratchProfile(prepared, bundle.packageId, expectedClientEntries, timeoutMs)
   } catch (error) {
     await prepared.dispose()
     throw error

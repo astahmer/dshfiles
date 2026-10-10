@@ -11,5 +11,6 @@ Feature: Palette and stylesheet performance budget
   Scenario: The @dshfiles plugins share one stylesheet
     Then exactly one shared plugin stylesheet is injected
 
+  @scenario:command-palette.performance-budget
   Scenario: The command palette opens and filters within budget
     Then the command palette opens within 100 ms and filters each keystroke within 32 ms

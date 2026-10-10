@@ -18,7 +18,7 @@ export default defineConfig({
   ...defineBddProject({
     name: 'web-e2e',
     features: 'e2e/features/*.feature',
-    steps: 'e2e/support/steps.ts',
+    steps: ['e2e/support/steps.ts', 'e2e/support/plugin-journeys/**/*.ts'],
   }),
   timeout: 300_000,
   expect: { timeout: 15_000 },

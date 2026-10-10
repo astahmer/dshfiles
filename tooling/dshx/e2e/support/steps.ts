@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
-import { bootProfile, type BootedProfile } from './boot.js'
+import { bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
 import { redactHostOutput } from './scratch-profile.js'
 import {
@@ -34,7 +34,7 @@ const evidenceRunFor = (page: Page): EvidenceRun => {
   return run
 }
 
-const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
+export const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
   const run = evidenceRunFor(page)
   try {
     await assertion()
@@ -43,6 +43,12 @@ const recordAssertion = async (page: Page, assertionId: string, assertion: () =>
     throw error
   }
   recordEvidenceAssertion(run, assertionId, 'passed')
+}
+
+export const finishJourneyAssertions = async (page: Page): Promise<void> => {
+  const run = evidenceRunFor(page)
+  completeEvidenceStep(run, 'assertion-complete')
+  await capturePageEvidenceFrame(run, page, 'assertion-complete')
 }
 
 const evidenceStatus = (status: string | undefined): EvidenceStatus => {
@@ -106,6 +112,24 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
   }
 })
 
+Given('the isolated plugin profile {string} is booted', async ({ page }: { page: Page }, packageId: string) => {
+  const profile = await bootPluginProfile(packageId)
+  profiles.set(page, profile)
+  try {
+    await visitScratchProfile(page, profile)
+    const previewNoticeContinue = page.getByRole('button', { name: 'Continue', exact: true })
+    await expect(previewNoticeContinue).toBeVisible()
+    await previewNoticeContinue.click()
+    await expect(previewNoticeContinue).toBeHidden()
+    completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
+    await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
+  } catch (error) {
+    await profile.close()
+    profiles.delete(page)
+    throw error
+  }
+})
+
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   const outcome = await readProfileOutcome(page, profile)
@@ -134,6 +158,14 @@ Then('every client entry that failed to activate is reported by id', async ({ pa
   })
   await recordAssertion(page, 'failure-card-identifies-boot-state', () => expect(failures.length > 0 || /web boot: \d+ entr/.test(outcome.text)).toBe(true))
   await recordAssertion(page, 'scratch-host-port-is-available', () => expect(profile.output()).not.toContain('EADDRINUSE'))
+  completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
+  await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
+})
+
+Then('no Slot fell back to its error boundary', async ({ page }: { page: Page }) => {
+  const profile = profileFor(page)
+  const outcome = await readProfileOutcome(page, profile)
+  await recordAssertion(page, 'no-slot-render-failures', () => expect(outcome.slotFailures).toEqual([]))
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })
