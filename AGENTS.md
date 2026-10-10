@@ -119,6 +119,11 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   yours. Commit only your own paths with `jj split -m "…" <paths>` (one
   described revision per logical change, `Co-Authored-By` trailer); check
   `jj log -r 'conflicts()'` after rebases. Skill: `jj-shared-workspace`.
+- When finishing work in a named workspace, try to integrate its described
+  change into the latest relevant branch tip so other workspaces can build on
+  it. Preserve active writers; if integration risks rewriting unrelated work or
+  causing unresolved conflicts, keep the source revision intact and report the
+  exact integration handoff instead of silently leaving it stranded.
 - Long runs: commit and tick the plan's checkboxes after each milestone, and
   keep a `plans/<topic>/README.md` progress table with a "Resume here" line.
 
