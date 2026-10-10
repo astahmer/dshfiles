@@ -1,9 +1,7 @@
 import { expect, type Page } from '@playwright/test'
-import { After, Before, Given, Then, When, readBootOutcome } from './bdd.js'
-import { defineParameterType } from 'playwright-bdd'
+import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootProfile, type BootedProfile } from './boot.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
-import type { PluginBoot } from './plugin-boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import {
   capturePageEvidenceFrame,
@@ -55,11 +53,10 @@ const evidenceStatus = (status: string | undefined): EvidenceStatus => {
 }
 
 Before(async ({ page, $testInfo }) => {
-  const isolatedPluginSuite = $testInfo.file.endsWith('every-plugin-boots.feature.spec.js')
   const run = await createEvidenceRun({
-    suiteId: isolatedPluginSuite ? 'isolated-plugin-boot' : 'client-plugin-boot',
+    suiteId: 'client-plugin-boot',
     scenarioPath: $testInfo.titlePath,
-    expectedStepIds: isolatedPluginSuite ? ['plugin-opened', 'assertion-complete', 'host-cleanup'] : ['profile-booted', 'assertion-complete', 'host-cleanup'],
+    expectedStepIds: ['profile-booted', 'assertion-complete', 'host-cleanup'],
   })
   evidenceRuns.set(page, run)
 })
@@ -119,18 +116,6 @@ Then('the Web UI mounts without a plugin failure card', async ({ page }: { page:
   await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
 })
 
-Then('the Web UI mounts without a failure card', async ({ page }: { page: Page }) => {
-  const boots = isolatedBoots.get(page)
-  const pluginBoot = [...(boots?.values() ?? [])][0]
-  if (pluginBoot === undefined) throw new Error('No isolated plugin profile is running for this scenario.')
-  const outcome = await readProfileOutcome(page, pluginBoot)
-  await recordAssertion(page, 'isolated-plugin-has-no-failed-client-entry', () =>
-    assertClientBootReady(outcome, pluginBoot, `${pluginBoot.pluginId} did not reach a clean Client boot.`),
-  )
-  completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
-  await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
-})
-
 Then('every client entry that failed to activate is reported by id', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   const outcome = await readProfileOutcome(page, profile)
@@ -160,51 +145,7 @@ Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
   completeEvidenceStep(evidenceRunFor(page), 'host-cleanup')
 })
 
-/**
- * Steps for booting each plugin on its own.
- *
- * These are the only steps that build a disposable profile, and they live beside
- * the boot ones because the failure they guard is the same class: a client entry
- * that throws during apply and is only visible in a browser.
- */
-
-/** Plugin boots still running for this page, so a scenario can close them all. */
-const isolatedBoots = new WeakMap<Page, Map<string, PluginBoot>>()
-
-Given('each plugin is booted on its own', async ({ page }: { page: Page }) => {
-  isolatedBoots.set(page, new Map())
-})
-
-When('the plugin "{pluginId}" is opened', async ({ page }: { page: Page }, pluginId: string) => {
-  const { bootPluginAlone } = await import('./plugin-boot.js')
-  const boot = await bootPluginAlone(pluginId)
-  isolatedBoots.get(page)?.set(pluginId, boot)
-  await visitScratchProfile(page, boot)
-  completeEvidenceStep(evidenceRunFor(page), 'plugin-opened')
-  await capturePageEvidenceFrame(evidenceRunFor(page), page, 'plugin-opened')
-})
-
-Then('no Slot fell back to its error boundary', async ({ page }: { page: Page }) => {
-  const profile = profiles.get(page) ?? [...(isolatedBoots.get(page)?.values() ?? [])][0]
-  if (profile === undefined) throw new Error('No DSH profile is running for this scenario.')
-  const outcome = await readProfileOutcome(page, profile)
-  await recordAssertion(page, 'plugin-slots-do-not-use-error-boundaries', () =>
-    expect(outcome.slotFailures, `these Slots mounted an error boundary instead of their entry:\n${profile.output()}`).toEqual([]),
-  )
-  completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
-  await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
-})
-
-Then('the plugin shuts down', async ({ page }: { page: Page }) => {
-  const boots = isolatedBoots.get(page)
-  if (boots === undefined) return
-  for (const boot of boots.values()) await boot.close()
-  boots.clear()
-  completeEvidenceStep(evidenceRunFor(page), 'host-cleanup')
-})
-
-// A scenario that fails mid-way must not leave a Host running, so every isolated
-// boot is torn down after each scenario regardless of how it ended.
+// A scenario that fails mid-way must not leave its scratch Host running.
 After(async ({ page, $testInfo }) => {
   const run = evidenceRuns.get(page)
   let cleanupError: unknown
@@ -215,17 +156,6 @@ After(async ({ page, $testInfo }) => {
     cleanupError ??= error
   }
   profiles.delete(page)
-  const boots = isolatedBoots.get(page)
-  if (boots !== undefined) {
-    for (const boot of boots.values()) {
-      try {
-        await boot.close()
-      } catch (error) {
-        cleanupError ??= error
-      }
-    }
-    boots.clear()
-  }
   if (run !== undefined) {
     if (cleanupError === undefined) completeEvidenceStep(run, 'host-cleanup')
     await finishEvidenceRun(run, cleanupError === undefined ? evidenceStatus($testInfo.status) : 'failed')
@@ -314,6 +244,3 @@ Then(
   },
 )
 
-// The scenario outline interpolates a package id, so the parameter type has to be
-// declared before any step that uses {pluginId} can match.
-defineParameterType({ name: 'pluginId', regexp: /@dshfiles\/[a-z-]+/ })

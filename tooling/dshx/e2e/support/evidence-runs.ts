@@ -46,7 +46,7 @@ const evidenceManifestSchema = z
     schemaVersion: z.literal(1),
     owner: z.literal('dshx-e2e'),
     runId: z.string().regex(/^run-[0-9a-f-]{36}$/),
-    suiteId: z.enum(['client-plugin-boot', 'isolated-plugin-boot']),
+    suiteId: z.literal('client-plugin-boot'),
     scenarioDigest: z.string().regex(/^[0-9a-f]{16}$/),
     createdAt: z.string().datetime(),
     sourceRun: z.string().url().nullable(),

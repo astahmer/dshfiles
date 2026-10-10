@@ -2,9 +2,11 @@
 
 /** Boot each owned plugin alone in a composed scratch profile and a real browser. */
 
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { listPluginBundles, pluginsToBoot, readBootIgnores, validateBootIgnores } from './plugin-inventory.mjs'
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const pluginsRoot = resolve(workspace, 'plugins/@dshfiles')
@@ -19,50 +21,42 @@ const pinnedNode = async () => {
   }
 }
 
-/** The package manager installs the profile's link: dependencies. */
-const pnpmInstall = profileDir =>
-  new Promise((resolve, reject) => {
-    const child = spawn('pnpm', ['install', '--prefer-offline'], { cwd: profileDir, stdio: ['ignore', 'pipe', 'pipe'] })
-    let stderr = ''
-    child.stderr.on('data', chunk => {
-      stderr += String(chunk)
-    })
+/** Build the local artifacts before installing their linked bundles in the scratch profile. */
+const buildPlugin = plugin =>
+  new Promise((resolveBuild, rejectBuild) => {
+    const child = spawn('pnpm', ['exec', 'dshx', 'build'], { cwd: plugin.dir, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    let settled = false
+    const collect = chunk => {
+      output = `${output}${String(chunk)}`.slice(-8_192)
+    }
+    child.stdout.on('data', collect)
+    child.stderr.on('data', collect)
+    const finish = callback => value => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      child.off('error', handleError)
+      child.off('close', handleClose)
+      callback(value)
+    }
+    const fail = finish(rejectBuild)
+    const complete = finish(resolveBuild)
+    const handleError = error => fail(new Error(`${plugin.id} build could not be spawned: ${error.message}`))
+    const handleClose = code => {
+      if (code === 0) complete()
+      else fail(new Error(`${plugin.id} build exited with ${String(code)}:\n${output}`))
+    }
     const timer = setTimeout(() => {
       child.kill('SIGKILL')
-      reject(new Error(`pnpm install in ${profileDir} timed out: ${stderr.slice(-400)}`))
+      fail(new Error(`${plugin.id} build exceeded 180000ms:\n${output}`))
     }, 180_000)
-    // A missing pnpm emits `error`, never `exit`; without this, the gate stalls.
-    child.on('error', cause => {
-      clearTimeout(timer)
-      reject(new Error(`pnpm install in ${profileDir} could not be spawned: ${String(cause)}`))
-    })
-    child.once('exit', code => {
-      clearTimeout(timer)
-      if (code === 0) resolve()
-      else reject(new Error(`pnpm install exited ${String(code)}: ${stderr.slice(-400)}`))
-    })
+    child.once('error', handleError)
+    child.once('close', handleClose)
   })
 
-/** Directories that are packages: a `dsh` block is what makes one a plugin. */
-const listPlugins = async () => {
-  const entries = await readdir(pluginsRoot, { withFileTypes: true })
-  const plugins = []
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const manifest = await readFile(resolve(pluginsRoot, entry.name, 'package.json'), 'utf8').catch(() => undefined)
-    if (manifest === undefined) continue
-    const { dsh } = JSON.parse(manifest)
-    if (typeof dsh !== 'object' || dsh === null) continue
-    plugins.push({
-      id: `@dshfiles/${entry.name}`,
-      dir: resolve(pluginsRoot, entry.name),
-      hasClient: typeof dsh.client === 'object' && dsh.client !== null,
-    })
-  }
-  return plugins.sort((left, right) => left.id.localeCompare(right.id))
-}
-
 const bootAlone = async plugin => {
+  await buildPlugin(plugin)
   const profile = await prepareBootProfile(plugin.dir, plugin.id)
   try {
     return await checkClientBoot({
@@ -82,7 +76,7 @@ const bootAlone = async plugin => {
 const describe = result => {
   if (result.spawnError !== undefined) return result.spawnError.split('\n')[0]
   if (result.processError !== undefined) return result.processError.split('\n')[0]
-  if (result.browserError !== undefined) return result.browserError.split('\n')[0]
+  if (result.browserError !== undefined) return result.browserError.split('\n').filter(Boolean).slice(-6).join(' | ')
   if (result.compositionFailures.length > 0) {
     return `was never composed: offline dump-config is missing ${result.compositionFailures.join(', ')}`
   }
@@ -101,10 +95,17 @@ const describe = result => {
 
 const main = async () => {
   await pinnedNode()
-  const plugins = await listPlugins()
+  const plugins = await listPluginBundles(pluginsRoot)
   if (plugins.length === 0) throw new Error('No DSH bundles found to boot.')
+  const ignores = await readBootIgnores(resolve(workspace, 'tooling/dshx/scripts/boot-ignore.json'))
+  const ignoredIds = validateBootIgnores(ignores, plugins)
+  const runnable = pluginsToBoot(plugins, ignoredIds)
+  for (const ignore of ignores) {
+    console.log(`  skip ${ignore.packageId}: ${ignore.reason} (owner: ${ignore.owner}; remove when: ${ignore.removalCondition}${ignore.expiresOn === undefined ? '' : `; expires: ${ignore.expiresOn}`})`)
+  }
+  if (runnable.length === 0) throw new Error('Every DSH bundle is ignored; boot gate must test at least one plugin.')
   const failures = []
-  for (const plugin of plugins) {
+  for (const plugin of runnable) {
     const result = await bootAlone(plugin).catch(error => ({
       ok: false,
       failures: [],
@@ -117,10 +118,10 @@ const main = async () => {
     else failures.push(`${plugin.id}: ${problem}`)
   }
   if (failures.length === 0) {
-    console.log(`\nAll ${String(plugins.length)} plugins booted on their own.`)
+    console.log(`\nAll ${String(runnable.length)} of ${String(plugins.length)} discovered plugins booted on their own${ignoredIds.size === 0 ? '' : `; ${String(ignoredIds.size)} ignored with documented removal conditions`}.`)
     return
   }
-  console.error(`\n${String(failures.length)} of ${String(plugins.length)} plugins did not boot cleanly:`)
+  console.error(`\n${String(failures.length)} of ${String(runnable.length)} tested plugins did not boot cleanly (${String(plugins.length)} discovered, ${String(ignoredIds.size)} ignored):`)
   for (const failure of failures) console.error(`  - ${failure}`)
   process.exitCode = 1
 }
