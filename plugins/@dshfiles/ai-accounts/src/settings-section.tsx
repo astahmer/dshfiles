@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { DISTRIBUTION_HINT, DISTRIBUTIONS } from './account-labels.js'
+import { DISTRIBUTION_HINT, DISTRIBUTION_LABEL, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
 import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
@@ -243,12 +243,15 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
                 value={file.distribution}
               >
                 <SelectTrigger className="dshx:w-36" id={id} size="sm">
-                  <SelectValue />
+                  <SelectValue>{DISTRIBUTION_LABEL[file.distribution]}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dshx:w-80 dshx:max-w-[calc(100vw-2rem)]">
                   {DISTRIBUTIONS.map(value => (
-                    <SelectItem key={value} value={value}>
-                      {value}
+                    <SelectItem className="dshx:items-start dshx:py-2" key={value} value={value}>
+                      <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+                        <span>{DISTRIBUTION_LABEL[value]}</span>
+                        <span className="dshx:whitespace-normal dshx:text-xs dshx:text-muted-foreground">{DISTRIBUTION_HINT[value]}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

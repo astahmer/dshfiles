@@ -40,11 +40,18 @@ export const STATE_LABEL = {
 
 export const DISTRIBUTIONS: readonly AccountsFile['distribution'][] = ['sticky', 'priority', 'round-robin', 'balanced']
 
+export const DISTRIBUTION_LABEL = {
+  sticky: 'Sticky',
+  priority: 'Priority',
+  'round-robin': 'Round-robin',
+  balanced: 'Balanced',
+} satisfies Record<AccountsFile['distribution'], string>
+
 export const DISTRIBUTION_HINT = {
-  sticky: 'One account per conversation, so the upstream prompt cache stays warm. A rate-limited account is skipped and the retry lands on the next one.',
-  priority: 'Drain one account until it is rate-limited, then the next in order.',
-  'round-robin': 'Rotate on every request so spend spreads evenly.',
-  balanced: 'Weighted random, biased toward the least recently used account.',
+  sticky: 'Keep each conversation on one account to reuse its prompt cache. Switch only if that account is unavailable.',
+  priority: 'Use accounts in list order. Stay on the first available account until it is rate-limited.',
+  'round-robin': 'Move to the next available account on every request.',
+  balanced: 'Choose randomly, favoring accounts used least recently.',
 } satisfies Record<AccountsFile['distribution'], string>
 
 /** What connects a new account, for the notice the rail shows after creating one. */
