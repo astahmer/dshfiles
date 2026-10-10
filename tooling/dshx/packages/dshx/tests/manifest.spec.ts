@@ -140,6 +140,42 @@ describe('checkProjectManifest', () => {
     ])
   })
 
+  it('validates the package-owned DSHX feature catalog and its project-relative path', async () => {
+    const root = await temporaryProject()
+    const resolved = await resolveDshxConfig({ cwd: root })
+    const manifest = fullManifest()
+    Object.assign(manifest, { dshx: { features: './dshx.features.json' } })
+    await writeManifest(root, manifest)
+    await writeFile(
+      resolve(root, 'dshx.features.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        kind: 'bundle',
+        features: [
+          {
+            id: 'send-message',
+            title: 'Send a message',
+            summary: 'Submit a user message to the active conversation.',
+            surfaces: ['client'],
+            configuration: [],
+            states: ['ready', 'sending', 'failed'],
+            failureModes: ['The active conversation rejects the message.'],
+            externalDependencies: [],
+            verification: [{ kind: 'gherkin', id: 'plugin.send-message', featureFile: 'tests/plugin.feature' }],
+          },
+        ],
+      }),
+    )
+    await expect(checkProjectManifest(resolved)).resolves.toEqual([])
+
+    await writeFile(resolve(root, 'dshx.features.json'), JSON.stringify({ schemaVersion: 1, features: [] }))
+    await expect(checkProjectManifest(resolved)).resolves.toContainEqual(expect.objectContaining({ code: 'DSHX4232', severity: 'error' }))
+
+    Object.assign(manifest, { dshx: { features: '../outside.json' } })
+    await writeManifest(root, manifest)
+    await expect(checkProjectManifest(resolved)).resolves.toContainEqual(expect.objectContaining({ code: 'DSHX4230', severity: 'error' }))
+  })
+
   it('collects manifest, bundle, export, Client, and publishing problems in one pass', async () => {
     const root = await temporaryProject()
     const resolved = await resolveDshxConfig({ cwd: root })

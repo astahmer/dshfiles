@@ -92,5 +92,8 @@
         "dshfiles.workbench"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

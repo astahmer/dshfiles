@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "durable-event-streams",
+      "title": "Persist and replay ordered memory events",
+      "summary": "Append events to isolated streams, replay in order, deduplicate re-ingested events, and serialize concurrent writers without gaps.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "empty",
+        "appended",
+        "replayed",
+        "duplicate-ignored",
+        "concurrent-write"
+      ],
+      "failureModes": [
+        "Positions remain contiguous under interleaved concurrent writers.",
+        "Database files are private to the user and migrations are idempotent."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.event-replay",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/store.test.ts",
+          "testName": "appends, replays in order and ignores re-ingested events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.concurrent-writers",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/store.test.ts",
+          "testName": "serializes writers from concurrent threads without gaps or duplicate positions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.private-database",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/store.test.ts",
+          "testName": "creates the database private to the user and migrates idempotently"
+        }
+      ]
+    },
+    {
+      "id": "scoped-keyword-search",
+      "title": "Search and zoom within authorized memory scope",
+      "summary": "Search exact terms and snippets across conversations in the same project, keep other projects hidden, and return bounded zoomable context.",
+      "surfaces": [
+        "host",
+        "tool",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "same-project",
+        "other-project-hidden",
+        "global-only",
+        "cross-project-enabled",
+        "truncated"
+      ],
+      "failureModes": [
+        "Cross-project results remain denied unless explicitly enabled.",
+        "Secrets are redacted before event, tree, or index persistence."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.project-isolation",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/search.test.ts",
+          "testName": "shares a project across conversations but hides other projects"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.explicit-cross-project",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/search.test.ts",
+          "testName": "searches all projects only when allowed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.secret-index-redaction",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/search.test.ts",
+          "testName": "redacts secrets before they reach the events, the tree or the index"
+        }
+      ]
+    },
+    {
+      "id": "incremental-summary-engine",
+      "title": "Build and persist incremental memory summaries",
+      "summary": "Create complete hierarchy nodes, preserve summaries byte-for-byte across reload, extend at the tail, and report raw pending items explicitly.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "raw-tail",
+        "summary-pending",
+        "summarized",
+        "persisted-view",
+        "reload"
+      ],
+      "failureModes": [
+        "A pending leaf is rendered as raw and tagged rather than omitted.",
+        "New histories produce deterministic summaries and view bytes."
+      ],
+      "externalDependencies": [
+        {
+          "id": "memory-summarizer",
+          "boundary": "Optional asynchronous summary-generation callback.",
+          "deterministicFake": "Inject a gated synthetic summarizer with success, timeout, failure, cancellation, and concurrency cases; no paid model calls."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.summary-determinism",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "is deterministic for the same history"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.summary-reload",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "reloads the persisted view byte-for-byte instead of rebuilding it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.pending-summary",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "renders leaves still waiting for a summary raw and tagged instead of omitting them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.summarizer-timeout",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "times out a hung summarizer and frees its concurrency slot"
+        }
+      ]
+    },
+    {
+      "id": "crash-recovery-and-versioned-views",
+      "title": "Recover interrupted indexing and migrate persisted views",
+      "summary": "Complete interrupted pipelines when reopened, retain main and secondary views across schema migration, and explicitly bound pending tails.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "interrupted",
+        "recovered",
+        "migrated",
+        "secondary-view",
+        "tail-capped"
+      ],
+      "failureModes": [
+        "A summarizer failure retains source history for later retry.",
+        "Version-1 views migrate without rebuilding away stored content."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.interrupted-recovery",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "finishes an interrupted pipeline when a new engine opens the same database"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.failure-retry",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "never loses history when the summarizer fails, and retries on the next append"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-sqlite.view-migration",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/engine.test.ts",
+          "testName": "migrates a version-1 database by keeping its views as the main kind"
+        }
+      ]
+    }
+  ]
+}

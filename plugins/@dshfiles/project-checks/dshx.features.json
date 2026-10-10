@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "trusted-actions",
+      "title": "Run trusted project checks",
+      "summary": "Run configured fixed-argv actions only inside canonical trusted project roots and retain bounded receipts without exposing child output.",
+      "surfaces": [
+        "client",
+        "host",
+        "command",
+        "settings",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "actions",
+          "defaultValue": "[]",
+          "constraints": "At most 32 unique actions; each id is lowercase letters, digits, or hyphens and 1 to 32 characters.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].label",
+          "defaultValue": "required",
+          "constraints": "Trimmed text from 1 to 80 characters.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].description",
+          "defaultValue": "",
+          "constraints": "Text up to 240 characters.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].command",
+          "defaultValue": "required",
+          "constraints": "One fixed executable string, 1 to 2048 characters; never interpreted by a shell.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].args",
+          "defaultValue": "[]",
+          "constraints": "At most 64 argv strings, each at most 2048 characters.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].root",
+          "defaultValue": "required",
+          "constraints": "Absolute canonical project root, 1 to 2048 characters.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].timeoutMs",
+          "defaultValue": "60000",
+          "constraints": "Integer from 1000 to 300000 milliseconds.",
+          "coveredBy": [
+            "project-checks.trusted-root"
+          ]
+        },
+        {
+          "key": "actions[].verifyBeforeComplete",
+          "defaultValue": "false",
+          "constraints": "Boolean; enable turn-stopping verification before completion.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "project-checks.verify-retry"
+          ]
+        },
+        {
+          "key": "maxVerificationAttempts",
+          "defaultValue": "2",
+          "constraints": "Integer from 1 to 2 attempts.",
+          "coveredBy": [
+            "project-checks.verify-retry"
+          ]
+        }
+      ],
+      "states": [
+        "ready",
+        "running",
+        "passed",
+        "failed",
+        "timed-out",
+        "cancelled",
+        "stale-revision"
+      ],
+      "failureModes": [
+        "A sibling or traversal path is rejected before spawn.",
+        "Subprocess timeout, cancellation, or storage failure yields a bounded failure receipt."
+      ],
+      "externalDependencies": [
+        {
+          "id": "project-process",
+          "boundary": "Host-managed child process execution within the configured root.",
+          "deterministicFake": "Use a fake subprocess provider with a temporary project root and harmless argv; never run commands in a user project."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "project-checks.trusted-root",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "project-checks.receipt-freshness",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "project-checks.verify-retry",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "native-hook-receipts",
+      "title": "Show native hook invocation records",
+      "summary": "Display actual hook invoked/result events and avoid inventing skipped-hook records that DSH does not provide.",
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "invoked",
+        "passed",
+        "failed",
+        "not-reported"
+      ],
+      "failureModes": [
+        "A missing native event remains not-reported rather than being inferred as skipped."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "project-checks.native-hook-events",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

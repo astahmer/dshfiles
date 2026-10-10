@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "scratch-core-composition",
+      "title": "Compose local runtime rows in a scratch profile",
+      "summary": "Replace selected first-party Loader rows with package-scoped local core bundles only in an explicitly prepared scratch profile.",
+      "surfaces": [
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "not-installed",
+        "composed",
+        "booted",
+        "failed"
+      ],
+      "failureModes": [
+        "A missing local package prevents composition.",
+        "A duplicate top-level Loader id replaces an unrelated row."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "dsh-core-runtime.scratch-composition",
+          "reason": "Infrastructure-only core bridge; it has no user-facing feature and is used solely for isolated runtime verification."
+        }
+      ]
+    },
+    {
+      "id": "core-singleton-identity",
+      "title": "Preserve first-party module identity",
+      "summary": "Forward the local Agent, AgentLoop, Session, and persistence exports without introducing a second singleton identity.",
+      "surfaces": [
+        "integration",
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "shared-module-identity",
+        "duplicate-module-rejected"
+      ],
+      "failureModes": [
+        "A registry resolves a second core package copy.",
+        "The bridge accidentally adds user-facing tools or settings."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "dsh-core-runtime.module-identity",
+          "reason": "Infrastructure-only core bridge; it has no user-facing feature and is used solely for isolated runtime verification."
+        },
+        {
+          "kind": "unit-test",
+          "id": "dsh-core-runtime.module-identity-test",
+          "file": "plugins/@dshfiles/dsh-core-runtime/tests/runtime-bridge.test.mjs",
+          "testName": "replacement entrypoints forward the local core module identities"
+        }
+      ]
+    }
+  ],
+  "kind": "infrastructure"
+}

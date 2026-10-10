@@ -20,5 +20,8 @@
   "devDependencies": {
     "typescript": "7.0.2",
     "vitest": "^4.1.10"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "registered-project-search",
+      "title": "Search registered projects by name and path",
+      "summary": "Match registered project labels and canonical directories while preserving project identity in returned choices.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "empty",
+        "matched",
+        "selected"
+      ],
+      "failureModes": [
+        "An empty result remains selectable-safe.",
+        "Canonical path is returned separately from display name."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.project-search",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "searches registered project names and canonical paths"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.identity-path",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "keeps project identity and canonical folder path explicit"
+        }
+      ]
+    },
+    {
+      "id": "keyboard-folder-selection",
+      "title": "Select project folders with keyboard navigation",
+      "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "focused",
+        "next",
+        "previous",
+        "empty"
+      ],
+      "failureModes": [
+        "Keyboard actions on an empty list do not invent a selection."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.keyboard-wrap",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "wraps keyboard selection and handles an empty list"
+        }
+      ]
+    },
+    {
+      "id": "unregistered-recent-folders",
+      "title": "Offer recent folders not yet registered as projects",
+      "summary": "After registered project matches, offer eligible recent folders and keep their canonical path distinct from registered project identity.",
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "registered-match",
+        "recent-unregistered",
+        "selected"
+      ],
+      "failureModes": [
+        "Recent directory selection cannot claim an existing project ID until Host registration succeeds."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.recent-folders",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "offers unregistered recent folders after matching projects"
+        }
+      ]
+    }
+  ]
+}

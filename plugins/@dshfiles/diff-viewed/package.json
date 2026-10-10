@@ -60,5 +60,8 @@
         "dshfiles.diffViewed"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

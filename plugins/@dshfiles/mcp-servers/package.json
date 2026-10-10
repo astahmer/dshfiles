@@ -93,5 +93,8 @@
         "settings.mcpServers"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

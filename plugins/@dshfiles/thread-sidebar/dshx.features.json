@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "thread-classification",
+      "title": "Organize threads by workspace and status",
+      "summary": "Group active, pinned, parked, inactive, and archived threads by project; pin/archive through Host APIs and keep parking browser-local.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "threadRowDensity",
+          "defaultValue": "compact",
+          "constraints": "One of compact or comfortable.",
+          "choices": [
+            "compact",
+            "comfortable"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowProject",
+          "defaultValue": "true",
+          "constraints": "Boolean; show project labels.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowProjectColor",
+          "defaultValue": "true",
+          "constraints": "Boolean; color project labels.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowTitle",
+          "defaultValue": "true",
+          "constraints": "Boolean; show thread titles.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowMachine",
+          "defaultValue": "true",
+          "constraints": "Boolean; show machine labels.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowPath",
+          "defaultValue": "false",
+          "constraints": "Boolean; show workspace paths.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowTime",
+          "defaultValue": "true",
+          "constraints": "Boolean; show thread activity time.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "threadRowStatusDot",
+          "defaultValue": "true",
+          "constraints": "Boolean; show thread status indicator.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "parkedSessionIds",
+          "defaultValue": "[]",
+          "constraints": "Browser-local parked session ID list; not synchronized to Host.",
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "collapsedSections",
+          "defaultValue": "[archived]",
+          "constraints": "Section ID list; archived is collapsed by default.",
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        }
+      ],
+      "states": [
+        "active",
+        "pinned",
+        "parked",
+        "inactive",
+        "archived"
+      ],
+      "failureModes": [
+        "Park state remains local and is not mistaken for a durable Host operation.",
+        "Activity uses session metadata timestamps and may reflect metadata updates."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.classification",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "idle-archive-policy",
+      "title": "Automatically archive eligible idle threads",
+      "summary": "Apply an opt-in idle policy while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "autoArchiveEnabled",
+          "defaultValue": "false",
+          "constraints": "Boolean; automatic archive is opt-in.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        },
+        {
+          "key": "idleMinutes",
+          "defaultValue": "120",
+          "constraints": "Integer from 15 to 10080 minutes.",
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        },
+        {
+          "key": "scanIntervalMinutes",
+          "defaultValue": "10",
+          "constraints": "Integer from 1 to 120 minutes.",
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        },
+        {
+          "key": "excludedWorkspaceIds",
+          "defaultValue": "[]",
+          "constraints": "Workspace ID exclusion list.",
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        },
+        {
+          "key": "excludedSessionIds",
+          "defaultValue": "[]",
+          "constraints": "Session ID exclusion list.",
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        },
+        {
+          "key": "workspaceFilter",
+          "defaultValue": "null",
+          "constraints": "Optional workspace ID used to scope the visible thread list.",
+          "coveredBy": [
+            "thread-sidebar.idle-archive"
+          ]
+        }
+      ],
+      "states": [
+        "disabled",
+        "eligible",
+        "excluded",
+        "archived",
+        "archive-failed"
+      ],
+      "failureModes": [
+        "Running, blank, pinned, parked, or excluded sessions are never automatically archived.",
+        "A failed archive leaves the session visible and reports the failure."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.idle-archive",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "navigation-layout",
+      "title": "Customize sidebar navigation and sections",
+      "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",
+      "surfaces": [
+        "client",
+        "settings",
+        "storage"
+      ],
+      "configuration": [
+        {
+          "key": "headerMode",
+          "defaultValue": "compact",
+          "constraints": "One of compact or expanded.",
+          "choices": [
+            "compact",
+            "expanded"
+          ],
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "hideBrandLogo",
+          "defaultValue": "false",
+          "constraints": "Boolean; hide the brand logo.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "navigationDensity",
+          "defaultValue": "compact",
+          "constraints": "One of compact or comfortable.",
+          "choices": [
+            "compact",
+            "comfortable"
+          ],
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "navigationOverflow",
+          "defaultValue": "scroll-menu",
+          "constraints": "One of scroll, menu, or scroll-menu.",
+          "choices": [
+            "scroll",
+            "menu",
+            "scroll-menu"
+          ],
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "headerRegionHeight",
+          "defaultValue": "null",
+          "constraints": "Optional persisted pixel height.",
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "headerOrder",
+          "defaultValue": "[]",
+          "constraints": "Ordered header item ID list.",
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "hiddenHeaderIds",
+          "defaultValue": "[]",
+          "constraints": "Hidden header item ID list.",
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "footerOrder",
+          "defaultValue": "[]",
+          "constraints": "Ordered footer item ID list.",
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        },
+        {
+          "key": "hiddenFooterIds",
+          "defaultValue": "[]",
+          "constraints": "Hidden footer item ID list; default includes More.",
+          "coveredBy": [
+            "thread-sidebar.navigation-layout"
+          ]
+        }
+      ],
+      "states": [
+        "compact",
+        "expanded",
+        "scroll-overflow",
+        "menu-overflow",
+        "custom-order"
+      ],
+      "failureModes": [
+        "Unknown item IDs do not create phantom navigation entries.",
+        "Persisted layout values fall back to safe defaults when invalid."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.navigation-layout",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "palette-search-history",
+      "title": "Search threads, files, and recent navigation",
+      "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "paletteRecentLimit",
+          "defaultValue": "20",
+          "constraints": "Integer from 5 to 100 recent entries.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        },
+        {
+          "key": "paletteChord",
+          "defaultValue": "primary+KeyK",
+          "constraints": "Persisted keyboard chord string.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        },
+        {
+          "key": "fileSearchChord",
+          "defaultValue": "primary+KeyP",
+          "constraints": "Persisted keyboard chord string.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        },
+        {
+          "key": "threadSearchChord",
+          "defaultValue": "null",
+          "constraints": "Optional persisted keyboard chord string.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        },
+        {
+          "key": "backChord",
+          "defaultValue": "primary+BracketLeft",
+          "constraints": "Persisted keyboard chord string.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        },
+        {
+          "key": "forwardChord",
+          "defaultValue": "primary+BracketRight",
+          "constraints": "Persisted keyboard chord string.",
+          "coveredBy": [
+            "thread-sidebar.palette-search"
+          ]
+        }
+      ],
+      "states": [
+        "closed",
+        "searching-threads",
+        "searching-files",
+        "history-back",
+        "history-forward"
+      ],
+      "failureModes": [
+        "Conflicting key chords are reported rather than silently stealing another shortcut.",
+        "Unsupported URL routes are not treated as navigable thread state."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.palette-search",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.navigation-history",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "thread-children-and-links",
+      "title": "Browse child sessions and share thread URLs",
+      "summary": "Expand recursive child sessions with inherited workspace context and copy credential-free thread URLs.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "maxChildren",
+          "defaultValue": "3",
+          "constraints": "Integer from 1 to 50 children per level.",
+          "coveredBy": [
+            "thread-sidebar.children-links"
+          ]
+        }
+      ],
+      "states": [
+        "collapsed",
+        "expanded",
+        "nested",
+        "copied"
+      ],
+      "failureModes": [
+        "Child chains preserve inherited workspace identity.",
+        "Copied links omit credentials and unsupported path-based routes."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.children-links",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "pending-host-restart",
+      "title": "Warn when a host restart is required",
+      "summary": "Detect pending host-side plugin updates and ask for explicit confirmation before handing off a restart when the supervisor supports it.",
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "unchanged",
+        "client-only-update",
+        "host-update-pending",
+        "confirmation-required",
+        "restarting"
+      ],
+      "failureModes": [
+        "No restart is requested for unchanged or client-only bundles.",
+        "Missing supervisor handoff is reported without restarting the user instance."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.restart-confirmation",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

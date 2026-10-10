@@ -73,5 +73,8 @@
         "dshfiles.settingsSearch"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "credential-redaction",
+      "title": "Redact credentials before data reaches persistence",
+      "summary": "Remove common credential shapes and caller-supplied secret literals while leaving ordinary code intact.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "unchanged",
+        "redacted",
+        "caller-literal-redacted"
+      ],
+      "failureModes": [
+        "Short literals are ignored to avoid over-redaction.",
+        "Credential-shaped text is removed before storage and indexing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.credential-shapes",
+          "file": "plugins/@dshfiles/optmem-core/src/redaction.test.ts",
+          "testName": "removes common credential shapes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.caller-literals",
+          "file": "plugins/@dshfiles/optmem-core/src/redaction.test.ts",
+          "testName": "redacts caller-supplied literals and ignores too-short ones"
+        }
+      ]
+    },
+    {
+      "id": "bounded-utf8-text",
+      "title": "Count, clip, and paginate UTF-8 text by bytes",
+      "summary": "Measure and bound UTF-8 payloads without splitting a code point and with an explicit truncation marker.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "within-limit",
+        "clipped",
+        "paginated"
+      ],
+      "failureModes": [
+        "A multi-byte character is never split by byte clipping.",
+        "Pagination preserves the complete text without gaps."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.utf8-byte-count",
+          "file": "plugins/@dshfiles/optmem-core/src/utf8.test.ts",
+          "testName": "counts bytes like a UTF-8 encoder"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.utf8-safe-clip",
+          "file": "plugins/@dshfiles/optmem-core/src/utf8.test.ts",
+          "testName": "never splits a code point when clipping"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.utf8-pagination",
+          "file": "plugins/@dshfiles/optmem-core/src/utf8.test.ts",
+          "testName": "paginates by bytes without losing text"
+        }
+      ]
+    },
+    {
+      "id": "memory-tree-addressing",
+      "title": "Address complete nodes in a hierarchical memory tree",
+      "summary": "Map level/index addresses to ranges, navigate relatives, identify complete nodes, and find the covering view node deterministically.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "leaf",
+        "complete-node",
+        "partial-node",
+        "covering-view"
+      ],
+      "failureModes": [
+        "Invalid addresses are rejected instead of mapped to a different node.",
+        "Incomplete nodes are never presented as complete summaries."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.tree-address-mapping",
+          "file": "plugins/@dshfiles/optmem-core/src/tree-math.test.ts",
+          "testName": "maps (level, idx) to the \"start+len\" covering range and back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.tree-completeness",
+          "file": "plugins/@dshfiles/optmem-core/src/tree-math.test.ts",
+          "testName": "only treats fully covered nodes as complete"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.view-covering-node",
+          "file": "plugins/@dshfiles/optmem-core/src/tree-math.test.ts",
+          "testName": "finds the view node covering a position"
+        }
+      ]
+    },
+    {
+      "id": "deterministic-view-and-summary",
+      "title": "Build deterministic bounded summaries and views",
+      "summary": "Merge the most due node pairs first, preserve recent detail, retry summaries under a tighter byte budget, and report compatibility capabilities accurately.",
+      "surfaces": [
+        "host",
+        "storage",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "fine-grained",
+        "coarsened",
+        "summary-retry",
+        "compatibility",
+        "full-unavailable"
+      ],
+      "failureModes": [
+        "A summarizer answer that cannot fit is clipped deterministically or rejected if empty.",
+        "Full mode reports exactly which runtime hooks are missing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.view-determinism",
+          "file": "plugins/@dshfiles/optmem-core/src/view-math.test.ts",
+          "testName": "is deterministic"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.summary-budget",
+          "file": "plugins/@dshfiles/optmem-core/src/bounded-summary.test.ts",
+          "testName": "retries with a stricter budget until the answer fits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem-core.full-mode-capabilities",
+          "file": "plugins/@dshfiles/optmem-core/src/capabilities.test.ts",
+          "testName": "reports exactly what full mode is missing"
+        }
+      ]
+    }
+  ]
+}

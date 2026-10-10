@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
@@ -16,6 +16,7 @@ import { buildLocaleNamespaceOwnership, findLocaleNamespaceConflict } from '../c
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
 import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
+import { featureCatalogIssues } from './features.js'
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -419,6 +420,47 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
   }
 }
 
+const checkFeatureCatalog = async (
+  diagnostics: DshxDiagnostic[],
+  config: ResolvedDshxConfig,
+  packageManifest: Record<string, unknown>,
+): Promise<void> => {
+  if (packageManifest.dshx === undefined) return
+  if (!isObject(packageManifest.dshx)) {
+    diagnostics.push(issue('DSHX4230', 'error', 'package.json dshx metadata must be an object.', config.packageFile, 'Set dshx.features to a package-relative feature catalog path.'))
+    return
+  }
+  const featurePath = packageManifest.dshx.features
+  if (featurePath === undefined) return
+  if (typeof featurePath !== 'string' || featurePath.trim() === '') {
+    diagnostics.push(issue('DSHX4230', 'error', 'package.json dshx.features must be a non-empty package-relative path.', config.packageFile, 'Set dshx.features to a JSON file such as "./dshx.features.json".'))
+    return
+  }
+  const featureFile = resolve(config.root, featurePath)
+  const relativeFeatureFile = relative(config.root, featureFile)
+  if (relativeFeatureFile === '..' || relativeFeatureFile.startsWith(`..${sep}`) || isAbsolute(relativeFeatureFile)) {
+    diagnostics.push(issue('DSHX4230', 'error', 'package.json dshx.features must stay inside the project root.', config.packageFile, 'Move the feature catalog into this package and use a relative path.'))
+    return
+  }
+  let source: string
+  try {
+    source = await readFile(featureFile, 'utf8')
+  } catch (error) {
+    diagnostics.push(issue('DSHX4231', 'error', `Cannot read DSHX feature catalog: ${String(error)}`, featureFile, 'Create the referenced JSON catalog or correct dshx.features.'))
+    return
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(source)
+  } catch (error) {
+    diagnostics.push(issue('DSHX4231', 'error', `DSHX feature catalog is not valid JSON: ${error instanceof Error ? error.message : String(error)}`, featureFile, 'Fix the JSON syntax before running DSHX checks.'))
+    return
+  }
+  for (const message of featureCatalogIssues(value)) {
+    diagnostics.push(issue('DSHX4232', 'error', `Invalid DSHX feature catalog: ${message}`, featureFile, 'Use schemaVersion 1 and link each configuration option to a declared scenario id.'))
+  }
+}
+
 /** Collect current package and bundle metadata issues without changing project files. */
 export async function checkProjectManifest(config: ResolvedDshxConfig, options: { readonly compatibility?: DshCompatibility } = {}): Promise<DshxDiagnostic[]> {
   const diagnostics: DshxDiagnostic[] = []
@@ -462,6 +504,7 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
     ]
   }
   const manifest = value
+  await checkFeatureCatalog(diagnostics, config, manifest)
   // A Host-provided package in `dependencies` resolves a second copy and only
   // fails at boot, so it is refused here where the fix can be spelled out.
   diagnostics.push(...projectHostProvidedDependencyDiagnostics(manifest, config.packageFile))

@@ -77,5 +77,8 @@
         "@deepseek-ai/dsh-client-ui-slots"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

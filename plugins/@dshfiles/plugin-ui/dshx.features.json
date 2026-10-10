@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "query-client-binding",
+      "title": "Provide host-backed client queries",
+      "summary": "Expose one query client per bundle and deliver typed query state to decorated children while preserving readable failures.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "idle",
+        "loading",
+        "success",
+        "error"
+      ],
+      "failureModes": [
+        "Query hooks outside the provider fail clearly.",
+        "Remote errors without a message use a safe fallback."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.query-context",
+          "file": "plugins/@dshfiles/plugin-ui/tests/query.test.tsx",
+          "testName": "serves queries to children"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.query-client-identity",
+          "file": "plugins/@dshfiles/plugin-ui/tests/query.test.tsx",
+          "testName": "is one client per bundle"
+        }
+      ]
+    },
+    {
+      "id": "schema-validated-persistent-values",
+      "title": "Persist schema-validated client values",
+      "summary": "Read fallback values for missing, malformed, or invalid storage, persist only schema-valid writes, react to other-tab changes, and report unavailable writes without losing in-memory state.",
+      "surfaces": [
+        "client",
+        "storage"
+      ],
+      "configuration": [],
+      "states": [
+        "fallback",
+        "valid",
+        "invalid",
+        "cross-tab-update",
+        "write-failed",
+        "removed"
+      ],
+      "failureModes": [
+        "Invalid storage is not propagated as a valid value.",
+        "Storage denial leaves a usable in-memory value and exposes failure status."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.stored-value-validation",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stored-value.test.tsx",
+          "testName": "persists valid writes and rejects invalid ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.stored-value-cross-tab",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stored-value.test.tsx",
+          "testName": "follows another tab through the storage event"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.stored-value-failure",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stored-value.test.tsx",
+          "testName": "keeps the value in memory and reports false when storage refuses the write"
+        }
+      ]
+    },
+    {
+      "id": "typed-forms-and-accessible-tables",
+      "title": "Compose validated forms and accessible data tables",
+      "summary": "Show schema errors on submit, submit valid form state, sort tables from accessible header buttons, and render empty states across columns.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "pristine",
+        "invalid",
+        "valid",
+        "sorted",
+        "empty"
+      ],
+      "failureModes": [
+        "Invalid form values are not submitted.",
+        "An empty table preserves its column structure and accessible headers."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.form-validation",
+          "file": "plugins/@dshfiles/plugin-ui/tests/form.test.tsx",
+          "testName": "shows schema errors after submission and submits valid values"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.table-sorting",
+          "file": "plugins/@dshfiles/plugin-ui/tests/table.test.tsx",
+          "testName": "sorts through an accessible header button"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.table-empty",
+          "file": "plugins/@dshfiles/plugin-ui/tests/table.test.tsx",
+          "testName": "renders the empty row across every column"
+        }
+      ]
+    },
+    {
+      "id": "debounced-client-values",
+      "title": "Debounce fast-changing client input",
+      "summary": "Publish only the final value after the configured delay so search and preference consumers avoid redundant work.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "pending",
+        "published",
+        "cancelled"
+      ],
+      "failureModes": [
+        "A superseded value is never published after the latest value wins."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "plugin-ui.debounce-latest",
+          "file": "plugins/@dshfiles/plugin-ui/tests/debounced-value.test.tsx",
+          "testName": "publishes only the last value after the delay"
+        }
+      ]
+    }
+  ]
+}

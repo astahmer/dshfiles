@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "dynamic-panel-navigation",
+      "title": "Navigate to registered panels",
+      "summary": "Offer only currently registered root panels and navigate using their current display labels.",
+      "surfaces": [
+        "client",
+        "command",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "available",
+        "unregistered",
+        "selected"
+      ],
+      "failureModes": [
+        "An orphan or unregistered panel is omitted.",
+        "A target removed before selection reports a stale-target error."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "sidebar-commands.panel-navigation",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "sidebar-commands.stale-target",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "recent-session-navigation",
+      "title": "Navigate to a recent session",
+      "summary": "Offer at most twenty newest sessions after excluding blank, subagent, and archived sessions, then open the selected session after the palette closes.",
+      "surfaces": [
+        "client",
+        "command",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "available",
+        "filtered",
+        "deferred-open",
+        "stale"
+      ],
+      "failureModes": [
+        "A stale session row reports an error and leaves current navigation unchanged."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "sidebar-commands.recent-sessions",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "thread-sidebar-palette-actions",
+      "title": "Expose thread-sidebar actions when supported",
+      "summary": "Register palette and search entries only when thread-sidebar acknowledges its cancelable capability probe.",
+      "surfaces": [
+        "client",
+        "command",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "probe-pending",
+        "supported",
+        "unsupported"
+      ],
+      "failureModes": [
+        "Missing or rejected capability acknowledgement omits the dependent action."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "sidebar-commands.palette-capability",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

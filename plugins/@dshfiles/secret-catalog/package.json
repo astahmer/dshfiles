@@ -92,5 +92,8 @@
         "dshfiles.secretCatalog"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

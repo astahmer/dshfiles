@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "agent-directory",
+      "title": "Discover live agents and topics",
+      "summary": "List active agents and workspace topics without exposing peer message contents in notifications.",
+      "surfaces": [
+        "tool",
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "no-agents",
+        "live-agents",
+        "workspace-topic-available"
+      ],
+      "failureModes": [
+        "The requested agent is no longer live.",
+        "A workspace topic cannot be derived when the agent has no working directory."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-communication.directory",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "topic-delivery-policy",
+      "title": "Apply topic delivery and steering policy",
+      "summary": "Quiet stores only, queue delivers a non-interrupting follow-up, and steer is allowed only for urgent messages from an allowlisted sender.",
+      "surfaces": [
+        "tool",
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "quiet",
+        "queued",
+        "steered",
+        "not-allowlisted"
+      ],
+      "failureModes": [
+        "Delivery fails after a recipient exits.",
+        "Untrusted peer text is mistaken for instructions."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-communication.delivery-policy",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "durable-inbox",
+      "title": "Read and acknowledge direct messages",
+      "summary": "Read bounded durable inbox records, send direct messages, and acknowledge records so they no longer appear in later reads.",
+      "surfaces": [
+        "tool",
+        "host",
+        "storage"
+      ],
+      "configuration": [],
+      "states": [
+        "pending",
+        "read",
+        "acknowledged"
+      ],
+      "failureModes": [
+        "An inactive target rejects direct send.",
+        "Malformed or hostile peer text must remain quoted data."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-communication.inbox",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

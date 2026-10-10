@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "review-file-markers",
+      "title": "Mark review files as viewed",
+      "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
+      "surfaces": [
+        "client",
+        "storage"
+      ],
+      "configuration": [],
+      "states": [
+        "unviewed",
+        "viewed",
+        "progress-updated"
+      ],
+      "failureModes": [
+        "An invalid review action URL hides the control.",
+        "A malformed or unavailable summary hides progress instead of displaying invented state."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "diff-viewed.toggle-progress",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "diff-viewed.change-scope",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "cross-tab-view-state",
+      "title": "Retain viewed marks across tabs",
+      "summary": "Persist bounded browser-local marks, adopt cross-tab changes, and fall back safely when stored data is corrupt.",
+      "surfaces": [
+        "storage",
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "stored",
+        "cross-tab-updated",
+        "corrupt-fallback",
+        "retention-evicted"
+      ],
+      "failureModes": [
+        "A full retention cap evicts the oldest mark.",
+        "Corrupt storage initializes the feature empty without crashing the panel."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "diff-viewed.storage-retention",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "diff-viewed.cross-tab",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

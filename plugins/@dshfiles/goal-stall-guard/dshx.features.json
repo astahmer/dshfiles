@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "pause-stalled-goals",
+      "title": "Pause goals after consecutive empty rounds",
+      "summary": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "stallThreshold",
+          "defaultValue": "3",
+          "constraints": "Integer from 2 to 50; invalid values are rejected.",
+          "coveredBy": [
+            "goal-stall-guard.threshold"
+          ]
+        }
+      ],
+      "states": [
+        "progress",
+        "empty-round-streak",
+        "paused",
+        "pause-failed"
+      ],
+      "failureModes": [
+        "Tool-only progress is counted as activity.",
+        "Pause service failure is logged but does not throw into the session."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "goal-stall-guard.streak-reset",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "goal-stall-guard.threshold",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "goal-stall-guard.unavailable-goal",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

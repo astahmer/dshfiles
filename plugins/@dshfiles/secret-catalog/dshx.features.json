@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "scoped-alias-catalog",
+      "title": "Browse aliases by scope and environment",
+      "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker and identify the current host-local scope.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "defaultScope",
+          "defaultValue": "all",
+          "constraints": "One of all, project, global, or local.",
+          "choices": [
+            "all",
+            "project",
+            "global",
+            "local"
+          ],
+          "coveredBy": [
+            "secret-catalog.scope-filter"
+          ]
+        },
+        {
+          "key": "defaultEnvironment",
+          "defaultValue": "prod",
+          "constraints": "Must match ^[A-Za-z0-9_-]+$.",
+          "coveredBy": [
+            "secret-catalog.scope-filter"
+          ]
+        },
+        {
+          "key": "hideOnBlur",
+          "defaultValue": "true",
+          "constraints": "Boolean; clear revealed values when focus leaves the view.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
+        }
+      ],
+      "states": [
+        "all-scopes",
+        "project-scope",
+        "global-scope",
+        "local-scope",
+        "ambiguous-alias"
+      ],
+      "failureModes": [
+        "Duplicate alias and environment across scopes makes value operations unavailable.",
+        "A scope without a selected folder cannot claim project-specific results."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Managed secret CLI list/read operations and local vault metadata.",
+          "deterministicFake": "Inject a fake CLI runner with synthetic alias metadata and values; never read a real vault or session credential."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.scope-filter",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.project-picker",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "bounded-secret-reveal",
+      "title": "Reveal and copy an exact secret value",
+      "summary": "Reveal one exact alias and environment only on demand, permit a bounded preview/full/hidden cycle, and clear plaintext on timeout, blur, scope change, refresh, or unmount.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "revealSeconds",
+          "defaultValue": "15",
+          "constraints": "Integer from 3 to 300 seconds.",
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
+        },
+        {
+          "key": "noticeSeconds",
+          "defaultValue": "4",
+          "constraints": "Integer from 0 to 60 seconds; zero keeps the notice persistent.",
+          "coveredBy": [
+            "secret-catalog.reveal-expiry"
+          ]
+        }
+      ],
+      "states": [
+        "hidden",
+        "preview",
+        "full",
+        "expired",
+        "cleared"
+      ],
+      "failureModes": [
+        "Secret values are never included in catalog metadata, argv, or notices.",
+        "Blur or navigation clears client plaintext before another reveal."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Exact alias/environment read through the managed secret executable.",
+          "deterministicFake": "Return synthetic test-only secret strings through injected CLI and clipboard adapters; never set or read real secret environment values."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.reveal-expiry",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "alias-mutations",
+      "title": "Create, edit, rename, and remove aliases safely",
+      "summary": "Create generated or manual values, edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [],
+      "states": [
+        "editing",
+        "creating",
+        "renaming",
+        "removing-alias",
+        "deleting-vault-item",
+        "collision"
+      ],
+      "failureModes": [
+        "Duplicate alias/environment collisions are blocked before writes.",
+        "Manual values travel through stdin and are not echoed in process output."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Create/edit/move/unset/rm subprocess operations.",
+          "deterministicFake": "Assert fixed argv and synthetic stdin/output with an injected runner; do not invoke Bitwarden or external vault services."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.add-edit",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.rename-remove",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "metadata-only-agent-tools",
+      "title": "Expose safe secret catalog tools to agents",
+      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment.",
+      "surfaces": [
+        "tool",
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "metadata-listed",
+        "exact-value-requested",
+        "not-found",
+        "ambiguous"
+      ],
+      "failureModes": [
+        "List never contains secret values.",
+        "Ambiguous aliases and missing scopes fail closed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.agent-tools",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

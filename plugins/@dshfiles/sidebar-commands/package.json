@@ -69,5 +69,8 @@
         "dshfiles.sidebarCommands"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

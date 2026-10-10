@@ -92,5 +92,8 @@
       "external": [],
       "immediately": false
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

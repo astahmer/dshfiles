@@ -51,5 +51,8 @@
         "@deepseek-ai/dsh-session"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

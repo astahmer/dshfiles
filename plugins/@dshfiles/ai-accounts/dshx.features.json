@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "account-lifecycle",
+      "title": "Manage provider account drafts",
+      "summary": "Add, edit, enable, and persist account profiles while preserving unsaved edits across validation and save failures.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage"
+      ],
+      "configuration": [
+        {
+          "key": "saveMode",
+          "defaultValue": "auto",
+          "constraints": "One of auto or manual.",
+          "choices": [
+            "auto",
+            "manual"
+          ],
+          "coveredBy": [
+            "ai-accounts.save-policy"
+          ]
+        },
+        {
+          "key": "autoSaveDelayMs",
+          "defaultValue": "800",
+          "constraints": "Integer from 200 to 10000 milliseconds; used only by auto save.",
+          "coveredBy": [
+            "ai-accounts.save-policy"
+          ]
+        }
+      ],
+      "states": [
+        "clean",
+        "dirty",
+        "saving",
+        "saved",
+        "validation-error",
+        "save-error"
+      ],
+      "failureModes": [
+        "Invalid account path or environment alias is rejected.",
+        "A failed write preserves the draft and supports retry or revert."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.account-draft",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.save-policy",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "model-routing",
+      "title": "Curate models and choose account routes",
+      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced account pools with cooldown-aware failover.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings",
+        "storage"
+      ],
+      "configuration": [
+        {
+          "key": "distribution",
+          "defaultValue": "sticky",
+          "constraints": "One of sticky, priority, round-robin, or balanced.",
+          "choices": [
+            "sticky",
+            "priority",
+            "round-robin",
+            "balanced"
+          ],
+          "coveredBy": [
+            "ai-accounts.pool-failover"
+          ]
+        },
+        {
+          "key": "cooldownMs",
+          "defaultValue": "300000",
+          "constraints": "Integer from 0 to 86400000 milliseconds.",
+          "coveredBy": [
+            "ai-accounts.pool-failover"
+          ]
+        },
+        {
+          "key": "modelsPageAccounts",
+          "defaultValue": "true",
+          "constraints": "Boolean; show account routing controls on the models page.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.model-curation"
+          ]
+        }
+      ],
+      "states": [
+        "available",
+        "cooling-down",
+        "rebound",
+        "no-eligible-account"
+      ],
+      "failureModes": [
+        "A provider rate limit cools the selected account and may rebind the request.",
+        "All eligible accounts are cooling down and no route can be selected."
+      ],
+      "externalDependencies": [
+        {
+          "id": "provider-model-catalogs",
+          "boundary": "Provider model catalog and account pool response adapters.",
+          "deterministicFake": "Inject synthetic catalogs and quota/rate-limit responses; never load OAuth state or call provider APIs."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.model-curation",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.pool-failover",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "quota-dashboard",
+      "title": "Read provider quota and usage status",
+      "summary": "Render account quota windows, reset times, status indicators, and configurable footer or edge meters with hidden and ordered accounts.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "usageRefreshSeconds",
+          "defaultValue": "60",
+          "constraints": "Integer from 15 to 3600 seconds.",
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        },
+        {
+          "key": "footerButton",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the footer quota control.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        },
+        {
+          "key": "meterLabel",
+          "defaultValue": "both",
+          "constraints": "One of both, percent, or reset.",
+          "choices": [
+            "both",
+            "percent",
+            "reset"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        },
+        {
+          "key": "usageOrder",
+          "defaultValue": "[]",
+          "constraints": "Ordered account ID list; unknown IDs are ignored.",
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        },
+        {
+          "key": "hiddenUsageAccounts",
+          "defaultValue": "[]",
+          "constraints": "Account ID list hidden from usage meters.",
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        },
+        {
+          "key": "edgeWidget",
+          "defaultValue": "true",
+          "constraints": "Boolean; enable the edge quota overlay.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.quota-display"
+          ]
+        }
+      ],
+      "states": [
+        "loading",
+        "available",
+        "limited",
+        "reset-known",
+        "failed",
+        "hidden"
+      ],
+      "failureModes": [
+        "A quota provider failure is displayed without persisting a fake success.",
+        "Missing or stale accounts do not crash the quota strip."
+      ],
+      "externalDependencies": [
+        {
+          "id": "provider-quota-apis",
+          "boundary": "Quota refresh adapter per configured provider.",
+          "deterministicFake": "Return synthetic usage/reset/error payloads through injected provider clients with a fake clock."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.quota-display",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "usage-history-and-pricing",
+      "title": "Review usage history and cost forecasts",
+      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, and apply explicit price overrides without persisting provider response payloads.",
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "pricingRefreshHours",
+          "defaultValue": "24",
+          "constraints": "Integer from 1 to 720 hours.",
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
+        },
+        {
+          "key": "pricingOverrides",
+          "defaultValue": "{}",
+          "constraints": "Model ID to synthetic price override map; malformed entries are ignored safely.",
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
+        },
+        {
+          "key": "currency",
+          "defaultValue": "USD",
+          "constraints": "The only supported currency is USD.",
+          "choices": [
+            "USD"
+          ],
+          "coveredBy": [
+            "ai-accounts.pricing-cost"
+          ]
+        }
+      ],
+      "states": [
+        "snapshot-written",
+        "same-bucket-updated",
+        "provider-failure",
+        "history-trimmed",
+        "price-missing"
+      ],
+      "failureModes": [
+        "Failed quota reads write no history row.",
+        "Missing model price yields an unavailable estimate rather than an invented cost."
+      ],
+      "externalDependencies": [
+        {
+          "id": "models-dev-pricing",
+          "boundary": "External model pricing catalog adapter.",
+          "deterministicFake": "Inject a fixed pricing catalog and simulated refresh timestamps; do not fetch models.dev in routine tests."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.history-retention",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.pricing-cost",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "luna-reserve-routing",
+      "title": "Route exhausted Luna accounts through Reserve",
+      "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "codexLunaReserve",
+          "defaultValue": "true",
+          "constraints": "Boolean; enable separate Luna Reserve routing and metering.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.luna-reserve"
+          ]
+        },
+        {
+          "key": "costEstimates",
+          "defaultValue": "true",
+          "constraints": "Boolean; enable composer cost estimates.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "ai-accounts.luna-reserve"
+          ]
+        }
+      ],
+      "states": [
+        "weekly-available",
+        "weekly-spent",
+        "reserve-available",
+        "reserve-spent",
+        "route-default"
+      ],
+      "failureModes": [
+        "Reserve exhaustion does not masquerade as weekly quota.",
+        "Disabled Reserve leaves the default route unchanged."
+      ],
+      "externalDependencies": [
+        {
+          "id": "codex-quota-api",
+          "boundary": "Codex quota-window provider adapter.",
+          "deterministicFake": "Use canned weekly and Reserve windows; never authenticate or call Codex in CI."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.luna-reserve",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

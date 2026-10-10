@@ -82,5 +82,8 @@
         "conversation.queueReorder"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

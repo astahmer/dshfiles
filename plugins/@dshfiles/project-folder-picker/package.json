@@ -27,5 +27,8 @@
   },
   "peerDependencies": {
     "react": ">=18.2.0 <19"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

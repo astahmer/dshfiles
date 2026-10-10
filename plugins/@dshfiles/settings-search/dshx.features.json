@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "settings-index-search",
+      "title": "Search and browse native settings metadata",
+      "summary": "Search redacted schema labels, descriptions, entries, ancestors, and options; browse empty-query categories and navigate results with the keyboard.",
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "navigationSearch",
+          "defaultValue": "true",
+          "constraints": "Boolean; expose the navigation search entry.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "settings-search.search-redaction"
+          ]
+        },
+        {
+          "key": "focusOnOpen",
+          "defaultValue": "true",
+          "constraints": "Boolean; focus the query field when opened.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "settings-search.keyboard-navigation"
+          ]
+        },
+        {
+          "key": "maxResults",
+          "defaultValue": "30",
+          "constraints": "Integer from 5 to 100 results.",
+          "coveredBy": [
+            "settings-search.keyboard-navigation"
+          ]
+        }
+      ],
+      "states": [
+        "empty-query",
+        "searching",
+        "results",
+        "no-results",
+        "focused"
+      ],
+      "failureModes": [
+        "Secret schema fields and descendants never appear in indexed labels or descriptions.",
+        "An unavailable settings mirror is surfaced without exposing unredacted values."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-search.search-redaction",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-search.keyboard-navigation",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "typed-setting-editor",
+      "title": "Edit and reset typed settings overrides",
+      "summary": "Use live snapshots and revision-guarded set/unset operations to edit typed values or clear an override, falling back to the live editor when no native owner route exists.",
+      "surfaces": [
+        "client",
+        "integration",
+        "settings"
+      ],
+      "configuration": [],
+      "states": [
+        "inherited",
+        "overridden",
+        "saving",
+        "revision-conflict",
+        "owner-route",
+        "live-editor-fallback"
+      ],
+      "failureModes": [
+        "A stale expected revision is rejected.",
+        "Unsupported owner routing falls back to the live editor instead of selecting a fabricated native section."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-search.typed-edit",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-search.reset-override",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-search.owner-route",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

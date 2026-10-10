@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "queue-ordering",
+      "title": "Reorder pending messages",
+      "summary": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
+      "configuration": [
+        {
+          "key": "expandByDefault",
+          "defaultValue": "true",
+          "constraints": "Boolean; choose the initial queue dock expansion state.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "queue-reorder.dock-preferences"
+          ]
+        },
+        {
+          "key": "previewLength",
+          "defaultValue": "200",
+          "constraints": "Integer from 40 to 1000 characters.",
+          "coveredBy": [
+            "queue-reorder.message-preview"
+          ]
+        }
+      ],
+      "states": [
+        "collapsed",
+        "expanded",
+        "moving",
+        "idle",
+        "busy",
+        "failed"
+      ],
+      "failureModes": [
+        "Move at the first/last boundary is a no-op.",
+        "A missing item or absent live agent rejects mutation without changing order."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.move-message",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.drag-target",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.dock-preferences",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    },
+    {
+      "id": "text-only-message-editing",
+      "title": "Edit pending text messages",
+      "summary": "Edit only non-empty text-only queue messages and refuse blank content or attachments.",
+      "surfaces": [
+        "client",
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "viewing",
+        "editing",
+        "saving",
+        "failed"
+      ],
+      "failureModes": [
+        "An attachment or non-text payload prevents editing.",
+        "An empty draft is not saved."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.message-preview",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.busy-locks",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

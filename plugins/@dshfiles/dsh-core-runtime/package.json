@@ -145,5 +145,8 @@
       ],
       "platform": "web"
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

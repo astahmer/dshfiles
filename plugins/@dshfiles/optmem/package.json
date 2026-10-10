@@ -63,5 +63,8 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }
