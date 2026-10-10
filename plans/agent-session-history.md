@@ -10,9 +10,9 @@
 - The current Host `sessionController` provides visible Session list/search, cold-safe history pages, follow streams, projections, image attachment reads, and mutations (create, select model, rename, fork, prompt, queue update, cancel). `workspaceController` provides registered workspace membership, pins, archives, and workspace/session ordering. These are Host services, not currently exposed as Agent history tools.
 - Host history records preserve the full typed Session event stream used by Chat/Trajectory (turns, request/model context, assistant/tool events, token usage, timings, and attachment references). `sessionController.page` requires a caller-supplied `throughSeq`; cold `follow` produces a useful opening page but activates/promotes the Session after yielding its snapshot. There is not yet a cold-safe “latest page” operation that provides a cursor without reading all events or activating the Agent.
 - Host `sessionController.search` returns bounded results but does not expose provider cursors or metadata filters; lower-level `sessionQuery.searchSessions` supports cursor/filter requests. Verify public typing and safe use before choosing the search boundary.
-- The Host `tools` service registers callable Agent tools and passes the acting Agent in `ToolRunContext`. The Host `approval` service supports a human-mediated, audited `allowed-once` result during a live turn. The current Host Agent tool catalog has no Session-history tools.
-- The DSHX communication plugin demonstrates the owned-plugin pattern for registering Agent tools against a typed Host-side service. Its surface is a reference, not an assumed implementation contract.
-- Relevant sources: [`agent-communication`](../plugins/@dshfiles/agent-communication/README.md), [`thread-sidebar`](../plugins/@dshfiles/thread-sidebar/README.md), and [DSHX Agent communication](../tooling/dshx/docs/agent-communication.md).
+- The Host `tools` service registers callable Agent tools and passes the acting Agent in `ToolRunContext`. The Host `approval` service supports a human-mediated, audited `allowed-once` result during a live turn. The current runtime does not load Session-history tools.
+- DSH core already ships the opt-in `@deepseek-ai/dsh-tool-session-query` package with five read-only search/trace/event tools. It currently authorizes cross-session reads by exact `cwd` equality and exposes no page/list grouping or writes. Extend that package rather than creating duplicate DSHX read tools; keep Agent Communication's domain separate.
+- Relevant sources: [`agent-communication`](../plugins/@dshfiles/agent-communication/README.md), [`thread-sidebar`](../plugins/@dshfiles/thread-sidebar/README.md), [DSH Agent communication](../tooling/dshx/docs/agent-communication.md), and [native Session Query tools](../../dsh-core-agent-session-history/packages/session-query/tool-session-query/README.md).
 
 ## Goal
 
@@ -91,16 +91,16 @@ DSH already exposes a Host `approval` service for in-turn human decisions; its o
 |--------|----------|-----------|
 | Reuse Thread Sidebar as the feature | No | It is a human-facing browser UI; user wants Agent-callable tools. |
 | Extend Agent Communication | Do not merge history semantics into it | Its domain is live peer messaging. Reuse its proven Agent-tool/typed-service pattern, but keep Session History as a separate domain boundary unless API discovery proves a shared abstraction is needed. |
-| Build through local DSHX plus a narrow DSH Host API improvement | Chosen provisionally | DSHX already registers Agent tools through `ctx.tools`; native Session/Workspace/Approval services provide most needed operations. Add a cold-safe latest-page/cursor contract because the existing page API requires `throughSeq` and cold `follow` can activate a Session. Revisit only if source-level audit finds a safe existing alternative. |
+| Extend native `@deepseek-ai/dsh-tool-session-query` plus a narrow DSH Host API improvement | Chosen | The existing package already owns model-facing Session search, trace, and raw event reads with tested authorization. Extend its permissions and progressive pages/writes instead of duplicating read tools in DSHX; add the cold-safe latest-page cursor contract because `page` required `throughSeq` and cold `follow` can activate a Session. |
 | Return entire transcript by default | No | Search, bounded summaries, and explicit trajectory ranges support context efficiency and least exposure. |
 | Permission source | Host-enforced, exact source TBD | Browser-local preferences and filesystem sandbox settings cannot safely authorize Agent access to Session data. |
 
 ### Architecture
 
-1. Reuse native Host `sessionController`, `workspaceController`, and `approval` contracts where exact contracts suffice; register Agent tools through the DSHX Host plugin pattern.
-2. Add a narrow Session Controller history-page API that atomically selects the latest cursor and returns one bounded page without activating a cold Session; preserve existing explicit `throughSeq` reads.
-3. Define one typed Host-side Session History service that enforces Agent/workspace grants before catalog lookup/search/read/mutation and returns validated, bounded results. Register tools over it, deriving caller identity only from `ToolRunContext.agent`, never arguments.
-4. Implement search/list with native SessionQuery cursor/filter contracts, then progressive trajectory/attachment reads, then every supported Session mutation with explicit grants and optional one-time approval.
+1. Extend the existing `@deepseek-ai/dsh-tool-session-query` package; keep the Session History boundary separate from peer messaging and avoid duplicating its search/trace/read tools.
+2. Add the narrow Session Controller history-page API that atomically selects the latest cursor and returns one bounded page without activating a cold Session; preserve existing explicit `throughSeq` reads.
+3. Enforce per-Agent Session permission presets in the Host package before any query or mutation; derive the caller only from `ToolRunContext.agent` and resolve caller/target workspaces through the canonical Workspace registry.
+4. Add supported list/group filters and progressive trajectory/attachment reads to the existing tools, then expose all supported Session mutations under the read/write presets and optional one-time approval.
 5. Compose and verify in a scratch profile; do not alter or restart the live profile during implementation.
 
 ### Trust and privacy constraints
@@ -179,9 +179,9 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 
 ## Implementation steps
 
-1. **Contract audit:** confirmed native Agent Tool, Session Controller, SessionQuery, Workspace Controller, history/event, and Approval contracts; identify exact missing page-seek behavior and public typing.
-2. **Capability decision:** create `@dshfiles/agent-session-history` with local DSHX; add only the narrowly required DSH Host history-page API if no supported cold-safe latest-page alternative exists. Keep live-agent communication separate.
-3. **Permission contract:** resolve the caller's current workspace from its Session cwd and Host Workspace registry; define per-Agent Session presets, cross-workspace and unassigned scope, optional one-time approval, and fail-closed Host enforcement.
+1. **Contract audit:** verified Host Agent Tool, Session Controller, SessionQuery, Workspace Controller, Approval, and existing native `dsh-tool-session-query` contracts; document exact page-seek, filter, and group behavior.
+2. **Capability decision:** extend native `@deepseek-ai/dsh-tool-session-query`; add the narrow DSH Host latest-page API because existing `page` required `throughSeq` and no cold-safe latest-page alternative exists.
+3. **Permission contract:** resolve each caller's workspace from its Session cwd and Host Workspace registry; configure per-Agent Session presets, cross-workspace and unassigned behavior, optional one-time approval, and fail-closed Host enforcement.
 4. **Search/list tools:** add schemas, validation, bounded cursor pagination, date/status/group/workspace filters, safe authorization errors, cancellation, and focused tests using supported SessionQuery APIs.
 5. **Progressive trajectory reads:** add metadata/summary, selected turn/range, exact event/tool-call detail, and explicitly selected attachment reads with byte caps, snapshot boundaries, and redaction rules.
 6. **Session operations:** expose every operation supported by native Session and Workspace Controllers; test allowed and denied cases for each mutation under each preset. Do not emulate missing Host verbs.
