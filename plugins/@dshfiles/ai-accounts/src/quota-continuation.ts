@@ -487,9 +487,8 @@ const createQuotaContinuationService = ({
 
       try {
         const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
-        const activities = collectUserActivities<SessionInspectionEvents[number]>(
-          inspected.events,
-          event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined),
+        const activities = collectUserActivities<SessionInspectionEvents[number]>(inspected.events, event =>
+          event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
         )
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current)
