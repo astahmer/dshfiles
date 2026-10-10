@@ -36,7 +36,10 @@ export const buildProfile = (params: {
   for (const id of new Set(params.additionalModelIds)) {
     if (models.some(model => model.id === id)) continue
     const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
+    const gptFamily = /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(id)?.[1]
+    const familyTemplate = gptFamily === undefined ? undefined : upstreamModels.findLast(model => /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(model.id)?.[1] === gptFamily)
     const template =
+      familyTemplate ??
       (id.startsWith('gpt-') ? upstreamModels.find(model => model.id.startsWith('gpt-')) : undefined) ??
       upstreamModels.find(model => model.api === api) ??
       upstreamModels[0]

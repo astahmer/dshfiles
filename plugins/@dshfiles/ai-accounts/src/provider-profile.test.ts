@@ -11,6 +11,38 @@ const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
 }
 
 describe('account provider profiles', () => {
+  it.each(['gpt-6.1-sol', 'gpt-6.1-luna', 'gpt-6.1'])('inherits matching GPT family capabilities for %s instead of Spark', async modelId => {
+    const profile = buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'codex-emialex',
+      displayName: 'CodexEmiAlex',
+      additionalModelIds: [modelId, 'gpt-6.1-codex-spark'],
+      reasoningDefaults: { [modelId]: 'low' },
+    })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['codex-emialex', profile]]),
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: {
+            read: async () => undefined,
+            list: async () => [],
+            modify: async () => undefined,
+            delete: async () => undefined,
+          },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map() },
+    )
+
+    expect(await adapter.resolveModel('codex-emialex', modelId)).toMatchObject({
+      inputModalities: ['text', 'image'],
+    })
+    expect((await adapter.resolveModel('codex-emialex', 'gpt-5.3-codex-spark')).inputModalities).toEqual(['text'])
+    expect((await adapter.resolveModel('codex-emialex', 'gpt-6.1-codex-spark')).inputModalities).toEqual(['text'])
+  })
+
   it('adds custom OpenCode Go models and keeps non-favorites available', () => {
     const profile = buildProfile({
       upstream: opencodeGoProvider(),
