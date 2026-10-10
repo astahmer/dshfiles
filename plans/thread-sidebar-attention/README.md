@@ -4,23 +4,24 @@
 
 | Gate | Status | Evidence / next action |
 |---|---|---|
-| Map supported attention signals | Complete | Approval/plan-review, question, and completion-unread are available; no durable session-error signal. |
+| Map supported attention signals | Complete | Approval/plan-review, question, and completion-unread are available; no supported durable session-error signal, so no Error category was added. |
 | Implement sticky headings, per-status grouping, and subagent exclusion default | Complete | Feature revision `0b3fa2ae`; Approval/Input grouped, Turn finished inline, subagents excluded by default. |
-| Normalize formatting and preference tests | Complete | `oxfmt --check` passed for eight files; `preferences.test.ts` passed 8/8. Formatter follow-up `e66fbf5b`. |
-| Integrate into current default history | Complete, tree check pending | `default@` ancestry includes both feature and formatter revisions. Verify no owned-path changes after formatter revision. |
-| Package typecheck/build and full tests | Blocked | Current build fails on absent generated DSH declarations and unrelated `client-entry.tsx` contract/type errors. Do not edit that unowned file. |
-| Probe runtime and inspect UI | Pending | Requires a successful current bundle. Never restart or touch live web profile. |
-| Confirm final integration/runtime state | Pending | Compare owned paths, check default workspace safely, then close goal only with runtime evidence. |
+| Normalize formatting and preference tests | Complete | `oxfmt --check` passed for eight files; preference tests pass. Formatter follow-up `e66fbf5b`. |
+| Integrate into current default history | Complete | Current default workspace has the same tree for all eight owned feature paths (`jj diff --from default@ --to @ --stat -- <paths>`: 0 files changed); source revisions are in ancestry. |
+| Package validation | Complete | Typecheck, all 63 tests, build, and host-bundle import check pass using compatible generated declarations from the default checkout. |
+| Rebuild other plugin-ui consumers | Partial | 11 consumer builds succeeded. Five were blocked by unrelated unresolved contracts/APIs (`dsh-agent` declarations, queue-reorder projection/API drift); project-folder-picker has no build script. |
+| Scratch runtime and browser inspection | Complete | Isolated minimal profile on port 3199 booted with no activation failures. Chromium showed “DeepSeek Harness”, sidebar present, computed sticky heading `Active(0)`, zero console errors and failed responses. No real session data was seeded. |
+| Live profile safety | Complete | Did not sync the web profile, touch `127.0.0.1:3080`, or restart the live instance. |
 
 ## Current state
 
-- Source workspace: `/Users/astahmer/dev/dshfiles-sidebar-attention-settings` (`thread-attention-settings`). Working copy was clean after the formatter revision.
-- Current `default@` is `ad674f56` (`wip`); its ancestry contains feature `0b3fa2ae` and formatter `e66fbf5b`.
-- `jj diff --from e66fbf5b --to default@ --stat` showed only three unrelated Command Palette files, so no later changes to the feature tree were reported.
-- Focused checks passed: `fnm exec --using=22.23.3 pnpm exec oxfmt --check --config .oxfmtrc.json <8 owned files>` and `fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/preferences.test.ts` (8/8).
-- Current plugin build failed at `client-entry.tsx`, `client.tsx`, `organization.ts`, and tests because `@deepseek-ai/dsh-api-session-controller/client` / `@deepseek-ai/dsh-session/types` declarations are absent; concurrent `client-entry.tsx` edits also reference missing `ClientContext.sessions` and an implicit `item` type.
-- No live DSH restart, profile sync, or runtime verification has occurred.
+- Source workspace: `/Users/astahmer/dev/dshfiles-sidebar-attention-settings` (`thread-attention-settings`). Feature revisions `0b3fa2ae` and `e66fbf5b` are in the current default workspace ancestry; owned-path tree comparison is empty.
+- `fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/thread-sidebar typecheck` passed. The full package suite passed 63/63 tests across 13 files. `pnpm build` produced all six artifacts; `node -e "import('./dist/index.js')"` succeeded.
+- The source workspace lacked generated `session` and `api-session-controller` declarations. Temporary `lib` links to the default checkout’s artifacts enabled validation; they are environment-only and must be removed before closeout.
+- Oxlint reported 0 errors and four existing antislop warnings in `client.tsx` (two explicit Record annotations and two passthrough aliases). Formatting check passed for all eight owned files.
+- UI stylesheet consumer rebuilds: 11 passed; five failed on separate unresolved DSH contracts/APIs (queue-reorder, agent-communication, ai-accounts, project-checks); project-folder-picker has no build script. Those packages are not part of the thread-sidebar validation result.
+- Scratch profile composition resolved the bundle once, and isolated boot reported no activation failures. Headless Chromium verified the loaded sidebar, sticky heading positioning, and clean console/network status. The live web profile and its stored state were not changed.
 
 ## Resume here
 
-Resolve only the missing generated-contract/build environment if a trusted compatible artifact is available; do not edit the concurrent `client-entry.tsx` work. Re-run package checks and import-check the current host bundle. After successful build, use an isolated probe/scratch profile for runtime verification; leave `127.0.0.1:3080` untouched. Reassess whether the default workspace is safe to fast-forward without rewriting active work.
+Remove temporary generated-declaration symlinks, confirm the source workspace is clean and the owned-path diff from default remains empty, then update/close this plan and mark the goal complete. Do not restart or sync the live web profile.
