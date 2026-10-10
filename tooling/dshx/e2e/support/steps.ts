@@ -39,6 +39,13 @@ const evidenceRunFor = (page: Page): EvidenceRun => {
 
 export const browserDiagnosticsFor = (page: Page): readonly string[] => browserDiagnostics.get(page) ?? []
 
+const registerProviderSetupDismissal = (page: Page): Promise<void> => {
+  const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
+  return page.addLocatorHandler(providerSetup, async dialog => {
+    await dialog.getByRole('button', { name: 'Configure later', exact: true }).click()
+  })
+}
+
 export const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
   const run = evidenceRunFor(page)
   try {
@@ -72,6 +79,12 @@ Before(async ({ page, $testInfo }) => {
   evidenceRuns.set(page, run)
   const diagnostics: string[] = []
   browserDiagnostics.set(page, diagnostics)
+  await registerProviderSetupDismissal(page)
+  page.context().on('page', newPage => {
+    void registerProviderSetupDismissal(newPage).catch(() => {
+      diagnostics.push('provider onboarding handler registration failed')
+    })
+  })
   page.on('console', message => {
     if (message.type() === 'error') diagnostics.push(`console.error: ${message.text().replaceAll(PRIVATE_URL, '<private-url>')}`)
   })
@@ -153,10 +166,6 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
     await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
     await expect(previewNotice).toBeHidden()
 
-    const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
-    await page.addLocatorHandler(providerSetup, async dialog => {
-      await dialog.getByRole('button', { name: 'Configure later', exact: true }).click()
-    })
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {
