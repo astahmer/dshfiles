@@ -364,6 +364,55 @@
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
         }
       ]
+    },
+    {
+      "id": "failure-recovery",
+      "title": "Recover failed account requests per failure kind",
+      "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "failureRecovery",
+          "defaultValue": "transport: retry 2x then fail over; rateLimit: fail over then wait 60 s; exhausted: Luna Reserve then fail over; auth and oversized: hand to DSH",
+          "constraints": "Per kind (transport, rateLimit, exhausted, auth, oversized): retries 0-10, backoffMs 100-60000, lunaReserve, failover, waitSeconds 0-3600, shrink, then fail|dsh; malformed fields fall back to defaults.",
+          "coveredBy": [
+            "ai-accounts.failure-policy-ladder",
+            "ai-accounts.failure-recovery-pool"
+          ]
+        }
+      ],
+      "states": [
+        "retrying",
+        "luna-reserve",
+        "failed-over",
+        "waiting",
+        "shrunk",
+        "given-up"
+      ],
+      "failureModes": [
+        "A fail-over never crosses provider kinds, skips hidden accounts and accounts without the model.",
+        "A recovered account takes its conversations back after its cooldown.",
+        "Settings written before failure recovery keep loading with defaults."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.failure-policy-ladder",
+          "file": "plugins/@dshfiles/ai-accounts/src/failure-policy.test.ts",
+          "testName": "retries a transport failure with doubling backoff, fails over, retries the stand-in, then fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.failure-recovery-pool",
+          "file": "plugins/@dshfiles/ai-accounts/src/failure-recovery.test.ts",
+          "testName": "moves a rate-limited conversation to the next healthy account and cools the spent one"
+        }
+      ]
     }
   ],
   "kind": "bundle"

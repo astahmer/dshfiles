@@ -17,7 +17,12 @@ const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large
 
 /** `undefined` for failures this plugin leaves alone (image offload, empty responses, cancellations…). */
 export const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'>): FailureKind | undefined => {
-  if (failure.code === 'CONTEXT_WINDOW_EXCEEDED' || failure.status === 413 || OVERSIZED_TEXT.test(failure.message) || isContextWindowExceededError(failure.message)) {
+  if (
+    failure.code === 'CONTEXT_WINDOW_EXCEEDED' ||
+    failure.status === 413 ||
+    OVERSIZED_TEXT.test(failure.message) ||
+    isContextWindowExceededError(failure.message)
+  ) {
     return 'oversized'
   }
   if (EXHAUSTED_CODES.has(failure.code) || isQuotaExceededError(`${failure.code} ${failure.message}`)) return 'exhausted'
@@ -116,22 +121,18 @@ export const createFailureRecovery = (deps: {
       const step = decision.step
 
       if (step.kind === 'give-up') {
-        if (failureKind === 'rateLimit' || failureKind === 'exhausted') deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs)
+        if (failureKind === 'rateLimit' || failureKind === 'exhausted') deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
         return { kind: 'give-up', then: step.then, failureKind, account }
       }
       if (step.kind === 'luna-reserve') deps.lunaReserve.engage(account)
       if (step.kind === 'failover') {
-        deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs)
+        deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
         deps.pool.bindRoute(input.conversationKey, input.provider, step.to)
       }
       if (step.kind === 'shrink') state.shrink = true
       state.attempts += 1
       const plannedAttempts =
-        policy.retries +
-        (policy.lunaReserve ? 1 : 0) +
-        candidates.length * (policy.retries + 1) +
-        (policy.waitSeconds > 0 ? 1 : 0) +
-        (policy.shrink ? 1 : 0)
+        policy.retries + (policy.lunaReserve ? 1 : 0) + candidates.length * (policy.retries + 1) + (policy.waitSeconds > 0 ? 1 : 0) + (policy.shrink ? 1 : 0)
       return {
         kind: 'retry',
         step,
@@ -164,7 +165,10 @@ export const offloadResentImages = (messages: readonly Message[]): readonly Mess
   const next = messages.map((message, index) => {
     if (index >= lastAnswer || !message.content.some(block => block.type === 'image' && block.offloaded !== true)) return message
     changed = true
-    return { ...message, content: message.content.map(block => (block.type === 'image' && block.offloaded !== true ? { ...block, offloaded: true as const } : block)) }
+    return {
+      ...message,
+      content: message.content.map(block => (block.type === 'image' && block.offloaded !== true ? { ...block, offloaded: true as const } : block)),
+    }
   })
   return changed ? next : messages
 }

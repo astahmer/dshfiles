@@ -62,7 +62,7 @@ export interface AccountPool {
   replace(accounts: readonly PoolAccountInput[]): void
   acquire(conversationKey: string | undefined, now?: number): PoolAccount | undefined
   noteServed(accountId: string): void
-  noteRateLimited(accountId: string, retryAfterMs: number | undefined): void
+  noteRateLimited(accountId: string, retryAfterMs: number | undefined, now?: number): void
   isHealthy(accountId: string, now?: number): boolean
   bindRoute(conversationKey: string, from: string, to: string): void
   routeFor(conversationKey: string | undefined, provider: string, now?: number): string
@@ -199,11 +199,11 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
      * Put an account in cooldown. A provider-declared `retryAfterMs` wins over
      * the configured default, so a 429 carrying a precise reset is honored exactly.
      */
-    noteRateLimited(accountId, retryAfterMs) {
+    noteRateLimited(accountId, retryAfterMs, now = Date.now()) {
       const account = accounts.get(accountId)
       if (account === undefined) return
       const wait = retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : defaultCooldownMs
-      account.cooldownUntil = Date.now() + wait
+      account.cooldownUntil = now + wait
       account.cooldownMs = wait
     },
 
