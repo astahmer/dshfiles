@@ -1,6 +1,20 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
+import { DEFAULT_RECOVERY_POLICY, recoveryPolicySchema, type KindPolicy, type RecoveryPolicy } from './failure-policy.js'
+
+const kindPolicySetting = (fallback: KindPolicy, description: string) =>
+  Schema.object({
+    retries: Schema.natural().max(10).default(fallback.retries).description('Retries on the same account.'),
+    backoffMs: Schema.natural().min(100).max(60_000).default(fallback.backoffMs).description('First retry delay in ms; each further retry doubles it.'),
+    lunaReserve: Schema.boolean().default(fallback.lunaReserve).description('Codex: continue on Luna Reserve while it lasts.'),
+    failover: Schema.boolean().default(fallback.failover).description('Fail over to the next account of the same provider that offers the model.'),
+    waitSeconds: Schema.natural().max(3_600).default(fallback.waitSeconds).description('Wait up to this long for a provider-declared reset, then retry once (0 = never wait).'),
+    shrink: Schema.boolean().default(fallback.shrink).description('Last try: resend earlier images as file placeholders.'),
+    then: Schema.union([Schema.const('fail').description('Fail the turn'), Schema.const('dsh').description('Hand to DSH (built-in retry, compaction)')])
+      .default(fallback.then)
+      .description('When every option above is spent.'),
+  }).description(description)
 
 /**
  * Preferences for the accounts page and its quota surfaces. Account profiles
@@ -30,6 +44,14 @@ export const aiAccountsSettings = defineSettings({
     modelsPageAccounts: Schema.boolean().default(true),
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
     codexLunaReserve: Schema.boolean().default(true),
+    /** What each kind of failed model request on an account route does next. */
+    failureRecovery: Schema.object({
+      transport: kindPolicySetting(DEFAULT_RECOVERY_POLICY.transport, 'Connection resets, timeouts, 5xx and replay-buffer overflows.'),
+      rateLimit: kindPolicySetting(DEFAULT_RECOVERY_POLICY.rateLimit, 'Rate limited (429).'),
+      exhausted: kindPolicySetting(DEFAULT_RECOVERY_POLICY.exhausted, 'Usage exhausted: no quota left, weekly limit spent.'),
+      auth: kindPolicySetting(DEFAULT_RECOVERY_POLICY.auth, 'Signed out, rejected or missing credentials.'),
+      oversized: kindPolicySetting(DEFAULT_RECOVERY_POLICY.oversized, 'Request or context too large.'),
+    }).description('Failure recovery'),
     /** Estimated session cost beside the composer stats, priced from models.dev. */
     costEstimates: Schema.boolean().default(true),
     /** How often the Host refetches models.dev prices. */
@@ -85,27 +107,34 @@ export const aiAccountsHostSettings = aiAccountsSettings.host({
   },
 })
 
-/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
-export const readPricingSettings = (): PricingSettings => {
+const readLiveSettings = (): object => {
   let value: unknown
   try {
     value = readHostSettings?.()
   } catch {
     value = undefined
   }
-  return pricingSettingsSchema.parse(typeof value === 'object' && value !== null ? value : {})
+  return typeof value === 'object' && value !== null ? value : {}
 }
 
+/** Live pricing preferences; defaults when the namespace is not registered on this Host. */
+export const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
+
 /** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
-export const readLunaReserveRouting = (): boolean => {
-  let value: unknown
-  try {
-    value = readHostSettings?.()
-  } catch {
-    value = undefined
-  }
-  return z
+export const readLunaReserveRouting = (): boolean =>
+  z
     .object({ codexLunaReserve: z.boolean().catch(true) })
     .catch({ codexLunaReserve: true })
-    .parse(value ?? {}).codexLunaReserve
+    .parse(readLiveSettings()).codexLunaReserve
+
+const recoverySettingsSchema = z.object({
+  failureRecovery: recoveryPolicySchema,
+  usageOrder: z.array(z.string()).catch([]),
+  hiddenUsageAccounts: z.array(z.string()).catch([]),
+})
+
+/** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
+export const readRecoverySettings = (): { readonly policy: RecoveryPolicy; readonly usageOrder: readonly string[]; readonly hiddenUsageAccounts: readonly string[] } => {
+  const parsed = recoverySettingsSchema.parse(readLiveSettings())
+  return { policy: parsed.failureRecovery, usageOrder: parsed.usageOrder, hiddenUsageAccounts: parsed.hiddenUsageAccounts }
 }

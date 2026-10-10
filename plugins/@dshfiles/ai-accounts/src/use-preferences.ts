@@ -1,5 +1,6 @@
 import { useSettings } from '@dshfiles/dshx/client'
 import { z } from 'zod'
+import { recoveryPolicySchema } from './failure-policy.js'
 import { DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './settings.js'
 
 const meterLabelSchema = z.enum(['both', 'percent', 'reset']).catch('both')
@@ -21,6 +22,7 @@ export const usePreferences = () => {
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     codexLunaReserve: value?.codexLunaReserve ?? true,
+    failureRecovery: recoveryPolicySchema.parse(value?.failureRecovery),
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,
     pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,

@@ -14,6 +14,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { DISTRIBUTION_HINT, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
+import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
 import { usePreferences } from './use-preferences.js'
 
@@ -27,6 +28,24 @@ const METER_LABELS = [
   { value: 'percent', label: '% left' },
   { value: 'reset', label: 'Time to reset' },
 ] as const
+
+const RETRY_COUNTS = [0, 1, 2, 3, 5] as const
+const BACKOFF_MS = [500, 1_000, 2_000, 5_000, 10_000] as const
+const WAIT_SECONDS = [0, 30, 60, 120, 300, 900] as const
+
+const FAILURE_KIND_COPY: Readonly<Record<FailureKind, { readonly title: string; readonly hint: string; readonly options: readonly (keyof KindPolicy)[] }>> = {
+  transport: {
+    title: 'Connection failure',
+    hint: 'Resets, timeouts, 5xx, and Codex replay-buffer overflows.',
+    options: ['retries', 'backoffMs', 'failover', 'shrink', 'then'],
+  },
+  rateLimit: { title: 'Rate limited', hint: 'The provider answered 429.', options: ['retries', 'backoffMs', 'failover', 'waitSeconds', 'then'] },
+  exhausted: { title: 'Usage exhausted', hint: 'No quota left, or the weekly limit is spent.', options: ['lunaReserve', 'failover', 'waitSeconds', 'then'] },
+  auth: { title: 'Sign-in failure', hint: 'Signed out, rejected or missing credentials.', options: ['retries', 'failover', 'then'] },
+  oversized: { title: 'Request too large', hint: 'Context overflow or an oversized body; DSH compaction handles overflow.', options: ['shrink', 'then'] },
+}
+
+const formatDuration = (milliseconds: number): string => (milliseconds < 1_000 ? `${String(milliseconds)} ms` : milliseconds < 60_000 ? `${String(milliseconds / 1_000)} s` : `${String(milliseconds / 60_000)} min`)
 
 const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
 
@@ -252,6 +271,8 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Row>
       </Group>
 
+      <FailureRecoveryGroup readOnly={readOnly} write={write} />
+
       <Group description="Where current quota is shown." title="Usage surfaces">
         <Row hint="Meters above the sidebar foot (one button on the collapsed rail); click one for the account cards." label="Sidebar usage">
           {id => (
@@ -466,6 +487,115 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
           </p>
         )}
       </div>
+    </Group>
+  )
+}
+
+/**
+ * What a failed request on an account route does next, per failure kind. The
+ * options run top to bottom, each skipped when off or unavailable.
+ */
+const FailureRecoveryGroup = (props: { readonly readOnly: boolean; readonly write: (task: Promise<unknown>) => void }): JSX.Element => {
+  const preferences = usePreferences()
+  const policy = preferences.failureRecovery
+  const update = <Field extends keyof KindPolicy>(kind: FailureKind, field: Field, value: KindPolicy[Field]): void =>
+    props.write(preferences.settings.set('failureRecovery', { ...policy, [kind]: { ...policy[kind], [field]: value } }))
+
+  return (
+    <Group
+      description="Options run top to bottom: same account, Luna Reserve, next account of the same provider with the same model (in usage-strip order, hidden accounts skipped), wait, a smaller request. A switch shows as a retry row in the turn."
+      title="Failure recovery"
+    >
+      {FAILURE_KINDS.map(kind => {
+        const copy = FAILURE_KIND_COPY[kind]
+        const current = policy[kind]
+        const shows = (field: keyof KindPolicy): boolean => copy.options.includes(field)
+        return (
+          <fieldset className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:pt-3 dshx:first-of-type:border-t-0 dshx:first-of-type:pt-0" key={kind}>
+            <legend className="dshx:flex dshx:flex-col dshx:gap-0.5">
+              <span className="dshx:text-sm dshx:font-medium">{copy.title}</span>
+              <span className="dshx:text-xs dshx:text-muted-foreground">{copy.hint}</span>
+            </legend>
+            {shows('retries') ? (
+              <Row label="Retry the same account">
+                {id => (
+                  <NumberSelect
+                    disabled={props.readOnly}
+                    format={value => (value === 0 ? 'Never' : `${String(value)}×`)}
+                    id={id}
+                    onChange={value => update(kind, 'retries', value)}
+                    options={RETRY_COUNTS}
+                    value={current.retries}
+                  />
+                )}
+              </Row>
+            ) : null}
+            {shows('backoffMs') && current.retries > 0 ? (
+              <Row hint="Each further retry waits twice as long." label="First retry after">
+                {id => (
+                  <NumberSelect
+                    disabled={props.readOnly}
+                    format={formatDuration}
+                    id={id}
+                    onChange={value => update(kind, 'backoffMs', value)}
+                    options={BACKOFF_MS}
+                    value={current.backoffMs}
+                  />
+                )}
+              </Row>
+            ) : null}
+            {shows('lunaReserve') ? (
+              <Row hint="Codex accounts with reserve left, while Codex Luna Reserve is on." label="Continue on Luna Reserve">
+                {id => (
+                  <Switch
+                    checked={current.lunaReserve}
+                    disabled={props.readOnly || !preferences.codexLunaReserve}
+                    id={id}
+                    onCheckedChange={value => update(kind, 'lunaReserve', value)}
+                  />
+                )}
+              </Row>
+            ) : null}
+            {shows('failover') ? (
+              <Row hint="The failed account cools down; the conversation returns to it once it recovers." label="Fail over to the next account">
+                {id => <Switch checked={current.failover} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'failover', value)} />}
+              </Row>
+            ) : null}
+            {shows('waitSeconds') ? (
+              <Row hint="Waits out a provider-declared reset no longer than this, then retries once." label="Then wait up to">
+                {id => (
+                  <NumberSelect
+                    disabled={props.readOnly}
+                    format={value => (value === 0 ? 'Never' : formatDuration(value * 1_000))}
+                    id={id}
+                    onChange={value => update(kind, 'waitSeconds', value)}
+                    options={WAIT_SECONDS}
+                    value={current.waitSeconds}
+                  />
+                )}
+              </Row>
+            ) : null}
+            {shows('shrink') ? (
+              <Row hint="Last try: images the model already answered go as file placeholders. Large tool outputs are kept." label="Shrink before the last try">
+                {id => <Switch checked={current.shrink} disabled={props.readOnly} id={id} onCheckedChange={value => update(kind, 'shrink', value)} />}
+              </Row>
+            ) : null}
+            <Row label="When nothing is left">
+              {id => (
+                <Select disabled={props.readOnly} onValueChange={value => update(kind, 'then', value === 'dsh' ? 'dsh' : 'fail')} value={current.then}>
+                  <SelectTrigger className="dshx:w-44" id={id} size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fail">Fail the turn</SelectItem>
+                    <SelectItem value="dsh">Hand to DSH</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </Row>
+          </fieldset>
+        )
+      })}
     </Group>
   )
 }

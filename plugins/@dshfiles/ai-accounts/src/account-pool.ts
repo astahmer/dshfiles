@@ -10,9 +10,9 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
  * - `round-robin`: every request advances the cursor.
  * - `balanced`: weighted random, biased toward the least recently served.
  *
- * 429 failover applies in every mode: a rate-limited account is skipped until
- * its window resets and the conversation rebinds. Distribution only picks which
- * healthy account serves the next request; it never decides whether to fail over.
+ * Distribution only picks which healthy account serves the next request; it
+ * never decides whether to fail over. That is `failure-recovery.ts`, which
+ * cools a failed account here and binds the conversation to a stand-in.
  */
 
 export const DISTRIBUTIONS = ['sticky', 'priority', 'round-robin', 'balanced'] as const
@@ -63,6 +63,9 @@ export interface AccountPool {
   acquire(conversationKey: string | undefined, now?: number): PoolAccount | undefined
   noteServed(accountId: string): void
   noteRateLimited(accountId: string, retryAfterMs: number | undefined): void
+  isHealthy(accountId: string, now?: number): boolean
+  bindRoute(conversationKey: string, from: string, to: string): void
+  routeFor(conversationKey: string | undefined, provider: string, now?: number): string
   unbind(conversationKey: string | undefined): void
   setDistribution(next: Distribution): void
   distribution(): Distribution
@@ -76,6 +79,8 @@ const idleSeconds = (lastUsedAt: number, now: number): number => Math.max((now -
 export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool => {
   const accounts = new Map<string, PoolAccount>()
   const affinity = new Map<string, string>()
+  /** Conversation → the account that took over its chosen route after a fail-over. */
+  const routeBindings = new Map<string, { readonly from: string; readonly to: string }>()
   const defaultCooldownMs = options.cooldownMs ?? DEFAULT_COOLDOWN_MS
   let cursor = 0
   const requested = options.distribution ?? DEFAULT_DISTRIBUTION
@@ -153,6 +158,9 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       for (const [conversationKey, accountId] of affinity) {
         if (reconciled.get(accountId)?.enabled !== true) affinity.delete(conversationKey)
       }
+      for (const [conversationKey, binding] of routeBindings) {
+        if (reconciled.get(binding.to)?.enabled !== true) routeBindings.delete(conversationKey)
+      }
       cursor %= Math.max(accounts.size, 1)
     },
 
@@ -199,9 +207,38 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       account.cooldownMs = wait
     },
 
+    isHealthy(accountId, now = Date.now()) {
+      const account = accounts.get(accountId)
+      return account !== undefined && account.enabled && account.cooldownUntil <= now
+    },
+
+    bindRoute(conversationKey, from, to) {
+      if (from === to) routeBindings.delete(conversationKey)
+      else routeBindings.set(conversationKey, { from, to })
+    },
+
+    /**
+     * The account that serves a conversation's chosen route on the wire. A
+     * fail-over holds until the chosen account's cooldown ends, so a recovered
+     * account takes its conversations back instead of draining the stand-in.
+     */
+    routeFor(conversationKey, provider, now = Date.now()) {
+      if (conversationKey === undefined) return provider
+      const binding = routeBindings.get(conversationKey)
+      if (binding === undefined || binding.from !== provider) return provider
+      const chosen = accounts.get(provider)
+      const standIn = accounts.get(binding.to)
+      if ((chosen?.enabled === true && chosen.cooldownUntil <= now) || standIn?.enabled !== true) {
+        routeBindings.delete(conversationKey)
+        return provider
+      }
+      return binding.to
+    },
+
     unbind(conversationKey) {
       if (conversationKey === undefined) return
       affinity.delete(conversationKey)
+      routeBindings.delete(conversationKey)
     },
 
     setDistribution(next) {
@@ -220,6 +257,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
     reset() {
       accounts.clear()
       affinity.clear()
+      routeBindings.clear()
       cursor = 0
     },
 
@@ -237,27 +275,6 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       }))
     },
   }
-}
-
-/** Rate limits are quota, not transport noise: only these rotate accounts. */
-const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
-  'RATE_LIMIT',
-  'RATE_LIMIT_EXCEEDED',
-  'QUOTA_EXCEEDED',
-  'ACCOUNT_QUOTA_EXCEEDED',
-  'INSUFFICIENT_QUOTA',
-  'USAGE_LIMIT_REACHED',
-])
-
-export interface RateLimitFailure {
-  readonly code?: string
-  readonly status?: number
-}
-
-export const isRateLimitFailure = (failure: RateLimitFailure | undefined | null): boolean => {
-  if (failure === undefined || failure === null) return false
-  if (failure.status === 429 || failure.status === 403) return true
-  return failure.code !== undefined && RATE_LIMIT_CODES.has(failure.code)
 }
 
 /**

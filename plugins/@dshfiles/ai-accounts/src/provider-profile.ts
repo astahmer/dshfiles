@@ -127,20 +127,38 @@ async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChun
  */
 export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+  private readonly routeFor: (options: GenerateOptions) => string
 
-  constructor(config: ConstructorParameters<typeof PiAiAdapter>[0], deps: { reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>> }) {
+  constructor(
+    config: ConstructorParameters<typeof PiAiAdapter>[0],
+    deps: {
+      reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+      /**
+       * The account that serves this request on the wire. A fail-over swaps the
+       * route here only, like Luna Reserve swaps the model, so the picker, the
+       * request header and the transcript keep the route the user chose.
+       */
+      routeFor?: (options: GenerateOptions) => string
+    },
+  ) {
     super(config)
     this.reasoningDefaults = deps.reasoningDefaults
+    this.routeFor = deps.routeFor ?? (options => options.provider)
+  }
+
+  private wireCall(options: GenerateOptions): GenerateOptions {
+    const provider = this.routeFor(options)
+    return pinnedCall(provider === options.provider ? options : { ...options, provider }, this.reasoningDefaults)
   }
 
   override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return retryableUpstreamReplayOverflow(super.stream(pinnedCall(options, this.reasoningDefaults)))
+    return retryableUpstreamReplayOverflow(super.stream(this.wireCall(options)))
   }
 
   override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return super.prepareCall(provider, model, signal).then(call => ({
       ...call,
-      stream: (options: GenerateOptions) => retryableUpstreamReplayOverflow(call.stream(pinnedCall(options, this.reasoningDefaults))),
+      stream: (options: GenerateOptions) => retryableUpstreamReplayOverflow(call.stream(this.wireCall(options))),
     }))
   }
 }

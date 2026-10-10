@@ -7,7 +7,7 @@ import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } fr
 import { createUsageCache } from './account-usage.js'
 import { resolveClaudeInferenceToken } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings } from './settings.js'
+import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readRecoverySettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
@@ -26,9 +26,13 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOp
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import { LlmError, resolveImageAttachmentAccess, type LlmFailure } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
-import { createAccountPool, creditServedAttempt, isRateLimitFailure } from './account-pool.js'
+import { createAccountPool, creditServedAttempt } from './account-pool.js'
+import { createFailureRecovery, offloadResentImages, type RecoveryAction } from './failure-recovery.js'
+// Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
+import type { LlmRetryEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
+import { randomUUID } from 'node:crypto'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
@@ -64,6 +68,9 @@ export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './prov
  */
 
 const HOUR_MS = 3_600_000
+/** A Luna Reserve switch outlives a stale usage card for this long, then the card decides again. */
+const LUNA_RESERVE_HOLD_MS = HOUR_MS
+const NOTICE_MESSAGE_CHARS = 400
 /** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
 const PRICING_CHECK_MS = 30 * 60_000
 
@@ -131,6 +138,9 @@ export default definePlugin({
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
     const claudeUpstream = anthropicProvider()
+    /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
+    const lunaReserveHolds = new Map<string, number>()
+    const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
     const discoveredModelIds = new Map<string, { readonly route: KeyedRoute; readonly modelIds: readonly string[] }>()
     const modelCatalogRefreshes = new Map<string, { readonly route: KeyedRoute; readonly controller: AbortController }>()
     const sameKeyedRoute = (candidate: Route | undefined, expected: KeyedRoute): boolean => {
@@ -194,7 +204,8 @@ export default definePlugin({
                     upstream: codexUpstream,
                     onReserve: () =>
                       readLunaReserveRouting() &&
-                      shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now()),
+                      (lunaReserveHeld(id, Date.now()) ||
+                        shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
                   })
                 : route.kind === CLAUDE_KIND
                   ? claudeUpstream
@@ -234,6 +245,40 @@ export default definePlugin({
     for (const [id, route] of routes) {
       pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
     }
+
+    const offersModel = (id: string, model: string): boolean => profiles.get(id)?.piProvider?.getModels().some(candidate => candidate.id === model) === true
+    const recovery = createFailureRecovery({
+      pool,
+      isAccountRoute: provider => routes.has(provider),
+      readPolicy: () => readRecoverySettings().policy,
+      // Same provider kind and the same model, in the order the usage strip
+      // lists accounts; accounts hidden there never take over a conversation.
+      failoverCandidates: ({ from, model }) => {
+        const source = routes.get(from)
+        if (source === undefined) return []
+        const settings = readRecoverySettings()
+        const hidden = new Set(settings.hiddenUsageAccounts)
+        return [...new Set([...settings.usageOrder, ...routes.keys()])].filter(id => {
+          const route = routes.get(id)
+          return route !== undefined && route.enabled && route.kind === source.kind && !hidden.has(id) && (model === undefined || offersModel(id, model))
+        })
+      },
+      lunaReserve: {
+        available: id => {
+          if (routes.get(id)?.kind !== CODEX_KIND || !readLunaReserveRouting()) return false
+          const now = Date.now()
+          const usage = runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage
+          if (lunaReserveHeld(id, now) || shouldUseLunaReserve(usage, now)) return false
+          if (usage === undefined || usage.status !== 'ok') return true
+          return usage.windows.some(window => window.reserve === true && Math.round(window.percentRemaining) > 0)
+        },
+        engage: id => {
+          lunaReserveHolds.set(id, Date.now() + LUNA_RESERVE_HOLD_MS)
+          runtime.usageCache?.invalidate()
+        },
+      },
+      newRetryId: () => randomUUID(),
+    })
 
     const llm = ctx.get('llm')
     if (llm === undefined) return
@@ -302,7 +347,7 @@ export default definePlugin({
           },
         },
       },
-      { reasoningDefaults },
+      { reasoningDefaults, routeFor: options => recovery.routeFor(options.sessionId, options.provider) },
     )
 
     let adapterRegistration: AdapterRegistrationHandle | undefined
@@ -422,10 +467,10 @@ export default definePlugin({
     ctx.effect(() => {
       disposers.push(
         ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
-          // A conversation's account is bound before the call and credited only
-          // after the upstream answers, so a failed attempt is never "used".
-          const account = pool.acquire(options.sessionId)
-          return creditServedAttempt(next(), { pool, accountId: account?.id })
+          // Credited only after the upstream answers, so a failed attempt is never "used",
+          // and to the account a fail-over put on the wire rather than the chosen route.
+          const accountId = routes.has(options.provider) ? recovery.routeFor(options.sessionId, options.provider) : undefined
+          return creditServedAttempt(next(), { pool, accountId })
         }),
       )
 
@@ -439,19 +484,50 @@ export default definePlugin({
           const id = agent.id
           perAgent.get(id)?.()
           const dispose = agent.ctx.effect(() => {
-            const offRequestError = agent.ctx.on('agent/request-error', async (error, next) => {
-              if (!isRateLimitFailure(error.failure)) return next()
-              const served = pool.acquire(id)
-              if (served?.id !== error.provider) return next()
-              pool.noteRateLimited(error.provider, error.failure.providerRetryAfterMs)
-              pool.unbind(id)
-              ctx.logger.info(`ai-accounts: ${error.provider} is rate limited; the retry can use another account (${pool.distribution()})`)
-              const action = await next()
-              if (action === undefined) await quotaContinuations.recordFailure(agent, served.id)
-              return action
+            const offRequestMessages = agent.ctx.on('agent/request-messages', async ({ turn, step }, next) => {
+              const messages = await next()
+              return recovery.shrinkActive(id, turn, step) ? offloadResentImages(messages) : messages
             })
-            agent.ctx.on('agent/disposed', () => pool.unbind(id))
-            return () => offRequestError()
+            // Prepended so the account policy decides before DSH's provider-wide retry,
+            // which would otherwise spend its retries on an account that is already spent.
+            const offRequestError = agent.ctx.on(
+              'agent/request-error',
+              async ({ turn, step, provider, failure, signal }, next) => {
+                const surface = agent.session.deriveMessages()
+                const action = recovery.recover({
+                  conversationKey: id,
+                  turn,
+                  step,
+                  provider,
+                  model: agent.session.requestHeader()?.config.model,
+                  failure,
+                  canShrink: offloadResentImages(surface) !== surface,
+                })
+                if (action.kind === 'pass') return next()
+                if (action.kind === 'give-up') {
+                  const decision = action.then === 'dsh' ? await next() : undefined
+                  if (decision === undefined && (action.failureKind === 'rateLimit' || action.failureKind === 'exhausted')) {
+                    await quotaContinuations.recordFailure(agent, action.account)
+                  }
+                  return decision
+                }
+                const retryId = action.retryId
+                if (!isRetryId(retryId)) return next()
+                const notice = retryNotice(action, { retryId, turn, step, failure, label: accountId => routes.get(accountId)?.displayName ?? accountId })
+                ctx.logger.info(`ai-accounts: ${notice.failure.message}`)
+                agent.session.append('llm/retry', notice)
+                const delayMs = action.step.kind === 'retry' || action.step.kind === 'wait' ? action.step.delayMs : 0
+                if (!(await cancellableDelay(delayMs, signal))) return undefined
+                agent.session.append('llm/retry-started', { retryId: notice.retryId, turn, step, retry: notice.retry })
+                return { kind: 'retry' }
+              },
+              { prepend: true },
+            )
+            agent.ctx.on('agent/disposed', () => recovery.forget(id))
+            return () => {
+              offRequestError()
+              offRequestMessages()
+            }
           })
           perAgent.set(id, () => {
             dispose()
@@ -480,3 +556,57 @@ export default definePlugin({
     })
   },
 })
+
+/** `RetryId` is an unvalidated brand; narrowing here keeps llm-retry a type-only import. */
+const isRetryId = (id: string): id is RetryId => id.length > 0
+
+const cancellableDelay = (delayMs: number, signal: AbortSignal): Promise<boolean> => {
+  if (signal.aborted) return Promise.resolve(false)
+  if (delayMs <= 0) return Promise.resolve(true)
+  return new Promise(resolve => {
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      resolve(false)
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(true)
+    }, delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * One `llm/retry` row per rung, under this plugin's own policy key so DSH's
+ * retry counter never mistakes it for its own. A switch of account, model or
+ * request carries its own code so the chat row shows what changed instead of
+ * the generic quota or auth text the original code maps to.
+ */
+const retryNotice = (
+  action: Extract<RecoveryAction, { kind: 'retry' }>,
+  context: { readonly retryId: RetryId; readonly turn: number; readonly step: number; readonly failure: LlmFailure; readonly label: (accountId: string) => string },
+): Extract<LlmRetryEventData, { mode: 'normal' }> => {
+  const from = context.label(action.account)
+  const cause = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)
+  const step = action.step
+  const failure: LlmFailure =
+    step.kind === 'failover'
+      ? { message: `Switched from ${from} to ${context.label(step.to)} after: ${cause}`, code: 'ACCOUNT_FAILOVER' }
+      : step.kind === 'luna-reserve'
+        ? { message: `Continuing ${from} on Luna Reserve after: ${cause}`, code: 'LUNA_RESERVE' }
+        : step.kind === 'shrink'
+          ? { message: `Retrying ${from} with earlier images as file placeholders after: ${cause}`, code: 'REQUEST_SHRUNK' }
+          : { ...context.failure, message: `${from}: ${cause}` }
+  return {
+    retryId: context.retryId,
+    turn: context.turn,
+    step: context.step,
+    provider: action.account,
+    mode: 'normal',
+    policyKey: `ai-accounts:${action.failureKind}`,
+    retry: action.attempt,
+    maxRetries: action.plannedAttempts,
+    delayMs: step.kind === 'retry' || step.kind === 'wait' ? step.delayMs : 0,
+    failure,
+  }
+}
