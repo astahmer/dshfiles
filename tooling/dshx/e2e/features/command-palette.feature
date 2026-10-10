@@ -39,3 +39,17 @@ Feature: Command palette
     Given the isolated plugin profile "@dshfiles/command-palette" is booted
     When the command palette is opened
     Then command, content, line, and help prefixes open their matching views
+
+  @scenario:command-palette.new-thread-action
+  Scenario: New thread is searchable in the command palette
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    When the palette query is "New thread"
+    Then the New thread action is available and can run
+
+  @scenario:command-palette.new-thread-cmd-k
+  Scenario: Cmd+K opens the palette with the New thread action
+    Given the web profile is booted
+    When Cmd+K opens the command palette
+    When the palette query is "New thread"
+    Then the New thread action is available and can run

@@ -15,6 +15,11 @@ When('the command palette is opened', async ({ page }: { page: Page }) => {
   await openPalette(page)
 })
 
+When('Cmd+K opens the command palette', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Meta+K')
+  await expect(paletteDialog(page)).toBeVisible()
+})
+
 When('the command palette is reopened', async ({ page }: { page: Page }) => {
   await openPalette(page)
 })
@@ -29,6 +34,14 @@ When('the Go to file action is selected', async ({ page }: { page: Page }) => {
 
 When('the dark-theme action is selected', async ({ page }: { page: Page }) => {
   await paletteOption(page, /Use dark theme/).click()
+})
+
+Then('the New thread action is available and can run', async ({ page }: { page: Page }) => {
+  const newThreadAction = paletteDialog(page).locator('[data-value="destination:@dshfiles/command-palette/new-thread"]')
+  await recordAssertion(page, 'new-thread-action-is-searchable', () => expect(newThreadAction).toBeVisible())
+  await newThreadAction.click()
+  await recordAssertion(page, 'new-thread-action-closes-palette', () => expect(paletteDialog(page)).not.toBeVisible())
+  await finishJourneyAssertions(page)
 })
 
 Then('thread search reports no matches', async ({ page }: { page: Page }) => {
