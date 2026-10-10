@@ -24,6 +24,7 @@ export interface BootedProfile {
   /** Tokenized URL held only for navigation inside the browser test. */
   readonly url: string
   readonly profile: string
+  readonly homeRoot: string
   readonly port: number
   readonly expectedClientEntries: readonly string[]
   readonly host: ChildProcess
@@ -177,6 +178,7 @@ export const startScratchProfile = async (
     return {
       url,
       profile: prepared.profile,
+      homeRoot: prepared.homeRoot,
       port,
       expectedClientEntries,
       host,

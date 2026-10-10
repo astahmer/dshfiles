@@ -201,7 +201,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     queryKey: diagnosticsKey,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.diagnostics({ limit: REPORT_LIMIT }, { signal: hostSignal }) }),
     refetchInterval: 30_000,
-    retry: false,
+    retry: 2,
   })
   const diagnostics = diagnosticsQuery.data
   const liveAgentIds = new Set(diagnostics?.agents.map(agent => agent.id) ?? [])

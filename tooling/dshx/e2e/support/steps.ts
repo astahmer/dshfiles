@@ -1,6 +1,9 @@
 import { expect, type Page } from '@playwright/test'
+import { readdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
+import { redactHostOutput } from './scratch-profile.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
 import {
   capturePageEvidenceFrame,
@@ -65,6 +68,26 @@ const dismissProviderSetupDuringStartup = async (page: Page): Promise<void> => {
   await registerProviderSetupDismissal(page)
 }
 
+const hostApiDiagnosticsFor = async (homeRoot: string): Promise<{ readonly files: readonly string[]; readonly lines: readonly string[] }> => {
+  const logDirectories = ['logs', '.dsh/logs']
+  const logFiles = (
+    await Promise.all(
+      logDirectories.map(async directory => {
+        const entries = await readdir(join(homeRoot, directory), { withFileTypes: true }).catch(() => [])
+        return entries.filter(entry => entry.isFile()).map(entry => ({ name: `${directory}/${entry.name}`, path: join(homeRoot, directory, entry.name) }))
+      }),
+    )
+  ).flat()
+  const logContents = await Promise.all(logFiles.map(file => readFile(file.path, 'utf8').catch(() => '')))
+  return {
+    files: logFiles.map(file => file.name),
+    lines: logContents
+      .flatMap(content => content.split(/\r?\n/))
+      .filter(line => line.includes('API handler') || line.includes('dshx:api'))
+      .slice(-20)
+      .map(redactHostOutput),
+  }
+}
 export const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
   const run = evidenceRunFor(page)
   try {
@@ -282,10 +305,12 @@ After(async ({ page, $testInfo }) => {
         }
       })
       .catch(error => ({ evaluationError: error instanceof Error ? error.message : String(error) }))
+    const profile = profiles.get(page)
     const diagnostics = {
       browserState,
       events: browserDiagnostics.get(page) ?? [],
-      hostOutput: profiles.get(page)?.output() ?? null,
+      hostOutput: profile?.output() ?? null,
+      hostApiDiagnostics: profile === undefined ? [] : await hostApiDiagnosticsFor(profile.homeRoot),
     }
     await $testInfo.attach('browser-diagnostics.json', {
       body: JSON.stringify(diagnostics, null, 2),
