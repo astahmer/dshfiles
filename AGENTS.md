@@ -134,6 +134,13 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r main
   ```
 
+- Before editing code in another repository, inspect its `jj root` and
+  `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
+  changes under `packages/**` belong in the canonical
+  `deepseek-ai/deepseek-harness` checkout (origin:
+  `https://github.com/deepseek-ai/deepseek-harness.git`); create a named
+  workspace in that existing store, not an ad-hoc clone, and record its root
+  and workspace path in the handoff.
 - Before editing, verify `jj root`, `jj status`, and `jj workspace list` from
   that path. Record the T3 thread ID, workspace name, and absolute path in the
   task handoff. Do not use an ad-hoc copy or a T3-generated project directory
