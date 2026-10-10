@@ -51,10 +51,12 @@ const collectPackages = async () => {
 
 const collectScenarioTags = async () => {
   const entries = await readdir(featureRoot, { withFileTypes: true })
+  const featureFiles = new Set()
   const tags = new Map()
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.feature')) continue
     const featureFile = resolve(featureRoot, entry.name)
+    featureFiles.add(featureFile)
     const source = await readFile(featureFile, 'utf8')
     for (const line of source.split(/\r?\n/)) {
       if (!/^\s*@/.test(line)) continue
@@ -65,11 +67,11 @@ const collectScenarioTags = async () => {
       }
     }
   }
-  return tags
+  return { featureFiles, tags }
 }
 
 const packages = await collectPackages()
-const scenarioTags = await collectScenarioTags()
+const { featureFiles, tags: scenarioTags } = await collectScenarioTags()
 const errors = []
 const catalogs = []
 const declaredVerificationIds = new Set()
@@ -155,6 +157,11 @@ for (const [verificationId, featureFile] of expectedGherkin) {
   if (files.length === 0) errors.push(`Declared Gherkin scenario ${verificationId} has no @scenario tag.`)
   if (files.length > 1) errors.push(`Gherkin scenario ${verificationId} is tagged more than once: ${files.map(file => relative(workspaceRoot, file)).join(', ')}.`)
   if (files.length === 1 && files[0] !== featureFile) errors.push(`Gherkin scenario ${verificationId} is tagged in ${relative(workspaceRoot, files[0])}, expected ${relative(workspaceRoot, featureFile)}.`)
+}
+for (const featureFile of new Set(expectedGherkin.values())) {
+  if (isWithin(featureRoot, featureFile) && !featureFiles.has(featureFile)) {
+    errors.push(`Declared Gherkin feature file ${relative(workspaceRoot, featureFile)} is missing from E2E feature discovery.`)
+  }
 }
 for (const [verificationId, files] of scenarioTags) {
   if (!expectedGherkin.has(verificationId)) errors.push(`Orphan @scenario:${verificationId} tag in ${relative(workspaceRoot, files[0])}.`)

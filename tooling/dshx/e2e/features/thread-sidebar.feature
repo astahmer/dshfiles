@@ -1,0 +1,47 @@
+Feature: Thread sidebar journeys
+
+  These journeys use a fresh isolated Host profile with no provider credentials.
+  Blank sessions and settings are created or changed only through the real UI.
+
+  @scenario:thread-sidebar.classification
+  Scenario: Blank Host sessions stay out of classified thread rows
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a blank Host thread is started
+    And the Active section is folded and reopened
+    Then the sidebar keeps the blank session out of classified thread rows
+
+  @scenario:thread-sidebar.idle-archive
+  Scenario: Auto-archive stays opt-in and saves its schedule
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When auto-archive is enabled with a new idle threshold and scan interval
+    Then the policy settings survive a browser reload
+
+  @scenario:thread-sidebar.navigation-layout
+  Scenario: Header destinations can be reordered and hidden
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the header is expanded, reordered, and one destination is hidden
+    Then the custom layout survives a browser reload
+
+  @scenario:thread-sidebar.palette-search
+  Scenario: Thread search reports an empty result from a fresh Host profile
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the sidebar thread-search destination is opened with a nonmatching query
+    Then the thread-sidebar palette shows no matching sessions
+
+  @scenario:thread-sidebar.navigation-history
+  Scenario: Back and Forward follow Host-created blank threads
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When two blank Host threads are opened
+    Then Back and Forward return to the corresponding Host sessions
+
+  @scenario:thread-sidebar.children-links
+  Scenario: Blank Host sessions do not expose child or link actions
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a blank Host thread is started
+    Then no child rows or thread-link actions are offered for the blank session
+
+  @scenario:thread-sidebar.restart-confirmation
+  Scenario: No restart action is offered without pending Host changes
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the thread-sidebar command palette is searched for restart
+    Then no restart action or confirmation appears without pending Host changes

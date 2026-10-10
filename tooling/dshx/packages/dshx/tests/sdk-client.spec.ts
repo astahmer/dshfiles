@@ -3,9 +3,14 @@ import { createTestClient, createTestHost, mountPlugin } from '../src/testing/in
 import { definePlugin, defineTool } from '../src/host/index.js'
 import { defineClientPlugin } from '../src/client/index.js'
 import type { ClientContext } from '../src/client/types.js'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 
 describe('native SDK testing utilities', () => {
+  it('uses the Client face for same-named Cordis services', () => {
+    expectTypeOf<ClientContext['sessions']>().toEqualTypeOf<ISessions>()
+  })
+
   it('derives Cordis service injection from declared Client capabilities', () => {
     const definition = defineClientPlugin({ id: 'capability-injection', uses: ['ui', 'panels', 'rpc'] })
     expect(definition.inject).toEqual(['slots', 'layout', 'connection'])

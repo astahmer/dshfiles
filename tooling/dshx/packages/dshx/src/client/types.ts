@@ -1,4 +1,5 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { BuiltInLocaleId } from '@deepseek-ai/dsh-client-locale/client'
 import type {
   ChildrenDecl,
@@ -22,7 +23,9 @@ declare const localeDefinitionBrand: unique symbol
 type LocaleDictionary = Readonly<Record<string, string>>
 
 /** Client service contracts that replace same-named Host services in Cordis Context. */
-export interface ClientServiceMap {}
+export interface ClientServiceMap {
+  readonly sessions: ISessions
+}
 
 export type ClientContext = Omit<Context, keyof ClientServiceMap> & ClientServiceMap
 

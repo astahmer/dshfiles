@@ -75,3 +75,12 @@ test('rejects orphan and missing scenario tags instead of silently reducing cove
     assert.match(result.stderr, /Orphan @scenario:demo\.unknown tag/)
   })
 })
+
+test('reports a missing Gherkin file separately from a missing scenario tag', async () => {
+  await withFixture(async ({ root, featureFile }) => {
+    await rm(featureFile)
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Declared Gherkin feature file tooling\/dshx\/e2e\/features\/demo\.feature is missing from E2E feature discovery/)
+  })
+})

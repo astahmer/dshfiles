@@ -142,7 +142,7 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.classification",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",
@@ -244,7 +244,7 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.idle-archive",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",
@@ -382,7 +382,7 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-layout",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",
@@ -493,12 +493,12 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.palette-search",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-history",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",
@@ -561,7 +561,7 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.children-links",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",
@@ -621,7 +621,7 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.restart-confirmation",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
           "kind": "unit-test",

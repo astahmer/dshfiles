@@ -9,12 +9,13 @@
     "catalog",
     "catalogReferences",
   ],
-  "ignoreBinaries": ["dsh", "jj"],
+  "ignoreBinaries": ["dsh", "dshx", "jj"],
   "ignore": ["scripts/smoke-multi-host*.mjs"],
   "workspaces": {
     ".": {
       "entry": [
         "e2e/support/steps.ts",
+        "e2e/support/plugin-journeys/**/*.ts",
         "scripts/smoke-client-slot.mjs",
         "scripts/smoke-multi-host.mjs",
         "scripts/smoke-multi-host-ssh.mjs"
