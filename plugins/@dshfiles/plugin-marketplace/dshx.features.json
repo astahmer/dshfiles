@@ -73,6 +73,30 @@
           "kind": "gherkin",
           "id": "plugin-marketplace.hub-boundary",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.catalog-browse-unit-search-sort",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/MarketplaceTab.test.tsx",
+          "testName": "searches the Hub server-side after a debounce and sorts by stars"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.catalog-browse-unit-compatibility-filter",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/MarketplaceTab.test.tsx",
+          "testName": "applies the configured default sort and hides incompatible plugins until toggled off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.catalog-browse-unit-page-retry",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/MarketplaceTab.test.tsx",
+          "testName": "handles list failure, retry, empty categories and cursor pagination"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.catalog-browse-unit-host-list-search",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
+          "testName": "forwards search and sort and exposes author, avatar, stars, update date and total"
         }
       ]
     },
@@ -115,6 +139,30 @@
           "kind": "gherkin",
           "id": "plugin-marketplace.install-retry",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.guarded-plugin-install-unit-double-confirmation",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/MarketplaceTab.test.tsx",
+          "testName": "requires two confirmations with the fixed risk statement before every download"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.guarded-plugin-install-unit-install-retry",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/MarketplaceTab.test.tsx",
+          "testName": "surfaces stable install errors and retries through the same confirmation path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.guarded-plugin-install-unit-verified-install",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
+          "testName": "installs a community plugin with the verified spec and verifies activation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "plugin-marketplace.guarded-plugin-install-unit-inactive-bundle-rejected",
+          "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
+          "testName": "rejects a zero exit when the bundle was not activated"
         }
       ]
     }

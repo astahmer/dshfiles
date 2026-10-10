@@ -75,6 +75,30 @@
           "kind": "gherkin",
           "id": "secret-catalog.project-picker",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.scoped-alias-catalog-unit-scope-filter",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-model.test.ts",
+          "testName": "filters All, Project, Global, and Local metadata scopes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.scoped-alias-catalog-unit-scope-identity-guard",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-catalog-model.test.ts",
+          "testName": "requires a selected folder for project/local rows and blocks ambiguous alias/environment actions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.scoped-alias-catalog-unit-metadata-projection",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "projects only value-free metadata from the CLI JSON contract"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.scoped-alias-catalog-unit-picker-host-contract",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "routes picker browsing and workspace registration through the Host Remote contracts"
         }
       ]
     },
@@ -128,6 +152,30 @@
           "kind": "gherkin",
           "id": "secret-catalog.reveal-expiry",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.bounded-secret-reveal-unit-exact-alias-reveal",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "runs reveal and clipboard copy only when exact alias methods are called"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.bounded-secret-reveal-unit-reveal-state-cycle",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reveal-model.test.ts",
+          "testName": "cycles from preview to full to hidden"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.bounded-secret-reveal-unit-masked-preview",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reveal-model.test.ts",
+          "testName": "previews long values at both ends and keeps short values masked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.bounded-secret-reveal-unit-secret-cli-output-redaction",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "does not expose CLI stdout for copy and mutation commands"
         }
       ]
     },
@@ -170,6 +218,48 @@
           "kind": "gherkin",
           "id": "secret-catalog.rename-remove",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-create-value-boundary",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
+          "testName": "keeps a generated value out of the request and omits blank metadata"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-manual-value-form",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
+          "testName": "passes a manual value through unchanged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-explicit-delete-confirmation",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-model.test.ts",
+          "testName": "requires a second explicit action before removing an alias or deleting its vault item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-replace-value-review",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-model.test.ts",
+          "testName": "requires a review step before replacing an existing value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-rename-exact-alias",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "renames an alias in its own config before editing it under the new name"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-alias-vs-vault-delete",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "keeps project alias removal distinct from global item deletion"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.alias-mutations-unit-stdin-secret-value",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
+          "testName": "adds manual local aliases over stdin without putting their values in argv or output"
         }
       ]
     },

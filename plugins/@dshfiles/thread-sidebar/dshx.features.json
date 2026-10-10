@@ -143,6 +143,24 @@
           "kind": "gherkin",
           "id": "thread-sidebar.classification",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-classification-unit-section-collapse-defaults",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "archived starts folded and the working sections start open"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-classification-unit-classification-priority",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "recent threads stay active until idle threshold; running and organization state keep priority"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-classification-unit-parked-settings-storage",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "parked ids, sidebar settings, and navigation choices round-trip through browser storage"
         }
       ]
     },
@@ -227,6 +245,24 @@
           "kind": "gherkin",
           "id": "thread-sidebar.idle-archive",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-idle-transition-boundary",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "next idle transition ignores running sessions and returns earliest future boundary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-auto-archive-eligibility",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "auto archive requires an old, idle, nonblank, unpinned, unparked, included session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-archive-never-stops-host",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "archive adapter explicitly refuses to stop Host activity"
         }
       ]
     },
@@ -347,6 +383,36 @@
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-layout",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-layout-unit-saved-navigation-order",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "navigation preferences preserve independent order, visibility, and header mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-layout-unit-header-footer-reorder",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "header and footer entries use saved ordering and boundary-safe movement"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-layout-unit-saved-split-height",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "valid saved split heights persist and invalid heights are rejected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-layout-unit-slot-composition-takeover",
+          "file": "plugins/@dshfiles/thread-sidebar/src/slot-takeover.test.ts",
+          "testName": "composition disables native declarations before the full sidebar can own them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.navigation-layout-unit-slot-seat-ownership",
+          "file": "plugins/@dshfiles/thread-sidebar/src/slot-takeover.test.ts",
+          "testName": "the seat above the foot exists only once this sidebar declares it"
         }
       ]
     },
@@ -433,6 +499,30 @@
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-history",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.palette-search-history-unit-history-back-forward",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-history.test.ts",
+          "testName": "back and forward walk visited threads and panels, disabled at either end"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.palette-search-history-unit-history-prune-forward",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-history.test.ts",
+          "testName": "visiting after going back drops the forward entries; revisiting the current entry is a no-op"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.palette-search-history-unit-history-limit",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-history.test.ts",
+          "testName": "history keeps only the newest entries past its limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.palette-search-history-unit-history-menu-jump",
+          "file": "plugins/@dshfiles/thread-sidebar/src/navigation-history.test.ts",
+          "testName": "the history menu jumps to any visited entry and keeps the rest for back and forward"
         }
       ]
     },
@@ -472,6 +562,36 @@
           "kind": "gherkin",
           "id": "thread-sidebar.children-links",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-nested-child-folding",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "subagents and their own children fold under the top-most listed ancestor, newest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-child-cycle-bound",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "a refused ancestor does not adopt the child, and a parent cycle stays bounded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-child-limit-open-thread",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "the open child stays visible even past the limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-sanitized-thread-link",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-url.test.ts",
+          "testName": "copied thread links retain the app path and omit transient credentials and fragments"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-thread-mention-token",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread mentions are inserted as a token followed by one space"
         }
       ]
     },
@@ -502,6 +622,24 @@
           "kind": "gherkin",
           "id": "thread-sidebar.restart-confirmation",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-restart-gate",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart.test.ts",
+          "testName": "restart availability requires both the launcher handoff and the DSH exit hook"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-graceful-restart-marker",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart.test.ts",
+          "testName": "restart request writes one marker and schedules a distinct graceful exit code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-host-vs-client-restart-detection",
+          "file": "plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts",
+          "testName": "only Host code or manifest changes since boot need a restart, not client rebuilds or identical rebuilds"
         }
       ]
     }

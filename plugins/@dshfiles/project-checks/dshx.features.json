@@ -125,6 +125,36 @@
           "kind": "gherkin",
           "id": "project-checks.verify-retry",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-trusted-action-config",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "requires absolute trusted roots and unique action ids"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-receipt-retention",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "trims old receipts per session while preserving the newest rows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-trusted-root-boundary",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "allows a session directory under its trusted root and rejects sibling traversal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-stale-revision",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "marks check receipts stale when the working-copy revision changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-completion-feedback",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "bounds completion feedback and names the attempt limit"
         }
       ]
     },
@@ -153,6 +183,12 @@
           "kind": "gherkin",
           "id": "project-checks.native-hook-events",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.native-hook-receipts-unit-native-hook-duration",
+          "file": "plugins/@dshfiles/project-checks/src/api.test.ts",
+          "testName": "accepts fractional durations recorded by the native Hook Protocol"
         }
       ]
     }

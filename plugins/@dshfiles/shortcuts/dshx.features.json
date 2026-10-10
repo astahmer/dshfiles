@@ -32,6 +32,30 @@
           "kind": "gherkin",
           "id": "shortcuts.platform-primary",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.sidebar-toggle-chord-unit-platform-primary-modifier",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "resolves primary to Meta on macOS and Control elsewhere"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.sidebar-toggle-chord-unit-extra-modifier-rejected",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "refuses a chord carrying an extra modifier"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.sidebar-toggle-chord-unit-capture-before-bubble",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "claims a matching chord before bubble listeners see it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.sidebar-toggle-chord-unit-repeat-and-prior-claim",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "leaves events alone that someone else already handled or that repeat"
         }
       ]
     },
@@ -65,6 +89,18 @@
           "kind": "gherkin",
           "id": "shortcuts.unclaimed-events",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.panel-selection-chords-unit-editable-target-guard",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "accepts text fields and editable regions, refuses buttons and checkboxes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shortcuts.panel-selection-chords-unit-dispose-handler",
+          "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
+          "testName": "stops listening once disposed"
         }
       ]
     }

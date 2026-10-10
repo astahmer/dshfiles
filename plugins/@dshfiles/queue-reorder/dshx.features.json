@@ -60,6 +60,30 @@
           "kind": "gherkin",
           "id": "queue-reorder.dock-preferences",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-ordering-unit-move-preserves-identity",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
+          "testName": "moves an item one position as a remove plus an insert, keeping its identity"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-ordering-unit-move-boundaries",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
+          "testName": "leaves an item at either end in place without splicing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-ordering-unit-next-step-location",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
+          "testName": "finds an item in the next-step list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-ordering-unit-stale-queue-item",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
+          "testName": "reports an item that is no longer pending"
         }
       ]
     },
@@ -93,6 +117,24 @@
           "kind": "gherkin",
           "id": "queue-reorder.busy-locks",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.text-only-message-editing-unit-editable-text-only",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "editableQueueText preserves text-only content"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.text-only-message-editing-unit-reject-attachments-and-empty",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "editableQueueText rejects attachments and blank content"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.text-only-message-editing-unit-host-queue-edit-action",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-editor-rendering.test.ts",
+          "testName": "queue edit uses the Host queue action instead of composer-only APIs"
         }
       ]
     }

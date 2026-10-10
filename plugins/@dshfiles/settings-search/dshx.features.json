@@ -66,6 +66,24 @@
           "kind": "gherkin",
           "id": "settings-search.keyboard-navigation",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.settings-index-search-unit-field-description-search",
+          "file": "plugins/@dshfiles/settings-search/src/settings-index.test.ts",
+          "testName": "searches field names, descriptions, namespace and section context"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.settings-index-search-unit-secret-path-redaction",
+          "file": "plugins/@dshfiles/settings-search/src/settings-index.test.ts",
+          "testName": "keeps empty-query browsing explicit and removes secret paths and descendants"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.settings-index-search-unit-stable-field-identity",
+          "file": "plugins/@dshfiles/settings-search/src/settings-index.test.ts",
+          "testName": "returns stable entry and field identities with namespace context"
         }
       ]
     },
@@ -107,6 +125,24 @@
           "kind": "gherkin",
           "id": "settings-search.owner-route",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.typed-setting-editor-unit-typed-json-validation",
+          "file": "plugins/@dshfiles/settings-search/src/settings-editor-model.test.ts",
+          "testName": "parses edits into typed JSON values and rejects invalid drafts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.typed-setting-editor-unit-exact-set-or-unset",
+          "file": "plugins/@dshfiles/settings-search/src/settings-editor-model.test.ts",
+          "testName": "maps a selected stable target to one exact set or inherited-value operation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.typed-setting-editor-unit-constant-union-options",
+          "file": "plugins/@dshfiles/settings-search/src/settings-editor-model.test.ts",
+          "testName": "uses typed select choices for union-of-constant schema fields"
         }
       ]
     }

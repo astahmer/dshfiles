@@ -32,6 +32,24 @@
           "kind": "gherkin",
           "id": "prompt-stash.storage-failure",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.prompt-library-unit-cross-tab-edit",
+          "file": "plugins/@dshfiles/prompt-stash/src/library.test.ts",
+          "testName": "refuses to overwrite a prompt changed in another browser tab"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.prompt-library-unit-cross-tab-delete",
+          "file": "plugins/@dshfiles/prompt-stash/src/library.test.ts",
+          "testName": "keeps the stored prompt when another tab changes it before deletion"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.prompt-library-unit-library-size-and-identity",
+          "file": "plugins/@dshfiles/prompt-stash/src/library.test.ts",
+          "testName": "rejects oversized text and duplicate prompt identities"
         }
       ]
     },
@@ -92,6 +110,24 @@
           "kind": "gherkin",
           "id": "prompt-stash.recent-user-messages",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.recent-user-prompts-unit-recent-user-only",
+          "file": "plugins/@dshfiles/prompt-stash/src/recent-prompts.test.ts",
+          "testName": "keeps newest user text in reverse order and excludes attachments and non-user messages"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.recent-user-prompts-unit-recent-anchor-validation",
+          "file": "plugins/@dshfiles/prompt-stash/src/recent-prompts.test.ts",
+          "testName": "ignores malformed rows and mismatched event anchors"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.recent-user-prompts-unit-recent-history-bounds",
+          "file": "plugins/@dshfiles/prompt-stash/src/recent-prompts.test.ts",
+          "testName": "deduplicates stable node identities and bounds the visible history"
         }
       ]
     },
@@ -120,6 +156,24 @@
           "kind": "gherkin",
           "id": "prompt-stash.draft-limits",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-and-sent-history-unit-draft-input-guard",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
+          "testName": "rejects a draft when the composer is busy, empty, too large, or contains non-text data"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-and-sent-history-unit-draft-storage-bounds",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
+          "testName": "ignores malformed, oversized, duplicate-id, and over-capacity stores"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-and-sent-history-unit-sent-history-projection",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
+          "testName": "reads only bounded plain-text user messages"
         }
       ]
     }

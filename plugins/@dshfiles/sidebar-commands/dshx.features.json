@@ -31,6 +31,24 @@
           "kind": "gherkin",
           "id": "sidebar-commands.stale-target",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.dynamic-panel-navigation-unit-registered-panels-only",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "lists only panels whose id is a registered main panel, sorted by label"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.dynamic-panel-navigation-unit-panel-label-fallback",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "falls back to the panel id when the label is blank"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.dynamic-panel-navigation-unit-stale-target-rejected",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "throws synchronously for a target that disappeared, scheduling nothing"
         }
       ]
     },
@@ -59,6 +77,30 @@
           "kind": "gherkin",
           "id": "sidebar-commands.recent-sessions",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.recent-session-navigation-unit-recent-session-filter",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "hides blank, subagent and archived sessions and orders the rest by recency"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.recent-session-navigation-unit-recent-session-limit",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "caps the session list at twenty rows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.recent-session-navigation-unit-session-list-not-ready",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "returns no sessions before the list snapshot lands"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.recent-session-navigation-unit-deferred-navigation",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "navigates only after onSelect has returned, so the shell can consume the token first"
         }
       ]
     },
@@ -86,6 +128,12 @@
           "kind": "gherkin",
           "id": "sidebar-commands.palette-capability",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-commands.thread-sidebar-palette-actions-unit-palette-capability-ack",
+          "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
+          "testName": "leads with palette actions only when the thread sidebar acknowledged the palette"
         }
       ]
     }

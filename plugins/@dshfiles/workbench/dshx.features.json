@@ -56,6 +56,36 @@
           "kind": "gherkin",
           "id": "workbench.surface-layouts",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-default-split-layout",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "opens the first two registered panels side by side by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-layout-restoration",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "restores the saved layout after a reload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-missing-panel-placeholder",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "keeps a saved panel whose plugin is gone as a closable placeholder that recovers on registration"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-invalid-layout-fallback",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "falls back to the default layout when Dockview rejects the saved one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-side-and-main-storage",
+          "file": "plugins/@dshfiles/workbench/src/layout-store.test.ts",
+          "testName": "keeps the side-panel layout apart from the main-area one"
         }
       ]
     },
@@ -83,6 +113,24 @@
           "kind": "gherkin",
           "id": "workbench.early-open",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.early-panel-registration-unit-queued-open-requests",
+          "file": "plugins/@dshfiles/workbench/src/registry.test.ts",
+          "testName": "keeps open requests, deduplicated and latest last, until the workbench takes them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.early-panel-registration-unit-open-before-mount",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "opens a panel another plugin asks for, even when asked before the view mounted"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.early-panel-registration-unit-shared-registry-instance",
+          "file": "plugins/@dshfiles/workbench/src/registry.test.ts",
+          "testName": "shares one page-wide instance across bundles through a global symbol"
         }
       ]
     }
