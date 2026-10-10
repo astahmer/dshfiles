@@ -2,7 +2,6 @@ import { expect, type Page } from '@playwright/test'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
-import { redactHostOutput } from './scratch-profile.js'
 import {
   capturePageEvidenceFrame,
   completeEvidenceStep,
