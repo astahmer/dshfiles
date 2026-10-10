@@ -396,6 +396,27 @@ A plugin that installs is not a plugin that works.
 - Prefer `dsh --profile web --dump-config` over reading installed plugin source
   to learn what a profile actually loads.
 
+### Owned-plugin completion means live-profile verification
+
+Do not treat a successful source build or an edit to `profiles/web/` as proof
+that the running web profile has the bundle. Keep these stages distinct:
+source validated, web seed updated, installed profile synced, live runtime
+confirmed. Report which stages are complete.
+
+After scratch/probe validation and an intentional promotion to web, sync the
+specific owned bundle into the actual profile with
+`fnm exec --using=22.23.3 pnpm profile:sync --profile web --bundle @dshfiles/<name>`.
+Read `docs/profile-installs.md` first. Then verify the installed profile and
+run `dsh --profile web --dump-config`; where possible, inspect the live client
+slot or behavior too. If the active profile was not synced, say so plainly.
+
+For migrations that move a keybinding or event owner between plugins, do not
+HMR-remove the old owner until the replacement is available in the live client
+(or keep a compatibility fallback). Otherwise a source update can disable the
+feature before its new bundle is installed. If the bundle is synced but not
+present in the running runtime, explain that a user-controlled restart is
+needed; never restart the live web instance yourself.
+
 ### Rebuilt plugins reach the browser over HMR
 
 `dsh web` does **not** need a restart to pick up a rebuilt plugin.
