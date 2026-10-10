@@ -35,6 +35,8 @@ const evidenceRunFor = (page: Page): EvidenceRun => {
   return run
 }
 
+export const browserDiagnosticsFor = (page: Page): readonly string[] => browserDiagnostics.get(page) ?? []
+
 export const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
   const run = evidenceRunFor(page)
   try {
@@ -66,6 +68,16 @@ Before(async ({ page, $testInfo }) => {
     expectedStepIds: ['profile-booted', 'assertion-complete', 'host-cleanup'],
   })
   evidenceRuns.set(page, run)
+  const diagnostics: string[] = []
+  browserDiagnostics.set(page, diagnostics)
+  page.on('console', message => {
+    if (message.type() === 'error') diagnostics.push(`console.error: ${message.text().replaceAll(PRIVATE_URL, '<private-url>')}`)
+  })
+  page.on('pageerror', error => diagnostics.push(`pageerror: ${error.message.replaceAll(PRIVATE_URL, '<private-url>')}`))
+  page.on('requestfailed', request => diagnostics.push(`requestfailed: ${request.resourceType()} ${request.failure()?.errorText ?? 'unknown'}`))
+  page.on('response', response => {
+    if (response.status() >= 400) diagnostics.push(`http ${response.status()}: ${response.request().resourceType()}`)
+  })
 })
 
 const profileFor = (page: Page): BootedProfile => {
@@ -118,10 +130,15 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   profiles.set(page, profile)
   try {
     await visitScratchProfile(page, profile)
-    const previewNoticeContinue = page.getByRole('button', { name: 'Continue', exact: true })
-    await expect(previewNoticeContinue).toBeVisible()
-    await previewNoticeContinue.click()
-    await expect(previewNoticeContinue).toBeHidden()
+    const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
+    await expect(previewNotice).toBeVisible()
+    await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
+    await expect(previewNotice).toBeHidden()
+
+    const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
+    await expect(providerSetup).toBeVisible()
+    await providerSetup.getByRole('button', { name: 'Configure later', exact: true }).click()
+    await expect(providerSetup).toBeHidden()
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {
@@ -182,6 +199,44 @@ Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
 After(async ({ page, $testInfo }) => {
   const run = evidenceRuns.get(page)
   let cleanupError: unknown
+  if ($testInfo.status !== 'passed') {
+    const browserState = await page
+      .evaluate(() => {
+        const isVisible = (element: HTMLElement): boolean => {
+          const style = getComputedStyle(element)
+          const rect = element.getBoundingClientRect()
+          return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+        }
+        const settingsButton = document.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')
+        const settingsTarget =
+          settingsButton === null
+            ? null
+            : document.elementFromPoint(
+                settingsButton.getBoundingClientRect().x + settingsButton.getBoundingClientRect().width / 2,
+                settingsButton.getBoundingClientRect().y + settingsButton.getBoundingClientRect().height / 2,
+              )
+        return {
+          dialogs: Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'))
+            .filter(isVisible)
+            .map(dialog => ({
+              title: dialog.querySelector<HTMLElement>('[role="heading"]')?.innerText.trim() ?? '',
+              alerts: Array.from(dialog.querySelectorAll<HTMLElement>('[role="alert"]'), alert => alert.innerText.trim()),
+              buttons: Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'), button => button.getAttribute('aria-label') ?? button.innerText.trim()),
+            })),
+          settingsTarget: settingsTarget === null ? null : { tag: settingsTarget.tagName, role: settingsTarget.getAttribute('role'), className: String(settingsTarget.className) },
+        }
+      })
+      .catch(error => ({ evaluationError: error instanceof Error ? error.message : String(error) }))
+    const diagnostics = {
+      browserState,
+      events: browserDiagnostics.get(page) ?? [],
+      hostOutput: profiles.get(page)?.output() ?? null,
+    }
+    await $testInfo.attach('browser-diagnostics.json', {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: 'application/json',
+    })
+  }
   if (run !== undefined) await capturePageEvidenceFrame(run, page, 'final-state').catch(error => (cleanupError = error))
   try {
     await profiles.get(page)?.close()

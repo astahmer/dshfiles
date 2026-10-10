@@ -20,7 +20,7 @@
             "false"
           ],
           "coveredBy": [
-            "settings-search.search-redaction"
+            "settings-search.keyboard-navigation"
           ]
         },
         {
@@ -59,13 +59,13 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "settings-search.search-redaction",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "id": "settings-search.settings-index-search",
+          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
         },
         {
           "kind": "gherkin",
           "id": "settings-search.keyboard-navigation",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
         },
         {
           "kind": "unit-test",
@@ -114,17 +114,17 @@
         {
           "kind": "gherkin",
           "id": "settings-search.typed-edit",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
         },
         {
           "kind": "gherkin",
           "id": "settings-search.reset-override",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
         },
         {
           "kind": "gherkin",
           "id": "settings-search.owner-route",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
         },
         {
           "kind": "unit-test",

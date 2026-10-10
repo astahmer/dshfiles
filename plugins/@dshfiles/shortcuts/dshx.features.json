@@ -26,12 +26,17 @@
         {
           "kind": "gherkin",
           "id": "shortcuts.sidebar-toggle",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
         },
         {
           "kind": "gherkin",
           "id": "shortcuts.platform-primary",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "shortcuts.repeated-keydown",
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
         },
         {
           "kind": "unit-test",
@@ -82,13 +87,8 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "shortcuts.panel-selection",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
-        },
-        {
-          "kind": "gherkin",
           "id": "shortcuts.unclaimed-events",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
         },
         {
           "kind": "unit-test",
