@@ -3,9 +3,16 @@ import { resolve } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
-import { createCommunicationService, startHostCommunicationBridge, type CommunicationMessage, type CommunicationPrincipal } from '@dshfiles/dshx/communication'
+import {
+  CommunicationError,
+  createCommunicationService,
+  startHostCommunicationBridge,
+  type CommunicationActivityOperation,
+  type CommunicationMessage,
+  type CommunicationPrincipal,
+} from '@dshfiles/dshx/communication'
 import type { Context, Effect } from '@deepseek-ai/cordis'
-import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
+import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { formatInbox, messageReference, notificationText } from './messages.js'
 
 const summaryOutputSchema = {
@@ -48,12 +55,16 @@ const agentListTool = defineTool({
   description: 'List live DSH Agents and their Session ids. Use this to find a recipient for a direct peer message.',
   parameters: {},
   output: summaryOutput,
-  execute: async () => {
-    const context = hostContext
-    if (context === undefined) throw new Error('Agent communication Host is not active.')
-    const items = context.agents.list().map(agent => ({ id: agent.id, status: agent.status }))
-    return { summary: JSON.stringify({ agents: items }) }
-  },
+  execute: async (_args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_agents',
+      run: async () => {
+        if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
+        const items = hostContext.agents.list().map(agent => ({ id: agent.id, status: agent.status }))
+        return { summary: JSON.stringify({ agents: items }) }
+      },
+    }),
 })
 
 const topicListTool = defineTool({
@@ -61,10 +72,15 @@ const topicListTool = defineTool({
   description: 'List communication topics. Agents with the same DSH working directory join its hashed workspace topic automatically.',
   parameters: {},
   output: summaryOutput,
-  execute: async () => {
-    const service = requireService()
-    return { summary: JSON.stringify({ topics: await service.listTopics() }) }
-  },
+  execute: async (_args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_topics',
+      run: async () => {
+        const service = requireService()
+        return { summary: JSON.stringify({ topics: await service.listTopics() }) }
+      },
+    }),
 })
 
 const subscribeTool = defineTool({
@@ -81,20 +97,25 @@ const subscribeTool = defineTool({
     allowSteerFrom: { type: 'string', description: 'Comma-separated DSH Agent Session ids allowed to steer when delivery is steer.' },
   },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const principal = principalForAgent(execution.agent)
-    const allowSteerFrom =
-      args.allowSteerFrom
-        ?.split(',')
-        .map(value => value.trim())
-        .filter(Boolean) ?? []
-    const subscription = await requireService().subscribe(principal, {
-      topic: args.topic,
-      ...(args.delivery === undefined ? {} : { delivery: args.delivery }),
-      allowSteerFrom,
-    })
-    return { summary: `Subscribed ${principal.id} to ${subscription.topic} with ${subscription.delivery} delivery.` }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_subscribe',
+      run: async () => {
+        const principal = principalForAgent(execution.agent)
+        const allowSteerFrom =
+          args.allowSteerFrom
+            ?.split(',')
+            .map(value => value.trim())
+            .filter(Boolean) ?? []
+        const subscription = await requireService().subscribe(principal, {
+          topic: args.topic,
+          delivery: args.delivery ?? 'queue',
+          allowSteerFrom,
+        })
+        return { summary: `Subscribed ${principal.id} to ${subscription.topic} with ${subscription.delivery} delivery.` }
+      },
+    }),
 })
 
 const unsubscribeTool = defineTool({
@@ -103,11 +124,16 @@ const unsubscribeTool = defineTool({
     'Unsubscribe this Agent from a topic. Unsubscribing from its workspace topic opts out of automatic workspace rejoin; set inbox delivery to quiet to mute direct-message notices.',
   parameters: { topic: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const principal = principalForAgent(execution.agent)
-    const result = await requireService().unsubscribe(principal, args.topic)
-    return { summary: result.removed ? `Unsubscribed from ${args.topic}.` : `No subscription existed for ${args.topic}.` }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_unsubscribe',
+      run: async () => {
+        const principal = principalForAgent(execution.agent)
+        const result = await requireService().unsubscribe(principal, args.topic)
+        return { summary: result.removed ? `Unsubscribed from ${args.topic}.` : `No subscription existed for ${args.topic}.` }
+      },
+    }),
 })
 
 const publishTool = defineTool({
@@ -119,16 +145,21 @@ const publishTool = defineTool({
     priority: { type: 'string', enum: ['normal', 'urgent'], description: 'Urgent can steer only if the receiver opted in and allowlisted this sender.' },
   },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const sender = principalForAgent(execution.agent)
-    const message = await requireService().publish({
-      sender,
-      topic: args.topic,
-      text: args.text,
-      ...(args.priority === undefined ? {} : { priority: args.priority }),
-    })
-    return { summary: `Published ${message.id} to ${message.topic}; ${message.recipients.length} subscriber(s) matched.` }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_publish',
+      run: async () => {
+        const sender = principalForAgent(execution.agent)
+        const message = await requireService().publish({
+          sender,
+          topic: args.topic,
+          text: args.text,
+          priority: args.priority ?? 'normal',
+        })
+        return { summary: `Published ${message.id} to ${message.topic}; ${message.recipients.length} subscriber(s) matched.` }
+      },
+    }),
 })
 
 const sendTool = defineTool({
@@ -141,16 +172,21 @@ const sendTool = defineTool({
     priority: { type: 'string', enum: ['normal', 'urgent'] },
   },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const sender = principalForAgent(execution.agent)
-    const message = await requireService().send({
-      sender,
-      toAgentId: args.toAgentId,
-      text: args.text,
-      ...(args.priority === undefined ? {} : { priority: args.priority }),
-    })
-    return { summary: `Sent ${message.id} to ${args.toAgentId}; the message is durably stored in the recipient inbox.` }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_send',
+      run: async () => {
+        const sender = principalForAgent(execution.agent)
+        const message = await requireService().send({
+          sender,
+          toAgentId: args.toAgentId,
+          text: args.text,
+          priority: args.priority ?? 'normal',
+        })
+        return { summary: `Sent ${message.id} to ${args.toAgentId}; the message is durably stored in the recipient inbox.` }
+      },
+    }),
 })
 
 const inboxTool = defineTool({
@@ -161,15 +197,18 @@ const inboxTool = defineTool({
     limit: { type: 'integer', description: 'Maximum messages, 1 to 500; defaults to 20.' },
   },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const principal = principalForAgent(execution.agent)
-    const items = await requireService().inbox({
-      principal,
-      ...(args.topic === undefined ? {} : { topic: args.topic }),
-      limit: args.limit ?? 20,
-    })
-    return { summary: formatInbox(items) }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_inbox',
+      run: async () => {
+        const principal = principalForAgent(execution.agent)
+        const limit = args.limit ?? 20
+        const inboxInput = args.topic === undefined ? { principal, limit } : { principal, topic: args.topic, limit }
+        const items = await requireService().inbox(inboxInput)
+        return { summary: formatInbox(items) }
+      },
+    }),
 })
 
 const acknowledgeTool = defineTool({
@@ -177,11 +216,16 @@ const acknowledgeTool = defineTool({
   description: 'Acknowledge one message in this Agent’s inbox so it will no longer appear in future inbox reads.',
   parameters: { messageId: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => {
-    const principal = principalForAgent(execution.agent)
-    const result = await requireService().acknowledge(principal, args.messageId)
-    return { summary: result.acknowledged ? `Acknowledged ${args.messageId}.` : `Message ${args.messageId} was already acknowledged.` }
-  },
+  execute: async (args, execution) =>
+    trackToolActivity({
+      execution,
+      operation: 'dshx_comm_ack',
+      run: async () => {
+        const principal = principalForAgent(execution.agent)
+        const result = await requireService().acknowledge(principal, args.messageId)
+        return { summary: result.acknowledged ? `Acknowledged ${args.messageId}.` : `Message ${args.messageId} was already acknowledged.` }
+      },
+    }),
 })
 
 let hostContext: Context | undefined
@@ -190,6 +234,40 @@ let communicationService: ReturnType<typeof createCommunicationService> | undefi
 const requireService = (): ReturnType<typeof createCommunicationService> => {
   if (communicationService === undefined) throw new Error('Agent communication Host is not active.')
   return communicationService
+}
+
+type ToolActivityResult<Value> = { readonly outcome: 'success'; readonly value: Value } | { readonly outcome: 'failure'; readonly error: unknown }
+
+const trackToolActivity = async <Value>(input: {
+  readonly execution: ToolRunContext
+  readonly operation: CommunicationActivityOperation
+  readonly run: () => Promise<Value>
+}): Promise<Value> => {
+  const startedAt = performance.now()
+  const result = await input.run().then(
+    (value): ToolActivityResult<Value> => ({ outcome: 'success', value }),
+    (error): ToolActivityResult<Value> => ({ outcome: 'failure', error }),
+  )
+  const agent = input.execution.agent
+  if (agent !== undefined) {
+    try {
+      await requireService().recordActivity({
+        principal: { kind: 'agent', id: agent.id },
+        operation: input.operation,
+        outcome: result.outcome,
+        occurredAt: Date.now(),
+        durationMs: Math.min(3_600_000, Math.max(0, Math.round(performance.now() - startedAt))),
+        callId: input.execution.callId,
+        rootCallId: input.execution.rootCallId ?? null,
+        errorCode: result.outcome === 'failure' ? (result.error instanceof CommunicationError ? result.error.code : 'operation-failed') : null,
+      })
+    } catch (error) {
+      const errorCode = error instanceof CommunicationError ? error.code : 'activity-record-failed'
+      hostContext?.logger.warn('agent-communication: activity record failed (tool=%s, code=%s)', input.operation, errorCode)
+    }
+  }
+  if (result.outcome === 'failure') throw result.error
+  return result.value
 }
 
 const queueNotice = async (

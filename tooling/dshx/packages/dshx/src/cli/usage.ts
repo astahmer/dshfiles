@@ -292,6 +292,7 @@ const workspaceHelp = actionHelpGroup('workspace', {
 const communicationHelp = actionHelpGroup('comm', {
   agents: { description: 'List live DSH Agents and their Session ids.' },
   topics: { description: 'List topics and subscriber counts.' },
+  report: { description: 'Read a bounded, metadata-only communication activity and delivery report.' },
   subscribe: {
     description: 'Subscribe this external CLI principal.',
     positionals: { topic: positional('Topic name.') },

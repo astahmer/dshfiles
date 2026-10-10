@@ -234,7 +234,7 @@ const sharedArgs = {
   },
   limit: {
     type: 'string',
-    description: 'Maximum communication messages to return.',
+    description: 'Maximum communication messages or diagnostic rows to return.',
     valueHint: 'count',
   },
   help: { type: 'boolean', alias: 'h', description: 'Show command help.' },
@@ -397,7 +397,7 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   delivery: { allows: platformAction('comm', 'subscribe'), usage: '--delivery is only valid with comm subscribe.' },
   priority: { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' },
   topic: { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' },
-  limit: { allows: platformAction('comm', 'inbox'), usage: '--limit is only valid with comm inbox.' },
+  limit: { allows: platformAction('comm', 'inbox', 'report'), usage: '--limit is only valid with comm inbox or comm report.' },
   slot: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
   provider: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
   order: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
@@ -626,17 +626,16 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   )
   if (command === 'comm' && !help) {
     const [action, first, ...extra] = platformArgs
-    const actions = ['agents', 'topics', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
+    const actions = ['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
     if (!actions.includes(action ?? '')) throw new CliUsageError(`comm requires ${actions.join(', ')}.`)
     if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && first === undefined) throw new CliUsageError(`comm ${action} requires an id.`)
     if (['publish', 'send'].includes(action ?? '') && (first === undefined || extra.join(' ').trim().length === 0)) {
       throw new CliUsageError(`comm ${action} requires a target and message text.`)
     }
-    if (['agents', 'topics', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
+    if (['agents', 'topics', 'report', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
       throw new CliUsageError(`comm ${action} accepts no positional arguments.`)
     if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && extra.length > 0)
       throw new CliUsageError(`comm ${action} accepts one positional argument.`)
-    if (action === 'inbox' && platformArgs.length > 0) throw new CliUsageError('comm inbox accepts no positional arguments.')
     if (action === 'mcp' && (json || delivery !== undefined || priority !== undefined || topic !== undefined || limit !== undefined)) {
       throw new CliUsageError('comm mcp does not accept --json or inbox/message options.')
     }

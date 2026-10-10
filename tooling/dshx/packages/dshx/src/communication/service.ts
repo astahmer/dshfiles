@@ -5,21 +5,34 @@ import { randomUUID } from 'node:crypto'
 import writeFileAtomic from 'write-file-atomic'
 import { z } from 'zod'
 import {
+  communicationActivityEventSchema,
+  communicationAgentSchema,
+  communicationDiagnosticsSchema,
+  communicationDiagnosticMessageSchema,
+  communicationDiagnosticSubscriptionSchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
   communicationStateSchema,
+  communicationStateV1Schema,
   communicationSubscriptionSchema,
   communicationTopicSchema,
+  type CommunicationActivityEvent,
+  type CommunicationActivityOperation,
+  type CommunicationAgent,
   type CommunicationDelivery,
+  type CommunicationDiagnostics,
   type CommunicationMessage,
   type CommunicationPrincipal,
   type CommunicationState,
+  type CommunicationStateV1,
   type CommunicationSubscription,
   type CommunicationTopic,
 } from './types.js'
 
 const MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 const MAX_MESSAGES = 5_000
+const MAX_ACTIVITY_EVENTS = 5_000
+const MAX_DIAGNOSTIC_ROWS = 100
 const MAX_STATE_BYTES = 16 * 1024 * 1024
 const MAX_SUBSCRIPTIONS = 5_000
 const MAX_ACKNOWLEDGEMENTS = 100_000
@@ -90,6 +103,19 @@ export interface CommunicationInboxInput {
   readonly limit?: number
 }
 
+export interface CommunicationActivityInput {
+  readonly principal: { readonly kind: 'agent'; readonly id: string }
+  readonly operation: CommunicationActivityOperation
+  readonly outcome: 'success' | 'failure'
+  readonly occurredAt: number
+  readonly durationMs: number
+  readonly callId: string
+  readonly rootCallId?: string | null
+  readonly errorCode?: string | null
+}
+
+const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [communicationStateV1Schema, communicationStateSchema])
+
 export class CommunicationError extends Error {
   constructor(
     readonly code: string,
@@ -101,12 +127,14 @@ export class CommunicationError extends Error {
 }
 
 const initialState = (): CommunicationState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   messages: [],
   subscriptions: [],
   acknowledgements: [],
   workspaceOptOuts: [],
   notifications: [],
+  activityStartedAt: null,
+  activityEvents: [],
 })
 
 const defaultStatePath = (): string => {
@@ -120,13 +148,16 @@ const cleanState = (state: CommunicationState, now: number): CommunicationState 
   const retainedIds = new Set(state.messages.filter(message => message.createdAt >= now - MESSAGE_RETENTION_MS).map(message => message.id))
   const messages = state.messages.filter(message => retainedIds.has(message.id)).slice(-MAX_MESSAGES)
   const survivingIds = new Set(messages.map(message => message.id))
+  const activityEvents = state.activityEvents.filter(event => event.occurredAt >= now - MESSAGE_RETENTION_MS).slice(-MAX_ACTIVITY_EVENTS)
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     messages,
     subscriptions: state.subscriptions.slice(-MAX_SUBSCRIPTIONS),
     acknowledgements: state.acknowledgements.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_ACKNOWLEDGEMENTS),
     workspaceOptOuts: [...new Set(state.workspaceOptOuts)].slice(-10_000),
     notifications: state.notifications.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_NOTIFICATIONS),
+    activityStartedAt: state.activityStartedAt,
+    activityEvents,
   }
 }
 
@@ -139,6 +170,30 @@ const assertTopic = (topic: string, privateAllowed = false): string => {
 }
 
 const messageId = (): string => randomUUID()
+
+const migrateLegacyState = (state: CommunicationStateV1): CommunicationState => ({
+  schemaVersion: 2,
+  messages: state.messages,
+  subscriptions: state.subscriptions,
+  acknowledgements: state.acknowledgements,
+  workspaceOptOuts: state.workspaceOptOuts,
+  notifications: state.notifications,
+  activityStartedAt: null,
+  activityEvents: [],
+})
+
+const topicsForState = (state: CommunicationState): readonly CommunicationTopic[] => {
+  const counts = new Map<string, Set<string>>()
+  for (const subscription of state.subscriptions) {
+    if (subscription.topic === 'inbox') continue
+    const subscribers = counts.get(subscription.topic) ?? new Set<string>()
+    subscribers.add(principalKey(subscription.principal))
+    counts.set(subscription.topic, subscribers)
+  }
+  return [...counts.entries()]
+    .map(([topic, subscribers]) => communicationTopicSchema.parse({ topic, subscribers: subscribers.size }))
+    .sort((left, right) => left.topic.localeCompare(right.topic))
+}
 
 export class CommunicationService {
   readonly #statePath: string
@@ -154,17 +209,114 @@ export class CommunicationService {
   }
 
   async listTopics(): Promise<readonly CommunicationTopic[]> {
-    const state = await this.#readState()
-    const counts = new Map<string, Set<string>>()
-    for (const subscription of state.subscriptions) {
-      if (subscription.topic === 'inbox') continue
-      const subscribers = counts.get(subscription.topic) ?? new Set<string>()
-      subscribers.add(principalKey(subscription.principal))
-      counts.set(subscription.topic, subscribers)
+    return topicsForState(await this.#readState())
+  }
+
+  async recordActivity(input: CommunicationActivityInput): Promise<void> {
+    const event: CommunicationActivityEvent = communicationActivityEventSchema.parse({
+      id: randomUUID(),
+      principal: input.principal,
+      operation: input.operation,
+      outcome: input.outcome,
+      occurredAt: input.occurredAt,
+      durationMs: input.durationMs,
+      callId: input.callId,
+      rootCallId: input.rootCallId ?? null,
+      errorCode: input.errorCode ?? null,
+    })
+    await this.#updateState(state => ({
+      state: {
+        ...state,
+        activityStartedAt: state.activityStartedAt ?? event.occurredAt,
+        activityEvents: [...state.activityEvents, event],
+      },
+      value: undefined,
+    }))
+  }
+
+  async diagnostics(input: { readonly agents: readonly CommunicationAgent[]; readonly limit?: number }): Promise<CommunicationDiagnostics> {
+    const limit = input.limit ?? 20
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_DIAGNOSTIC_ROWS) {
+      throw new CommunicationError('invalid-limit', `Diagnostic limit must be an integer from 1 to ${MAX_DIAGNOSTIC_ROWS}.`)
     }
-    return [...counts.entries()]
-      .map(([topic, subscribers]) => communicationTopicSchema.parse({ topic, subscribers: subscribers.size }))
-      .sort((left, right) => left.topic.localeCompare(right.topic))
+
+    const state = await this.#readState()
+    const agents = z.array(communicationAgentSchema).parse(input.agents)
+    const topics = topicsForState(state)
+    const acknowledgements = new Map(state.acknowledgements.map(entry => [`${entry.messageId}:${principalKey(entry.principal)}`, entry.acknowledgedAt]))
+    const notifications = new Map(state.notifications.map(entry => [`${entry.messageId}:${entry.agentId}`, entry.notifiedAt]))
+    let pendingMessageCount = 0
+    let pendingRecipientCount = 0
+    let unnotifiedRecipientCount = 0
+
+    for (const message of state.messages) {
+      let hasPendingRecipient = false
+      for (const recipient of message.recipients) {
+        const recipientKey = principalKey(recipient.principal)
+        if (!acknowledgements.has(`${message.id}:${recipientKey}`)) {
+          pendingRecipientCount += 1
+          hasPendingRecipient = true
+        }
+        if (recipient.principal.kind === 'agent' && recipient.delivery !== 'quiet' && !notifications.has(`${message.id}:${recipient.principal.id}`)) {
+          unnotifiedRecipientCount += 1
+        }
+      }
+      if (hasPendingRecipient) pendingMessageCount += 1
+    }
+
+    const recentMessages = state.messages
+      .slice(-limit)
+      .reverse()
+      .map(message => {
+        const pendingRecipients = message.recipients.filter(recipient => !acknowledgements.has(`${message.id}:${principalKey(recipient.principal)}`))
+        const unnotifiedRecipients = message.recipients.filter(
+          recipient => recipient.principal.kind === 'agent' && recipient.delivery !== 'quiet' && !notifications.has(`${message.id}:${recipient.principal.id}`),
+        )
+        return communicationDiagnosticMessageSchema.parse({
+          id: message.id,
+          topic: message.topic,
+          sender: message.sender,
+          priority: message.priority,
+          createdAt: message.createdAt,
+          recipientCount: message.recipients.length,
+          pendingRecipientCount: pendingRecipients.length,
+          unnotifiedRecipientCount: unnotifiedRecipients.length,
+        })
+      })
+    const subscriptions = [...state.subscriptions]
+      .sort((left, right) => left.topic.localeCompare(right.topic) || principalKey(left.principal).localeCompare(principalKey(right.principal)))
+      .slice(0, limit)
+      .map(subscription =>
+        communicationDiagnosticSubscriptionSchema.parse({
+          principal: subscription.principal,
+          topic: subscription.topic,
+          delivery: subscription.delivery,
+          allowSteerFromCount: subscription.allowSteerFrom.length,
+          createdAt: subscription.createdAt,
+        }),
+      )
+
+    return communicationDiagnosticsSchema.parse({
+      generatedAt: this.#now(),
+      agentCount: agents.length,
+      agents: agents.slice(0, limit),
+      topicCount: topics.length,
+      topics: topics.slice(0, limit),
+      subscriptionCount: state.subscriptions.length,
+      subscriptions,
+      messageCount: state.messages.length,
+      pendingMessageCount,
+      pendingRecipientCount,
+      unnotifiedRecipientCount,
+      recentMessages,
+      activity: {
+        trackingStartedAt: state.activityStartedAt,
+        oldestRetainedAt: state.activityEvents[0]?.occurredAt ?? null,
+        retainedCount: state.activityEvents.length,
+        events: state.activityEvents.slice(-limit).reverse(),
+      },
+      historyNote: 'Activity history starts when the first tool-call event is recorded; earlier use cannot be inferred.',
+    })
   }
 
   async subscribe(
@@ -406,7 +558,9 @@ export class CommunicationService {
     if (Buffer.byteLength(text) > MAX_STATE_BYTES) throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')
     try {
       const value: unknown = JSON.parse(text)
-      return cleanState(communicationStateSchema.parse(value), this.#now())
+      const persistedState = persistedCommunicationStateSchema.parse(value)
+      const state = persistedState.schemaVersion === 1 ? migrateLegacyState(persistedState) : persistedState
+      return cleanState(state, this.#now())
     } catch {
       throw new CommunicationError('state-unreadable', 'Communication state is invalid or unreadable; it was left untouched.')
     }
@@ -417,6 +571,10 @@ export class CommunicationService {
       const current = cleanState(await this.#readState(), this.#now())
       const updated = update(current)
       const parsed = communicationStateSchema.parse(cleanState(updated.state, this.#now()))
+      const serialized = `${JSON.stringify(parsed)}\n`
+      if (Buffer.byteLength(serialized) > MAX_STATE_BYTES) {
+        throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')
+      }
       const stateDirectory = dirname(this.#statePath)
       await mkdir(stateDirectory, { recursive: true, mode: 0o700 })
       const directoryInfo = await lstat(stateDirectory)
@@ -426,7 +584,7 @@ export class CommunicationService {
       if (typeof process.getuid === 'function' && directoryInfo.uid !== process.getuid()) {
         throw new CommunicationError('state-directory-owner', 'Communication state directory belongs to a different user.')
       }
-      await writeFileAtomic(this.#statePath, `${JSON.stringify(parsed)}\n`, { mode: 0o600, fsync: true })
+      await writeFileAtomic(this.#statePath, serialized, { mode: 0o600, fsync: true })
       await chmod(this.#statePath, 0o600)
       return updated.value
     })

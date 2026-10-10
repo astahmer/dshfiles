@@ -57,13 +57,14 @@ A successful Agent tool invocation proves use of that tool. Message lifecycle pr
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
+| Choice         | Decision                                                                                                                                 | Rationale                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Evidence store | Extend communication state with a versioned, bounded activity collection; inspect migration/compatibility behavior before implementation | Existing service already owns private atomic persistence; avoids a second unrelated store |
-| Event fields | Timestamp, event id, principal id, operation, outcome, duration, optional correlation id, bounded error code | Lets operator follow work without logging peer text, arguments, or secrets |
-| Read boundary | Typed service/bridge diagnostic method shared by CLI and UI | One permission, validation, and redaction boundary |
-| UI state | Existing plugin UI and Host-backed query/mutation patterns | Keep the UI a projection of Host state, not another source of truth |
-| Retention | Propose bounded count and age; finalize after reviewing state schema and retention tests | Prevent unbounded growth and make historical coverage explicit |
+| Event fields   | Timestamp, event id, principal id, operation, outcome, duration, optional correlation id, bounded error code                             | Lets operator follow work without logging peer text, arguments, or secrets                |
+| Read boundary  | Typed service/bridge diagnostic method shared by CLI and UI                                                                              | One permission, validation, and redaction boundary                                        |
+| UI state       | Existing plugin UI and Host-backed query/mutation patterns                                                                               | Keep the UI a projection of Host state, not another source of truth                       |
+| Retention      | Retain at most 5,000 activity records and 30 days, under the existing 16 MiB state-file cap                                              | Align with message retention and bound the new state collection                           |
+| Correlation    | Record DSH tool `callId` and root call id when available                                                                                 | Installed DSH ToolRunContext exposes both ids without logging arguments                   |
 
 ### Architecture
 
@@ -123,14 +124,14 @@ Use stacked overview cards; activity and subscriptions become separate lists. Ke
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Open report | Fetch bounded health, activity, subscriptions, and lifecycle metadata |
-| Change time range / filter | Re-query with validated bounds; no persistent mutation |
-| Reveal message body | Explicitly show one selected message body; no body in list rows |
-| Change delivery mode | Confirm, then call Host mutation and refresh projection; `steer` requires explicitly selecting allowed sender Session IDs |
-| Unsubscribe / rejoin topic | Confirm, then call Host mutation and refresh projection |
-| Acknowledge message | Confirm, acknowledge only selected message, then refresh pending list |
+| Action                     | Result                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Open report                | Fetch bounded health, activity, subscriptions, and lifecycle metadata                                                     |
+| Refresh diagnostics        | Re-query the bounded report; no persistent mutation                                                                       |
+| Reveal message body        | Explicitly show one selected message body; no body in list rows                                                           |
+| Change delivery mode       | Confirm, then call Host mutation and refresh projection; `steer` requires explicitly selecting allowed sender Session IDs |
+| Unsubscribe / rejoin topic | Confirm, then call Host mutation and refresh projection                                                                   |
+| Acknowledge message        | Confirm, acknowledge only selected message, then refresh pending list                                                     |
 
 ## Data model
 
@@ -162,20 +163,20 @@ Activity records contain no message body or raw arguments. Existing message cont
 
 ## Implementation steps
 
-1. [ ] Review plan and confirm command shape, event retention, and control scope.
-2. [ ] In the dedicated workspace, inspect installed DSH tool execution contracts, state versioning/retention, CLI routing, and plugin UI/Host API patterns; document any contract-driven plan changes.
-3. [ ] Implement bounded activity recording and a metadata-only diagnostic projection, with tests for success/failure, redaction, limits, retention, and state compatibility.
-4. [ ] Add read-only `dshx comm report` output and focused CLI tests. Verify no command path mutates state.
-5. [ ] Build and verify CLI/Host work without touching the live profile; checkpoint this milestone before UI work.
+1. [x] Set staged scope: read-only report first, then Host-backed UI controls; choose 30-day / 5,000-record activity retention and no implicit steer enablement.
+2. [x] Inspect installed DSH ToolRunContext, state schema/retention, CLI routing, and report extension points; correlation uses tool call ids, and version-1 state needs backward-compatible decoding.
+3. [x] Implement bounded activity recording and a metadata-only diagnostic projection, with tests for success/failure, redaction, limits, 30-day expiry, and state compatibility.
+4. [x] Add read-only `dshx comm report` output and focused CLI tests. Verify no command path mutates state.
+5. [x] Build and validate CLI/Host code without touching the live profile; checkpoint before UI work. The scratch profile composed and booted on port 3199, but the report remained unavailable because its empty Session did not reach the Host's `agents` setup gate; do not treat that as an activation failure or proof of non-use.
 6. [ ] Add communication inspector UI with Host-backed queries, metadata-first timeline, and explicit body reveal.
 7. [ ] Add scoped subscription and acknowledgement controls through validated Host mutations; test authorization, stale data, confirmation, and failure behavior.
-8. [ ] Build/test/typecheck/lint the affected packages, perform scratch-profile/runtime checks on a second port, and capture operator-facing evidence. Do not restart the live instance.
+8. [ ] Build/test/typecheck/lint the affected packages, exercise Host setup with an actual scratch Agent on a second port if possible, and capture operator-facing evidence. Do not restart the live instance.
 
-## Open questions
+## Resolved design choices
 
-1. Confirm activity retention window and maximum record count after reviewing actual state growth and current limits.
-2. Confirm whether message-body reveal belongs in first UI release, or whether first release should stay metadata-only.
-3. Confirm preferred UI placement (plugin panel/slot versus dedicated settings view) after checking live slot and navigation contracts.
+1. Activity retention is 5,000 events / 30 days, matching bounded state retention.
+2. Message-body reveal is in the first UI release only as an explicit per-message action; reports and lists stay metadata-only.
+3. Use a sidebar panel registered through `sidebar.panellist` and `main`, confirmed against the live Slot contract; do not replace built-in UI.
 
 ## Acceptance criteria
 
@@ -190,9 +191,11 @@ Activity records contain no message body or raw arguments. Existing message cont
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-10 | Use dedicated `agent-communication-observability` JJ workspace based on `main` tip | Isolate work from concurrent edits in the default workspace and start from the requested branch tip |
-| 2026-10-10 | Deliver read-only CLI diagnostics before UI controls | Establish evidence shape and prove privacy/redaction before adding interactive management |
-| 2026-10-10 | Log Agent tool activity separately from message lifecycle | Successful read-only tool use is not visible in message state; message delivery alone cannot prove tool invocation |
-| 2026-10-10 | Keep initial UI controls limited to subscription changes and per-message acknowledgement | Avoid introducing destructive history operations or additional send/publish paths |
+| Date       | Decision                                                                                 | Rationale                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-10 | Use dedicated `agent-communication-observability` JJ workspace based on `main` tip       | Isolate work from concurrent edits in the default workspace and start from the requested branch tip                |
+| 2026-10-10 | Deliver read-only CLI diagnostics before UI controls                                     | Establish evidence shape and prove privacy/redaction before adding interactive management                          |
+| 2026-10-10 | Log Agent tool activity separately from message lifecycle                                | Successful read-only tool use is not visible in message state; message delivery alone cannot prove tool invocation |
+| 2026-10-10 | Keep initial UI controls limited to subscription changes and per-message acknowledgement | Avoid introducing destructive history operations or additional send/publish paths                                  |
+| 2026-10-10 | Cap activity at 5,000 records / 30 days and correlate with DSH tool call ids             | Matches existing communication retention policy and uses installed ToolRunContext identity without capturing args  |
+| 2026-10-10 | Preserve legacy schema-v1 reads and migrate on writes                                    | Existing persisted communication state must remain readable; no destructive rewrite on diagnostics                 |

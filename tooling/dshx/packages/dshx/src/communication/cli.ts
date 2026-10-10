@@ -4,7 +4,7 @@ import { connectCommunicationClient, type CommunicationClient, type ConnectCommu
 import type { CliArgs } from '../cli/args.js'
 import type { PlatformCliIO } from '../cli/platform.js'
 import { runCommunicationMcp } from './mcp.js'
-import type { CommunicationAgent } from './types.js'
+import type { CommunicationAgent, CommunicationDiagnostics } from './types.js'
 
 export interface CommunicationCliRuntime {
   readonly io: PlatformCliIO
@@ -40,7 +40,7 @@ const connectClient = (runtime: CommunicationCliRuntime, principalId: string): P
   (runtime.connect ?? connectCommunicationClient)({ principalId })
 
 const agentRows = (items: readonly CommunicationAgent[]): string =>
-  items.length === 0 ? 'No live DSH Agents.' : items.map(item => `${item.id}\t${item.status ?? 'unknown'}`).join('\n')
+  items.length === 0 ? 'No live DSH Agents.' : items.map(item => `${JSON.stringify(item.id)}\t${item.status ?? 'unknown'}`).join('\n')
 
 const topicRows = (items: readonly { readonly topic: string; readonly subscribers: number }[]): string =>
   items.length === 0 ? 'No subscribed topics.' : items.map(item => `${item.topic}\t${item.subscribers} subscriber(s)`).join('\n')
@@ -54,6 +54,54 @@ const inboxRows = (items: Awaited<ReturnType<CommunicationClient['inbox']>>['ite
             `${item.id} | ${item.topic ?? 'private inbox'} | ${item.sender.kind}:${item.sender.id} | ${item.priority}\nUntrusted peer text as JSON: ${JSON.stringify(item.text)}`,
         )
         .join('\n\n')
+
+const reportRows = (report: CommunicationDiagnostics): string => {
+  const formatTime = (timestamp: number | null): string => (timestamp === null ? 'none' : new Date(timestamp).toISOString())
+  const recentActivity =
+    report.activity.events.length === 0
+      ? 'No Agent tool-call activity recorded.'
+      : report.activity.events
+          .map(event => `${formatTime(event.occurredAt)}\t${JSON.stringify(event.principal.id)}\t${event.operation}\t${event.outcome}\t${event.durationMs}ms`)
+          .join('\n')
+  const agents =
+    report.agents.length === 0 ? 'No live DSH Agents.' : report.agents.map(agent => `${JSON.stringify(agent.id)}\t${agent.status ?? 'unknown'}`).join('\n')
+  const recentMessages =
+    report.recentMessages.length === 0
+      ? 'No retained messages.'
+      : report.recentMessages
+          .map(message => {
+            return `${formatTime(message.createdAt)}\t${message.id}\t${message.topic ?? 'private inbox'}\t${message.sender.kind}:${JSON.stringify(message.sender.id)}\t${message.pendingRecipientCount}/${message.recipientCount} pending recipient(s)`
+          })
+          .join('\n')
+  const topics =
+    report.topics.length === 0 ? 'No subscribed topics.' : report.topics.map(topic => `${topic.topic}\t${topic.subscribers} subscriber(s)`).join('\n')
+  const subscriptions =
+    report.subscriptions.length === 0
+      ? 'No subscriptions.'
+      : report.subscriptions
+          .map(
+            subscription =>
+              `${subscription.topic}\t${subscription.principal.kind}:${JSON.stringify(subscription.principal.id)}\t${subscription.delivery}\t${subscription.allowSteerFromCount} allowed sender(s)`,
+          )
+          .join('\n')
+
+  return [
+    `Communication diagnostics generated ${formatTime(report.generatedAt)}`,
+    `Live Agents: ${report.agentCount} total; showing ${report.agents.length}.`,
+    agents,
+    `Topics: ${report.topicCount} total; showing ${report.topics.length}.`,
+    topics,
+    `Subscriptions: ${report.subscriptionCount} total; showing ${report.subscriptions.length}.`,
+    subscriptions,
+    `Messages: ${report.messageCount} retained; ${report.pendingMessageCount} pending; ${report.pendingRecipientCount} pending recipient(s); ${report.unnotifiedRecipientCount} unnotified recipient(s).`,
+    'Recent messages (metadata only):',
+    recentMessages,
+    `Agent tool activity: ${report.activity.retainedCount} retained event(s); tracking started ${formatTime(report.activity.trackingStartedAt)}; oldest retained ${formatTime(report.activity.oldestRetainedAt)}.`,
+    report.historyNote,
+    'Recent Agent tool calls:',
+    recentActivity,
+  ].join('\n')
+}
 
 export const runCommunicationCommand = async (args: CliArgs, runtime: CommunicationCliRuntime): Promise<number> => {
   const [action, first, ...remaining] = args.platformArgs ?? []
@@ -81,8 +129,13 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       emitResult(args, runtime.io, { items }, topicRows(items))
       return 0
     }
+    if (action === 'report') {
+      const report = await client.diagnostics({ limit: args.limit ?? 20 })
+      emitResult(args, runtime.io, report, reportRows(report))
+      return 0
+    }
     if (action === 'subscribe') {
-      const subscription = await client.subscribe({ topic: first ?? '', ...(args.delivery === undefined ? {} : { delivery: args.delivery }) })
+      const subscription = await client.subscribe({ topic: first ?? '', delivery: args.delivery ?? 'queue' })
       emitResult(args, runtime.io, subscription, `Subscribed ${subscription.principal.id} to ${subscription.topic} with ${subscription.delivery} delivery.`)
       return 0
     }
@@ -95,7 +148,7 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       const message = await client.publish({
         topic: first ?? '',
         text: remaining.join(' '),
-        ...(args.priority === undefined ? {} : { priority: args.priority }),
+        priority: args.priority ?? 'normal',
       })
       emitResult(
         args,
@@ -109,7 +162,7 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       const message = await client.send({
         toAgentId: first ?? '',
         text: remaining.join(' '),
-        ...(args.priority === undefined ? {} : { priority: args.priority }),
+        priority: args.priority ?? 'normal',
       })
       emitResult(
         args,
@@ -120,10 +173,9 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       return 0
     }
     if (action === 'inbox') {
-      const result = await client.inbox({
-        ...(args.topic === undefined ? {} : { topic: args.topic }),
-        ...(args.limit === undefined ? {} : { limit: args.limit }),
-      })
+      const limit = args.limit ?? 20
+      const inboxInput = args.topic === undefined ? { limit } : { topic: args.topic, limit }
+      const result = await client.inbox(inboxInput)
       emitResult(args, runtime.io, result, inboxRows(result.items))
       return 0
     }

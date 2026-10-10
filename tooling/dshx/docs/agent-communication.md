@@ -60,11 +60,26 @@ subscribers can select `quiet` or `queue`; they cannot request steering.
 External MCP clients discover `comm_*` tools and poll their own inbox. The
 stdio process does not expose a network listener.
 
+## Observability
+
+The Host records each Agent communication-tool invocation with operation,
+Agent identity, tool/root call ids, outcome, duration, timestamp, and a bounded
+error code. It never records tool arguments or message text. Activity history is
+bounded to 5,000 events and 30 days; it begins with the first recorded tool
+call, so older use cannot be inferred. Existing message and notification state
+remains separate evidence of message lifecycle.
+
+`dshx comm report` returns bounded, metadata-only health, Agent, topic,
+subscription, message-lifecycle, and tool-activity data. It is read-only and
+never prints message bodies. A missing bridge or an empty event history is not
+proof that Agents never used the capability.
+
 ## Commands
 
 ```sh
 dshx comm agents --json
 dshx comm topics --json
+dshx comm report --limit 20 --json
 dshx comm subscribe release-notes --delivery quiet
 dshx comm publish release-notes "Review the compatibility notes"
 dshx comm send <dsh-session-id> "The build finished; please review"
@@ -80,8 +95,8 @@ exit with code `1`; successful commands exit with code `0`. MCP reserves stdout
 for protocol frames and reports startup errors to stderr.
 
 Message bodies are limited to 12,000 characters. State is private JSON, written
-atomically with mode `0600`, capped at 5,000 retained messages and 16 MiB, and
-pruned after 30 days. Acknowledgements and notification receipts are
+atomically with mode `0600`, capped at 5,000 retained messages and activity
+events and 16 MiB, with messages and activity pruned after 30 days. Acknowledgements and notification receipts are
 idempotent. Delivery is at-least-once across a Host crash in the narrow window
 between DSH accepting a follow-up and the receipt being persisted; notice text
 contains a stable communication id so Agents can recognize a repeated notice.

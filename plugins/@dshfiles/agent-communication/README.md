@@ -19,9 +19,10 @@ use DSH's native steer API. All other active-agent notices use a queued
 follow-up; quiet subscriptions get no notice. To mute direct-message notices,
 subscribe to `inbox` with `delivery: quiet`; the private inbox remains available.
 
-The CLI and MCP stdio adapter use the same typed Host service:
+The CLI and MCP stdio adapter use the same typed Host service. The report shows bounded activity and delivery metadata without message bodies; activity history begins when Agent tool-call recording first runs:
 
 ```sh
+dshx comm report --limit 20 --json
 dshx comm topics --json
 dshx comm mcp --principal editor
 ```

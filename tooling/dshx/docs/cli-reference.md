@@ -222,6 +222,7 @@ session storage or open a network listener.
 ```bash
 dshx comm agents [--json]
 dshx comm topics [--json]
+dshx comm report [--limit <count>] [--json]
 dshx comm subscribe <topic> [--delivery quiet|queue] [--principal <name>]
 dshx comm unsubscribe <topic> [--principal <name>]
 dshx comm publish <topic> <message...> [--priority normal|urgent]
@@ -236,9 +237,12 @@ The CLI's default external inbox identity is `cli`; MCP defaults to
 subscriptions. External clients may subscribe with `quiet` or `queue` delivery.
 DSH Agents automatically join a hashed topic for their working directory and
 their direct inbox. Queue delivery adds a content-free notice and does not
-interrupt a running turn. Steering is available only through DSH Agent tools
-when the recipient has opted in, allowlisted the sender, and the message is
-urgent. See [Agent communication](./agent-communication.md) for the service,
+interrupt a running turn. `comm report` returns bounded message and activity
+metadata only; it never includes message bodies and never changes state. Agent
+tool history begins when the first tool-call event is recorded, so absence of
+older events does not prove non-use. Steering is available only through DSH
+Agent tools when the recipient has opted in, allowlisted the sender, and the
+message is urgent. See [Agent communication](./agent-communication.md) for the service,
 security boundary, candidate decision, and profile activation.
 
 Standalone tool invocation, general service enumeration, profile enumeration,

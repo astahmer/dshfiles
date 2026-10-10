@@ -8,6 +8,7 @@ import { acceptJsonLine, JsonLineTransportError, requestJsonLine, writeJsonLine 
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
+  communicationDiagnosticsSchema,
   communicationInboxSchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
@@ -15,6 +16,7 @@ import {
   communicationTopicSchema,
   type CommunicationAgent,
   type CommunicationDelivery,
+  type CommunicationDiagnostics,
   type CommunicationInbox,
   type CommunicationMessage,
   type CommunicationPrincipal,
@@ -26,7 +28,7 @@ const PROTOCOL_VERSION = 1
 const MAX_REQUEST_BYTES = 64 * 1024
 const MAX_RESPONSE_BYTES = 1024 * 1024
 const REQUEST_TIMEOUT_MS = 5_000
-const operationSchema = z.enum(['agents', 'topics', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack'])
+const operationSchema = z.enum(['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack'])
 
 const bridgeRequestSchema = z
   .object({
@@ -58,6 +60,7 @@ export interface CommunicationClient {
   readonly principal: CommunicationPrincipal
   listAgents(): Promise<readonly CommunicationAgent[]>
   listTopics(): Promise<readonly CommunicationTopic[]>
+  diagnostics(input?: { readonly limit?: number }): Promise<CommunicationDiagnostics>
   subscribe(input: {
     readonly topic: string
     readonly delivery?: CommunicationDelivery
@@ -136,6 +139,13 @@ const dispatch = async (
   if (request.operation === 'topics') {
     if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
     return service.listTopics()
+  }
+  if (request.operation === 'report') {
+    const input = z
+      .object({ limit: z.number().int().min(1).max(100).optional() })
+      .strict()
+      .parse(request.input ?? {})
+    return service.diagnostics({ agents: await listAgents(), limit: input.limit ?? 20 })
   }
   if (!isRecord(request.input)) throw new CommunicationError('invalid-request', 'Communication operation input must be an object.')
   if (request.operation === 'subscribe') {
@@ -359,6 +369,7 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
     principal,
     listAgents: async () => z.array(communicationAgentSchema).parse(await request('agents')),
     listTopics: async () => z.array(communicationTopicSchema).parse(await request('topics')),
+    diagnostics: async input => communicationDiagnosticsSchema.parse(await request('report', input ?? {})),
     subscribe: async input => communicationSubscriptionSchema.parse(await request('subscribe', input)),
     unsubscribe: async topic =>
       z
