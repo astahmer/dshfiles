@@ -23,8 +23,8 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "agent-communication.directory",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "id": "agent-communication.host-report",
+          "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
         },
         {
           "kind": "unit-test",
@@ -56,11 +56,6 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
-          "id": "agent-communication.delivery-policy",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
-        },
-        {
           "kind": "unit-test",
           "id": "agent-communication.delivery-policy-unit-modes",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
@@ -89,11 +84,6 @@
       ],
       "externalDependencies": [],
       "verification": [
-        {
-          "kind": "gherkin",
-          "id": "agent-communication.inbox",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
-        },
         {
           "kind": "unit-test",
           "id": "agent-communication.inbox-unit-durable-ack",
