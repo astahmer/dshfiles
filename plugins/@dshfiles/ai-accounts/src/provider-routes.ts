@@ -67,11 +67,15 @@ const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: st
 
 export interface BuiltRoutes {
   readonly routes: Map<string, Route>
-  /** Accounts left out because their Codex home is invalid, with the reason. */
+  /** Accounts left out, with the reason: an invalid Codex home, or a provider id another plugin already serves. */
   readonly rejected: readonly string[]
 }
 
-export const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
+/**
+ * `takenProviders` are provider ids another plugin already registered. DSH rejects a duplicate adapter for the whole
+ * registration and fails the boot, so an enabled account on such an id is left out instead.
+ */
+export const buildRoutes = (config: AiAccountsConfig, options: { readonly takenProviders?: ReadonlySet<string> } = {}): BuiltRoutes => {
   const routes = new Map<string, Route>()
   const rejected: string[] = []
   for (const account of config.codexAccounts) {
@@ -117,6 +121,11 @@ export const buildRoutes = (config: AiAccountsConfig): BuiltRoutes => {
       apiKeyEnv: account.apiKeyEnv,
       enabled: account.enabled,
     })
+  }
+  for (const [instanceId, route] of routes) {
+    if (!route.enabled || options.takenProviders?.has(instanceId) !== true) continue
+    routes.delete(instanceId)
+    rejected.push(`${instanceId}: another plugin already serves provider "${instanceId}"`)
   }
   return { routes, rejected }
 }

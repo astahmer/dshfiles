@@ -378,9 +378,11 @@ export default definePlugin({
       modelDiscoveries.set(id, { route, dispose })
     }
 
+    let registeredProviders: ReadonlySet<string> = new Set()
     const applyRouteSnapshot = (sourceFile: ReturnType<typeof readAccountFileSync>): void => {
       const nextConfig = configFromAccountsFile(sourceFile)
-      const { routes: nextRoutes, rejected } = buildRoutes(nextConfig)
+      const takenProviders = new Set(llm.listProviders().map(provider => provider.id).filter(id => !registeredProviders.has(id)))
+      const { routes: nextRoutes, rejected } = buildRoutes(nextConfig, { takenProviders })
       for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
       runtime.rejectedRoutes = rejected
       const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
@@ -397,6 +399,7 @@ export default definePlugin({
       } else {
         adapterRegistration.replace(providers)
       }
+      registeredProviders = new Set(providers)
       if (directoryRegistration === undefined) {
         if (directoryEntries.length > 0) directoryRegistration = llm.registerConfigurableProviders(directoryEntries)
       } else {
