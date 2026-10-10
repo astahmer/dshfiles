@@ -8,13 +8,17 @@ When('the AI Accounts settings section is opened', async ({ page }: { page: Page
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
-Then('the rate-limit recovery policy exposes its default failover', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'ai-accounts-rate-limit-failover-default', async () => {
+Then('the rate-limit recovery failover can be changed and restored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-rate-limit-failover-toggle', async () => {
     const rateLimit = page.getByRole('group', { name: /Rate limited/ })
     const failover = rateLimit.getByRole('switch', { name: 'Fail over to the next account' })
     await expect(rateLimit.getByText('The provider answered 429.')).toBeVisible()
     await expect(failover).toBeChecked()
     await expect(failover).toBeEnabled()
+    await failover.click()
+    await expect(failover).not.toBeChecked()
+    await failover.click()
+    await expect(failover).toBeChecked()
   })
   await finishJourneyAssertions(page)
 })
