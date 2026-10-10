@@ -9,6 +9,17 @@ test('older stored preferences default the header and thread split to natural he
   assert.equal(decodePreferences(JSON.parse(stored))?.headerRegionHeight, null)
 })
 
+test('older preferences gain per-category attention modes and keep subagent attention off', () => {
+  const { approvalNeededDisplay, inputNeededDisplay, turnFinishedDisplay, includeSubagentAttention, ...older } = DEFAULT_PREFERENCES
+  const parsed = decodePreferences(older)
+  assert.ok(parsed)
+  assert.deepEqual(
+    [parsed.approvalNeededDisplay, parsed.inputNeededDisplay, parsed.turnFinishedDisplay, parsed.includeSubagentAttention],
+    [approvalNeededDisplay, inputNeededDisplay, turnFinishedDisplay, includeSubagentAttention],
+  )
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, turnFinishedDisplay: 'section' }), null)
+})
+
 test('valid saved split heights persist and invalid heights are rejected', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 384 })
   const invalidStored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 24 })

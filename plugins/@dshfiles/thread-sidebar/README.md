@@ -98,18 +98,23 @@ per-thread **Thread notifications** menu. Notifications can be snoozed for 15
 minutes, 1, 3, 8, or 24 hours, muted until manually re-enabled, or unmuted.
 Snoozes and mutes affect alerts only; they do not hide attention rows.
 Desktop notifications are opt-in in Sidebar settings and show the thread title.
-Mute, snooze, and unseen-completion state are saved in this browser. The sidebar
-separates **Approval needed**, **Input needed**, and **Turn finished**.
+Mute, snooze, and unseen-completion state are saved in this browser. The sidebar separates **Approval needed**, **Input needed**, and **Turn finished**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Both use the Client's
 explicit Session pending-interaction status. Unknown interaction kinds and
 generic unstructured questions remain unclassified. **Turn finished**
-marks a completed turn not yet opened from the sidebar. An unresolved request
-stays available in its conversation composer and returns to the attention group
-when that thread is no longer selected. Opening a finished thread clears its
-local completion marker. Completion alerts are observable only while the DSH
-page is connected, so offline completion notifications are not replayed after
-reconnect.
+marks a completed turn not yet opened from the sidebar. Each category can be
+configured independently as a separate group or an inline thread-row label.
+Approval and Input default to groups; Turn finished defaults to an inline
+label. Group headings stick to the top while scrolling. Subagent attention is
+excluded from groups, labels, and desktop alerts by default; enable **Include
+subagent threads** in Sidebar settings to opt in. An unresolved request stays
+available in its conversation composer and returns to its configured attention
+display when that thread is no longer selected. Opening a finished thread clears
+its local completion marker. Completion alerts are observable only while the
+DSH page is connected, so offline completion notifications are not replayed
+after reconnect. Per-thread errors are not included because the sidebar's
+session-status hook does not expose a durable error status.
 
 Child sessions render with increasing indentation and a direct “child of …”
 label. The sidebar follows DSH's durable `parentId` chain, so the presentation

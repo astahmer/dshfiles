@@ -9,6 +9,7 @@ import {
   type AutoArchiveContext,
   DEFAULT_PREFERENCES,
   isAutoArchiveCandidate,
+  isAttentionSessionIncluded,
   nextIdleTransitionAt,
   moveSidebarEntry,
   reorderSidebarEntry,
@@ -80,6 +81,14 @@ test('archived starts folded and the working sections start open', () => {
 test('every default collapsed section is one the sidebar can actually render', () => {
   const known = new Set<SidebarSection>(['pinned', 'active', 'parked', 'inactive', 'archived'])
   for (const section of DEFAULT_PREFERENCES.collapsedSections) assert.ok(known.has(section), `unknown section ${section}`)
+})
+
+test('subagent attention is opt-in and recognizes durable child links or origin', () => {
+  assert.equal(DEFAULT_PREFERENCES.includeSubagentAttention, false)
+  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'parent' }), false), true)
+  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), false), false)
+  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'origin-child', origin: 'subagent' }), false), false)
+  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), true), true)
 })
 
 test('recent threads stay active until idle threshold; running and organization state keep priority', () => {

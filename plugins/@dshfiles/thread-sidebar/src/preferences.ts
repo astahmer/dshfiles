@@ -39,6 +39,10 @@ const preferencesSchema = z
     threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),
     threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
     threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
+    approvalNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.approvalNeededDisplay),
+    inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
+    turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),
+    includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
   })
   .strict()

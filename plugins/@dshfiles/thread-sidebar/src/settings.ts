@@ -36,6 +36,18 @@ export const threadSidebarSettings = defineSettings({
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
+    approvalNeededDisplay: Schema.union(['group', 'label'] as const)
+      .default(DEFAULT_PREFERENCES.approvalNeededDisplay)
+      .description('Show approval requests in a separate attention group or as an inline thread-row label.'),
+    inputNeededDisplay: Schema.union(['group', 'label'] as const)
+      .default(DEFAULT_PREFERENCES.inputNeededDisplay)
+      .description('Show user questions in a separate attention group or as an inline thread-row label.'),
+    turnFinishedDisplay: Schema.union(['group', 'label'] as const)
+      .default(DEFAULT_PREFERENCES.turnFinishedDisplay)
+      .description('Show completed turns in a separate attention group or as an inline thread-row label.'),
+    includeSubagentAttention: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.includeSubagentAttention)
+      .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
     maxChildren: Schema.natural()
       .min(1)
       .max(50)

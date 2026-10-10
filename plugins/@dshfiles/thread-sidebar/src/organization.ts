@@ -10,6 +10,7 @@ export const SIDEBAR_ICON_ROW_THRESHOLD = 76
 
 export type NavigationDensity = 'compact' | 'comfortable'
 export type NavigationOverflow = 'scroll' | 'menu' | 'scroll-menu'
+export type AttentionDisplayMode = 'group' | 'label'
 
 export interface SidebarPreferences {
   autoArchiveEnabled: boolean
@@ -45,6 +46,10 @@ export interface SidebarPreferences {
   threadRowPath: boolean
   threadRowTime: boolean
   threadRowStatusDot: boolean
+  approvalNeededDisplay: AttentionDisplayMode
+  inputNeededDisplay: AttentionDisplayMode
+  turnFinishedDisplay: AttentionDisplayMode
+  includeSubagentAttention: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
 }
@@ -85,6 +90,10 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowPath: false,
   threadRowTime: true,
   threadRowStatusDot: true,
+  approvalNeededDisplay: 'group',
+  inputNeededDisplay: 'group',
+  turnFinishedDisplay: 'label',
+  includeSubagentAttention: false,
   maxChildren: 3,
 }
 
@@ -94,6 +103,11 @@ export interface OrderedSidebarEntry {
 }
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
+
+export const isAttentionSessionIncluded = (
+  session: Pick<SessionSummary, 'origin' | 'parentId'>,
+  includeSubagentAttention: boolean,
+): boolean => includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 export interface AutoArchiveContext {
   session: SessionActivity
