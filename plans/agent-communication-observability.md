@@ -169,7 +169,7 @@ Activity records contain no message body or raw arguments. Existing message cont
 5. [x] Build and validate CLI/Host code without touching the live profile; checkpoint before UI work. The scratch profile composed and booted on port 3199, but the report remained unavailable because its empty Session did not reach the Host's `agents` setup gate; do not treat that as an activation failure or proof of non-use.
 6. [x] Add communication inspector UI with Host-backed queries, metadata-first timeline, and explicit body reveal.
 7. [x] Add scoped subscription and acknowledgement controls through validated Host mutations; test current-Agent authorization, live steer senders, redacted allowlist output, confirmation, and service rejection behavior.
-8. [x] Final package checks and a scratch browser check passed for this plugin (port 3279); the panel renders and exits loading into an explicit Host-unavailable state with no browser console errors. No live Agent turn or live-profile restart was performed. Full shared-UI rebuild and repository lint/format checks expose unrelated existing failures recorded in the progress README.
+8. [x] Final package checks and the isolated scratch browser journey pass. The initial report failure was a readiness race: the API route could run before the async setup Effect assigned `communicationService`; setup now assigns Host state synchronously before bridge startup. The browser verifies a connected Host, honest empty activity/messages/subscriptions, and all three catalog journeys pass without an external model call. The repo-wide feature coverage check still reports 103 unrelated baseline issues; no live Agent turn or live-profile restart was performed.
 
 ## Resolved design choices
 

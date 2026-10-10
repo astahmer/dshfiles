@@ -7,3 +7,15 @@ Feature: Agent communication inspector
     Given the isolated plugin profile "@dshfiles/agent-communication" is booted
     When the Agent communication panel is opened
     Then diagnostics show the connected Host and truthful empty history
+
+  @scenario:agent-communication.delivery-policy
+  Scenario: The subscription controls do not invent delivery policies
+    Given the isolated plugin profile "@dshfiles/agent-communication" is booted
+    When the Agent communication panel is opened
+    Then subscription controls show no configured delivery policy
+
+  @scenario:agent-communication.inbox
+  Scenario: The durable inbox reports an empty message history
+    Given the isolated plugin profile "@dshfiles/agent-communication" is booted
+    When the Agent communication panel is opened
+    Then the inbox reports no recent messages

@@ -328,45 +328,46 @@ const setupHost = (context: Context): Effect<void> => {
 
   return {
     async *[Symbol.asyncIterator]() {
-    let bridge: Awaited<ReturnType<typeof startHostCommunicationBridge>> | undefined
-    const clearHostContext = (): void => {
-      if (hostContext !== context) return
-      hostContext = undefined
-      communicationService = undefined
-    }
+      let bridge: Awaited<ReturnType<typeof startHostCommunicationBridge>> | undefined
+      const clearHostContext = (): void => {
+        if (hostContext !== context) return
+        hostContext = undefined
+        communicationService = undefined
+      }
 
-    try {
-      const activeBridge = await startHostCommunicationBridge(service, {
-        listAgents: () =>
-          context.agents.list().map(agent => ({
-            id: agent.id,
-            status: agent.status,
-            workspaceTopic: workspaceTopic(agent) ?? null,
-          })),
-      })
-      bridge = activeBridge
-      yield async () => {
+      try {
+        const activeBridge = await startHostCommunicationBridge(service, {
+          listAgents: () =>
+            context.agents.list().map(agent => ({
+              id: agent.id,
+              status: agent.status,
+              workspaceTopic: workspaceTopic(agent) ?? null,
+            })),
+        })
+        bridge = activeBridge
+        yield async () => {
+          try {
+            await activeBridge.close()
+          } finally {
+            clearHostContext()
+          }
+        }
+        context.on('agent/created', async ({ agent }) => {
+          await initializeAgent(agent)
+          return undefined
+        })
+        for (const agent of context.agents.list()) await initializeAgent(agent)
+      } catch (error) {
         try {
-          await activeBridge.close()
+          if (bridge !== undefined) await bridge.close()
         } finally {
           clearHostContext()
         }
+        throw error
       }
-      context.on('agent/created', async ({ agent }) => {
-        await initializeAgent(agent)
-        return undefined
-      })
-      for (const agent of context.agents.list()) await initializeAgent(agent)
-    } catch (error) {
-      try {
-        if (bridge !== undefined) await bridge.close()
-      } finally {
-        clearHostContext()
-      }
-      throw error
-    }
-  },
-})
+    },
+  }
+}
 
 const host = defineHost({
   name: 'agent-communication',
