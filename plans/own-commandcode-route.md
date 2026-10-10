@@ -118,6 +118,16 @@ that raises `LlmError` with a code is the whole remedy.
 
 ### Phase 2 — configure the route, keeping `@mars-sea` installed
 
+> **2026-10-10 finding.** `~/.dsh/plugins/ai-accounts/accounts.json` already has an
+> enabled `commandcode` account, so composing `@mars-sea` next to it failed the boot
+> with `DUPLICATE_ADAPTER`. AI Accounts now leaves out an account whose provider id
+> another plugin already registered and lists it under `skipped` in `ai_accounts`
+> status, so `@mars-sea` keeps serving the route. Our route is **not** working yet:
+> on a scratch `web` copy it ended a turn with `404 status code (no body)` while
+> `@mars-sea` answered the same prompt. Its provider auth resolves only a stored
+> credential or `COMMANDCODE_API_KEY`, not `~/.commandcode/auth.json` (only the usage
+> reader reads that file), and it advertises no reasoning tiers.
+
 Add a `kind: commandcode` account to the `web` profile's `opencodeAccounts` so
 our plugin registers the route alongside the existing one. Two providers may
 compete for the route name; which one wins must be read from the composed config
