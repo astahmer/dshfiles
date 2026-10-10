@@ -109,7 +109,7 @@
           "kind": "unit-test",
           "id": "queue-reorder.text-only-message-editing-unit-editable-text-only",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
-          "testName": "editableQueueText preserves text-only content"
+          "testName": "decodeQueuedRows tolerates malformed rows and marks unknown blocks as not editable"
         },
         {
           "kind": "unit-test",
