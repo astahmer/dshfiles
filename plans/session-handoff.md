@@ -9,9 +9,7 @@ delete this file when empty.
 - [ ] In flight (agent): fix `mcp-servers` / `secret-catalog` build failures (`dshx.features.json`), scratch boot
   "session-persistence-jsonl: format catalog v4 does not match Session v5", split the mixed `wpztzsot` "wip"
   revision in main if main is unpushed.
-- [ ] OptMem summarizer provider: unset → first provider serving `gpt-6-luna` (commandcode spends credits);
-  decide `summarizerProvider` (e.g. a Codex account).
-- [ ] Live patch warning `entry "preset-standard:tool-ask-user" not found` (outside the Nix block).
+- [ ] Live patch warning `entry "llm-commandcode" not found` (`--dump-config`; that row is not composed in `web`).
 
 ## Later
 - [ ] Luna Reserve live check when a Codex weekly limit is next spent (routing is fixture-tested only).
