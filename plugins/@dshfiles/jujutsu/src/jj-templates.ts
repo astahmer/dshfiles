@@ -17,6 +17,7 @@ export const REVISION_TEMPLATE =
   '\',"divergent":\' ++ self.divergent() ++ ' +
   '\',"empty":\' ++ self.empty() ++ ' +
   '\',"conflict":\' ++ self.conflict() ++ ' +
+  '\',"changeOffset":\' ++ coalesce(self.change_offset(), "0") ++ ' +
   '\',"evolved":false}\' ++ "\\n"'
 
 export const OPERATION_TEMPLATE =

@@ -20,6 +20,8 @@ export const revisionSchema = z.object({
   empty: z.boolean(),
   conflict: z.boolean(),
   evolved: z.boolean(),
+  // Older Hosts omit it; jj only needs the offset to tell divergent copies apart.
+  changeOffset: z.number().int().min(0).max(65_535).default(0),
 })
 
 const repoPathSchema = z.string().min(1).max(2048)
