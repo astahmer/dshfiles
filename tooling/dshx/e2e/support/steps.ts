@@ -49,6 +49,22 @@ const registerProviderSetupDismissal = (page: Page): Promise<void> => {
   })
 }
 
+const dismissProviderSetupDuringStartup = async (page: Page): Promise<void> => {
+  const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
+  const providerSetupAppeared = await providerSetup.waitFor({ state: 'visible', timeout: 5_000 }).then(
+    () => true,
+    error => {
+      if (error instanceof Error && error.name === 'TimeoutError') return false
+      throw error
+    },
+  )
+  if (providerSetupAppeared) {
+    await providerSetup.getByRole('button', { name: 'Configure later', exact: true }).click()
+    await expect(providerSetup).toBeHidden()
+  }
+  await registerProviderSetupDismissal(page)
+}
+
 export const recordAssertion = async (page: Page, assertionId: string, assertion: () => void | Promise<void>): Promise<void> => {
   const run = evidenceRunFor(page)
   try {
@@ -84,7 +100,6 @@ Before(async ({ page, $testInfo }) => {
   const allowedOrigins = new Set<string>()
   browserDiagnostics.set(page, diagnostics)
   allowedBrowserOrigins.set(page, allowedOrigins)
-  await registerProviderSetupDismissal(page)
   page.context().on('page', newPage => {
     void registerProviderSetupDismissal(newPage).catch(() => {
       diagnostics.push('provider onboarding handler registration failed')
@@ -155,6 +170,7 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
   profiles.set(page, profile)
   try {
     await visitScratchProfile(page, profile)
+    await dismissProviderSetupDuringStartup(page)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {
@@ -173,6 +189,7 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
     await expect(previewNotice).toBeVisible()
     await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
     await expect(previewNotice).toBeHidden()
+    await dismissProviderSetupDuringStartup(page)
 
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
