@@ -24,4 +24,4 @@
 
 ## Resume here
 
-Remove temporary generated-declaration symlinks, confirm the source workspace is clean and the owned-path diff from default remains empty, then update/close this plan and mark the goal complete. Do not restart or sync the live web profile.
+No further implementation step remains. The live web profile was intentionally not synced or restarted; any future rollout remains user-controlled.
