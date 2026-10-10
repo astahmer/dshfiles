@@ -321,11 +321,13 @@ const initializeAgent = async (agent: Agent): Promise<void> => {
   await service.deliverPending(agent.id)
 }
 
-const setupHost = (context: Context): Effect<void> => ({
-  async *[Symbol.asyncIterator]() {
-    hostContext = context
-    const service = createCommunicationService({ notifyAgent: queueNotice })
-    communicationService = service
+const setupHost = (context: Context): Effect<void> => {
+  hostContext = context
+  const service = createCommunicationService({ notifyAgent: queueNotice })
+  communicationService = service
+
+  return {
+    async *[Symbol.asyncIterator]() {
     let bridge: Awaited<ReturnType<typeof startHostCommunicationBridge>> | undefined
     const clearHostContext = (): void => {
       if (hostContext !== context) return
