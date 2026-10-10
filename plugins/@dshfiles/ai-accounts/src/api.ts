@@ -276,6 +276,8 @@ export const aiAccountsApi = defineApi({
   methods: {
     /** Read the whole file: distribution plus every account. */
     read: method({ input: z.void(), output: accountsFileSchema }),
+    /** Absolute Host path of the active runtime account file; never a credential file. */
+    filePath: method({ input: z.void(), output: z.string().max(4096) }),
     /** Value-free Secret Catalog metadata for global entries or one explicitly selected folder. */
     secretCatalogKeys: method({ input: z.object({ cwd: z.string().max(4096).nullable() }), output: secretCatalogKeysSchema }),
     /** Import one selected scoped alias into the saved account's DSH credential reference. */
@@ -286,6 +288,7 @@ export const aiAccountsApi = defineApi({
         environment: z.string().min(1).max(256),
         scope: z.enum(['global', 'project', 'local']),
         cwd: z.string().max(4096).nullable(),
+        replaceExisting: z.boolean().optional(),
       }),
       output: z.object({ imported: z.literal(true), apiKeyEnv: z.string().max(128) }),
     }),

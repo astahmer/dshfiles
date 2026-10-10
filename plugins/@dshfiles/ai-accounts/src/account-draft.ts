@@ -87,6 +87,12 @@ export const badgeFromName = (displayName: string): string =>
  * One click, one account. The kind decides every default: a unique route slug,
  * a display name, a tag, a colour and a spare icon — all editable afterwards.
  */
+export const suggestedApiKeyRef = (instanceId: string): string => {
+  const segment = instanceId.replace(/[^A-Za-z0-9_]/gu, '_').toUpperCase()
+  const normalized = /^[A-Z]/u.test(segment) ? segment : `ACCOUNT_${segment}`
+  return `${normalized.slice(0, 112)}_API_KEY`
+}
+
 export const newAccountDraft = (input: { readonly kind: AccountKind; readonly existing: readonly AccountProfile[] }): AccountDraft => {
   const taken = new Set(input.existing.map(account => account.instanceId))
   let instanceId = `${input.kind}_work`
@@ -99,7 +105,7 @@ export const newAccountDraft = (input: { readonly kind: AccountKind; readonly ex
     enabled: true,
     homePath: DEFAULT_HOME[input.kind],
     shadowHomePath: '',
-    apiKeyEnv: '',
+    apiKeyEnv: input.kind === 'codex' ? '' : suggestedApiKeyRef(instanceId),
     apiBaseUrl: '',
     badge: badgeFromName(displayName),
     accentColor: KIND_ACCENT[input.kind],

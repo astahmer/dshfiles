@@ -130,13 +130,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   }
 
   const storeCredential = async (input: { readonly ref: string; readonly value: string }): Promise<boolean> => {
-    if (
-      credentialSetup === undefined ||
-      draft === null ||
-      problem !== null ||
-      input.ref !== draft.apiKeyEnv.trim() ||
-      !isKeyEnvName(input.ref)
-    ) {
+    if (credentialSetup === undefined || draft === null || problem !== null || input.ref !== draft.apiKeyEnv.trim() || !isKeyEnvName(input.ref)) {
       setNotice('Save a valid account and API-key variable before storing a key.')
       return false
     }
@@ -165,6 +159,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     readonly environment: string
     readonly scope: 'global' | 'project' | 'local'
     readonly cwd: string | null
+    readonly replaceExisting?: boolean
   }): Promise<boolean> => {
     if (draft === null || problem !== null || !isKeyEnvName(draft.apiKeyEnv.trim())) {
       setNotice('Save a valid API-key variable ending in _API_KEY before importing a key.')
@@ -178,7 +173,11 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
         queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file }),
         queryClient.invalidateQueries({ queryKey: aiAccountsKeys.usage }),
       ])
-      setNotice('Secret imported into DSH credentials. The next request uses it; no relaunch needed.')
+      setNotice(
+        input.replaceExisting
+          ? 'Key replaced from Secret Catalog. The next request uses it; no relaunch needed.'
+          : 'Secret imported into DSH credentials. The next request uses it; no relaunch needed.',
+      )
       return true
     } catch {
       setNotice('The account mapping was saved, but the Secret Catalog key could not be imported. Check the entry and retry.')
@@ -240,6 +239,14 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     setNotice((await writeClipboard(text)) ? message : `Copy this into a terminal: ${text}`)
   }
 
+  const copyPath = async (): Promise<void> => {
+    try {
+      await copy(await accounts.filePath(), 'Accounts file path copied. It contains account settings, not key values.')
+    } catch {
+      setNotice('Could not read the accounts file path.')
+    }
+  }
+
   /**
    * While an account has no login, poll for one: the user signs in with the
    * command shown, and the card refreshes as soon as Codex writes the file.
@@ -291,6 +298,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     remove,
     createAccount,
     copy,
+    copyPath,
     preferences,
   }
 }

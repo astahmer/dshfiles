@@ -1,3 +1,5 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -20,6 +22,10 @@ const OverlaySwitch = (props: { readonly label: string; readonly checked: boolea
 
 export const AccountsToolbar = (props: { readonly state: AccountsPanelState; readonly file: AccountsFile }): JSX.Element => (
   <header className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1600px] dshx:flex-wrap dshx:items-center dshx:justify-center dshx:gap-x-5 dshx:gap-y-2 dshx:text-xs dshx:text-muted-foreground">
+    <Button onClick={() => void props.state.copyPath()} size="xs" type="button" variant="outline">
+      <CopyIcon />
+      Copy accounts file path
+    </Button>
     <span>
       Applying settings for <strong className="dshx:font-semibold dshx:text-foreground">All accounts</strong> on{' '}
       <strong className="dshx:font-semibold dshx:text-foreground">this host</strong>

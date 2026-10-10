@@ -47,9 +47,33 @@ describe('Secret Catalog credential bridge', () => {
     const options = await bridge.listKeys('/tmp/project')
 
     expect(options).toEqual([
-      { alias: 'OPENCODE_GO_KEY', environment: 'prod', scope: 'global', cwd: null, variableName: 'OPENCODE_GO_KEY', service: 'OpenCode Go', description: 'OpenCode Go' },
-      { alias: 'PROJECT_KEY', environment: 'prod', scope: 'project', cwd: '/tmp/project', variableName: 'PROJECT_KEY', service: 'OpenCode Go', description: 'OpenCode Go' },
-      { alias: 'LOCAL_KEY', environment: 'prod', scope: 'local', cwd: '/tmp/project', variableName: 'LOCAL_KEY', service: 'OpenCode Go', description: 'OpenCode Go' },
+      {
+        alias: 'OPENCODE_GO_KEY',
+        environment: 'prod',
+        scope: 'global',
+        cwd: null,
+        variableName: 'OPENCODE_GO_KEY',
+        service: 'OpenCode Go',
+        description: 'OpenCode Go',
+      },
+      {
+        alias: 'PROJECT_KEY',
+        environment: 'prod',
+        scope: 'project',
+        cwd: '/tmp/project',
+        variableName: 'PROJECT_KEY',
+        service: 'OpenCode Go',
+        description: 'OpenCode Go',
+      },
+      {
+        alias: 'LOCAL_KEY',
+        environment: 'prod',
+        scope: 'local',
+        cwd: '/tmp/project',
+        variableName: 'LOCAL_KEY',
+        service: 'OpenCode Go',
+        description: 'OpenCode Go',
+      },
     ])
     expect(JSON.stringify(options)).not.toContain('synthetic-secret')
   })
@@ -65,7 +89,13 @@ describe('Secret Catalog credential bridge', () => {
     }
     const bridge = createSecretCatalogCredentialBridge({ operations, getCredentials: () => credentials })
 
-    const result = await bridge.importKey({ alias: 'OPENCODE_GO_KEY', environment: 'prod', scope: 'global', cwd: null, targetRef: 'OPENCODEX_OPENCODE_GO_API_KEY' })
+    const result = await bridge.importKey({
+      alias: 'OPENCODE_GO_KEY',
+      environment: 'prod',
+      scope: 'global',
+      cwd: null,
+      targetRef: 'OPENCODEX_OPENCODE_GO_API_KEY',
+    })
 
     expect(result).toBeUndefined()
     expect(writes).toEqual([{ ref: 'OPENCODEX_OPENCODE_GO_API_KEY', value: 'synthetic-secret-value' }])
@@ -138,7 +168,7 @@ describe('Secret Catalog credential bridge', () => {
     expect(requests.every(request => request.args[0] !== 'get')).toBe(true)
   })
 
-  it('does not overwrite an already configured writable destination', async () => {
+  it('does not overwrite an already configured writable destination without confirmation', async () => {
     const { operations, requests } = testOperations()
     const bridge = createSecretCatalogCredentialBridge({
       operations,
@@ -150,7 +180,32 @@ describe('Secret Catalog credential bridge', () => {
 
     await expect(
       bridge.importKey({ alias: 'OPENCODE_GO_KEY', environment: 'prod', scope: 'global', cwd: null, targetRef: 'OPENCODEX_OPENCODE_GO_API_KEY' }),
-    ).rejects.toThrow('That API-key variable already has a value; choose another reference.')
+    ).rejects.toThrow('That API-key variable already has a value; confirm replacement or choose another reference.')
     expect(requests.every(request => request.args[0] !== 'get')).toBe(true)
+  })
+
+  it('replaces an existing writable credential only when explicitly requested', async () => {
+    const { operations } = testOperations()
+    const writes: Array<{ readonly ref: string; readonly value: string }> = []
+    const bridge = createSecretCatalogCredentialBridge({
+      operations,
+      getCredentials: () => ({
+        describe: async () => ({ configured: true, writable: true }),
+        set: async (ref: string, value: string) => {
+          writes.push({ ref, value })
+        },
+      }),
+    })
+
+    await bridge.importKey({
+      alias: 'OPENCODE_GO_KEY',
+      environment: 'prod',
+      scope: 'global',
+      cwd: null,
+      targetRef: 'OPENCODEX_OPENCODE_GO_API_KEY',
+      replaceExisting: true,
+    })
+
+    expect(writes).toEqual([{ ref: 'OPENCODEX_OPENCODE_GO_API_KEY', value: 'synthetic-secret-value' }])
   })
 })

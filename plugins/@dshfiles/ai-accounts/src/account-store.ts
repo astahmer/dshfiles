@@ -23,7 +23,7 @@ import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
  * which stays inside each Codex home where its owner put it.
  */
 
-const STORE_PATH = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
+const STORE_PATH = resolve(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
 
 const DEFAULT_SHADOW_ROOT = join(codexAccountHome(), '.codex-dshx')
 
@@ -56,6 +56,8 @@ const storeFileSchema = accountsFileSchema.extend({
  * an external edit is picked up on the next request.
  */
 /** Load the file into the cache so activation can read it synchronously. */
+export const accountFilePath = (): string => STORE_PATH
+
 export const primeAccountFile = (): AccountStoreFile => {
   try {
     cachedRaw = readFileSync(STORE_PATH, 'utf8')
@@ -150,8 +152,7 @@ const observe = async (
   resolveCredential?: CredentialValueResolver,
 ): Promise<AccountProfile> => {
   const cooling = status?.state === 'cooling'
-  const resolveKey = async (name: string): Promise<string> =>
-    resolveCredential === undefined ? readKeyFromEnv(name) : resolveCredential(name)
+  const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? readKeyFromEnv(name) : resolveCredential(name))
   if (draft.kind === 'opencode-go') {
     const hasKey = (await resolveKey(draft.apiKeyEnv)).length > 0
     return observed(draft, {

@@ -56,7 +56,8 @@ export const createSecretCatalogCredentialBridge = (input: {
       throw new Error('The DSH credential store could not be checked.')
     }
     if (!target.writable) throw new Error('That variable is supplied by a read-only source; choose another API-key variable.')
-    if (target.configured) throw new Error('That API-key variable already has a value; choose another reference.')
+    if (target.configured && request.replaceExisting !== true)
+      throw new Error('That API-key variable already has a value; confirm replacement or choose another reference.')
 
     const cwd = sourceCwdFor(request.scope, request.cwd)
     const matches = (await uniqueRows(input.operations, cwd)).filter(

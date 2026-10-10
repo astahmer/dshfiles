@@ -4,7 +4,7 @@ import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
 import { aiAccountsApi, baseModelName, isKeyEnvName, type AccountsFile, type AccountsUsage } from './api.js'
-import { buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
+import { accountFilePath, buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
@@ -43,11 +43,12 @@ export const accountsHostApi = aiAccountsApi.host({
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
+  filePath: () => accountFilePath(),
   secretCatalogKeys: async ({ input, ctx }) => {
     const bridge = secretCatalogBridgeFor(ctx)
     if (bridge === undefined) return { available: false, items: [] }
     try {
-      return { available: true, items: [...await bridge.listKeys(input.cwd)] }
+      return { available: true, items: [...(await bridge.listKeys(input.cwd))] }
     } catch {
       return { available: false, items: [] }
     }
@@ -64,6 +65,7 @@ export const accountsHostApi = aiAccountsApi.host({
       scope: input.scope,
       cwd: input.cwd,
       targetRef: account.apiKeyEnv,
+      replaceExisting: input.replaceExisting,
     })
     accountRuntime(ctx)?.usageCache?.invalidate()
     return { imported: true, apiKeyEnv: account.apiKeyEnv }

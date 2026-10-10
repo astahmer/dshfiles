@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 
 export const secretScopeSchema = z.enum(['global', 'project', 'local'])
@@ -22,6 +21,7 @@ export interface SecretCatalogCredentialBridge {
     readonly scope: SecretScope
     readonly cwd: string | null
     readonly targetRef: string
+    readonly replaceExisting?: boolean
   }): Promise<void>
 }
 

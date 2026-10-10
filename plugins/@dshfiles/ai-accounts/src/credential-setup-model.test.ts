@@ -1,29 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { shouldOfferCredentialSetup, type CredentialSetupVisibilityInput } from './credential-setup-model.js'
 
-const missingCredential = (): CredentialSetupVisibilityInput => ({
+const selectedKeyedAccount = (): CredentialSetupVisibilityInput => ({
   setupAvailable: true,
   draftInstanceId: 'open-code-go-alex',
   selectedInstanceId: 'open-code-go-alex',
-  selectedSignedIn: false,
-  apiKeyEnv: 'OPENCODEX_OPENCODE_GO_API_KEY',
-  credentialInfo: { configured: false, writable: true },
+  accountKind: 'opencode-go',
 })
 
 describe('API-key setup visibility', () => {
-  it('offers setup for a missing key on the active account', () => {
-    expect(shouldOfferCredentialSetup(missingCredential())).toBe(true)
+  it('offers setup for a selected keyed account even when its key already exists', () => {
+    expect(shouldOfferCredentialSetup(selectedKeyedAccount())).toBe(true)
   })
 
-  it('does not confuse configured-key request failures such as a provider 404 with missing credentials', () => {
-    const input = missingCredential()
-    expect(shouldOfferCredentialSetup({ ...input, selectedSignedIn: true, credentialInfo: { configured: true, writable: true } })).toBe(false)
-  })
-
-  it('does not offer setup for read-only, invalid, unavailable, or non-selected references', () => {
-    const input = missingCredential()
-    expect(shouldOfferCredentialSetup({ ...input, credentialInfo: { configured: false, writable: false } })).toBe(false)
-    expect(shouldOfferCredentialSetup({ ...input, apiKeyEnv: 'PATH' })).toBe(false)
+  it('does not offer a key action for Codex or when setup is unavailable or another account is selected', () => {
+    const input = selectedKeyedAccount()
+    expect(shouldOfferCredentialSetup({ ...input, accountKind: 'codex' })).toBe(false)
     expect(shouldOfferCredentialSetup({ ...input, setupAvailable: false })).toBe(false)
     expect(shouldOfferCredentialSetup({ ...input, selectedInstanceId: 'different-account' })).toBe(false)
   })

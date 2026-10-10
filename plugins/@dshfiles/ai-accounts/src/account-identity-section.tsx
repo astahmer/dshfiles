@@ -79,7 +79,9 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
                   ? selected?.signedIn === true
                     ? 'Signed in'
                     : 'Sign in, then refresh'
-                  : `Key from ${draft.apiKeyEnv === '' ? 'the environment' : draft.apiKeyEnv}`)
+                  : draft.apiKeyEnv === ''
+                    ? 'No key name set yet'
+                    : `Key source: ${draft.apiKeyEnv}`)
               }
             />
           )}
