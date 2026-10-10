@@ -13,6 +13,7 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
+import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
 import {
   closePalette,
   getPaletteMode,
@@ -257,6 +258,30 @@ export default defineClient({
             resolve: () => ({ status: 'handled', run: () => openPalette('all') }),
           }),
         'command-palette: shortcut',
+      )
+    const startNewThread = (): void => ctx.uiWorkspace.startSession()
+    const newThreadAction: PaletteAction = {
+      id: '@dshfiles/command-palette/new-thread',
+      label: () => translate('commandPaletteNewThread'),
+      aliases: ['new thread', 'new chat', 'new session'],
+      group: 'action',
+      run: startNewThread,
+    }
+    ctx.effect(() => registerPaletteAction(newThreadAction), 'command-palette: new thread action')
+    const newThreadShortcutId = 'commandPalette.newThread'
+    if (isShortcutCommandId(newThreadShortcutId))
+      ctx.effect(
+        () =>
+          ctx.shortcuts.register({
+            id: newThreadShortcutId,
+            label: () => translate('commandPaletteNewThread'),
+            aliases: ['new thread', 'new chat', 'new session'],
+            defaults: newThreadShortcutDefaults,
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({ status: 'handled', run: startNewThread }),
+          }),
+        'command-palette: new thread shortcut',
       )
     const themeActions: readonly PaletteAction[] = [
       {

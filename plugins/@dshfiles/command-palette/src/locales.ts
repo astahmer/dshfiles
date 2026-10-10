@@ -43,6 +43,7 @@ const en = {
   commandPaletteThemeDark: 'Use dark theme',
   commandPaletteThemeSystem: 'Use system theme',
   commandPaletteActionFailed: 'That action could not be completed.',
+  commandPaletteNewThread: 'New thread',
 }
 
 const zh = {
@@ -86,6 +87,7 @@ const zh = {
   commandPaletteThemeDark: '切换为深色主题',
   commandPaletteThemeSystem: '跟随系统主题',
   commandPaletteActionFailed: '无法完成此操作。',
+  commandPaletteNewThread: '新建会话',
 }
 
 export const commandPaletteLocale = defineLocale(COMMAND_PALETTE_LOCALE_NAMESPACE, { en, zh })
