@@ -71,13 +71,16 @@ flowchart LR
 
 ### Permission model
 
-Use Session-specific permissions, independent from filesystem sandbox modes. Start with named presets and permit narrower grants later:
+Use Session-specific permissions, independent from filesystem sandbox modes. Store one preset per calling Agent Session, with a read-current-workspace default when no override exists:
 
 | Preset | Effective access |
 |---|---|
 | **Read current workspace** (default) | Discover and read Sessions associated with the Agent's current workspace; no mutations. |
+| **Read all workspaces** | Discover and read Sessions in any registered workspace; no mutations. |
 | **Read/write current workspace** | Read plus all supported Session actions within the current workspace. |
-| **Read/write all workspaces** | Read plus all supported Session actions across workspaces, including unassigned Sessions only if explicitly included. |
+| **Read/write all workspaces** | Read plus all supported Session actions across registered workspaces. |
+
+Unassigned Sessions are excluded unless the Agent's configured permission entry explicitly includes them. Child Agents use their own Agent Session entry and cannot inherit a wider scope from tool arguments.
 
 “Write” means the complete set of supported Session operations, not merely sending a prompt: create; continue/send or queue prompts; stop/cancel activity; edit, remove, or steer queued items; fork; rename; select model; pin/unpin; archive/restore; move Sessions within workspaces; and any future Session mutation. A preset can grant that set together; operation-level denies or narrower grants may further restrict it. Never infer Session write access from filesystem Full Access.
 
