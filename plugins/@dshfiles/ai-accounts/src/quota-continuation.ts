@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+import type { SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ScheduleId, type ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
@@ -29,7 +29,7 @@ const SNOOZE_MS = {
 
 type QuotaContinuationDomain = Domain<typeof quotaContinuationDomain>
 type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
-type SessionControllerService = NonNullable<Context['sessionController']>
+type SessionControllerService = SessionController
 type SessionInspectionEvents = Awaited<ReturnType<SessionControllerService['inspect']>>['events']
 type SessionControllerPort = {
   inspect: (
@@ -487,7 +487,10 @@ const createQuotaContinuationService = ({
 
       try {
         const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
-        const activities = collectUserActivities(inspected.events, event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined))
+        const activities = collectUserActivities<SessionInspectionEvents[number]>(
+          inspected.events,
+          event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined),
+        )
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current)
           return { accepted: false }

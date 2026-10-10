@@ -8,6 +8,7 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { ScheduleId, createAfterScheduleRecord } from '@deepseek-ai/dsh-schedule'
+import type { SessionController } from '@deepseek-ai/dsh-api-session-controller'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-continuation.js'
@@ -16,7 +17,7 @@ import { promptFor } from './quota-continuation-message.js'
 type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
 type ScheduleCreateRequest = Parameters<NonNullable<Context['schedule']>['create']>[1]
 type ScheduleRecord = Awaited<ReturnType<NonNullable<Context['schedule']>['create']>>
-type SessionPromptRequest = Parameters<NonNullable<Context['sessionController']>['prompt']>[0]
+type SessionPromptRequest = Parameters<SessionController['prompt']>[0]
 
 const openContext = async (root: string) => {
   const context = new Context()
