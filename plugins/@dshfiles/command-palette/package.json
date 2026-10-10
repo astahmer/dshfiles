@@ -95,5 +95,8 @@
         "@deepseek-ai/dsh-client-store"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

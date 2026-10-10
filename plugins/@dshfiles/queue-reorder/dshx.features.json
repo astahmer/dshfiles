@@ -22,14 +22,6 @@
           "coveredBy": [
             "queue-reorder.dock-preferences"
           ]
-        },
-        {
-          "key": "previewLength",
-          "defaultValue": "200",
-          "constraints": "Integer from 40 to 1000 characters.",
-          "coveredBy": [
-            "queue-reorder.message-preview"
-          ]
         }
       ],
       "states": [
@@ -110,11 +102,6 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "queue-reorder.message-preview",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
-        },
-        {
-          "kind": "gherkin",
           "id": "queue-reorder.busy-locks",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
         },
@@ -135,6 +122,54 @@
           "id": "queue-reorder.text-only-message-editing-unit-host-queue-edit-action",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-editor-rendering.test.ts",
           "testName": "queue edit uses the Host queue action instead of composer-only APIs"
+        }
+      ]
+    },
+    {
+      "id": "queued-message-preview",
+      "title": "Preview queued message text",
+      "summary": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [
+        {
+          "key": "previewLength",
+          "defaultValue": "200",
+          "constraints": "Integer from 40 to 1000 characters.",
+          "coveredBy": [
+            "queue-reorder.message-preview"
+          ]
+        }
+      ],
+      "states": [
+        "text-preview",
+        "truncated-preview",
+        "attachment-only",
+        "empty-preview"
+      ],
+      "failureModes": [
+        "Text previews split a Unicode code point during truncation.",
+        "Image or file payload data is rendered as message text."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.message-preview",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queued-message-preview-unit-normalizes-and-hides-attachments",
+          "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
+          "testName": "flattens text and named blocks while excluding attachments"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queued-message-preview-unit-unicode-safe-limit",
+          "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
+          "testName": "clips by Unicode code point and appends one ellipsis"
         }
       ]
     }

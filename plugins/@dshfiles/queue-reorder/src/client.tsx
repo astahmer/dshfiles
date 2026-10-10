@@ -23,6 +23,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSPr
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
 import { editableQueueText } from './queue-edit.js'
+import { messagePreview } from './message-preview.js'
 import { queueReorderSettings } from './settings.js'
 
 // Inline instead of client.css so this plugin's sheet stays byte-identical to the shared plugin-ui sheet.
@@ -92,18 +93,6 @@ const attachmentsOf = (content: readonly TextBlock[]): string | null => {
   const files = content.filter(block => block.type !== 'text')
   if (files.length === 0) return null
   return `${files.length} attachment${files.length === 1 ? '' : 's'}`
-}
-
-/** One-line preview, truncated the way the shipped dock truncates. */
-const previewOf = (content: readonly TextBlock[], limit: number): string => {
-  const flat = content
-    .filter(block => block.type !== 'image' && block.type !== 'file')
-    .map(block => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`))
-    .join(' ')
-    .replace(/\s+/gu, ' ')
-    .trim()
-  const chars = Array.from(flat)
-  return chars.length > limit ? `${chars.slice(0, limit).join('')}…` : flat
 }
 
 const RowAction = (props: {
@@ -308,8 +297,8 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                           value={draft}
                         />
                       ) : (
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={previewOf(row.content, previewLength) || undefined}>
-                          {previewOf(row.content, previewLength) || files || '—'}
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={messagePreview(row.content, previewLength) || undefined}>
+                          {messagePreview(row.content, previewLength) || files || '—'}
                         </span>
                       )}
                       {queueMutable ? (

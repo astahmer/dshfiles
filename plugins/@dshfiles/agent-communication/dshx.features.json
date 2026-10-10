@@ -25,6 +25,12 @@
           "kind": "gherkin",
           "id": "agent-communication.directory",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.agent-directory-unit-topics",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "lists named topics without exposing private inbox subscriptions"
         }
       ]
     },
@@ -53,6 +59,12 @@
           "kind": "gherkin",
           "id": "agent-communication.delivery-policy",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.delivery-policy-unit-modes",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "delivers queued and allowlisted steering notifications but keeps quiet messages durable"
         }
       ]
     },
@@ -81,6 +93,12 @@
           "kind": "gherkin",
           "id": "agent-communication.inbox",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.inbox-unit-durable-ack",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "keeps direct messages pending until the recipient acknowledges them after reopen"
         }
       ]
     }

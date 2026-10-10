@@ -27,6 +27,7 @@ const PRIVATE_URL = /http:\/\/127\.0\.0\.1:\d+\/\S*/g
 /** Per-scenario state, keyed by the page playwright-bdd hands each scenario. */
 const profiles = new WeakMap<Page, BootedProfile>()
 const evidenceRuns = new WeakMap<Page, EvidenceRun>()
+const browserDiagnostics = new WeakMap<Page, string[]>()
 
 const evidenceRunFor = (page: Page): EvidenceRun => {
   const run = evidenceRuns.get(page)

@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "palette-search",
+      "title": "Search threads and workspace files",
+      "summary": "Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "closed",
+        "open-empty",
+        "thread-results",
+        "file-results",
+        "content-results"
+      ],
+      "failureModes": [
+        "A thread title or project match is omitted from results.",
+        "A file basename match is buried below unrelated path matches."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.thread-search",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "command-palette.file-search",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.palette-search-unit-thread-fields",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "thread search matches title, project, and id prefix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.palette-search-unit-empty-thread-recency",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "empty thread search returns the most recent candidates"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.palette-search-unit-file-basename-and-frecent",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "file search prefers basename matches and lifts frecent paths"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.palette-search-unit-empty-file-frecent",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "empty file search lists frecent paths before walk order"
+        }
+      ]
+    },
+    {
+      "id": "action-registry",
+      "title": "Register and invoke typed palette actions",
+      "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
+      "surfaces": [
+        "client",
+        "api"
+      ],
+      "configuration": [],
+      "states": [
+        "registered",
+        "available",
+        "selected",
+        "disposed"
+      ],
+      "failureModes": [
+        "A duplicate or unnamespaced action id enters the registry.",
+        "A disposed action remains visible or callable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.action-registration",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.action-registry-unit-registration-lifecycle",
+          "file": "plugins/@dshfiles/command-palette/src/palette-api.test.ts",
+          "testName": "registrations publish actions, notify subscribers, and dispose cleanly"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.action-registry-unit-valid-action-ids",
+          "file": "plugins/@dshfiles/command-palette/src/palette-api.test.ts",
+          "testName": "duplicate and un-namespaced action IDs are rejected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.action-registry-unit-browser-settings",
+          "file": "plugins/@dshfiles/command-palette/src/palette-api.test.ts",
+          "testName": "palette mode and recent limit share the browser registry across API calls"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.action-registry-unit-search-ranking",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "actions match labels and aliases, preserve ties, and use frecency"
+        }
+      ]
+    },
+    {
+      "id": "frecency-ranking",
+      "title": "Rank recently used actions and files",
+      "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
+      "surfaces": [
+        "client",
+        "storage"
+      ],
+      "configuration": [],
+      "states": [
+        "unused",
+        "recently-used",
+        "frecent",
+        "evicted"
+      ],
+      "failureModes": [
+        "Recent use fails to affect result ordering.",
+        "Usage storage grows beyond its configured bound."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.recent-use-ranking",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.frecency-unit-counts-use",
+          "file": "plugins/@dshfiles/command-palette/src/frecency.test.ts",
+          "testName": "recording a use counts it and refreshes its time"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.frecency-unit-recency-and-habit-weight",
+          "file": "plugins/@dshfiles/command-palette/src/frecency.test.ts",
+          "testName": "recent use outweighs an old habit until the habit is much stronger"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.frecency-unit-bounded-storage",
+          "file": "plugins/@dshfiles/command-palette/src/frecency.test.ts",
+          "testName": "storage stays bounded and drops the weakest entries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.frecency-unit-empty-file-order",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "empty file search lists frecent paths before walk order"
+        }
+      ]
+    },
+    {
+      "id": "palette-prefix-routing",
+      "title": "Route prefixed searches to the right content",
+      "summary": "Use distinct palette prefixes to switch between commands, indexed content, and line-numbered file views.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "command-prefix",
+        "content-prefix",
+        "line-prefix"
+      ],
+      "failureModes": [
+        "A recognized prefix searches the wrong content type.",
+        "A line prefix is parsed as ordinary search text."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.prefix-routing",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.prefix-routing-unit-command-content-line",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "palette prefixes route to command, content, and line views"
+        }
+      ]
+    },
+    {
+      "id": "performance-budget",
+      "title": "Keep palette ranking within the interaction budget",
+      "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "open",
+        "query-change",
+        "ranked-results"
+      ],
+      "failureModes": [
+        "Opening or typing exceeds the documented palette interaction budget."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.performance-budget",
+          "featureFile": "tooling/dshx/e2e/features/palette-performance.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.performance-unit-thread-ranking",
+          "file": "plugins/@dshfiles/command-palette/src/palette-perf.test.ts",
+          "testName": "ranking 2,000 threads per keystroke stays within one frame budget"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.performance-unit-file-ranking",
+          "file": "plugins/@dshfiles/command-palette/src/palette-perf.test.ts",
+          "testName": "ranking 20,000 file paths per keystroke stays within one frame budget"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.performance-unit-action-ranking",
+          "file": "plugins/@dshfiles/command-palette/src/palette-perf.test.ts",
+          "testName": "ranking 500 actions per keystroke stays well inside one frame"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.performance-unit-open-large-dataset",
+          "file": "plugins/@dshfiles/command-palette/src/palette-perf.test.ts",
+          "testName": "opening the palette prepares 2,000 threads, 20,000 files and 200 frecency entries in under 50 ms"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}
