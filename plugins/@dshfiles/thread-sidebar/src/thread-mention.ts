@@ -28,3 +28,28 @@ export const captureThreadMentionInsertion = (): void => {
 export const requestThreadMentionInsertion = (sessionId: string): void => {
   window.dispatchEvent(new CustomEvent(THREAD_MENTION_INSERT_EVENT, { detail: { sessionId } }))
 }
+
+export type ThreadMentionFailurePhase = 'remote-result' | 'exception'
+
+export type ThreadMentionFailureDiagnosticInput = {
+  phase: ThreadMentionFailurePhase
+  errorName: string
+  errorCode?: string
+}
+
+export type ThreadMentionFailureDiagnostic = {
+  phase: ThreadMentionFailurePhase
+  errorName: string
+  errorCode?: string
+}
+
+export const threadMentionFailureCodeSchema = z.object({ code: z.string() })
+
+export const summarizeThreadMentionFailure = (input: ThreadMentionFailureDiagnosticInput): ThreadMentionFailureDiagnostic => {
+  const diagnostic: ThreadMentionFailureDiagnostic = {
+    phase: input.phase,
+    errorName: input.errorName,
+  }
+  if (input.errorCode !== undefined) diagnostic.errorCode = input.errorCode
+  return diagnostic
+}

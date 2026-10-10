@@ -20,7 +20,15 @@ import { archiveWithoutStopping } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
-import { buildThreadReferenceInsert, decodeThreadMentionSessionId, THREAD_MENTION_CAPTURE_EVENT, THREAD_MENTION_INSERT_EVENT } from './thread-mention.js'
+import {
+  buildThreadReferenceInsert,
+  decodeThreadMentionSessionId,
+  summarizeThreadMentionFailure,
+  threadMentionFailureCodeSchema,
+  THREAD_MENTION_CAPTURE_EVENT,
+  THREAD_MENTION_INSERT_EVENT,
+  type ThreadMentionFailureDiagnosticInput,
+} from './thread-mention.js'
 import './client.css'
 
 export default defineClient({
@@ -154,6 +162,14 @@ export default defineClient({
               const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
               if (controller.signal.aborted) return
               if (!result.ok) {
+                console.warn(
+                  'thread-sidebar: mention resolution failed',
+                  summarizeThreadMentionFailure({
+                    phase: 'remote-result',
+                    errorName: result.error.name,
+                    errorCode: result.error.code,
+                  }),
+                )
                 input.notify('error', translate('threadSidebarMentionFailure'))
                 return
               }
@@ -165,8 +181,17 @@ export default defineClient({
               if (!input.insertReference(buildThreadReferenceInsert(candidate), span)) {
                 input.notify('info', translate('threadSidebarMentionDraftChanged'))
               }
-            } catch {
-              if (!controller.signal.aborted) input.notify('error', translate('threadSidebarMentionFailure'))
+            } catch (failure) {
+              if (!controller.signal.aborted) {
+                const parsedFailure = threadMentionFailureCodeSchema.safeParse(failure)
+                const diagnostic: ThreadMentionFailureDiagnosticInput = {
+                  phase: 'exception',
+                  errorName: failure instanceof Error ? failure.name : 'unknown',
+                }
+                if (parsedFailure.success) diagnostic.errorCode = parsedFailure.data.code
+                console.warn('thread-sidebar: mention resolution failed', summarizeThreadMentionFailure(diagnostic))
+                input.notify('error', translate('threadSidebarMentionFailure'))
+              }
             } finally {
               pending.current.delete(controller)
             }
