@@ -128,6 +128,22 @@ that raises `LlmError` with a code is the whole remedy.
 > credential or `COMMANDCODE_API_KEY`, not `~/.commandcode/auth.json` (only the usage
 > reader reads that file), and it advertises no reasoning tiers.
 
+> **2026-10-11 finding: the 404 was our base path, and a Go plan cannot use our route at all.**
+> A live `web` turn on `commandcode/gpt-6-luna` (session-56629e61) ended with
+> `404 status code (no body)` / `PI_AI_ERROR`, served by AI Accounts' pi-ai route:
+> the live `~/.dsh/profiles/web/package.json` bundles omit `@mars-sea/dsh-commandcode-provider`,
+> so its `llm-commandcode` patch row is orphaned (`patch: entry "llm-commandcode" not found`)
+> until `nixapply` re-syncs the seed from `profiles/web`. Root cause of the 404: our base was
+> `/provider`, so pi-ai posted to `/provider/chat/completions`; the Provider API lives at
+> `/provider/v1/chat/completions` (and `/provider/v1/messages` for Claude). Fixed, plus: the key
+> falls back to `~/.commandcode/auth.json`, the catalog reads `supported_endpoints` (Claude ids
+> no longer carry `anthropic/`), and `anthropic-messages` is registered. The fixed route then
+> gets `403 upgrade_required`: **the Go plan has no Provider API access**; only the CLI
+> transport (`/alpha/generate`, CLI-version headers) serves it, which `@mars-sea` implements
+> and we do not. That refusal now names the remedy (`nixapply` + restart). Porting the CLI
+> transport is the real prerequisite for Phase 4 on a Go plan. Effort tiers still absent
+> (`reasoning: false`), so an `agent-default-model` row with `reasoningEffort` is refused.
+
 Add a `kind: commandcode` account to the `web` profile's `opencodeAccounts` so
 our plugin registers the route alongside the existing one. Two providers may
 compete for the route name; which one wins must be read from the composed config
