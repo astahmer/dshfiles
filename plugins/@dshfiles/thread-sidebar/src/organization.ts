@@ -104,10 +104,8 @@ export interface OrderedSidebarEntry {
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
 
-export const isAttentionSessionIncluded = (
-  session: Pick<SessionSummary, 'origin' | 'parentId'>,
-  includeSubagentAttention: boolean,
-): boolean => includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
+export const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
+  includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 export interface AutoArchiveContext {
   session: SessionActivity

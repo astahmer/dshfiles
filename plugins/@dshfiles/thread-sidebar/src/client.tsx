@@ -961,17 +961,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       inputNeeded: preferences.inputNeededDisplay === 'group' ? needsInputRows : [],
       turnFinished: preferences.turnFinishedDisplay === 'group' ? turnFinishedRows : [],
     }),
-    [
-      approvalNeededRows,
-      needsInputRows,
-      preferences.approvalNeededDisplay,
-      preferences.inputNeededDisplay,
-      preferences.turnFinishedDisplay,
-      turnFinishedRows,
-    ],
+    [approvalNeededRows, needsInputRows, preferences.approvalNeededDisplay, preferences.inputNeededDisplay, preferences.turnFinishedDisplay, turnFinishedRows],
   )
   const attentionIds = useMemo(
-    () => new Set([...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished].map(session => session.id)),
+    () =>
+      new Set([...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished].map(session => session.id)),
     [groupedAttentionRows],
   )
   const inlineAttentionLabels = useMemo(() => {
@@ -986,14 +980,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       for (const session of turnFinishedRows) labels.set(session.id, 'threadSidebarTurnFinished')
     }
     return labels
-  }, [
-    approvalNeededRows,
-    needsInputRows,
-    preferences.approvalNeededDisplay,
-    preferences.inputNeededDisplay,
-    preferences.turnFinishedDisplay,
-    turnFinishedRows,
-  ])
+  }, [approvalNeededRows, needsInputRows, preferences.approvalNeededDisplay, preferences.inputNeededDisplay, preferences.turnFinishedDisplay, turnFinishedRows])
 
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
@@ -1307,9 +1294,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             <fieldset className="dshx:grid dshx:min-w-0 dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
               <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentation')}</legend>
               <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentationHint')}</p>
-              <div className="dshx:grid dshx:gap-1.5">
-                {attentionPreferenceRows.map(({ key, label }) => attentionDisplayRow(key, label))}
-              </div>
+              <div className="dshx:grid dshx:gap-1.5">{attentionPreferenceRows.map(({ key, label }) => attentionDisplayRow(key, label))}</div>
               <Label className="dshx:font-normal dshx:leading-snug">
                 <Checkbox
                   checked={preferences.includeSubagentAttention}
