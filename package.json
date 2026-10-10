@@ -11,7 +11,7 @@
     "verify:core-runtime-identity": "node scripts/verify-core-runtime-identity.mjs",
     "sync:core-api-session-controller": "node scripts/sync-dsh-core-api-session-controller.mjs",
     "verify:core-runtime-scratch": "node scripts/verify-core-runtime-scratch.mjs",
-    "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && node --experimental-strip-types scripts/verify-project-checks-scratch.mjs",
+    "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && pnpm --dir plugins/@dshfiles/project-checks run verify:scratch",
     "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
     "verify:dsh-customization:a11y": "node scripts/dsh-customization-a11y.mjs",
     "check": "pnpm run typecheck:scripts && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:plugin-boot && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch && pnpm run lint && pnpm run fmt:check",

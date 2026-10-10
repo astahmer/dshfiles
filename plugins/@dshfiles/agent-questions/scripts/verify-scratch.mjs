@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../')
 if (process.versions.node !== '22.23.3') {
   throw new Error(`Use Node 22.23.3 for DSH acceptance; found ${process.versions.node}.`)
 }
@@ -23,7 +23,7 @@ if (dshOutput.status !== 0 || dshOutput.stdout.trim() !== '0.2.0-rc.2') {
 const helperPath = resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')
 const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = await import(pathToFileURL(helperPath).href)
 const packagePath = resolve(repoRoot, 'plugins/@dshfiles/agent-questions')
-const fixturePath = resolve(repoRoot, 'scripts/fixtures/@dshfiles/agent-questions-cold-resume-fixture')
+const fixturePath = resolve(repoRoot, 'plugins/@dshfiles/agent-questions/tests/fixtures/agent-questions-cold-resume-fixture')
 const profileName = 'agent-questions'
 const scratch = await createScratchProfile({
   profileName,

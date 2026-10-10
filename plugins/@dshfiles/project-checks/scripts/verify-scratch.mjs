@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { delimiter, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../')
 if (process.versions.node !== '22.23.3') throw new Error(`Use Node 22.23.3 for DSH acceptance; found ${process.versions.node}.`)
 
 const pnpmVersion = spawnSync('pnpm', ['--version'], { encoding: 'utf8' })
