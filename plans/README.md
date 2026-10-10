@@ -13,6 +13,7 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 | [Command Palette](command-palette/README.md) | Remaining composed UI/style and profile acceptance. |
 | [Queue attachment editing](queue-attachment-editing.md) | Proposed Host-level attachment-preserving edit; not established by the current workaround. |
 | [Command Code route](own-commandcode-route.md) | Remaining provider route and third-party removal gates. |
+| [Session handoff](session-handoff.md) | Open coordinator items without another owning plan (restart prerequisites, follow-ups). |
 | [Plugin boot integrity](plugin-boot-integrity.md) | Cross-plugin profile composition and runtime acceptance. |
 
 ## Cross-plugin, toolchain, and product research
