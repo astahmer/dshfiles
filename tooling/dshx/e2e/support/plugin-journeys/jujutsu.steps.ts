@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, hostApiDiagnosticsForPage, hostOutputFor, recordAssertion } from '../steps.js'
+import { browserDiagnosticsFor, finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 interface JujutsuFixture {
   readonly temporaryRoot: string
@@ -133,20 +133,10 @@ const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<vo
       }, { timeout: 15_000 })
       .not.toBe('pending')
   } catch (cause) {
-    const diagnostics = await hostApiDiagnosticsForPage(page)
-    const hostOutput = hostOutputFor(page)
-      .split(/\r?\n/)
-      .filter(line => /directory|workspace|error|api/i.test(line))
-      .slice(-20)
-    throw new Error(`Folder listing did not settle. API diagnostics: ${JSON.stringify(diagnostics.lines)}\nHost output: ${hostOutput.join('\n')}`, { cause })
+    throw new Error(`Folder listing did not settle. Browser diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}`, { cause })
   }
   if (await listingError.isVisible()) {
-    const diagnostics = await hostApiDiagnosticsForPage(page)
-    const hostOutput = hostOutputFor(page)
-      .split(/\r?\n/)
-      .filter(line => /directory|workspace|error|api/i.test(line))
-      .slice(-20)
-    throw new Error(`Host rejected the disposable fixture folder. API diagnostics: ${JSON.stringify(diagnostics.lines)}\nHost output: ${hostOutput.join('\n')}`)
+    throw new Error(`Host rejected the disposable fixture folder. Browser diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}`)
   }
   await selectFolder.click()
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
