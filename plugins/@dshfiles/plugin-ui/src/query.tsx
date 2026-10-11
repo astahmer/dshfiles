@@ -1,7 +1,9 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { keepPreviousData, QueryClient } from '@tanstack/query-core'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 export * from '@tanstack/react-query'
+export { keepPreviousData }
 
 let pluginQueryClientInstance: QueryClient | undefined
 
