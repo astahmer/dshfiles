@@ -9,6 +9,8 @@ export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
 const preferencesSchema = z
   .object({
+    archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
+    archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
     autoArchiveEnabled: z.boolean(),
     idleMinutes: z.number().int().min(15).max(10080),
     scanIntervalMinutes: z.number().int().min(1).max(120),
