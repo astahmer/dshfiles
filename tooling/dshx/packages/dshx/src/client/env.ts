@@ -1,3 +1,3 @@
-/// <reference path="./css-modules.d.ts" />
+/// <reference path="../../client/css-modules.d.ts" />
 
 export {}
