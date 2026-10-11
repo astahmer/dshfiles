@@ -141,6 +141,12 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   exact integration handoff instead of silently leaving it stranded.
 - Long runs: commit and tick the plan's checkboxes after each milestone, and
   keep a `plans/<topic>/README.md` progress table with a "Resume here" line.
+- A plan is a working document, not a record. The moment its acceptance work
+  lands, migrate its durable behavior, decisions, and evidence into the owning
+  package or toolchain doc, delete the plan and its resume-only notes, and add or
+  remove its row in `plans/README.md` — in the same revision that lands the work.
+  A plan that outlives the work it describes is a second source of truth and goes
+  stale silently.
 
 ### Threads and JJ workspaces
 
@@ -148,19 +154,18 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `jj workspace add` may sit beside the repository directory; they are still
   linked and versioned when `jj workspace list` shows them.
 - For independent code work, create a named workspace from this repository,
-  based on the intended local revision — the current spine tip, not `main`,
-  which sits at the base of a long line:
+  based on the intended local revision — normally the current spine tip:
 
   ```sh
   jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r integration-spine
   ```
 
-- The history above `main` is one line again: `main` = `xspqskqt/0`, the line's
-  tip is bookmarked `integration-spine`, and every live workspace `@` sits on it.
-  `plans/jj-unify-20261011/README.md` records how it was consolidated, what was
-  dropped, and the recovery operations. New work continues from the spine tip; a
-  workspace based on `main` forks below every consolidated change. Keep the line
-  single-headed — branch off it, do not duplicate branches next to it.
+- The history above the consolidation base is one line: `main` and
+  `integration-spine` both point at its tip, and every live workspace `@` sits on
+  it. New work continues from that tip. Keep the line single-headed — branch off
+  it, do not duplicate branches next to it. A fork usually shows up as two heads
+  plus a duplicate change-id; fold it with `jj rebase -r <stray-head> -d <tip>`
+  and abandon the duplicate copy.
 
 - Before editing code in another repository, inspect its `jj root` and
   `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
@@ -503,8 +508,9 @@ result is not decided by baseline lint/format drift. `pnpm run check` stays the
 full superset.
 
 `pnpm run check:plugins:cached` runs the four plugin gates and records the
-outcome under `.jj-gates/<fingerprint>.json`, keyed by the content diff against
-`main`. A rebase, split or other rewrite that leaves the content identical
+outcome under `.jj-gates/<fingerprint>.json`, keyed by the revision's content —
+its full tree diff against the empty root, so it does not depend on where `main`
+points. A rebase, split or other rewrite that leaves the content identical
 reports the recorded result instead of rebuilding; `--force` re-runs, and a
 recorded failure still exits non-zero. This is the cheap way to answer "did the
 history surgery change the code?" without four suites.
