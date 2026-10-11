@@ -834,22 +834,27 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         message: props.tSidebar(failed ? 'threadSidebarActionFailure' : 'threadSidebarArchivedNotice'),
         actionLabel: props.tSidebar('threadSidebarUndo'),
         durationMs: UNDO_NOTICE_DURATION_MS,
-        onAction: () => {
-          void (async () => {
-            let undoFailed = false
-            for (const archivedId of archivedIds) {
-              try {
-                await props.unarchiveSession(archivedId)
-              } catch {
-                undoFailed = true
+        onAction: (() => {
+          let undoInFlight = false
+          return () => {
+            if (undoInFlight) return
+            undoInFlight = true
+            void (async () => {
+              let undoFailed = false
+              for (const archivedId of archivedIds) {
+                try {
+                  await props.unarchiveSession(archivedId)
+                } catch {
+                  undoFailed = true
+                }
               }
-            }
-            setNotice({
-              tone: undoFailed ? 'danger' : 'success',
-              message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarRestoredNotice'),
-            })
-          })()
-        },
+              setNotice({
+                tone: undoFailed ? 'danger' : 'success',
+                message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarRestoredNotice'),
+              })
+            })()
+          }
+        })(),
       })
       return
     }

@@ -19,7 +19,7 @@ export const scheduleSuccessNoticeDismissal = (
   notice: SidebarNotice,
   setNotice: (update: (current: SidebarNotice | null) => SidebarNotice | null) => void,
 ): (() => void) | undefined => {
-  if (notice.tone !== 'success') return
+  if (notice.tone !== 'success' && notice.durationMs === undefined) return
 
   const timer = setTimeout(() => {
     setNotice(current => (current === notice ? null : current))

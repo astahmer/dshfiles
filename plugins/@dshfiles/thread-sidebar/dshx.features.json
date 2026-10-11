@@ -216,18 +216,9 @@
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
       "summary": "Show a temporary notice after manual archive and restore exactly the threads archived by that action when Undo is selected.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "archived",
-        "undo-available",
-        "restored",
-        "restore-failed"
-      ],
+      "states": ["archived", "undo-available", "restored", "restore-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
         "A partial restore reports failure without hiding the remaining archive state."
