@@ -11,6 +11,7 @@
     "@dshfiles/goal-stall-guard": "link:../../../dev/dshfiles/plugins/@dshfiles/goal-stall-guard",
     "@dshfiles/jujutsu": "link:../../../dev/dshfiles/plugins/@dshfiles/jujutsu",
     "@dshfiles/mcp-servers": "link:../../../dev/dshfiles/plugins/@dshfiles/mcp-servers",
+    "@dshfiles/model-effort-picker": "link:../../../dev/dshfiles/plugins/@dshfiles/model-effort-picker",
     "@dshfiles/multi-host": "link:../../../dev/dshfiles/plugins/@dshfiles/multi-host",
     "@dshfiles/optmem": "link:../../../dev/dshfiles/plugins/@dshfiles/optmem",
     "@dshfiles/plugin-marketplace": "link:../../../dev/dshfiles/plugins/@dshfiles/plugin-marketplace",
@@ -53,6 +54,7 @@
         "@dshfiles/command-palette",
         "@dshfiles/thread-sidebar",
         "@dshfiles/ai-accounts",
+        "@dshfiles/model-effort-picker",
         "@dshfiles/editor",
         "@dshfiles/workbench",
         "@dshfiles/optmem"
