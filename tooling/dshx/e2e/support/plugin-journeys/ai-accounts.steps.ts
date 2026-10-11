@@ -42,10 +42,13 @@ When('a Codex account draft is edited in manual save mode', async ({ page }: { p
 
 Then('the manual draft saves and persists when AI Accounts is reopened', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-manual-draft-persistence', async () => {
-    await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+    const saveChanges = page.getByRole('button', { name: 'Save changes', exact: true })
+    await saveChanges.click()
+    await expect(saveChanges).toBeDisabled()
     await expect(page.getByRole('status').filter({ hasText: 'Saved. New sessions use the updated route settings.' })).toBeVisible()
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await expect(page.getByRole('radio', { name: /Manual/ })).toBeChecked()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toHaveValue('E2E Draft Account')
   })
