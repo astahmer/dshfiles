@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "dshx build",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -85,7 +86,8 @@
     "@types/react": "~18.3.31",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
