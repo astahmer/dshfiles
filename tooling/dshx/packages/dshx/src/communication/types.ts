@@ -69,7 +69,7 @@ export const communicationDiagnosticAgentSchema = communicationAgentSchema
   .extend({
     workspaceTopic: z.string().min(1).max(128).nullable(),
     workspaceOptedOut: z.boolean(),
-    workspaceSubscribed: z.boolean(),
+    workspaceSubscribed: z.boolean().optional(),
   })
   .strict()
 export type CommunicationDiagnosticAgent = z.infer<typeof communicationDiagnosticAgentSchema>
@@ -88,6 +88,15 @@ export const communicationInboxSchema = z
   })
   .strict()
 export type CommunicationInbox = z.infer<typeof communicationInboxSchema>
+
+export const communicationMessagePageSchema = z
+  .object({
+    items: z.array(communicationMessageSchema).max(100),
+    nextCursor: z.string().uuid().nullable(),
+    totalMatching: z.number().int().nonnegative().max(5_000),
+  })
+  .strict()
+export type CommunicationMessagePage = z.infer<typeof communicationMessagePageSchema>
 
 const communicationAcknowledgementSchema = z
   .object({
@@ -204,9 +213,11 @@ export type CommunicationState = z.infer<typeof communicationStateSchema>
 export const communicationDiagnosticRecipientSchema = z
   .object({
     principal: communicationPrincipalSchema,
-    delivery: communicationDeliverySchema,
-    readAt: z.number().int().nonnegative().nullable(),
+    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
+    readAt: z.number().int().nonnegative().nullable().optional().default(null),
     acknowledgedAt: z.number().int().nonnegative().nullable(),
+    notifiedAt: z.number().int().nonnegative().nullable().optional(),
+    allowSteerFromCount: z.number().int().nonnegative().optional(),
   })
   .strict()
 export type CommunicationDiagnosticRecipient = z.infer<typeof communicationDiagnosticRecipientSchema>
@@ -232,8 +243,9 @@ export const communicationDiagnosticSubscriptionSchema = z
   .object({
     principal: communicationPrincipalSchema,
     topic: z.string().min(1).max(128),
-    delivery: communicationDeliverySchema,
+    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
     createdAt: z.number().int().nonnegative(),
+    allowSteerFromCount: z.number().int().nonnegative().optional(),
   })
   .strict()
 export type CommunicationDiagnosticSubscription = z.infer<typeof communicationDiagnosticSubscriptionSchema>
@@ -247,6 +259,7 @@ export const communicationDiagnosticMessageSchema = z
     createdAt: z.number().int().nonnegative(),
     recipientCount: z.number().int().nonnegative().max(512),
     pendingRecipientCount: z.number().int().nonnegative().max(512),
+    unnotifiedRecipientCount: z.number().int().nonnegative().max(512).optional(),
   })
   .strict()
 export type CommunicationDiagnosticMessage = z.infer<typeof communicationDiagnosticMessageSchema>
@@ -263,6 +276,7 @@ export const communicationDiagnosticsSchema = z
     messageCount: z.number().int().nonnegative(),
     pendingMessageCount: z.number().int().nonnegative(),
     pendingRecipientCount: z.number().int().nonnegative(),
+    unnotifiedRecipientCount: z.number().int().nonnegative().optional(),
     recentMessages: z.array(communicationDiagnosticMessageSchema).max(100),
     activity: z
       .object({

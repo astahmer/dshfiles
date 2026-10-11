@@ -3,6 +3,7 @@ export type { CommunicationClient, ConnectCommunicationClientOptions, HostCommun
 export { CommunicationError, CommunicationService, createCommunicationService } from './service.js'
 export type {
   CommunicationActivityInput,
+  CommunicationBrowseInput,
   CommunicationInboxInput,
   CommunicationPublishInput,
   CommunicationSendInput,
@@ -20,6 +21,7 @@ export {
   communicationDiagnosticsSchema,
   communicationInboxSchema,
   communicationMessageBodySchema,
+  communicationMessagePageSchema,
   communicationMessageRecipientsSchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
@@ -41,6 +43,7 @@ export type {
   CommunicationInbox,
   CommunicationMessage,
   CommunicationMessageBody,
+  CommunicationMessagePage,
   CommunicationMessageRecipients,
   CommunicationPrincipal,
   CommunicationPriority,

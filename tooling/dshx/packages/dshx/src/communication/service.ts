@@ -11,6 +11,7 @@ import {
   communicationDiagnosticRecipientSchema,
   communicationDiagnosticsSchema,
   communicationMessageBodySchema,
+  communicationMessagePageSchema,
   communicationMessageRecipientsSchema,
   communicationDiagnosticMessageSchema,
   communicationDiagnosticSubscriptionSchema,
@@ -30,6 +31,7 @@ import {
   type CommunicationDiagnostics,
   type CommunicationMessage,
   type CommunicationMessageBody,
+  type CommunicationMessagePage,
   type CommunicationMessageRecipients,
   type CommunicationPrincipal,
   type CommunicationState,
@@ -104,6 +106,14 @@ export interface CommunicationSendInput {
 export interface CommunicationInboxInput {
   readonly principal: CommunicationPrincipal
   readonly topic?: string
+  readonly limit?: number
+}
+
+export interface CommunicationBrowseInput {
+  readonly topic?: string
+  readonly agentId?: string
+  readonly search?: string
+  readonly beforeId?: string
   readonly limit?: number
 }
 
@@ -217,6 +227,49 @@ export class CommunicationService {
 
   async listTopics(): Promise<readonly CommunicationTopic[]> {
     return topicsForState(await this.#readState())
+  }
+
+  async browseMessages(input: CommunicationBrowseInput = {}): Promise<CommunicationMessagePage> {
+    const parsed = z
+      .object({
+        topic: topicSchema.optional(),
+        agentId: z.string().min(1).max(256).optional(),
+        search: z.string().trim().min(1).max(120).optional(),
+        beforeId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(100).default(50),
+      })
+      .strict()
+      .refine(value => value.topic === undefined || value.agentId === undefined, 'Choose a topic or direct Agent, not both.')
+      .parse(input)
+    if (parsed.topic !== undefined) assertTopic(parsed.topic)
+
+    const state = await this.#readState()
+    const search = parsed.search?.toLocaleLowerCase()
+    const matches = state.messages.filter(message => {
+      if (parsed.topic !== undefined && message.topic !== parsed.topic) return false
+      if (
+        parsed.agentId !== undefined &&
+        (message.topic !== null ||
+          ((message.sender.kind !== 'agent' || message.sender.id !== parsed.agentId) &&
+            !message.recipients.some(recipient => recipient.principal.kind === 'agent' && recipient.principal.id === parsed.agentId)))
+      ) {
+        return false
+      }
+      return search === undefined || message.text.toLocaleLowerCase().includes(search)
+    })
+    let endIndex = matches.length
+    if (parsed.beforeId !== undefined) {
+      const cursorIndex = matches.findIndex(message => message.id === parsed.beforeId)
+      if (cursorIndex < 0) throw new CommunicationError('cursor-not-found', 'The message page cursor is no longer available; refresh the conversation.')
+      endIndex = cursorIndex
+    }
+    const startIndex = Math.max(0, endIndex - parsed.limit)
+    const items = matches.slice(startIndex, endIndex)
+    return communicationMessagePageSchema.parse({
+      items,
+      nextCursor: startIndex > 0 ? (items[0]?.id ?? null) : null,
+      totalMatching: matches.length,
+    })
   }
 
   async recordActivity(input: CommunicationActivityInput): Promise<void> {

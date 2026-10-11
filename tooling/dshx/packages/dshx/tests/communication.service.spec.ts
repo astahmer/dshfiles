@@ -100,6 +100,35 @@ describe('durable Agent communication', () => {
     await expect(reopened.acknowledge(sender, message.id)).rejects.toThrow('Message is not present in this subscriber inbox.')
   })
 
+  it('pages and searches stored conversations without marking messages read', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-parent' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-child' }
+    const sent = await Promise.all(
+      Array.from({ length: 6 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `Page item ${index}` })),
+    )
+
+    const newest = await service.browseMessages({ agentId: recipient.id, limit: 2 })
+    expect(newest.items.map(message => message.text)).toEqual(['Page item 4', 'Page item 5'])
+    expect(newest.totalMatching).toBe(6)
+    expect(newest.nextCursor).toBe(newest.items[0]?.id)
+
+    const older = await service.browseMessages({
+      agentId: recipient.id,
+      ...(newest.nextCursor === null ? {} : { beforeId: newest.nextCursor }),
+      limit: 2,
+    })
+    expect(older.items.map(message => message.text)).toEqual(['Page item 2', 'Page item 3'])
+    expect(older.items.some(message => newest.items.some(newer => newer.id === message.id))).toBe(false)
+    expect(await service.browseMessages({ agentId: recipient.id, search: 'ITEM 3' })).toMatchObject({
+      items: [{ id: sent[3]?.id, text: 'Page item 3' }],
+      totalMatching: 1,
+    })
+    const lastSent = sent[5]
+    if (lastSent === undefined) throw new Error('Expected six direct messages.')
+    expect(await service.messageRecipients(lastSent.id)).toMatchObject({ recipients: [{ readAt: null, acknowledgedAt: null }] })
+  })
+
   it('migrates old queued and steered records to passive delivery without replaying notifications', async () => {
     const path = await statePath()
     const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
@@ -143,6 +172,50 @@ describe('durable Agent communication', () => {
       schemaVersion: 3,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
       subscriptions: [{ delivery: 'passive' }, { delivery: 'passive' }],
+    })
+    expect(persisted).not.toHaveProperty('notifications')
+  })
+
+  it('migrates schema version 1 records to passive delivery without notification replay', async () => {
+    const path = await statePath()
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+    const messageId = '7d46f641-e4d7-4b22-959f-2b52074fd1e0'
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 1,
+        messages: [
+          {
+            id: messageId,
+            topic: null,
+            sender,
+            text: 'schema-one message',
+            priority: 'normal',
+            createdAt: now,
+            recipients: [{ principal: recipient, delivery: 'queue', allowSteerFrom: [] }],
+          },
+        ],
+        subscriptions: [
+          { principal: recipient, topic: 'inbox', delivery: 'queue', allowSteerFrom: [], createdAt: now },
+        ],
+        acknowledgements: [],
+        workspaceOptOuts: [],
+        notifications: [{ messageId, agentId: recipient.id, notifiedAt: now }],
+      }),
+      { mode: 0o600 },
+    )
+
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    const inbox = await service.inbox({ principal: recipient, topic: 'inbox' })
+    expect(inbox).toMatchObject([{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }])
+    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    expect(persisted).toMatchObject({
+      schemaVersion: 3,
+      messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
+      subscriptions: [{ delivery: 'passive' }],
+      activityStartedAt: null,
+      activityEvents: [],
     })
     expect(persisted).not.toHaveProperty('notifications')
   })
