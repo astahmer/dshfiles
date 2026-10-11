@@ -22,8 +22,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "@deepseek-ai/schemastery": "3.18.4",
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
     "@radix-ui/primitive": "1.1.7",
     "@radix-ui/react-alert-dialog": "1.1.24",
     "@radix-ui/react-arrow": "1.1.16",
