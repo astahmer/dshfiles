@@ -211,7 +211,7 @@ Then('revision and bookmark moves preview in the target context without changing
   await branchPreview.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(branchPreview).toBeHidden()
 
-  await recordAssertion(page, 'jujutsu-cancelled-moves-preserve-commit-parents-and-bookmark-target', () => expect(snapshotRepository(fixture)).toBe(before))
+  await recordAssertion(page, 'jujutsu-cancelled-moves-preserve-repository-state', () => expect(snapshotRepository(fixture)).toBe(before))
   await finishJourneyAssertions(page)
 })
 
