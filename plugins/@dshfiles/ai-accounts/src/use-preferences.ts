@@ -25,6 +25,7 @@ export const usePreferences = () => {
     failureRecovery: recoveryPolicySchema.parse(value?.failureRecovery),
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,
+    costPlacement: value?.costPlacement === 'separate' ? 'separate' : 'inside',
     pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,
     pricingOverrides: value?.pricingOverrides ?? {},
   }

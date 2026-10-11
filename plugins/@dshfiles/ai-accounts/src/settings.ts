@@ -9,7 +9,10 @@ const kindPolicySetting = (fallback: KindPolicy, description: string) =>
     backoffMs: Schema.natural().min(100).max(60_000).default(fallback.backoffMs).description('First retry delay in ms; each further retry doubles it.'),
     lunaReserve: Schema.boolean().default(fallback.lunaReserve).description('Codex: continue on Luna Reserve while it lasts.'),
     failover: Schema.boolean().default(fallback.failover).description('Fail over to the next account of the same provider that offers the model.'),
-    waitSeconds: Schema.natural().max(3_600).default(fallback.waitSeconds).description('Wait up to this long for a provider-declared reset, then retry once (0 = never wait).'),
+    waitSeconds: Schema.natural()
+      .max(3_600)
+      .default(fallback.waitSeconds)
+      .description('Wait up to this long for a provider-declared reset, then retry once (0 = never wait).'),
     shrink: Schema.boolean().default(fallback.shrink).description('Last try: resend earlier images as file placeholders.'),
     then: Schema.union([Schema.const('fail').description('Fail the turn'), Schema.const('dsh').description('Hand to DSH (built-in retry, compaction)')])
       .default(fallback.then)
@@ -52,6 +55,8 @@ export const aiAccountsSettings = defineSettings({
       auth: kindPolicySetting(DEFAULT_RECOVERY_POLICY.auth, 'Signed out, rejected or missing credentials.'),
       oversized: kindPolicySetting(DEFAULT_RECOVERY_POLICY.oversized, 'Request or context too large.'),
     }).description('Failure recovery'),
+    /** Show the estimated session cost in the token stats or in its own dock entry. */
+    costPlacement: Schema.union(['inside', 'separate']).default('inside'),
     /** Estimated session cost beside the composer stats, priced from models.dev. */
     costEstimates: Schema.boolean().default(true),
     /** How often the Host refetches models.dev prices. */
@@ -134,7 +139,11 @@ const recoverySettingsSchema = z.object({
 })
 
 /** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-export const readRecoverySettings = (): { readonly policy: RecoveryPolicy; readonly usageOrder: readonly string[]; readonly hiddenUsageAccounts: readonly string[] } => {
+export const readRecoverySettings = (): {
+  readonly policy: RecoveryPolicy
+  readonly usageOrder: readonly string[]
+  readonly hiddenUsageAccounts: readonly string[]
+} => {
   const parsed = recoverySettingsSchema.parse(readLiveSettings())
   return { policy: parsed.failureRecovery, usageOrder: parsed.usageOrder, hiddenUsageAccounts: parsed.hiddenUsageAccounts }
 }

@@ -3,11 +3,12 @@ import { useApi } from '@dshfiles/dshx/client'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@dshfiles/plugin-ui/components/ui/hover-card'
 import { CoinsIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
 import { SESSION_COST_PROJECTION_KEY, estimateCost, formatUsd, routeKey, sessionCostViewSchema, type CostEstimate, type RouteQuote } from './cost-estimate.js'
 import { fetchedAgo } from './pricing-status.js'
+import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
 
 type ProjectionHook = (key: string) => unknown
@@ -41,7 +42,9 @@ export const SessionCostDockEntry = (props: { readonly useProjection?: unknown }
 
 const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
-  const { pricingOverrides } = usePreferences()
+  const { costPlacement, pricingOverrides } = usePreferences()
+  const markerRef = useRef<HTMLSpanElement | null>(null)
+  const displayRef = useRef<SessionCostDisplay | null>(null)
   const raw = props.useProjection(SESSION_COST_PROJECTION_KEY)
   const view = useMemo(() => {
     const parsed = sessionCostViewSchema.safeParse(raw)
@@ -55,10 +58,43 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
   const quotes = quotesQuery.data
   const quoteMap = useMemo(() => new Map((quotes?.quotes ?? []).map(quote => [routeKey(quote), quote])), [quotes])
 
-  if (view === null || quotes === undefined || quotes === null) return null
-  const session = estimateCost({ groups: view.groups, quotes: quoteMap })
-  if (!session.priced) return null
-  const turn = view.turn === null ? null : estimateCost({ groups: view.turn.groups, quotes: quoteMap })
+  const session = view === null || quotes === undefined || quotes === null ? null : estimateCost({ groups: view.groups, quotes: quoteMap })
+  const turn = session === null || view === null || view.turn === null ? null : estimateCost({ groups: view.turn.groups, quotes: quoteMap })
+  const inlineValue =
+    session === null || !session.priced
+      ? undefined
+      : {
+          amount: amountText(session),
+          description: `Estimated session cost ${amountText(session)}. Estimate from published API prices, not an invoice.`,
+          rows: [
+            { label: 'Input', tokens: session.tokens.uncachedInputTokens, cost: session.cost.input },
+            { label: 'Output', tokens: session.tokens.outputTokens, cost: session.cost.output },
+            { label: 'Cache read', tokens: session.tokens.cacheReadTokens, cost: session.cost.cacheRead },
+            { label: 'Cache write', tokens: session.tokens.cacheWriteTokens, cost: session.cost.cacheWrite },
+          ]
+            .filter(row => row.tokens > 0)
+            .map(row => ({ label: row.label, value: `${compactTokens(row.tokens)} tok · ${formatUsd(row.cost)}` }))
+            .concat(turn === null || !turn.priced ? [] : [{ label: 'Last turn', value: amountText(turn) }]),
+        }
+  const hasInlineValue = inlineValue !== undefined
+
+  useEffect(() => {
+    if (costPlacement !== 'inside' || !hasInlineValue || typeof document === 'undefined') return
+    const display = new SessionCostDisplay(document, () => sessionCostDockScope(markerRef.current))
+    displayRef.current = display
+    display.start()
+    return () => {
+      displayRef.current = null
+      display.dispose()
+    }
+  }, [costPlacement, hasInlineValue])
+
+  useEffect(() => {
+    displayRef.current?.sync(inlineValue)
+  }, [inlineValue])
+
+  if (session === null || !session.priced || quotes === undefined || quotes === null) return null
+  if (costPlacement === 'inside') return <span ref={markerRef} style={{ display: 'none' }} />
   const fetchedAt = quotes.fetchedAt
 
   return (

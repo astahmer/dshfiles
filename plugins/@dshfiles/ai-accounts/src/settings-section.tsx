@@ -45,7 +45,8 @@ const FAILURE_KIND_COPY: Readonly<Record<FailureKind, { readonly title: string; 
   oversized: { title: 'Request too large', hint: 'Context overflow or an oversized body; DSH compaction handles overflow.', options: ['shrink', 'then'] },
 }
 
-const formatDuration = (milliseconds: number): string => (milliseconds < 1_000 ? `${String(milliseconds)} ms` : milliseconds < 60_000 ? `${String(milliseconds / 1_000)} s` : `${String(milliseconds / 60_000)} min`)
+const formatDuration = (milliseconds: number): string =>
+  milliseconds < 1_000 ? `${String(milliseconds)} ms` : milliseconds < 60_000 ? `${String(milliseconds / 1_000)} s` : `${String(milliseconds / 60_000)} min`
 
 const OVERRIDE_LINE = /^\s*(\S+\/\S+)\s*=\s*(.+?)\s*$/
 
@@ -441,6 +442,23 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
             id={id}
             onCheckedChange={value => props.write(settings.set('costEstimates', value))}
           />
+        )}
+      </Row>
+      <Row hint="Choose whether the estimate joins the token-usage stats or stays in its own dock entry." label="Cost placement">
+        {id => (
+          <Select
+            disabled={props.readOnly || !preferences.costEstimates}
+            onValueChange={value => props.write(settings.set('costPlacement', value === 'separate' ? 'separate' : 'inside'))}
+            value={preferences.costPlacement}
+          >
+            <SelectTrigger className="dshx:w-36" id={id} size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="inside">Inside stats</SelectItem>
+              <SelectItem value="separate">Separate</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </Row>
       <Row label="Refresh prices every">
