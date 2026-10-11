@@ -1,3 +1,4 @@
+import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -40,7 +41,7 @@ export default defineClient({
   // so the compiler cannot infer them. Declaring only slots lets the plugin
   // activate and then throw inside the slot, which blanks the sidebar instead of
   // failing the boot.
-  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions', 'conversation', 'remote'],
+  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions', 'conversation', 'remote', 'remote.sessionReferenceResolver'],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
@@ -148,7 +149,8 @@ export default defineClient({
       useEffect(() => {
         const sessionContext = ctx.sessions.scope(props.sessionId)
         if (sessionContext === undefined) return
-        const input = ctx.conversation.input.for(sessionContext)
+        const sessionContextForConversation = sessionContext as Context
+        const input = ctx.conversation.input.for(sessionContextForConversation)
         const capture = (): void => {
           insertion.current = props.inputActions.captureInsertion()
         }
@@ -162,7 +164,7 @@ export default defineClient({
           void (async () => {
             let failurePhase: ThreadMentionFailureDiagnosticInput['phase'] = 'resolver-exception'
             try {
-              const result = await sessionContext.remote.sessionReferenceResolver.candidates(targetSessionId, controller.signal)
+              const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
               if (controller.signal.aborted) return
               if (!result.ok) {
                 console.warn(
