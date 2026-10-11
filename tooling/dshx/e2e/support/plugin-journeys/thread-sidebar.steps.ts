@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type TestInfo } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
@@ -50,8 +50,8 @@ When('a blank Host thread is started', async ({ page }: { page: Page }) => {
   await startBlankThread(page)
 })
 
-When('a nonblank Host thread is archived and immediately undone', async ({ page }: { page: Page }) => {
-  const prompt = 'thread sidebar archive undo e2e target'
+When('a nonblank Host thread is archived and immediately undone', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
+  const prompt = 'thread sidebar archive undo e2e'
   if (currentThreadId(page) === null) await startBlankThread(page)
   await page.getByRole('textbox').first().fill(prompt)
   await page.getByRole('textbox').first().press('Enter')
@@ -64,19 +64,49 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
   const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
-  await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
   const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
-  await expect(transientNotice).toBeVisible()
-  const transientNoticeLayout = await transientNotice.evaluate(element => {
-    const style = getComputedStyle(element)
-    return { position: style.position, bottom: Number.parseFloat(style.bottom) }
+  let screenshotClip: { x: number; y: number; width: number; height: number } | undefined
+  let layoutEvidence: string | undefined
+  await recordAssertion(page, 'thread-sidebar-archive-notice-overlays-thread-list', async () => {
+    await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
+    await expect(transientNotice).toBeVisible()
+    const undoButton = transientNotice.getByRole('button', { name: 'Undo', exact: true })
+    await expect(undoButton).toBeVisible()
+    const transientNoticeLayout = await transientNotice.evaluate(element => {
+      const style = getComputedStyle(element)
+      return { position: style.position, bottom: Number.parseFloat(style.bottom) }
+    })
+    const sidebarPosition = await threadSidebar(page).evaluate(element => getComputedStyle(element).position)
+    const sidebarBounds = await threadSidebar(page).boundingBox()
+    const noticeBounds = await transientNotice.boundingBox()
+    const undoButtonBounds = await undoButton.boundingBox()
+    if (sidebarBounds === null || noticeBounds === null || undoButtonBounds === null) {
+      throw new Error('The archive notice or sidebar has no layout box.')
+    }
+    const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
+    expect(transientNoticeLayout.position).toBe('absolute')
+    expect(transientNoticeLayout.bottom).toBeGreaterThan(0)
+    expect(sidebarPosition).toBe('relative')
+    expect(noticeBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
+    expect(noticeBounds.x + noticeBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
+    expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(sidebarBounds.y + sidebarBounds.height)
+    expect(undoButtonBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
+    expect(undoButtonBounds.x + undoButtonBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
+    expect(undoButtonBounds.y + undoButtonBounds.height).toBeLessThanOrEqual(sidebarBounds.y + sidebarBounds.height)
+    expect(scrollPaneTopAfterArchive).toBe(scrollPaneTopBeforeArchive)
+    layoutEvidence = JSON.stringify(
+      { transientNoticeLayout, sidebarPosition, sidebarBounds, noticeBounds, undoButtonBounds, scrollPaneTopBeforeArchive, scrollPaneTopAfterArchive },
+      null,
+      2,
+    )
+    screenshotClip = { x: sidebarBounds.x, y: sidebarBounds.y, width: sidebarBounds.width, height: sidebarBounds.height }
   })
-  expect(transientNoticeLayout.position).toBe('absolute')
-  expect(transientNoticeLayout.bottom).toBeGreaterThan(0)
-  const sidebarPosition = await threadSidebar(page).evaluate(element => getComputedStyle(element).position)
-  expect(sidebarPosition).toBe('relative')
-  const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
-  expect(scrollPaneTopAfterArchive).toBe(scrollPaneTopBeforeArchive)
+  if (layoutEvidence === undefined || screenshotClip === undefined) throw new Error('The archive notice evidence was not captured.')
+  await $testInfo.attach('archive-undo-notice-layout.json', { body: layoutEvidence, contentType: 'application/json' })
+  await $testInfo.attach('archive-undo-notice.png', {
+    body: await page.screenshot({ type: 'png', animations: 'disabled', clip: screenshotClip }),
+    contentType: 'image/png',
+  })
   const archivedSection = threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })
   await expect(archivedSection).toBeVisible()
   await archivedSection.click()
@@ -90,7 +120,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
 })
 
 Then('the thread is restored from the archive notice', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar archive undo e2e target' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar archive undo e2e' })
   await recordAssertion(page, 'thread-sidebar-archive-undo-restores-thread', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Archived (0)', exact: true })).toHaveCount(0)
     await expect(targetRow).toHaveCount(1)
@@ -109,7 +139,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
 
   await startBlankThread(page)
-  const timedPrompt = 'thread sidebar archive duration e2e target'
+  const timedPrompt = 'thread sidebar archive duration e2e'
   const composer = page.getByRole('textbox').first()
   await composer.fill(timedPrompt)
   await composer.press('Enter')
@@ -127,7 +157,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
 
   await startBlankThread(page)
-  const disabledPrompt = 'thread sidebar archive disabled e2e target'
+  const disabledPrompt = 'thread sidebar archive disabled e2e'
   await page.getByRole('textbox').first().fill(disabledPrompt)
   await page.getByRole('textbox').first().press('Enter')
   const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
@@ -337,7 +367,7 @@ Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
 
 When('auto-archive is enabled for one thread while global auto-archive stays off', async ({ page }: { page: Page }) => {
   const targetThreadId = await startBlankThread(page)
-  const prompt = 'thread sidebar auto archive override e2e target'
+  const prompt = 'thread sidebar auto archive override'
   const composer = page.getByRole('textbox').first()
   await composer.fill(prompt)
   await composer.press('Enter')
@@ -357,7 +387,7 @@ When('auto-archive is enabled for one thread while global auto-archive stays off
 })
 
 Then('the per-thread override survives reload without changing the global setting', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override e2e target' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await openSidebarSettings(page)
   await recordAssertion(page, 'thread-sidebar-global-auto-archive-remains-off', async () => {
     await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
