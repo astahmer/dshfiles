@@ -41,7 +41,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Empty, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
@@ -96,6 +96,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
 import { revisionActionMachine } from './revision-action-machine.js'
+import { repositoryLoadingState } from './repository-loading.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
@@ -332,7 +333,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state])
 
   const busy = registerMutation.isPending || stateQuery.isFetching || actionBusy
-  const loadingRepository = registerMutation.isPending || (repoId !== null && state === undefined && stateQuery.isFetching)
+  const repositoryStatus = repositoryLoadingState({ registering: registerMutation.isPending, fetching: stateQuery.isFetching, hasState: state !== undefined })
+  const loadingRepository = repositoryStatus.loading
 
   const remoteNames = state?.remoteNames ?? []
   const selectedRemote = remoteNames.includes(remote) ? remote : (remoteNames[0] ?? '')
@@ -958,27 +960,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       </>
     )
 
-  const emptyState =
-    state === undefined ? (
-      <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
-        <EmptyHeader>
-          {loadingRepository && (
-            <EmptyMedia>
-              <Spinner />
-            </EmptyMedia>
-          )}
-          <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
-            {loadingRepository ? 'Loading repository…' : 'Choose a repository to open its revision graph.'}
-          </EmptyTitle>
-          {!loadingRepository && (
-            <Button className="dshx:mt-2" onClick={() => setPickerOpen(true)} size="sm" type="button" variant="outline">
-              <FolderGit2Icon />
-              Choose repository…
-            </Button>
-          )}
-        </EmptyHeader>
-      </Empty>
-    ) : null
+  const emptyState = repositoryStatus.showEmptyPrompt ? (
+    <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
+      <EmptyHeader>
+        <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Choose a repository to open its revision graph.</EmptyTitle>
+        <Button className="dshx:mt-2" onClick={() => setPickerOpen(true)} size="sm" type="button" variant="outline">
+          <FolderGit2Icon />
+          Choose repository…
+        </Button>
+      </EmptyHeader>
+    </Empty>
+  ) : null
 
   const tabsContent = (
     <>
@@ -1038,6 +1030,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   Source Control
                 </TabsTrigger>
               </TabsList>
+              <span aria-live="polite" className="dshx:flex dshx:size-6 dshx:items-center dshx:justify-center" role="status">
+                {loadingRepository && (
+                  <>
+                    <Spinner aria-hidden="true" className="dshx:size-3" />
+                    <span className="dshx:sr-only">Loading repository…</span>
+                  </>
+                )}
+              </span>
               <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
                 <PreferencesMenu />
                 <DropdownMenu>
