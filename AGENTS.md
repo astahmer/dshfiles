@@ -164,6 +164,17 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `branch: null` / `worktreePath: null` in T3 metadata as unbound, not as proof
   that the thread inherited a sibling workspace. If using a T3-managed Git
   worktree, first verify with JJ that it shares this repository.
+- If a still-active task's named workspace has been forgotten, preserve its old
+  directory and shared operation history; do not roll back the forget operation
+  or try to add a workspace over a non-empty directory. Inspect `jj op log` /
+  `jj op show` and the shared spine, then create a fresh linked workspace at a
+  new path from the latest relevant clean spine revision that contains the
+  needed shared work (do not blindly choose `main` if the spine is ahead).
+  `jj workspace add` must materialize the checkout; omit `--ignore-working-copy`.
+  When this is a safe continuation, recover without asking the user to choose a
+  workspace path. Compare the new tree with the old task's owned revisions and
+  restore only missing owned changes; preserve sibling work and report both
+  paths and the selected base revision.
 - Keep active source workspaces untouched during consolidation. Duplicate a
   fixed revision snapshot into an integration workspace, rebase that copy onto
   `main`, and retain the source workspace until tree equality and status prove
