@@ -239,6 +239,24 @@
           "id": "optmem.bounded-context-injection-unit-view-budget",
           "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
           "testName": "keeps the injected view within its budget once the project outgrows it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-route-cache-fake-clock",
+          "file": "plugins/@dshfiles/optmem/src/summarizer.test.ts",
+          "testName": "re-resolves a thread after the cache expires or the policy changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-injected-provider-stream",
+          "file": "plugins/@dshfiles/optmem/src/summarizer.test.ts",
+          "testName": "sends a compaction call on the thread's resolved route with the input framed as data"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-provider-error",
+          "file": "plugins/@dshfiles/optmem/src/summarizer.test.ts",
+          "testName": "fails clearly on an errored stream"
         }
       ]
     },
