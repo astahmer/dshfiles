@@ -16,7 +16,10 @@ const withFixture = async callback => {
   const featureRoot = resolve(root, 'tooling/dshx/e2e/features')
   await mkdir(pluginRoot, { recursive: true })
   await mkdir(featureRoot, { recursive: true })
-  await writeFile(resolve(pluginRoot, 'package.json'), JSON.stringify({ name: '@dshfiles/demo', dsh: { client: {} }, dshx: { features: './dshx.features.json' } }))
+  await writeFile(
+    resolve(pluginRoot, 'package.json'),
+    JSON.stringify({ name: '@dshfiles/demo', dsh: { client: {} }, dshx: { features: './dshx.features.json' } }),
+  )
   await writeFile(
     resolve(pluginRoot, 'dshx.features.json'),
     JSON.stringify({
@@ -28,15 +31,11 @@ const withFixture = async callback => {
           title: 'Boot a disposable profile',
           summary: 'Start a temporary profile with this bundle enabled.',
           surfaces: ['host'],
-          configuration: [
-            { key: 'timeoutMs', defaultValue: '30000', constraints: 'Positive integer milliseconds.', coveredBy: ['demo.boot-profile'] },
-          ],
+          configuration: [{ key: 'timeoutMs', defaultValue: '30000', constraints: 'Positive integer milliseconds.', coveredBy: ['demo.boot-profile'] }],
           states: ['starting', 'ready', 'failed'],
           failureModes: ['The Host fails before publishing the bundle.'],
           externalDependencies: [],
-          verification: [
-            { kind: 'gherkin', id: 'demo.boot-profile', featureFile: 'tooling/dshx/e2e/features/demo.feature' },
-          ],
+          verification: [{ kind: 'gherkin', id: 'demo.boot-profile', featureFile: 'tooling/dshx/e2e/features/demo.feature' }],
         },
       ],
     }),
@@ -46,8 +45,7 @@ const withFixture = async callback => {
   return callback({ root, featureFile })
 }
 
-const runCheck = (root, mode = '--check') =>
-  spawnSync(process.execPath, ['--experimental-strip-types', scriptPath, mode, '--root', root], { encoding: 'utf8' })
+const runCheck = (root, mode = '--check') => spawnSync(process.execPath, ['--experimental-strip-types', scriptPath, mode, '--root', root], { encoding: 'utf8' })
 
 test.after(async () => {
   await Promise.all(temporaryRoots.map(root => rm(root, { recursive: true, force: true })))

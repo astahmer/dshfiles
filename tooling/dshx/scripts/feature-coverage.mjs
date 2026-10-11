@@ -155,15 +155,20 @@ for (const plugin of packages) {
 for (const [verificationId, featureFile] of expectedGherkin) {
   const files = scenarioTags.get(verificationId) ?? []
   if (files.length === 0) errors.push(`Declared Gherkin scenario ${verificationId} has no @scenario tag.`)
-  if (files.length > 1) errors.push(`Gherkin scenario ${verificationId} is tagged more than once: ${files.map(file => relative(workspaceRoot, file)).join(', ')}.`)
-  if (files.length === 1 && files[0] !== featureFile) errors.push(`Gherkin scenario ${verificationId} is tagged in ${relative(workspaceRoot, files[0])}, expected ${relative(workspaceRoot, featureFile)}.`)
+  if (files.length > 1)
+    errors.push(`Gherkin scenario ${verificationId} is tagged more than once: ${files.map(file => relative(workspaceRoot, file)).join(', ')}.`)
+  if (files.length === 1 && files[0] !== featureFile)
+    errors.push(`Gherkin scenario ${verificationId} is tagged in ${relative(workspaceRoot, files[0])}, expected ${relative(workspaceRoot, featureFile)}.`)
 }
 for (const featureFile of new Set(expectedGherkin.values())) {
   if (isWithin(featureRoot, featureFile) && !featureFiles.has(featureFile)) {
     errors.push(`Declared Gherkin feature file ${relative(workspaceRoot, featureFile)} is missing from E2E feature discovery.`)
   }
 }
-for (const [verificationId, files] of scenarioTags) {
+for (const { id, featureFile, line } of misplacedTags) {
+  errors.push(`Misplaced @scenario:${id} tag in ${relative(workspaceRoot, featureFile)}:${line}; scenario tags must annotate a Scenario or Scenario Outline.`)
+}
+for (const [verificationId, files] of allScenarioTags) {
   if (!expectedGherkin.has(verificationId)) errors.push(`Orphan @scenario:${verificationId} tag in ${relative(workspaceRoot, files[0])}.`)
 }
 
@@ -172,13 +177,17 @@ const configCount = catalogs.reduce((total, plugin) => total + plugin.catalog.fe
 
 if (isReportMode) {
   process.stdout.write(`# Plugin feature coverage\n\n`)
-  process.stdout.write(`Packages: ${String(packages.length)}; catalogs: ${String(catalogs.length)}; features: ${String(featureCount)}; configuration options: ${String(configCount)}; Gherkin: ${String(counts.gherkin)}; unit tests: ${String(counts['unit-test'])}; Host tests: ${String(counts['host-test'])}; not applicable: ${String(counts['not-applicable'])}.\n\n`)
+  process.stdout.write(
+    `Packages: ${String(packages.length)}; catalogs: ${String(catalogs.length)}; features: ${String(featureCount)}; configuration options: ${String(configCount)}; Gherkin: ${String(counts.gherkin)}; unit tests: ${String(counts['unit-test'])}; Host tests: ${String(counts['host-test'])}; not applicable: ${String(counts['not-applicable'])}.\n\n`,
+  )
   process.stdout.write(`| Package | Feature | Configuration | Verification | External test boundary |\n|---|---|---|---|---|\n`)
   for (const plugin of catalogs) {
     for (const feature of plugin.catalog.features) {
       const verification = feature.verification.map(item => `${item.kind}: \`${item.id}\``).join('; ')
       const external = feature.externalDependencies.map(dependency => `${dependency.id}: ${dependency.deterministicFake}`).join('; ') || 'none'
-      process.stdout.write(`| ${plugin.name} | ${feature.id}: ${feature.title} | ${feature.configuration.map(option => `\`${option.key}\``).join(', ') || 'none'} | ${verification} | ${external} |\n`)
+      process.stdout.write(
+        `| ${plugin.name} | ${feature.id}: ${feature.title} | ${feature.configuration.map(option => `\`${option.key}\``).join(', ') || 'none'} | ${verification} | ${external} |\n`,
+      )
     }
   }
 }
@@ -188,5 +197,7 @@ if (errors.length > 0) {
   for (const error of errors) process.stderr.write(`- ${error}\n`)
   process.exitCode = 1
 } else {
-  process.stdout.write(`Validated ${String(packages.length)} package catalogs, ${String(featureCount)} features, ${String(configCount)} configuration options, ${String(counts.gherkin)} Gherkin scenarios, ${String(counts['unit-test'])} unit tests, and ${String(counts['host-test'])} Host tests.\n`)
+  process.stdout.write(
+    `Validated ${String(packages.length)} package catalogs, ${String(featureCount)} features, ${String(configCount)} configuration options, ${String(counts.gherkin)} Gherkin scenarios, ${String(counts['unit-test'])} unit tests, and ${String(counts['host-test'])} Host tests.\n`,
+  )
 }
