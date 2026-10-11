@@ -479,13 +479,7 @@ export const apply = async context => {
     })
     const reattachedQuestionResult = await reattachedQuestion
     if (resolution?.status !== 'resolved' || resolution.notified !== true) {
-      throw new Error(
-        'Cold-resumed parent feedback status=' +
-          String(resolution?.status) +
-          ', notified=' +
-          String(resolution?.notified) +
-          '.',
-      )
+      throw new Error('Cold-resumed parent feedback status=' + String(resolution?.status) + ', notified=' + String(resolution?.notified) + '.')
     }
     const questionAnswerText = requireToolSuccess(questionAnswer, 'Reattached parent answer')
     const reattachedQuestionText = requireToolSuccess(reattachedQuestionResult, 'Reattached child question')

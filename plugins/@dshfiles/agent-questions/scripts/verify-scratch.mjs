@@ -95,9 +95,8 @@ const startHost = async () => {
 }
 
 const stopHost = async () => {
-  const child = host
-  if (child === undefined || child.exitCode !== null || child.signalCode !== null) return
-  child.kill('SIGTERM')
+  if (host === undefined || host.exitCode !== null || host.signalCode !== null) return
+  host.kill('SIGTERM')
   let timeout
   try {
     await Promise.race([
@@ -107,7 +106,7 @@ const stopHost = async () => {
       }),
     ])
   } catch (error) {
-    child.kill('SIGKILL')
+    host.kill('SIGKILL')
     await hostExited
     throw error
   } finally {
@@ -163,7 +162,9 @@ try {
   assert.equal(prepared.feedbackResolutionToolPassed, true)
   assert.deepEqual(prepared.feedbackResolutionStatuses, { current: 'resolved', stale: 'stale', cancelled: 'rejected', batch: 'resolved' })
   assert.equal(prepared.oversizedBatchRejected, true)
-  process.stdout.write('PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.\n')
+  process.stdout.write(
+    'PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.\n',
+  )
   await stopHost()
   await startHost()
   const result = await waitForJson(fixtureResultPath, 'The cold-resume result')
@@ -191,7 +192,7 @@ try {
     },
     parentNotified: true,
   })
-  process.stdout.write('PASS: Pending questions and feedback cold-resumed; the parent answered, resolved current/stale feedback, and the child retrieved durable receipts.\n')
+  process.stdout.write('PASS: Pending question and feedback cold-resumed; the parent reattached, answered, and resolved the pending feedback after restart.\n')
 } finally {
   await stopHost()
   await scratch.cleanup()
