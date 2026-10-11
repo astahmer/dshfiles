@@ -7,7 +7,7 @@ const defaultColors = DEFAULT_PREFERENCES.attentionColors
 describe('thread attention presentation', () => {
   it.each([
     ['threadSidebarApprovalNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
-    ['threadSidebarInputNeeded', 'dshx:text-info/80', 'dshx:bg-info'],
+    ['threadSidebarInputNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
     ['threadSidebarTurnFinished', 'dshx:text-success/80', 'dshx:bg-success'],
   ] as const)('uses configured semantic colors for %s', (label, textClass, dotClass) => {
     expect(attentionLabelClass(label, defaultColors)).toBe(textClass)
@@ -22,6 +22,15 @@ describe('thread attention presentation', () => {
     expect(attentionDotClass({ attentionLabel: 'threadSidebarInputNeeded', attentionColors, unread: false, running: false })).toBe('dshx:bg-primary')
     expect(attentionDotClass({ attentionLabel: 'threadSidebarTurnFinished', attentionColors, unread: false, running: false })).toBe(
       'dshx:bg-muted-foreground/45',
+    )
+  })
+
+  it('uses different default colors for input-needed and working threads', () => {
+    expect(attentionDotClass({ attentionLabel: 'threadSidebarInputNeeded', attentionColors: defaultColors, unread: false, running: false })).toBe(
+      'dshx:bg-warning',
+    )
+    expect(attentionDotClass({ attentionLabel: undefined, attentionColors: defaultColors, unread: false, running: true })).toBe(
+      'dshx:animate-pulse dshx:bg-info',
     )
   })
 

@@ -108,7 +108,8 @@ configured independently as a separate group or an inline thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar
 settings (Muted, Primary, Info, Success, Warning, or Danger); the default colors
-are Warning, Info, and Success. Group headings stick to the top while scrolling.
+are Warning for Approval and Input, and Success for Turn finished; generic
+working indicators remain Info. Group headings stick to the top while scrolling.
 Subagent attention is
 excluded from groups, labels, and desktop alerts by default; enable **Include
 subagent threads** in Sidebar settings to opt in. An unresolved request stays

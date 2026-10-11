@@ -104,6 +104,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',
   attentionColors: { approvalNeeded: 'warning', inputNeeded: 'info', turnFinished: 'success' },
+  attentionColors: { approvalNeeded: 'warning', inputNeeded: 'warning', turnFinished: 'success' },
   includeSubagentAttention: false,
   applyActionsToChildThreads: true,
   maxChildren: 3,

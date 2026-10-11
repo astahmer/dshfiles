@@ -71,6 +71,14 @@
           "coveredBy": ["thread-sidebar.attention-colors"]
         },
         {
+          "key": "attentionColors",
+          "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"warning\",\"turnFinished\":\"success\"}",
+          "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
+          "coveredBy": [
+            "thread-sidebar.attention-colors"
+          ]
+        },
+        {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
           "constraints": "Parked session IDs in sidebar preferences; not updated through Host session attention.",
