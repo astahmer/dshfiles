@@ -26,6 +26,7 @@
     "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/command-palette": "link:../command-palette",
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -100,7 +101,8 @@
         "@deepseek-ai/dsh-client-ui-settings"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-store"
+        "@deepseek-ai/dsh-client-store",
+        "@dshfiles/shared-runtime"
       ]
     }
   },

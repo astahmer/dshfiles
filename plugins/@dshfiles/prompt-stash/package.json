@@ -26,6 +26,7 @@
   "dependencies": {
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -62,7 +63,9 @@
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-slots"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },

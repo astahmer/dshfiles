@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -92,7 +93,8 @@
         "@deepseek-ai/dsh-api-workspace-controller"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-store"
+        "@deepseek-ai/dsh-client-store",
+        "@dshfiles/shared-runtime"
       ]
     }
   },

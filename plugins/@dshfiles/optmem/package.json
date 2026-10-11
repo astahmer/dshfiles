@@ -24,7 +24,8 @@
     "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/optmem-core": "link:../optmem-core",
     "@dshfiles/optmem-sqlite": "link:../optmem-sqlite",
-    "@dshfiles/plugin-ui": "link:../plugin-ui"
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -86,7 +87,9 @@
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-plugin-manager"
       ],
-      "external": []
+      "external": [
+        "@dshfiles/shared-runtime"
+      ]
     }
   },
   "dshx": {

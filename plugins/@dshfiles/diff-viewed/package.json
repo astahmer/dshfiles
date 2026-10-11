@@ -22,8 +22,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "^4.4.3",
-    "@dshfiles/plugin-ui": "link:../plugin-ui"
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -58,6 +59,9 @@
       ],
       "locales": [
         "dshfiles.diffViewed"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
       ]
     }
   },

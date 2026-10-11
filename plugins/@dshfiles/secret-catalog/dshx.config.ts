@@ -4,6 +4,6 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/secret-catalog',
   host: { entry: 'src/host.ts' },
-  client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

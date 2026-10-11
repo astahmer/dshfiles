@@ -232,6 +232,16 @@ setup you actually use.
 so nothing in the Nix setup can pull an experiment back in. It has its own
 `node_modules` and its own port lifecycle.
 
+When the full `probe` composition has unrelated activation failures, isolate the
+target instead of treating those failures as the plugin's result. Prefer the
+dshx E2E `bootPluginProfile('@dshfiles/<name>')` fixture: it creates a
+disposable DSH home/profile with the base web bundles, required non-owned
+dependencies, and the selected owned bundle, runs it on a free port, then removes
+the scratch home. For manual runtime checks, use a fresh `DSH_HOME` under
+`/private/tmp` and a minimal dedicated profile so account, usage, and plugin data
+cannot touch real profiles. Check boot output and exercise the user-facing
+behavior in a browser; build/import checks alone do not prove the plugin works.
+
 ```sh
 # 1. write the plugin in this repo, under plugins/@dshfiles/<name>/
 # 2. verify it without touching web

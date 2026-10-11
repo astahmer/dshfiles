@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "ws": "^8.18.0",
     "zod": "^4.4.3"
   },
@@ -76,6 +77,9 @@
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
       ]
     }
   },

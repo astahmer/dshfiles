@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "write-file-atomic": "7.0.0",
     "zod": "^4.4.3"
   },
@@ -76,6 +77,9 @@
       ],
       "locales": [
         "dshfiles.agentCommunication"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
       ]
     }
   },

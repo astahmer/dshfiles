@@ -27,6 +27,7 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
     "@dshfiles/project-folder-picker": "link:../project-folder-picker",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -90,6 +91,9 @@
       ],
       "locales": [
         "dshfiles.secretCatalog"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
       ]
     }
   },

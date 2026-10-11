@@ -29,6 +29,7 @@
     "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "dockview-react": "8.4.1",
     "zod": "^4.4.3"
   },
@@ -86,7 +87,9 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-shortcuts"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false,
       "locales": [
         "dshfiles.workbench"

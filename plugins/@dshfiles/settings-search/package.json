@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -71,6 +72,9 @@
       ],
       "locales": [
         "dshfiles.settingsSearch"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
       ]
     }
   },

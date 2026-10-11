@@ -1,0 +1,5 @@
+# Client-only supplier: its row makes the Host load this package's chunk before any
+# @dshfiles plugin that lists it in dsh.client.external.
+- insert:
+    - id: dshfiles-shared-runtime
+      name: '@dshfiles/shared-runtime'

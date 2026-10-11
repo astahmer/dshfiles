@@ -25,6 +25,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/shared-runtime": "link:../shared-runtime",
     "@dshfiles/workbench": "link:../workbench",
     "monaco-editor": "0.57.0",
     "zod": "^4.4.3"
@@ -80,7 +81,9 @@
         "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-client-ui-settings"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },
