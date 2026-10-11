@@ -123,6 +123,15 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   the checkout's working copy sits mid-history, writing any file amends that
   revision and rebases its whole subtree under every other agent. Move `@` to the
   tip first, or do the file work in a scratch `jj workspace add`.
+- **Never rewrite a revision another workspace holds as its `@`.** Describing,
+  squashing or abandoning it races that workspace's snapshot and leaves a
+  divergent copy of the same change (same change-id, second commit-id); that is
+  how this repo's spine once forked into three chains. Name only revisions you
+  created, and ask the owner otherwise.
+- **History-shape requests are jj surgery.** "Unify the history", "one branch",
+  "spine branch", "linear history", "too many heads": load `jj-shared-workspace`
+  (and the base `jj` skill) before touching anything, and expect the whole store
+  to be rewritten.
 - Pass `-m` to `jj describe` and `jj squash`, or `--use-destination-message` to
   `jj squash`. A bare `jj squash` opens an editor and hangs the agent shell.
 - When finishing work in a named workspace, try to integrate its described

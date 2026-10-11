@@ -1,6 +1,6 @@
 ---
 name: jj-shared-workspace
-description: Commit, resolve conflicts and checkpoint long runs in this repo's shared jj working copy, where other agents edit other paths at the same time. Use whenever you finish a logical change, see another agent's files in `jj status`, hit a conflicted revision, or run a long multi-milestone task that a usage limit could interrupt.
+description: Commit, resolve conflicts and checkpoint long runs in this repo's shared jj working copy, where 20+ agents edit other paths at the same time. Use whenever you finish a logical change, see another agent's files in `jj status`, hit a conflicted revision, or run a long multi-milestone task that a usage limit could interrupt. Also load it for every history-shape request — "unify the jj history", "one branch", "spine branch", "linear history", "single line of descendants", "too many heads", "consolidate the history" — because this store's history is shared by every agent.
 ---
 
 # jj in a shared working copy
@@ -46,6 +46,10 @@ A usage-limit stop must lose nothing:
 Consolidating everything above a base revision rewrites other agents' working copies. Beyond the checkout hazards in
 AGENTS.md (`@` mid-line, `--use-destination-message`):
 
+- Name only revisions you created. Describing, squashing, amending or abandoning
+  a revision that another workspace holds as its `@` races that workspace's
+  snapshot and leaves a divergent copy of the same change (same change-id, second
+  commit-id) — that is how this store's spine once forked into three chains.
 - Rebuild with `jj duplicate -r <immutable commit-id> -o <tip>`. Rebasing a set of planned commit ids goes stale
   as soon as one step hole-fills its descendants.
 - Back out only your own steps with `jj op revert <op-id>`; `jj op restore` also discards every other agent's
