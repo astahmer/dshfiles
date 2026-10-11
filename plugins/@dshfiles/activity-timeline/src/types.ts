@@ -1,0 +1,98 @@
+import { z } from 'zod'
+
+export const activitySourceSchema = z.enum(['session', 'communication', 'integration', 'system'])
+export type ActivitySource = z.infer<typeof activitySourceSchema>
+
+export const activityLevelSchema = z.enum(['routine', 'notable', 'attention'])
+export type ActivityLevel = z.infer<typeof activityLevelSchema>
+
+export const activityReferenceSchema = z
+  .object({
+    kind: z.enum(['session', 'workspace', 'integration-candidate', 'message', 'revision']),
+    id: z.string().min(1).max(256),
+    label: z.string().max(200).nullable(),
+  })
+  .strict()
+export type ActivityReference = z.infer<typeof activityReferenceSchema>
+
+export const activityEventSchema = z
+  .object({
+    id: z.string().min(1).max(256),
+    at: z.number().int().nonnegative(),
+    source: activitySourceSchema,
+    type: z.string().min(1).max(80),
+    level: activityLevelSchema,
+    sessionId: z.string().min(1).max(256).nullable(),
+    workspaceId: z.string().min(1).max(256).nullable(),
+    taskId: z.string().min(1).max(256).nullable(),
+    correlationId: z.string().min(1).max(128).nullable(),
+    causationId: z.string().min(1).max(256).nullable(),
+    summary: z.string().min(1).max(500),
+    detail: z.string().max(2000).nullable(),
+    metadata: z.record(z.string(), z.union([z.string().max(500), z.number(), z.boolean(), z.null()])),
+    references: z.array(activityReferenceSchema).max(8),
+    provenance: z.enum(['observed', 'reported']),
+  })
+  .strict()
+export type ActivityEvent = z.infer<typeof activityEventSchema>
+
+export const activityIngestSchema = activityEventSchema
+  .partial({ level: true, sessionId: true, workspaceId: true, taskId: true, correlationId: true, causationId: true, detail: true, metadata: true, references: true, provenance: true })
+  .extend({ id: z.string().min(1).max(256), at: z.number().int().nonnegative(), source: activitySourceSchema, type: z.string().min(1).max(80), summary: z.string().min(1).max(500) })
+export type ActivityIngest = z.infer<typeof activityIngestSchema>
+
+export const condensedItemSchema = z
+  .object({
+    kind: z.enum(['event', 'group']),
+    id: z.string().min(1).max(256),
+    at: z.number().int().nonnegative(),
+    source: activitySourceSchema,
+    type: z.string().min(1).max(80),
+    level: activityLevelSchema,
+    sessionId: z.string().min(1).max(256).nullable(),
+    correlationId: z.string().min(1).max(128).nullable(),
+    summary: z.string().min(1).max(500),
+    count: z.number().int().positive(),
+    eventIds: z.array(z.string().min(1).max(256)).max(500),
+    references: z.array(activityReferenceSchema).max(8),
+  })
+  .strict()
+export type CondensedItem = z.infer<typeof condensedItemSchema>
+
+export const activityPageSchema = z
+  .object({
+    items: z.array(condensedItemSchema).max(200),
+    nextCursor: z.string().min(1).max(256).nullable(),
+    hasMore: z.boolean(),
+    newestAt: z.number().int().nonnegative().nullable(),
+    attentionCount: z.number().int().nonnegative(),
+    totalRetained: z.number().int().nonnegative(),
+  })
+  .strict()
+export type ActivityPage = z.infer<typeof activityPageSchema>
+
+export const activityFilterSchema = z
+  .object({
+    sources: z.array(activitySourceSchema).max(4).optional(),
+    levels: z.array(activityLevelSchema).max(3).optional(),
+    sessionId: z.string().min(1).max(256).optional(),
+    correlationId: z.string().min(1).max(128).optional(),
+    search: z.string().trim().min(1).max(120).optional(),
+    detailed: z.boolean().optional(),
+    cursor: z.string().min(1).max(256).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+    before: z.number().int().nonnegative().optional(),
+  })
+  .strict()
+export type ActivityFilter = z.infer<typeof activityFilterSchema>
+
+export const activityStateSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    events: z.array(activityEventSchema).max(5000),
+    ingestCount: z.number().int().nonnegative(),
+    duplicateCount: z.number().int().nonnegative(),
+    startedAt: z.number().int().nonnegative(),
+  })
+  .strict()
+export type ActivityState = z.infer<typeof activityStateSchema>

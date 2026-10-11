@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "kind": "infrastructure",
+  "features": [
+    {
+      "id": "activity-feed",
+      "title": "Unified agent activity feed",
+      "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
+      "surfaces": ["host", "tool", "storage", "client", "integration"],
+      "configuration": [],
+      "states": ["empty", "live", "paged", "filtered", "searched", "reconnected", "attention"],
+      "failureModes": [
+        "A duplicate delivery is deduplicated by event id instead of appended twice.",
+        "Out-of-order timestamps are re-sorted on ingest.",
+        "A malformed ingest payload is rejected instead of stored.",
+        "Missing sources (no jj coordinator, no communication) leave the feed usable rather than failing.",
+        "The retained window is bounded, so old events age out predictably."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/jj-integration",
+          "boundary": "Optional cross-plugin cordis events (dshfiles/activity/event) plus a bounded backfill request; the timeline never runs jj itself.",
+          "deterministicFake": "Adapters are exercised directly in src/service.test.ts; the jj adapter boundary is validated without the coordinator running."
+        },
+        {
+          "id": "@dshfiles/agent-communication",
+          "boundary": "Optional cross-plugin cordis events for message and communication-tool activity; no communication state is read directly.",
+          "deterministicFake": "Adapter mapping is unit-tested with fixed payloads."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.feed-browser-journey",
+          "reason": "The browser feed journey is covered by host-side normalization and pagination tests in this revision; a Playwright scenario is deferred until the panel is composed in a profile."
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-interleaving",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "interleaves events from multiple agents in chronological order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-duplicates",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "deduplicates repeated delivery of the same event id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-ordering",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "orders out-of-order timestamps and preserves references"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-replay",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "replays retained history after a coordinator restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-pagination",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "paginates history newest-first with an older cursor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-filters",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "filters and searches without scanning the whole history on the client"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-bounded",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "keeps a bounded in-memory window under high volume"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-missing-source",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "does not require any agent, session, or jj source to be present"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.feed-invalid-payload",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "rejects malformed ingest payloads instead of storing them"
+        }
+      ]
+    },
+    {
+      "id": "activity-condensation",
+      "title": "Deterministic condensation and attention visibility",
+      "summary": "Collapses routine runs and correlated events into traceable groups while keeping errors, blocked integrations, and attention-required events individually visible; a detailed mode expands every retained event.",
+      "surfaces": ["host", "tool", "client"],
+      "configuration": [],
+      "states": ["condensed", "detailed", "grouped", "attention-visible", "correlation-grouped"],
+      "failureModes": [
+        "A summary always carries the ids of its underlying events so it stays traceable.",
+        "Attention events are never folded into a routine group.",
+        "Condensation is deterministic, so repeated renders produce the same feed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "activity-timeline.condensation-browser-journey",
+          "reason": "Condensation is a pure function verified by unit tests; the browser expansion journey is deferred with the panel composition."
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-routine",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "condenses routine runs and keeps attention events individual"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-correlation",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "groups correlated events and expands to their ids"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-attention",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "exposes attention events even when routine events are condensed away"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-deterministic",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "is deterministic and traceable to underlying event ids"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-adapters",
+          "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
+          "testName": "maps adapters with authoritative levels"
+        }
+      ]
+    }
+  ]
+}

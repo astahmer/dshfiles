@@ -58,6 +58,7 @@ export interface JjIntegrationServiceOptions {
   readonly validationCommand?: string
   readonly allowAnyAgentIntegration?: boolean
   readonly coordinatorSessions?: readonly string[]
+  readonly onEvent?: (event: IntegrationEvent) => void
 }
 
 export interface IntegrationRunResult {
@@ -95,6 +96,7 @@ export class JjIntegrationService {
   readonly #validationCommand: string | undefined
   readonly #allowAnyAgentIntegration: boolean
   readonly #coordinatorSessions: ReadonlySet<string>
+  readonly #onEvent: ((event: IntegrationEvent) => void) | undefined
   readonly #executor: JjExecutor
   readonly #executeCommand: CommandExecutor | undefined
   #writes: Promise<void> = Promise.resolve()
@@ -115,6 +117,7 @@ export class JjIntegrationService {
     this.#validationCommand = options.validationCommand
     this.#allowAnyAgentIntegration = options.allowAnyAgentIntegration ?? false
     this.#coordinatorSessions = new Set(options.coordinatorSessions ?? [])
+    this.#onEvent = options.onEvent
   }
 
   async overview(): Promise<{ readonly state: JjIntegrationState; readonly spineBookmark: string }> {
@@ -752,7 +755,7 @@ export class JjIntegrationService {
       readonly detail?: string | null
     },
   ): IntegrationEvent {
-    return {
+    const event: IntegrationEvent = {
       id: randomUUID(),
       type,
       at: this.#now(),
@@ -770,6 +773,8 @@ export class JjIntegrationService {
       outcome: input.outcome ?? null,
       detail: input.detail ?? null,
     }
+    this.#onEvent?.(event)
+    return event
   }
 
   async #integrateAlready(candidate: IntegrationCandidate, spine: ObservedRevision): Promise<IntegrationRunResult> {

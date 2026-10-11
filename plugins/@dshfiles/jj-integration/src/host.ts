@@ -8,6 +8,13 @@ import { jjIntegrationApi } from './api.js'
 import type { JjExecutor, CommandExecutor } from './jj.js'
 import { IntegrationError, createJjIntegrationService, type JjIntegrationService } from './service.js'
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
+  }
+}
+
 const MAX_OUTPUT = 512 * 1024
 const MAX_STDERR = 64 * 1024
 
@@ -284,7 +291,16 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
       allowAnyAgentIntegration: config.allowAnyAgentIntegration,
       coordinatorSessions: config.coordinatorSessions,
       ...(config.validationCommand === undefined ? {} : { validationCommand: config.validationCommand }),
+      onEvent: event => {
+        context.emit('dshfiles/activity/event', { kind: 'integration', value: event })
+      },
     },
+  })
+  context.on('dshfiles/activity/backfill', () => {
+    void active.listEvents(200).then(events => {
+      for (const event of events) context.emit('dshfiles/activity/event', { kind: 'integration', value: event })
+    })
+    return undefined
   })
   service = active
   context.on('agent/created', ({ agent }) => {

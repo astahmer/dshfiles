@@ -18,6 +18,13 @@ import { communicationWorkspaceTopic, findOwnedLiveAgent, findOwnedLiveAgents, o
 import { formatInbox } from './messages.js'
 import { createSessionHistorySearchRequest, projectSessionHistoryPage, sessionHistorySearchInputSchema } from './session-history.js'
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
+  }
+}
+
 const summaryOutputSchema = {
   type: 'object',
   additionalProperties: false,
@@ -309,6 +316,7 @@ const publishTool = defineTool({
           ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
           ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
         })
+        hostContext?.emit('dshfiles/activity/event', { kind: 'communication-message', value: { at: message.createdAt, messageId: message.id, senderId: sender.id, recipientCount: message.recipients.length, intent: message.intent, topic: message.topic, ...(message.correlationId === null ? {} : { correlationId: message.correlationId }), sessionId: sender.id } })
         return { summary: `Published ${message.id} to ${message.topic} as ${message.intent}; ${message.recipients.length} subscriber(s) matched.` }
       },
     }),
@@ -346,6 +354,7 @@ const sendTool = defineTool({
           ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
           ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
         })
+        hostContext?.emit('dshfiles/activity/event', { kind: 'communication-message', value: { at: message.createdAt, messageId: message.id, senderId: sender.id, recipientCount: message.recipients.length, intent: message.intent, topic: message.topic, ...(message.correlationId === null ? {} : { correlationId: message.correlationId }), sessionId: sender.id } })
         const recipientLive = hostContext?.agents.list().some(agent => agent.id === args.toAgentId) === true
         return {
           summary: `Sent ${message.id} to ${args.toAgentId} as ${message.intent}; durably stored in the recipient inbox (recipient ${recipientLive ? 'currently live' : 'not currently live; the message stays pending until that Session runs again'}).`,
@@ -451,6 +460,18 @@ const trackToolActivity = async <Value>(input: {
       const errorCode = error instanceof CommunicationError ? error.code : 'activity-record-failed'
       hostContext?.logger.warn('agent-communication: activity record failed (tool=%s, code=%s)', input.operation, errorCode)
     }
+    hostContext?.emit('dshfiles/activity/event', {
+      kind: 'communication-activity',
+      value: {
+        at: Date.now(),
+        sessionId: agent.id,
+        operation: input.operation,
+        outcome: result.outcome,
+        callId: input.execution.callId,
+        rootCallId: input.execution.rootCallId ?? null,
+        errorCode: result.outcome === 'failure' ? (result.error instanceof CommunicationError ? result.error.code : 'operation-failed') : null,
+      },
+    })
   }
   if (result.outcome === 'failure') throw result.error
   return result.value
@@ -463,6 +484,32 @@ const setupHost = (context: Context): Effect<void> => {
   hostContext = context
   const service = createCommunicationService()
   communicationService = service
+  context.on('dshfiles/activity/backfill', () => {
+    void (async () => {
+      try {
+        const page = await service.browseMessages({ limit: 100 })
+        for (const message of page.items) {
+          context.emit('dshfiles/activity/event', {
+            kind: 'communication-message',
+            value: {
+              at: message.createdAt,
+              messageId: message.id,
+              senderId: message.sender.id,
+              recipientCount: message.recipients.length,
+              intent: message.intent,
+              topic: message.topic,
+              ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+              sessionId: message.sender.kind === 'agent' ? message.sender.id : null,
+            },
+          })
+        }
+      } catch {
+        return
+      }
+    })()
+    return undefined
+  })
+
   context.on('agent/created', async ({ agent }) => {
     await initializeAgent(agent)
     return undefined
