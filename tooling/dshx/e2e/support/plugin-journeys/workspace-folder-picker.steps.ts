@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -25,4 +28,28 @@ Then('the picker starts in folder browsing mode without project actions', async 
     await expect(dialog.getByRole('listbox', { name: 'Projects and recent folders' })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
+})
+
+Then('a new folder can be created and registered as a workspace', async ({ page }: { page: Page }) => {
+  const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-picker-e2e-'))
+  const workspaceName = 'registered-workspace'
+  const workspacePath = join(scratchRoot, workspaceName)
+  const dialog = folderPickerDialog(page)
+  try {
+    const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+    await pathInput.fill(scratchRoot)
+    await pathInput.press('Enter')
+    await recordAssertion(page, 'scratch-parent-is-opened', () => expect(dialog.locator('p').filter({ hasText: scratchRoot }).first()).toBeVisible())
+    await dialog.getByRole('textbox', { name: 'New folder name' }).fill(workspaceName)
+    await dialog.getByRole('button', { name: 'Create folder', exact: true }).click()
+    await recordAssertion(page, 'new-folder-is-created-and-opened', () => expect(dialog.locator('p').filter({ hasText: workspacePath }).first()).toBeVisible())
+    await dialog.getByRole('button', { name: 'Select this folder', exact: true }).click()
+    await recordAssertion(page, 'folder-picker-closes-after-selection', () => expect(dialog).toBeHidden())
+    await recordAssertion(page, 'created-folder-is-registered-as-workspace', () =>
+      expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
+    )
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
 })

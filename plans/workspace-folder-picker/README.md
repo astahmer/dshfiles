@@ -9,7 +9,7 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 | Reproduce and choose scope | Done | Published-package scratch journeys opened the custom dialog but Host listing failed; this confirms the old native-only capability cannot serve the in-app browser. Scope remains Add Workspace only. |
 | Add a hybrid Host capability | Done | Host/API and Loader-composition regressions pass; focused Host typecheck plus canonical Host/Client/Web builds pass. Three changed Core README translation pairs pass scoped verification. The default `auto` path remains unchanged. |
 | Wire the owned plugin and web seed | Done | Plugin patch opts into `backend: hybrid`; README documents preserved native picking. Plugin typecheck/build/import pass; Vitest has no unit tests. Workspace `contract` passed; broad plugin build remains blocked by an unrelated missing vendored `@deepseek-ai/dsh-session-format-catalog` artifact in `@dshfiles/dsh-core-runtime`. |
-| Verify isolated composition and browser journeys | In progress | Published-package journeys reach Add Workspace but the Host list request fails (`This folder could not be opened`) because rc.2 lacks the hybrid capability. Full local-Core scratch returns HTTP 200 but client boot fails on missing `@deepseek-ai/dsh-session/surface`; 27 dependent client entries remain pending. Core Web E2E cannot start: missing `native/system/.../system.node` and Session Controller import. No live profile was touched. |
+| Verify isolated composition and browser journeys | In progress | Published-package journeys reach Add Workspace but the Host list request fails (`This folder could not be opened`) because rc.2 lacks the hybrid capability. Header E2E now includes temp-only browse/create/select/registration (Playwright step discovery passes), but runtime remains blocked: local-Core client boot misses `@deepseek-ai/dsh-session/surface` (27 entries pending), and Core Web E2E lacks `native/system/.../system.node` plus Session Controller import. No live profile was touched. |
 | Promote and report restart boundary | Pending | Do not sync or restart the live profile; Core Host/profile composition changes require a user-controlled restart. |
 
 ## Decisions
@@ -18,6 +18,7 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 - Add an explicit `hybrid` interaction: native `pick` plus bounded, validated browse `list/createDirectory` on native-capable hosts; fall back to browse-only where native picking is unavailable.
 - Only the owned workspace-folder-picker profile patch opts into `hybrid`; its custom UI stays scoped to Add Workspace slots.
 - Do not modify the live DSH process or installed profile during the experiment.
+- Hybrid reuses Browse's existing host-filesystem scope; path validation does not add a workspace-root authorization boundary. This broader browse capability stays opt-in in the plugin profile.
 
 ## Workspace handoff
 
@@ -28,4 +29,4 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 
 ## Resume here
 
-Close out focused Core/plugin checks and the path-scope security review, then split only owned JJ paths. Browser acceptance remains open: the published runtime lacks this unshipped hybrid contract, while the scratch source runtime has unrelated Client module and native-binding failures. Re-run the two Add Workspace journeys plus create/select/registration after a package-coherent Core runtime is available; do not promote or restart live DSH.
+Browser acceptance remains open: the published runtime lacks this unshipped hybrid contract, while the scratch source runtime has unrelated Client module and native-binding failures. Once a package-coherent Core runtime is available, run both entry-point journeys plus the new temp-only create/select/registration flow. Source changes are split on the DSH Files spine and Core feature revision is recorded above; do not promote or restart live DSH.

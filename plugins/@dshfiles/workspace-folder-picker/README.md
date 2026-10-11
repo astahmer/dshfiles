@@ -17,10 +17,10 @@ unchanged.
 
 - The header and sidebar workspace owners retain open/busy state and workspace
   creation.
-- The bundle's profile patch selects the `browse` mode on the adaptive Host
-  directory picker; listing and folder creation use the installed
-  `directoryPicker` Remote, while creating a workspace remains the owner's
-  responsibility.
+- The bundle's profile patch selects the `hybrid` mode on the adaptive Host
+  picker; Add Workspace uses the installed `directoryPicker` browse Remote,
+  while other directory flows keep native picking and workspace registration
+  remains the workspace owner's responsibility.
 - The shared picker defaults to project mode for its other consumers. This
   bundle opts into directory-only mode without duplicating the explorer UI.
 
