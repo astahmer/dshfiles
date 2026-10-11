@@ -16,6 +16,11 @@ describe('native SDK testing utilities', () => {
     expect(definition.inject).toEqual(['slots', 'layout', 'connection'])
   })
 
+  it('injects the model directory service dependencies with the models capability', () => {
+    const definition = defineClientPlugin({ id: 'model-directory-injection', uses: ['models'] })
+    expect(definition.inject).toEqual(['modelDirectories', 'sessions', 'remote', 'remote.session'])
+  })
+
   it('registers composer React actions into native session-scoped toolbar seats', async () => {
     const client = await createTestClient()
     try {

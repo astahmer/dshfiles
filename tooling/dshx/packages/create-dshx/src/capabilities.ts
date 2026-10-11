@@ -55,6 +55,7 @@ export const CLIENT_SERVICES = {
   workspaces: { packageName: DSH_PACKAGES.workspaceController, availability: 'optional' },
   commandUi: { packageName: '@deepseek-ai/dsh-client-ui-commands', availability: 'optional' },
   remote: { packageName: DSH_PACKAGES.remotes, availability: 'optional' },
+  'remote.session': { packageName: DSH_PACKAGES.sessionController, availability: 'optional' },
   connection: { packageName: DSH_PACKAGES.connection, availability: 'provided' },
   configForms: { packageName: DSH_PACKAGES.settings, availability: 'optional' },
 } as const
@@ -80,7 +81,7 @@ export const CLIENT_CAPABILITIES = {
   },
   models: {
     cordisServices: CLIENT_CAPABILITY_INJECTIONS.models,
-    providers: [CLIENT_SERVICES.modelDirectories.packageName],
+    providers: [CLIENT_SERVICES.modelDirectories.packageName, CLIENT_SERVICES.sessions.packageName, CLIENT_SERVICES.remote.packageName],
   },
   rpc: {
     cordisServices: CLIENT_CAPABILITY_INJECTIONS.rpc,

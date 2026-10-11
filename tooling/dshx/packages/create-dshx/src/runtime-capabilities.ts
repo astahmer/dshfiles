@@ -6,7 +6,7 @@ export const CLIENT_CAPABILITY_INJECTIONS = {
   panels: ['slots', 'layout'],
   sidebar: ['slots', 'layout'],
   composer: ['slots'],
-  models: ['modelDirectories'],
+  models: ['modelDirectories', 'sessions', 'remote', 'remote.session'],
   rpc: ['connection'],
 } as const
 
