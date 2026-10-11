@@ -28,6 +28,9 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./client/contracts": {
+      "types": "./lib/types/client/contracts.d.ts"
+    },
     "./typert": {
       "types": "./lib/typert.host.d.ts",
       "default": "./lib/typert.host.js"

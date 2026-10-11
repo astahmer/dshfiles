@@ -3,7 +3,8 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
 import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client/contracts'
+import type { SessionStore } from '@deepseek-ai/dsh-session'
 import { slotContributionParts } from '../src/client/define.js'
 import { localeDefinitionParts } from '../src/client/locale.js'
 import type { ClientConversationContribution } from '../src/client/types.js'
@@ -48,13 +49,17 @@ describe('defineClient', () => {
     expectTypeOf(definition.inject).toEqualTypeOf<readonly ['slots']>()
   })
 
-  it('replaces the same-named Cordis Host service with the Client Session contract', () => {
+  it('keeps Host and Client session service contracts separate', () => {
+    expectTypeOf<Context['sessions']>().toEqualTypeOf<SessionStore>()
+    expectTypeOf<Context['sessions']['get']>().toBeFunction()
     const definition = defineClient({
       inject: ['sessions'],
       setup(ctx) {
         expectTypeOf(ctx.sessions).toEqualTypeOf<ISessions>()
         expectTypeOf(ctx.sessions.scope).toBeFunction()
-        // @ts-expect-error Host-only SessionStore operations are not part of the Client Session API.
+        // @ts-expect-error Host-only SessionStore lookups are not part of the Client Session API.
+        ctx.sessions.get('session-id')
+        // @ts-expect-error Host-only SessionStore creation is not part of the Client Session API.
         ctx.sessions.create('session-id')
       },
     })

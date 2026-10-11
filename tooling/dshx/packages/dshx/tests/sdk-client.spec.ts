@@ -3,7 +3,7 @@ import { createTestClient, createTestHost, mountPlugin } from '../src/testing/in
 import { definePlugin, defineTool } from '../src/host/index.js'
 import { defineClientPlugin } from '../src/client/index.js'
 import type { ClientContext } from '../src/client/types.js'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client/contracts'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 
 describe('native SDK testing utilities', () => {
