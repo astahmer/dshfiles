@@ -7,7 +7,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
-import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { effortName, filterModelGroups, selectionForEffort, selectionForModel } from './model-picker-model.js'
 
@@ -65,7 +65,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
       <PopoverTrigger asChild>
         <Button
           aria-label={`${triggerLabel}, reasoning ${effortLabel}`}
-          className="dshx-root dshx:h-8 dshx:max-w-56 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:text-left"
+          className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-left"
           disabled={locked}
           size="sm"
           variant="ghost"
@@ -75,27 +75,34 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
           ) : (
             <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
           )}
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:items-start dshx:leading-tight">
-            <span className="dshx:max-w-full dshx:truncate dshx:text-xs dshx:font-medium" data-model-picker-text>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
+            <span
+              className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+              data-model-picker-text
+              style={{ display: 'var(--dsh-composer-model-text-display, inline)' }}
+            >
               {triggerLabel}
             </span>
-            <span className="dshx:max-w-full dshx:truncate dshx:text-[10px] dshx:text-muted-foreground" data-model-picker-effort>
+            <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground">
+              ·
+            </span>
+            <span
+              className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground"
+              data-model-picker-effort
+            >
               {effortLabel}
             </span>
           </span>
           <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="dshx-root dshx:w-[min(30rem,calc(100vw-1rem))] dshx:overflow-hidden dshx:p-0" side="top" sideOffset={8}>
-        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:border-b dshx:border-border dshx:px-4 dshx:py-3">
-          <div>
-            <p className="dshx:text-sm dshx:font-semibold">Choose a model</p>
-            <p className="dshx:text-xs dshx:text-muted-foreground">Browse providers, then tune reasoning.</p>
-          </div>
-          {state.status === 'loading' && <Badge variant="secondary">Loading</Badge>}
-        </div>
-
-        <div className="dshx:space-y-3 dshx:p-3">
+      <PopoverContent
+        align="start"
+        className="dshx-root dshx:max-h-[min(82vh,36rem)] dshx:w-[min(26rem,calc(100vw-1rem))] dshx:overflow-hidden dshx:p-0"
+        side="top"
+        sideOffset={8}
+      >
+        <div className="dshx:space-y-2 dshx:p-3">
           <label className="dshx:relative dshx:block">
             <SearchIcon aria-hidden="true" className="dshx:absolute dshx:left-2.5 dshx:top-1/2 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground" />
             <Input
@@ -109,7 +116,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
             />
           </label>
 
-          <ScrollArea className="dshx:h-64 dshx:max-h-[42vh] dshx:min-h-24 dshx:rounded-md dshx:border dshx:border-border">
+          <ScrollArea className="dshx:h-52 dshx:max-h-[36vh] dshx:min-h-24">
             <div aria-label="Models grouped by provider" className="dshx:space-y-2 dshx:p-2" role="list">
               {filteredGroups.map(group => (
                 <section aria-label={group.name} className="dshx:space-y-1" key={group.id}>
@@ -165,13 +172,24 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
           )}
         </div>
 
-        <section aria-label="Reasoning effort" className="dshx:space-y-4 dshx:border-t dshx:border-border dshx:bg-muted/30 dshx:px-4 dshx:py-4">
-          <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
-            <div>
+        <section aria-label="Reasoning effort" className="dshx:space-y-2 dshx:border-t dshx:border-border dshx:px-3 dshx:py-3">
+          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
+            <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
               <p className="dshx:text-sm dshx:font-semibold">Reasoning effort</p>
-              <p className="dshx:text-xs dshx:text-muted-foreground">Uses the selected model’s advertised levels.</p>
+              <Badge variant="secondary">{effortLabel}</Badge>
             </div>
-            <Badge variant="secondary">{effortLabel}</Badge>
+            {selectedModel !== undefined && current !== null && (
+              <Button
+                aria-pressed={current.reasoningEffort === undefined}
+                disabled={busy}
+                onClick={() => void submitSelection(selectionForEffort(current, undefined))}
+                size="xs"
+                variant="ghost"
+              >
+                <RotateCcwIcon aria-hidden="true" />
+                Use provider default
+              </Button>
+            )}
           </div>
 
           {selectedModel === undefined || current === null ? (
@@ -179,23 +197,40 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
           ) : efforts.length === 0 ? (
             <p className="dshx:text-xs dshx:text-muted-foreground">This model does not advertise reasoning levels.</p>
           ) : (
-            <div className="dshx:space-y-3">
+            <div className="dshx:space-y-2">
               {efforts.length > 1 && (
-                <Slider
-                  aria-label="Reasoning effort"
-                  disabled={busy}
-                  max={efforts.length - 1}
-                  min={0}
-                  onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
-                  onValueCommit={(values: number[]) => {
-                    const effort = efforts[values[0] ?? 0]
-                    if (effort !== undefined) void submitSelection(selectionForEffort(current, effort.id))
-                  }}
-                  step={1}
-                  value={[sliderIndex]}
-                />
+                <div className="dshx:relative dshx:py-1">
+                  <Slider
+                    aria-label="Reasoning effort"
+                    className="dshx:py-1 dshx:[&_[data-slot=slider-track]]:h-3 dshx:[&_[data-slot=slider-track]]:bg-border dshx:[&_[data-slot=slider-range]]:bg-info dshx:[&_[data-slot=slider-thumb]]:z-[2] dshx:[&_[data-slot=slider-thumb]]:size-6 dshx:[&_[data-slot=slider-thumb]]:border-2 dshx:[&_[data-slot=slider-thumb]]:border-info dshx:[&_[data-slot=slider-thumb]]:bg-background dshx:[&_[data-slot=slider-thumb]]:shadow-md"
+                    data-model-effort-slider
+                    disabled={busy}
+                    max={efforts.length - 1}
+                    min={0}
+                    onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
+                    onValueCommit={(values: number[]) => {
+                      const effort = efforts[values[0] ?? 0]
+                      if (effort !== undefined) void submitSelection(selectionForEffort(current, effort.id))
+                    }}
+                    step={1}
+                    value={[sliderIndex]}
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="dshx:pointer-events-none dshx:absolute dshx:inset-x-3 dshx:top-1/2 dshx:z-[1] dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:justify-between"
+                    data-model-effort-slider-markers
+                  >
+                    {efforts.map((effort, index) => (
+                      <span
+                        className={cn('dshx:size-1 dshx:rounded-full', index <= sliderIndex ? 'dshx:bg-background/70' : 'dshx:bg-muted-foreground/50')}
+                        data-model-effort-marker
+                        key={effort.id}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
-              <div className="dshx:flex dshx:justify-between dshx:gap-2">
+              <div className="dshx:flex dshx:justify-between dshx:gap-2" data-model-effort-options>
                 {efforts.map((effort, index) => (
                   <button
                     aria-pressed={index === selectedEffortIndex}
@@ -203,6 +238,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                       'dshx:rounded-sm dshx:px-1 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:transition-colors dshx:hover:text-foreground dshx:focus-visible:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
                       index === selectedEffortIndex && 'dshx:font-semibold dshx:text-foreground',
                     )}
+                    data-model-effort-option
                     disabled={busy}
                     key={effort.id}
                     onClick={() => void submitSelection(selectionForEffort(current, effort.id))}
@@ -211,17 +247,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                     {effort.name}
                   </button>
                 ))}
-              </div>
-              <div className="dshx:flex dshx:justify-end">
-                <Button
-                  aria-pressed={current.reasoningEffort === undefined}
-                  disabled={busy}
-                  onClick={() => void submitSelection(selectionForEffort(current, undefined))}
-                  size="xs"
-                  variant="outline"
-                >
-                  Use provider default
-                </Button>
               </div>
             </div>
           )}

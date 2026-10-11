@@ -21,8 +21,41 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   const selectedEffort = (await effortLabel.innerText()).trim()
   await expect(trigger).toBeVisible()
   await expect(effortLabel).toBeVisible()
+  const modelBounds = await trigger.boundingBox()
+  const effortBounds = await effortLabel.boundingBox()
+  if (modelBounds === null || effortBounds === null) throw new Error('The composer model and reasoning labels have no visible bounds.')
+  expect(Math.abs(modelBounds.y - effortBounds.y)).toBeLessThan(2)
   pickerSelectionByPage.set(page, { model: selectedModel, effort: selectedEffort })
   await trigger.click()
+
+  await expect(page.getByText('Choose a model', { exact: true })).toHaveCount(0)
+  const popoverBounds = await page.getByRole('dialog').boundingBox()
+  if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
+  expect(popoverBounds.width).toBeLessThanOrEqual(430)
+  const effort = reasoningEffort(page)
+  const providerDefault = effort.getByRole('button', { name: 'Use provider default', exact: true })
+  await expect(providerDefault).toBeVisible()
+  const defaultBounds = await providerDefault.boundingBox()
+  const slider = effort.getByRole('slider')
+  const sliderBounds = await slider.boundingBox()
+  if (defaultBounds === null || sliderBounds === null) throw new Error('The reasoning controls have no visible bounds.')
+  expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
+  const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
+  if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
+  expect(trackBounds.height).toBeGreaterThanOrEqual(10)
+  expect(sliderBounds.width).toBeGreaterThanOrEqual(20)
+  const accentRange = await effort.locator('[data-model-effort-slider] [data-slot="slider-range"]').evaluate(element => {
+    const probe = document.createElement('div')
+    probe.style.backgroundColor = 'var(--dsw-alias-state-business-primary)'
+    document.body.append(probe)
+    const accentColor = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return accentColor !== 'rgba(0, 0, 0, 0)' && getComputedStyle(element).backgroundColor === accentColor
+  })
+  expect(accentRange).toBe(true)
+  expect(await effort.locator('[data-model-effort-slider-markers] [data-model-effort-marker]').count()).toBe(
+    await effort.locator('[data-model-effort-option]').count(),
+  )
 
   const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
   const providerGroups = modelList.locator('section[aria-label]')
@@ -75,7 +108,7 @@ When('the reasoning-effort slider is adjusted one step', async ({ page }: { page
   const targetValue = direction === 'ArrowLeft' ? currentValue - 1 : currentValue + 1
   if (targetValue < minimum || targetValue > maximum) throw new Error('The reasoning slider has no adjacent value to select.')
 
-  const targetEffort = (await effort.getByRole('button').nth(targetValue).innerText()).trim()
+  const targetEffort = (await effort.locator('[data-model-effort-option]').nth(targetValue).innerText()).trim()
   await slider.press(direction)
   await expect(slider).toHaveAttribute('aria-valuenow', String(targetValue))
   pickerSelectionByPage.set(page, { model: selection.model, effort: targetEffort })
