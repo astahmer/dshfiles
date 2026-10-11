@@ -25,6 +25,33 @@ When('the AI Accounts settings section is opened', async ({ page }: { page: Page
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
+When('a Codex account draft is edited in manual save mode', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  const manualSave = page.getByRole('radio', { name: /Manual/ })
+  await manualSave.check()
+  await expect(manualSave).toBeChecked()
+  await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+  await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+  await page.getByRole('textbox', { name: 'Display name', exact: true }).fill('E2E Draft Account')
+  await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes.' })).toBeVisible()
+})
+
+Then('the manual draft saves and persists when AI Accounts is reopened', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-manual-draft-persistence', async () => {
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Saved. New sessions use the updated route settings.' })).toBeVisible()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toHaveValue('E2E Draft Account')
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the usage windows per account can be configured and restored', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-usage-window-layout', async () => {
     const layout = page.getByRole('combobox', { name: 'Windows per account' })

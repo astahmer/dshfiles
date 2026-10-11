@@ -2,6 +2,13 @@ Feature: AI Accounts
 
   AI Accounts policy settings are available in the real Settings UI.
 
+  @scenario:ai-accounts.account-draft
+  @scenario:ai-accounts.save-policy
+  Scenario: Keep and save an account draft in manual mode
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Codex account draft is edited in manual save mode
+    Then the manual draft saves and persists when AI Accounts is reopened
+
   @scenario:ai-accounts.failure-recovery
   Scenario: Configure rate-limit failover from AI Accounts settings
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

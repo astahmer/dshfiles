@@ -28,12 +28,12 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.account-draft",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
           "kind": "gherkin",
           "id": "ai-accounts.save-policy",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]
     },
