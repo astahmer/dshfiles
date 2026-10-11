@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "workspace-folder-add-flow",
+      "title": "Add workspaces from the folder browser",
+      "summary": "The sidebar Add workspace flow opens directly in the Host-backed folder explorer without offering registered projects.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["closed", "browsing", "selected", "busy"],
+      "failureModes": [
+        "Directory listing and workspace creation stay behind the Host Remote APIs.",
+        "The add flow does not expose registered project choices or project registration actions."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.folder-mode",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        }
+      ]
+    }
+  ]
+}

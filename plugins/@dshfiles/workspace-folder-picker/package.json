@@ -1,0 +1,88 @@
+{
+  "name": "@dshfiles/workspace-folder-picker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open the workspace add flow directly in a Host-backed folder browser.",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "dshx check && pnpm lint && pnpm fmt:check",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint src tests dshx.config.ts",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "test": "vitest run --passWithNoTests",
+    "build": "dshx build",
+    "dev": "dshx dev --open"
+  },
+  "dependencies": {
+    "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/project-folder-picker": "link:../project-folder-picker"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/cordis-plugin-include": "1.0.9",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.5",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "@types/react": "~18.3.31",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "react": "^18.3.1",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-gateway": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-remotes": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-workspace-controller"
+      ],
+      "external": [],
+      "immediately": false
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

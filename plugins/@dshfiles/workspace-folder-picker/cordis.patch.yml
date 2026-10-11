@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-workspace-folder-picker
+      name: '@dshfiles/workspace-folder-picker'
