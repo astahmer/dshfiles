@@ -8,13 +8,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { MoreHorizontalIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, BellIcon, PauseIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
+import { useState, type ReactNode } from 'react'
 import {
   isThreadMuted,
   setThreadMute,
@@ -23,27 +21,31 @@ import {
   threadNotificationPreferences,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
 } from './thread-notifications.js'
-import { useState } from 'react'
 import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 
+export type HeaderThreadActionKind = 'pin' | 'park' | 'notifications' | 'archive'
+
 interface HeaderThreadActionsInjected {
+  action: HeaderThreadActionKind
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   unarchiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useWorkspaces'> &
-  PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> &
-  HeaderThreadActionsInjected
+type HeaderThreadActionsProps = Pick<
+  PropsRuntime<'conversation.session.header.utilities'>,
+  'sessionId' | 'useSessions' | 'useWorkspaces' | 'placement'
+> & PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> & HeaderThreadActionsInjected
 
-/** Session-scoped copy of the thread-list management actions for the header overflow. */
 export const HeaderThreadActions = ({
+  action,
   sessionId,
   useSessions,
   useWorkspaces,
+  placement,
   archiveSession,
   unarchiveSession,
   pinSession,
@@ -87,9 +89,9 @@ export const HeaderThreadActions = ({
       return workspaceState.archivedSessionIds.includes(targetId)
     })
     if (operation === 'archive' && needsChange.some(targetId => sessionState.byId[targetId]?.running === true)) return
-    const action = { pin: pinSession, unpin: unpinSession, archive: archiveSession, unarchive: unarchiveSession }[operation]
+    const actionHandler = { pin: pinSession, unpin: unpinSession, archive: archiveSession, unarchive: unarchiveSession }[operation]
     try {
-      for (const targetId of needsChange) await action(targetId)
+      for (const targetId of needsChange) await actionHandler(targetId)
     } catch {
       setActionFailed(true)
     }
@@ -97,69 +99,84 @@ export const HeaderThreadActions = ({
   const updateMute = (until: number | null): void => {
     threadNotificationPreferences.set(setThreadMute(notificationPreferences, sessionId, until))
   }
+  const actionButton = (label: string, icon: ReactNode, onClick?: () => void, disabled = false) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size={placement === 'toolbar' ? 'icon-sm' : 'sm'}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {placement === 'toolbar' ? icon : label}
+    </Button>
+  )
+  const error = actionFailed ? (
+    <span className="dshx:px-2 dshx:py-1.5 dshx:text-destructive" role="alert">
+      {t('threadSidebarActionFailure')}
+    </span>
+  ) : null
+  if (action !== 'archive' && archived) return null
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={t('threadSidebarContextMenu')}>
-          <MoreHorizontalIcon className="dshx:size-4" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarContextMenu')}>
-        {archived ? (
-          <DropdownMenuItem onSelect={() => void updateThreadOperation('unarchive')}>{t('threadSidebarRestore')}</DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem onSelect={() => void updateThreadOperation(pinned ? 'unpin' : 'pin')}>
-              {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+  if (action === 'pin') {
+    const label = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
+    return (
+      <span className="dshx-root">
+        {actionButton(label, <PinIcon className="dshx:size-4" aria-hidden="true" />, () => void updateThreadOperation(pinned ? 'unpin' : 'pin'))}
+        {error}
+      </span>
+    )
+  }
+
+  if (action === 'park') {
+    const label = t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')
+    return (
+      <span className="dshx-root">
+        {actionButton(label, <PauseIcon className="dshx:size-4" aria-hidden="true" />, updateParked, session.running)}
+      </span>
+    )
+  }
+
+  if (action === 'notifications') {
+    const label = t(muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications')
+    return (
+      <span className="dshx-root">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            {actionButton(label, <BellIcon className="dshx:size-4" aria-hidden="true" />)}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarNotifications')}>
+            {snoozeDurations.map(duration => (
+              <DropdownMenuItem
+                key={duration.milliseconds}
+                onSelect={() => updateMute(Date.now() + duration.milliseconds)}
+              >
+                {t('threadSidebarSnoozeFor')} {t(duration.label)}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuItem onSelect={() => updateMute(null)}>
+              {t('threadSidebarMuteUntilEnabled')}
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={session.running} onSelect={updateParked}>
-              {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>{t(muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications')}</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="dshx-root dshx:min-w-44">
-                {snoozeDurations.map(duration => (
-                  <DropdownMenuItem
-                    key={duration.milliseconds}
-                    onSelect={() => {
-                      updateMute(Date.now() + duration.milliseconds)
-                    }}
-                  >
-                    {t('threadSidebarSnoozeFor')} {t(duration.label)}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem
-                  onSelect={() => {
-                    updateMute(null)
-                  }}
-                >
-                  {t('threadSidebarMuteUntilEnabled')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!muted}
-                  onSelect={() => {
-                    threadNotificationPreferences.set(clearThreadMute(notificationPreferences, sessionId))
-                  }}
-                >
-                  {t('threadSidebarUnmute')}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
             <DropdownMenuItem
-              disabled={targetIds.some(targetId => sessionState.byId[targetId]?.running === true)}
-              onSelect={() => void updateThreadOperation('archive')}
+              disabled={!muted}
+              onSelect={() => {
+                threadNotificationPreferences.set(clearThreadMute(notificationPreferences, sessionId))
+              }}
             >
-              {t('threadSidebarArchive')}
+              {t('threadSidebarUnmute')}
             </DropdownMenuItem>
-          </>
-        )}
-        {actionFailed ? (
-          <div className="dshx:px-2 dshx:py-1.5 dshx:text-destructive" role="alert">
-            {t('threadSidebarActionFailure')}
-          </div>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
+    )
+  }
+
+  const label = t(archived ? 'threadSidebarRestore' : 'threadSidebarArchive')
+  const disabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
+  return (
+    <span className="dshx-root">
+      {actionButton(label, <ArchiveIcon className="dshx:size-4" aria-hidden="true" />, () => void updateThreadOperation(archived ? 'unarchive' : 'archive'), disabled)}
+      {error}
+    </span>
   )
 }

@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { HeaderThreadActions } from './header-actions.js'
+import { HeaderThreadActions, type HeaderThreadActionKind } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
 import { threadNotificationPreferences, DEFAULT_THREAD_NOTIFICATION_PREFERENCES } from './thread-notifications.js'
 import { SidebarStateProvider } from './sidebar-state.js'
 
 const labels: Readonly<Record<string, string>> = {
-  threadSidebarContextMenu: 'Thread actions',
   threadSidebarPin: 'Pin',
   threadSidebarUnpin: 'Unpin',
   threadSidebarPark: 'Park',
@@ -27,7 +26,10 @@ const labels: Readonly<Record<string, string>> = {
   threadSidebarActionFailure: 'Could not update thread',
 }
 
-const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean }) => {
+const mount = (
+  action: HeaderThreadActionKind,
+  options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; placement?: 'toolbar' | 'overflow' },
+) => {
   const session = {
     id: 's1',
     title: 'Thread',
@@ -41,6 +43,8 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     if (options?.failPin === true) throw new Error('pin failed')
   })
   const props = {
+    action,
+    placement: options?.placement ?? 'overflow',
     sessionId: 's1',
     useSessions: <Value,>(select: (state: unknown) => Value) => select({ ids: ['s1'], byId: { s1: session } }),
     useWorkspaces: <Value,>(select: (state: unknown) => Value) =>
@@ -54,7 +58,6 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     unpinSession: vi.fn(async () => {}),
     t: (key: string) => labels[key] ?? key,
   }
-  // SAFETY: the fixture doubles only the selector fields this component reads.
   const headerActionProps = props as unknown as Parameters<typeof HeaderThreadActions>[0]
   const view = render(
     <SidebarStateProvider>
@@ -62,13 +65,6 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     </SidebarStateProvider>,
   )
   return { ...view, pinSession }
-}
-
-const openMenu = (): void => {
-  const trigger = screen.getByRole('button', { name: 'Thread actions' })
-  trigger.focus()
-  fireEvent.keyDown(trigger, { key: 'Enter', code: 'Enter' })
-  fireEvent.keyUp(trigger, { key: 'Enter', code: 'Enter' })
 }
 
 beforeEach(() => {
@@ -79,47 +75,53 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('HeaderThreadActions', () => {
-  it('pins and parks a thread from the header menu', () => {
-    const header = mount()
-    openMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
+  it('renders pin and park as direct overflow actions without an inner ellipsis', () => {
+    const header = mount('pin')
+    expect(screen.queryByRole('button', { name: 'Thread actions' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Pin' }))
     expect(header.pinSession).toHaveBeenCalledWith('s1')
-    openMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }))
+
+    cleanup()
+    mount('park')
+    fireEvent.click(screen.getByRole('button', { name: 'Park' }))
     expect(localStorage.getItem(PREFERENCES_STORAGE_KEY)).not.toBeNull()
   })
 
-  it('snoozes the current thread notifications', () => {
-    mount()
-    openMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Thread notifications' }))
+  it('opens the notification action and snoozes the current thread', () => {
+    mount('notifications')
+    fireEvent.click(screen.getByRole('button', { name: 'Thread notifications' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze for 15 minutes' }))
     expect(threadNotificationPreferences.get()?.mutedUntil.s1).toBeGreaterThan(Date.now())
   })
 
   it('offers restore for archived threads and omits controls for blank ones', () => {
-    mount({ archived: true })
-    openMenu()
-    expect(screen.getByRole('menuitem', { name: 'Restore' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
+    mount('archive', { archived: true })
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
     cleanup()
-    mount({ blank: true })
+    mount('pin', { blank: true })
+    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
+  })
+
+  it('renders a compact toolbar action when moved out of overflow', () => {
+    mount('pin', { placement: 'toolbar' })
+    const pin = screen.getByRole('button', { name: 'Pin' })
+    expect(pin.getAttribute('data-size')).toBe('icon-sm')
     expect(screen.queryByRole('button', { name: 'Thread actions' })).toBeNull()
   })
 
   it('disables park and archive while a thread is running', () => {
-    mount({ running: true })
-    openMenu()
-    expect(screen.getByRole('menuitem', { name: 'Park' }).getAttribute('aria-disabled')).toBe('true')
-    expect(screen.getByRole('menuitem', { name: 'Archive' }).getAttribute('aria-disabled')).toBe('true')
+    mount('park', { running: true })
+    expect(screen.getByRole('button', { name: 'Park' }).hasAttribute('disabled')).toBe(true)
+    cleanup()
+    mount('archive', { running: true })
+    expect(screen.getByRole('button', { name: 'Archive' }).hasAttribute('disabled')).toBe(true)
   })
 
-  it('reports failed Host mutations in the reopened menu', async () => {
-    const header = mount({ failPin: true })
-    openMenu()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
+  it('reports failed Host mutations beside the action', async () => {
+    const header = mount('pin', { failPin: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Pin' }))
     await vi.waitFor(() => expect(header.pinSession).toHaveBeenCalledOnce())
-    openMenu()
     expect((await screen.findByRole('alert')).textContent).toBe('Could not update thread')
   })
 })

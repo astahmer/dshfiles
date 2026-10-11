@@ -379,6 +379,14 @@
           "coveredBy": [
             "thread-sidebar.custom-views"
           ]
+        },
+        {
+          "key": "viewPresets",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"all\",\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"working\",\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
+          "coveredBy": [
+            "thread-sidebar.custom-views"
+          ]
         }
       ],
       "states": [
@@ -1000,6 +1008,12 @@
           "id": "thread-sidebar.thread-children-and-links-unit-sanitized-thread-link",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-url.test.ts",
           "testName": "copied thread links retain the app path and omit transient credentials and fragments"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-thread-mention-token",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread reference keeps the native session mention and title presentation"
         }
       ]
     },
@@ -1062,6 +1076,12 @@
           "id": "thread-sidebar.session-header-actions-unit-action-failure",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
           "testName": "reports failed Host mutations in the reopened menu"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-toolbar-placement",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "renders a compact toolbar action when moved out of overflow"
         }
       ]
     },

@@ -235,7 +235,7 @@ Then('the Host thread stays parked after reload without an attention error', asy
   await finishJourneyAssertions(page)
 })
 
-When('a nonblank Host thread is pinned from its session header menu', async ({ page }: { page: Page }) => {
+When('a nonblank Host thread is pinned from its session header overflow', async ({ page }: { page: Page }) => {
   const prompt = 'thread sidebar header pin e2e target'
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
@@ -243,8 +243,13 @@ When('a nonblank Host thread is pinned from its session header menu', async ({ p
   await composer.press('Enter')
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
   await expect(targetRow).toHaveCount(1)
-  await page.getByRole('button', { name: 'Thread actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Pin', exact: true }).click()
+  const moreActions = page.getByRole('button', { name: 'More conversation actions', exact: true })
+  await expect(moreActions).toHaveCount(1)
+  await moreActions.click()
+  const overflowPanel = page.getByRole('dialog', { name: 'More conversation actions', exact: true })
+  await expect(overflowPanel).toBeVisible()
+  await expect(overflowPanel.getByRole('button', { name: 'Thread actions', exact: true })).toHaveCount(0)
+  await overflowPanel.getByRole('button', { name: 'Pin', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
 })
 
