@@ -117,6 +117,22 @@ Then('the policy settings survive a browser reload', async ({ page }: { page: Pa
   await finishJourneyAssertions(page)
 })
 
+When('an attention status color is changed in Sidebar settings', async ({ page }: { page: Page }) => {
+  await openSidebarSettings(page)
+  await sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Warning', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Danger', exact: true }).click()
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await openSidebarSettings(page)
+})
+
+Then('the selected attention color survives a browser reload', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-attention-color-survives-reload', async () => {
+    await expect(sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Danger', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the header is expanded, reordered, and one destination is hidden', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
   const customize = customizeSidebar(page)

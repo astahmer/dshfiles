@@ -110,6 +110,14 @@
           ]
         },
         {
+          "key": "attentionColors",
+          "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"info\",\"turnFinished\":\"success\"}",
+          "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
+          "coveredBy": [
+            "thread-sidebar.attention-colors"
+          ]
+        },
+        {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
           "constraints": "Parked session IDs in sidebar preferences; not updated through Host session attention.",
@@ -160,6 +168,23 @@
           "kind": "gherkin",
           "id": "thread-sidebar.park-context-menu",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.attention-colors",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.attention-colors-unit-preference-validation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older settings gain default attention colors and reject unknown semantic colors"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.attention-colors-unit-independent-mappings",
+          "file": "plugins/@dshfiles/thread-sidebar/src/attention-presentation.test.ts",
+          "testName": "uses independently configured colors for each attention status"
         },
         {
           "kind": "unit-test",

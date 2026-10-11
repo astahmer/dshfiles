@@ -55,14 +55,17 @@ import {
   parseSessionIds,
   sessionLineage,
   sectionForSession,
+  type AttentionColor,
+  type AttentionColorKey,
+  type AttentionColors,
   type SessionActivity,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowDensity,
   workspaceForLineage,
 } from './organization.js'
-import { attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
-import { toggleCollapsedSection } from './preferences.js'
+import { attentionColorDotClass, attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
+import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -101,11 +104,26 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
 
-const attentionPreferenceRows: readonly { key: AttentionDisplayPreferenceKey; label: ThreadAttentionLabel }[] = [
-  { key: 'approvalNeededDisplay', label: 'threadSidebarApprovalNeeded' },
-  { key: 'inputNeededDisplay', label: 'threadSidebarInputNeeded' },
-  { key: 'turnFinishedDisplay', label: 'threadSidebarTurnFinished' },
+const attentionPreferenceRows: readonly {
+  key: AttentionDisplayPreferenceKey
+  label: ThreadAttentionLabel
+  colorKey: AttentionColorKey
+}[] = [
+  { key: 'approvalNeededDisplay', label: 'threadSidebarApprovalNeeded', colorKey: 'approvalNeeded' },
+  { key: 'inputNeededDisplay', label: 'threadSidebarInputNeeded', colorKey: 'inputNeeded' },
+  { key: 'turnFinishedDisplay', label: 'threadSidebarTurnFinished', colorKey: 'turnFinished' },
 ]
+
+const attentionColorOptions: readonly AttentionColor[] = ['muted', 'primary', 'info', 'success', 'warning', 'danger']
+
+const attentionColorLabelKeys = {
+  muted: 'threadSidebarColorMuted',
+  primary: 'threadSidebarColorPrimary',
+  info: 'threadSidebarColorInfo',
+  success: 'threadSidebarColorSuccess',
+  warning: 'threadSidebarColorWarning',
+  danger: 'threadSidebarColorDanger',
+} satisfies Record<AttentionColor, Parameters<ThreadSidebarTranslate>[0]>
 
 const ALL_PROJECTS = '__all__'
 const UNASSIGNED_PROJECT = '__unassigned__'
@@ -184,6 +202,7 @@ interface RowStyle {
   readonly path: boolean
   readonly time: boolean
   readonly statusDot: boolean
+  readonly attentionColors: AttentionColors
   readonly maxChildren: number
 }
 
@@ -225,9 +244,10 @@ const StatusDot = (props: {
   readonly session: SessionSummary
   readonly unreadLabel: string
   readonly attentionLabel: ThreadAttentionLabel | undefined
+  readonly attentionColors: AttentionColors
 }): JSX.Element => {
   const unread = Boolean(props.session.attention?.unread)
-  const dotClass = attentionDotClass({ attentionLabel: props.attentionLabel, unread, running: props.session.running })
+  const dotClass = attentionDotClass({ attentionLabel: props.attentionLabel, attentionColors: props.attentionColors, unread, running: props.session.running })
   return (
     <span
       className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', dotClass)}
@@ -272,12 +292,19 @@ const ChildThreadList = (props: {
               title={new Date(child.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(child.id)}
             >
-              <StatusDot session={child} unreadLabel={t('threadSidebarUnread')} attentionLabel={attentionLabel} />
+              <StatusDot
+                session={child}
+                unreadLabel={t('threadSidebarUnread')}
+                attentionLabel={attentionLabel}
+                attentionColors={props.rowStyle.attentionColors}
+              />
               <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', child.attention?.unread && 'dshx:font-semibold')}>
                 {child.displayTitle}
               </span>
               {attentionLabel === undefined ? null : (
-                <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel))}>{t(attentionLabel)}</span>
+                <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel, props.rowStyle.attentionColors))}>
+                  {t(attentionLabel)}
+                </span>
               )}
               {props.rowStyle.time ? (
                 <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
@@ -331,7 +358,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             >
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} attentionLabel={props.attentionLabel} /> : null}
+                  {rowStyle.statusDot ? (
+                    <StatusDot
+                      session={session}
+                      unreadLabel={t('threadSidebarUnread')}
+                      attentionLabel={props.attentionLabel}
+                      attentionColors={rowStyle.attentionColors}
+                    />
+                  ) : null}
                   <span
                     className={cn(
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
@@ -345,7 +379,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <BellOffIcon className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" aria-label={t('threadSidebarNotificationsMuted')} />
                   ) : null}
                   {props.attentionLabel === undefined ? null : (
-                    <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel))}>
+                    <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel, rowStyle.attentionColors))}>
                       {t(props.attentionLabel)}
                     </span>
                   )}
@@ -416,7 +450,12 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         key={child.id}
                         className={cn(
                           'dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background',
-                          attentionDotClass({ attentionLabel, unread: Boolean(child.attention?.unread), running: child.running }),
+                          attentionDotClass({
+                            attentionLabel,
+                            attentionColors: rowStyle.attentionColors,
+                            unread: Boolean(child.attention?.unread),
+                            running: child.running,
+                          }),
                         )}
                       />
                     )
@@ -694,30 +733,64 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     updatePreferences(patch)
   }
 
-  const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel): JSX.Element => {
+  const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel, colorKey: AttentionColorKey): JSX.Element => {
     const mode = preferences[key]
     const modeLabel = mode === 'group' ? 'threadSidebarAttentionGroup' : 'threadSidebarAttentionLabel'
+    const color = preferences.attentionColors[colorKey]
+    const colorLabel = props.tSidebar(attentionColorLabelKeys[color])
     return (
-      <div key={key} className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2">
+      <div key={key} className="dshx:grid dshx:min-w-0 dshx:gap-1">
         <span className="dshx:min-w-0 dshx:truncate dshx:text-xs">{props.tSidebar(label)}</span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" className="dshx:shrink-0" aria-label={`${props.tSidebar(label)}: ${props.tSidebar(modeLabel)}`}>
-              {props.tSidebar(modeLabel)}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuRadioGroup
-              value={mode}
-              onValueChange={value => {
-                if (value === 'group' || value === 'label') changePreferences({ [key]: value })
-              }}
-            >
-              <DropdownMenuRadioItem value="group">{props.tSidebar('threadSidebarAttentionGroup')}</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="label">{props.tSidebar('threadSidebarAttentionLabel')}</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:flex-1" aria-label={`${props.tSidebar(label)}: ${props.tSidebar(modeLabel)}`}>
+                {props.tSidebar(modeLabel)}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup
+                value={mode}
+                onValueChange={value => {
+                  if (value === 'group' || value === 'label') changePreferences({ [key]: value })
+                }}
+              >
+                <DropdownMenuRadioItem value="group">{props.tSidebar('threadSidebarAttentionGroup')}</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="label">{props.tSidebar('threadSidebarAttentionLabel')}</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-1.5"
+                aria-label={`${props.tSidebar(label)}: ${props.tSidebar('threadSidebarAttentionColor')} ${colorLabel}`}
+              >
+                <span className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', attentionColorDotClass(color))} aria-hidden="true" />
+                <span className="dshx:truncate">{colorLabel}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={color}
+                onValueChange={value => {
+                  const checked = attentionColorSchema.safeParse(value)
+                  if (!checked.success) return
+                  changePreferences({ attentionColors: { ...preferences.attentionColors, [colorKey]: checked.data } })
+                }}
+              >
+                {attentionColorOptions.map(option => (
+                  <DropdownMenuRadioItem key={option} value={option}>
+                    <span className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', attentionColorDotClass(option))} aria-hidden="true" />
+                    {props.tSidebar(attentionColorLabelKeys[option])}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     )
   }
@@ -1050,9 +1123,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       path: preferences.threadRowPath,
       time: preferences.threadRowTime,
       statusDot: preferences.threadRowStatusDot,
+      attentionColors: preferences.attentionColors,
       maxChildren: preferences.maxChildren,
     }),
     [
+      preferences.attentionColors,
       preferences.maxChildren,
       preferences.threadRowDensity,
       preferences.threadRowMachine,
@@ -1166,7 +1241,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
     const lineage = sessionLineage(session, sessionState.byId)
     const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-    const childThreads = (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).filter(child => !attentionIds.has(child.id))
+    const childThreads = (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).filter(
+      child => !attentionIds.has(child.id) && (threadListView === 'all' || currentWorkingThreadIds.has(child.id)),
+    )
     const selectedChildId = childThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
     return (
@@ -1332,7 +1409,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             <fieldset className="dshx:grid dshx:min-w-0 dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
               <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentation')}</legend>
               <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentationHint')}</p>
-              <div className="dshx:grid dshx:gap-1.5">{attentionPreferenceRows.map(({ key, label }) => attentionDisplayRow(key, label))}</div>
+              <div className="dshx:grid dshx:gap-2.5">
+                {attentionPreferenceRows.map(({ key, label, colorKey }) => attentionDisplayRow(key, label, colorKey))}
+              </div>
               <Label className="dshx:font-normal dshx:leading-snug">
                 <Checkbox
                   checked={preferences.includeSubagentAttention}
@@ -1441,7 +1520,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarApprovalNeeded'))}>
+                <span
+                  className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarApprovalNeeded', preferences.attentionColors))}
+                >
                   {props.tSidebar('threadSidebarApprovalNeeded')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.approvalNeeded.length})</span>
@@ -1453,7 +1534,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           {groupedAttentionRows.inputNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInputNeeded')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarInputNeeded'))}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarInputNeeded', preferences.attentionColors))}>
                   {props.tSidebar('threadSidebarInputNeeded')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.inputNeeded.length})</span>
@@ -1465,7 +1546,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           {groupedAttentionRows.turnFinished.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarTurnFinished')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarTurnFinished'))}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarTurnFinished', preferences.attentionColors))}>
                   {props.tSidebar('threadSidebarTurnFinished')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.turnFinished.length})</span>
@@ -1509,7 +1590,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           groupedAttentionRows.turnFinished.length === 0 &&
           [...rowsBySection.values()].every(rows => rows.length === 0) ? (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
-              <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">{props.tSidebar('threadSidebarEmpty')}</EmptyTitle>
+              <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
+                {props.tSidebar('threadSidebarEmpty')}
+              </EmptyTitle>
             </Empty>
           ) : null}
         </div>

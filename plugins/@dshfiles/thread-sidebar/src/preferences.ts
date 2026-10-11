@@ -1,10 +1,11 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
-import { DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
 const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'inactive', 'archived'])
+export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
 const preferencesSchema = z
   .object({
@@ -42,6 +43,14 @@ const preferencesSchema = z
     approvalNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.approvalNeededDisplay),
     inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
     turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),
+    attentionColors: z
+      .object({
+        approvalNeeded: attentionColorSchema,
+        inputNeeded: attentionColorSchema,
+        turnFinished: attentionColorSchema,
+      })
+      .strict()
+      .default(DEFAULT_PREFERENCES.attentionColors),
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),

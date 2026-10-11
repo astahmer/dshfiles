@@ -11,6 +11,10 @@ export const SIDEBAR_ICON_ROW_THRESHOLD = 76
 export type NavigationDensity = 'compact' | 'comfortable'
 export type NavigationOverflow = 'scroll' | 'menu' | 'scroll-menu'
 export type AttentionDisplayMode = 'group' | 'label'
+export const ATTENTION_COLOR_OPTIONS = ['muted', 'primary', 'info', 'success', 'warning', 'danger'] as const
+export type AttentionColor = (typeof ATTENTION_COLOR_OPTIONS)[number]
+export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished'
+export type AttentionColors = Record<AttentionColorKey, AttentionColor>
 
 export interface SidebarPreferences {
   autoArchiveEnabled: boolean
@@ -49,6 +53,7 @@ export interface SidebarPreferences {
   approvalNeededDisplay: AttentionDisplayMode
   inputNeededDisplay: AttentionDisplayMode
   turnFinishedDisplay: AttentionDisplayMode
+  attentionColors: AttentionColors
   includeSubagentAttention: boolean
   applyActionsToChildThreads: boolean
   /** Child threads listed under a parent before the "N more…" line. */
@@ -94,6 +99,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',
+  attentionColors: { approvalNeeded: 'warning', inputNeeded: 'info', turnFinished: 'success' },
   includeSubagentAttention: false,
   applyActionsToChildThreads: true,
   maxChildren: 3,

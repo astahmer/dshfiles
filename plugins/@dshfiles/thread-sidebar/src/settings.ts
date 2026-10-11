@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { DEFAULT_PREFERENCES } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES } from './organization.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
 
@@ -45,6 +45,17 @@ export const threadSidebarSettings = defineSettings({
     turnFinishedDisplay: Schema.union(['group', 'label'] as const)
       .default(DEFAULT_PREFERENCES.turnFinishedDisplay)
       .description('Show completed turns in a separate attention group or as an inline thread-row label.'),
+    attentionColors: Schema.object({
+      approvalNeeded: Schema.union(ATTENTION_COLOR_OPTIONS).default(
+        DEFAULT_PREFERENCES.attentionColors.approvalNeeded,
+      ),
+      inputNeeded: Schema.union(ATTENTION_COLOR_OPTIONS).default(DEFAULT_PREFERENCES.attentionColors.inputNeeded),
+      turnFinished: Schema.union(ATTENTION_COLOR_OPTIONS).default(
+        DEFAULT_PREFERENCES.attentionColors.turnFinished,
+      ),
+    })
+      .default(DEFAULT_PREFERENCES.attentionColors)
+      .description('Semantic color used for each attention status dot and label.'),
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),

@@ -22,6 +22,12 @@ Feature: Thread sidebar journeys
     When auto-archive is enabled with a new idle threshold and scan interval
     Then the policy settings survive a browser reload
 
+  @scenario:thread-sidebar.attention-colors
+  Scenario: Attention status colors are configurable and saved
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When an attention status color is changed in Sidebar settings
+    Then the selected attention color survives a browser reload
+
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

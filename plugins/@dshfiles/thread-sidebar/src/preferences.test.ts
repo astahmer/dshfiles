@@ -58,6 +58,18 @@ test('Host settings values decode through the sidebar contract', () => {
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, headerRegionHeight: 200 })?.headerRegionHeight, 200)
 })
 
+test('older settings gain default attention colors and reject unknown semantic colors', () => {
+  const { attentionColors, ...older } = DEFAULT_PREFERENCES
+  assert.deepEqual(decodePreferences(older)?.attentionColors, attentionColors)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, attentionColors: { ...attentionColors, turnFinished: 'neon' } }), null)
+})
+
+test('attention colors migrate only when the Host still has defaults', () => {
+  const local = { ...DEFAULT_PREFERENCES, attentionColors: { ...DEFAULT_PREFERENCES.attentionColors, turnFinished: 'warning' as const } }
+  const host = { ...DEFAULT_PREFERENCES }
+  assert.deepEqual(preferencesToMigrate(local, host), { attentionColors: local.attentionColors })
+})
+
 test('a Host namespace from before the brand-logo setting keeps the logo shown', () => {
   const { hideBrandLogo, ...older } = DEFAULT_PREFERENCES
   assert.equal(hideBrandLogo, false)
