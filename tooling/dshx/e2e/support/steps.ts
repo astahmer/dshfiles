@@ -225,14 +225,16 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
-Given('the isolated plugin composition {string} and {string} is booted', async (
+Given('the isolated plugin composition {string} and {string} with external bundle {string} is booted', async (
   { page }: { page: Page },
   packageId: string,
   companionPackageId: string,
+  externalBundleId: string,
 ) => {
   const profile = await bootComposedPluginProfile({
     packageIds: [packageId, companionPackageId],
-    profileLabel: `${packageId}+${companionPackageId}`,
+    profileLabel: `${packageId}+${companionPackageId}+${externalBundleId}`,
+    additionalBundleIds: [externalBundleId],
   })
   await visitIsolatedPluginProfile(page, profile)
 })

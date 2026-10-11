@@ -26,7 +26,7 @@
         },
         {
           "key": "openFileLinks",
-          "defaultValue": true,
+          "defaultValue": "true",
           "constraints": "Boolean; applies live.",
           "coveredBy": [
             "editor.open-file-links-native-row"
