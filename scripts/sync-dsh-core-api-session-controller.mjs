@@ -61,13 +61,60 @@ try {
   for (const filename of ['package.json', 'tsconfig.json', 'tsconfig.host.json', 'tsconfig.client.json', 'tsdown.config.ts']) {
     await copyFile(join(localPackageRoot, filename), join(overlayPackageRoot, filename))
   }
+  // Keep temporary compiler metadata outside the generated package output.
+  for (const [filename, buildInfoName] of [
+    ['tsconfig.host.json', '.controller-host.tsbuildinfo'],
+    ['tsconfig.client.json', '.controller-client.tsbuildinfo'],
+  ]) {
+    const configPath = join(overlayPackageRoot, filename)
+    const config = await readJson(configPath)
+    await writeFile(configPath, JSON.stringify({
+      ...config,
+      compilerOptions: {
+        ...config.compilerOptions,
+        tsBuildInfoFile: join(overlayRoot, buildInfoName),
+      },
+    }))
+  }
+
+  const localSessionRoot = join(repositoryRoot, 'tooling/dsh-core/session')
+  const overlaySessionRoot = join(overlayRoot, 'packages/core/session')
+  await rm(join(overlaySessionRoot, 'src'), { recursive: true, force: true })
+  await cp(join(localSessionRoot, 'src'), join(overlaySessionRoot, 'src'), { recursive: true })
+  await copyFile(join(localSessionRoot, 'package.json'), join(overlaySessionRoot, 'package.json'))
+  await copyFile(join(dshSourceRoot, 'packages/core/session/tsconfig.json'), join(overlaySessionRoot, 'tsconfig.json'))
+  // Preserve the Controller's Cordis/Typert identity; only the local Zod dependency differs.
+  const overlaySessionNodeModules = join(overlaySessionRoot, 'node_modules')
+  await rm(overlaySessionNodeModules, { recursive: true, force: true })
+  await mkdir(overlaySessionNodeModules, { recursive: true })
+  await symlink(join(dshSourceRoot, 'packages/core/session/node_modules/@deepseek-ai'), join(overlaySessionNodeModules, '@deepseek-ai'), 'dir')
+  await symlink(join(dshSourceRoot, 'node_modules/@types'), join(overlaySessionNodeModules, '@types'), 'dir')
+  await symlink(join(repositoryRoot, 'node_modules/zod'), join(overlaySessionNodeModules, 'zod'), 'dir')
+  const overlayApiDeepseekModules = join(overlayPackageRoot, 'node_modules/@deepseek-ai')
+  await rm(join(overlayApiDeepseekModules, 'dsh-session'), { recursive: true, force: true })
+  await symlink(overlaySessionRoot, join(overlayApiDeepseekModules, 'dsh-session'), 'dir')
 
   const overlayAgentRoot = join(overlayRoot, 'packages/core/agent')
   await copyFile(join(repositoryRoot, 'tooling/dsh-core/agent/src/types.ts'), join(overlayAgentRoot, 'src/types.ts'))
+  const overlayAgentDeepseekModules = join(overlayAgentRoot, 'node_modules/@deepseek-ai')
+  await rm(join(overlayAgentDeepseekModules, 'dsh-session'), { recursive: true, force: true })
+  await symlink(overlaySessionRoot, join(overlayAgentDeepseekModules, 'dsh-session'), 'dir')
+  await rm(join(overlayApiDeepseekModules, 'dsh-agent'), { recursive: true, force: true })
+  await symlink(overlayAgentRoot, join(overlayApiDeepseekModules, 'dsh-agent'), 'dir')
+  const agentProjectConfig = await readJson(join(overlayAgentRoot, 'tsconfig.json'))
+  const agentTypesConfig = join(overlayAgentRoot, 'tsconfig.dshfiles-types.json')
+  await writeFile(agentTypesConfig, JSON.stringify({
+    extends: './tsconfig.json',
+    files: ['src/types.ts'],
+    include: [],
+    references: agentProjectConfig.references,
+    compilerOptions: { emitDeclarationOnly: true },
+  }))
 
   const typescript = join(dshSourceRoot, 'node_modules/typescript/bin/tsc')
   const tsdown = join(dshSourceRoot, 'node_modules/.bin/tsdown')
-  run(process.execPath, [typescript, '--project', join(overlayAgentRoot, 'tsconfig.json'), '--emitDeclarationOnly'], overlayRoot)
+  run(process.execPath, [typescript, '--project', join(overlaySessionRoot, 'tsconfig.json'), '--pretty', 'false'], overlayRoot)
+  run(process.execPath, [typescript, '--project', agentTypesConfig, '--pretty', 'false'], overlayRoot)
   run(process.execPath, [typescript, '--project', join(overlayPackageRoot, 'tsconfig.host.json')], overlayRoot)
 
   const generatorModule = await import('@deepseek-ai/dsh-typert-generator')
