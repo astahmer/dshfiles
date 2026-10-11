@@ -26,8 +26,10 @@ const startBlankThread = async (page: Page): Promise<string> => {
   const createResponse = await createResponsePromise
   const body: unknown = await createResponse.json()
   const rpcResult = typeof body === 'object' && body !== null && 'result' in body ? body.result : undefined
-  const result = typeof rpcResult === 'object' && rpcResult !== null && 'ok' in rpcResult && rpcResult.ok === true && 'value' in rpcResult ? rpcResult.value : undefined
-  const createdThreadId = typeof result === 'object' && result !== null && 'sessionId' in result && typeof result.sessionId === 'string' ? result.sessionId : null
+  const result =
+    typeof rpcResult === 'object' && rpcResult !== null && 'ok' in rpcResult && rpcResult.ok === true && 'value' in rpcResult ? rpcResult.value : undefined
+  const createdThreadId =
+    typeof result === 'object' && result !== null && 'sessionId' in result && typeof result.sessionId === 'string' ? result.sessionId : null
   if (createdThreadId === null) throw new Error('The Host did not return a session ID after New thread was clicked.')
   await expect.poll(() => currentThreadId(page)).toBe(createdThreadId)
   await expect(page.getByRole('textbox').first()).toBeVisible()
@@ -55,12 +57,16 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
   await page.getByRole('textbox').first().press('Enter')
   const archivedThreadId = currentThreadId(page)
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
   await expect(targetRow).toHaveCount(1)
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
+  const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
+  const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
+  expect(scrollPaneTopAfterArchive).toBe(scrollPaneTopBeforeArchive)
   const archivedSection = threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })
   await expect(archivedSection).toBeVisible()
   await archivedSection.click()

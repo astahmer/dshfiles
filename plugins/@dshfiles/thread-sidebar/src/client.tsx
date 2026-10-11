@@ -1625,10 +1625,29 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     sessions,
   ])
 
+  const isTransientNotice =
+    notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))
+  const noticeAlert =
+    notice === null ? null : (
+      <Alert
+        variant={notice.tone === 'danger' ? 'destructive' : notice.tone}
+        className={cn(noticeClass, isTransientNotice && 'dshx:pointer-events-auto dshx:max-w-full dshx:shadow-lg')}
+      >
+        <div className="dshx:flex dshx:items-center dshx:gap-2">
+          <SidebarNoticeMessage message={notice.message} />
+          {notice.actionLabel !== undefined && notice.onAction !== undefined ? (
+            <Button size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-xs" onClick={notice.onAction}>
+              {notice.actionLabel}
+            </Button>
+          ) : null}
+        </div>
+      </Alert>
+    )
+
   return (
     <TooltipProvider delayDuration={500}>
       <section
-        className="dshx-root dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
+        className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
         aria-label={props.tSidebar('threadSidebarTitle')}
       >
         <header className="dshx:px-2 dshx:py-1">
@@ -1885,20 +1904,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           </section>
         ) : null}
 
-        {notice !== null || storageWarning || threadViewStorageWarning ? (
+        {isTransientNotice && noticeAlert !== null ? (
+          <div className="dshx:pointer-events-none dshx:absolute dshx:inset-x-2 dshx:bottom-3 dshx:z-20 dshx:flex dshx:justify-center">
+            {noticeAlert}
+          </div>
+        ) : null}
+        {(notice !== null && !isTransientNotice) || storageWarning || threadViewStorageWarning ? (
           <div className="dshx:grid dshx:gap-2 dshx:px-2 dshx:pb-2">
-            {notice !== null ? (
-              <Alert variant={notice.tone === 'danger' ? 'destructive' : notice.tone} className={noticeClass}>
-                <div className="dshx:flex dshx:items-center dshx:gap-2">
-                  <SidebarNoticeMessage message={notice.message} />
-                  {notice.actionLabel !== undefined && notice.onAction !== undefined ? (
-                    <Button size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-xs" onClick={notice.onAction}>
-                      {notice.actionLabel}
-                    </Button>
-                  ) : null}
-                </div>
-              </Alert>
-            ) : null}
+            {notice !== null && !isTransientNotice ? noticeAlert : null}
             {storageWarning || threadViewStorageWarning ? (
               <Alert variant="warning" className={noticeClass}>
                 <SidebarNoticeMessage message={props.tSidebar('threadSidebarStorageFailure')} />
@@ -1907,7 +1920,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           </div>
         ) : null}
 
-        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-2 dshx:pb-3">
+        <div data-testid="thread-sidebar-scroll" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-2 dshx:pb-3">
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
               <Spinner />
