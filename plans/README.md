@@ -8,12 +8,15 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 |---|---|
 | Agent Communication | [Implementation plan](agent-communication-observability.md); [acceptance tracker](agent-communication-observability/README.md). Remaining scratch/browser acceptance. |
 | [Agent session history](agent-session-history.md) | Discovery and design proposal; no implementation claim. |
+| [Agent session observability](agent-session-observability/README.md) | Read-only cross-session visibility; scoped directory and workspace lookup landed, task/history access and all Session writes pending. |
 | [Async Agent questions](async-agent-questions.md) | Native/root acceptance and unresolved Host boundaries beyond the implemented plugin contract. |
 | [AI Accounts: Claude and Cursor](claude-cursor-accounts.md) | Provider runtime and real-account acceptance gates. |
 | [Command Palette](command-palette/README.md) | Remaining composed UI/style and profile acceptance. |
 | [Queue attachment editing](queue-attachment-editing.md) | Proposed Host-level attachment-preserving edit; not established by the current workaround. |
 | [Command Code route](own-commandcode-route.md) | Remaining provider route and third-party removal gates. |
 | [Session handoff](session-handoff.md) | Open coordinator items without another owning plan (restart prerequisites, follow-ups). |
+| [Settings Search native Editor owner](settings-search-native-owner/README.md) | Native `openFileLinks` owner route for the Editor setting; needs the newer core client contract and a scratch-runtime proof before promotion. |
+| [Workspace folder picker](workspace-folder-picker/README.md) | Add-Workspace in-app folder browser; hybrid Host capability in progress, isolated journeys and promotion pending. |
 | [Plugin boot integrity](plugin-boot-integrity.md) | Cross-plugin profile composition and runtime acceptance. |
 
 ## Cross-plugin, toolchain, and product research
@@ -34,4 +37,4 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 
 ## Index maintenance
 
-Keep this index limited to active plans. When a plan completes, migrate durable behavior, decisions, and evidence into the owning docs, update links, then remove the plan and its resume-only notes. Do not treat historical receipts as fresh verification.
+Keep this index limited to active plans. When a plan completes, migrate durable behavior, decisions, and evidence into the owning docs, update links, then remove the plan and its resume-only notes — in the same revision that lands the work. Deferred items that outlive the plan move to [session-handoff.md](session-handoff.md) rather than staying behind. Do not treat historical receipts as fresh verification.

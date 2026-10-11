@@ -26,6 +26,9 @@ delete this file when empty.
 - [ ] Repo `pnpm lint` / `fmt:check` leftovers outside touched files.
 - [ ] ADE leftovers and dock-everything/workbench panel kinds — [ade/README.md](ade/README.md), [ade/docking.md](ade/docking.md).
 - [ ] Delete `plugins/@dshfiles/plugin-marketplace` after `nixapply` + restart; delete `~/.dsh/profiles/scratch-jj`.
+- [ ] Host persisted-read concurrency for thread-content search: the installed provider still reads cold persisted
+  logs serially. The source patch sets `persistedReadConcurrency: 4` in the canonical Host/provider checkout (not
+  this repository), so live search keeps the old concurrency until that core change ships.
 - [ ] Web promotion is deliberately incomplete (decided 2026-10-11): 22 of 30 owned dirs are composed. Missing real
   bundles: `model-effort-picker`, `cursor-agent` (Cursor ACP driver), `dsh-core-runtime` (opt-in core replacement —
   intentional default). The other five are libraries pulled in transitively (`plugin-ui`, `optmem-core`,

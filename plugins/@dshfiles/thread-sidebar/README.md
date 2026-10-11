@@ -48,6 +48,20 @@ Right-click or hold either arrow, or click the ▾ beside them, for the recent
 history menu (newest first, current entry marked); picking an entry jumps there
 and keeps the rest for Back and Forward.
 
+**Saved views.** The view row above the thread list is backed by validated view
+presets (`src/thread-view-preferences.ts`): each preset carries a name, order,
+and the grouping/status/source filters it applies. Stored v1 view preferences
+migrate into that preset list once. **Customize views** opens
+`src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
+selected, and removed; the row's quick controls apply the selected preset
+without opening the manager.
+
+**Archive undo notice.** Archiving reports itself as a compact overlay anchored
+to the sidebar (`data-testid="thread-sidebar-transient-notice"`), so the thread
+list does not move, and the notice offers an immediate undo before it disappears.
+Persistent warnings — storage failures and restart requests — stay in the list
+flow instead.
+
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,
 project, path, and ID prefix, recent threads when the query is empty,
