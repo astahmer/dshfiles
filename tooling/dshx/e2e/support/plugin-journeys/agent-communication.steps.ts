@@ -24,7 +24,8 @@ Then('diagnostics show the connected Host and truthful empty history', async ({ 
   await page.getByRole('tab', { name: 'Subscriptions', exact: true }).click()
   await recordAssertion(page, 'communication-subscription-list-empty-state', async () => {
     await expect(page.getByText('No subscriptions.', { exact: true })).toBeVisible()
-    await expect(page.getByText('No live Agents.', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^session-[0-9a-f-]{36}$/)).toBeVisible()
+    await expect(page.getByText(/^Workspace topic: workspace\/[a-f0-9]{24}$/)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

@@ -4,7 +4,7 @@ import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { prepareBootProfile, prepareComposedBootProfile, type BootProfileBundle, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
+import { prepareComposedBootProfile, type BootProfileBundle, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
@@ -14,10 +14,18 @@ const workspaceRoot = resolve(toolingRoot, '..')
 const pluginsRoot = join(workspaceRoot, 'plugins/@dshfiles')
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
 const PackageManifest = z.object({ name: z.string().min(1), dsh: z.unknown().optional() }).passthrough()
-const DshManifest = z.object({ client: z.record(z.string(), z.unknown()).optional() }).passthrough()
+const DshManifest = z
+  .object({
+    client: z
+      .object({ external: z.array(z.string()).default([]) })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough()
 
 export interface LocalBootBundle extends BootProfileBundle {
   readonly hasClient: boolean
+  readonly clientExternalPackages: readonly string[]
 }
 
 export interface BootedProfile {
@@ -52,9 +60,36 @@ export const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
     const manifest = PackageManifest.parse(rawManifest)
     if (manifest.dsh === undefined) continue
     const dsh = DshManifest.parse(manifest.dsh)
-    bundles.push({ projectRoot, packageId: manifest.name, hasClient: dsh.client !== undefined })
+    bundles.push({
+      projectRoot,
+      packageId: manifest.name,
+      hasClient: dsh.client !== undefined,
+      clientExternalPackages: dsh.client?.external ?? [],
+    })
   }
   return bundles.sort((first, second) => first.packageId.localeCompare(second.packageId))
+}
+
+const resolveLocalBundleDependencies = (target: LocalBootBundle, available: readonly LocalBootBundle[]): [LocalBootBundle, ...LocalBootBundle[]] => {
+  const ordered: LocalBootBundle[] = []
+  const visited = new Set<string>()
+  const visiting = new Set<string>()
+  const visit = (bundle: LocalBootBundle): void => {
+    if (visited.has(bundle.packageId)) return
+    if (visiting.has(bundle.packageId)) throw new Error(`Local client bundle dependency cycle includes ${bundle.packageId}.`)
+    visiting.add(bundle.packageId)
+    for (const packageId of bundle.clientExternalPackages) {
+      const dependency = available.find(candidate => candidate.packageId === packageId)
+      if (dependency !== undefined) visit(dependency)
+    }
+    visiting.delete(bundle.packageId)
+    visited.add(bundle.packageId)
+    ordered.push(bundle)
+  }
+  visit(target)
+  const [firstBundle, ...remainingBundles] = ordered
+  if (firstBundle === undefined) throw new Error(`Local client bundle ${target.packageId} could not be resolved.`)
+  return [firstBundle, ...remainingBundles]
 }
 
 export const buildPlugin = async (projectRoot: string, packageId: string): Promise<void> => {
@@ -220,10 +255,12 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
 }
 
 export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> => {
-  const bundle = (await listLocalBootBundles()).find(candidate => candidate.packageId === packageId)
+  const availableBundles = await listLocalBootBundles()
+  const bundle = availableBundles.find(candidate => candidate.packageId === packageId)
   if (bundle === undefined) throw new Error(`Owned plugin bundle ${packageId} was not found.`)
-  await buildPlugin(bundle.projectRoot, bundle.packageId)
-  const prepared = await prepareBootProfile(bundle.projectRoot, bundle.packageId)
+  const profileBundles = resolveLocalBundleDependencies(bundle, availableBundles)
+  for (const profileBundle of profileBundles) await buildPlugin(profileBundle.projectRoot, profileBundle.packageId)
+  const prepared = await prepareComposedBootProfile(profileBundles)
   const expectedClientEntries = bundle.hasClient ? [bundle.packageId] : []
   try {
     return await startScratchProfile(prepared, bundle.packageId, expectedClientEntries, timeoutMs)
