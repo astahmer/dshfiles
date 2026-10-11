@@ -531,6 +531,57 @@
       ]
     },
     {
+      "id": "session-header-actions",
+      "title": "Manage threads from the session header",
+      "summary": "Expose pin, park, snooze, archive, and restore actions beside the conversation header and honor child-thread action preferences.",
+      "surfaces": ["client", "host", "storage", "integration"],
+      "configuration": [],
+      "states": ["active", "pinned", "parked", "snoozed", "archived"],
+      "failureModes": [
+        "Blank sessions have no header actions.",
+        "Running sessions cannot be parked or archived.",
+        "Failed Host mutations are reported in the menu."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.session-header-actions",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-pin-and-park",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "pins and parks a thread from the header menu"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-snooze",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "snoozes the current thread notifications"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-restore-and-blank",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "offers restore for archived threads and omits controls for blank ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-running-state",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "disables park and archive while a thread is running"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-action-failure",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "reports failed Host mutations in the reopened menu"
+        }
+      ]
+    },
+    {
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
       "summary": "Detect pending host-side plugin updates and ask for explicit confirmation before handing off a restart when the supervisor supports it.",

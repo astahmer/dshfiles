@@ -28,6 +28,12 @@ Feature: Thread sidebar journeys
     And the Active section is folded and reopened
     Then the sidebar keeps the blank session out of classified thread rows
 
+  @scenario:thread-sidebar.session-header-actions
+  Scenario: Pin a thread from its session header menu
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is pinned from its session header menu
+    Then the thread stays pinned after reload
+
   @scenario:thread-sidebar.idle-archive
   Scenario: Auto-archive stays opt-in and saves its schedule
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

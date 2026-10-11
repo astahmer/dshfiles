@@ -158,6 +158,34 @@ Then('the Host thread stays parked after reload without an attention error', asy
   await finishJourneyAssertions(page)
 })
 
+When('a nonblank Host thread is pinned from its session header menu', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar header pin e2e target'
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await page.getByRole('button', { name: 'Thread actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Pin', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
+})
+
+Then('the thread stays pinned after reload', async ({ page }: { page: Page }) => {
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar header pin e2e target' })
+  await recordAssertion(page, 'thread-sidebar-session-header-pin-succeeds', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
+    await expect(targetRow).toHaveCount(1)
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-session-header-pin-survives-reload', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
+    await expect(targetRow).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the Active section is folded and reopened', async ({ page }: { page: Page }) => {
   const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')

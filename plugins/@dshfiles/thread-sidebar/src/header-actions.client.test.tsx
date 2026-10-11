@@ -17,12 +17,14 @@ const labels: Readonly<Record<string, string>> = {
   threadSidebarUnmute: 'Turn notifications back on', threadSidebarActionFailure: 'Could not update thread',
 }
 
-const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean }) => {
+const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean }) => {
   const session = {
     id: 's1', title: 'Thread', displayTitle: 'Thread', cwd: '/workspace', updatedAt: 1,
     running: options?.running ?? false, blank: options?.blank ?? false,
   }
-  const pinSession = vi.fn(async () => {})
+  const pinSession = vi.fn(async () => {
+    if (options?.failPin === true) throw new Error('pin failed')
+  })
   const props = {
     sessionId: 's1',
     useSessions: <Value,>(select: (state: unknown) => Value) => select({ ids: ['s1'], byId: { s1: session } }),
@@ -32,8 +34,12 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     archiveSession: vi.fn(async () => {}), unarchiveSession: vi.fn(async () => {}), pinSession,
     unpinSession: vi.fn(async () => {}), t: (key: string) => labels[key] ?? key,
   }
-  const view = render(<SidebarStateProvider><HeaderThreadActions {...(props as never)} /></SidebarStateProvider>)
-  return { ...view, props }
+  const view = render(
+    <SidebarStateProvider>
+      <HeaderThreadActions {...(props as Parameters<typeof HeaderThreadActions>[0])} />
+    </SidebarStateProvider>,
+  )
+  return { ...view, pinSession }
 }
 
 const openMenu = (): void => {
@@ -55,7 +61,7 @@ describe('HeaderThreadActions', () => {
     const header = mount()
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
-    expect(header.props.pinSession).toHaveBeenCalledWith('s1')
+    expect(header.pinSession).toHaveBeenCalledWith('s1')
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }))
     expect(localStorage.getItem(PREFERENCES_STORAGE_KEY)).not.toBeNull()
@@ -84,5 +90,14 @@ describe('HeaderThreadActions', () => {
     openMenu()
     expect(screen.getByRole('menuitem', { name: 'Park' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.getByRole('menuitem', { name: 'Archive' }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('reports failed Host mutations in the reopened menu', async () => {
+    const header = mount({ failPin: true })
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin' }))
+    await vi.waitFor(() => expect(header.pinSession).toHaveBeenCalledOnce())
+    openMenu()
+    expect((await screen.findByRole('alert')).textContent).toBe('Could not update thread')
   })
 })
