@@ -539,12 +539,6 @@
           "id": "thread-sidebar.thread-children-and-links-unit-sanitized-thread-link",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-url.test.ts",
           "testName": "copied thread links retain the app path and omit transient credentials and fragments"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.thread-children-and-links-unit-thread-mention-token",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread mentions are inserted as a token followed by one space"
         }
       ]
     },
@@ -583,6 +577,60 @@
           "id": "thread-sidebar.pending-host-restart-unit-host-vs-client-restart-detection",
           "file": "plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts",
           "testName": "only Host code or manifest changes since boot need a restart, not client rebuilds or identical rebuilds"
+        }
+      ]
+    },
+    {
+      "id": "thread-reference-mention",
+      "title": "Insert cross-session references into the composer",
+      "summary": "Resolve a target Host session and insert its native reference chip at the active composer’s captured selection.",
+      "surfaces": [
+        "client",
+        "host",
+        "integration"
+      ],
+      "configuration": [],
+      "states": [
+        "captured",
+        "resolving",
+        "inserted",
+        "unavailable",
+        "failed"
+      ],
+      "failureModes": [
+        "Unresolvable targets and canceled requests never change the draft.",
+        "Error diagnostics expose only bounded, non-sensitive fields."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.mention-insertion",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-native-reference-presentation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread reference keeps the native session mention and title presentation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-request-decode",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread mention requests decode only a non-empty session id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-safe-diagnostics",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread mention failure diagnostics expose only safe identity fields"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-classified-diagnostics",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread mention classifies Remote preflight errors without logging their messages"
         }
       ]
     }
