@@ -12,15 +12,6 @@
   name: "@deepseek-ai/dsh-client-ui-settings-general"
   config:
     welcomeNoticeVersion: 2026-09-28.1
-- id: llm-commandcode
-  name: "@mars-sea/dsh-commandcode-provider"
-  config:
-    apiKeyEnv: COMMANDCODE_API_KEY
-    visibleModels:
-      - stealth/space-bunny-alpha
-      - gpt-6-luna
-    modelVisibility: {}
-    showSidebarQuota: true
 - id: agent-default-model
   name: "@deepseek-ai/dsh-agent-default-model"
   config:

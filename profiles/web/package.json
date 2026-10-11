@@ -23,7 +23,6 @@
     "@dshfiles/sidebar-commands": "link:../../../dev/dshfiles/plugins/@dshfiles/sidebar-commands",
     "@dshfiles/thread-sidebar": "link:../../../dev/dshfiles/plugins/@dshfiles/thread-sidebar",
     "@dshfiles/workbench": "link:../../../dev/dshfiles/plugins/@dshfiles/workbench",
-    "@mars-sea/dsh-commandcode-provider": "0.12.3",
     "dsh-our-free-model": "github:Ebony-Vinyl/dsh-our-free-model#e9695299b549e851214e359b27cfb90da3cf6e95",
     "dshmarket": "^1.66.14"
   },
@@ -34,7 +33,6 @@
         "@deepseek-ai/dsh-web-app",
         "dshmarket",
         "dsh-our-free-model",
-        "@mars-sea/dsh-commandcode-provider",
         "@dshfiles/queue-reorder",
         "@dshfiles/shortcuts",
         "@dshfiles/jujutsu",
