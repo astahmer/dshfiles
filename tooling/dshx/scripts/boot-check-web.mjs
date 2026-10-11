@@ -11,8 +11,9 @@ import { listPluginBundles, pluginsToBoot, readBootIgnores, validateBootIgnores 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const pluginsRoot = resolve(workspace, 'plugins/@dshfiles')
 const dshxDist = resolve(workspace, 'tooling/dshx/packages/dshx/dist')
-const { prepareBootProfile } = await import(resolve(dshxDist, 'project/boot-profile.js'))
+const { prepareBootProfile, prepareComposedBootProfile } = await import(resolve(dshxDist, 'project/boot-profile.js'))
 const { checkClientBoot } = await import(resolve(dshxDist, 'project/client-boot-check.js'))
+const sourceProfileRoot = resolve(workspace, 'profiles/web')
 
 const pinnedNode = async () => {
   const pinned = (await readFile(resolve(workspace, '.node-version'), 'utf8')).trim()
@@ -56,7 +57,6 @@ const buildPlugin = plugin =>
   })
 
 const bootAlone = async plugin => {
-  await buildPlugin(plugin)
   const profile = await prepareBootProfile(plugin.dir, plugin.id)
   try {
     return await checkClientBoot({
@@ -73,7 +73,27 @@ const bootAlone = async plugin => {
   }
 }
 
-const describe = result => {
+const bootComposed = async (plugins, ignoredIds) => {
+  const profile = await prepareComposedBootProfile(
+    plugins.map(plugin => ({ projectRoot: plugin.dir, packageId: plugin.id })),
+    { sourceProfileRoot, includeSourceProfileBundles: true },
+  )
+  try {
+    return await checkClientBoot({
+      projectRoot: workspace,
+      profile: profile.profile,
+      port: 0,
+      dshHome: profile.homeRoot,
+      profileRoot: profile.profileRoot,
+      expectedBundles: profile.expectedBundles,
+      expectedClientEntries: plugins.filter(plugin => plugin.hasClient && !ignoredIds.has(plugin.id)).map(plugin => plugin.id),
+    })
+  } finally {
+    await profile.dispose()
+  }
+}
+
+const describe = (result, ignoredIds = new Set()) => {
   if (result.spawnError !== undefined) return result.spawnError.split('\n')[0]
   if (result.processError !== undefined) return result.processError.split('\n')[0]
   if (result.browserError !== undefined) return result.browserError.split('\n').filter(Boolean).slice(-6).join(' | ')
@@ -88,8 +108,13 @@ const describe = result => {
   if (result.slotFailures.length > 0) {
     return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}, so those panels are blank even though every entry activated`
   }
-  if (result.failures.length > 0) return result.failures.map(entry => `${entry.id} (${entry.state})`).join(', ')
-  if (!result.ok) return 'the Web UI did not mount cleanly'
+  const failures = result.failures.filter(entry => !ignoredIds.has(entry.id))
+  if (failures.length > 0) return failures.map(entry => `${entry.id} (${entry.state})`).join(', ')
+  if (result.readinessError !== undefined) return result.readinessError.split('\n')[0]
+  if (result.timedOut) return 'the Web UI did not become ready before the timeout'
+  if (!result.browserReady) return 'the Web UI did not become ready'
+  const onlyIgnoredFailures = result.failures.length > 0 && failures.length === 0
+  if (!result.ok && !onlyIgnoredFailures) return 'the Web UI did not mount cleanly'
   return undefined
 }
 
@@ -100,12 +125,33 @@ const main = async () => {
   const ignores = await readBootIgnores(resolve(workspace, 'tooling/dshx/scripts/boot-ignore.json'))
   const ignoredIds = validateBootIgnores(ignores, plugins)
   const runnable = pluginsToBoot(plugins, ignoredIds)
+  const profileManifest = JSON.parse(await readFile(resolve(sourceProfileRoot, 'package.json'), 'utf8'))
+  const profilePluginIds = profileManifest.dsh.profile.bundles.filter(packageId => packageId.startsWith('@dshfiles/'))
+  const pluginById = new Map(plugins.map(plugin => [plugin.id, plugin]))
+  const profilePlugins = profilePluginIds.map(packageId => {
+    const plugin = pluginById.get(packageId)
+    if (plugin === undefined) throw new Error(`Web profile bundle ${packageId} has no source plugin directory.`)
+    return plugin
+  })
   for (const ignore of ignores) {
-    console.log(`  skip ${ignore.packageId}: ${ignore.reason} (owner: ${ignore.owner}; remove when: ${ignore.removalCondition}${ignore.expiresOn === undefined ? '' : `; expires: ${ignore.expiresOn}`})`)
+    console.log(
+      `  skip ${ignore.packageId}: ${ignore.reason} (owner: ${ignore.owner}; remove when: ${ignore.removalCondition}${ignore.expiresOn === undefined ? '' : `; expires: ${ignore.expiresOn}`})`,
+    )
   }
   if (runnable.length === 0) throw new Error('Every DSH bundle is ignored; boot gate must test at least one plugin.')
   const failures = []
+  const buildFailures = new Set()
+  for (const plugin of plugins) {
+    try {
+      await buildPlugin(plugin)
+    } catch (error) {
+      buildFailures.add(plugin.id)
+      failures.push(`${plugin.id}: build failed: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`)
+    }
+  }
+
   for (const plugin of runnable) {
+    if (buildFailures.has(plugin.id)) continue
     const result = await bootAlone(plugin).catch(error => ({
       ok: false,
       failures: [],
@@ -117,11 +163,29 @@ const main = async () => {
     if (problem === undefined) console.log(`  ok  ${plugin.id}`)
     else failures.push(`${plugin.id}: ${problem}`)
   }
+  if (buildFailures.size === 0) {
+    const result = await bootComposed(profilePlugins, ignoredIds).catch(error => ({
+      ok: false,
+      failures: [],
+      slotFailures: [],
+      compositionFailures: [],
+      browserError: error instanceof Error ? error.message : String(error),
+    }))
+    const problem = describe(result, ignoredIds)
+    if (problem === undefined) console.log(`  ok  full web profile (${String(profilePlugins.length)} local bundles)`)
+    else failures.push(`full web profile: ${problem}`)
+  } else {
+    failures.push('full web profile: composition smoke skipped because one or more bundles failed to build')
+  }
   if (failures.length === 0) {
-    console.log(`\nAll ${String(runnable.length)} of ${String(plugins.length)} discovered plugins booted on their own${ignoredIds.size === 0 ? '' : `; ${String(ignoredIds.size)} ignored with documented removal conditions`}.`)
+    console.log(
+      `\nAll ${String(runnable.length)} of ${String(plugins.length)} discovered plugins booted alone; full web profile composition booted clean${ignoredIds.size === 0 ? '' : `; ${String(ignoredIds.size)} ignored with documented removal conditions`}.`,
+    )
     return
   }
-  console.error(`\n${String(failures.length)} of ${String(runnable.length)} tested plugins did not boot cleanly (${String(plugins.length)} discovered, ${String(ignoredIds.size)} ignored):`)
+  console.error(
+    `\n${String(failures.length)} of ${String(runnable.length)} tested plugins did not boot cleanly (${String(plugins.length)} discovered, ${String(ignoredIds.size)} ignored):`,
+  )
   for (const failure of failures) console.error(`  - ${failure}`)
   process.exitCode = 1
 }

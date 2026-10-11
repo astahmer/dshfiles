@@ -107,9 +107,9 @@ frameworks doubles that cost for no extra coverage.
 - `dshx check --boot` proves the server half loads. Adding `--runtime` extends it
   with the browser pass, which asserts no client entry is `failed`.
 - `scripts/smoke-dsh.mjs` proves a scaffolded plugin works against a pinned DSH.
-- The new profile smoke proves _this repo's_ profile — the real
-  `~/.dsh/profiles/web` composition — boots clean, which is the check that would
-  have caught both defects on the day they shipped.
+- The full profile smoke composes the checked-in `profiles/web` seed in a
+  scratch DSH home, so it validates this repo's bundle graph without touching
+  the active profile.
 
 ### Tech choices
 
@@ -341,8 +341,10 @@ test — is still worth proposing upstream as a documented
    output with unit tests over real card text.
 3. Add the boot smoke: boot a profile on a reserved port, open it, assert no
    entry is `failed`. Wire it into `smoke-dsh.mjs` for the scaffolded plugin.
-4. Add the profile smoke: boot the repo's actual `web` profile and assert the same.
-   This is the check that would have caught both original defects.
+4. ~~Add the profile smoke.~~ Implemented in `test:boot`: preserve every bundle
+   from the checked-in `profiles/web` seed, link all local source bundles, and
+   assert the composed profile in a real browser. A static provider contract
+   also requires each `@dshfiles/*` external to be a local dependency and bundle.
 5. ~~Adopt `@playwright/test` with Gherkin for journeys.~~ Done:
    `e2e/features/client-boot.feature` compiles to Playwright specs via
    `bddgen`, with `e2e/support/steps.ts` the only file that knows the boot
@@ -377,6 +379,7 @@ test — is still worth proposing upstream as a documented
 - [ ] The boot smoke passes on a healthy profile.
 - [ ] The boot smoke treats `pending` on `sessions` or `remote.*` as a pass.
 - [ ] The repo's `web` profile boots clean under the profile smoke.
+- [x] Local external providers are present as linked profile dependencies and bundle rows.
 - [ ] A fresh clone reaches the browser tests without a manual browser install.
 - [ ] Both original defects are covered: the missing `slots` service by the static
       check, the locale collision by the type-level refusal and the boot smoke.

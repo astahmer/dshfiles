@@ -121,12 +121,18 @@ const installProfile = async (profileRoot: string, homeRoot: string, expectedPac
   }
 }
 
+interface PrepareBootProfilesOptions {
+  readonly additionalBundleIds?: readonly string[]
+  readonly sourceProfileRoot?: string
+  readonly includeSourceProfileBundles?: boolean
+}
+
 const prepareBootProfiles = async (
   localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]],
-  additionalBundleIds: readonly string[] = [],
+  options: PrepareBootProfilesOptions = {},
 ): Promise<PreparedBootProfile> => {
   const sourceHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-  const sourceProfileRoot = join(sourceHome, 'profiles', 'web')
+  const sourceProfileRoot = options.sourceProfileRoot ?? join(sourceHome, 'profiles', 'web')
   const sourceManifest = ProfilePackage.parse(JSON.parse(await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
   const pnpmWorkspace = await readFile(join(sourceProfileRoot, 'pnpm-workspace.yaml'))
   const workspaceManifest = WorkspacePackage.parse(JSON.parse(await readFile(join(WORKSPACE_ROOT, 'tooling/dshx/package.json'), 'utf8')))
@@ -144,6 +150,7 @@ const prepareBootProfiles = async (
 
   const [firstBundle, ...remainingBundles] = localBundles
   const packageIds: [string, ...string[]] = [firstBundle.packageId, ...remainingBundles.map(bundle => bundle.packageId)]
+  const additionalBundleIds = options.additionalBundleIds ?? []
   const expectedBundles: [string, ...string[]] = [packageIds[0], ...packageIds.slice(1), ...additionalBundleIds]
   if (new Set(expectedBundles).size !== expectedBundles.length) throw new Error('A scratch profile cannot contain duplicate bundle ids.')
 
@@ -153,7 +160,18 @@ const prepareBootProfiles = async (
   try {
     await mkdir(profileRoot, { recursive: true })
     const dependencies = Object.fromEntries(Object.entries(sourceManifest.dependencies).filter(([name]) => !name.startsWith('@dshfiles/')))
-    const bundles = [...new Set([...BASE_BUNDLES, ...expectedBundles])]
+    const localPackageIds = new Set(packageIds)
+    const profileBundles = sourceManifest.dsh.profile.bundles.filter(bundleId => bundleId.startsWith('@dshfiles/'))
+    if (options.includeSourceProfileBundles === true) {
+      const missingLocalBundles = profileBundles.filter(bundleId => !localPackageIds.has(bundleId))
+      if (missingLocalBundles.length > 0) {
+        throw new Error(`The composed web boot is missing source bundles: ${missingLocalBundles.join(', ')}.`)
+      }
+    }
+    const bundles =
+      options.includeSourceProfileBundles === true
+        ? [...new Set(sourceManifest.dsh.profile.bundles)]
+        : [...new Set([...BASE_BUNDLES, ...expectedBundles])]
     for (const bundle of localBundles) dependencies[bundle.packageId] = `link:${resolve(bundle.projectRoot)}`
     const manifest = {
       name: 'dshx-boot-profile',
@@ -171,7 +189,8 @@ const prepareBootProfiles = async (
       homeRoot,
       profileRoot,
       profile: PROFILE_NAME,
-      expectedBundles,
+      expectedBundles:
+        options.includeSourceProfileBundles === true ? [bundles[0] ?? BASE_BUNDLES[0], ...bundles.slice(1)] : expectedBundles,
       async dispose() {
         if (disposed) return
         disposed = true
@@ -190,4 +209,4 @@ export const prepareBootProfile = async (projectRoot: string, packageId: string)
 export const prepareComposedBootProfile = async (
   localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]],
   additionalBundleIds: readonly string[] = [],
-): Promise<PreparedBootProfile> => prepareBootProfiles(localBundles, additionalBundleIds)
+): Promise<PreparedBootProfile> => prepareBootProfiles(localBundles, { additionalBundleIds })
