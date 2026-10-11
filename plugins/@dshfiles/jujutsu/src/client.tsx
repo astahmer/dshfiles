@@ -384,6 +384,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     return graphOrder.filter(revision => branchIds.has(revision.commitId))
   }, [dropPresentation, state, graphOrder])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
+  const dropSourceRevision = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.sourceId)
+  const dropDestinationRevision = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.destinationId)
 
   const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
   const listScrollRef = useRef<HTMLDivElement | null>(null)
@@ -932,6 +934,28 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
         </div>
+        {dropPresentation !== null && (
+          <div className="dshx:flex-none dshx:border-b dshx:px-3 dshx:py-2">
+            <InlineDropPreview
+              branch={dropPresentation.kind === 'rebase' ? previewBranch : []}
+              busy={actionBusy}
+              destinationLabel={
+                dropDestinationRevision === undefined
+                  ? dropPresentation.destinationId.slice(0, 12)
+                  : `${dropDestinationRevision.shortestChangeId} · ${firstLine(dropDestinationRevision.description)}`
+              }
+              onCancel={() => sendAction({ type: 'cancel' })}
+              onConfirm={confirmPreview}
+              presentation={dropPresentation}
+              preview={preview}
+              sourceLabel={
+                dropSourceRevision === undefined
+                  ? dropPresentation.sourceId.slice(0, 12)
+                  : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`
+              }
+            />
+          </div>
+        )}
         <div
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
@@ -956,7 +980,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               if (item === undefined) return null
               const sticky = virtualRow.index === stickyDayIndex
               const rowDropPresentation = item.kind === 'revision' && dropPresentation?.destinationId === item.revision.commitId ? dropPresentation : null
-              const dropSourceRevision = rowDropPresentation === null ? undefined : revisionsByCommitId.get(rowDropPresentation.sourceId)
               return (
                 <div
                   className={sticky ? 'dshx:sticky dshx:top-0 dshx:z-10' : 'dshx:absolute dshx:top-0 dshx:left-0 dshx:w-full'}
@@ -994,7 +1017,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       bookmarkMenu={bookmarkMenu}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
-                      expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
+                      expanded={selectedRevision?.commitId === item.revision.commitId}
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
                       menu={revisionMenu(item.revision)}
@@ -1010,18 +1033,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
-                      {rowDropPresentation !== null && (
-                        <InlineDropPreview
-                          branch={rowDropPresentation.kind === 'rebase' ? previewBranch : []}
-                          busy={actionBusy}
-                          destinationLabel={`${item.revision.shortestChangeId} · ${firstLine(item.revision.description)}`}
-                          onCancel={() => sendAction({ type: 'cancel' })}
-                          onConfirm={confirmPreview}
-                          presentation={rowDropPresentation}
-                          preview={preview}
-                          sourceLabel={dropSourceRevision === undefined ? rowDropPresentation.sourceId.slice(0, 12) : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`}
-                        />
-                      )}
                     </RevisionRow>
                   )}
                 </div>
