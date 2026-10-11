@@ -226,7 +226,7 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.history-retention",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
           "kind": "gherkin",

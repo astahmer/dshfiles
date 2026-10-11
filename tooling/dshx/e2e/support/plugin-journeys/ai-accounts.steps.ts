@@ -69,6 +69,28 @@ Then('the usage windows per account can be configured and restored', async ({ pa
   await finishJourneyAssertions(page)
 })
 
+Then('the usage history cadence and retention can be changed and restored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-history-retention', async () => {
+    const recordEvery = page.getByRole('combobox', { name: 'Record every' })
+    const keepHistory = page.getByRole('combobox', { name: 'Keep history for' })
+    await expect(recordEvery).toHaveText('5 min')
+    await recordEvery.click()
+    await page.getByRole('option', { name: '10 min', exact: true }).click()
+    await expect(recordEvery).toHaveText('10 min')
+    await expect(keepHistory).toHaveText('90 days')
+    await keepHistory.click()
+    await page.getByRole('option', { name: '180 days', exact: true }).click()
+    await expect(keepHistory).toHaveText('180 days')
+    await recordEvery.click()
+    await page.getByRole('option', { name: '5 min', exact: true }).click()
+    await expect(recordEvery).toHaveText('5 min')
+    await keepHistory.click()
+    await page.getByRole('option', { name: '90 days', exact: true }).click()
+    await expect(keepHistory).toHaveText('90 days')
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the exhausted-limit retry default is off and the inline choice is on', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-quota-retry-settings', async () => {
     const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
