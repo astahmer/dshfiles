@@ -50,3 +50,9 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When two Codex accounts are added with Priority distribution
     Then the account order controls Priority routing
+
+  @scenario:ai-accounts.model-curation
+  Scenario: Hide or show AI Accounts on the Models page
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When the AI Accounts settings section is opened
+    Then the AI Accounts list on the Models page can be hidden and restored

@@ -170,3 +170,23 @@ Then('the account order controls Priority routing', async ({ page }: { page: Pag
   })
   await finishJourneyAssertions(page)
 })
+
+Then('the AI Accounts list on the Models page can be hidden and restored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-model-curation', async () => {
+    const settings = page.getByRole('dialog')
+    const accountList = page.getByRole('switch', { name: 'Accounts on the Models page' })
+    await expect(accountList).toBeChecked()
+    await accountList.click()
+    await expect(accountList).not.toBeChecked()
+    await settings.getByRole('button', { name: 'Models', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toHaveCount(0)
+    await settings.getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    const restoredAccountList = page.getByRole('switch', { name: 'Accounts on the Models page' })
+    await expect(restoredAccountList).not.toBeChecked()
+    await restoredAccountList.click()
+    await expect(restoredAccountList).toBeChecked()
+    await settings.getByRole('button', { name: 'Models', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
