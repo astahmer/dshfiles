@@ -41,6 +41,28 @@ describe('GitHub Copilot credential records', () => {
     expect(await readCopilotCredential(provider, 'copilot-personal')).toBeUndefined()
   })
 
+  it('omits undefined optional SDK fields before writing a JSON-backed grant', async () => {
+    const records = new Map<string, CredentialRecord>()
+    const provider = {
+      readRecord: async (key: { toString(): string }) => records.get(key.toString()),
+      modifyRecord: async (key: { toString(): string }, mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>) => {
+        const next = await mutate(records.get(key.toString()))
+        if (next !== undefined) records.set(key.toString(), next)
+        return next
+      },
+    }
+    const copilotCredential = { ...credential, enterpriseUrl: undefined }
+
+    const stored = await modifyCopilotCredential(provider, 'copilot-personal', async () => copilotCredential)
+    const record = records.get(String(copilotCredentialKey('copilot-personal')))
+
+    expect(stored).toEqual(credential)
+    expect(record).toEqual({ kind: 'grant', payload: credential })
+    if (stored === undefined) throw new Error('Copilot grant was not stored.')
+    expect(Object.hasOwn(stored, 'enterpriseUrl')).toBe(false)
+    expect(JSON.stringify(record)).not.toContain('enterpriseUrl')
+  })
+
   it('fails closed on a malformed grant without exposing it as a login', async () => {
     const records = new Map<string, CredentialRecord>([[String(copilotCredentialKey('copilot-work')), { kind: 'grant', payload: { access: 'partial' } }]])
     const provider = { readRecord: async (key: { toString(): string }) => records.get(key.toString()) }

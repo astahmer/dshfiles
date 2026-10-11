@@ -15,6 +15,20 @@ const credentialSchema = z
   })
   .passthrough()
 
+const omitUndefinedObjectProperties = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(omitUndefinedObjectProperties)
+  if (value === null || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return value
+
+  const entries: [string, unknown][] = []
+  for (const [key, nested] of Object.entries(value)) {
+    if (nested !== undefined) entries.push([key, omitUndefinedObjectProperties(nested)])
+  }
+  return Object.fromEntries(entries)
+}
+
+const credentialForStorage = (credential: OAuthCredential): OAuthCredential =>
+  credentialSchema.parse(omitUndefinedObjectProperties(credentialSchema.parse(credential)))
+
 export const copilotCredentialKey = (instanceId: string) => credentialKey('ai-accounts', `github-copilot-${Buffer.from(instanceId, 'utf8').toString('hex')}`)
 
 export const readCopilotCredential = async (
@@ -37,7 +51,7 @@ export const modifyCopilotCredential = async (
   const result = await provider.modifyRecord(copilotCredentialKey(instanceId), async current => {
     const parsed = current?.kind === 'grant' ? credentialSchema.safeParse(current.payload) : undefined
     const next = await mutate(parsed?.success ? parsed.data : undefined)
-    return next === undefined ? undefined : { kind: 'grant', payload: next }
+    return next === undefined ? undefined : { kind: 'grant', payload: credentialForStorage(next) }
   })
   if (result?.kind !== 'grant') return undefined
   const parsed = credentialSchema.safeParse(result.payload)
