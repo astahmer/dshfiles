@@ -15,6 +15,7 @@ const openPromptLibrary = async ({ page }: { page: Page }): Promise<void> => {
 
 const createSavedPrompt = async ({ page, title, text }: { page: Page; title: string; text: string }): Promise<void> => {
   await page.getByRole('button', { name: 'New prompt', exact: true }).click()
+  await expect(page.getByLabel('Prompt text', { exact: true })).toBeFocused()
   await page.getByLabel('Label (optional)', { exact: true }).fill(title)
   await page.getByLabel('Prompt text', { exact: true }).fill(text)
   await page.getByRole('button', { name: 'Save prompt', exact: true }).click()
@@ -35,6 +36,24 @@ When('the prompt library is opened', async ({ page }: { page: Page }) => {
 
 When('a saved prompt {string} with text {string} is created', async ({ page }: { page: Page }, title: string, text: string) => {
   await createSavedPrompt({ page, title, text })
+})
+
+When('the composer text {string} is saved as a prompt', async ({ page }: { page: Page }, text: string) => {
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  const composer = composerInput({ page })
+  await composer.click()
+  await composer.fill(text)
+  await page.getByRole('button', { name: 'Prompts', exact: true }).click()
+  await page.getByRole('button', { name: 'Save current', exact: true }).click()
+})
+
+Then('current composer text {string} remains and prompt {string} is saved', async ({ page }: { page: Page }, text: string, title: string) => {
+  await recordAssertion(page, 'prompt-library-save-current-preserves-composer', async () => {
+    await expect(composerInput({ page })).toHaveText(text)
+    await expect(promptOption({ page, title })).toBeVisible()
+    await expect(page.getByRole('status')).toHaveText('Current composer text saved as a prompt. The composer was not changed.')
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('the saved prompts are searched for {string}', async ({ page }: { page: Page }, query: string) => {
@@ -85,7 +104,6 @@ When('the saved prompt {string} is deleted', async ({ page }: { page: Page }, ti
 
 Then('the saved prompt {string} is no longer listed', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'prompt-library-confirmed-delete-removes-prompt', () => expect(promptOption({ page, title })).toHaveCount(0))
-  await finishJourneyAssertions(page)
 })
 
 When('the saved prompt {string} is opened for editing', async ({ page }: { page: Page }, title: string) => {

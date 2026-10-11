@@ -17,6 +17,8 @@ Feature: Prompt stash
     Then the saved prompt "Support reply" remains listed
     When the saved prompt "Support reply" is deleted
     Then the saved prompt "Support reply" is no longer listed
+    When the composer text "Quick current prompt" is saved as a prompt
+    Then current composer text "Quick current prompt" remains and prompt "Quick current prompt" is saved
 
   @scenario:prompt-stash.library-conflict
   Scenario: Keep local edits when another tab changes a saved prompt
