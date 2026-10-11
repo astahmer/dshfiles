@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import type {} from '@deepseek-ai/dsh-agent'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
@@ -16,6 +16,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
 
+import { optmemApi, type OptmemOverview, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
 import { createLlmSummarizer, createRouteResolver, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
@@ -94,6 +95,7 @@ const backfillCommand = defineCommand({
 const effortOf = (effort: OptmemSettings['summarizerEffort']): SummaryEffort | undefined => (effort === '' ? undefined : effort)
 
 const summarizerPolicy = (settings: OptmemSettings): SummarizerPolicy => ({
+  paused: settings.summarizerPaused,
   override:
     settings.summarizerModel.length > 0
       ? { provider: settings.summarizerProvider, model: settings.summarizerModel, effort: effortOf(settings.summarizerEffort) }
@@ -171,10 +173,96 @@ const hostServices = (ctx: Context): HostServices => {
   }
 }
 
+const databasePath = (): string => dshHomePath('plugins', 'optmem', 'optmem.db')
+
+let hostContext: Context | undefined
+
+const databaseBytes = async (path: string): Promise<number | null> => {
+  const sizes = await Promise.all(['', '-wal', '-shm'].map(suffix => stat(`${path}${suffix}`).then(file => file.size, () => null)))
+  return sizes[0] === null ? null : sizes.reduce<number>((total, size) => total + (size ?? 0), 0)
+}
+
+const overview = async (): Promise<OptmemOverview> => {
+  const path = databasePath()
+  const requestedMode = currentSettings().mode === 'full' ? 'full' : 'compatibility'
+  const bytes = await databaseBytes(path)
+  if (!runtime)
+    return {
+      state: 'off',
+      failure: 'OptMem is not active in this DSH host.',
+      requestedMode,
+      activeMode: 'compatibility',
+      fullModeAvailable: false,
+      settingsSource,
+      database: { path, bytes },
+      events: null,
+      streams: null,
+      summaryCalls: null,
+      pendingSummaries: null,
+      pendingMerges: null,
+      captured: 0,
+      skipped: 0,
+      queued: 0,
+      lastRoute: { kind: 'unresolved' },
+      lastError: null,
+      retryInMs: null,
+    }
+  const host = runtime.status()
+  const memory = host.state === 'ready' ? await runtime.requireEngine().status().catch(() => undefined) : undefined
+  const route = host.summarizer
+  return {
+    state: host.state,
+    failure: host.failure,
+    requestedMode,
+    activeMode: requestedMode === 'full' && host.mode.ok ? 'full' : 'compatibility',
+    fullModeAvailable: host.capabilities.replaceContext && host.capabilities.resetPerTurn,
+    settingsSource: host.settings,
+    database: { path, bytes },
+    events: memory ? memory.streams.reduce((total, stream) => total + stream.length, 0) : null,
+    streams: memory ? memory.streams.length : null,
+    summaryCalls: memory ? memory.summarizer.calls : null,
+    pendingSummaries: memory ? memory.queue.leaves + memory.queue.parents + memory.queue.running + memory.failures.count : null,
+    pendingMerges: memory ? memory.streams.filter(stream => stream.mergePending).length : null,
+    captured: host.captured,
+    skipped: host.skipped,
+    queued: host.queued,
+    lastRoute:
+      route.kind === 'ready'
+        ? { kind: 'ready', source: route.source, conversationId: route.conversationId, route: { ...route.route, effort: route.route.effort ?? null } }
+        : route,
+    lastError: (memory && memory.failures.count > 0 ? memory.failures.lastError : null) ?? host.lastCaptureError ?? null,
+    retryInMs: memory?.failures.retryInMs ?? null,
+  }
+}
+
+const providers = async (): Promise<readonly OptmemProvider[]> => {
+  const llm = hostContext?.get('llm')
+  if (!llm) return []
+  return Promise.all(
+    llm.listProviders().map(async provider => ({
+      id: provider.id,
+      name: provider.name,
+      kind: (await accountKind(provider.id)) ?? null,
+      models: (await llm.listModels(provider.id).catch(() => [])).map(model => model.id),
+    })),
+  )
+}
+
+const panelApi = optmemApi.host({
+  overview: () => overview(),
+  providers: () => providers(),
+  backfill: async ({ input }) => {
+    if (!runtime) throw new Error('OptMem is not active in this DSH host.')
+    const limit = Number.isSafeInteger(input.limit) && input.limit > 0 ? Math.min(input.limit, 500) : 20
+    return { text: await runtime.backfill(limit) }
+  },
+})
+
 const setup = (ctx: Context): void => {
+  hostContext = ctx
   const active = createOptmemRuntime({
     services: hostServices(ctx),
-    databasePath: dshHomePath('plugins', 'optmem', 'optmem.db'),
+    databasePath: databasePath(),
     settings: currentSettings,
     settingsSource: () => settingsSource,
     logger: ctx.logger('optmem'),
@@ -198,6 +286,7 @@ const setup = (ctx: Context): void => {
     await active.start()
     return async () => {
       if (runtime === active) runtime = undefined
+      if (hostContext === ctx) hostContext = undefined
       await active.stop()
     }
   }, 'optmem runtime')
@@ -209,5 +298,6 @@ export default defineHost({
   commands: [backfillCommand],
   prompts: [memoryContext],
   settings: [ownedSettings],
+  apis: [panelApi],
   setup,
 })
