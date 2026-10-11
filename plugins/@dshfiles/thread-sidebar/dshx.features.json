@@ -601,7 +601,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.thread-children-and-links-unit-thread-mention-token",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread mentions are inserted as a token followed by one space"
+          "testName": "thread reference keeps the native session mention and title presentation"
         }
       ]
     },
