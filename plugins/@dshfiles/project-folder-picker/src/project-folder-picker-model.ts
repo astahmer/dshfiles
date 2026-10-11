@@ -2,6 +2,9 @@ import type { ProjectFolderSelection, RegisteredProject } from './project-folder
 
 export type PickerDirection = 'up' | 'down'
 
+export const initialBrowseTarget = (mode: 'projects' | 'directories' | undefined): { readonly path: undefined } | null =>
+  mode === 'directories' ? { path: undefined } : null
+
 export const filterRegisteredProjects = (projects: readonly RegisteredProject[], query: string): readonly RegisteredProject[] => {
   if (query.startsWith('/')) return []
   const search = query.trim().toLocaleLowerCase()

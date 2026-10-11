@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterRegisteredProjects,
+  initialBrowseTarget,
   folderSelection,
   movePickerSelection,
   pickerEntries,
@@ -13,6 +14,12 @@ const dshfilesProject: RegisteredProject = { workspaceId: 'ws-1', title: 'dshfil
 const projects: readonly RegisteredProject[] = [dshfilesProject, { workspaceId: 'ws-2', title: 'emisoup', canonicalPath: '/Users/me/dev/emisoup' }]
 
 describe('project and folder selection', () => {
+  it('preserves project mode by default and starts directory mode at Host home', () => {
+    expect(initialBrowseTarget(undefined)).toBeNull()
+    expect(initialBrowseTarget('projects')).toBeNull()
+    expect(initialBrowseTarget('directories')).toEqual({ path: undefined })
+  })
+
   it('searches registered project names and canonical paths', () => {
     expect(filterRegisteredProjects(projects, 'EMI')).toEqual([projects[1]])
     expect(filterRegisteredProjects(projects, '/Users/me/dev/dsh')).toEqual([])

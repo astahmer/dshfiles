@@ -6,20 +6,10 @@
       "id": "registered-project-search",
       "title": "Search registered projects by name and path",
       "summary": "Match registered project labels and canonical directories while preserving project identity in returned choices.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "empty",
-        "matched",
-        "selected"
-      ],
-      "failureModes": [
-        "An empty result remains selectable-safe.",
-        "Canonical path is returned separately from display name."
-      ],
+      "states": ["empty", "matched", "selected"],
+      "failureModes": ["An empty result remains selectable-safe.", "Canonical path is returned separately from display name."],
       "externalDependencies": [],
       "verification": [
         {
@@ -40,19 +30,10 @@
       "id": "keyboard-folder-selection",
       "title": "Select project folders with keyboard navigation",
       "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "focused",
-        "next",
-        "previous",
-        "empty"
-      ],
-      "failureModes": [
-        "Keyboard actions on an empty list do not invent a selection."
-      ],
+      "states": ["focused", "next", "previous", "empty"],
+      "failureModes": ["Keyboard actions on an empty list do not invent a selection."],
       "externalDependencies": [],
       "verification": [
         {
@@ -67,20 +48,10 @@
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
       "summary": "After registered project matches, offer eligible recent folders and keep their canonical path distinct from registered project identity.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "registered-match",
-        "recent-unregistered",
-        "selected"
-      ],
-      "failureModes": [
-        "Recent directory selection cannot claim an existing project ID until Host registration succeeds."
-      ],
+      "states": ["registered-match", "recent-unregistered", "selected"],
+      "failureModes": ["Recent directory selection cannot claim an existing project ID until Host registration succeeds."],
       "externalDependencies": [],
       "verification": [
         {
@@ -88,6 +59,24 @@
           "id": "project-folder-picker.recent-folders",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "offers unregistered recent folders after matching projects"
+        }
+      ]
+    },
+    {
+      "id": "directory-only-mode",
+      "title": "Start directly in the Host folder browser",
+      "summary": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["projects-default", "directory-browsing"],
+      "failureModes": ["The default project mode remains unchanged for existing consumers.", "Directory-only mode begins at the Host home listing."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.directory-mode",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "preserves project mode by default and starts directory mode at Host home"
         }
       ]
     }

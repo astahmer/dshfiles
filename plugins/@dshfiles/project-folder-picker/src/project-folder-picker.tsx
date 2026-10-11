@@ -8,7 +8,14 @@ import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/p
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { folderSelection, movePickerSelection, pickerEntries, pickerEntrySelection, type PickerEntry } from './project-folder-picker-model.js'
+import {
+  folderSelection,
+  initialBrowseTarget,
+  movePickerSelection,
+  pickerEntries,
+  pickerEntrySelection,
+  type PickerEntry,
+} from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -40,6 +47,8 @@ export interface ProjectFolderPickerProps {
   readonly onRegisterWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
   readonly onSelect: (selection: ProjectFolderSelection) => void
   readonly onClose: () => void
+  readonly mode?: 'projects' | 'directories'
+  readonly disabled?: boolean
   readonly title?: string
   /**
    * Identity of the machine these paths live on, shown with each row the way the
@@ -81,10 +90,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [newDirectoryName, setNewDirectoryName] = useState('')
-  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(null)
+  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
-  const pathMode = query.startsWith('/')
+  const pathMode = props.mode === 'directories' || query.startsWith('/')
   const recentFolders = props.recentFolders
   const entries = useMemo(() => pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
 
@@ -109,7 +118,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const createMutation = useMutation({
     mutationFn: (variables: { readonly parent: string; readonly name: string }) => props.directoryPicker.createDirectory(variables.parent, variables.name),
   })
-  const busy = listingQuery.isFetching || pickMutation.isPending || registerMutation.isPending || createMutation.isPending
+  const busy = props.disabled === true || listingQuery.isFetching || pickMutation.isPending || registerMutation.isPending || createMutation.isPending
   const error = pickMutation.isError
     ? 'The folder picker is unavailable on this Host.'
     : registerMutation.isError
@@ -148,8 +157,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const registerCurrentFolder = (): void => {
     if (listing === null) return
     registerMutation.mutate(listing.path, {
-      onSuccess: project =>
-        props.onSelect({ kind: 'workspace', workspaceId: project.workspaceId, canonicalPath: project.canonicalPath, title: project.title }),
+      onSuccess: project => props.onSelect({ kind: 'workspace', workspaceId: project.workspaceId, canonicalPath: project.canonicalPath, title: project.title }),
     })
   }
 
@@ -202,25 +210,29 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     }
   }
 
-  const title = props.title ?? 'Choose a project or folder'
+  const title = props.title ?? (props.mode === 'directories' ? 'Choose a folder' : 'Choose a project or folder')
 
   return (
     <Dialog
-      onOpenChange={open => {
+      onOpenChange={(open: boolean) => {
         if (!open) props.onClose()
       }}
       open
     >
       <DialogContent
         className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
-        onOpenAutoFocus={event => {
+        onOpenAutoFocus={(event: { preventDefault: () => void }) => {
           event.preventDefault()
           searchInput.current?.focus()
         }}
         showCloseButton={false}
       >
         <DialogTitle className="dshx:sr-only">{title}</DialogTitle>
-        <DialogDescription className="dshx:sr-only">Search registered projects, or type a path starting with / to browse folders.</DialogDescription>
+        <DialogDescription className="dshx:sr-only">
+          {props.mode === 'directories'
+            ? 'Browse folders and choose one to add as a workspace.'
+            : 'Search registered projects, or type a path starting with / to browse folders.'}
+        </DialogDescription>
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
           <div className="dshx:relative dshx:flex-1">
             <SearchIcon
@@ -228,7 +240,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
             />
             <Input
-              aria-label="Search projects or enter a folder path"
+              aria-label={props.mode === 'directories' ? 'Enter a folder path' : 'Search projects or enter a folder path'}
               autoComplete="off"
               className="dshx:h-9 dshx:pl-8"
               onChange={event => {
@@ -239,7 +251,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 createMutation.reset()
               }}
               onKeyDown={onKeyDown}
-              placeholder={props.placeholder ?? 'Search projects or type / for a folder…'}
+              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Enter a folder path…' : 'Search projects or type / for a folder…')}
               ref={searchInput}
               value={query}
             />
@@ -281,9 +293,11 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} size="sm" type="button">
                   Select this folder
                 </Button>
-                <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
-                  Register project
-                </Button>
+                {props.mode !== 'directories' && (
+                  <Button disabled={busy} onClick={() => registerCurrentFolder()} size="sm" type="button" variant="outline">
+                    Register project
+                  </Button>
+                )}
                 <form
                   className="dshx:flex dshx:min-w-60 dshx:flex-1 dshx:items-center dshx:gap-2"
                   onSubmit={event => {

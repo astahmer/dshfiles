@@ -16,9 +16,12 @@ port, and a workspace registration callback.
 />
 ```
 
-Optional props: `title`, `machineName`, `placeholder`, and `recentFolders`
-(previously chosen paths listed after the projects; selecting one yields a
-`directory` selection).
+Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
+`disabled`, and `mode`. The default `projects` mode shows registered projects
+and switches to browsing when the query starts with `/`. `directories` starts
+in folder browsing and hides project choices and project registration. Recent
+folders (previously chosen paths listed after the projects) yield a `directory`
+selection.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:
