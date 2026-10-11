@@ -10,6 +10,11 @@ delete this file when empty.
   "session-persistence-jsonl: format catalog v4 does not match Session v5", split the mixed `wpztzsot` "wip"
   revision in main if main is unpushed.
 - [ ] Live patch warning `entry "llm-commandcode" not found` (`--dump-config`; that row is not composed in `web`).
+- [ ] Restart preflight (2026-10-11): `dsh --profile web --dump-config` exits 0 and every host bundle imports under
+  Node 22.23.3, but import + composition ≠ `apply` — read the boot output for "did not activate" lines. Only 22
+  owned dirs are composed (promotion item under Later).
+- [ ] Re-check for running agents before killing :3080 (29 idle / 1 running at the 2026-10-11 capture); a restart
+  drops every in-flight turn, including other agents' sessions.
 
 ## Later
 - [ ] Luna Reserve live check when a Codex weekly limit is next spent (routing is fixture-tested only).
@@ -21,3 +26,21 @@ delete this file when empty.
 - [ ] Repo `pnpm lint` / `fmt:check` leftovers outside touched files.
 - [ ] ADE leftovers and dock-everything/workbench panel kinds — [ade/README.md](ade/README.md), [ade/docking.md](ade/docking.md).
 - [ ] Delete `plugins/@dshfiles/plugin-marketplace` after `nixapply` + restart; delete `~/.dsh/profiles/scratch-jj`.
+- [ ] Web promotion is deliberately incomplete (decided 2026-10-11): 22 of 30 owned dirs are composed. Missing real
+  bundles: `model-effort-picker`, `cursor-agent` (Cursor ACP driver), `dsh-core-runtime` (opt-in core replacement —
+  intentional default). The other five are libraries pulled in transitively (`plugin-ui`, `optmem-core`,
+  `optmem-sqlite`, `project-folder-picker`, `workspace-folder-picker`). To promote later: add the bundle to the
+  checked-in `profiles/web/package.json` seed, then `pnpm profile:sync --profile web` and `nixapply` so it survives.
+  Evidence: `dsh --profile web --dump-config` → 22 `@dshfiles` rows, matching the seed.
+- [ ] Vendored core runtime is stale (decided 2026-10-11: not now, no canonical checkout path given):
+  `tooling/dsh-core/api-session-controller/lib/index.js` is the Oct 7 22:53 build while `src/` is Oct 11 18:49. Types
+  were hand-patched in `lib/types/types.d.ts`; the runtime was not — `updateAttention` is present but
+  `lastTurnFailureAt` is absent, so thread-sidebar's "latest turn failures" projection reports nothing at runtime.
+  Fix with `DSH_SOURCE_ROOT=<canonical deepseek-harness checkout> pnpm run sync:core-api-session-controller`.
+- [ ] `pnpm run check:dshx` is red on specs the communication redesign left behind: the line's `8e975fb8df49`
+  rewrote `tooling/dshx/packages/dshx/src/communication/service.ts` and dropped `notifyAgent` / `deliverPending`,
+  but `tests/communication-service.spec.ts` and `tests/communication-diagnostics.spec.ts:131` still assert them →
+  3 type errors. Port or retire those specs (they are the only red in `pnpm run check:green`).
+- [ ] Global `jj` skill triggers ("unify the history", "spine branch", "linear history") are edited in the sources
+  but not deployed: the AGENTS repo needs `jj bookmark set main` + push, then `nix flake update agents` +
+  `nixapply`. `~/.agents` is a read-only Nix build, so applying alone does not pick up the base-skill change.
