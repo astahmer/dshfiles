@@ -277,6 +277,32 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]
+    },
+    {
+      "id": "credential-recovery",
+      "title": "Open credential setup from failed turns",
+      "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["hidden-for-other-failures", "available-for-credential-failure", "accounts-panel-open"],
+      "failureModes": [
+        "A failed turn with missing credentials does not need to be retried before setup is reachable.",
+        "Unrelated failures do not show an irrelevant credential action."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.credential-failure-filter",
+          "file": "plugins/@dshfiles/ai-accounts/src/credential-recovery.test.ts",
+          "testName": "offers setup for a missing credential failure"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.credential-recovery",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ]
     }
   ],
   "kind": "bundle"

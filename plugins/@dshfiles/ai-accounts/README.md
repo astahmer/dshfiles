@@ -106,6 +106,12 @@ over, then wait up to a minute; sign-in and oversized stay with DSH. A
 fail-over swaps the account on the wire only, cools the failed account, and
 returns the conversation to it once it recovers. Each step shows as a retry
 row in the turn. Large tool outputs are never trimmed.
+
+When a turn ends with an authentication failure (including an invalid API key
+or a missing credential), an inline **Add or fix credentials** action opens the
+AI Accounts panel. Use the account's **Set up key…** action there to store a key
+or repair its reference. Other failed turns do not show credential setup.
+
 Every open surface shares one Host reading, cached for 30 seconds; **Refresh**
 bypasses the cache.
 

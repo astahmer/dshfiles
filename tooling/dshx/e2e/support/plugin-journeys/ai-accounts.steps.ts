@@ -2,6 +2,23 @@ import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
+When('a provider request fails because its credential is missing', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('Verify inline recovery for missing provider credentials.')
+  await page.getByRole('button', { name: 'Send message', exact: true }).click({ timeout: 10_000 })
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Add or fix credentials', exact: true })).toBeVisible()
+})
+
+Then('the inline credential action opens AI Accounts', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-credential-recovery-action', async () => {
+    await page.getByRole('button', { name: 'Add or fix credentials', exact: true }).click()
+    await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add account', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the AI Accounts settings section is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()

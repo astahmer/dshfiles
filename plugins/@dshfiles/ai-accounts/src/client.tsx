@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from './models-page-slot.js'
 import type {} from './sidebar-footer-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
@@ -17,6 +18,7 @@ import { UsageHistoryPanel } from './usage-history-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
+import { CredentialRecoveryMessage } from './credential-recovery-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 import { useSyncExternalStore } from 'react'
@@ -59,8 +61,12 @@ export default defineClientPlugin({
               if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
             },
           }
-    const label = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsPanel')
-    const historyLabel = (): string => ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)('aiAccountsUsageHistory')
+    const translate = ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)
+    const label = (): string => translate('aiAccountsPanel')
+    const historyLabel = (): string => translate('aiAccountsUsageHistory')
+    // SAFETY: This id is registered as a main-panel slot below.
+    const openAccounts = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+    // SAFETY: This id is registered as a main-panel slot below.
     const openUsageHistory = (): void => ctx.layout.selectPanel(USAGE_PANEL_ID as MainPanelId)
     // Every slot shares the bundle's query client, so the footer, edge widget
     // and panels read one usage cache instead of polling side by side.
@@ -71,7 +77,7 @@ export default defineClientPlugin({
     )
     const UsageHistoryPanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <UsageHistoryPanel onBack={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+        <UsageHistoryPanel onBack={openAccounts} />
       </PluginQueryProvider>
     )
     const subscribeStripSeat = (listener: () => void): (() => void) => ctx.slots.subscribe('sidebar.footer.above', listener)
@@ -105,9 +111,17 @@ export default defineClientPlugin({
         <SessionCostDockEntry useProjection={props.useProjection} />
       </PluginQueryProvider>
     )
+    const CredentialRecoveryMessageView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
+      <CredentialRecoveryMessage
+        turn={props.turn}
+        onOpenAccounts={openAccounts}
+        hint={translate('credentialRecoveryHint')}
+        actionLabel={translate('credentialRecoveryAction')}
+      />
+    )
     const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
       <PluginQueryProvider>
-        <AiAccountsSettingsSection close={props.close} openAccounts={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)} />
+        <AiAccountsSettingsSection close={props.close} openAccounts={openAccounts} />
       </PluginQueryProvider>
     )
     // A settings page of its own, beside Models and Command Code in the nav.
@@ -142,6 +156,10 @@ export default defineClientPlugin({
 
     // Its own id beside the shipped `stats` cell: reusing `stats` would replace the token readout.
     api.ui.register({ name: 'conversation.composer.dock', id: 'ai-accounts-session-cost', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SessionCostView)
+    api.ui.register(
+      { name: 'conversation.chat.turnTail', id: 'ai-accounts-credential-recovery', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
+      CredentialRecoveryMessageView,
+    )
 
     api.ui.register(
       {
