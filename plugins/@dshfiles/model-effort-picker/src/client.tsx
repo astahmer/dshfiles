@@ -9,6 +9,8 @@ export default defineClientPlugin({
     api.ui.register(
       {
         name: 'conversation.input.model',
+        // Lower priority wins, so shadow the native slot at priority 0.
+        priority: -1,
         inject: sessionId => {
           const directory = api.models.directoryFor(sessionId)
           const available = api.raw.ctx.sessions.subagentAddress(sessionId) === undefined

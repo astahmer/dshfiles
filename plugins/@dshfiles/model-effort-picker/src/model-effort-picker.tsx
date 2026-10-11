@@ -22,18 +22,19 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
     () => directory.getSnapshot(),
   )
   const filteredGroups = useMemo(() => filterModelGroups(state.groups, query), [state.groups, query])
-  const selectedGroup = state.current === null ? undefined : state.groups.find(group => group.id === state.current?.provider)
-  const selectedModel = selectedGroup?.models.find(model => model.id === state.current?.model)
+  const current = state.current
+  const selectedGroup = current === null ? undefined : state.groups.find(group => group.id === current.provider)
+  const selectedModel = selectedGroup?.models.find(model => model.id === current?.model)
   const efforts = selectedModel?.reasoning?.efforts ?? []
-  const selectedEffort = state.current?.reasoningEffort ?? selectedModel?.reasoning?.defaultEffort
+  const selectedEffort = current?.reasoningEffort ?? selectedModel?.reasoning?.defaultEffort
   const selectedEffortIndex = Math.max(
     0,
     efforts.findIndex(effort => effort.id === selectedEffort),
   )
   const [sliderIndex, setSliderIndex] = useState(selectedEffortIndex)
   const busy = locked || state.status === 'selecting'
-  const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : effortName(selectedModel, state.current)
-  const triggerLabel = selectedModel?.name ?? state.current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
+  const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : effortName(selectedModel, current)
+  const triggerLabel = selectedModel?.name ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
 
   useEffect(() => {
     if (open && available) load()
@@ -116,14 +117,14 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                     {group.name}
                   </div>
                   {group.models.map(model => {
-                    const active = state.current?.provider === group.id && state.current.model === model.id
+                    const active = current?.provider === group.id && current.model === model.id
                     return (
                       <Button
                         aria-pressed={active}
                         className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:text-left', active && 'dshx:bg-accent')}
                         disabled={busy}
                         key={`${group.id}:${model.id}`}
-                        onClick={() => void submitSelection(selectionForModel(group, model, state.current))}
+                        onClick={() => void submitSelection(selectionForModel(group, model, current))}
                         size="sm"
                         variant="ghost"
                       >
@@ -173,7 +174,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
             <Badge variant="secondary">{effortLabel}</Badge>
           </div>
 
-          {selectedModel === undefined || state.current === null ? (
+          {selectedModel === undefined || current === null ? (
             <p className="dshx:text-xs dshx:text-muted-foreground">Select a model to see its reasoning controls.</p>
           ) : efforts.length === 0 ? (
             <p className="dshx:text-xs dshx:text-muted-foreground">This model does not advertise reasoning levels.</p>
@@ -185,10 +186,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                   disabled={busy}
                   max={efforts.length - 1}
                   min={0}
-                  onValueChange={values => setSliderIndex(values[0] ?? 0)}
-                  onValueCommit={values => {
+                  onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
+                  onValueCommit={(values: number[]) => {
                     const effort = efforts[values[0] ?? 0]
-                    if (effort !== undefined) void submitSelection(selectionForEffort(state.current, effort.id))
+                    if (effort !== undefined) void submitSelection(selectionForEffort(current, effort.id))
                   }}
                   step={1}
                   value={[sliderIndex]}
@@ -204,7 +205,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                     )}
                     disabled={busy}
                     key={effort.id}
-                    onClick={() => void submitSelection(selectionForEffort(state.current, effort.id))}
+                    onClick={() => void submitSelection(selectionForEffort(current, effort.id))}
                     type="button"
                   >
                     {effort.name}
@@ -213,9 +214,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
               </div>
               <div className="dshx:flex dshx:justify-end">
                 <Button
-                  aria-pressed={state.current.reasoningEffort === undefined}
+                  aria-pressed={current.reasoningEffort === undefined}
                   disabled={busy}
-                  onClick={() => void submitSelection(selectionForEffort(state.current, undefined))}
+                  onClick={() => void submitSelection(selectionForEffort(current, undefined))}
                   size="xs"
                   variant="outline"
                 >
