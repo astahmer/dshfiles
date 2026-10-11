@@ -528,6 +528,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                             attentionColors: rowStyle.attentionColors,
                             unread: Boolean(child.attention?.unread),
                             running: child.running,
+                            failed: lastTurnFailureAt(child) !== undefined && !child.running,
                           }),
                         )}
                       />
