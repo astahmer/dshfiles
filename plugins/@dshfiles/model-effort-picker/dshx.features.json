@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "model-selection",
+      "title": "Search and select provider models",
+      "summary": "Search provider-grouped model catalogs in the composer and expose reasoning controls only when the selected model advertises effort levels.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["closed", "open", "searching", "empty"],
+      "failureModes": ["A search with no catalog match shows an explicit empty state.", "Reasoning controls stay unavailable until a model is selected."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "model-effort-picker.search-empty-catalog",
+          "featureFile": "tooling/dshx/e2e/features/model-effort-picker.feature"
+        }
+      ]
+    }
+  ]
+}
