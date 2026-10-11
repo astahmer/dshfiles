@@ -325,8 +325,14 @@ export default defineClient({
           archiveSession: (sessionId: SessionSummary['id']) =>
             archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
           unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
-          pinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.pinSession(sessionId),
-          unpinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unpinSession(sessionId),
+          pinSession: async (sessionId: SessionSummary['id']) => {
+            const result = await ctx.remote.workspace.pinSession({ sessionId })
+            if (!result.ok) throw new Error(result.error.code)
+          },
+          unpinSession: async (sessionId: SessionSummary['id']) => {
+            const result = await ctx.remote.workspace.unpinSession({ sessionId })
+            if (!result.ok) throw new Error(result.error.code)
+          },
         }),
       },
       decorate(HeaderThreadActions),
@@ -358,8 +364,14 @@ export default defineClient({
             archiveSession: (sessionId: SessionSummary['id']) =>
               archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
             unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
-            pinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.pinSession(sessionId),
-            unpinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unpinSession(sessionId),
+            pinSession: async (sessionId: SessionSummary['id']) => {
+              const result = await ctx.remote.workspace.pinSession({ sessionId })
+              if (!result.ok) throw new Error(result.error.code)
+            },
+            unpinSession: async (sessionId: SessionSummary['id']) => {
+              const result = await ctx.remote.workspace.unpinSession({ sessionId })
+              if (!result.ok) throw new Error(result.error.code)
+            },
             markRead: async (sessionId: SessionSummary['id']) =>
               (
                 await ctx.sessions.updateAttention({
