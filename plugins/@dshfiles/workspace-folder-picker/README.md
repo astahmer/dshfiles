@@ -1,19 +1,21 @@
 # Workspace Folder Picker
 
-Replaces the sidebar's native Add workspace directory flow with the shared
-`ProjectFolderPicker` opened directly in directory-browsing mode. The flow
-starts listing the Host home directory immediately, lets the operator navigate
-folders or use the Host's native chooser, and submits the selected path to the
-workspace owner's existing registration callback.
+Replaces the Add workspace directory flow in the header workspace menu and the
+sidebar browser with the shared `ProjectFolderPicker` opened directly in
+directory-browsing mode. The flow starts listing the Host home directory
+immediately, lets the operator navigate folders or use the Host's native
+chooser, and submits the selected path to the workspace owner's existing
+registration callback.
 
 The chooser intentionally does not show registered projects or the
-"Register project" action: this entry point is for adding a workspace, not
-choosing one that already exists. The blank-session Hero keeps its own default
-flow.
+"Register project" action: this entry point adds a workspace rather than
+choosing one that already exists. The existing workspace-selection UI remains
+unchanged.
 
 ## Boundaries
 
-- `sidebar.workspaces.directoryFlow` owns open/busy state and workspace creation.
+- The header and sidebar workspace owners retain open/busy state and workspace
+  creation.
 - Host-backed directory listing, native picking, and folder creation use the
   installed `directoryPicker` Remote; creating a workspace remains the owner's
   responsibility.

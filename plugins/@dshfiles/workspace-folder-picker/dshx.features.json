@@ -5,7 +5,7 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The sidebar Add workspace flow opens directly in the Host-backed folder explorer without offering registered projects.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["closed", "browsing", "selected", "busy"],
@@ -17,7 +17,12 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "workspace-folder-picker.folder-mode",
+          "id": "workspace-folder-picker.header-folder-mode",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.sidebar-folder-mode",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
         }
       ]
