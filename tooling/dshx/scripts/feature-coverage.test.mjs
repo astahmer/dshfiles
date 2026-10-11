@@ -41,7 +41,7 @@ const withFixture = async callback => {
     }),
   )
   const featureFile = resolve(featureRoot, 'demo.feature')
-  await writeFile(featureFile, '@scenario:demo.boot-profile\nFeature: Demo boot\n  Scenario: Boot the disposable profile\n')
+  await writeFile(featureFile, 'Feature: Demo boot\n  @scenario:demo.boot-profile\n  Scenario: Boot the disposable profile\n')
   return callback({ root, featureFile })
 }
 
@@ -66,11 +66,21 @@ test('checks package metadata against scenario tags and generates a compact repo
 
 test('rejects orphan and missing scenario tags instead of silently reducing coverage', async () => {
   await withFixture(async ({ root, featureFile }) => {
-    await writeFile(featureFile, '@scenario:demo.unknown\nFeature: Demo\n  Scenario: Unowned\n')
+    await writeFile(featureFile, 'Feature: Demo\n  @scenario:demo.unknown\n  Scenario: Unowned\n')
     const result = runCheck(root)
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Declared Gherkin scenario demo\.boot-profile has no @scenario tag/)
     assert.match(result.stderr, /Orphan @scenario:demo\.unknown tag/)
+  })
+})
+
+test('rejects scenario tags attached to a Feature instead of a Scenario', async () => {
+  await withFixture(async ({ root, featureFile }) => {
+    await writeFile(featureFile, '@scenario:demo.boot-profile\nFeature: Demo boot\n  Scenario: Boot the disposable profile\n')
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Declared Gherkin scenario demo\.boot-profile has no @scenario tag/)
+    assert.match(result.stderr, /Misplaced @scenario:demo\.boot-profile tag in tooling\/dshx\/e2e\/features\/demo\.feature:1; scenario tags must annotate a Scenario or Scenario Outline/)
   })
 })
 
