@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -12,7 +13,7 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node", "@dshfiles/dshx/client/env"]
   },
   "include": ["src"]
 }

@@ -426,6 +426,82 @@
           "testName": "survives a read-only memory directory"
         }
       ]
+    },
+    {
+      "id": "settings-panel",
+      "title": "Edit memory settings and see live status in DSH",
+      "summary": "One panel on the Settings nav and the bundle Plugins page edits every OptMem setting with row editors for cheap models and fallback routes, checks routes against the models each provider offers, shows live memory status, and pauses summaries or backfills sessions.",
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [
+        {
+          "key": "summarizerPaused",
+          "defaultValue": "false",
+          "constraints": "Boolean; while true no summary call is made and pending summaries retry once resumed.",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "optmem.settings-panel-unit-pause"
+          ]
+        }
+      ],
+      "states": [
+        "loading",
+        "ready",
+        "dirty",
+        "saving",
+        "read-only",
+        "host-outdated"
+      ],
+      "failureModes": [
+        "An old Host without the panel API shows a restart notice while settings still save.",
+        "An unregistered namespace shows defaults read-only.",
+        "Undecodable stored fields fall back to their defaults instead of failing the panel."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-pause",
+          "file": "plugins/@dshfiles/optmem/src/summarizer.test.ts",
+          "testName": "calls nothing while summaries are paused in settings, even with an override"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-old-host-defaults",
+          "file": "plugins/@dshfiles/optmem/src/settings-draft.test.ts",
+          "testName": "fills every field an old Host does not serve with its default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-bad-field-fallback",
+          "file": "plugins/@dshfiles/optmem/src/settings-draft.test.ts",
+          "testName": "keeps the valid fields when one stored field no longer decodes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-changed-keys",
+          "file": "plugins/@dshfiles/optmem/src/settings-draft.test.ts",
+          "testName": "writes only the fields that differ from the Host value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-route-warnings",
+          "file": "plugins/@dshfiles/optmem/src/settings-draft.test.ts",
+          "testName": "checks an override and fallbacks against the models their provider offers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.settings-panel-unit-cheap-model-warnings",
+          "file": "plugins/@dshfiles/optmem/src/settings-draft.test.ts",
+          "testName": "flags a cheap-model entry none of whose models its providers offer"
+        }
+      ]
     }
   ],
   "kind": "bundle"
