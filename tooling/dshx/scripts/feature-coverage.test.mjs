@@ -87,6 +87,17 @@ test('rejects scenario tags attached to a Feature instead of a Scenario', async 
   })
 })
 
+test('accepts scenario tags on a Scenario Outline', async () => {
+  await withFixture(async ({ root, featureFile }) => {
+    await writeFile(
+      featureFile,
+      'Feature: Demo boot\n  @scenario:demo.boot-profile\n  Scenario Outline: Boot a <profile> profile\n    Given the disposable profile is <profile>\n    Examples:\n      | profile |\n      | demo    |\n',
+    )
+    const result = runCheck(root)
+    assert.equal(result.status, 0, result.stderr)
+  })
+})
+
 test('reports a missing Gherkin file separately from a missing scenario tag', async () => {
   await withFixture(async ({ root, featureFile }) => {
     await rm(featureFile)
