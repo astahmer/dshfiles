@@ -33,3 +33,10 @@ Feature: Settings Search
     When the Settings navigation search opens and receives focus
     When the ui-theme preference is opened from navigation results
     Then the Appearance preference uses its native owner or typed fallback
+
+  @scenario:editor.open-file-links-native-row
+  Scenario: Open the Editor file-link preference through Settings Search
+    Given the isolated plugin composition "@dshfiles/settings-search" and "@dshfiles/editor" is booted
+    When the Settings navigation search opens and receives focus
+    When the Editor openFileLinks setting is opened from navigation results
+    Then the Editor file-link preference uses its native General switch and is focused

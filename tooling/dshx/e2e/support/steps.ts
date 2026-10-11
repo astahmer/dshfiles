@@ -237,6 +237,20 @@ Given('the isolated plugin composition {string} and {string} is booted', async (
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated plugin composition {string} and {string} with external bundle {string} is booted', async (
+  { page }: { page: Page },
+  packageId: string,
+  companionPackageId: string,
+  externalBundleId: string,
+) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: [packageId, companionPackageId],
+    profileLabel: `${packageId}+${companionPackageId}+${externalBundleId}`,
+    additionalBundleIds: [externalBundleId],
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   const outcome = await readProfileOutcome(page, profile)

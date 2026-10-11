@@ -63,6 +63,15 @@ When('the ui-theme preference is opened from navigation results', async ({ page 
   await preferenceResult.click()
 })
 
+When('the Editor openFileLinks setting is opened from navigation results', async ({ page }: { page: Page }) => {
+  const navigation = page.getByRole('dialog').getByRole('navigation')
+  const navigationSearch = navigation.getByRole('searchbox', { name: 'Search settings' })
+  await navigationSearch.fill('openFileLinks')
+  const settingResult = navigation.getByRole('button', { name: /openFileLinks/i }).first()
+  await expect(settingResult).toBeVisible()
+  await settingResult.click()
+})
+
 When('Settings are searched for {string}', async ({ page }: { page: Page }, settingName: string) => {
   await settingsPageSearch(page).fill(settingName)
 })
@@ -113,6 +122,20 @@ Then('the Appearance preference uses its native owner or typed fallback', async 
       await expect(dialog.locator('button[aria-pressed="true"]')).toBeFocused()
     })
   }
+  await finishJourneyAssertions(page)
+})
+
+Then('the Editor file-link preference uses its native General switch and is focused', async ({ page }: { page: Page }) => {
+  const fileLinksSwitch = page.getByRole('dialog').getByRole('switch', { name: 'Open file links in Editor' })
+  await recordAssertion(page, 'editor-file-links-search-opens-native-general-row', async () => {
+    await expect(fileLinksSwitch).toBeVisible()
+    await expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true')
+    await expect(fileLinksSwitch).toBeFocused()
+  })
+  await fileLinksSwitch.click()
+  await recordAssertion(page, 'editor-file-links-switch-persists-host-setting', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'false'))
+  await fileLinksSwitch.click()
+  await recordAssertion(page, 'editor-file-links-switch-restores-default', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true'))
   await finishJourneyAssertions(page)
 })
 
