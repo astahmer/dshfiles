@@ -1631,7 +1631,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     notice === null ? null : (
       <Alert
         variant={notice.tone === 'danger' ? 'destructive' : notice.tone}
-        className={cn(noticeClass, isTransientNotice && 'dshx:pointer-events-auto dshx:max-w-full dshx:shadow-lg')}
+        className={cn(noticeClass, isTransientNotice && 'dshx:grid-cols-1 dshx:pointer-events-auto dshx:max-w-full dshx:shadow-lg')}
       >
         <div className="dshx:flex dshx:items-center dshx:gap-2">
           <SidebarNoticeMessage message={notice.message} />
