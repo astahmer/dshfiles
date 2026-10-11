@@ -232,6 +232,24 @@
           "kind": "gherkin",
           "id": "ai-accounts.pricing-cost",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pricing-cost-unit-cache-fallback",
+          "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
+          "testName": "fetches, trims and caches the catalog, then serves the cache offline"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pricing-cost-unit-refresh-clock",
+          "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
+          "testName": "refreshes only once the cache is older than the period, and shares one request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pricing-cost-unit-error-retains-cache",
+          "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
+          "testName": "keeps the last catalog when models.dev answers an error or nothing priced"
         }
       ]
     },
