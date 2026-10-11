@@ -191,6 +191,81 @@
       ]
     },
     {
+      "id": "thread-list-views",
+      "title": "Group and filter thread rows",
+      "summary": "Group the sidebar list by project, activity date, status, or no sections, and filter using Host-exposed status and source metadata.",
+      "surfaces": ["client", "storage"],
+      "configuration": [
+        {
+          "key": "groupBy",
+          "defaultValue": "status",
+          "constraints": "Browser-local view preference: project, date, status, or none.",
+          "choices": ["project", "date", "status", "none"],
+          "coveredBy": ["thread-sidebar.view-controls"]
+        },
+        {
+          "key": "statusFilter",
+          "defaultValue": "all",
+          "constraints": "Browser-local view preference: all, working, attention, or archived.",
+          "choices": ["all", "working", "attention", "archived"],
+          "coveredBy": ["thread-sidebar.view-controls"]
+        },
+        {
+          "key": "sourceFilter",
+          "defaultValue": "all",
+          "constraints": "Browser-local view preference: all, main threads, or subagent threads.",
+          "choices": ["all", "main", "subagents"],
+          "coveredBy": ["thread-sidebar.view-controls"]
+        }
+      ],
+      "states": ["project", "date", "status", "none", "all", "working", "attention", "archived", "main", "subagents"],
+      "failureModes": ["Status and source filters are limited to running, attention, archived, parentId, and origin data exposed by SessionSummary."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.view-controls",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-project-grouping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "groups repositories alphabetically and keeps newest threads first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-date-and-flat-grouping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "groups activity by local calendar date and leaves none as one flat list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-status-filters",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "filters supported activity states"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-source-filters",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "filters main and subagent sources using Host lineage metadata"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-preference-defaults",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "defaults newly added view options for older saved values"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-preference-validation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "rejects unknown options and malformed stored values"
+        }
+      ]
+    },
+    {
       "id": "idle-archive-policy",
       "title": "Automatically archive eligible idle threads",
       "summary": "Apply an opt-in idle policy while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",

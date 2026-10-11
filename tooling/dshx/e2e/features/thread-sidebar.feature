@@ -34,6 +34,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is pinned from its session header menu
     Then the thread stays pinned after reload
 
+  @scenario:thread-sidebar.view-controls
+  Scenario: Thread grouping and filters affect rows and survive reload
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a Host thread is archived and the view is grouped and filtered
+    Then only matching rows remain visible after reload
+
   @scenario:thread-sidebar.idle-archive
   Scenario: Auto-archive stays opt-in and saves its schedule
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

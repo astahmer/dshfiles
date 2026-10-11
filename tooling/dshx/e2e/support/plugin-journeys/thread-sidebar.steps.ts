@@ -32,6 +32,11 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
+const selectThreadViewValue = async (page: Page, triggerName: string, value: string): Promise<void> => {
+  await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
+  await page.getByRole('menuitemradio', { name: value, exact: true }).click()
+}
+
 When('a blank Host thread is started', async ({ page }: { page: Page }) => {
   await startBlankThread(page)
 })
@@ -201,6 +206,54 @@ Then('the sidebar keeps the blank session out of classified thread rows', async 
     await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toHaveAttribute('aria-expanded', 'true')
     await expect(threadSidebar(page).locator('article')).toHaveCount(0)
     await expect(threadSidebar(page).getByText('No threads in this section.', { exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a Host thread is archived and the view is grouped and filtered', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar view filter e2e target'
+  await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await targetRow.click({ button: 'right' })
+  const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
+  await expect(archiveItem).toBeEnabled()
+  await archiveItem.click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
+
+  await selectThreadViewValue(page, 'Group: Status', 'Date')
+  await selectThreadViewValue(page, 'Filter: None', 'Archived')
+  await selectThreadViewValue(page, 'Filter: Archived', 'Main threads')
+  await expect(targetRow).toBeVisible()
+  await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(prompt)
+
+  await selectThreadViewValue(page, 'Filter: Archived · Main threads', 'Working')
+  await expect(targetRow).toHaveCount(0)
+  await expect(threadSidebar(page).getByText('No threads are working right now.', { exact: true })).toBeVisible()
+  await selectThreadViewValue(page, 'Filter: Working · Main threads', 'Archived')
+  await selectThreadViewValue(page, 'Filter: Archived · Main threads', 'Subagent threads')
+  await expect(targetRow).toHaveCount(0)
+  await selectThreadViewValue(page, 'Filter: Archived · Subagent threads', 'Main threads')
+  await expect(targetRow).toBeVisible()
+
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+})
+
+Then('only matching rows remain visible after reload', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar view filter e2e target'
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await recordAssertion(page, 'thread-sidebar-grouping-and-filter-preferences-survive-reload', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
+    await expect(targetRow).toBeVisible()
+    await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(prompt)
+    await threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true }).click()
+    await expect(page.getByRole('menuitemradio', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })
