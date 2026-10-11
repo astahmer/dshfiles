@@ -1,9 +1,11 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { z } from 'zod'
@@ -19,6 +21,7 @@ import {
   rankActions,
   rankFiles,
   rankThreads,
+  parseThreadSearchInput,
   WORKSPACE_FILES_EVENT,
   type ContentHit,
   type PalettePrefix,
@@ -45,6 +48,10 @@ export interface ThreadPaletteCopy {
   readonly navigate: string
   readonly open: string
   readonly close: string
+  readonly clear: string
+  readonly back: string
+  readonly searchIn: string
+  readonly sessionNotFound: string
   readonly unassigned: string
   readonly prefixHint: string
   readonly viewAll: string
@@ -59,6 +66,8 @@ export interface ThreadPaletteCopy {
   readonly helpCommands: string
   readonly helpContent: string
   readonly helpLine: string
+  readonly helpSession: string
+  readonly helpThread: string
   readonly helpNone: string
   readonly goToLine: string
   readonly noEditorFile: string
@@ -107,7 +116,19 @@ const rowValue = (row: PaletteRow): string => {
 
 type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help'
 
-const VIEW_BY_PREFIX: Readonly<Record<PalettePrefix, PaletteView>> = { '>': 'commands', '#': 'content', ':': 'line', '?': 'help' }
+interface PaletteLocation {
+  readonly mode: PaletteMode
+  readonly query: string
+}
+
+const VIEW_BY_PREFIX: Readonly<Record<PalettePrefix, PaletteView>> = {
+  '>': 'commands',
+  '#': 'content',
+  ':': 'line',
+  '?': 'help',
+  'thread:': 'threads',
+  'session:': 'threads',
+}
 
 interface ContentState {
   readonly status: 'idle' | 'searching' | 'done' | 'failed'
@@ -180,11 +201,17 @@ const useWorkspaceFiles = (enabled: boolean): FilesState => {
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [mode, setMode] = useState(props.mode)
-  useEffect(() => setMode(props.mode), [props.mode])
   const [query, setQuery] = useState('')
-  const parsed = parsePaletteQuery(useDeferredValue(query))
+  const [backStack, setBackStack] = useState<readonly PaletteLocation[]>([])
+  const parsed = parsePaletteQuery(query)
   const view: PaletteView = parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
-  const deferredQuery = parsed.text
+  const deferredQuery = useDeferredValue(parsed.text)
+  const subview = backStack.length > 0 || parsed.prefix !== null
+  useEffect(() => {
+    setMode(props.mode)
+    setQuery('')
+    setBackStack([])
+  }, [props.mode])
   const emptyQuery = deferredQuery.trim().length === 0
   const [notice, setNotice] = useState<string | null>(null)
   const [selected, setSelected] = useState('')
@@ -215,13 +242,17 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   )
 
   const threadIndex = useMemo(() => indexThreads(props.threads), [props.threads])
+  const threadSearch = parseThreadSearchInput(deferredQuery)
   const threadRows = useMemo(
     () =>
       view === 'all' || view === 'threads'
-        ? rankThreads({ index: threadIndex, query: deferredQuery, limit: deferredQuery.trim().length === 0 ? props.recentLimit : RESULT_LIMIT })
+        ? rankThreads({ index: threadIndex, query: threadSearch.query, limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT })
         : [],
-    [deferredQuery, props.recentLimit, threadIndex, view],
+    [props.recentLimit, threadIndex, threadSearch.query, view],
   )
+  const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
+  const missingSessionId =
+    (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
 
   const content = useContentSearch(view === 'content' ? deferredQuery : '', props.searchContent)
   const contentRows = useMemo(() => {
@@ -237,13 +268,15 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     () =>
       view === 'help'
         ? [
+            { prefix: 'thread:' as const, label: props.copy.helpThread },
+            { prefix: 'session:' as const, label: props.copy.helpSession },
             { prefix: '>' as const, label: props.copy.helpCommands },
             { prefix: '#' as const, label: props.copy.helpContent },
             { prefix: ':' as const, label: props.copy.helpLine },
             { prefix: '' as const, label: props.copy.helpNone },
           ]
         : [],
-    [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, view],
+    [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, props.copy.helpSession, props.copy.helpThread, view],
   )
 
   const goToFile: PaletteActionOption = useMemo(
@@ -301,6 +334,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const activate = async (row: PaletteRow): Promise<void> => {
     if (row.kind === 'help') {
       setQuery(row.prefix)
+      setSelected('')
       return
     }
     if (row.kind === 'line') {
@@ -311,8 +345,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     }
     if (row.kind === 'destination' && row.destination.id === GO_TO_FILE_ID) {
       remember(GO_TO_FILE_ID)
+      setBackStack(stack => [...stack, { mode, query }])
       setMode('files')
       setQuery('')
+      setSelected('')
       return
     }
     if (row.kind === 'thread' || row.kind === 'content') {
@@ -336,6 +372,31 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     } finally {
       setRunningAction(false)
     }
+  }
+
+  const goBack = (): void => {
+    if (parsed.prefix !== null) {
+      setQuery(parsed.text)
+      setSelected('')
+      setNotice(null)
+      return
+    }
+    const previous = backStack.at(-1)
+    if (previous !== undefined) {
+      setBackStack(stack => stack.slice(0, -1))
+      setMode(previous.mode)
+      setQuery(previous.query)
+      setSelected('')
+      setNotice(null)
+      return
+    }
+    if (query.length > 0) {
+      setQuery('')
+      setSelected('')
+      setNotice(null)
+      return
+    }
+    props.onClose()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -381,6 +442,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     help: { chip: props.copy.viewHelp, placeholder: props.copy.helpPlaceholder },
   }
   const placeholder = viewCopy[view].placeholder
+  const escapeLabel = subview ? props.copy.back : query.length > 0 ? props.copy.clear : props.copy.close
 
   const destinationItem = (destination: PaletteActionOption): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
@@ -419,7 +481,15 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
 
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
-      <DialogContent className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl" showCloseButton={false}>
+      <DialogContent
+        className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+        showCloseButton={false}
+        onEscapeKeyDown={(event: KeyboardEvent) => {
+          if (!subview && query.length === 0) return
+          event.preventDefault()
+          goBack()
+        }}
+      >
         <DialogTitle className="dshx:sr-only">{props.copy.title}</DialogTitle>
         <DialogDescription className="dshx:sr-only">{placeholder}</DialogDescription>
         <Command shouldFilter={false} value={selected} onValueChange={setSelected} onKeyDown={onKeyDown} loop className="dshx:rounded-none">
@@ -429,17 +499,50 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             value={query}
             onValueChange={next => {
               setQuery(next)
+              setSelected('')
               setNotice(null)
             }}
             placeholder={placeholder}
           />
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-            <Badge variant="secondary">{viewCopy[view].chip}</Badge>
+            {subview ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={props.copy.back}
+                title={props.copy.back}
+                onClick={event => {
+                  goBack()
+                  event.currentTarget.closest('[role="dialog"]')?.querySelector<HTMLInputElement>('[data-slot="command-input"]')?.focus()
+                }}
+              >
+                <ArrowLeftIcon aria-hidden="true" />
+              </Button>
+            ) : (
+              <Tabs
+                value={mode}
+                onValueChange={(value: string) => {
+                  if (value !== 'all' && value !== 'threads' && value !== 'files') return
+                  setMode(value)
+                  setSelected('')
+                }}
+              >
+                <TabsList aria-label={props.copy.searchIn}>
+                  <TabsTrigger value="all">{props.copy.viewAll}</TabsTrigger>
+                  <TabsTrigger value="threads">{props.copy.threads}</TabsTrigger>
+                  <TabsTrigger value="files">{props.copy.files}</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+            {subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
             <span className="dshx:truncate">{notice ?? props.copy.prefixHint}</span>
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
-              {filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty)}
+              {missingSessionId && threadSearch.exactId !== undefined
+                ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
+                : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
             {helpRows.length > 0 ? (
               <CommandGroup heading={props.copy.viewHelp}>
@@ -559,7 +662,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           </span>
           <span className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Esc</Kbd>
-            {props.copy.close}
+            {escapeLabel}
           </span>
           {filesStatus !== null && fileRows.length > 0 ? <span className="dshx:ml-auto dshx:truncate">{filesStatus}</span> : null}
         </footer>

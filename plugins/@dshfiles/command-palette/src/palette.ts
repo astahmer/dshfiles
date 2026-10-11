@@ -3,14 +3,36 @@ export const OPEN_FILE_EVENT = 'dshfiles:open-file'
 export const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
 export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
-/** VS Code-style query prefixes: `>` commands, `#` thread content, `:` line in the open file, `?` the list of prefixes. */
-export type PalettePrefix = '>' | '#' | ':' | '?'
+/** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
+export type PalettePrefix = '>' | '#' | ':' | '?' | 'thread:' | 'session:'
 
-export const PALETTE_PREFIXES: readonly PalettePrefix[] = ['>', '#', ':', '?']
+export const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '#', ':', '?']
 
 export const parsePaletteQuery = (query: string): { readonly prefix: PalettePrefix | null; readonly text: string } => {
-  const prefix = PALETTE_PREFIXES.find(candidate => query.startsWith(candidate)) ?? null
-  return { prefix, text: prefix === null ? query : query.slice(1) }
+  const lowered = query.toLocaleLowerCase()
+  const prefix = PALETTE_PREFIXES.find(candidate => lowered.startsWith(candidate)) ?? null
+  return { prefix, text: prefix === null ? query : query.slice(prefix.length) }
+}
+
+export interface ThreadSearchInput {
+  readonly query: string
+  readonly exactId: string | undefined
+}
+
+export const parseThreadSearchInput = (input: string): ThreadSearchInput => {
+  const query = input.trim()
+  if (/^session-[^\s/?#&]+$/u.test(query)) return { query, exactId: query }
+  let url: URL
+  try {
+    url = new URL(query)
+  } catch {
+    return { query, exactId: undefined }
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return { query, exactId: undefined }
+  const threadIds = url.searchParams.getAll('thread')
+  const sessionIds = url.searchParams.getAll('session')
+  const id = threadIds.length === 1 ? threadIds[0] : threadIds.length === 0 && sessionIds.length === 1 ? sessionIds[0] : undefined
+  return id === undefined || id.length === 0 ? { query: `${url.origin}${url.pathname}`, exactId: undefined } : { query: id, exactId: id }
 }
 
 /** A positive line number from the text after `:`, or null. */
@@ -93,7 +115,7 @@ const weighted = (score: number | null, weight: number): number => (score === nu
 
 /** Recent threads for an empty query; otherwise the best title, project, path or id matches. */
 export const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => {
-  const needle = query.trim().toLocaleLowerCase()
+  const needle = parseThreadSearchInput(query).query.toLocaleLowerCase()
   if (needle.length === 0) return index.recent.slice(0, limit)
   const matches: Array<{ readonly thread: ThreadCandidate; readonly best: number }> = []
   for (const entry of index.entries) {

@@ -29,6 +29,18 @@ When('the palette query is {string}', async ({ page }: { page: Page }, query: st
   await paletteInput(page).fill(query)
 })
 
+When('the Threads tab is selected', async ({ page }: { page: Page }) => {
+  await paletteDialog(page).getByRole('tab', { name: 'Threads' }).click()
+})
+
+When('the Everything tab is selected', async ({ page }: { page: Page }) => {
+  await paletteDialog(page).getByRole('tab', { name: 'Everything' }).click()
+})
+
+When('Escape is pressed in the command palette', async ({ page }: { page: Page }) => {
+  await paletteInput(page).press('Escape')
+})
+
 When('the Go to file action is selected', async ({ page }: { page: Page }) => {
   await paletteOption(page, /Go to file/).click()
 })
@@ -42,6 +54,60 @@ Then('the New thread action is available and can run', async ({ page }: { page: 
   await recordAssertion(page, 'new-thread-action-is-searchable', () => expect(newThreadAction).toBeVisible())
   await newThreadAction.click()
   await recordAssertion(page, 'new-thread-action-closes-palette', () => expect(paletteDialog(page)).not.toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
+Then('Everything, Threads, and Files tabs are available', async ({ page }: { page: Page }) => {
+  const tabs = paletteDialog(page).getByRole('tab')
+  await recordAssertion(page, 'palette-search-tabs-are-visible', async () => {
+    await expect(tabs).toHaveCount(3)
+    await expect(tabs.nth(0)).toHaveAccessibleName('Everything')
+    await expect(tabs.nth(1)).toHaveAccessibleName('Threads')
+    await expect(tabs.nth(2)).toHaveAccessibleName('Files')
+  })
+})
+
+Then('the Threads tab is active', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-search-tab-is-selected', () =>
+    expect(paletteDialog(page).getByRole('tab', { name: 'Threads' })).toHaveAttribute('aria-selected', 'true'),
+  )
+})
+
+Then('the thread prefix opens a backable thread subview', async ({ page }: { page: Page }) => {
+  const dialog = paletteDialog(page)
+  await recordAssertion(page, 'thread-prefix-enters-thread-subview', async () => {
+    await expect(dialog.getByRole('button', { name: 'Back' })).toBeVisible()
+    await expect(dialog.getByText('Threads', { exact: true })).toBeVisible()
+    await expect(
+      dialog.getByText('Session session-e2e-missing was not found. It may have been deleted or belong to another profile.', { exact: true }),
+    ).toBeVisible()
+  })
+})
+
+Then('the palette returns to Threads search', async ({ page }: { page: Page }) => {
+  const dialog = paletteDialog(page)
+  await recordAssertion(page, 'escape-returns-to-parent-thread-search', async () => {
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('tab', { name: 'Threads' })).toHaveAttribute('aria-selected', 'true')
+    await expect(paletteInput(page)).toHaveValue('session-e2e-missing')
+    await expect(dialog.getByRole('button', { name: 'Back' })).toHaveCount(0)
+  })
+})
+
+Then('Escape clears the palette query without closing it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'escape-clears-root-query', async () => {
+    await expect(paletteInput(page)).toHaveValue('')
+    await expect(paletteDialog(page)).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the palette reports that session {string} was not found', async ({ page }: { page: Page }, sessionId: string) => {
+  await recordAssertion(page, 'session-link-reports-an-unknown-session-without-query-data', () =>
+    expect(
+      paletteDialog(page).getByText(`Session ${sessionId} was not found. It may have been deleted or belong to another profile.`, { exact: true }),
+    ).toBeVisible(),
+  )
   await finishJourneyAssertions(page)
 })
 
@@ -108,9 +174,7 @@ Then('the recently used dark-theme action ranks first', async ({ page }: { page:
 Then('command, content, line, and help prefixes open their matching views', async ({ page }: { page: Page }) => {
   const input = paletteInput(page)
   await input.fill('?')
-  await recordAssertion(page, 'help-prefix-routes-to-prefix-list', () =>
-    expect(paletteOption(page, /Commands and destinations/)).toBeVisible(),
-  )
+  await recordAssertion(page, 'help-prefix-routes-to-prefix-list', () => expect(paletteOption(page, /Commands and destinations/)).toBeVisible())
 
   await input.fill('>')
   await recordAssertion(page, 'command-prefix-routes-to-commands', async () => {

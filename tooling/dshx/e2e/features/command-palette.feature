@@ -49,6 +49,28 @@ Feature: Command palette
     When the command palette is opened
     Then command, content, line, and help prefixes open their matching views
 
+  @scenario:command-palette.thread-tabs-and-escape
+  Scenario: Thread tabs, prefixes, and Escape navigation stay inside the palette
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    Then Everything, Threads, and Files tabs are available
+    When the Threads tab is selected
+    Then the Threads tab is active
+    When the palette query is "thread:session-e2e-missing"
+    Then the thread prefix opens a backable thread subview
+    When Escape is pressed in the command palette
+    Then the palette returns to Threads search
+    When the Everything tab is selected
+    When Escape is pressed in the command palette
+    Then Escape clears the palette query without closing it
+
+  @scenario:command-palette.session-link-search
+  Scenario: A pasted session link uses its ID and ignores unrelated query parameters
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    When the palette query is "session:https://dsh.example.invalid/?thread=session-e2e-missing&workspace=workspace-e2e&token=fake-value"
+    Then the palette reports that session "session-e2e-missing" was not found
+
   @scenario:command-palette.new-thread-action
   Scenario: New thread is searchable in the command palette
     Given the isolated plugin profile "@dshfiles/command-palette" is booted

@@ -6,6 +6,7 @@ import {
   indexThreads,
   parseLineNumber,
   parsePaletteQuery,
+  parseThreadSearchInput,
   rankActions,
   rankFiles,
   rankThreads,
@@ -56,6 +57,17 @@ test('thread search matches title, project, and id prefix', () => {
   )
 })
 
+test('thread search accepts session IDs and extracts IDs from links without retaining auth query data', () => {
+  const id = 'session-4830f814-c905-4a23-85d4-86d40322ee0a'
+  const link = `https://dsh.example.invalid/?thread=${id}&workspace=7ab07f52-2801-4aee-be31-0ae83de8797c&token=fake-value`
+  const threads = [thread({ id, title: 'Older session' })]
+
+  assert.deepEqual(parseThreadSearchInput(id), { query: id, exactId: id })
+  assert.deepEqual(parseThreadSearchInput(link), { query: id, exactId: id })
+  assert.deepEqual(parseThreadSearchInput(link.replace('thread=', 'session=')), { query: id, exactId: id })
+  assert.deepEqual(rankThreads({ index: indexThreads(threads), query: link, limit: 10 }), threads)
+})
+
 test('file search prefers basename matches and lifts frecent paths', () => {
   const index = indexFiles(['docs/palette-notes.md', 'src/palette.ts', 'src/deep/nested/palette.ts', 'src/sidebar-state.tsx', 'README.md'])
   const none = (): number => 0
@@ -93,7 +105,9 @@ test('actions match labels and aliases, preserve ties, and use frecency', () => 
   )
 })
 
-test('palette prefixes route to command, content, and line views', () => {
+test('palette prefixes route to thread, command, content, and line views', () => {
+  assert.deepEqual(parsePaletteQuery('thread:session-abc'), { prefix: 'thread:', text: 'session-abc' })
+  assert.deepEqual(parsePaletteQuery('SESSION:session-abc'), { prefix: 'session:', text: 'session-abc' })
   assert.deepEqual(parsePaletteQuery('>toggle'), { prefix: '>', text: 'toggle' })
   assert.deepEqual(parsePaletteQuery('#migration plan'), { prefix: '#', text: 'migration plan' })
   assert.deepEqual(parsePaletteQuery(':42'), { prefix: ':', text: '42' })
