@@ -46,13 +46,9 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.turnFinishedDisplay)
       .description('Show completed turns in a separate attention group or as an inline thread-row label.'),
     attentionColors: Schema.object({
-      approvalNeeded: Schema.union(ATTENTION_COLOR_OPTIONS).default(
-        DEFAULT_PREFERENCES.attentionColors.approvalNeeded,
-      ),
+      approvalNeeded: Schema.union(ATTENTION_COLOR_OPTIONS).default(DEFAULT_PREFERENCES.attentionColors.approvalNeeded),
       inputNeeded: Schema.union(ATTENTION_COLOR_OPTIONS).default(DEFAULT_PREFERENCES.attentionColors.inputNeeded),
-      turnFinished: Schema.union(ATTENTION_COLOR_OPTIONS).default(
-        DEFAULT_PREFERENCES.attentionColors.turnFinished,
-      ),
+      turnFinished: Schema.union(ATTENTION_COLOR_OPTIONS).default(DEFAULT_PREFERENCES.attentionColors.turnFinished),
     })
       .default(DEFAULT_PREFERENCES.attentionColors)
       .description('Semantic color used for each attention status dot and label.'),
