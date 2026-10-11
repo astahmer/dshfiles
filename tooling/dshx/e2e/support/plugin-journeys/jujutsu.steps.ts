@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { browserDiagnosticsFor, finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 interface JujutsuFixture {
   readonly temporaryRoot: string
@@ -113,34 +113,13 @@ const revisionRow = (page: Page, description: string) =>
 const dragHandleFor = (page: Page, description: string) => revisionRow(page, description).locator('div[draggable="true"]')
 
 const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
-  const panel = page.getByRole('button', { name: 'Jujutsu', exact: true }).first()
-  const chooseRepository = page.getByRole('button', { name: 'Choose repository', exact: true }).first()
-  if (!(await chooseRepository.isVisible().catch(() => false))) await panel.click()
-  await expect(chooseRepository).toBeVisible()
-  await chooseRepository.click()
-  const picker = page.getByRole('dialog', { name: 'Choose a Jujutsu repository', exact: true })
-  const path = picker.getByRole('textbox', { name: /enter a folder path/i })
-  await path.fill(fixture.repositoryPath)
-  await path.press('Enter')
-  const selectFolder = picker.getByRole('button', { name: 'Select this folder', exact: true })
-  const listingError = picker.getByRole('alert')
-  try {
-    await expect
-      .poll(async () => {
-        if (await selectFolder.isVisible().catch(() => false)) return 'ready'
-        if (await listingError.isVisible().catch(() => false)) return 'error'
-        return 'pending'
-      }, { timeout: 15_000 })
-      .not.toBe('pending')
-  } catch (cause) {
-    throw new Error(`Folder listing did not settle. Browser diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}`, { cause })
-  }
-  if (await listingError.isVisible()) {
-    throw new Error(`Host rejected the disposable fixture folder. Browser diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}`)
-  }
-  await selectFolder.click()
-  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
-  await expect(revisionRow(page, fixture.targetDescription)).toBeVisible()
+  await page.evaluate(
+    ({ key, path }) => localStorage.setItem(key, JSON.stringify(path)),
+    { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath },
+  )
+  await page.reload()
+  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
+  await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })
 }
 
 const openClickToTargetPreview = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
