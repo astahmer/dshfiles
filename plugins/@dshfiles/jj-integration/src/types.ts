@@ -93,6 +93,7 @@ export type ConflictRecord = z.infer<typeof conflictRecordSchema>
 export const validationRecordSchema = z
   .object({
     kind: z.enum(['none', 'command']),
+    revision: jjRevisionSchema.nullable(),
     command: z.string().max(500).nullable(),
     exitCode: z.number().int().nullable(),
     outputExcerpt: z.string().max(2000),
@@ -185,4 +186,4 @@ export const jjIntegrationStateSchema = z
   .strict()
 export type JjIntegrationState = z.infer<typeof jjIntegrationStateSchema>
 
-export const noneValidation = (): ValidationRecord => ({ kind: 'none', command: null, exitCode: null, outputExcerpt: '', ranAt: null })
+export const noneValidation = (): ValidationRecord => ({ kind: 'none', revision: null, command: null, exitCode: null, outputExcerpt: '', ranAt: null })

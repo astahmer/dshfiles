@@ -315,6 +315,30 @@ describe('jj integration coordination (real jj repositories)', () => {
     expect((await restarted.runCandidate({ candidateId: candidate.id, sessionId: 'session-restart' })).outcome).toBe('integrated')
   })
 
+  it('refuses to queue an empty source revision instead of advancing the spine', async () => {
+    const fixture = await createFixture()
+    const agentPath = await addAgentWorkspace(fixture, 'ws-empty')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-empty', source: 'agent-tool' })
+    const spineBefore = await spineCommit(fixture)
+    await expect(fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-empty' })).rejects.toMatchObject({
+      code: 'empty-revision',
+    })
+    expect(await fixture.service.listCandidates()).toHaveLength(0)
+    expect(await spineCommit(fixture)).toBe(spineBefore)
+  })
+
+  it('records the exact validated revision in the validation receipt', async () => {
+    const fixture = await createFixture({ validationCommand: 'exit 0' })
+    const agentPath = await addAgentWorkspace(fixture, 'ws-receipt')
+    await commitWork(agentPath, 'receipt.txt', 'work\n', 'receipt work')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-receipt', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-receipt' })
+    const run = await fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-receipt' })
+    expect(run.outcome).toBe('integrated')
+    expect(run.candidate.validation.kind).toBe('command')
+    expect(run.candidate.validation.revision?.commitId).toBe(run.candidate.resultRevision?.commitId)
+  })
+
   it('refuses a second coordinator process that holds the integration lock', async () => {
     const fixture = await createFixture()
     const agentPath = await addAgentWorkspace(fixture, 'ws-lock')

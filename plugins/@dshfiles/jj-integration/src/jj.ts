@@ -153,6 +153,22 @@ export const changedFiles = async (
     .filter(line => line.length > 0)
 }
 
+export const isRevisionEmpty = async (
+  executor: JjExecutor,
+  cwd: string,
+  revision: string,
+  signal?: AbortSignal,
+): Promise<boolean> => {
+  const result = await run(executor, {
+    args: ['diff', '--from', `${revision}-`, '--to', revision, '--summary'],
+    cwd,
+    ...(signal === undefined ? {} : { signal }),
+    allowFailure: true,
+    label: 'Check whether a revision is empty',
+  })
+  return result.exitCode === 0 && result.stdout.trim().length === 0
+}
+
 export const conflictFiles = async (executor: JjExecutor, cwd: string, revision: string, signal?: AbortSignal): Promise<readonly string[]> => {
   const result = await run(executor, {
     args: ['resolve', '--list', '-r', revision],

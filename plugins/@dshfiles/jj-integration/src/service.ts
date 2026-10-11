@@ -25,6 +25,7 @@ import {
   duplicateOnto,
   forgetWorkspace,
   isAncestor,
+  isRevisionEmpty,
   resolveRevision,
   revisionExists,
   runValidationCommand,
@@ -327,6 +328,9 @@ export class JjIntegrationService {
         ? await resolveRevision(this.#executor, workspace.path, '@', input.signal)
         : await resolveRevision(this.#executor, workspace.path, input.revision, input.signal)
       const spine = await resolveRevision(this.#executor, repository.root, repository.spineBookmark, input.signal)
+      if (await isRevisionEmpty(this.#executor, workspace.path, source.changeId, input.signal)) {
+        throw new IntegrationError('empty-revision', 'The selected source revision contains no changes to integrate.')
+      }
       const dependsOn = [...new Set(input.dependsOn ?? [])]
       const candidateId = randomUUID()
       for (const dependencyId of dependsOn) {
@@ -477,6 +481,9 @@ export class JjIntegrationService {
         if (currentSource === undefined) return this.#failCandidate(candidate, 'failed', 'Source workspace revision could not be resolved.')
         if (currentSource.commitId !== candidate.sourceRevision.commitId) {
           return this.#failCandidate(candidate, 'stale', 'Source revision evolved after this candidate was queued; retry to capture the new revision.')
+        }
+        if (await isRevisionEmpty(this.#executor, workspace.path, candidate.sourceRevision.changeId, input.signal)) {
+          return this.#failCandidate(candidate, 'blocked', 'Source revision contains no changes; nothing to integrate.')
         }
         if (await isAncestor(this.#executor, repository.root, candidate.sourceRevision.commitId, spine.commitId, input.signal)) {
           return this.#integrateAlready(candidate, spine)
@@ -687,6 +694,7 @@ export class JjIntegrationService {
       const output = `${result.stdout}\n${result.stderr}`.trim()
       return {
         kind: 'command',
+        revision: toRevision(revision),
         command,
         exitCode: result.exitCode,
         outputExcerpt: output.slice(-2000),
