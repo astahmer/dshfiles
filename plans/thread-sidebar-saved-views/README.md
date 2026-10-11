@@ -1,13 +1,13 @@
 # Thread sidebar saved views
 
-| Milestone                                                                 | Status      | Evidence                                                                                      |
-| ------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------- |
-| Inspect current grouping/filter state and migration boundary              | complete    | Existing v1 key stores one group/status/source preference.                                    |
-| Add validated presets, defaults, operations, and v1 migration             | complete    | `thread-view-preferences.ts` plus focused unit tests.                                         |
-| Add manager UI, dynamic tabs, and optional quick controls                 | complete    | `thread-view-manager.tsx`, sidebar wiring, English/Chinese labels.                            |
-| Add isolated browser journey and feature inventory entries                | complete    | New `thread-view-presets.feature`; E2E passed; inventory reports 83 pre-existing issues only. |
-| Run plugin gates and rebuild UI consumers                                 | complete   | Sidebar typecheck/build/import passed; 96 tests and isolated E2E passed. 11 consumers built; 7 existing type/dependency failures remain, and source-only project-folder-picker has no build script (its typecheck and 5 tests pass). |
-| Split owned paths into focused JJ change and preserve integration handoff | in progress | Current `@` parent is `15d9f72e`; `integration-spine` remains conflicted. Do not rewrite or resolve it here. |
+| Milestone                                                                 | Status             | Evidence                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Inspect current grouping/filter state and migration boundary              | complete           | Existing v1 key stores one group/status/source preference.                                                                                                                                                                           |
+| Add validated presets, defaults, operations, and v1 migration             | complete           | `thread-view-preferences.ts` plus focused unit tests.                                                                                                                                                                                |
+| Add manager UI, dynamic tabs, and optional quick controls                 | complete           | `thread-view-manager.tsx`, sidebar wiring, English/Chinese labels.                                                                                                                                                                   |
+| Add isolated browser journey and feature inventory entries                | complete           | New `thread-view-presets.feature`; E2E passed; inventory reports 83 pre-existing issues only.                                                                                                                                        |
+| Run plugin gates and rebuild UI consumers                                 | complete           | Sidebar typecheck/build/import passed; 96 tests and isolated E2E passed. 11 consumers built; 7 existing type/dependency failures remain, and source-only project-folder-picker has no build script (its typecheck and 5 tests pass). |
+| Split owned paths into focused JJ change and preserve integration handoff | complete (handoff) | `877d3679` in workspace `thread-view-presets`, based on `15d9f72e`; tree matches validated snapshot. `integration-spine` remains conflicted, so no integration attempted.                                                            |
 
 ## Validation notes
 
@@ -19,4 +19,4 @@
 
 ## Resume here
 
-Verify current `@` and workspace ownership, split only task-owned paths with `jj split`, then preserve the unresolved `integration-spine` conflict and report integration handoff. Do not rebase or resolve it blindly.
+Integrate revision `877d3679` only after `integration-spine` conflict is resolved. Do not rebase or resolve either conflicted head blindly. Original workspace `thread-view-controls` still contains a duplicate task patch; leave it untouched and coordinate cleanup before any further history surgery.
