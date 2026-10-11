@@ -239,3 +239,37 @@ noisier than the first run.
 - Build-from-scratch and append throughput are 3–4× slower than the first run; the view bytes, file size
   and call counts match, so the gap is mostly load on the machine plus the second view per stream. Re-run
   on an idle machine before treating it as a regression.
+
+## 100k re-run, three passes (2026-10-11)
+
+`fnm exec --using=22.23.3 node --no-warnings bench/run.ts 100000`, three runs back to back, darwin/arm64. Waited
+20 minutes for the 1-minute load average to fall under 6; it stayed between 17 and 38. The runs went ahead anyway,
+so this is still not a quiet-machine baseline.
+
+| run | 1-min load (start → end) | build from scratch | append        |
+| --- | ------------------------ | ------------------ | ------------- |
+| 1   | 16.9 → 18.3              | 62.4 s             | 5,072 ev/s    |
+| 2   | 18.3 → 16.5              | 70.4 s             | 6,018 ev/s    |
+| 3   | 16.5 → 12.9              | 47.2 s             | 6,080 ev/s    |
+
+Median of the three runs, each value taken separately:
+
+| metric                           | 100,000             |
+| -------------------------------- | ------------------- |
+| append (store, 1 event/tx)       | 6,018 ev/s          |
+| build tree+views from scratch    | 62.4 s              |
+| summarizer calls / clips         | 139,076 / 0         |
+| merge-batch line merges          | 396,457             |
+| steady append+drain p50 / p95    | 2.71 ms / 11.33 ms  |
+| search p50 / p95                 | 21.94 ms / 36.83 ms |
+| zoom p50 / p95                   | 0.01 ms / 0.26 ms   |
+| context p50 / p95                | 0.05 ms / 0.61 ms   |
+| snapshot p50 / p95               | 0.41 ms / 2.84 ms   |
+| project view bytes (max) / lines | 125,759 / 395       |
+| database file                    | 247.4 MB            |
+| process RSS                      | 374.0 MB            |
+
+- Deterministic counts (summarizer calls, merges, view bytes, file size) match across all three runs.
+- Under similar load, the median build time (62.4 s) and search p95 (36.8 ms) beat the 2026-10-09 busy run
+  (97.5 s, 292 ms). Search p50 matches the first run (19.2 ms). Run 3 had a search and snapshot p95 spike
+  (120 ms, 36 ms), so the median hides some tail noise. RSS varied a lot (255 to 747 MB).
