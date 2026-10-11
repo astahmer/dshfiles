@@ -34,6 +34,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountKind; readonly clas
         </svg>
       )
     case 'commandcode':
+    case 'github-copilot':
       return <SquareTerminalIcon aria-label={label} className={className} role="img" style={style} />
     case 'cursor':
       return <MousePointer2Icon aria-label={label} className={className} role="img" style={style} />

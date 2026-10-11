@@ -33,6 +33,8 @@ export const readAccountUsage = async (input: {
       return readClaudeUsage(resolveClaudeConfigDir(account.homePath), signal)
     case 'commandcode':
       return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
+    case 'github-copilot':
+      return emptyUsage('unsupported', 'GitHub does not expose a supported subscription quota endpoint.')
     case 'cursor':
       return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
     case 'opencode-go': {

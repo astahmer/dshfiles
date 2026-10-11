@@ -18,11 +18,12 @@ import { usePreferences } from './use-preferences.js'
 /** The one credential field each kind needs to work, edited in place. */
 const CREDENTIAL_FIELD = {
   codex: { key: 'homePath', label: 'CODEX_HOME', placeholder: '~/.codex' },
+  'github-copilot': null,
   claude: { key: 'homePath', label: 'CLAUDE_CONFIG_DIR', placeholder: '~/.claude' },
   'opencode-go': { key: 'apiKeyEnv', label: 'Key variable', placeholder: 'OPENCODE_API_KEY' },
   commandcode: { key: 'apiKeyEnv', label: 'Key variable', placeholder: 'COMMANDCODE_API_KEY' },
   cursor: { key: 'apiKeyEnv', label: 'Token variable', placeholder: 'empty: cursor-agent login' },
-} as const satisfies Record<AccountDraft['kind'], { readonly key: 'homePath' | 'apiKeyEnv'; readonly label: string; readonly placeholder: string }>
+} as const satisfies Record<AccountDraft['kind'], { readonly key: 'homePath' | 'apiKeyEnv'; readonly label: string; readonly placeholder: string } | null>
 
 const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved: (file: AccountsFile) => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
@@ -55,16 +56,20 @@ const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved
         Display name
         <Input onChange={event => setDraft({ ...draft, displayName: event.target.value })} value={draft.displayName} />
       </label>
-      <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
-        {field.label}
-        <Input
-          className="dshx:font-mono! dshx:text-xs"
-          onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}
-          placeholder={field.placeholder}
-          spellCheck={false}
-          value={draft[field.key]}
-        />
-      </label>
+      {field === null ? (
+        <p className="dshx:text-xs dshx:text-muted-foreground">Manage GitHub sign-in in the full AI Accounts panel.</p>
+      ) : (
+        <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
+          {field.label}
+          <Input
+            className="dshx:font-mono! dshx:text-xs"
+            onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}
+            placeholder={field.placeholder}
+            spellCheck={false}
+            value={draft[field.key]}
+          />
+        </label>
+      )}
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:sm:col-span-2">
         {preferences.saveMode === 'manual' ? (
           <>

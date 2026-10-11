@@ -30,6 +30,7 @@ describe('provider ids another plugin serves', () => {
       { instanceId: 'opencode-go-work', displayName: '', kind: 'opencode-go', apiKeyEnv: '', apiBaseUrl: '', enabled: true },
     ],
     claudeAccounts: [],
+    githubCopilotAccounts: [{ instanceId: 'copilot-work', displayName: 'Copilot Work', enabled }],
     opencodeApiKey: '',
     distribution: 'sticky',
     cooldownMs: 0,
@@ -38,13 +39,14 @@ describe('provider ids another plugin serves', () => {
 
   it('leaves out an enabled account whose id is already registered, and says why', () => {
     const { routes, rejected } = buildRoutes(config(true), { takenProviders: new Set(['commandcode']) })
-    expect([...routes.keys()]).toEqual(['opencode-go-work'])
+    expect([...routes.keys()]).toEqual(['opencode-go-work', 'copilot-work'])
+    expect(routes.get('copilot-work')).toMatchObject({ kind: 'github-copilot', displayName: 'Copilot Work' })
     expect(rejected).toEqual(['commandcode: another plugin already serves provider "commandcode"'])
   })
 
   it('keeps a disabled account, which registers no adapter', () => {
     const { routes, rejected } = buildRoutes(config(false), { takenProviders: new Set(['commandcode']) })
-    expect([...routes.keys()].sort()).toEqual(['commandcode', 'opencode-go-work'])
+    expect([...routes.keys()].sort()).toEqual(['commandcode', 'copilot-work', 'opencode-go-work'])
     expect(rejected).toEqual([])
   })
 })

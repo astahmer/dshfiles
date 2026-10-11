@@ -5,6 +5,7 @@ import type { UsageHistoryScheduler } from './usage-recorder.js'
 import type { QuotaContinuationService } from './quota-continuation.js'
 import type { AccountsUsage } from './api.js'
 import type { PricingCatalog } from './pricing-catalog.js'
+import type { CopilotLoginService } from './copilot-login.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
@@ -16,6 +17,7 @@ interface AccountRuntime {
   refreshModelCatalog?: (instanceId: string) => Promise<void>
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; latest(): AccountsUsage | undefined; invalidate(): void }
   pricing?: PricingCatalog
+  copilotLogin?: CopilotLoginService
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()
@@ -27,6 +29,7 @@ export const activateAccountRuntime = (ctx: Context): AccountRuntime => {
   runtimes.set(ctx.root, runtime)
   ctx.effect(() => () => {
     runtime.scheduler?.dispose()
+    runtime.copilotLogin?.dispose()
     if (runtimes.get(ctx.root) === runtime) runtimes.delete(ctx.root)
   })
   return runtime

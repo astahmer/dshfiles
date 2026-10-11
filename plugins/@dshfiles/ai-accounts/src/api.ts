@@ -15,7 +15,7 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
  * it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'cursor'])
+export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
 
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
@@ -235,6 +235,16 @@ export type AccountsCatalog = z.infer<typeof accountsCatalogSchema>
 export type UsageCard = z.infer<typeof usageCardSchema>
 export type AccountsUsage = z.infer<typeof accountsUsageSchema>
 
+export const copilotLoginStateSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  status: z.enum(['idle', 'starting', 'waiting', 'complete', 'error']),
+  userCode: z.string().max(32).nullable(),
+  verificationUri: z.string().url().max(512).nullable(),
+  message: z.string().max(300).nullable(),
+})
+
+export type CopilotLoginState = z.infer<typeof copilotLoginStateSchema>
+
 export const identityResultSchema = z.object({
   instanceId: z.string().min(1).max(64),
   email: z.string().max(320).nullable(),
@@ -318,6 +328,21 @@ export const aiAccountsApi = defineApi({
     identity: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: identityResultSchema,
+    }),
+    /** Start the GitHub device-code flow for one saved Copilot account. */
+    beginCopilotLogin: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      output: copilotLoginStateSchema,
+    }),
+    /** Read the current non-secret state of a Copilot sign-in flow. */
+    copilotLoginStatus: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      output: copilotLoginStateSchema,
+    }),
+    /** Remove one Copilot account's stored OAuth grant. */
+    signOutCopilot: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      output: z.object({ signedOut: z.literal(true) }),
     }),
     /**
      * One account's model catalog with the reasoning levels each model

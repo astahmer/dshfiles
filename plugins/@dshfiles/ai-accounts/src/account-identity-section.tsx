@@ -75,7 +75,7 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
               readOnly
               value={
                 selected?.identity ??
-                (draft.kind === 'codex' || draft.kind === 'claude' || draft.kind === 'cursor'
+                (draft.kind === 'codex' || draft.kind === 'claude' || draft.kind === 'github-copilot' || draft.kind === 'cursor'
                   ? selected?.signedIn === true
                     ? 'Signed in'
                     : 'Sign in, then refresh'

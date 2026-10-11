@@ -38,6 +38,7 @@ const PathField = (props: {
 
 const KEY_FIELD = {
   codex: null,
+  'github-copilot': null,
   claude: {
     label: 'SETUP TOKEN',
     hint: 'Optional `claude setup-token` reference. The value stays in DSH credentials or the Host environment.',

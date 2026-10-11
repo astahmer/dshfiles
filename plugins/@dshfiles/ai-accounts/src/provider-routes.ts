@@ -7,6 +7,7 @@ export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
 export const COMMANDCODE_KIND = CC_KIND
 export const CLAUDE_KIND = 'claude'
+export const GITHUB_COPILOT_KIND = 'github-copilot'
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
@@ -43,6 +44,13 @@ export interface KeyedRoute {
   readonly enabled: boolean
 }
 
+export interface GitHubCopilotRoute {
+  readonly kind: typeof GITHUB_COPILOT_KIND
+  readonly instanceId: string
+  readonly displayName: string
+  readonly enabled: boolean
+}
+
 export interface ClaudeRoute {
   readonly kind: typeof CLAUDE_KIND
   readonly instanceId: string
@@ -52,7 +60,7 @@ export interface ClaudeRoute {
   readonly enabled: boolean
 }
 
-export type Route = CodexRoute | KeyedRoute | ClaudeRoute
+export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute
 
 export const keyEnvFor = (route: KeyedRoute): string =>
   route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
@@ -119,6 +127,15 @@ export const buildRoutes = (config: AiAccountsConfig, options: { readonly takenP
       displayName: displayNameFor(account.displayName, CLAUDE_KIND, instanceId),
       configDir: resolveClaudeConfigDir(account.configDir),
       apiKeyEnv: account.apiKeyEnv,
+      enabled: account.enabled,
+    })
+  }
+  for (const account of config.githubCopilotAccounts) {
+    const instanceId = normalizeInstanceId(account.instanceId, GITHUB_COPILOT_KIND)
+    routes.set(instanceId, {
+      kind: GITHUB_COPILOT_KIND,
+      instanceId,
+      displayName: displayNameFor(account.displayName, GITHUB_COPILOT_KIND, instanceId),
       enabled: account.enabled,
     })
   }

@@ -150,6 +150,7 @@ const observe = async (
   file: AccountStoreFile,
   status: AccountStatus | undefined,
   resolveCredential?: CredentialValueResolver,
+  isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
 ): Promise<AccountProfile> => {
   const cooling = status?.state === 'cooling'
   const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? readKeyFromEnv(name) : resolveCredential(name))
@@ -188,6 +189,17 @@ const observe = async (
       plan: auth.plan ?? null,
       loginHint: claudeLoginHint(configDir),
       detail: auth.detail ?? null,
+    })
+  }
+  if (draft.kind === 'github-copilot') {
+    const signedIn = await (isCopilotSignedIn?.(draft.instanceId) ?? Promise.resolve(false))
+    return observed(draft, {
+      cooling,
+      signedIn,
+      identity: null,
+      plan: null,
+      loginHint: 'Sign in with GitHub to connect Copilot.',
+      detail: null,
     })
   }
   if (draft.kind === 'cursor') {
@@ -246,12 +258,13 @@ export const buildAccountsFile = async (
   file: AccountStoreFile,
   statuses: readonly AccountStatus[],
   resolveCredential?: CredentialValueResolver,
+  isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
 ): Promise<AccountsFile> => ({
   ...file,
   accounts: await Promise.all(
     file.accounts.map(async draft => {
       const status = statuses.find(candidate => candidate.id === draft.instanceId)
-      return observe(draft, file, status, resolveCredential)
+      return observe(draft, file, status, resolveCredential, isCopilotSignedIn)
     }),
   ),
 })

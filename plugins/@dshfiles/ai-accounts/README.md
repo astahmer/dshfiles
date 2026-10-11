@@ -2,8 +2,9 @@
 
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 OpenCode Go and Command Code accounts each become their own route in the model
-picker. Cursor accounts only track identity and quota, because Cursor sessions
-run through the `@dshfiles/cursor-agent` runtime driver.
+picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
+accounts only track identity and quota, because Cursor sessions run through the
+`@dshfiles/cursor-agent` runtime driver.
 
 ## Providers
 
@@ -13,7 +14,13 @@ run through the `@dshfiles/cursor-agent` runtime driver.
 | Claude       | `claude /login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`)                |
 | OpenCode Go  | key in DSH credentials or the Host environment                                                                                                       | yes         | rolling, weekly and monthly windows                                    |
 | Command Code | key in DSH credentials or the Host environment, or `cmd login`                                                                                       | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)             |
+| GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                            | yes         | unsupported; GitHub exposes no supported subscription quota endpoint  |
 | Cursor       | `cursor-agent login`, or a token in DSH credentials or the Host environment                                                                          | no          | included usage for the billing cycle (undocumented dashboard endpoint) |
+
+GitHub Copilot sign-in opens GitHub's device authorization page and shows a
+short code in AI Accounts. Each account's OAuth grant is stored as a DSH
+credential record, separate from `accounts.json`; the plugin refreshes tokens
+through pi-ai and offers the Copilot models returned for that subscription.
 
 The plugin reads Claude Code's login but never refreshes it. When that token
 expires, run Claude Code once on the account. Quota needs the interactive

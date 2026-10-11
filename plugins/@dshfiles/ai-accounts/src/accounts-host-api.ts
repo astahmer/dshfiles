@@ -12,6 +12,7 @@ import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { resolveRouteQuote } from './pricing-catalog.js'
 import { readPricingSettings } from './settings.js'
+import { readCopilotCredential } from './copilot-credentials.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -19,7 +20,12 @@ import { readPricingSettings } from './settings.js'
  * `ai_accounts` tool can never describe different state.
  */
 export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
-  buildAccountsFile(await readAccountFile(), accountRuntime(ctx)?.accounts?.pool.describe() ?? [], resolveKeyFromContext(ctx))
+  buildAccountsFile(
+    await readAccountFile(),
+    accountRuntime(ctx)?.accounts?.pool.describe() ?? [],
+    resolveKeyFromContext(ctx),
+    async instanceId => (await readCopilotCredential(ctx.get('credentials'), instanceId)) !== undefined,
+  )
 
 export const accountsSnapshot = accountsFile
 
@@ -36,6 +42,12 @@ const quotaContinuationServiceFor = (ctx: Context) => {
 }
 
 const secretCatalogBridgeFor = (ctx: Context): SecretCatalogCredentialBridge | undefined => ctx.get('secretCatalogCredentials')
+
+const copilotLoginFor = (ctx: Context) => {
+  const service = accountRuntime(ctx)?.copilotLogin
+  if (service === undefined) throw new Error('GitHub Copilot sign-in is unavailable.')
+  return service
+}
 
 export const accountsHostApi = aiAccountsApi.host({
   read: async ({ ctx }) => {
@@ -88,6 +100,13 @@ export const accountsHostApi = aiAccountsApi.host({
     return accountsFile(ctx)
   },
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
+  beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
+  copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
+  signOutCopilot: async ({ input, ctx }) => {
+    await copilotLoginFor(ctx).signOut(input.instanceId)
+    accountRuntime(ctx)?.usageCache?.invalidate()
+    return { signedOut: true }
+  },
   catalog: async ({ input, ctx }) => {
     await refreshRoutes(ctx)
     const llm = ctx.get('llm')

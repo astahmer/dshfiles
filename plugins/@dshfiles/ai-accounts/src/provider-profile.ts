@@ -6,6 +6,7 @@ import { accountModelName } from './api.js'
 import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
+import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
@@ -16,7 +17,11 @@ export const buildProfile = (params: {
   readonly favoriteModelIds?: readonly string[]
   /** Explicit ordering; unlisted ids keep provider order after these. */
   readonly modelOrder?: readonly string[]
-  readonly upstream: ReturnType<typeof openaiCodexProvider> | ReturnType<typeof opencodeGoProvider> | ReturnType<typeof anthropicProvider>
+  readonly upstream:
+    | ReturnType<typeof openaiCodexProvider>
+    | ReturnType<typeof opencodeGoProvider>
+    | ReturnType<typeof anthropicProvider>
+    | ReturnType<typeof githubCopilotProvider>
   readonly provider: string
   readonly displayName: string
   readonly additionalModelIds: readonly string[]

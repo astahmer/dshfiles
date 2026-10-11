@@ -5,12 +5,14 @@ import { DISTRIBUTION_HINT, STATE_LABEL } from './account-labels.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+import { CopilotSignIn } from './copilot-sign-in.js'
 
 const SESSION_MODE = {
   codex: draft => (draft.shadowHomePath === '' ? 'Private auth under the shadow root' : 'Shared state, private auth'),
   claude: draft => (draft.apiKeyEnv === '' ? 'Claude Code login' : 'Setup token, login for quota'),
   'opencode-go': () => 'Key from the environment',
   commandcode: draft => (draft.apiKeyEnv === '' ? 'cmd login or COMMANDCODE_API_KEY' : 'Key from the environment'),
+  'github-copilot': () => 'GitHub device-code sign-in; OAuth is stored in DSH credentials',
   cursor: () => 'Quota only; sessions use Cursor Agent',
 } satisfies Record<AccountDraft['kind'], (draft: AccountDraft) => string>
 
@@ -30,7 +32,7 @@ export const SessionSection = (props: { readonly state: AccountsPanelState; read
   return (
     <NumberedSection
       actions={
-        selected === null || selected.signedIn ? null : (
+        selected === null || selected.signedIn || selected.kind === 'github-copilot' ? null : (
           <Button onClick={() => void copy(selected.loginHint, 'Sign-in command copied.')} size="xs" type="button" variant="outline">
             <ExternalLinkIcon />
             Copy sign-in command
@@ -51,7 +53,8 @@ export const SessionSection = (props: { readonly state: AccountsPanelState; read
       <p className="dshx:text-xs dshx:text-muted-foreground">
         Requests spread by <strong className="dshx:font-semibold dshx:text-foreground">{file.distribution}</strong>. {DISTRIBUTION_HINT[file.distribution]}
       </p>
-      {selected !== null && !selected.signedIn ? (
+      {draft.kind === 'github-copilot' ? <CopilotSignIn instanceId={draft.instanceId} signedIn={selected?.signedIn === true} /> : null}
+      {selected !== null && !selected.signedIn && selected.kind !== 'github-copilot' ? (
         <Alert role="status" variant="info">
           <AlertTitle>Sign in with</AlertTitle>
           <AlertDescription>

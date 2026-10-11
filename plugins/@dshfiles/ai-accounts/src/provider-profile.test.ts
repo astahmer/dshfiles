@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
+import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { createCommandCodeProvider } from './commandcode-provider.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
 
@@ -41,6 +42,19 @@ describe('account provider profiles', () => {
     })
     expect((await adapter.resolveModel('codex-emialex', 'gpt-5.3-codex-spark')).inputModalities).toEqual(['text'])
     expect((await adapter.resolveModel('codex-emialex', 'gpt-6.1-codex-spark')).inputModalities).toEqual(['text'])
+  })
+
+  it('uses GitHub Copilot model metadata for each account route', () => {
+    const profile = buildProfile({
+      upstream: githubCopilotProvider(),
+      provider: 'github-copilot-work',
+      displayName: 'GitHub Copilot Work',
+      additionalModelIds: [],
+    })
+    const model = modelsFor(profile).find(candidate => candidate.id === 'gpt-6-luna')
+
+    expect(profile.piProvider).toMatchObject({ id: 'github-copilot-work', name: 'GitHub Copilot Work' })
+    expect(model).toMatchObject({ provider: 'github-copilot-work', api: 'openai-responses' })
   })
 
   it('adds custom OpenCode Go models and keeps non-favorites available', () => {

@@ -24,6 +24,7 @@ const DEFAULT_HOME = {
   claude: '~/.claude',
   'opencode-go': '',
   commandcode: '',
+  'github-copilot': '',
   cursor: '',
 } satisfies Record<AccountKind, string>
 
@@ -105,7 +106,7 @@ export const newAccountDraft = (input: { readonly kind: AccountKind; readonly ex
     enabled: true,
     homePath: DEFAULT_HOME[input.kind],
     shadowHomePath: '',
-    apiKeyEnv: input.kind === 'codex' ? '' : suggestedApiKeyRef(instanceId),
+    apiKeyEnv: input.kind === 'codex' || input.kind === 'github-copilot' ? '' : suggestedApiKeyRef(instanceId),
     apiBaseUrl: '',
     badge: badgeFromName(displayName),
     accentColor: KIND_ACCENT[input.kind],

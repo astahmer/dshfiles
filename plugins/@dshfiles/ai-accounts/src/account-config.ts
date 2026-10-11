@@ -25,6 +25,12 @@ export interface KeyedAccountConfig {
 
 export type OpenCodeAccountConfig = KeyedAccountConfig
 
+export interface GitHubCopilotAccountConfig {
+  readonly instanceId: string
+  readonly displayName: string
+  readonly enabled: boolean
+}
+
 export interface ClaudeAccountConfig {
   readonly instanceId: string
   readonly displayName: string
@@ -39,6 +45,7 @@ export interface AiAccountsConfig {
   readonly codexAccounts: readonly CodexAccountConfig[]
   readonly opencodeAccounts: readonly OpenCodeAccountConfig[]
   readonly claudeAccounts: readonly ClaudeAccountConfig[]
+  readonly githubCopilotAccounts: readonly GitHubCopilotAccountConfig[]
   readonly opencodeApiKey: string
   readonly distribution: Distribution
   readonly cooldownMs: number
@@ -86,8 +93,13 @@ export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSy
     }))
   const opencodeAccounts: KeyedAccountConfig[] = []
   const claudeAccounts: ClaudeAccountConfig[] = []
+  const githubCopilotAccounts: GitHubCopilotAccountConfig[] = []
   for (const account of file.accounts) {
     if (account.kind === 'codex' || account.kind === 'cursor') continue
+    if (account.kind === 'github-copilot') {
+      githubCopilotAccounts.push({ instanceId: account.instanceId, displayName: account.displayName, enabled: account.enabled })
+      continue
+    }
     if (account.kind === 'claude') {
       claudeAccounts.push({
         instanceId: account.instanceId,
@@ -113,6 +125,7 @@ export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSy
     codexAccounts,
     opencodeAccounts,
     claudeAccounts,
+    githubCopilotAccounts,
     opencodeApiKey: readKeyFromEnv('OPENCODE_API_KEY') ?? '',
     distribution: file.distribution,
     cooldownMs: file.cooldownMs,

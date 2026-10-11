@@ -5,6 +5,7 @@ export { Config } from './account-config.js'
 import type {} from '@dshfiles/dshx/client'
 import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } from './accounts-host-api.js'
 import { createUsageCache } from './account-usage.js'
+import { createCopilotLoginService } from './copilot-login.js'
 import { resolveClaudeInferenceToken } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readRecoverySettings } from './settings.js'
@@ -22,6 +23,9 @@ import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
+import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
+import { deleteCopilotCredential, modifyCopilotCredential, readCopilotCredential } from './copilot-credentials.js'
+import { GITHUB_COPILOT_KIND } from './provider-routes.js'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -134,10 +138,17 @@ export default definePlugin({
     const initialFile = readAccountFileSync()
     let config = configFromAccountsFile(initialFile)
     let routes = buildRoutes(config).routes
+    const copilotLogin = createCopilotLoginService({
+      credentials: ctx.get('credentials'),
+      isCopilotAccount: instanceId => routes.get(instanceId)?.kind === GITHUB_COPILOT_KIND,
+      onChange: () => runtime.usageCache?.invalidate(),
+    })
+    runtime.copilotLogin = copilotLogin
 
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
     const claudeUpstream = anthropicProvider()
+    const githubCopilotUpstream = githubCopilotProvider()
     /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
     const lunaReserveHolds = new Map<string, number>()
     const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
@@ -210,7 +221,9 @@ export default definePlugin({
                   })
                 : route.kind === CLAUDE_KIND
                   ? claudeUpstream
-                  : keyedUpstream(route),
+                  : route.kind === GITHUB_COPILOT_KIND
+                    ? githubCopilotUpstream
+                    : keyedUpstream(route),
             provider: id,
             displayName: route.displayName,
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
@@ -294,6 +307,7 @@ export default definePlugin({
             await materializeCodexShadowHome(route.layout)
             return readCodexAccessToken(route.layout.effectiveHomePath)
           }
+          if (route.kind === GITHUB_COPILOT_KIND) return undefined
           if (route.kind === CLAUDE_KIND) {
             try {
               return await resolveClaudeInferenceToken({
@@ -322,13 +336,21 @@ export default definePlugin({
           credentials: {
             read: async provider => {
               const route = routes.get(provider)
+              if (route?.kind === GITHUB_COPILOT_KIND) return readCopilotCredential(ctx.get('credentials'), route.instanceId)
               if (route === undefined || route.kind !== CODEX_KIND) return undefined
               await materializeCodexShadowHome(route.layout)
               return readCodexOAuthCredential(route.layout.effectiveHomePath)
             },
-            list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
+            list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND || route.kind === GITHUB_COPILOT_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
             modify: async (provider, mutate) => {
               const route = routes.get(provider)
+              if (route?.kind === GITHUB_COPILOT_KIND) {
+                return modifyCopilotCredential(ctx.get('credentials'), route.instanceId, async current => {
+                  const next = await mutate(current)
+                  if (next !== undefined && next.type !== 'oauth') throw new LlmError('GitHub Copilot uses OAuth credentials.', 'UNSUPPORTED_OPERATION')
+                  return next
+                })
+              }
               if (route === undefined || route.kind !== CODEX_KIND) {
                 throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
               }
@@ -338,7 +360,12 @@ export default definePlugin({
               if (next !== undefined && next.type === 'oauth') await persistCodexOAuthCredential(codexHome, next)
               return next
             },
-            delete: async () => {
+            delete: async provider => {
+              const route = routes.get(provider)
+              if (route?.kind === GITHUB_COPILOT_KIND) {
+                await deleteCopilotCredential(ctx.get('credentials'), route.instanceId)
+                return
+              }
               throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
             },
           },

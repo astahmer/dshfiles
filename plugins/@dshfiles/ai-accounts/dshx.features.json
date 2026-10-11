@@ -86,6 +86,11 @@
           "kind": "gherkin",
           "id": "ai-accounts.pool-failover",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.github-copilot",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts-copilot.feature"
         }
       ]
     },
