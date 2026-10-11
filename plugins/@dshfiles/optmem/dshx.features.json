@@ -446,7 +446,8 @@
             "false"
           ],
           "coveredBy": [
-            "optmem.settings-panel-unit-pause"
+            "optmem.settings-panel-unit-pause",
+            "optmem.settings-panel"
           ]
         }
       ],
@@ -465,6 +466,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "optmem.settings-panel",
+          "featureFile": "tooling/dshx/e2e/features/optmem.feature"
+        },
         {
           "kind": "unit-test",
           "id": "optmem.settings-panel-unit-pause",
