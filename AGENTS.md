@@ -484,9 +484,18 @@ join two variants of one change and still merge cleanly.
 
 The root `pnpm run check` additionally runs `lint` and `fmt:check`, which fail
 across work that predates any single change (measured 2026-10-11: ~270 files with
-lint findings, ~148 unformatted). Do not read that as your regression: intersect
-the failing paths with your own diff (`jj diff --from <base> --to @ --summary`)
-and report the remainder as baseline drift.
+lint findings, ~148 unformatted). Do not read that as your regression:
+`pnpm run check:diff` lints and format-checks only the paths your revision
+touches (`jj diff --from @- --to @`, override with `--from`/`--to`), and
+`pnpm run check:green` runs every other gate without `lint`/`fmt:check`, so it
+can actually be green. `pnpm run check` stays the full superset.
+
+`pnpm run check:plugins:cached` runs the four plugin gates and records the
+outcome under `.jj-gates/<fingerprint>.json`, keyed by the content diff against
+`main`. A rebase, split or other rewrite that leaves the content identical
+reports the recorded result instead of rebuilding; `--force` re-runs, and a
+recorded failure still exits non-zero. This is the cheap way to answer "did the
+history surgery change the code?" without four suites.
 
 ### Owned-plugin completion means live-profile verification
 

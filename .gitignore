@@ -15,6 +15,9 @@ playwright-report/
 .playwright-cli/
 .dsh-e2e-evidence/
 
+# Cached plugin gate results keyed by tree content (.jj-gates/<fingerprint>.json).
+.jj-gates/
+
 # Generated narrow core fork output.
 tooling/dsh-core/agent/lib/
 tooling/dsh-core/agent-loop/lib/
