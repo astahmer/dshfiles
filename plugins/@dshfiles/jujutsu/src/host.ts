@@ -231,7 +231,17 @@ const readEvolvedCommitIds = async (
       ctx,
       repo.root,
       repo.identity,
-      [RevisionReads.ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', revisions.map(revision => revision.commitId).join('|'), '--limit', '1500', '--template', EVOLUTION_TEMPLATE],
+      [
+        RevisionReads.ignoreWorkingCopy,
+        'evolog',
+        '--no-graph',
+        '--revisions',
+        revisions.map(revision => revision.commitId).join('|'),
+        '--limit',
+        '1500',
+        '--template',
+        EVOLUTION_TEMPLATE,
+      ],
       signal,
       { outputLimit: 512_000 },
     )
@@ -448,13 +458,18 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
           '\nThe current workspace and its working files remain in place.',
       }
     }
-    case 'bookmark-create': {
+    case 'bookmark-set': {
       const destination = findRevision(revisions, action.destinationId)
-      if (revisions.some(revision => revision.localBookmarks.includes(action.bookmark))) throw new Error('Bookmark already exists. Drag it to move it instead.')
+      const current = revisions.find(revision => revision.localBookmarks.includes(action.bookmark))
       return {
-        title: 'Create bookmark',
-        summary: 'Create ' + action.bookmark + ' at ' + destination.shortestChangeId,
-        detail: firstLine(destination.description),
+        title: 'Set bookmark',
+        summary: 'Set ' + action.bookmark + ' at ' + destination.shortestChangeId,
+        detail:
+          (current === undefined
+            ? 'Create bookmark at ' + destination.shortestChangeId
+            : 'Current target: ' + current.shortestChangeId + '\nNew target: ' + destination.shortestChangeId) +
+          '\n\nThis creates the bookmark if it is new, or updates it if it already exists. Backward and sideways movement is enabled.\n' +
+          firstLine(destination.description),
       }
     }
     case 'bookmark-delete': {

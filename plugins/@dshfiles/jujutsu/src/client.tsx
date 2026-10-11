@@ -569,7 +569,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Rebase onto main
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Create bookmark…</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Set bookmark…</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => copyText(revision.changeId)}>Copy change ID</ContextMenuItem>
         <ContextMenuItem onSelect={() => copyText(revision.commitId)}>Copy commit ID</ContextMenuItem>
@@ -1251,11 +1251,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   const name = bookmarkDraft.name.trim()
                   if (name.length === 0) return
                   setBookmarkDraft(null)
-                  askForConfirmation({ kind: 'bookmark-create', bookmark: name, destinationId: bookmarkDraft.commitId })
+                  askForConfirmation({ kind: 'bookmark-set', bookmark: name, destinationId: bookmarkDraft.commitId })
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle className="dshx:text-base">Create bookmark</DialogTitle>
+                  <DialogTitle className="dshx:text-base">Set bookmark</DialogTitle>
                   <DialogDescription>At {revisionsByCommitId.get(bookmarkDraft.commitId)?.shortestChangeId ?? 'the selected revision'}.</DialogDescription>
                 </DialogHeader>
                 <Input

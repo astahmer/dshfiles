@@ -83,9 +83,9 @@ export const buildMutationArgv = (action: Mutation): readonly string[] => {
     case 'bookmark-move':
       if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark move.')
       return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
-    case 'bookmark-create':
+    case 'bookmark-set':
       if (!isBookmarkName(action.bookmark) || !isCommitId(action.destinationId)) throw new Error('Invalid bookmark name.')
-      return ['bookmark', 'create', '--revision', action.destinationId, action.bookmark]
+      return ['bookmark', 'set', '--allow-backwards', '--revision', action.destinationId, action.bookmark]
     case 'bookmark-delete':
       if (!isBookmarkName(action.bookmark)) throw new Error('Invalid bookmark name.')
       return ['bookmark', 'delete', action.bookmark]

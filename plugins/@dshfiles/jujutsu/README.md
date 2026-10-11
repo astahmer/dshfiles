@@ -26,7 +26,7 @@ contracts.
 - Full diff opens every file of a revision with numbered rows and collapsed
   "N unmodified lines" separators, rendered from `jj diff --git`.
 - Right-click a revision for full diff, describe, edit, new change, squash,
-  duplicate, revert onto @, rebase onto main, create bookmark, copy IDs, and
+  duplicate, revert onto @, rebase onto main, set or move a bookmark, copy IDs, and
   abandon; right-click a local bookmark to push or delete it.
 - A Source Control view modelled on jj-view: a message box that describes or
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,

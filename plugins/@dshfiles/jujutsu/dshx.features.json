@@ -5,119 +5,70 @@
       "id": "revision-graph",
       "title": "Browse and filter the revision graph",
       "summary": "Browse revision identity, authors, time, bookmarks, tags, workspaces, conflict/divergence markers, and filter by text, author, mine, immutability, or date.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "defaultView",
           "defaultValue": "graph",
           "constraints": "One of graph or source.",
-          "choices": [
-            "graph",
-            "source"
-          ],
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "choices": ["graph", "source"],
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "ancestorCount",
           "defaultValue": "5",
           "constraints": "Integer from 1 to 20 ancestors.",
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "hideImmutable",
           "defaultValue": "false",
           "constraints": "Boolean; hide immutable revisions.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "mineOnly",
           "defaultValue": "false",
           "constraints": "Boolean; filter revisions to the current author.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "dateHeadings",
           "defaultValue": "true",
           "constraints": "Boolean; group graph rows under date headings.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "revisionLimit",
           "defaultValue": "300",
           "constraints": "Integer from 50 to 500 revisions.",
-          "coveredBy": [
-            "jujutsu.graph-filters"
-          ]
+          "coveredBy": ["jujutsu.graph-filters"]
         },
         {
           "key": "refreshMode",
           "defaultValue": "interval",
           "constraints": "One of interval or manual.",
-          "choices": [
-            "interval",
-            "manual"
-          ],
-          "coveredBy": [
-            "jujutsu.refresh-behavior"
-          ]
+          "choices": ["interval", "manual"],
+          "coveredBy": ["jujutsu.refresh-behavior"]
         },
         {
           "key": "refreshIntervalSeconds",
           "defaultValue": "60",
           "constraints": "Integer of at least 10 seconds.",
-          "coveredBy": [
-            "jujutsu.refresh-behavior"
-          ]
+          "coveredBy": ["jujutsu.refresh-behavior"]
         },
         {
           "key": "refreshOnVisible",
           "defaultValue": "true",
           "constraints": "Boolean; refresh when the panel becomes visible.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.refresh-behavior"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.refresh-behavior"]
         }
       ],
-      "states": [
-        "current",
-        "immutable",
-        "empty",
-        "conflicted",
-        "divergent",
-        "evolved",
-        "filtered"
-      ],
+      "states": ["current", "immutable", "empty", "conflicted", "divergent", "evolved", "filtered"],
       "failureModes": [
         "Invalid repositories and replaced filesystem identities are rejected.",
         "A stale repository snapshot does not silently authorize a mutation."
@@ -146,59 +97,31 @@
       "id": "revision-detail-and-diff",
       "title": "Inspect revisions and changed files",
       "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "fileView",
           "defaultValue": "tree",
           "constraints": "One of tree or flat.",
-          "choices": [
-            "tree",
-            "flat"
-          ],
-          "coveredBy": [
-            "jujutsu.diff-review"
-          ]
+          "choices": ["tree", "flat"],
+          "coveredBy": ["jujutsu.diff-review"]
         },
         {
           "key": "diffExpanded",
           "defaultValue": "false",
           "constraints": "Boolean; expand diffs by default.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.diff-review"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.diff-review"]
         },
         {
           "key": "diffLayout",
           "defaultValue": "auto",
           "constraints": "One of auto, unified, or split.",
-          "choices": [
-            "auto",
-            "unified",
-            "split"
-          ],
-          "coveredBy": [
-            "jujutsu.diff-review"
-          ]
+          "choices": ["auto", "unified", "split"],
+          "coveredBy": ["jujutsu.diff-review"]
         }
       ],
-      "states": [
-        "summary",
-        "full-diff",
-        "tree-files",
-        "flat-files",
-        "reviewed",
-        "unreviewed"
-      ],
+      "states": ["summary", "full-diff", "tree-files", "flat-files", "reviewed", "unreviewed"],
       "failureModes": [
         "Paths containing spaces, Unicode, or shell metacharacters remain literal file identities.",
         "Missing review or diff data is reported rather than guessed."
@@ -215,60 +138,32 @@
     {
       "id": "previewed-revision-mutations",
       "title": "Preview and confirm repository mutations",
-      "summary": "Create, squash, duplicate, revert, rebase, bookmark, restore, split, and abandon changes only after a single-use preview bound to exact repository state.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "summary": "Create, squash, duplicate, revert, rebase, set bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state.",
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "composerBar",
           "defaultValue": "true",
           "constraints": "Boolean; show the composer change bar.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.composer-context"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.composer-context"]
         },
         {
           "key": "composerChips",
           "defaultValue": "true",
           "constraints": "Boolean; show base/context chips.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.composer-context"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.composer-context"]
         },
         {
           "key": "composerBarBase",
           "defaultValue": "parent",
           "constraints": "One of parent, trunk, or bookmark; invalid revset input falls back to parent.",
-          "choices": [
-            "parent",
-            "trunk",
-            "bookmark"
-          ],
-          "coveredBy": [
-            "jujutsu.composer-context"
-          ]
+          "choices": ["parent", "trunk", "bookmark"],
+          "coveredBy": ["jujutsu.composer-context"]
         }
       ],
-      "states": [
-        "previewed",
-        "confirmed",
-        "cancelled",
-        "expired",
-        "stale",
-        "failed"
-      ],
+      "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
       "failureModes": [
         "Changed repository state, expired preview, or unsafe fileset rejects confirmation.",
         "A failed operation refreshes status and never implies a remote push succeeded."
@@ -290,6 +185,12 @@
           "kind": "gherkin",
           "id": "jujutsu.composer-context",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.bookmark-set",
+          "file": "plugins/@dshfiles/jujutsu/src/bookmark-set.integration.test.ts",
+          "testName": "set bookmark creates a name and moves an existing bookmark to any visible revision"
         }
       ]
     },
@@ -297,32 +198,17 @@
       "id": "workspace-and-session-history",
       "title": "Create workspaces and navigate session history",
       "summary": "Create isolated JJ workspaces at a selected revision, launch a session only after explicit confirmation, and browse/load/fork at exact durable event boundaries.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [
         {
           "key": "headerToggle",
           "defaultValue": "true",
           "constraints": "Boolean; show the panel header toggle.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "jujutsu.workspace-session"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.workspace-session"]
         }
       ],
-      "states": [
-        "workspace-created",
-        "session-not-launched",
-        "session-launched",
-        "history-loaded",
-        "forked"
-      ],
+      "states": ["workspace-created", "session-not-launched", "session-launched", "history-loaded", "forked"],
       "failureModes": [
         "Existing workspace, ancestor, or symlink target is rejected.",
         "History operations preserve exact sequence boundaries and do not rewrite previous events."

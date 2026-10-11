@@ -222,9 +222,10 @@ test('revision actions build fixed argv with literal file filesets', () => {
   assert.deepEqual(buildMutationArgv({ kind: 'abandon', commitIds: [id, id, otherId] }), ['abandon', id, otherId])
   assert.deepEqual(buildMutationArgv({ kind: 'revert', commitId: id, destinationId: otherId }), ['revert', '--revision', id, '--onto', otherId])
   assert.deepEqual(buildMutationArgv({ kind: 'commit', commitId: id, message: 'ship it' }), ['commit', '--message', 'ship it'])
-  assert.deepEqual(buildMutationArgv({ kind: 'bookmark-create', bookmark: 'feature/x', destinationId: id }), [
+  assert.deepEqual(buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/x', destinationId: id }), [
     'bookmark',
-    'create',
+    'set',
+    '--allow-backwards',
     '--revision',
     id,
     'feature/x',
