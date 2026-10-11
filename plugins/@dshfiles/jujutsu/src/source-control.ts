@@ -55,7 +55,10 @@ export const emptyAncestorCandidates = <Row extends LinkedRevision>(revisions: r
 }
 
 /** The branch a rebase moves: the source and every visible descendant. */
-export const descendantCommitIds = (revisions: readonly Pick<Revision, 'commitId' | 'parents'>[], sourceId: string): ReadonlySet<string> => {
+export const descendantCommitIds = (
+  revisions: readonly { readonly commitId: string; readonly parents: readonly string[] }[],
+  sourceId: string,
+): ReadonlySet<string> => {
   const children = new Map<string, string[]>()
   for (const revision of revisions) {
     for (const parent of revision.parents) children.set(parent, [...(children.get(parent) ?? []), revision.commitId])

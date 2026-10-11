@@ -4,6 +4,14 @@ import { previewSchema, type Mutation } from './api.js'
 import { revisionActionMachine } from './revision-action-machine.js'
 
 const rebase: Mutation = { kind: 'rebase', sourceId: 'a'.repeat(40), destinationId: 'b'.repeat(40) }
+const rebasePresentation = { kind: 'rebase', sourceId: rebase.sourceId, destinationId: rebase.destinationId } as const
+const bookmarkMove: Mutation = { kind: 'bookmark-move', bookmark: 'feature', destinationId: 'b'.repeat(40) }
+const bookmarkPresentation = {
+  kind: 'bookmark-move',
+  bookmark: 'feature',
+  sourceId: 'a'.repeat(40),
+  destinationId: 'b'.repeat(40),
+} as const
 const preview = previewSchema.parse({
   id: '00000000-0000-4000-8000-000000000001',
   kind: 'rebase',
@@ -39,27 +47,74 @@ const startActions = (client: Partial<Client> = {}) => {
 describe('revisionActionMachine', () => {
   it('tracks the drag and returns to idle on drag end (Escape or a drop outside)', () => {
     const { actor } = startActions()
-    actor.send({ type: 'drag.start', sourceId: 'a' })
+    actor.send({ type: 'drag.start', origin: { kind: 'revision', sourceId: 'a' } })
     actor.send({ type: 'drag.enter', targetId: 'b' })
-    expect(actor.getSnapshot().context).toMatchObject({ dragSource: 'a', dropTarget: 'b' })
+    expect(actor.getSnapshot().context).toMatchObject({ dragOrigin: { kind: 'revision', sourceId: 'a' }, dropTarget: 'b' })
     actor.send({ type: 'drag.end' })
     expect(actor.getSnapshot().value).toBe('idle')
-    expect(actor.getSnapshot().context).toMatchObject({ dragSource: null, dropTarget: null })
+    expect(actor.getSnapshot().context).toMatchObject({ dragOrigin: null, dropTarget: null })
   })
 
   it('ignores a drop that maps to no action', () => {
     const { actor } = startActions()
-    actor.send({ type: 'drag.start', sourceId: 'a' })
-    actor.send({ type: 'drop', repoId: 'repo', action: null })
+    actor.send({ type: 'drag.start', origin: { kind: 'revision', sourceId: 'a' } })
+    actor.send({ type: 'drop', repoId: 'repo', action: null, targetId: 'b', presentation: null, error: null })
     expect(actor.getSnapshot().value).toBe('idle')
+  })
+
+  it('retains a visible rejection when a branch drop is invalid', () => {
+    const { actor } = startActions()
+    actor.send({ type: 'drag.start', origin: { kind: 'revision', sourceId: 'a' } })
+    actor.send({
+      type: 'drop',
+      repoId: 'repo',
+      action: null,
+      targetId: 'descendant',
+      presentation: null,
+      error: 'A branch cannot be rebased onto one of its own revisions.',
+    })
+    expect(actor.getSnapshot().value).toBe('idle')
+    expect(actor.getSnapshot().context.error).toBe('A branch cannot be rebased onto one of its own revisions.')
+  })
+
+  it('clears only the matching drop target when the pointer leaves a row', () => {
+    const { actor } = startActions()
+    actor.send({ type: 'drag.start', origin: { kind: 'revision', sourceId: 'a' } })
+    actor.send({ type: 'drag.enter', targetId: 'b' })
+    actor.send({ type: 'drag.enter', targetId: 'c' })
+    actor.send({ type: 'drag.leave', targetId: 'b' })
+    expect(actor.getSnapshot().context.dropTarget).toBe('c')
+    actor.send({ type: 'drag.leave', targetId: 'c' })
+    expect(actor.getSnapshot().context.dropTarget).toBeNull()
+  })
+
+  it('prepares a dropped bookmark with its origin for contextual preview', async () => {
+    const { actor } = startActions()
+    actor.send({ type: 'drag.start', origin: { kind: 'bookmark', sourceId: 'a', bookmark: 'feature' } })
+    actor.send({
+      type: 'drop',
+      repoId: 'repo',
+      action: bookmarkMove,
+      targetId: bookmarkMove.destinationId,
+      presentation: bookmarkPresentation,
+      error: null,
+    })
+    await waitFor(actor, snapshot => snapshot.matches('previewing'))
+    expect(actor.getSnapshot().context).toMatchObject({
+      action: bookmarkMove,
+      dropPresentation: bookmarkPresentation,
+      dropTarget: bookmarkMove.destinationId,
+      dragOrigin: null,
+    })
   })
 
   it('walks drop → preview → confirm and refreshes the repository', async () => {
     const { actor, settled } = startActions()
-    actor.send({ type: 'drag.start', sourceId: 'a' })
-    actor.send({ type: 'drop', repoId: 'repo', action: rebase })
-    expect(actor.getSnapshot().context.dragSource).toBeNull()
+    actor.send({ type: 'drag.start', origin: { kind: 'revision', sourceId: 'a' } })
+    actor.send({ type: 'drop', repoId: 'repo', action: rebase, targetId: rebase.destinationId, presentation: rebasePresentation, error: null })
+    expect(actor.getSnapshot().context.dragOrigin).toBeNull()
     await waitFor(actor, snapshot => snapshot.matches('previewing'))
+    expect(actor.getSnapshot().context.dropPresentation).toEqual(rebasePresentation)
     actor.send({ type: 'confirm' })
     const done = await waitFor(actor, snapshot => snapshot.matches('idle'))
     expect(done.context.preview).toBeNull()
@@ -69,7 +124,7 @@ describe('revisionActionMachine', () => {
 
   it('cancels the preview without running it', async () => {
     const { actor, settled } = startActions()
-    actor.send({ type: 'prepare', repoId: 'repo', action: rebase })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
     await waitFor(actor, snapshot => snapshot.matches('previewing'))
     actor.send({ type: 'cancel' })
     expect(actor.getSnapshot().value).toBe('idle')
@@ -82,7 +137,7 @@ describe('revisionActionMachine', () => {
         throw new Error('Working copy changed')
       },
     })
-    actor.send({ type: 'prepare', repoId: 'repo', action: rebase })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
     await waitFor(actor, snapshot => snapshot.matches('previewing'))
     actor.send({ type: 'confirm' })
     const failed = await waitFor(actor, snapshot => snapshot.context.error !== null)
@@ -97,7 +152,7 @@ describe('revisionActionMachine', () => {
         throw Object.assign(new Error('API handler failed. See Host diagnostics.'), { name: 'ApiError', kind: 'remote', remoteCode: 'internal' })
       },
     })
-    actor.send({ type: 'prepare', repoId: 'repo', action: rebase })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
     const failed = await waitFor(actor, snapshot => snapshot.context.error !== null)
     expect(failed.context.error).toBe('Could not prepare this action.')
   })
@@ -110,7 +165,7 @@ describe('revisionActionMachine', () => {
         return new Promise(() => {})
       },
     })
-    actor.send({ type: 'prepare', repoId: 'repo', action: rebase })
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
     await Promise.resolve()
     actor.send({ type: 'reset' })
     expect(signals[0]?.aborted).toBe(true)

@@ -1,0 +1,58 @@
+import type { Revision, Mutation } from './api.js'
+import type { DropPresentation } from './revision-action-machine.js'
+import { descendantCommitIds } from './source-control.js'
+
+export const REVISION_MIME = 'application/x-jujutsu-revision'
+export const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
+export const BOOKMARK_SOURCE_MIME = 'application/x-jujutsu-bookmark-source'
+
+export type RevisionDropResolution =
+  | { readonly kind: 'action'; readonly action: Mutation; readonly presentation: DropPresentation }
+  | { readonly kind: 'invalid'; readonly message: string }
+  | { readonly kind: 'noop' }
+
+type DragRevision = {
+  readonly commitId: Revision['commitId']
+  readonly parents: readonly Revision['commitId'][]
+  readonly immutable: Revision['immutable']
+  readonly localBookmarks: readonly string[]
+}
+
+export const resolveRevisionDrop = (input: {
+  readonly sourceRevisionId: string
+  readonly target: DragRevision
+  readonly revisions: readonly DragRevision[]
+}): RevisionDropResolution => {
+  const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
+  if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
+  if (source.immutable) return { kind: 'invalid', message: 'Immutable revisions cannot be rebased.' }
+  if (descendantCommitIds(input.revisions, source.commitId).has(input.target.commitId)) {
+    return { kind: 'invalid', message: 'A branch cannot be rebased onto one of its own revisions.' }
+  }
+  return {
+    kind: 'action',
+    action: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
+    presentation: { kind: 'rebase', sourceId: source.commitId, destinationId: input.target.commitId },
+  }
+}
+
+export const resolveBookmarkDrop = (input: {
+  readonly bookmark: string
+  readonly sourceRevisionId: string
+  readonly target: DragRevision
+  readonly revisions: readonly DragRevision[]
+}): RevisionDropResolution => {
+  const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
+  if (source === undefined || !source.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
+  if (input.target.localBookmarks.includes(input.bookmark)) return { kind: 'noop' }
+  return {
+    kind: 'action',
+    action: { kind: 'bookmark-move', bookmark: input.bookmark, destinationId: input.target.commitId },
+    presentation: {
+      kind: 'bookmark-move',
+      sourceId: source.commitId,
+      destinationId: input.target.commitId,
+      bookmark: input.bookmark,
+    },
+  }
+}

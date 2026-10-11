@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -95,7 +95,8 @@ import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
-import { revisionActionMachine } from './revision-action-machine.js'
+import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
+import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
@@ -133,8 +134,6 @@ interface JujutsuPanelProps {
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
 const SELECTED_REPO_KEY = 'dshfiles.jujutsu.selected'
 const REVIEW_PROGRESS_KEY = 'dshfiles.jujutsu.review-progress.v1'
-const REVISION_MIME = 'application/x-jujutsu-revision'
-const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
 const REPO_HISTORY_LIMIT = 12
 
 const CODE_BLOCK =
@@ -233,6 +232,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
+  const [moveSource, setMoveSource] = useState<Revision | null>(null)
+  const [copyNotice, setCopyNotice] = useState<{ readonly copied: boolean; readonly label: string } | null>(null)
   const mineOnly = preferences.mineOnly
   const hideImmutable = preferences.hideImmutable
 
@@ -240,7 +241,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const preview = actionSnapshot.matches('previewing') ? (actionSnapshot.context.preview ?? undefined) : undefined
   const confirmResult = actionSnapshot.context.result
   const actionBusy = actionSnapshot.hasTag('busy')
-  const { dragSource, dropTarget } = actionSnapshot.context
+  const { dragOrigin, dropTarget, dropPresentation } = actionSnapshot.context
+  const dragSource = dragOrigin?.kind === 'revision' ? dragOrigin.sourceId : null
 
   useEffect(() => {
     const confirmed = actionActor.on('confirmed', event => {
@@ -261,6 +263,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setRepoId(registered.repoId)
       setPath(registered.root)
       setSelection(null)
+      setMoveSource(null)
       setDescribeDrafts({})
       setFullDiff(null)
       const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
@@ -361,9 +364,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
   const graphRows = useMemo(() => {
     if (state === undefined) return []
-    const graphRevisions = hideImmutable ? graphOrder.filter(revision => !revision.immutable) : graphOrder
+    const graphRevisions = graphOrder.filter(revision => (!hideImmutable || !revision.immutable) && (!mineOnly || revision.mine || revision.workingCopy))
     return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
-  }, [state, graphOrder, revisionsByCommitId, hideImmutable])
+  }, [state, graphOrder, revisionsByCommitId, hideImmutable, mineOnly])
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
   const graphMetrics = GRAPH_DENSITY[preferences.graphDensity]
   const graphWidth = graphWidthFor(
@@ -375,6 +378,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
     [dragSource, state],
   )
+  const previewBranch = useMemo(() => {
+    if (dropPresentation?.kind !== 'rebase' || state === undefined) return []
+    const branchIds = descendantCommitIds(state.revisions, dropPresentation.sourceId)
+    return graphOrder.filter(revision => branchIds.has(revision.commitId))
+  }, [dropPresentation, state, graphOrder])
+  const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
 
   const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
   const listScrollRef = useRef<HTMLDivElement | null>(null)
@@ -427,6 +436,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(focusPendingRow)
 
   const moveRowFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape' && moveSource !== null) {
+      event.preventDefault()
+      setMoveSource(null)
+      return
+    }
     if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-row-focus')) return
     const current = pendingFocusIndex.current ?? Number(event.target.closest('[data-index]')?.getAttribute('data-index'))
     if (!Number.isInteger(current)) return
@@ -455,11 +469,23 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     actionSnapshot.context.error,
   ].filter((message): message is string => Boolean(message))
 
-  const askForConfirmation = (action: Mutation): void => {
+  const askForConfirmation = (action: Mutation, presentation: DropPresentation | null = null): void => {
     if (repoId === null) return
     if (action.kind === 'workspace-add') setProvisionedPath(null)
     registerMutation.reset()
-    sendAction({ type: 'prepare', repoId, action })
+    sendAction({ type: 'prepare', repoId, action, presentation })
+  }
+
+  const chooseMoveDestination = (destination: Revision): void => {
+    if (moveSource === null) return
+    const source = moveSource
+    setMoveSource(null)
+    const resolution = resolveRevisionDrop({ sourceRevisionId: source.commitId, target: destination, revisions: state?.revisions ?? [] })
+    if (resolution.kind === 'invalid') {
+      sendAction({ type: 'reject', error: resolution.message })
+      return
+    }
+    if (resolution.kind === 'action') askForConfirmation(resolution.action, resolution.presentation)
   }
 
   const confirmPreview = (): void => sendAction({ type: 'confirm' })
@@ -496,22 +522,34 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const endDrag = (): void => sendAction({ type: 'drag.end' })
 
-  const dropAction = (event: DragEvent, revision: Revision): Mutation | null => {
-    const draggedBookmark = event.dataTransfer.getData(BOOKMARK_MIME)
-    const draggedRevision = event.dataTransfer.getData(REVISION_MIME)
-    if (draggedBookmark) {
-      return revision.localBookmarks.includes(draggedBookmark) ? null : { kind: 'bookmark-move', bookmark: draggedBookmark, destinationId: revision.commitId }
+  const dropResolution = (event: DragEvent, target: Revision) => {
+    const revisions = state?.revisions ?? []
+    const bookmark = event.dataTransfer.getData(BOOKMARK_MIME)
+    if (bookmark.length > 0) {
+      return resolveBookmarkDrop({
+        bookmark,
+        sourceRevisionId: event.dataTransfer.getData(BOOKMARK_SOURCE_MIME),
+        target,
+        revisions,
+      })
     }
-    if (draggedRevision && draggedRevision !== revision.commitId && !descendantCommitIds(state?.revisions ?? [], draggedRevision).has(revision.commitId)) {
-      return { kind: 'rebase', sourceId: draggedRevision, destinationId: revision.commitId }
-    }
-    return null
+    const sourceRevisionId = event.dataTransfer.getData(REVISION_MIME)
+    if (sourceRevisionId.length > 0) return resolveRevisionDrop({ sourceRevisionId, target, revisions })
+    return { kind: 'noop' as const }
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
     event.preventDefault()
     registerMutation.reset()
-    sendAction({ type: 'drop', repoId, action: dropAction(event, revision) })
+    const resolution = dropResolution(event, revision)
+    sendAction({
+      type: 'drop',
+      repoId,
+      action: resolution.kind === 'action' ? resolution.action : null,
+      targetId: revision.commitId,
+      presentation: resolution.kind === 'action' ? resolution.presentation : null,
+      error: resolution.kind === 'invalid' ? resolution.message : null,
+    })
   }
 
   const toggleRevision = (revision: Revision): void => {
@@ -519,8 +557,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
   }
 
-  const copyText = (value: string): void => {
-    void navigator.clipboard?.writeText(value).catch(() => undefined)
+  const activateRevisionRow = (revision: Revision): void => {
+    if (moveSource !== null) {
+      chooseMoveDestination(revision)
+      return
+    }
+    toggleRevision(revision)
+  }
+
+  const copyText = async (value: string, label: string): Promise<void> => {
+    try {
+      const copied = await writeClipboard(value)
+      setCopyNotice({ copied, label })
+    } catch {
+      setCopyNotice({ copied: false, label })
+    }
   }
 
   const lastPushLabel =
@@ -566,6 +617,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Revert onto @
           </ContextMenuItem>
         )}
+        {!revision.immutable && (
+          <ContextMenuItem onSelect={() => setMoveSource(revision)}>Rebase branch onto…</ContextMenuItem>
+        )}
         {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
             Rebase onto main
@@ -573,8 +627,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         )}
         <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Set bookmark…</ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => copyText(revision.changeId)}>Copy change ID</ContextMenuItem>
-        <ContextMenuItem onSelect={() => copyText(revision.commitId)}>Copy commit ID</ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyText(revision.changeId, 'Full change ID')}>Copy full change ID</ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyText(revision.commitId, 'Commit ID for this revision')}>Copy commit ID (this revision)</ContextMenuItem>
         {!revision.immutable && (
           <>
             <ContextMenuSeparator />
@@ -593,7 +647,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       <ContextMenuItem disabled={!local || selectedRemote === ''} onSelect={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: name })}>
         Push to {selectedRemote || 'remote'}
       </ContextMenuItem>
-      <ContextMenuItem onSelect={() => copyText(name)}>Copy name</ContextMenuItem>
+      <ContextMenuItem onSelect={() => void copyText(name, 'Bookmark name')}>Copy name</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem disabled={!local} onSelect={() => askForConfirmation({ kind: 'bookmark-delete', bookmark: name })} variant="destructive">
         Delete bookmark…
@@ -620,8 +674,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <span aria-hidden>·</span>
           <button
             className="dshx:font-mono dshx:hover:text-foreground"
-            onClick={() => copyText(revision.commitId)}
-            title={`Copy ${revision.commitId}`}
+            onClick={() => void copyText(revision.commitId, 'Commit ID for this revision')}
+            title={`Copy commit ID ${revision.commitId}`}
             type="button"
           >
             {revision.commitId.slice(0, 12)}
@@ -886,11 +940,23 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           ref={listScrollRef}
           role="region"
         >
+          {moveSource !== null && (
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-primary/30 dshx:bg-primary/5 dshx:px-3 dshx:py-2 dshx:text-xs" role="status">
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                Choose a destination for {moveSource.shortestChangeId} · {firstLine(moveSource.description)}. Press Escape to cancel.
+              </span>
+              <Button onClick={() => setMoveSource(null)} size="sm" type="button" variant="outline">
+                Cancel
+              </Button>
+            </div>
+          )}
           <div className="dshx:relative dshx:w-full" style={{ height: listVirtualizer.getTotalSize() }}>
             {listVirtualizer.getVirtualItems().map(virtualRow => {
               const item = listItems[virtualRow.index]
               if (item === undefined) return null
               const sticky = virtualRow.index === stickyDayIndex
+              const rowDropPresentation = item.kind === 'revision' && dropPresentation?.destinationId === item.revision.commitId ? dropPresentation : null
+              const dropSourceRevision = rowDropPresentation === null ? undefined : revisionsByCommitId.get(rowDropPresentation.sourceId)
               return (
                 <div
                   className={sticky ? 'dshx:sticky dshx:top-0 dshx:z-10' : 'dshx:absolute dshx:top-0 dshx:left-0 dshx:w-full'}
@@ -926,9 +992,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : (
                     <RevisionRow
                       bookmarkMenu={bookmarkMenu}
-                      dimmed={movingBranch?.has(item.revision.commitId) === true}
-                      dropTarget={dropTarget === item.revision.commitId}
-                      expanded={selectedRevision?.commitId === item.revision.commitId}
+                      dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
+                      dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
+                      expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
                       menu={revisionMenu(item.revision)}
@@ -936,13 +1002,26 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                         if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME))
                           sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
                       }}
-                      onDragStart={() => sendAction({ type: 'drag.start', sourceId: item.revision.commitId })}
+                      onDragLeave={() => sendAction({ type: 'drag.leave', targetId: item.revision.commitId })}
+                      onDragStart={origin => sendAction({ type: 'drag.start', origin })}
                       onDrop={event => dropOn(event, item.revision)}
-                      onToggle={() => toggleRevision(item.revision)}
+                      onToggle={() => activateRevisionRow(item.revision)}
                       revision={item.revision}
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
+                      {rowDropPresentation !== null && (
+                        <InlineDropPreview
+                          branch={rowDropPresentation.kind === 'rebase' ? previewBranch : []}
+                          busy={actionBusy}
+                          destinationLabel={`${item.revision.shortestChangeId} · ${firstLine(item.revision.description)}`}
+                          onCancel={() => sendAction({ type: 'cancel' })}
+                          onConfirm={confirmPreview}
+                          presentation={rowDropPresentation}
+                          preview={preview}
+                          sourceLabel={dropSourceRevision === undefined ? rowDropPresentation.sourceId.slice(0, 12) : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`}
+                        />
+                      )}
                     </RevisionRow>
                   )}
                 </div>
@@ -1155,13 +1234,20 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
-          {(errorMessages.length > 0 || (confirmResult !== null && confirmResult.output.length > 0)) && (
+          {(errorMessages.length > 0 || copyNotice !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => (
                 <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                   <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
                 </Alert>
               ))}
+              {copyNotice !== null && (
+                <Alert className="dshx:px-3 dshx:py-2" role={copyNotice.copied ? 'status' : 'alert'} variant={copyNotice.copied ? 'default' : 'destructive'}>
+                  <AlertDescription className="dshx:text-xs">
+                    {copyNotice.copied ? `${copyNotice.label} copied.` : `Could not copy ${copyNotice.label.toLocaleLowerCase()}.`}
+                  </AlertDescription>
+                </Alert>
+              )}
               {confirmResult !== null && confirmResult.output.length > 0 && (
                 <Alert className="dshx:px-3 dshx:py-2">
                   <AlertDescription>
@@ -1281,9 +1367,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           onOpenChange={open => {
             if (!open) sendAction({ type: 'cancel' })
           }}
-          open={preview !== undefined}
+          open={preview !== undefined && dropPresentation === null}
         >
-          {preview !== undefined && (
+          {preview !== undefined && dropPresentation === null && (
             <AlertDialogContent className="dshx-root">
               <AlertDialogHeader className="dshx:place-items-start dshx:text-left">
                 <AlertDialogTitle className="dshx:text-base">Confirm {preview.title.toLocaleLowerCase()}</AlertDialogTitle>
@@ -1608,6 +1694,57 @@ const CHIP = 'dshx:inline-flex dshx:h-[18px] dshx:flex-none dshx:items-center ds
 const reverseHexChangeId = (changeId: string, length: number): string =>
   [...changeId.slice(0, length)].map(digit => String.fromCharCode('z'.charCodeAt(0) - Number.parseInt(digit, 16))).join('')
 
+interface InlineDropPreviewProps {
+  readonly presentation: DropPresentation
+  readonly sourceLabel: string
+  readonly destinationLabel: string
+  readonly branch: readonly Revision[]
+  readonly preview: ActionPreview | undefined
+  readonly busy: boolean
+  readonly onCancel: () => void
+  readonly onConfirm: () => void
+}
+
+const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
+  <section
+    aria-label={props.presentation.kind === 'rebase' ? 'Preview branch rebase' : 'Preview bookmark move'}
+    className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-primary/40 dshx:bg-primary/5 dshx:p-3"
+    role="group"
+  >
+    <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-1.5 dshx:text-xs">
+      <strong>{props.presentation.kind === 'rebase' ? 'Rebase branch' : `Move bookmark “${props.presentation.bookmark}”`}</strong>
+      <span className="dshx:text-muted-foreground">from</span>
+      <code className="dshx:font-mono!">{props.sourceLabel}</code>
+      <span className="dshx:text-muted-foreground">onto</span>
+      <code className="dshx:font-mono!">{props.destinationLabel}</code>
+    </div>
+    {props.presentation.kind === 'rebase' && (
+      <ol aria-label="Revisions in branch" className="dshx:flex dshx:max-h-32 dshx:flex-col dshx:gap-1 dshx:overflow-auto dshx:pl-5 dshx:text-xs">
+        {props.branch.map(revision => (
+          <li className="dshx:flex dshx:gap-2" key={revision.commitId}>
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{firstLine(revision.description)}</span>
+            <code className="dshx:flex-none dshx:font-mono! dshx:text-muted-foreground">{revision.shortestChangeId}</code>
+          </li>
+        ))}
+      </ol>
+    )}
+    <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
+      {props.preview?.summary ?? 'Preparing a state-bound preview…'}
+    </p>
+    {props.preview !== undefined && (
+      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">{props.preview.detail}</pre>
+    )}
+    <div className="dshx:flex dshx:justify-end dshx:gap-2">
+      <Button onClick={props.onCancel} size="sm" type="button" variant="outline">
+        Cancel
+      </Button>
+      <Button disabled={props.preview === undefined || props.busy} onClick={props.onConfirm} size="sm" type="button">
+        Confirm and run
+      </Button>
+    </div>
+  </section>
+)
+
 interface RevisionRowProps {
   readonly revision: Revision
   readonly expanded: boolean
@@ -1619,8 +1756,9 @@ interface RevisionRowProps {
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly onToggle: () => void
-  readonly onDragStart: () => void
+  readonly onDragStart: (origin: DragOrigin) => void
   readonly onDragEnter: (event: DragEvent) => void
+  readonly onDragLeave: () => void
   readonly onDrop: (event: DragEvent) => void
   readonly children: ReactNode
 }
@@ -1635,6 +1773,9 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
     <article
       className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]', props.dimmed && 'dshx:opacity-40')}
       onDragEnter={props.onDragEnter}
+      onDragLeave={event => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) props.onDragLeave()
+      }}
       onDragOver={event => {
         if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) {
           event.preventDefault()
@@ -1654,7 +1795,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
             onDragStart={event => {
               event.dataTransfer.setData(REVISION_MIME, revision.commitId)
               event.dataTransfer.effectAllowed = 'move'
-              props.onDragStart()
+              props.onDragStart({ kind: 'revision', sourceId: revision.commitId })
             }}
             style={{ height: rowHeightFor(props.metrics, props.graphLayout) }}
             title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
@@ -1709,7 +1850,9 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                           onDragStart={event => {
                             event.stopPropagation()
                             event.dataTransfer.setData(BOOKMARK_MIME, name)
+                            event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
                             event.dataTransfer.effectAllowed = 'move'
+                            props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
                           }}
                           title={local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
                         >

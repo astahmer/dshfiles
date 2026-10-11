@@ -44,7 +44,7 @@ export interface RevisionGraphRow {
 export interface GraphParentLink {
   readonly commitId: string
   readonly label: string
-  readonly hiddenImmutableCount: number
+  readonly hiddenParentCount: number
   readonly terminal: boolean
 }
 
@@ -69,17 +69,23 @@ export const matchesRevisionSearch = (revision: SearchableRevision, query: strin
     .includes(needle)
 }
 
-/** Collapse hidden immutable parents into explicit ancestry links to visible ancestors. */
-export const graphParentLinks = (revision: ParentRevision, revisionsById: ReadonlyMap<string, ParentRevision>, hideImmutable: boolean): GraphParentLink[] => {
+/** Collapse hidden parents into explicit links to the nearest visible ancestors. */
+export const graphParentLinks = (
+  revision: ParentRevision,
+  revisionsById: ReadonlyMap<string, ParentRevision>,
+  hideImmutable: boolean,
+  visibleCommitIds?: ReadonlySet<string>,
+): GraphParentLink[] => {
   const links = new Map<string, GraphParentLink>()
-  const visit = (commitId: string, hiddenImmutableCount: number, seen: ReadonlySet<string>): void => {
+  const visit = (commitId: string, hiddenParentCount: number, seen: ReadonlySet<string>): void => {
     const parent = revisionsById.get(commitId)
     if (parent === undefined) {
-      links.set(commitId, { commitId, label: commitId.slice(0, 8), hiddenImmutableCount, terminal: false })
+      links.set(commitId, { commitId, label: commitId.slice(0, 8), hiddenParentCount, terminal: false })
       return
     }
-    if (!hideImmutable || !parent.immutable) {
-      links.set(commitId, { commitId, label: parent.shortestChangeId, hiddenImmutableCount, terminal: false })
+    const visible = (!hideImmutable || !parent.immutable) && (visibleCommitIds === undefined || visibleCommitIds.has(commitId))
+    if (visible) {
+      links.set(commitId, { commitId, label: parent.shortestChangeId, hiddenParentCount, terminal: false })
       return
     }
     if (seen.has(commitId)) return
@@ -88,12 +94,12 @@ export const graphParentLinks = (revision: ParentRevision, revisionsById: Readon
       links.set(commitId, {
         commitId,
         label: parent.shortestChangeId,
-        hiddenImmutableCount: hiddenImmutableCount + 1,
+        hiddenParentCount: hiddenParentCount + 1,
         terminal: true,
       })
       return
     }
-    for (const nextParent of parent.parents) visit(nextParent, hiddenImmutableCount + 1, nextSeen)
+    for (const nextParent of parent.parents) visit(nextParent, hiddenParentCount + 1, nextSeen)
   }
   for (const parentId of revision.parents) visit(parentId, 0, new Set([revision.commitId]))
   return [...links.values()]
@@ -209,7 +215,7 @@ export const layoutRevisionGraph = (
   hideImmutable: boolean,
 ): readonly RevisionGraphRow[] => {
   const listed = new Set(revisions.map(revision => revision.commitId))
-  const parentLinks = new Map(revisions.map(revision => [revision.commitId, graphParentLinks(revision, revisionsById, hideImmutable)]))
+  const parentLinks = new Map(revisions.map(revision => [revision.commitId, graphParentLinks(revision, revisionsById, hideImmutable, listed)]))
   const firstParent = new Map(
     revisions.flatMap(revision => {
       const parent = parentLinks.get(revision.commitId)?.[0]?.commitId
@@ -235,7 +241,7 @@ export const layoutRevisionGraph = (
     const next = lanes.map(slot => (slot?.commitId === revision.commitId ? null : slot))
     const moves = new Map<number, number>()
     const outgoing = (parentLinks.get(revision.commitId) ?? []).map((parent, parentIndex): GraphLink => {
-      const dashed = parent.hiddenImmutableCount > 0
+      const dashed = parent.hiddenParentCount > 0
       if (!listed.has(parent.commitId)) return { fromLane: commitLane, toLane: commitLane, tone, dashed, terminal: true }
       const waiting = next.findIndex(slot => slot?.commitId === parent.commitId)
       if (waiting >= 0) {

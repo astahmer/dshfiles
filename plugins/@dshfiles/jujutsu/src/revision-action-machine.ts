@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { Mutation, previewSchema } from './api.js'
 import { assign, emit, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 
-type ActionPreview = z.infer<typeof previewSchema>
+export type ActionPreview = z.infer<typeof previewSchema>
 
 interface ConfirmResult {
   readonly message: string
@@ -15,10 +15,19 @@ interface RevisionActionClient {
   readonly confirm: (input: { readonly repoId: string; readonly previewId: string }, options: { readonly signal: AbortSignal }) => Promise<ConfirmResult>
 }
 
+export type DragOrigin =
+  | { readonly kind: 'revision'; readonly sourceId: string }
+  | { readonly kind: 'bookmark'; readonly sourceId: string; readonly bookmark: string }
+
+export type DropPresentation =
+  | { readonly kind: 'rebase'; readonly sourceId: string; readonly destinationId: string }
+  | { readonly kind: 'bookmark-move'; readonly sourceId: string; readonly destinationId: string; readonly bookmark: string }
+
 interface RevisionActionContext {
   readonly client: RevisionActionClient
-  readonly dragSource: string | null
+  readonly dragOrigin: DragOrigin | null
   readonly dropTarget: string | null
+  readonly dropPresentation: DropPresentation | null
   readonly repoId: string | null
   readonly action: Mutation | null
   readonly preview: ActionPreview | null
@@ -27,11 +36,20 @@ interface RevisionActionContext {
 }
 
 type RevisionActionEvent =
-  | { readonly type: 'drag.start'; readonly sourceId: string }
+  | { readonly type: 'drag.start'; readonly origin: DragOrigin }
   | { readonly type: 'drag.enter'; readonly targetId: string }
+  | { readonly type: 'drag.leave'; readonly targetId: string }
   | { readonly type: 'drag.end' }
-  | { readonly type: 'drop'; readonly repoId: string | null; readonly action: Mutation | null }
-  | { readonly type: 'prepare'; readonly repoId: string; readonly action: Mutation }
+  | {
+      readonly type: 'drop'
+      readonly repoId: string | null
+      readonly action: Mutation | null
+      readonly targetId: string
+      readonly presentation: DropPresentation | null
+      readonly error: string | null
+    }
+  | { readonly type: 'prepare'; readonly repoId: string; readonly action: Mutation; readonly presentation: DropPresentation | null }
+  | { readonly type: 'reject'; readonly error: string }
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' }
   | { readonly type: 'reset' }
@@ -44,7 +62,7 @@ const failureMessage = (error: unknown, fallback: string): string => {
   return error instanceof Error && error.message.length > 0 ? error.message : fallback
 }
 
-const idleContext = { dragSource: null, dropTarget: null, preview: null } as const
+const idleContext = { dragOrigin: null, dropTarget: null, dropPresentation: null, preview: null, action: null } as const
 
 /**
  * drag → drop → prepare → preview → confirm, plus prepare from menus. Leaving a busy state stops its actor, which aborts
@@ -69,35 +87,48 @@ export const revisionActionMachine = setup({
   },
 }).createMachine({
   id: 'revisionAction',
-  context: ({ input }) => ({ client: input.client, repoId: null, action: null, result: null, error: null, ...idleContext }),
+  context: ({ input }) => ({ client: input.client, repoId: null, result: null, error: null, ...idleContext }),
   initial: 'idle',
   on: {
     reset: { target: '.idle', actions: assign({ ...idleContext, result: null, error: null }) },
+    reject: { actions: assign(({ event }) => ({ error: event.error })) },
   },
   states: {
     idle: {
       on: {
-        'drag.start': { target: 'dragging', actions: assign(({ event }) => ({ dragSource: event.sourceId, dropTarget: null })) },
-        prepare: { target: 'preparing', actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, error: null })) },
+        'drag.start': { target: 'dragging', actions: assign(({ event }) => ({ dragOrigin: event.origin, dropTarget: null, dropPresentation: null, error: null })) },
+        prepare: {
+          target: 'preparing',
+          actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, dropPresentation: event.presentation, error: null })),
+        },
       },
     },
     dragging: {
       on: {
         'drag.enter': { actions: assign(({ event }) => ({ dropTarget: event.targetId })) },
-        'drag.end': { target: 'idle', actions: assign(idleContext) },
+        'drag.leave': { actions: assign(({ context, event }) => (context.dropTarget === event.targetId ? { dropTarget: null } : {})) },
+        'drag.end': { target: 'idle', actions: assign({ ...idleContext, error: null }) },
         drop: [
           {
             guard: ({ event }) => event.repoId !== null && event.action !== null,
             target: 'preparing',
-            actions: assign(({ event }) => ({ ...idleContext, repoId: event.repoId, action: event.action, error: null })),
+            actions: assign(({ event }) => ({
+              ...idleContext,
+              repoId: event.repoId,
+              action: event.action,
+              dropTarget: event.targetId,
+              dropPresentation: event.presentation,
+              error: null,
+            })),
           },
-          { target: 'idle', actions: assign(idleContext) },
+          { target: 'idle', actions: assign(({ event }) => ({ ...idleContext, error: event.error })) },
         ],
       },
     },
     preparing: {
       tags: ['busy'],
       entry: assign({ result: null }),
+      on: { cancel: { target: 'idle', actions: assign({ ...idleContext, error: null }) } },
       invoke: {
         src: 'prepare',
         input: ({ context }) => {
@@ -105,14 +136,22 @@ export const revisionActionMachine = setup({
           return { client: context.client, repoId: context.repoId, action: context.action }
         },
         onDone: { target: 'previewing', actions: assign(({ event }) => ({ preview: event.output })) },
-        onError: { target: 'idle', actions: assign(({ event }) => ({ error: failureMessage(event.error, 'Could not prepare this action.') })) },
+        onError: { target: 'idle', actions: assign(({ context, event }) => ({
+          ...idleContext,
+          action: null,
+          error: failureMessage(event.error, 'Could not prepare this action.'),
+          repoId: context.repoId,
+        })) },
       },
     },
     previewing: {
       on: {
         confirm: 'confirming',
-        cancel: { target: 'idle', actions: assign({ preview: null }) },
-        prepare: { target: 'preparing', actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, preview: null, error: null })) },
+        cancel: { target: 'idle', actions: assign(({ context }) => ({ ...idleContext, repoId: context.repoId, error: null })) },
+        prepare: {
+          target: 'preparing',
+          actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, dropPresentation: event.presentation, dropTarget: event.presentation?.destinationId ?? null, preview: null, error: null })),
+        },
       },
     },
     confirming: {
@@ -136,7 +175,7 @@ export const revisionActionMachine = setup({
           ],
         },
       },
-      exit: assign({ preview: null }),
+      exit: assign({ ...idleContext, preview: null }),
     },
   },
 })

@@ -121,6 +121,17 @@ describe('revision graph lanes', () => {
     expect(crossings(rows)).toBe(0)
   })
 
+  test('mine-only graph links bridge hidden non-mine ancestry with dashed rails', () => {
+    const feature = revision('feature', ['foreign'], { workingCopy: true })
+    const foreign = revision('foreign', ['trunk'])
+    const trunk = revision('trunk', [], { bookmarks: ['main'], immutable: true })
+    const allRevisions = [feature, foreign, trunk]
+    const rows = layoutRevisionGraph([feature, trunk], new Map(allRevisions.map(row => [row.commitId, row])), false)
+
+    expect(rowOf(rows, 'feature').outgoing).toEqual([{ fromLane: 0, toLane: 0, tone: 'trunk', dashed: true, terminal: false }])
+    expect(rowOf(rows, 'trunk').commitLane).toBe(0)
+  })
+
   test('parents outside the loaded graph end in a stub and free their lane for the next head', () => {
     const rows = layout([
       revision('old-branch', ['beyond-limit'], { workspaces: ['stale'] }),

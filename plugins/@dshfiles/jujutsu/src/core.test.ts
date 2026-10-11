@@ -101,8 +101,8 @@ test('hiding immutable revisions retains explicit ancestry links to visible pare
     [otherId, middle],
     [topId, top],
   ])
-  assert.deepEqual(graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenImmutableCount: 1, terminal: false }])
-  assert.deepEqual(graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenImmutableCount: 0, terminal: false }])
+  assert.deepEqual(graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenParentCount: 1, terminal: false }])
+  assert.deepEqual(graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenParentCount: 0, terminal: false }])
 })
 
 test('diff parser counts patch lines, skips headers, and maps file names', () => {
