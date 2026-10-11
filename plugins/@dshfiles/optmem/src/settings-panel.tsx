@@ -65,7 +65,12 @@ const Warnings = (props: { readonly warnings: readonly RouteWarning[] }): JSX.El
     </ul>
   )
 
-const NumberField = (props: { readonly id: string; readonly value: number; readonly disabled: boolean; readonly onChange: (value: number) => void }): JSX.Element => {
+const NumberField = (props: {
+  readonly id: string
+  readonly value: number
+  readonly disabled: boolean
+  readonly onChange: (value: number) => void
+}): JSX.Element => {
   const [text, setText] = useState(String(props.value))
   useEffect(() => setText(String(props.value)), [props.value])
   return (
@@ -85,7 +90,12 @@ const NumberField = (props: { readonly id: string; readonly value: number; reado
   )
 }
 
-const EffortSelect = (props: { readonly value: Effort; readonly disabled: boolean; readonly label: string; readonly onChange: (value: Effort) => void }): JSX.Element => (
+const EffortSelect = (props: {
+  readonly value: Effort
+  readonly disabled: boolean
+  readonly label: string
+  readonly onChange: (value: Effort) => void
+}): JSX.Element => (
   <select
     aria-label={props.label}
     className={selectClass}
@@ -110,7 +120,13 @@ const ListControls = (props: {
   readonly onRemove: () => void
 }): JSX.Element => (
   <div className="dshx:flex dshx:shrink-0 dshx:items-center">
-    <Button variant="ghost" size="icon-sm" aria-label={`Move ${props.label} up`} disabled={props.disabled || props.index === 0} onClick={() => props.onMove(props.index - 1)}>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={`Move ${props.label} up`}
+      disabled={props.disabled || props.index === 0}
+      onClick={() => props.onMove(props.index - 1)}
+    >
       <ArrowUpIcon />
     </Button>
     <Button
@@ -174,7 +190,13 @@ const ProviderSelect = (props: {
 }): JSX.Element => {
   const known = props.value === '' || props.providers.some(provider => provider.id === props.value)
   return (
-    <select aria-label={props.label} className={selectClass} value={props.value} disabled={props.disabled} onChange={event => props.onChange(event.target.value)}>
+    <select
+      aria-label={props.label}
+      className={selectClass}
+      value={props.value}
+      disabled={props.disabled}
+      onChange={event => props.onChange(event.target.value)}
+    >
       <option value="">Thread's provider</option>
       {props.providers.map(provider => (
         <option key={provider.id} value={provider.id}>
@@ -206,19 +228,32 @@ const StatusBlock = (props: {
   if (props.error !== undefined)
     return (
       <Alert>
-        <AlertDescription>Live status is unavailable ({props.error}). A DSH restart loads the OptMem host that serves it; settings below still save.</AlertDescription>
+        <AlertDescription>
+          Live status is unavailable ({props.error}). A DSH restart loads the OptMem host that serves it; settings below still save.
+        </AlertDescription>
       </Alert>
     )
   const overview = props.overview
   if (!overview) return <p className="dshx:text-xs dshx:text-muted-foreground">Loading status…</p>
   const route = overview.lastRoute
+  const pipeline = overview.pipeline
   const facts: readonly [string, string][] = [
     ['Database', `${formatBytes(overview.database.bytes)} · ${overview.database.path}`],
-    ['Events', overview.events === null ? 'n/a' : `${overview.events} in ${overview.streams ?? 0} stream(s)`],
+    ['Stored events', overview.uniqueEvents === null || overview.uniqueEvents === undefined ? 'n/a' : String(overview.uniqueEvents)],
+    ['Stream entries', overview.events === null ? 'n/a' : `${overview.events} across ${overview.streams ?? 0} streams`],
     ['Captured this run', `${overview.captured} (skipped ${overview.skipped}, queued ${overview.queued})`],
-    ['Summary calls', overview.summaryCalls === null ? 'n/a' : String(overview.summaryCalls)],
-    ['Pending summaries', overview.pendingSummaries === null ? 'n/a' : String(overview.pendingSummaries)],
-    ['Pending merges', overview.pendingMerges === null ? 'n/a' : String(overview.pendingMerges)],
+    ['Summary calls this run', overview.summaryCalls === null ? 'n/a' : String(overview.summaryCalls)],
+    ['Pipeline jobs in memory', overview.pendingSummaries === null ? 'n/a' : String(overview.pendingSummaries)],
+    ['Pending leaf entries', pipeline === undefined ? 'n/a' : String(pipeline.pendingLeafJobs)],
+    ['Distinct pending events', pipeline === undefined ? 'n/a' : String(pipeline.pendingEvents)],
+    ['Estimated leaf model calls', pipeline === undefined ? 'n/a' : String(pipeline.estimatedLeafSummaryCalls)],
+    ['Pending merge summaries', pipeline === undefined ? 'n/a' : String(pipeline.pendingMergeJobs)],
+    [
+      'Oldest pending event',
+      pipeline?.oldestPendingAt === null || pipeline?.oldestPendingAt === undefined ? 'none' : new Date(pipeline.oldestPendingAt).toLocaleString(),
+    ],
+    ['Completed summary nodes', pipeline === undefined ? 'n/a' : String(pipeline.completedSummaryNodes)],
+    ['Summary nodes / minute (10m)', pipeline === undefined ? 'n/a' : String((pipeline.summariesLastTenMinutes / 10).toFixed(1))],
     [
       'Last summary route',
       route.kind === 'ready'
@@ -232,7 +267,9 @@ const StatusBlock = (props: {
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <Badge variant={overview.state === 'ready' ? 'secondary' : 'destructive'}>{overview.state}</Badge>
+        <Badge variant={pipeline?.health === 'degraded' || overview.state === 'failed' ? 'destructive' : 'secondary'}>
+          {overview.state === 'ready' ? `Capture ready · ${pipeline?.health ?? 'pipeline status unavailable'}` : overview.state}
+        </Badge>
         <Badge variant="outline">{overview.activeMode === 'full' ? 'Full mode' : 'Compatibility mode'}</Badge>
         {overview.retryInMs === null ? null : <Badge variant="outline">retry in {Math.ceil(overview.retryInMs / 1_000)} s</Badge>}
         {overview.settingsSource === 'defaults' ? <Badge variant="outline">running on defaults</Badge> : null}
@@ -240,6 +277,10 @@ const StatusBlock = (props: {
           <RefreshCwIcon />
         </Button>
       </div>
+      <p className="dshx:text-xs dshx:text-muted-foreground">
+        Pending leaf entries are per-stream positions; one event may appear in both its conversation and project tree. Estimated model calls count only distinct
+        oversized events without an existing summary node.
+      </p>
       <dl className="dshx:grid dshx:grid-cols-[max-content_1fr] dshx:gap-x-4 dshx:gap-y-1 dshx:text-xs">
         {facts.map(([term, value]) => (
           <div key={term} className="dshx:contents">
@@ -397,14 +438,16 @@ export const OptmemSettingsPanel = (): JSX.Element => {
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-4">
             <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
               <span className="dshx:text-sm dshx:font-medium">Override route</span>
-              <p className="dshx:text-xs dshx:text-muted-foreground">One fixed provider, model and effort for every summary, instead of the per-kind cheap model.</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground">
+                One fixed provider, model and effort for every summary, instead of the per-kind cheap model.
+              </p>
             </div>
             <Switch
               aria-label="Use an override route"
               checked={overrideActive}
               disabled={disabled}
               onCheckedChange={checked => {
-                edit('summarizerModel', checked ? (base.summarizerModel || OptmemSettingsDraft.defaults.cheapModels[0]?.models[0] || 'model') : '')
+                edit('summarizerModel', checked ? base.summarizerModel || OptmemSettingsDraft.defaults.cheapModels[0]?.models[0] || 'model' : '')
                 if (!checked) edit('summarizerProvider', '')
               }}
             />
@@ -453,7 +496,12 @@ export const OptmemSettingsPanel = (): JSX.Element => {
                     disabled={disabled}
                     onChange={event => update({ kind: event.target.value })}
                   />
-                  <EffortSelect label={`Effort for ${entry.kind || 'entry'}`} value={entry.effort} disabled={disabled} onChange={value => update({ effort: value })} />
+                  <EffortSelect
+                    label={`Effort for ${entry.kind || 'entry'}`}
+                    value={entry.effort}
+                    disabled={disabled}
+                    onChange={value => update({ effort: value })}
+                  />
                   <div className="dshx:ml-auto">
                     <ListControls
                       index={index}
@@ -461,7 +509,12 @@ export const OptmemSettingsPanel = (): JSX.Element => {
                       disabled={disabled}
                       label={entry.kind || 'entry'}
                       onMove={to => edit('cheapModels', OptmemSettingsDraft.move(draft.cheapModels, index, to))}
-                      onRemove={() => edit('cheapModels', draft.cheapModels.filter((_, at) => at !== index))}
+                      onRemove={() =>
+                        edit(
+                          'cheapModels',
+                          draft.cheapModels.filter((_, at) => at !== index),
+                        )
+                      }
                     />
                   </div>
                 </div>
@@ -478,7 +531,12 @@ export const OptmemSettingsPanel = (): JSX.Element => {
             )
           })}
           <div className="dshx:flex dshx:gap-2">
-            <Button variant="outline" size="xs" disabled={disabled} onClick={() => edit('cheapModels', [...draft.cheapModels, { kind: '', models: [], effort: '' }])}>
+            <Button
+              variant="outline"
+              size="xs"
+              disabled={disabled}
+              onClick={() => edit('cheapModels', [...draft.cheapModels, { kind: '', models: [], effort: '' }])}
+            >
               <PlusIcon /> Add provider kind
             </Button>
             <Button variant="ghost" size="xs" disabled={disabled} onClick={() => edit('cheapModels', OptmemSettingsDraft.defaults.cheapModels)}>
@@ -502,7 +560,13 @@ export const OptmemSettingsPanel = (): JSX.Element => {
                 <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
                   <span className="dshx:w-5 dshx:text-xs dshx:text-muted-foreground">{index + 1}.</span>
                   <ModelDatalist id={listId} models={modelOptions(providers, entry.provider)} />
-                  <ProviderSelect label={`Fallback ${index + 1} provider`} value={entry.provider} providers={providers} disabled={disabled} onChange={value => update({ provider: value })} />
+                  <ProviderSelect
+                    label={`Fallback ${index + 1} provider`}
+                    value={entry.provider}
+                    providers={providers}
+                    disabled={disabled}
+                    onChange={value => update({ provider: value })}
+                  />
                   <Input
                     aria-label={`Fallback ${index + 1} model`}
                     className="dshx:h-8 dshx:w-56 dshx:font-mono! dshx:text-xs"
@@ -518,7 +582,12 @@ export const OptmemSettingsPanel = (): JSX.Element => {
                     disabled={disabled}
                     label={`fallback ${index + 1}`}
                     onMove={to => edit('summarizerFallbacks', OptmemSettingsDraft.move(draft.summarizerFallbacks, index, to))}
-                    onRemove={() => edit('summarizerFallbacks', draft.summarizerFallbacks.filter((_, at) => at !== index))}
+                    onRemove={() =>
+                      edit(
+                        'summarizerFallbacks',
+                        draft.summarizerFallbacks.filter((_, at) => at !== index),
+                      )
+                    }
                   />
                 </div>
                 <Warnings warnings={warningsFor(`summarizerFallbacks.${index}`)} />
@@ -558,13 +627,25 @@ export const OptmemSettingsPanel = (): JSX.Element => {
           <span />
         </Row>
         <div className="dshx:pb-3">
-          <StringList values={draft.excludedTools} disabled={disabled} placeholder="tool name" itemLabel="tool" onChange={values => edit('excludedTools', [...values])} />
+          <StringList
+            values={draft.excludedTools}
+            disabled={disabled}
+            placeholder="tool name"
+            itemLabel="tool"
+            onChange={values => edit('excludedTools', [...values])}
+          />
         </div>
         <Row label="Excluded paths" hint={schemaHint('excludedPaths')}>
           <span />
         </Row>
         <div className="dshx:pb-3">
-          <StringList values={draft.excludedPaths} disabled={disabled} placeholder="**/secret/**" itemLabel="path glob" onChange={values => edit('excludedPaths', [...values])} />
+          <StringList
+            values={draft.excludedPaths}
+            disabled={disabled}
+            placeholder="**/secret/**"
+            itemLabel="path glob"
+            onChange={values => edit('excludedPaths', [...values])}
+          />
         </div>
       </Section>
 

@@ -126,6 +126,18 @@ export const createRouteResolver = (options: {
   return { resolve, current: (): SummarizerRouteState => latest }
 }
 
+const isOutputBudgetFailure = (message: string): boolean =>
+  /finish_reason\s*=\s*length|output token (?:limit|budget)|max_tokens.{0,40}(?:limit|exhaust|length)/i.test(message)
+
+class OutputBudgetError extends Error {
+  readonly retryable = false
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'OutputBudgetError'
+  }
+}
+
 /** Summaries go through DSH's own LLM service, so provider credentials and routing stay DSH's. */
 export const createLlmSummarizer = (options: {
   readonly stream: (call: GenerateOptions) => AsyncIterable<StreamChunk>
@@ -135,27 +147,41 @@ export const createLlmSummarizer = (options: {
   summarize: async (request: SummaryRequest): Promise<SummaryResult> => {
     const state = await options.resolveRoute(request.conversationId)
     if (state.kind !== 'ready') throw new Error(`summarizer unavailable: ${state.kind === 'unavailable' ? state.reason : 'route not resolved'}`)
-    const call: GenerateOptions = {
-      provider: state.route.provider,
-      model: state.route.model,
-      ...(state.route.effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(state.route.effort) }),
-      system: instructions(request),
-      messages: [createUserMessage({ content: [{ type: 'text', text: framedInput(request) }], source: { kind: 'user' } })],
-      maxTokens: Math.max(1_024, request.maxBytes * 2),
-      purpose: 'compaction',
-      signal: AbortSignal.timeout(options.timeoutMs()),
+    const initialBudget = Math.min(16_384, Math.max(2_048, request.maxBytes * 4))
+    const budgets = [initialBudget, Math.min(16_384, initialBudget * 2)]
+    for (const maxTokens of budgets) {
+      const commonCall: Omit<GenerateOptions, 'reasoningEffort'> = {
+        provider: state.route.provider,
+        model: state.route.model,
+        system: instructions(request),
+        messages: [createUserMessage({ content: [{ type: 'text', text: framedInput(request) }], source: { kind: 'user' } })],
+        maxTokens,
+        purpose: 'compaction',
+        signal: AbortSignal.timeout(options.timeoutMs()),
+      }
+      const call: GenerateOptions = state.route.effort === undefined ? commonCall : { ...commonCall, reasoningEffort: ReasoningEffortId(state.route.effort) }
+      const assembler = new BlockAssembler()
+      for await (const chunk of options.stream(call)) assembler.push(chunk)
+      const finish = assembler.finish
+      const text = assembler
+        .blocks()
+        .flatMap(block => (block.type === 'text' ? [block.text] : []))
+        .join('')
+        .trim()
+      const failure = finish.kind === 'error' || finish.kind === 'aborted' ? finish.failure.message : ''
+      if (failure.length > 0) {
+        if (maxTokens === initialBudget && isOutputBudgetFailure(failure)) continue
+        if (isOutputBudgetFailure(failure)) throw new OutputBudgetError(`summary output budget exhausted at ${maxTokens} tokens: ${failure}`)
+        throw new Error(`summary call ended with ${finish.kind}: ${failure}`)
+      }
+      if (finish.kind === 'tool-calls') throw new Error('summary model requested a tool')
+      if (text.length === 0 && finish.kind === 'max-tokens') {
+        if (maxTokens === initialBudget) continue
+        throw new OutputBudgetError(`summary output budget exhausted at ${maxTokens} tokens without answer text`)
+      }
+      if (text.length === 0) throw new Error(`summary model returned no text (finish: ${finish.kind})`)
+      return { text, model: `${state.route.provider}/${state.route.model}` }
     }
-    const assembler = new BlockAssembler()
-    for await (const chunk of options.stream(call)) assembler.push(chunk)
-    const finish = assembler.finish
-    if (finish.kind === 'error' || finish.kind === 'aborted') throw new Error(`summary call ended with ${finish.kind}: ${finish.failure.message}`)
-    if (finish.kind === 'tool-calls') throw new Error('summary model requested a tool')
-    const text = assembler
-      .blocks()
-      .flatMap(block => (block.type === 'text' ? [block.text] : []))
-      .join('')
-      .trim()
-    if (text.length === 0) throw new Error(`summary model returned no text (finish: ${finish.kind})`)
-    return { text, model: `${state.route.provider}/${state.route.model}` }
+    throw new Error('summary call exhausted the output token budget twice without answer text')
   },
 })

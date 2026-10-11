@@ -89,8 +89,11 @@ pipeline, not by triggers, so an FTS failure never blocks ingestion.
 2. **Leaf pipeline** (background, bounded concurrency): for each stream pos ≥ cursor `leaf`, create level-0 node
    (verbatim if ≤512 B, else `Summarizer`). Advance cursor only over a contiguous completed prefix.
 3. **Parent pipeline** (background): when both children of (l,i) exist, enqueue (l+1, ⌊i/2⌋). Ready nodes are
-   queued, not scanned. Summaries are clipped to ≤512 B: ask for ≤N bytes, verify, retry up to 3× with a stricter
-   budget, keep the shortest; final fallback = deterministic UTF-8-safe truncation + `…` (logged).
+   queued, not scanned. Summaries are clipped to ≤512 B: ask for ≤N bytes, verify, retry with stricter byte budgets,
+   keep the shortest; final fallback = deterministic UTF-8-safe truncation + `…` (logged). The DSH adapter's output
+   token budget scales with the node limit and is retried once at double budget after an explicit `max-tokens` finish.
+   Other failures use bounded exponential retry (five attempts total); non-retryable output-budget failures wait for
+   explicit recovery rather than looping indefinitely. See [backlog diagnosis](backlog-diagnosis.md).
 4. **View append**: after the leaf cursor advances, append lines for new leaves to the view (tail only).
 5. **Merge batch** when `view.bytes > upper (128 KB)`: repeatedly pick the adjacent sibling pair in the view
    (both same level l, siblings of the same parent, parent node built) with the greatest

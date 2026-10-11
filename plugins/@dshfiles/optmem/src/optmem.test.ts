@@ -3,8 +3,10 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { StreamIds, TreeMath } from '@dshfiles/optmem-core'
 import { openSqliteMemory } from '@dshfiles/optmem-sqlite'
 
+import { optmemApi } from './api.ts'
 import { createSessionFixture, createTempHome, createTestRuntime, fakeSummarizer } from './testing/dsh-fixtures.ts'
 import { createMemoryToolHandlers } from './tools.ts'
 
@@ -35,6 +37,50 @@ const storedEvents = (path: string) => {
 const agentOf = (session: { readonly id: string; readonly header: { readonly id: string; readonly cwd?: string } }) => ({
   id: session.id,
   session: { header: session.header },
+})
+
+describe('Explorer read operations', () => {
+  it('rejects malformed and oversized Host requests at the API boundary', async () => {
+    const pathSchema = optmemApi.methods.projectForPath.input
+    const searchSchema = optmemApi.methods.projectSearch.input
+    const zoomSchema = optmemApi.methods.projectZoom.input
+    if (pathSchema === undefined || searchSchema === undefined || zoomSchema === undefined) throw new Error('Expected bounded Explorer API schemas')
+
+    expect(await pathSchema['~standard'].validate({ path: 42 })).toHaveProperty('issues')
+    expect(await searchSchema['~standard'].validate({ projectId: 'workspace:a', query: 'x'.repeat(513), limit: 25 })).toHaveProperty('issues')
+    expect(await searchSchema['~standard'].validate({ projectId: 'workspace:a', query: 'needle', limit: 51 })).toHaveProperty('issues')
+    expect(await zoomSchema['~standard'].validate({ projectId: 'workspace:a', address: '0+1; DROP TABLE events' })).toHaveProperty('issues')
+  })
+
+  it('resolves workspace and historical path identities and previews only the selected project', async () => {
+    const path = freshDatabase()
+    const { runtime } = createTestRuntime({ databasePath: path, workspaces })
+    await runtime.start()
+    const sessionA = createSessionFixture({ id: 'session-explorer-a', cwd: projectA })
+    const sessionB = createSessionFixture({ id: 'session-explorer-b', cwd: projectB })
+    runtime.onSessionEvent(sessionA.session, sessionA.user('project A memory marker'))
+    runtime.onSessionEvent(sessionB.session, sessionB.user('project B private marker'))
+    await runtime.settle()
+
+    const projectAId = await runtime.projectForPath(projectA)
+    const projectBId = await runtime.projectForPath(projectB)
+    expect(projectAId).toBe('workspace:ws-a')
+    expect(projectBId).toMatch(/^path:[a-f0-9]{16}$/)
+    expect(await runtime.projectForPath('/path/that/does/not/exist')).toBeNull()
+    if (projectAId === null || projectBId === null) throw new Error('Expected both captured projects to resolve')
+
+    const address = (await runtime.requireEngine().readView({ stream: StreamIds.project(projectAId), kind: 'main' })).nodes[0]
+    if (address === undefined) throw new Error('Expected a committed project node')
+    const formattedAddress = TreeMath.format(address)
+    const node = runtime.inspectNode({ projectId: projectAId, address: formattedAddress })
+    expect(node?.sources).toEqual(expect.arrayContaining([expect.objectContaining({ conversationId: 'session-explorer-a' })]))
+    expect(node?.parentAddress).toBeNull()
+    const preview = await runtime.contextPreview({ projectId: projectAId })
+    expect(preview.text).toContain('project A memory marker')
+    expect(preview.text).not.toContain('project B private marker')
+    expect(preview.sourceAddresses).toContain(formattedAddress)
+    await runtime.stop()
+  })
 })
 
 describe('capture', () => {

@@ -155,7 +155,7 @@ export type StoredSearchHit = {
   readonly entries: readonly StreamEntry[]
 }
 
-export type SearchQuery = { readonly query: string; readonly stream: StreamId | null; readonly limit: number }
+export type SearchQuery = { readonly query: string; readonly stream: StreamId | null; readonly limit: number; readonly offset?: number | undefined }
 
 export interface MemorySearch {
   indexPending(request: { readonly limit: number }): Promise<{ readonly indexed: number; readonly cursor: number }>

@@ -131,7 +131,9 @@ export type StreamStatus = {
 export type MemoryStatus = {
   readonly streams: readonly StreamStatus[]
   readonly queue: { readonly leaves: number; readonly parents: number; readonly running: number; readonly parentsFirst: boolean }
+  readonly queueByStream: readonly { readonly stream: StreamId; readonly leaves: number; readonly parents: number; readonly running: number }[]
   readonly failures: { readonly count: number; readonly lastError: string | null; readonly retryInMs: number | null }
+  readonly failuresByStream: readonly { readonly stream: StreamId; readonly count: number }[]
   readonly summarizer: { readonly calls: number; readonly clips: number }
   readonly merges: number
   readonly search: { readonly cursor: number; readonly lag: number; readonly error: string | null } | null
@@ -163,8 +165,11 @@ export type MemoryEngine = {
     readonly scope: MemoryScope
     readonly access: MemoryAccess
     readonly limit?: number | undefined
+    readonly offset?: number | undefined
   }): Promise<readonly MemorySearchHit[]>
   status(): Promise<MemoryStatus>
+  /** Explicit operator recovery: re-enqueue failed jobs (including non-retryable output-budget failures). */
+  retryFailures(): number
   /** Folds stream `from` into the end of `to` (see `MemoryStore.moveStream`) and schedules the moved leaves. */
   moveStream(request: { readonly from: StreamId; readonly to: StreamId; readonly projectId: string }): Promise<number>
   /** Resolves once queues, view maintenance and indexing are idle; failed jobs wait for the next append. */
@@ -244,7 +249,10 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const leafQueue = new Fifo<Job>()
   const parentQueue = new Fifo<Job>()
   const queued = new Set<string>()
+  const workByStream = new Map<StreamId, { leaves: number; parents: number; running: number }>()
   const failed = new Map<string, Job>()
+  const retryableFailed = new Map<string, Job>()
+  const attempts = new Map<string, number>()
   const views = new Map<string, CachedView>()
   const pendingMerges = new Set<string>()
   const runners = new Map<StreamId, ViewRunner>()
@@ -287,9 +295,18 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
 
   const recordFailure = (job: Job | undefined, error: unknown): void => {
     lastError = errorMessage(error)
-    if (job) failed.set(jobKey(job), job)
+    if (job) {
+      const key = jobKey(job)
+      const attempt = (attempts.get(key) ?? 0) + 1
+      attempts.set(key, attempt)
+      failed.set(key, job)
+      const permanent = error instanceof Error && 'retryable' in error && error.retryable === false
+      if (!permanent && attempt < 5) {
+        retryableFailed.set(key, job)
+        scheduleRetry()
+      }
+    }
     logger.warn('optmem pipeline step failed', { job: job ? jobKey(job) : 'view', error: lastError })
-    if (job) scheduleRetry()
   }
 
   /** Failed jobs come back on an exponential backoff timer, not only on the next append. */
@@ -307,16 +324,45 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     }, delay)
   }
 
+  const workState = (stream: StreamId): { leaves: number; parents: number; running: number } => {
+    let state = workByStream.get(stream)
+    if (state === undefined) {
+      state = { leaves: 0, parents: 0, running: 0 }
+      workByStream.set(stream, state)
+    }
+    return state
+  }
+
   const enqueue = (job: Job): void => {
     const key = jobKey(job)
     if (queued.has(key)) return
     queued.add(key)
+    const state = workState(job.stream)
+    if (job.kind === 'leaf') state.leaves++
+    else state.parents++
     ;(job.kind === 'leaf' ? leafQueue : parentQueue).push(job)
   }
 
   const retryFailed = (): void => {
-    for (const job of failed.values()) enqueue(job)
-    failed.clear()
+    for (const [key, job] of retryableFailed) {
+      enqueue(job)
+      retryableFailed.delete(key)
+      failed.delete(key)
+    }
+  }
+
+  const retryFailures = (): number => {
+    let retried = 0
+    for (const [key, job] of failed) {
+      attempts.delete(key)
+      retryableFailed.delete(key)
+      failed.delete(key)
+      enqueue(job)
+      retried++
+    }
+    consecutiveFailures = 0
+    pump()
+    return retried
   }
 
   const pump = (): void => {
@@ -324,14 +370,24 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       // A blocked merge batch waits on parents, so they jump ahead of backlog leaves until it resolves.
       const job = pendingMerges.size > 0 ? (parentQueue.shift() ?? leafQueue.shift()) : (leafQueue.shift() ?? parentQueue.shift())
       if (!job) return
+      const streamWork = workState(job.stream)
+      if (job.kind === 'leaf') streamWork.leaves--
+      else streamWork.parents--
       running++
+      streamWork.running++
       runJob(job)
         .then(() => {
+          const key = jobKey(job)
+          attempts.delete(key)
+          failed.delete(key)
+          retryableFailed.delete(key)
           consecutiveFailures = 0
+          if (failed.size === 0) lastError = null
         })
         .catch(error => recordFailure(job, error))
         .finally(() => {
           running--
+          workState(job.stream).running--
           queued.delete(jobKey(job))
           pump()
           checkIdle()
@@ -750,7 +806,12 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (!searchIndex) return []
     scheduleIndex()
     await indexing
-    const hits = await searchIndex.search({ query: request.query, stream, limit: Math.min(Math.max(1, request.limit ?? 10), maxSearchLimit) })
+    const hits = await searchIndex.search({
+      query: request.query,
+      stream,
+      limit: Math.min(Math.max(1, request.limit ?? 10), maxSearchLimit),
+      offset: Math.max(0, Math.min(request.offset ?? 0, 1_000_000)),
+    })
     return Promise.all(
       hits.map(async hit => {
         const entry =
@@ -794,10 +855,17 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       }),
     )
     const searchStatus = searchIndex ? await searchIndex.status().catch(() => ({ cursor: -1, lag: -1 })) : undefined
+    const queueByStream = [...workByStream.entries()]
+      .filter(([, work]) => work.leaves + work.parents + work.running > 0)
+      .map(([stream, work]) => ({ stream, leaves: work.leaves, parents: work.parents, running: work.running }))
+    const failedByStream = new Map<StreamId, number>()
+    for (const job of failed.values()) failedByStream.set(job.stream, (failedByStream.get(job.stream) ?? 0) + 1)
     return {
       streams,
       queue: { leaves: leafQueue.size, parents: parentQueue.size, running, parentsFirst: pendingMerges.size > 0 },
+      queueByStream,
       failures: { count: failed.size, lastError, retryInMs: retryAt === null ? null : Math.max(0, retryAt - clock.now()) },
+      failuresByStream: [...failedByStream.entries()].map(([stream, count]) => ({ stream, count })),
       summarizer: { calls: summaryCalls, clips: summaryClips },
       merges,
       search: searchStatus ? { ...searchStatus, error: searchError } : null,
@@ -815,5 +883,5 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     return isQuiet() ? Promise.resolve() : new Promise(resolve => quietWaiters.push(resolve))
   }
 
-  return { start, append, snapshot, readView, zoom, context, search, status, drain, close, moveStream }
+  return { start, append, snapshot, readView, zoom, context, search, status, retryFailures, drain, close, moveStream }
 }

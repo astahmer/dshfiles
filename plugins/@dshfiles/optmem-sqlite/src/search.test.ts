@@ -62,6 +62,15 @@ describe('memory_search', () => {
     expect(zoomed.kind === 'event' && zoomed.text).toContain('port 54329')
   })
 
+  it('paginates project-scoped results without broadening the project filter', async () => {
+    const first = await engine.search({ query: 'rounding', scope: 'project', access: alpha('a1'), limit: 1, offset: 0 })
+    const second = await engine.search({ query: 'rounding', scope: 'project', access: alpha('a1'), limit: 1, offset: 1 })
+    expect(first).toHaveLength(1)
+    expect(second).toHaveLength(1)
+    expect(second[0]?.eventId).not.toBe(first[0]?.eventId)
+    expect([...first, ...second].every(hit => hit.projectId === 'alpha')).toBe(true)
+  })
+
   it('finds a code snippet with punctuation', async () => {
     const hits = await engine.search({ query: 'parseInvoiceTotals(', scope: 'conversation', access: alpha('a1') })
     expect(hits.map(hit => hit.role).sort()).toEqual(['tool_call', 'tool_result'])

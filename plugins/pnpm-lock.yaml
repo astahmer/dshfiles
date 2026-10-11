@@ -1640,6 +1640,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: link:../../../tooling/dsh-core/agent
         version: link:../../../tooling/dsh-core/agent
+      '@deepseek-ai/dsh-api-session-controller':
+        specifier: link:../../../tooling/dsh-core/api-session-controller
+        version: link:../../../tooling/dsh-core/api-session-controller
       '@deepseek-ai/dsh-session':
         specifier: link:../../../tooling/dsh-core/session
         version: link:../../../tooling/dsh-core/session
@@ -1658,6 +1661,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: link:../shared-runtime
         version: link:../shared-runtime
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
@@ -1677,7 +1683,16 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-sidebar-right':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-workspace':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-commands':

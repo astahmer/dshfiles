@@ -8,6 +8,37 @@ When('the OptMem Memory settings section is opened', async ({ page }: { page: Pa
   await expect(page.getByRole('heading', { name: 'Memory (OptMem)', exact: true })).toBeVisible()
 })
 
+When('the OptMem Workbench Explorer is opened', async ({ page }: { page: Page }) => {
+  const marker = 'dshx-optmem-workbench-e2e-marker'
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions' })
+  await composer.fill(marker)
+  await composer.press('Enter')
+  await expect(page.getByText(marker, { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'OptMem', exact: true }).click()
+  await expect(page.getByRole('tablist', { name: 'OptMem views' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Explore', exact: true })).toBeVisible()
+})
+
+Then('Explore, Context Preview and Pipeline remain separate read-only tabs', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'optmem-explorer-read-only-tabs', async () => {
+    const marker = 'dshx-optmem-workbench-e2e-marker'
+    const search = page.getByRole('textbox', { name: 'Search project memories' })
+    await search.fill(marker)
+    const result = page.getByRole('button').filter({ hasText: marker })
+    await expect(result).toBeVisible({ timeout: 30_000 })
+    await result.click()
+    await expect(page.getByText(marker, { exact: true }).last()).toBeVisible()
+    await page.getByRole('tab', { name: 'Context preview', exact: true }).click()
+    await expect(page.getByText('Simulated · read-only', { exact: true })).toBeVisible()
+    await expect(page.locator('pre').filter({ hasText: marker })).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('tab', { name: 'Pipeline', exact: true }).click()
+    await expect(page.getByText('Read-only diagnostics · refreshes every 5 seconds', { exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Explore', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Search project memories' })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('summarization can be paused and resumed from the settings panel', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'optmem-settings-panel-pause-resume', async () => {
     const pause = page.getByRole('button', { name: 'Pause summaries', exact: true })

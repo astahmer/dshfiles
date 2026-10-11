@@ -192,6 +192,33 @@ describe('snapshot barrier', () => {
 })
 
 describe('recovery', () => {
+  it('distinguishes stream leaf jobs from unique events and estimated model calls', async () => {
+    const summarizer = createFakeSummarizer({ gated: true })
+    const { engine, memory } = await openEngine({ path: dbPath('pipeline-estimate'), summarizer, config: { concurrency: 1 } })
+    const pendingEvent = event({ conversationId: 'c1', projectId: 'p1', text: 'large '.repeat(200) })
+    await engine.append([pendingEvent])
+    const before = memory.pipelineOverview(512)
+    expect(before).toMatchObject({ pendingLeafJobs: 2, pendingEvents: 1, estimatedLeafSummaryCalls: 1, oldestPendingAt: pendingEvent.createdAt })
+    expect(memory.pipelineOverview(512, StreamIds.project('p1'))).toMatchObject({
+      pendingLeafJobs: 1,
+      pendingEvents: 1,
+      estimatedLeafSummaryCalls: 1,
+    })
+    expect(memory.pipelineOverview(512, StreamIds.conversation('c1'))).toMatchObject({ pendingLeafJobs: 1, pendingEvents: 1 })
+    const status = await engine.status()
+    expect(status.queueByStream).toEqual(
+      expect.arrayContaining([expect.objectContaining({ stream: StreamIds.project('p1') }), expect.objectContaining({ stream: StreamIds.conversation('c1') })]),
+    )
+    const projectWork = status.queueByStream.find(item => item.stream === StreamIds.project('p1'))
+    expect((projectWork?.running ?? 0) + (projectWork?.leaves ?? 0) + (projectWork?.parents ?? 0)).toBeGreaterThan(0)
+    summarizer.release()
+    await engine.drain()
+    const after = memory.pipelineOverview(512)
+    expect(after).toMatchObject({ pendingLeafJobs: 0, pendingEvents: 0, estimatedLeafSummaryCalls: 0, completedSummaryNodes: 2 })
+    await engine.close()
+    memory.close()
+  })
+
   it('finishes an interrupted pipeline when a new engine opens the same database', async () => {
     const path = dbPath('recovery')
     const stalled = await openEngine({ path, summarizer: createFakeSummarizer({ gated: true }), config: smallView })
@@ -263,6 +290,41 @@ describe('recovery', () => {
     await fixed.engine.drain()
     expect((await fixed.engine.snapshot({ stream: conversation, barrierMs: 0 })).viewThroughPos).toBe(2)
     fixed.memory.close()
+  })
+
+  it('bounds automatic retry attempts for a repeatedly failing job', async () => {
+    const summarizer = createFakeSummarizer({ failing: true })
+    const { engine, memory } = await openEngine({ path: dbPath('bounded-retries'), summarizer, config: { retryBaseMs: 1, retryMaxMs: 8 } })
+    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
+    await new Promise(resolve => setTimeout(resolve, 80))
+    const status = await engine.status()
+    expect(summarizer.requests).toHaveLength(5)
+    expect(status.failures).toMatchObject({ count: 1, retryInMs: null, lastError: 'summarizer unavailable' })
+    await engine.close()
+    memory.close()
+  })
+
+  it('only retries non-retryable summary failures after explicit operator recovery', async () => {
+    let calls = 0
+    const flaky = createFakeSummarizer()
+    const summarizer = {
+      summarize: async (request: Parameters<typeof flaky.summarize>[0]) => {
+        calls++
+        if (calls === 1) throw Object.assign(new Error('output budget exhausted'), { retryable: false })
+        return flaky.summarize(request)
+      },
+    }
+    const { engine, memory } = await openEngine({ path: dbPath('manual-retry'), summarizer, config: { retryBaseMs: 1, retryMaxMs: 5 } })
+    await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
+    await engine.drain()
+    expect(calls).toBe(1)
+    expect((await engine.status()).failures).toMatchObject({ count: 1, retryInMs: null })
+    expect(engine.retryFailures()).toBe(1)
+    await engine.drain()
+    expect(calls).toBe(2)
+    expect((await engine.status()).failures.count).toBe(0)
+    await engine.close()
+    memory.close()
   })
 
   it('retries failed summaries on a backoff timer without waiting for another append', async () => {

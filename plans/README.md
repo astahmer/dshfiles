@@ -30,7 +30,7 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 | [Host gaps](dsh-host-gaps.md) | Candidate native API gaps across owned plugins. |
 | Exhaustive plugin E2E | [Plan](plugin-e2e-coverage.md), [implementation tracker](plugin-e2e-coverage/README.md). Catalog and browser-journey implementation; acceptance remains open. |
 | Multi-host | [Architecture](multi-host/README.md), [phase tracker](multi-host/implementation.md); completed validation receipts live in the package docs. |
-| [OptMem remaining validation](optmem/README.md) | One remaining benchmark gate; implementation docs are package-local. |
+| [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark plus full-plugin build/repository acceptance gates; backlog/Explorer behavior is in package docs. |
 | [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption shortlist. |
 | [Repository hardening](repo-hardening/README.md) | Remaining repo/toolchain hardening tasks. |
 | [Software additions roadmap](software-additions-roadmap.md) | Cross-product roadmap and release gates. |

@@ -10,13 +10,14 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-workspace'
+import { StreamIds, TreeMath } from '@dshfiles/optmem-core'
 import { defineCommand, defineHost, definePromptContext } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
 
-import { optmemApi, type OptmemOverview, type OptmemProvider } from './api.ts'
+import { optmemApi, type OptmemExplorerZoom, type OptmemOverview, type OptmemProject, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
 import { createLlmSummarizer, createRouteResolver, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
@@ -178,7 +179,14 @@ const databasePath = (): string => dshHomePath('plugins', 'optmem', 'optmem.db')
 let hostContext: Context | undefined
 
 const databaseBytes = async (path: string): Promise<number | null> => {
-  const sizes = await Promise.all(['', '-wal', '-shm'].map(suffix => stat(`${path}${suffix}`).then(file => file.size, () => null)))
+  const sizes = await Promise.all(
+    ['', '-wal', '-shm'].map(suffix =>
+      stat(`${path}${suffix}`).then(
+        file => file.size,
+        () => null,
+      ),
+    ),
+  )
   return sizes[0] === null ? null : sizes.reduce<number>((total, size) => total + (size ?? 0), 0)
 }
 
@@ -208,7 +216,34 @@ const overview = async (): Promise<OptmemOverview> => {
       retryInMs: null,
     }
   const host = runtime.status()
-  const memory = host.state === 'ready' ? await runtime.requireEngine().status().catch(() => undefined) : undefined
+  const memory =
+    host.state === 'ready'
+      ? await runtime
+          .requireEngine()
+          .status()
+          .catch(() => undefined)
+      : undefined
+  const persisted = host.state === 'ready' ? runtime.pipelineOverview() : undefined
+  const pipeline =
+    memory === undefined || persisted === undefined
+      ? undefined
+      : {
+          ...persisted,
+          paused: currentSettings().summarizerPaused,
+          health: !currentSettings().enabled
+            ? ('off' as const)
+            : host.state === 'starting'
+              ? ('starting' as const)
+              : currentSettings().summarizerPaused
+                ? ('paused' as const)
+                : memory.failures.count > 0
+                  ? ('degraded' as const)
+                  : memory.queue.running > 0
+                    ? ('processing' as const)
+                    : persisted.pendingLeafJobs + persisted.pendingMergeJobs > 0
+                      ? ('waiting' as const)
+                      : ('idle' as const),
+        }
   const route = host.summarizer
   return {
     state: host.state,
@@ -219,10 +254,12 @@ const overview = async (): Promise<OptmemOverview> => {
     settingsSource: host.settings,
     database: { path, bytes },
     events: memory ? memory.streams.reduce((total, stream) => total + stream.length, 0) : null,
+    uniqueEvents: persisted?.uniqueEvents ?? null,
     streams: memory ? memory.streams.length : null,
     summaryCalls: memory ? memory.summarizer.calls : null,
     pendingSummaries: memory ? memory.queue.leaves + memory.queue.parents + memory.queue.running + memory.failures.count : null,
     pendingMerges: memory ? memory.streams.filter(stream => stream.mergePending).length : null,
+    ...(pipeline === undefined ? {} : { pipeline }),
     captured: host.captured,
     skipped: host.skipped,
     queued: host.queued,
@@ -248,6 +285,144 @@ const providers = async (): Promise<readonly OptmemProvider[]> => {
   )
 }
 
+const explorerProject = async (projectId: string) => {
+  if (projectId.length === 0 || projectId.length > 256) throw new Error('Select a valid OptMem project.')
+  if (!runtime) throw new Error('OptMem is not active in this DSH host.')
+  const stream = StreamIds.project(projectId)
+  const workspace = hostContext
+    ?.get('workspaceRegistry')
+    ?.list()
+    .find(item => `workspace:${item.id}` === projectId)
+  const streams = (await runtime.requireEngine().status()).streams
+  if (!workspace && !streams.some(item => item.stream === stream)) throw new Error('The selected OptMem project is unavailable.')
+  return { stream, workspace }
+}
+
+const explorerProjects = async (): Promise<readonly OptmemProject[]> => {
+  const workspaces = hostContext?.get('workspaceRegistry')?.list() ?? []
+  const overview = runtime?.status().state === 'ready' ? await runtime.requireEngine().status() : undefined
+  const projectStreams = overview?.streams.filter(item => item.stream.startsWith('project:')) ?? []
+  const registered = new Set(workspaces.map(item => `workspace:${item.id}`))
+  const projects: OptmemProject[] = workspaces.map(workspace => {
+    const projectId = `workspace:${workspace.id}`
+    const stream = projectStreams.find(item => item.stream === StreamIds.project(projectId))
+    return {
+      projectId,
+      title: workspace.title,
+      path: workspace.path,
+      registered: true,
+      eventCount: stream?.length ?? 0,
+    }
+  })
+  for (const stream of projectStreams) {
+    const projectId = stream.stream.slice('project:'.length)
+    if (registered.has(projectId)) continue
+    projects.push({ projectId, title: 'Unregistered project', path: null, registered: false, eventCount: stream.length })
+  }
+  return projects
+}
+
+const explorerView = async (projectId: string) => {
+  const { stream } = await explorerProject(projectId)
+  if (!runtime) return []
+  const view = await runtime.requireEngine().readView({ stream, kind: 'main' })
+  return view.nodes.flatMap(address => {
+    const node = runtime?.inspectNode({ projectId, address: TreeMath.format(address) })
+    return node === undefined ? [] : [{ address: node.address, text: node.text, bytes: node.bytes, model: node.model, createdAt: node.createdAt }]
+  })
+}
+
+const explorerZoom = async (input: {
+  readonly projectId: string
+  readonly address: string
+  readonly page?: number | undefined
+}): Promise<OptmemExplorerZoom> => {
+  const { stream } = await explorerProject(input.projectId)
+  if (!runtime) throw new Error('OptMem is not active in this DSH host.')
+  if (input.address.length === 0 || input.address.length > 64) throw new Error('Select a valid memory node.')
+  const page = Number.isSafeInteger(input.page) ? Math.max(0, Math.min(input.page ?? 0, 100_000)) : 0
+  const zoomed = await runtime.requireEngine().zoom({
+    stream,
+    address: input.address,
+    page,
+    access: { conversationId: 'optmem-explorer', projectId: input.projectId, allowAllProjects: false },
+  })
+  if (zoomed.kind === 'event')
+    return {
+      kind: 'event',
+      address: zoomed.address,
+      eventId: zoomed.eventId,
+      conversationId: zoomed.conversationId,
+      role: zoomed.role,
+      createdAt: zoomed.createdAt,
+      truncated: zoomed.truncated,
+      page: zoomed.page,
+      pageCount: zoomed.pageCount,
+      text: zoomed.text,
+    }
+  const metadata = runtime.inspectNode({ projectId: input.projectId, address: zoomed.address })
+  if (!metadata) throw new Error('The selected memory node is no longer available.')
+  return { kind: 'node', ...metadata, lines: zoomed.lines }
+}
+
+const explorerSearch = async (input: {
+  readonly projectId: string
+  readonly query: string
+  readonly offset?: number | undefined
+  readonly limit?: number | undefined
+}) => {
+  await explorerProject(input.projectId)
+  if (!runtime) throw new Error('OptMem is not active in this DSH host.')
+  const limit = Number.isSafeInteger(input.limit) ? Math.max(1, Math.min(input.limit ?? 25, 50)) : 25
+  const offset = Number.isSafeInteger(input.offset) ? Math.max(0, Math.min(input.offset ?? 0, 1_000_000)) : 0
+  const hits = await runtime.requireEngine().search({
+    query: input.query.slice(0, 512),
+    scope: 'project',
+    access: { conversationId: 'optmem-explorer', projectId: input.projectId, allowAllProjects: false },
+    limit: limit + 1,
+    offset,
+  })
+  const hasMore = hits.length > limit
+  const page = hits.slice(0, limit)
+  return {
+    hits: page.map(hit => ({
+      eventId: hit.eventId,
+      conversationId: hit.conversationId,
+      role: hit.role,
+      createdAt: hit.createdAt,
+      pos: hit.pos ?? 0,
+      snippet: hit.snippet,
+      address: hit.address,
+    })),
+    nextOffset: offset + page.length,
+    hasMore,
+  }
+}
+
+const projectPipeline = async (projectId: string): Promise<OptmemOverview['pipeline']> => {
+  await explorerProject(projectId)
+  if (!runtime) return undefined
+  const persisted = runtime.pipelineOverview(projectId)
+  if (!persisted) return undefined
+  const status = await runtime.requireEngine().status()
+  const stream = StreamIds.project(projectId)
+  const work = status.queueByStream.find(item => item.stream === stream)
+  const failures = status.failuresByStream.find(item => item.stream === stream)?.count ?? 0
+  const paused = currentSettings().summarizerPaused
+  const health = !currentSettings().enabled
+    ? 'off'
+    : paused
+      ? 'paused'
+      : failures > 0
+        ? 'degraded'
+        : (work?.running ?? 0) > 0
+          ? 'processing'
+          : persisted.pendingLeafJobs + persisted.pendingMergeJobs > 0 || (work?.leaves ?? 0) + (work?.parents ?? 0) > 0
+            ? 'waiting'
+            : 'idle'
+  return { ...persisted, paused, health }
+}
+
 const panelApi = optmemApi.host({
   overview: () => overview(),
   providers: () => providers(),
@@ -256,6 +431,20 @@ const panelApi = optmemApi.host({
     const limit = Number.isSafeInteger(input.limit) && input.limit > 0 ? Math.min(input.limit, 500) : 20
     return { text: await runtime.backfill(limit) }
   },
+  projects: () => explorerProjects(),
+  projectForPath: async ({ input }) => {
+    if (!runtime) return null
+    return runtime.projectForPath(input.path)
+  },
+  projectView: async ({ input }) => explorerView(input.projectId),
+  projectZoom: async ({ input }) => explorerZoom(input),
+  projectSearch: async ({ input }) => explorerSearch(input),
+  contextPreview: async ({ input }) => {
+    await explorerProject(input.projectId)
+    if (!runtime) throw new Error('OptMem is not active in this DSH host.')
+    return runtime.contextPreview({ projectId: input.projectId, conversationId: input.conversationId })
+  },
+  projectPipeline: async ({ input }) => projectPipeline(input.projectId),
 })
 
 const setup = (ctx: Context): void => {

@@ -414,6 +414,39 @@
           "testName": "flags a cheap-model entry none of whose models its providers offer"
         }
       ]
+    },
+    {
+      "id": "workbench-explorer",
+      "title": "Explore one project's memory and pipeline",
+      "summary": "The dedicated OptMem page offers project-scoped tree browsing, paginated search and source navigation, simulated context preview, and read-only persisted pipeline diagnostics.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["loading", "project-selected", "searching", "node-selected", "previewing", "pipeline"],
+      "failureModes": [
+        "A missing project shows a choose-project state instead of loading forever.",
+        "Unavailable or stale nodes show a bounded error without touching the memory store.",
+        "Pending unsummarized leaves are accounted in Pipeline and are not represented as committed tree nodes."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "optmem.workbench-explorer",
+          "featureFile": "tooling/dshx/e2e/features/optmem.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.workbench-explorer-unit-project-isolation",
+          "file": "plugins/@dshfiles/optmem/src/optmem.test.ts",
+          "testName": "resolves workspace and historical path identities and previews only the selected project"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.workbench-explorer-unit-project-pagination",
+          "file": "plugins/@dshfiles/optmem-sqlite/src/search.test.ts",
+          "testName": "paginates project-scoped results without broadening the project filter"
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -7,6 +7,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import {
   Capabilities,
   StreamIds,
+  TreeMath,
+  Utf8,
   createMemoryEngine,
   type CapabilityCheck,
   type HarnessCapabilities,
@@ -31,6 +33,12 @@ type Logger = { warn(message: string, ...args: unknown[]): void; info(message: s
 type Ready = { readonly memory: SqliteMemory; readonly engine: MemoryEngine }
 
 type Pending = { readonly session: CaptureSession; readonly event: SessionEvent }
+
+const sqlInteger = (value: unknown, field: string): number => {
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed)) throw new Error(`OptMem expected an integer for ${field}.`)
+  return parsed
+}
 
 /** The agent fields full mode reads: the session header and its committed event log. */
 export type RequestAgent = {
@@ -511,6 +519,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
           ready = { memory: current.memory, engine: await openEngine(current.memory) }
           for (const stream of injectedStreams) refreshStream(stream)
         }
+        if (previous.summarizerPaused && !next.summarizerPaused) ready?.engine.retryFailures()
       } catch (error) {
         state = 'failed'
         failure = errorMessage(error)
@@ -570,6 +579,103 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     backfill,
     requestMessages,
     settle,
+    pipelineOverview: (projectId?: string) => {
+      if (!ready) return undefined
+      const stream = projectId === undefined ? undefined : StreamIds.project(projectId)
+      const persisted = ready.memory.pipelineOverview(options.settings().maxNodeBytes, stream)
+      const events =
+        projectId === undefined
+          ? ready.memory.database.prepare('SELECT COUNT(*) AS total FROM events').get()
+          : ready.memory.database.prepare('SELECT COUNT(DISTINCT event_id) AS total FROM stream_entries WHERE stream = ?').get(StreamIds.project(projectId))
+      const uniqueEvents = sqlInteger(events?.['total'] ?? 0, 'unique event count')
+      return { ...persisted, uniqueEvents }
+    },
+    projectForPath: async (path: string): Promise<string | null> => {
+      if (path.length === 0 || path.length > 4_096) return null
+      const real = await realpath(path).catch(() => resolve(path))
+      const workspaceId = await services.workspaceId(real).catch(() => undefined)
+      if (workspaceId !== undefined) return `workspace:${workspaceId}`
+      if (!ready) return null
+      const projectId = `path:${createHash('sha256').update(real).digest('hex').slice(0, 16)}`
+      return (await ready.engine.status()).streams.some(item => item.stream === StreamIds.project(projectId)) ? projectId : null
+    },
+    contextPreview: async (request: { readonly projectId: string; readonly conversationId?: string | undefined }) => {
+      if (!ready) throw new Error('OptMem memory is unavailable.')
+      const stream = StreamIds.project(request.projectId)
+      const view = await ready.engine.readView({ stream, kind: 'compact' })
+      const preview = createInjectionCache()
+      const pageSize = 2_048
+      for (let fromPos = 0; fromPos < view.throughPos; fromPos += pageSize) {
+        const ids = await ready.memory.store.streamConversations(stream, fromPos, Math.min(view.throughPos, fromPos + pageSize))
+        preview.extendConversations(stream, fromPos, ids)
+      }
+      preview.setView(view)
+      const conversationId = request.conversationId ?? 'optmem-context-preview'
+      if (request.conversationId !== undefined) {
+        if (request.conversationId.length === 0 || request.conversationId.length > 256) throw new Error('Select a valid session id.')
+        const found = ready.memory.database
+          .prepare('SELECT 1 AS found FROM events WHERE project_id = ? AND conversation_id = ? LIMIT 1')
+          .get(request.projectId, request.conversationId)
+        if (!found) throw new Error('The selected session has no events in this project.')
+      }
+      const text = preview.render({
+        stream,
+        conversationId,
+        budgetBytes: options.settings().injectUpperBytes,
+        refreshBytes: 0,
+      })
+      return {
+        text,
+        budgetBytes: options.settings().injectUpperBytes,
+        estimatedTokens: Math.ceil(Utf8.byteLength(text) / 4),
+        sourceAddresses: view.nodes.map(TreeMath.format),
+      }
+    },
+    inspectNode: (request: { readonly projectId: string; readonly address: string }) => {
+      if (!ready) return undefined
+      const address = TreeMath.parse(request.address)
+      if (!address) return undefined
+      const stream = StreamIds.project(request.projectId)
+      const node = ready.memory.database
+        .prepare('SELECT text, bytes, model, created_at FROM nodes WHERE stream = ? AND level = ? AND idx = ?')
+        .get(stream, address.level, address.idx)
+      if (!node) return undefined
+      const start = TreeMath.start(address)
+      const length = TreeMath.length(address)
+      const sourceCount = ready.memory.database
+        .prepare('SELECT COUNT(*) AS total FROM stream_entries WHERE stream = ? AND pos >= ? AND pos < ?')
+        .get(stream, start, start + length)
+      const sources = ready.memory.database
+        .prepare(
+          `SELECT e.id, e.conversation_id, e.role, e.created_at
+           FROM stream_entries s JOIN events e ON e.id = s.event_id
+           WHERE s.stream = ? AND s.pos >= ? AND s.pos < ? ORDER BY s.pos LIMIT 51`,
+        )
+        .all(stream, start, start + length)
+        .map(source => ({
+          eventId: sqlInteger(source['id'], 'source event id'),
+          conversationId: String(source['conversation_id']),
+          role: String(source['role']),
+          createdAt: sqlInteger(source['created_at'], 'source timestamp'),
+        }))
+      const parent = TreeMath.parent(address)
+      const storedParent = ready.memory.database
+        .prepare('SELECT 1 AS found FROM nodes WHERE stream = ? AND level = ? AND idx = ?')
+        .get(stream, parent.level, parent.idx)
+      const children = TreeMath.children(address)?.map(TreeMath.format) ?? []
+      return {
+        address: TreeMath.format(address),
+        text: String(node['text']),
+        bytes: sqlInteger(node['bytes'], 'node byte length'),
+        model: String(node['model']),
+        createdAt: sqlInteger(node['created_at'], 'node timestamp'),
+        parentAddress: storedParent ? TreeMath.format(parent) : null,
+        childAddresses: children,
+        sources: sources.slice(0, 50),
+        sourceCount: sqlInteger(sourceCount?.['total'] ?? 0, 'node source count'),
+        sourcesTruncated: sources.length > 50,
+      }
+    },
     status: () => ({
       state,
       failure,

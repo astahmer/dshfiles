@@ -125,11 +125,23 @@ const ftsQuery = (query: string): string =>
 const ftsCursorStream = 'events'
 const snippetTokens = 16
 
+export type SqlitePipelineOverview = {
+  readonly pendingLeafJobs: number
+  readonly pendingEvents: number
+  readonly estimatedLeafSummaryCalls: number
+  readonly pendingMergeJobs: number
+  readonly oldestPendingAt: number | null
+  readonly completedSummaryNodes: number
+  readonly summariesLastTenMinutes: number
+}
+
 export type SqliteMemory = {
   readonly store: MemoryStore
   readonly search: MemorySearch
   /** Escape hatch for diagnostics, benchmarks and failure-injection tests. */
   readonly database: DatabaseSync
+  /** Read-only, persisted work estimates; queues and retry state remain process-local. */
+  pipelineOverview(maxNodeBytes: number, stream?: StreamId | undefined): SqlitePipelineOverview
   close(): void
 }
 
@@ -350,6 +362,44 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
     return row ? integer(row, 'pos') : 0
   }
 
+  const pipelineOverview = (maxNodeBytes: number, streamId?: StreamId): SqlitePipelineOverview => {
+    const pending = prepare(
+      `SELECT COUNT(*) AS jobs, COUNT(DISTINCT e.id) AS events,
+              COUNT(DISTINCT CASE
+                WHEN e.bytes + length(CAST(e.role AS BLOB)) + 2 > ?
+                 AND NOT EXISTS (SELECT 1 FROM nodes existing WHERE existing.event_id = e.id AND existing.level = 0)
+                THEN e.id END) AS summary_calls,
+              MIN(e.created_at) AS oldest_at
+       FROM stream_entries s
+       JOIN events e ON e.id = s.event_id
+       LEFT JOIN nodes n ON n.stream = s.stream AND n.level = 0 AND n.idx = s.pos
+       WHERE n.idx IS NULL AND (? IS NULL OR s.stream = ?)`,
+    ).get(maxNodeBytes, streamId ?? null, streamId ?? null) ?? { jobs: 0, events: 0, summary_calls: 0, oldest_at: null }
+    const merges = prepare(
+      `SELECT COUNT(*) AS jobs FROM nodes left_node
+       JOIN nodes right_node ON right_node.stream = left_node.stream
+         AND right_node.level = left_node.level AND right_node.idx = left_node.idx + 1
+       LEFT JOIN nodes parent ON parent.stream = left_node.stream
+         AND parent.level = left_node.level + 1 AND parent.idx = left_node.idx / 2
+       WHERE left_node.level >= 0 AND left_node.idx % 2 = 0 AND parent.idx IS NULL
+         AND left_node.bytes + right_node.bytes + 1 > ? AND (? IS NULL OR left_node.stream = ?)`,
+    ).get(maxNodeBytes, streamId ?? null, streamId ?? null) ?? { jobs: 0 }
+    const completion = prepare(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) AS recent
+       FROM nodes WHERE model NOT IN ('verbatim', 'concat') AND (? IS NULL OR stream = ?)`,
+    ).get(Date.now() - 10 * 60_000, streamId ?? null, streamId ?? null) ?? { total: 0, recent: 0 }
+    return {
+      pendingLeafJobs: integer(pending, 'jobs'),
+      pendingEvents: integer(pending, 'events'),
+      estimatedLeafSummaryCalls: integer(pending, 'summary_calls'),
+      pendingMergeJobs: integer(merges, 'jobs'),
+      oldestPendingAt: pending['oldest_at'] === null ? null : integer(pending, 'oldest_at'),
+      completedSummaryNodes: integer(completion, 'total'),
+      summariesLastTenMinutes: integer(completion, 'recent'),
+    }
+  }
+
   const search: MemorySearch = {
     indexPending: async request =>
       transaction('IMMEDIATE', () => {
@@ -371,14 +421,19 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
       const match = ftsQuery(request.query)
       if (match === '') return []
       // Rank first, snippet only the survivors: snippet() over every match costs ~0.1 ms per row.
+      const offset = Math.max(0, Math.min(request.offset ?? 0, 1_000_000))
       const ranked =
         request.stream === null
-          ? prepare('SELECT rowid AS id FROM events_fts WHERE events_fts MATCH ? ORDER BY bm25(events_fts), rowid DESC LIMIT ?').all(match, request.limit)
+          ? prepare('SELECT rowid AS id FROM events_fts WHERE events_fts MATCH ? ORDER BY bm25(events_fts), rowid DESC LIMIT ? OFFSET ?').all(
+              match,
+              request.limit,
+              offset,
+            )
           : prepare(
               `SELECT id FROM (SELECT rowid AS id, bm25(events_fts) AS score FROM events_fts WHERE events_fts MATCH ?) hits
                WHERE EXISTS (SELECT 1 FROM stream_entries s WHERE s.event_id = hits.id AND s.stream = ?)
-               ORDER BY score, id DESC LIMIT ?`,
-            ).all(match, request.stream, request.limit)
+               ORDER BY score, id DESC LIMIT ? OFFSET ?`,
+            ).all(match, request.stream, request.limit, offset)
       return ranked.flatMap(rankedRow => {
         const eventId = integer(rankedRow, 'id')
         // node:sqlite binds JS numbers as REAL, which an FTS5 rowid constraint silently ignores.
@@ -413,6 +468,7 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
     store,
     search,
     database,
+    pipelineOverview,
     close: () => {
       if (database.isOpen) database.close()
     },

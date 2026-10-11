@@ -1,10 +1,20 @@
 # @dshfiles/optmem
 
-Persistent project memory for DSH. Captures session activity into an append-only memory store, exposes memory tools, and injects a compact memory view into context.
+Persistent project memory for DSH. Captures session activity into an append-only memory store, exposes memory tools, and injects a compact memory view into context. The Host owns SQLite; browser inspection APIs are read-only and always scoped to one selected OptMem project.
 
 The Host adapter composes `@dshfiles/optmem-core` with the `node:sqlite` implementation in `@dshfiles/optmem-sqlite`. See [`docs/`](docs/) for requirements, clean-room research, architecture, runtime evidence, benchmarks, and a benchmark runbook. Scratch scenarios and their driver live in [`scripts/`](scripts/). The only remaining plan gate is the 100k-event storage benchmark rerun: [`plans/optmem/`](../../../plans/optmem/README.md).
 
 Build, test, and typecheck with `pnpm build`, `pnpm test`, and `pnpm typecheck` from this package.
+
+## Workbench Explorer
+
+A dedicated **OptMem** Workbench page (separate from Settings) offers three read-only tabs:
+
+- **Explore**: choose a registered workspace or an existing detached OptMem project, browse the committed main tree, search the selected project's indexed events with bounded pagination, inspect node text and up to 50 source events, and open a source session. The current workspace is the initial selection when available; the choice is saved locally in the browser.
+- **Context Preview**: run the same compact-view injection assembly with the selected project, optionally excluding one session. This is a simulation, not a record of past prompt injection. It does not start or resume a session.
+- **Pipeline**: inspect persisted, selected-project counters (missing stream leaves, distinct events, estimated unique oversized leaf calls, ready merges, oldest event, completed nodes and recent throughput). Counts are estimates and do not expose or change the queue.
+
+Workspace identity remains the current OptMem project identity (`workspace:<id>` or historical `path:<hash>`). Multiple Jujutsu workspaces in one repository are not silently joined; a repository-level identity migration would need an explicit compatibility and data-preservation design. Pending unsummarized tails are accounted in the Pipeline tab, not in the committed Explorer tree.
 
 ## Settings in DSH
 
@@ -18,9 +28,8 @@ Settings live in the `dshfiles-optmem` entry (Loader row inserted by this packag
 - An override route (one provider, model and effort for every summary), every byte budget, and the exclusions.
 - `mode` can be switched to `full` only when the Host reports the fork core marker (`agent/request-messages`).
   Otherwise it is read-only.
-- Live status from the Host API (`src/api.ts`): database size, events, summary calls, pending summaries and merges,
-  last summary route, current error. Two actions: **Pause summaries** (`summarizerPaused`, live; pending summaries
-  retry once resumed) and **Backfill sessions** (20 at a time).
+- Live status from the Host API (`src/api.ts`): database size, stored events vs stream entries, in-memory jobs vs persisted missing-leaf entries, estimated unique model calls, ready merges, oldest pending work, completed summaries, recent throughput, last route and error. The legacy `pendingSummaries` value is explicitly labeled as an in-memory job count, not calls or persisted backlog. **Pause summaries** is live; failed summaries retry after resume. **Backfill sessions** imports a bounded batch.
+- Backlog accounting, the output-budget failure mode, safe retry behavior, production-snapshot caveats and data-safety boundaries are recorded in [`docs/backlog-diagnosis.md`](docs/backlog-diagnosis.md).
 
 Old values decode field by field with defaults (`src/settings-draft.ts`). A Host started before the panel API shows a
 restart notice, and settings still save.

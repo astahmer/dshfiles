@@ -56,24 +56,39 @@ const select = (conversationId: string, policy: SummarizerPolicy = accountPolicy
 
 describe('summary route selection', () => {
   it("uses the thread's own provider with that provider kind's cheap model, never the thread's model", async () => {
-    expect(await select('thread-codex')).toMatchObject({ kind: 'ready', source: 'account', route: { provider: 'codex-emialex', model: 'gpt-6-luna', effort: 'low' } })
-    expect(await select('thread-opencode')).toMatchObject({ route: { provider: 'opencode-go-alex', model: 'opencode-go/deepseek-v4.1-flash', effort: undefined } })
+    expect(await select('thread-codex')).toMatchObject({
+      kind: 'ready',
+      source: 'account',
+      route: { provider: 'codex-emialex', model: 'gpt-6-luna', effort: 'low' },
+    })
+    expect(await select('thread-opencode')).toMatchObject({
+      route: { provider: 'opencode-go-alex', model: 'opencode-go/deepseek-v4.1-flash', effort: undefined },
+    })
     expect(await select('thread-commandcode')).toMatchObject({ route: { provider: 'commandcode', model: 'deepseek-v4-flash' } })
   })
 
   it('takes the newest model matching a trailing-star candidate', async () => {
-    expect(await select('thread-claude', accountPolicy, { claude_work: 'claude' })).toMatchObject({ route: { provider: 'claude_work', model: 'claude-haiku-5-1' } })
+    expect(await select('thread-claude', accountPolicy, { claude_work: 'claude' })).toMatchObject({
+      route: { provider: 'claude_work', model: 'claude-haiku-5-1' },
+    })
   })
 
   it('reads the provider kind from AI Accounts before falling back to the id prefix', async () => {
     const policy: SummarizerPolicy = { ...accountPolicy, cheapModels: [{ kind: 'cursor', models: ['auto'], effort: undefined }, ...accountPolicy.cheapModels] }
     expect(await select('thread-cursor', policy)).toMatchObject({ kind: 'unavailable' })
-    expect(await select('thread-cursor', policy, { 'work-cursor': 'cursor' })).toMatchObject({ kind: 'ready', route: { provider: 'work-cursor', model: 'auto' } })
+    expect(await select('thread-cursor', policy, { 'work-cursor': 'cursor' })).toMatchObject({
+      kind: 'ready',
+      route: { provider: 'work-cursor', model: 'auto' },
+    })
   })
 
   it('calls nothing while summaries are paused in settings, even with an override', async () => {
     const paused = { ...accountPolicy, paused: true, override: { provider: 'commandcode', model: 'gpt-6-luna' } }
-    expect(await select('thread-codex', paused)).toEqual({ kind: 'unavailable', conversationId: 'thread-codex', reason: 'summaries are paused in OptMem settings' })
+    expect(await select('thread-codex', paused)).toEqual({
+      kind: 'unavailable',
+      conversationId: 'thread-codex',
+      reason: 'summaries are paused in OptMem settings',
+    })
   })
 
   it('skips summarizing when the cheap model is not offered and no fallback remains', async () => {
@@ -94,7 +109,11 @@ describe('summary route selection', () => {
         { provider: 'commandcode', model: 'deepseek-v4-flash', effort: 'low' },
       ],
     }
-    expect(await select('thread-cursor', policy)).toMatchObject({ kind: 'ready', source: 'fallback', route: { provider: 'commandcode', model: 'deepseek-v4-flash', effort: 'low' } })
+    expect(await select('thread-cursor', policy)).toMatchObject({
+      kind: 'ready',
+      source: 'fallback',
+      route: { provider: 'commandcode', model: 'deepseek-v4-flash', effort: 'low' },
+    })
   })
 
   it('sends every summary to the override route, then the fallbacks, never to the account cheap model', async () => {
@@ -106,7 +125,10 @@ describe('summary route selection', () => {
 
   it('treats a legacy summarizerModel without provider as an override on the thread provider', async () => {
     const legacy: SummarizerPolicy = { ...accountPolicy, override: { provider: '', model: 'gpt-6-luna', effort: 'medium' } }
-    expect(await select('thread-commandcode', legacy)).toMatchObject({ source: 'override', route: { provider: 'commandcode', model: 'gpt-6-luna', effort: 'medium' } })
+    expect(await select('thread-commandcode', legacy)).toMatchObject({
+      source: 'override',
+      route: { provider: 'commandcode', model: 'gpt-6-luna', effort: 'medium' },
+    })
   })
 
   it('re-resolves a thread after the cache expires or the policy changes', async () => {
@@ -148,6 +170,7 @@ describe('llm summarizer', () => {
     const summarizer = createLlmSummarizer({
       stream: async function* (call) {
         calls.push(call)
+        yield* answer('This route should not be reached.')
       },
       resolveRoute: resolver.resolve,
       timeoutMs: () => 1_000,
@@ -156,15 +179,52 @@ describe('llm summarizer', () => {
     expect(calls).toEqual([])
   })
 
-  it('fails clearly on an errored stream', async () => {
+  it('retries output-budget exhaustion once with a larger bounded budget', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        if (calls.length === 1) {
+          yield { type: 'finish', reason: { kind: 'max-tokens' } }
+          return
+        }
+        yield* answer('Recovered concise note.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(summarizer.summarize(request)).resolves.toMatchObject({ text: 'Recovered concise note.' })
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('bounds repeated output-budget exhaustion to two requests', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield { type: 'finish', reason: { kind: 'max-tokens' } }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(summarizer.summarize(request)).rejects.toThrow('summary output budget exhausted at 4096 tokens without answer text')
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('fails clearly on an errored stream without retrying unrelated errors', async () => {
+    let calls = 0
     const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
     const failing = createLlmSummarizer({
       stream: async function* () {
+        calls++
         yield { type: 'finish', reason: { kind: 'error', failure: { code: 'rate_limited', message: 'slow down', retryable: true } } }
       },
       resolveRoute: resolver.resolve,
       timeoutMs: () => 1_000,
     })
     await expect(failing.summarize(request)).rejects.toThrow('summary call ended with error: slow down')
+    expect(calls).toBe(1)
   })
 })
