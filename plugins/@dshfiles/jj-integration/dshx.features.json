@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "infrastructure",
+  "features": [
+    {
+      "id": "workspace-lifecycle",
+      "title": "Jujutsu workspace lifecycle and ownership",
+      "summary": "Registers jj workspaces with a coordinator identity separate from Session, Agent, path, workspace topic, and jj revision; tracks owning Sessions over time and never infers readiness from an idle Session.",
+      "surfaces": ["host", "tool", "storage", "client", "integration"],
+      "configuration": [],
+      "states": ["created", "active", "idle", "ready", "integrating", "integrated", "blocked", "abandoned", "archived", "missing"],
+      "failureModes": [
+        "A workspace path that is not inside a jj repository is rejected without touching the filesystem.",
+        "A deleted or relocated workspace is marked missing instead of assumed complete.",
+        "An idle Session does not make its workspace ready for integration.",
+        "Multiple Sessions may own one workspace; detachment is recorded, never inferred."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj CLI through the DSH subprocess service; no shell and no agent-supplied arguments.",
+          "deterministicFake": "Real temporary jj repositories in src/jj.integration.test.ts; no jj mock is used."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "jj-integration.workspace-browser-journey",
+          "reason": "The workspace browser journey is exercised by the real-jj host tests in this revision; a dedicated Playwright scenario is deferred until the panel is composed in a profile."
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-registration",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "registers a workspace and records its owning session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-missing",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "handles a missing source workspace without advancing the spine"
+        }
+      ]
+    },
+    {
+      "id": "integration-queue",
+      "title": "Serialized canonical integration queue",
+      "summary": "Durable integration candidates capture immutable change and commit ids, refresh the canonical bookmark, duplicate the source revision onto it, block on conflict, validate, and advance the bookmark only on success; source workspaces are never modified.",
+      "surfaces": ["host", "tool", "storage", "client", "integration"],
+      "configuration": [
+        {
+          "key": "spineBookmark",
+          "defaultValue": "integration-spine",
+          "constraints": "Existing jj bookmark that represents the accepted canonical state; never inferred from recent activity.",
+          "coveredBy": ["jj-integration.queue-sequential"]
+        },
+        {
+          "key": "validationCommand",
+          "defaultValue": "unset",
+          "constraints": "Optional operator-configured command run in an ephemeral staging workspace at the duplicated revision; a non-zero exit leaves the bookmark unchanged.",
+          "coveredBy": ["jj-integration.queue-validation-failure"]
+        },
+        {
+          "key": "allowAnyAgentIntegration",
+          "defaultValue": "false",
+          "constraints": "When false, only the candidate owner Session or a configured coordinator Session may run integration; the browser API acts as the human operator.",
+          "coveredBy": ["jj-integration.queue-sequential"]
+        }
+      ],
+      "states": ["queued", "running", "blocked", "failed", "integrated", "already-integrated", "stale", "cancelled"],
+      "failureModes": [
+        "A conflicting duplicate is recorded as blocked and the canonical bookmark is not advanced.",
+        "A failed validation leaves the canonical bookmark unchanged.",
+        "A source revision that evolves after queueing is marked stale instead of integrated.",
+        "Two concurrent integration requests are serialized; the canonical bookmark is never advanced twice from one candidate.",
+        "A second coordinator process holding the lock is refused with integration-busy."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "jj duplicate --onto performs reconciliation without rewriting the source revision; jj resolve --list reports conflicts.",
+          "deterministicFake": "Real temporary jj repositories; integration behavior is verified against jj 0.45 rather than mocked."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "jj-integration.queue-browser-journey",
+          "reason": "The queue browser journey is exercised by the real-jj host tests in this revision; a dedicated Playwright scenario is deferred until the panel is composed in a profile."
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-sequential",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "integrates two independent workspaces sequentially"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-older-base",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "integrates work started from an older canonical revision"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-conflict",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "blocks a conflicting candidate without advancing the spine or touching the source workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-stale",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "marks a candidate stale when the source revision evolves after queueing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-already-integrated",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "detects an already integrated candidate and does not duplicate it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-validation-failure",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "leaves the canonical spine unchanged when validation fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-concurrent",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "serializes concurrent integration requests without corrupting the spine"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-dependencies",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "orders explicit dependencies before their dependents"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-restart",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "recovers after a coordinator restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.queue-lock",
+          "file": "plugins/@dshfiles/jj-integration/src/jj.integration.test.ts",
+          "testName": "refuses a second coordinator process that holds the integration lock"
+        }
+      ]
+    }
+  ]
+}

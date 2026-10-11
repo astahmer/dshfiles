@@ -8,6 +8,7 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 |---|---|
 | Agent Communication | [Implementation plan](agent-communication-observability.md); [acceptance tracker](agent-communication-observability/README.md). Remaining scratch/browser acceptance. |
 | [Agent communication + session tools integration](agent-communication-integration/README.md) | Audit of the two prior handoffs: passive-coordination invariants, session-tool read-only fixes, shared contracts, and next-handoff gates. |
+| [Jujutsu integration coordinator](jj-integration-coordinator/README.md) | Workspace lifecycle, durable serialized integration queue, canonical bookmark advancement, and real-jj evidence. |
 | [Agent session history](agent-session-history.md) | Discovery and design proposal; no implementation claim. |
 | [Agent session observability](agent-session-observability/README.md) | Read-only cross-session visibility; scoped directory and workspace lookup landed, task/history access and all Session writes pending. |
 | [Async Agent questions](async-agent-questions.md) | Native/root acceptance and unresolved Host boundaries beyond the implemented plugin contract. |

@@ -1304,6 +1304,76 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
+  '@dshfiles/jj-integration':
+    dependencies:
+      '@deepseek-ai/dsh-agent':
+        specifier: link:../../../tooling/dsh-core/agent
+        version: link:../../../tooling/dsh-core/agent
+      '@dshfiles/plugin-ui':
+        specifier: link:../plugin-ui
+        version: link:../plugin-ui
+      '@dshfiles/shared-runtime':
+        specifier: link:../shared-runtime
+        version: link:../shared-runtime
+      write-file-atomic:
+        specifier: 7.0.0
+        version: 7.0.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.5
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.4
+        version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(0fd82cc2bd900d5984f57e81487e9016)
+      '@deepseek-ai/dsh-api-gateway':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-client-connection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+      '@deepseek-ai/dsh-client-connection':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+      '@deepseek-ai/dsh-client-locale':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-subprocess':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-http-proxy@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+      '@deepseek-ai/dsh-tools':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
+      '@dshfiles/dshx':
+        specifier: link:../../../tooling/dshx/packages/dshx
+        version: link:../../../tooling/dshx/packages/dshx
+      '@types/node':
+        specifier: ^22.19.0
+        version: 22.20.5
+      '@types/react':
+        specifier: ~18.3.31
+        version: 18.3.31
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
+
   '@dshfiles/jujutsu':
     dependencies:
       '@deepseek-ai/dsh-api-session-controller':
