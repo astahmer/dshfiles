@@ -71,6 +71,11 @@ describe('summary route selection', () => {
     expect(await select('thread-cursor', policy, { 'work-cursor': 'cursor' })).toMatchObject({ kind: 'ready', route: { provider: 'work-cursor', model: 'auto' } })
   })
 
+  it('calls nothing while summaries are paused in settings, even with an override', async () => {
+    const paused = { ...accountPolicy, paused: true, override: { provider: 'commandcode', model: 'gpt-6-luna' } }
+    expect(await select('thread-codex', paused)).toEqual({ kind: 'unavailable', conversationId: 'thread-codex', reason: 'summaries are paused in OptMem settings' })
+  })
+
   it('skips summarizing when the cheap model is not offered and no fallback remains', async () => {
     const policy: SummarizerPolicy = { ...accountPolicy, cheapModels: [{ kind: 'codex', models: ['gpt-6-nova'], effort: 'low' }] }
     expect(await select('thread-codex', policy)).toEqual({

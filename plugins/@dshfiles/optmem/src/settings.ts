@@ -1,5 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
-import { defineSettings } from '@dshfiles/dshx/settings'
+import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 
 const effort = Schema.union([
   Schema.const('').description('Adapter default'),
@@ -17,7 +17,7 @@ export const optmemSettings = defineSettings({
       Schema.const('full').description('Full: fresh context per turn (needs a fork capability)'),
     ])
       .default('compat')
-      .description('Full mode is validated at startup and reported unsupported on stock DSH; the plugin then runs in compatibility mode.'),
+      .description('Full mode needs the dshfiles fork core (agent/request-messages); on stock DSH it is reported unsupported and the plugin runs in compatibility mode.'),
     injectUpperBytes: Schema.natural().min(1_024).max(65_536).default(8_192).description('Compact view merge threshold, and the injected memory budget.'),
     injectLowerBytes: Schema.natural().min(512).max(65_536).default(4_096).description('Compact view size a merge batch shrinks to.'),
     injectRefreshBytes: Schema.natural()
@@ -63,6 +63,9 @@ export const optmemSettings = defineSettings({
     )
       .default([])
       .description('Routes tried in order when the override or cheap model is not offered. With none left, summaries wait and retry; the thread\'s own model is never used.'),
+    summarizerPaused: Schema.boolean()
+      .default(false)
+      .description('Pause summarizing: no summary call is made; oversized events stay pending and are summarized once resumed.'),
     summarizerConcurrency: Schema.natural().min(1).max(16).default(2).description('Summaries in flight at once.'),
     summarizerTimeoutMs: Schema.natural().min(1_000).max(600_000).default(60_000).description('Timeout of one summary call; failures retry with backoff.'),
     barrierMs: Schema.natural().min(0).max(60_000).default(5_000).description('Longest wait for pending summaries before a snapshot renders them raw.'),
@@ -83,4 +86,4 @@ export const optmemSettings = defineSettings({
   applies: 'live',
 })
 
-export type OptmemSettings = ReturnType<typeof optmemSettings.schema>
+export type OptmemSettings = SettingsValue<typeof optmemSettings.schema>

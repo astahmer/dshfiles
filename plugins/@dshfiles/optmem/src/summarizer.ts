@@ -1,6 +1,8 @@
 import { BlockAssembler, ReasoningEffortId, createUserMessage, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Summarizer, SummaryRequest, SummaryResult } from '@dshfiles/optmem-core'
 
+import { SummaryRouting } from './routing.ts'
+
 const instructions = (request: SummaryRequest): string =>
   [
     'You maintain the long-term memory of a software engineering assistant.',
@@ -31,6 +33,8 @@ export type RouteEntry = { readonly provider: string; readonly model: string; re
 export type CheapModelEntry = { readonly kind: string; readonly models: readonly string[]; readonly effort?: SummaryEffort | undefined }
 
 export type SummarizerPolicy = {
+  /** Paused in settings: every summary waits and retries, nothing is called. */
+  readonly paused?: boolean | undefined
   readonly override: RouteEntry | undefined
   readonly cheapModels: readonly CheapModelEntry[]
   readonly fallbacks: readonly RouteEntry[]
@@ -50,23 +54,6 @@ export type RouteCatalog = {
   readonly models: (provider: string) => Promise<readonly string[]>
 }
 
-const offeredModel = (candidate: string, offered: readonly string[]): string | undefined => {
-  const matches = (id: string, wanted: string): boolean => id === wanted || id.endsWith(`/${wanted}`)
-  if (!candidate.endsWith('*')) return offered.find(id => matches(id, candidate))
-  const prefix = candidate.slice(0, -1)
-  const newestFirst = offered
-    .filter(id => id.startsWith(prefix) || id.includes(`/${prefix}`))
-    .toSorted((left, right) => right.localeCompare(left, 'en', { numeric: true }))
-  return newestFirst[0]
-}
-
-const cheapEntryFor = (entries: readonly CheapModelEntry[], provider: string, accountKind: string | undefined): CheapModelEntry | undefined =>
-  entries.find(entry => entry.kind === provider) ??
-  (accountKind === undefined ? undefined : entries.find(entry => entry.kind === accountKind)) ??
-  entries
-    .filter(entry => provider.startsWith(`${entry.kind}-`) || provider.startsWith(`${entry.kind}_`))
-    .toSorted((left, right) => right.kind.length - left.kind.length)[0]
-
 /**
  * Picks the route for one summary: the override when set, else the thread's own provider with that provider's cheap
  * model, then each fallback in order. Every candidate must be offered by its provider. It never uses the thread's own
@@ -78,6 +65,7 @@ export const selectSummaryRoute = async (request: {
   readonly catalog: RouteCatalog
 }): Promise<SummarizerRouteState> => {
   const { policy, conversationId, catalog } = request
+  if (policy.paused === true) return { kind: 'unavailable', conversationId, reason: 'summaries are paused in OptMem settings' }
   const sessionProvider = await catalog.sessionProvider(conversationId)
   const tried: string[] = []
   const tryEntry = async (entry: RouteEntry): Promise<SummaryRoute | undefined> => {
@@ -86,7 +74,7 @@ export const selectSummaryRoute = async (request: {
       tried.push(`${entry.model} (thread provider unknown)`)
       return undefined
     }
-    const model = offeredModel(entry.model, await catalog.models(provider))
+    const model = SummaryRouting.offeredModel(entry.model, await catalog.models(provider))
     if (model !== undefined) return { provider, model, effort: entry.effort }
     tried.push(`${provider}/${entry.model} (not offered)`)
     return undefined
@@ -97,11 +85,11 @@ export const selectSummaryRoute = async (request: {
     if (route) return { kind: 'ready', conversationId, source: 'override', route }
   } else if (sessionProvider === undefined) tried.push('thread provider unknown')
   else {
-    const cheap = cheapEntryFor(policy.cheapModels, sessionProvider, await catalog.providerKind(sessionProvider))
+    const cheap = SummaryRouting.cheapEntryFor(policy.cheapModels, sessionProvider, await catalog.providerKind(sessionProvider))
     if (cheap === undefined) tried.push(`${sessionProvider} (no cheap model configured)`)
     else {
       const offered = await catalog.models(sessionProvider)
-      const model = cheap.models.map(candidate => offeredModel(candidate, offered)).find(found => found !== undefined)
+      const model = cheap.models.map(candidate => SummaryRouting.offeredModel(candidate, offered)).find(found => found !== undefined)
       if (model !== undefined) return { kind: 'ready', conversationId, source: 'account', route: { provider: sessionProvider, model, effort: cheap.effort } }
       tried.push(`${sessionProvider}/${cheap.models.join('|')} (not offered)`)
     }

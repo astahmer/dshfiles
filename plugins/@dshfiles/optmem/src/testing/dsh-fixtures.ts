@@ -85,6 +85,7 @@ export const defaultSettings: OptmemSettings = {
   summarizerEffort: '',
   cheapModels: [],
   summarizerFallbacks: [],
+  summarizerPaused: false,
   summarizerConcurrency: 2,
   summarizerTimeoutMs: 5_000,
   barrierMs: 1_000,
