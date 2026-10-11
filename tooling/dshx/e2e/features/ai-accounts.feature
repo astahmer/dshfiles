@@ -33,6 +33,12 @@ Feature: AI Accounts
     When the AI Accounts settings section is opened
     Then the usage history cadence and retention can be changed and restored
 
+  @scenario:ai-accounts.pricing-cost
+  Scenario: Override model pricing without refreshing the catalog
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When the AI Accounts settings section is opened
+    Then the price refresh interval and explicit override can be changed and restored
+
   @scenario:ai-accounts.credential-recovery
   Scenario: Open credential setup from a missing-key turn
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

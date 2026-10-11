@@ -91,6 +91,32 @@ Then('the usage history cadence and retention can be changed and restored', asyn
   await finishJourneyAssertions(page)
 })
 
+Then('the price refresh interval and explicit override can be changed and restored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-pricing-cost-settings', async () => {
+    const refreshInterval = page.getByRole('combobox', { name: 'Refresh prices every' })
+    const overrides = page.getByRole('textbox', { name: 'Price overrides', exact: true })
+    await expect(refreshInterval).toHaveText('24 h')
+    await refreshInterval.click()
+    await page.getByRole('option', { name: '2 days', exact: true }).click()
+    await expect(refreshInterval).toHaveText('2 days')
+    await overrides.fill('codex/*=free')
+    await overrides.blur()
+    await expect(overrides).toHaveValue('codex/* = free')
+    await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await expect(refreshInterval).toHaveText('2 days')
+    await expect(overrides).toHaveValue('codex/* = free')
+    await refreshInterval.click()
+    await page.getByRole('option', { name: '24 h', exact: true }).click()
+    await expect(refreshInterval).toHaveText('24 h')
+    await overrides.fill('')
+    await overrides.blur()
+    await expect(overrides).toHaveValue('')
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the exhausted-limit retry default is off and the inline choice is on', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-quota-retry-settings', async () => {
     const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
