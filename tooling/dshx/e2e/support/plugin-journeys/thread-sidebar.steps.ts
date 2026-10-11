@@ -48,7 +48,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
   await page.getByRole('textbox').first().press('Enter')
   const archivedThreadId = currentThreadId(page)
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await expect(targetRow).toHaveCount(1)
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   await targetRow.click({ button: 'right' })
@@ -129,7 +129,7 @@ When('a nonblank Host thread is parked from its context menu', async ({ page }: 
   const composer = page.getByRole('textbox').first()
   await composer.fill(prompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await expect(targetRow).toHaveCount(1)
   await targetRow.hover()
   await targetRow.getByRole('button', { name: 'Thread notifications', exact: true }).click()
@@ -212,11 +212,12 @@ Then('the sidebar keeps the blank session out of classified thread rows', async 
 
 When('a Host thread is archived and the view is grouped and filtered', async ({ page }: { page: Page }) => {
   const prompt = 'thread sidebar view filter e2e target'
-  await startBlankThread(page)
+  if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
+  await expect(composer).toBeVisible()
   await composer.fill(prompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await expect(targetRow).toHaveCount(1)
   await targetRow.click({ button: 'right' })
   const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
@@ -228,7 +229,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectThreadViewValue(page, 'Filter: None', 'Archived')
   await selectThreadViewValue(page, 'Filter: Archived', 'Main threads')
   await expect(targetRow).toBeVisible()
-  await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(prompt)
+  await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText('thread sidebar view filter e2e')
 
   await selectThreadViewValue(page, 'Filter: Archived · Main threads', 'Working')
   await expect(targetRow).toHaveCount(0)
@@ -245,12 +246,12 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
 
 Then('only matching rows remain visible after reload', async ({ page }: { page: Page }) => {
   const prompt = 'thread sidebar view filter e2e target'
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await recordAssertion(page, 'thread-sidebar-grouping-and-filter-preferences-survive-reload', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
     await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
     await expect(targetRow).toBeVisible()
-    await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(prompt)
+    await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText('thread sidebar view filter e2e')
     await threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true }).click()
     await expect(page.getByRole('menuitemradio', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')

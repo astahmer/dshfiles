@@ -1,3 +1,4 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
 import { groupThreadEntries, matchesThreadSourceFilter, matchesThreadStatusFilter, threadDateGroup } from './thread-view.js'
 
@@ -79,7 +80,7 @@ describe('thread view filters', () => {
   it('filters main and subagent sources using Host lineage metadata', () => {
     expect(matchesThreadSourceFilter({}, 'main')).toBe(true)
     expect(matchesThreadSourceFilter({ origin: 'subagent' }, 'main')).toBe(false)
-    expect(matchesThreadSourceFilter({ parentId: 'parent' }, 'subagents')).toBe(true)
+    expect(matchesThreadSourceFilter({ parentId: SessionId('parent') }, 'subagents')).toBe(true)
     expect(matchesThreadSourceFilter({ origin: 'subagent' }, 'subagents')).toBe(true)
     expect(matchesThreadSourceFilter({}, 'all')).toBe(true)
   })
