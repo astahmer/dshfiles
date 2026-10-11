@@ -54,8 +54,8 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     unpinSession: vi.fn(async () => {}),
     t: (key: string) => labels[key] ?? key,
   }
-  // SAFETY: The fixture provides the selector fields this component consumes.
-  const headerActionProps = props as Parameters<typeof HeaderThreadActions>[0]
+  // SAFETY: the fixture doubles only the selector fields this component reads.
+  const headerActionProps = props as unknown as Parameters<typeof HeaderThreadActions>[0]
   const view = render(
     <SidebarStateProvider>
       <HeaderThreadActions {...headerActionProps} />
