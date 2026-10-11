@@ -73,10 +73,10 @@ const bootAlone = async plugin => {
   }
 }
 
-const bootComposed = async (plugins, ignoredIds) => {
+const bootComposed = async (plugins, ignoredIds, includeSourceProfileBundles = true) => {
   const profile = await prepareComposedBootProfile(
     plugins.map(plugin => ({ projectRoot: plugin.dir, packageId: plugin.id })),
-    { sourceProfileRoot, includeSourceProfileBundles: true },
+    includeSourceProfileBundles ? { sourceProfileRoot, includeSourceProfileBundles: true } : {},
   )
   try {
     return await checkClientBoot({
@@ -118,6 +118,8 @@ const describe = (result, ignoredIds = new Set()) => {
   return undefined
 }
 
+const errorSummary = error => (error instanceof Error ? error.message : String(error)).split('\n').filter(Boolean).slice(0, 5).join(' | ')
+
 const main = async () => {
   await pinnedNode()
   const plugins = await listPluginBundles(pluginsRoot)
@@ -128,6 +130,12 @@ const main = async () => {
   const profileManifest = JSON.parse(await readFile(resolve(sourceProfileRoot, 'package.json'), 'utf8'))
   const profilePluginIds = profileManifest.dsh.profile.bundles.filter(packageId => packageId.startsWith('@dshfiles/'))
   const pluginById = new Map(plugins.map(plugin => [plugin.id, plugin]))
+  const providerPairIds = ['@dshfiles/shared-runtime', '@dshfiles/settings-search']
+  const providerPair = providerPairIds.map(packageId => {
+    const plugin = pluginById.get(packageId)
+    if (plugin === undefined) throw new Error(`Web profile provider smoke is missing ${packageId}.`)
+    return plugin
+  })
   const profilePlugins = profilePluginIds.map(packageId => {
     const plugin = pluginById.get(packageId)
     if (plugin === undefined) throw new Error(`Web profile bundle ${packageId} has no source plugin directory.`)
@@ -141,12 +149,48 @@ const main = async () => {
   if (runnable.length === 0) throw new Error('Every DSH bundle is ignored; boot gate must test at least one plugin.')
   const failures = []
   const buildFailures = new Set()
-  for (const plugin of plugins) {
+  const builtPluginIds = new Set()
+  for (const plugin of providerPair) {
     try {
       await buildPlugin(plugin)
+      builtPluginIds.add(plugin.id)
     } catch (error) {
       buildFailures.add(plugin.id)
-      failures.push(`${plugin.id}: build failed: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`)
+      failures.push(`${plugin.id}: build failed: ${errorSummary(error)}`)
+    }
+  }
+  if (buildFailures.size === 0) {
+    const result = await bootComposed(providerPair, new Set(), false).catch(error => ({
+      ok: false,
+      failures: [],
+      slotFailures: [],
+      compositionFailures: [],
+      browserError: error instanceof Error ? error.message : String(error),
+    }))
+    const problem = describe(result)
+    if (problem === undefined) console.log('  ok  shared-runtime consumer composition')
+    else failures.push(`shared-runtime consumer composition: ${problem}`)
+  } else {
+    failures.push('shared-runtime consumer composition: skipped because its provider or consumer failed to build')
+  }
+  if (process.argv.includes('--provider-pair')) {
+    if (failures.length > 0) {
+      console.error('\nShared-runtime consumer smoke failed:')
+      for (const failure of failures) console.error(`  - ${failure}`)
+      process.exitCode = 1
+      return
+    }
+    console.log('\nShared-runtime consumer smoke passed.')
+    return
+  }
+  for (const plugin of plugins) {
+    if (builtPluginIds.has(plugin.id)) continue
+    try {
+      await buildPlugin(plugin)
+      builtPluginIds.add(plugin.id)
+    } catch (error) {
+      buildFailures.add(plugin.id)
+      failures.push(`${plugin.id}: build failed: ${errorSummary(error)}`)
     }
   }
 
