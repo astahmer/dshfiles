@@ -118,6 +118,7 @@ const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<vo
     { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath },
   )
   await page.reload()
+  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })
 }
