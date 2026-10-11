@@ -20,7 +20,7 @@
     "dist",
     "README.md",
     "LICENSE",
-    "client/env.d.ts"
+    "client"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -39,7 +39,7 @@
       "default": "./dist/host/index.js"
     },
     "./client": {
-      "types": "./dist/client/index.d.ts",
+      "types": "./client/index.d.ts",
       "default": "./dist/client/index.js"
     },
     "./client/env": {
