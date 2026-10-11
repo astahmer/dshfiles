@@ -1,4 +1,4 @@
-import { BookmarkIcon } from '@dshfiles/plugin-ui/icons'
+import { BookmarkIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
@@ -22,6 +22,7 @@ import {
   type PromptLibraryRead,
   type SavedPrompt,
 } from './library.js'
+import { draftSaveBlock } from './draft-store.js'
 
 type LibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
@@ -63,6 +64,13 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const insertionSpan = useRef<ReturnType<ComposerActionProps['inputActions']['captureInsertion']> | null>(null)
   const promptTextRef = useRef<HTMLTextAreaElement>(null)
   const shouldFocusNewPrompt = useRef(false)
+  const currentDraftBlock = draftSaveBlock({
+    phase: input.phase,
+    text: input.draft,
+    attachmentCount: input.attachmentIds.length,
+    referenceCount: input.occurrences.length,
+  })
+  const currentPromptSaveDisabled = currentDraftBlock !== null || input.draft.length > MAX_PROMPT_TEXT_LENGTH || prompts.length >= MAX_PROMPTS
   const recentPrompts = props.useChat(chat => {
     const newestFirstNodes = {
       *[Symbol.iterator]() {
@@ -214,16 +222,16 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   }
 
   const saveCurrentPrompt = (): void => {
-    if (input.phase !== 'plain') {
-      setNotice('Wait for the composer to finish before saving a prompt.')
-      return
-    }
-    if (input.draft.trim().length === 0) {
-      setNotice('Type prompt text in the composer before saving it.')
-      return
-    }
-    if (input.attachmentIds.length > 0 || input.occurrences.length > 0) {
-      setNotice('Saved prompts are text-only. Remove attachments and references first.')
+    if (currentDraftBlock !== null) {
+      setNotice(
+        currentDraftBlock === 'busy'
+          ? 'Wait for the current composer action to finish.'
+          : currentDraftBlock === 'empty'
+            ? 'Enter text before saving a prompt.'
+            : currentDraftBlock === 'rich-content'
+              ? 'Saved prompts are text-only. Remove attachments and references first.'
+              : 'The composer text is too long to save as a prompt.',
+      )
       return
     }
     if (input.draft.length > MAX_PROMPT_TEXT_LENGTH) {
@@ -404,26 +412,22 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
             </TabsList>
             {activeSource === 'saved' && libraryState === 'ready' && editor === null ? (
               <div className="dshx:flex dshx:items-center dshx:gap-2">
-                <span className="dshx:text-xs dshx:text-muted-foreground">
-                  {prompts.length} of {MAX_PROMPTS} prompts
+                <span className="dshx:text-xs dshx:text-muted-foreground" aria-label={`${prompts.length} of ${MAX_PROMPTS} prompts`}>
+                  {prompts.length}/{MAX_PROMPTS}
                 </span>
-                <Button
-                  type="button"
-                  size="xs"
-                  disabled={
-                    input.phase !== 'plain' ||
-                    input.draft.trim().length === 0 ||
-                    input.draft.length > MAX_PROMPT_TEXT_LENGTH ||
-                    input.attachmentIds.length > 0 ||
-                    input.occurrences.length > 0 ||
-                    prompts.length >= MAX_PROMPTS
-                  }
-                  onClick={saveCurrentPrompt}
-                >
+                <Button type="button" size="xs" disabled={currentPromptSaveDisabled} onClick={saveCurrentPrompt}>
                   Save current
                 </Button>
-                <Button type="button" variant="outline" size="xs" disabled={prompts.length >= MAX_PROMPTS} onClick={beginNewPrompt}>
-                  New prompt
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-xs"
+                  aria-label="New prompt"
+                  title="New prompt"
+                  disabled={prompts.length >= MAX_PROMPTS}
+                  onClick={beginNewPrompt}
+                >
+                  <PlusIcon />
                 </Button>
               </div>
             ) : null}
