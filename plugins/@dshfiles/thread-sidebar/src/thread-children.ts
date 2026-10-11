@@ -4,6 +4,35 @@ export interface ThreadNode {
   readonly updatedAt: number
 }
 
+export const threadActionTargetIds = <Thread extends ThreadNode>(options: {
+  readonly threadId: Thread['id']
+  readonly threads: readonly Thread[]
+  readonly cascadeToChildren: boolean
+}): Thread['id'][] => {
+  const targets = [options.threadId]
+  if (!options.cascadeToChildren) return targets
+
+  const childrenByParent = new Map<string, Thread['id'][]>()
+  for (const thread of options.threads) {
+    if (thread.parentId === undefined) continue
+    const children = childrenByParent.get(thread.parentId) ?? []
+    children.push(thread.id)
+    childrenByParent.set(thread.parentId, children)
+  }
+
+  const visited = new Set(targets)
+  for (let index = 0; index < targets.length; index += 1) {
+    const parentId = targets[index]
+    if (parentId === undefined) continue
+    for (const childId of childrenByParent.get(parentId) ?? []) {
+      if (visited.has(childId)) continue
+      visited.add(childId)
+      targets.push(childId)
+    }
+  }
+  return targets
+}
+
 export interface ThreadTree<Thread extends ThreadNode> {
   /** Threads rendered as their own sidebar row, in input order. */
   readonly roots: readonly Thread[]

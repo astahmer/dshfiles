@@ -9,14 +9,17 @@ test('older stored preferences default the header and thread split to natural he
   assert.equal(decodePreferences(JSON.parse(stored))?.headerRegionHeight, null)
 })
 
-test('older preferences gain per-category attention modes and keep subagent attention off', () => {
-  const { approvalNeededDisplay, inputNeededDisplay, turnFinishedDisplay, includeSubagentAttention, ...older } = DEFAULT_PREFERENCES
+test('older preferences gain attention modes and default child-thread actions to enabled', () => {
+  const { approvalNeededDisplay, inputNeededDisplay, turnFinishedDisplay, includeSubagentAttention, applyActionsToChildThreads, ...older } = DEFAULT_PREFERENCES
   const parsed = decodePreferences(older)
   assert.ok(parsed)
   assert.deepEqual(
     [parsed.approvalNeededDisplay, parsed.inputNeededDisplay, parsed.turnFinishedDisplay, parsed.includeSubagentAttention],
     [approvalNeededDisplay, inputNeededDisplay, turnFinishedDisplay, includeSubagentAttention],
   )
+  assert.equal(applyActionsToChildThreads, true)
+  assert.equal(parsed.applyActionsToChildThreads, true)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, applyActionsToChildThreads: false })?.applyActionsToChildThreads, false)
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, turnFinishedDisplay: 'section' }), null)
 })
 

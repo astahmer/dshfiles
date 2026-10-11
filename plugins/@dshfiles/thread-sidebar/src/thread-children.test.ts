@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { groupThreadChildren, visibleChildren, type ThreadNode } from './thread-children.js'
+import { groupThreadChildren, threadActionTargetIds, visibleChildren, type ThreadNode } from './thread-children.js'
 
 const thread = (id: string, updatedAt: number, parentId?: string): ThreadNode => (parentId === undefined ? { id, updatedAt } : { id, updatedAt, parentId })
 const ids = (threads: readonly ThreadNode[] | undefined): string[] => (threads ?? []).map(item => item.id)
@@ -33,10 +33,24 @@ test('a parent cycle stays bounded', () => {
   assert.equal(cycle.roots.length + [...cycle.childrenByRoot.values()].flat().length, 2)
 })
 
+test('thread actions include every descendant by default and can be limited to the selected thread', () => {
+  const threads = [thread('child', 1, 'parent'), thread('grandchild', 2, 'child'), thread('unrelated', 3)]
+  assert.deepEqual(threadActionTargetIds({ threadId: 'parent', threads, cascadeToChildren: true }), ['parent', 'child', 'grandchild'])
+  assert.deepEqual(threadActionTargetIds({ threadId: 'parent', threads, cascadeToChildren: false }), ['parent'])
+})
+
+test('thread action targets remain unique when parent links contain a cycle', () => {
+  const threads = [thread('child', 1, 'parent'), thread('parent', 2, 'child')]
+  assert.deepEqual(threadActionTargetIds({ threadId: 'parent', threads, cascadeToChildren: true }), ['parent', 'child'])
+})
+
 test('children past the limit hide behind a count until every child is shown', () => {
   const children = ['a', 'b', 'c', 'd', 'e'].map(id => ({ id }))
   const truncated = visibleChildren({ children, limit: 3, showAll: false, selectedId: undefined })
-  assert.deepEqual(truncated.shown.map(child => child.id), ['a', 'b', 'c'])
+  assert.deepEqual(
+    truncated.shown.map(child => child.id),
+    ['a', 'b', 'c'],
+  )
   assert.equal(truncated.hiddenCount, 2)
 
   const expanded = visibleChildren({ children, limit: 3, showAll: true, selectedId: undefined })
@@ -49,6 +63,9 @@ test('children past the limit hide behind a count until every child is shown', (
 test('the open child stays visible even past the limit', () => {
   const children = ['a', 'b', 'c', 'd', 'e'].map(id => ({ id }))
   const result = visibleChildren({ children, limit: 2, showAll: false, selectedId: 'e' })
-  assert.deepEqual(result.shown.map(child => child.id), ['a', 'b', 'e'])
+  assert.deepEqual(
+    result.shown.map(child => child.id),
+    ['a', 'b', 'e'],
+  )
   assert.equal(result.hiddenCount, 2)
 })

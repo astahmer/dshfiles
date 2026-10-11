@@ -48,6 +48,9 @@ export const threadSidebarSettings = defineSettings({
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
+    applyActionsToChildThreads: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
+      .description('Apply manual pin, park, archive, and restore actions to all child threads.'),
     maxChildren: Schema.natural()
       .min(1)
       .max(50)

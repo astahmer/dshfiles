@@ -43,6 +43,7 @@ const preferencesSchema = z
     inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
     turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
+    applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
   })
   .strict()

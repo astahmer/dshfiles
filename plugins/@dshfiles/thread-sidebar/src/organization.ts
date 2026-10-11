@@ -50,6 +50,7 @@ export interface SidebarPreferences {
   inputNeededDisplay: AttentionDisplayMode
   turnFinishedDisplay: AttentionDisplayMode
   includeSubagentAttention: boolean
+  applyActionsToChildThreads: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
 }
@@ -94,6 +95,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',
   includeSubagentAttention: false,
+  applyActionsToChildThreads: true,
   maxChildren: 3,
 }
 
