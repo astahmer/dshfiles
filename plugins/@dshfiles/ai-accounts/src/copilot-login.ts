@@ -13,6 +13,17 @@ const initialState = (instanceId: string): CopilotLoginState => ({
   message: null,
 })
 
+const failureMessage = (cause: unknown, phase: 'github' | 'credential-storage', current: CopilotLoginState): string => {
+  if (phase === 'credential-storage') return 'GitHub approved this device, but DSH could not save the Copilot credential.'
+  if (current.userCode === null) return 'Could not start GitHub Copilot sign-in. Check the Host network and try again.'
+
+  const status = cause instanceof Error ? /\b(401|403|429)\b/u.exec(cause.message)?.[1] : undefined
+  if (status === '401' || status === '403')
+    return 'GitHub approved the device, but Copilot rejected this account. Check subscription access or organization policy.'
+  if (status === '429') return 'GitHub is rate-limiting Copilot sign-in. Wait a moment, then try again.'
+  return 'GitHub approved the device, but Copilot setup failed. Check Host connectivity and subscription access, then retry.'
+}
+
 export const createCopilotLoginService = (input: {
   readonly credentials: Pick<CredentialProvider, 'readRecord' | 'modifyRecord' | 'deleteRecord'> | undefined
   readonly login?: NonNullable<typeof copilotOAuth>['login']
@@ -40,6 +51,7 @@ export const createCopilotLoginService = (input: {
 
     const login = input.login ?? copilotOAuth?.login
     if (login === undefined) throw new Error('The GitHub Copilot OAuth provider is unavailable.')
+    let phase: 'github' | 'credential-storage' = 'github'
     const task = login({
       signal: controller.signal,
       prompt: async () => '',
@@ -67,13 +79,15 @@ export const createCopilotLoginService = (input: {
     })
       .then(async credential => {
         if (controller.signal.aborted) return
+        phase = 'credential-storage'
         await modifyCopilotCredential(input.credentials, instanceId, async () => credential)
         states.set(instanceId, { ...state(instanceId), status: 'complete', message: 'GitHub Copilot is connected.' })
         input.onChange()
       })
-      .catch(() => {
+      .catch(cause => {
         if (controller.signal.aborted) return
-        states.set(instanceId, { ...state(instanceId), status: 'error', message: 'GitHub Copilot sign-in failed. Try again.' })
+        const current = state(instanceId)
+        states.set(instanceId, { ...current, status: 'error', message: failureMessage(cause, phase, current) })
       })
       .finally(() => {
         if (controllers.get(instanceId) === controller) controllers.delete(instanceId)

@@ -103,6 +103,55 @@ describe('GitHub Copilot device sign-in', () => {
     service.dispose()
   })
 
+  it('explains Copilot access rejection without exposing OAuth response data', async () => {
+    const { provider } = createCredentialProvider()
+    const service = createCopilotLoginService({
+      credentials: provider,
+      isCopilotAccount: () => true,
+      onChange: () => undefined,
+      login: async interaction => {
+        interaction.notify({ type: 'device_code', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' })
+        throw new Error('403 Forbidden: bearer sensitive-token')
+      },
+    })
+
+    await service.begin('copilot-personal')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(service.state('copilot-personal')).toMatchObject({
+      status: 'error',
+      message: 'GitHub approved the device, but Copilot rejected this account. Check subscription access or organization policy.',
+    })
+    expect(JSON.stringify(service.state('copilot-personal'))).not.toContain('sensitive-token')
+    service.dispose()
+  })
+
+  it('distinguishes credential-storage failures after successful GitHub authorization', async () => {
+    const { provider } = createCredentialProvider()
+    provider.modifyRecord = async () => {
+      throw new Error('private storage detail')
+    }
+    const service = createCopilotLoginService({
+      credentials: provider,
+      isCopilotAccount: () => true,
+      onChange: () => undefined,
+      login: async interaction => {
+        interaction.notify({ type: 'device_code', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' })
+        return credential
+      },
+    })
+
+    await service.begin('copilot-personal')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(service.state('copilot-personal')).toMatchObject({
+      status: 'error',
+      message: 'GitHub approved this device, but DSH could not save the Copilot credential.',
+    })
+    expect(JSON.stringify(service.state('copilot-personal'))).not.toContain('private storage detail')
+    service.dispose()
+  })
+
   it('rejects sign-in for a removed or non-Copilot account', async () => {
     const service = createCopilotLoginService({ credentials: undefined, isCopilotAccount: () => false, onChange: () => undefined })
     await expect(service.begin('other-account')).rejects.toThrow('no longer available')

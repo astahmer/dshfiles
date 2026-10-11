@@ -82,7 +82,7 @@ const PRICING_CHECK_MS = 30 * 60_000
 
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController'],
+  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials'],
   apis: [accountsHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
@@ -141,7 +141,7 @@ export default definePlugin({
     let config = configFromAccountsFile(initialFile)
     let routes = buildRoutes(config).routes
     const copilotLogin = createCopilotLoginService({
-      credentials: ctx.get('credentials'),
+      credentials: ctx.credentials,
       isCopilotAccount: instanceId => routes.get(instanceId)?.kind === GITHUB_COPILOT_KIND,
       onChange: () => runtime.usageCache?.invalidate(),
     })
