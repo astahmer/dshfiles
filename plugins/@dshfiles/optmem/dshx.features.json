@@ -5,60 +5,36 @@
       "id": "conversation-capture",
       "title": "Capture eligible conversation and tool activity",
       "summary": "Persist eligible human, assistant, and tool activity with bounded redaction, replay deduplication, exclusion markers, and optional subagent capture.",
-      "surfaces": [
-        "host",
-        "storage",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "settings", "integration"],
       "configuration": [
         {
           "key": "enabled",
           "defaultValue": "true",
           "constraints": "Boolean; disable capture and memory use.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "optmem.capture-dedup"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["optmem.capture-dedup"]
         },
         {
           "key": "captureSubagents",
           "defaultValue": "true",
           "constraints": "Boolean; capture eligible subagent activity.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "optmem.capture-dedup"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["optmem.capture-dedup"]
         },
         {
           "key": "excludedTools",
           "defaultValue": "[]",
           "constraints": "Tool-name list whose input and output are excluded from capture.",
-          "coveredBy": [
-            "optmem.exclusions"
-          ]
+          "coveredBy": ["optmem.exclusions"]
         },
         {
           "key": "excludedPaths",
           "defaultValue": "[**/.env, **/.env.*, **/*.pem, **/*.key, **/id_rsa*, **/.ssh/**]",
           "constraints": "Glob list applied before capture; sensitive defaults must remain excluded.",
-          "coveredBy": [
-            "optmem.exclusions"
-          ]
+          "coveredBy": ["optmem.exclusions"]
         }
       ],
-      "states": [
-        "captured",
-        "deduplicated",
-        "excluded-marker",
-        "disabled"
-      ],
+      "states": ["captured", "deduplicated", "excluded-marker", "disabled"],
       "failureModes": [
         "Injected context and checkpoints are skipped.",
         "Excluded tool/path content is represented only by a marker and never copied into memory."
@@ -105,127 +81,84 @@
       "id": "bounded-context-injection",
       "title": "Inject bounded same-project memory context",
       "summary": "Inject compact, bounded summaries into eligible prompts, refresh after configured growth, and fall back to compatible mode when a fork-only hook is unavailable.",
-      "surfaces": [
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["host", "settings", "integration"],
       "configuration": [
         {
           "key": "mode",
           "defaultValue": "compat",
           "constraints": "One of compat or full; unsupported full-mode hook reports a compat fallback.",
-          "choices": [
-            "compat",
-            "full"
-          ],
-          "coveredBy": [
-            "optmem.full-fallback"
-          ]
+          "choices": ["compat", "full"],
+          "coveredBy": ["optmem.full-fallback"]
         },
         {
           "key": "injectUpperBytes",
           "defaultValue": "8192",
           "constraints": "Integer from 1024 to 65536 bytes.",
-          "coveredBy": [
-            "optmem.injection-bounds"
-          ]
+          "coveredBy": ["optmem.injection-bounds"]
         },
         {
           "key": "injectLowerBytes",
           "defaultValue": "4096",
           "constraints": "Integer from 512 to 65536 bytes.",
-          "coveredBy": [
-            "optmem.injection-bounds"
-          ]
+          "coveredBy": ["optmem.injection-bounds"]
         },
         {
           "key": "injectRefreshBytes",
           "defaultValue": "1024",
           "constraints": "Integer from 0 to 65536 bytes.",
-          "coveredBy": [
-            "optmem.injection-bounds"
-          ]
+          "coveredBy": ["optmem.injection-bounds"]
         },
         {
           "key": "summarizerProvider",
           "defaultValue": "",
           "constraints": "Override provider id; empty means the provider of the thread being summarized.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "summarizerModel",
           "defaultValue": "",
           "constraints": "Override model for every summary; empty uses the thread's provider with its cheap model.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "summarizerEffort",
           "defaultValue": "",
           "constraints": "Empty (adapter default), low, medium, or high.",
-          "choices": [
-            "",
-            "low",
-            "medium",
-            "high"
-          ],
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "choices": ["", "low", "medium", "high"],
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "cheapModels",
           "defaultValue": "codex: gpt-6-luna (low); claude: claude-haiku-* (low); opencode-go: deepseek-v4.1-flash, deepseek-v4-flash, glm-5.3-flash; commandcode: deepseek-v4.1-flash, deepseek-v4-flash, gpt-6-luna; deepseek: deepseek-flash",
           "constraints": "Entries keyed by AI Accounts provider kind or exact provider id; models in preference order, a trailing * takes the newest match; each must be offered by the thread's provider.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "summarizerFallbacks",
           "defaultValue": "[]",
           "constraints": "Ordered provider/model/effort routes; empty provider means the thread's provider. With none offered, summaries wait and retry.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "summarizerConcurrency",
           "defaultValue": "2",
           "constraints": "Integer from 1 to 16 concurrent tasks.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "summarizerTimeoutMs",
           "defaultValue": "60000",
           "constraints": "Integer from 1000 to 600000 milliseconds.",
-          "coveredBy": [
-            "optmem.summarizer-failure"
-          ]
+          "coveredBy": ["optmem.summarizer-failure"]
         },
         {
           "key": "barrierMs",
           "defaultValue": "5000",
           "constraints": "Integer from 0 to 60000 milliseconds.",
-          "coveredBy": [
-            "optmem.barrier-cancel"
-          ]
+          "coveredBy": ["optmem.barrier-cancel"]
         }
       ],
-      "states": [
-        "compat",
-        "full",
-        "summary-pending",
-        "injected",
-        "cancelled",
-        "fallback"
-      ],
+      "states": ["compat", "full", "summary-pending", "injected", "cancelled", "fallback"],
       "failureModes": [
         "Unavailable summarizer leaves pending raw summaries for retry.",
         "Cancellation preserves the durable barrier marker and does not inject stale context.",
@@ -313,70 +246,42 @@
       "id": "scoped-memory-tools",
       "title": "Search and inspect scoped memory",
       "summary": "Expose bounded search, zoom, context, and status tools while keeping project scope isolated unless cross-project access is explicitly enabled.",
-      "surfaces": [
-        "host",
-        "tool",
-        "storage",
-        "settings"
-      ],
+      "surfaces": ["host", "tool", "storage", "settings"],
       "configuration": [
         {
           "key": "viewUpperBytes",
           "defaultValue": "128000",
           "constraints": "Integer from 4096 to 1048576 bytes.",
-          "coveredBy": [
-            "optmem.recall-scope"
-          ]
+          "coveredBy": ["optmem.recall-scope"]
         },
         {
           "key": "viewLowerBytes",
           "defaultValue": "64000",
           "constraints": "Integer from 2048 to 1048576 bytes.",
-          "coveredBy": [
-            "optmem.recall-scope"
-          ]
+          "coveredBy": ["optmem.recall-scope"]
         },
         {
           "key": "maxNodeBytes",
           "defaultValue": "512",
           "constraints": "Integer from 128 to 4096 bytes per node.",
-          "coveredBy": [
-            "optmem.recall-scope"
-          ]
+          "coveredBy": ["optmem.recall-scope"]
         },
         {
           "key": "toolResultCap",
           "defaultValue": "16384",
           "constraints": "Integer from 1024 to 262144 bytes.",
-          "coveredBy": [
-            "optmem.recall-scope"
-          ]
+          "coveredBy": ["optmem.recall-scope"]
         },
         {
           "key": "allowAllProjects",
           "defaultValue": "false",
           "constraints": "Boolean; permit cross-project reads only when opted in.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "optmem.recall-scope"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["optmem.recall-scope"]
         }
       ],
-      "states": [
-        "empty",
-        "same-project-results",
-        "zoomed",
-        "context-built",
-        "cross-project-denied",
-        "cross-project-enabled"
-      ],
-      "failureModes": [
-        "A cross-project query is denied by default.",
-        "Database failure reports failed status while leaving the Host responsive."
-      ],
+      "states": ["empty", "same-project-results", "zoomed", "context-built", "cross-project-denied", "cross-project-enabled"],
+      "failureModes": ["A cross-project query is denied by default.", "Database failure reports failed status while leaving the Host responsive."],
       "externalDependencies": [],
       "verification": [
         {
@@ -431,34 +336,17 @@
       "id": "settings-panel",
       "title": "Edit memory settings and see live status in DSH",
       "summary": "One panel on the Settings nav and the bundle Plugins page edits every OptMem setting with row editors for cheap models and fallback routes, checks routes against the models each provider offers, shows live memory status, and pauses summaries or backfills sessions.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
           "key": "summarizerPaused",
           "defaultValue": "false",
           "constraints": "Boolean; while true no summary call is made and pending summaries retry once resumed.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "optmem.settings-panel-unit-pause",
-            "optmem.settings-panel"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["optmem.settings-panel-unit-pause", "optmem.settings-panel"]
         }
       ],
-      "states": [
-        "loading",
-        "ready",
-        "dirty",
-        "saving",
-        "read-only",
-        "host-outdated"
-      ],
+      "states": ["loading", "ready", "dirty", "saving", "read-only", "host-outdated"],
       "failureModes": [
         "An old Host without the panel API shows a restart notice while settings still save.",
         "An unregistered namespace shows defaults read-only.",
