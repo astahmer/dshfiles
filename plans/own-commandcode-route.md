@@ -1,9 +1,16 @@
 # Own the Command Code provider route
 
-> **Status:** Phase 1 complete, and its answer changes this plan. Our route would
-> inherit the same defect, so this is a *fix*, not a move.
-> `@mars-sea/dsh-commandcode-provider` serves every Command Code request today
-> and its removal stays the last step.
+> **Status:** Phases 1–4 done (2026-10-11). AI Accounts serves Command Code
+> itself, Go plans included, through the CLI endpoint it ported from
+> `@mars-sea/dsh-commandcode-provider` (MIT, credited in the plugin's `NOTICE`).
+> The web seed no longer composes `@mars-sea`. **Resume here:** nothing left in
+> this plan; account pool/failover for Command Code is the generic AI Accounts
+> pool, not a port.
+
+- [x] Phase 1 — prove pi-ai's empty-response behaviour
+- [x] Phase 2 — our route registers and answers (scratch `web` copy, no `@mars-sea`)
+- [x] Phase 3 — CLI transport, effort tiers, empty-response classification, image pricing
+- [x] Phase 4 — `@mars-sea` removed from `profiles/web` (seed); live profile follows on `nixapply`
 
 ## Context
 
@@ -143,6 +150,26 @@ that raises `LlmError` with a code is the whole remedy.
 > and we do not. That refusal now names the remedy (`nixapply` + restart). Porting the CLI
 > transport is the real prerequisite for Phase 4 on a Go plan. Effort tiers still absent
 > (`reasoning: false`), so an `agent-default-model` row with `reasoningEffort` is refused.
+
+> **2026-10-11 finding: done. The CLI endpoint is ported and a real Go-plan turn answers.**
+> `src/commandcode-cli.ts` speaks `POST /alpha/generate` (NDJSON AI SDK stream parts);
+> `src/commandcode-capabilities.ts` carries the CLI's effort tiers, vision set, output
+> ceilings and image token pricing. Probed against the live gateway: the only required
+> client header is `x-command-code-version` (without it: `403 upgrade_required`, "CLI is
+> out of date"); `x-cli-environment`, `x-project-slug`, `x-taste-learning`, `x-co-flag`
+> change nothing and are not sent. All ten `config` fields and `memory` are required body
+> fields; `taste`/`skills`/`permissionMode` are not. The gateway prepends its own ~7k-token
+> system prompt, which is why a plan with Provider API access keeps `/provider/v1`.
+> Transport choice is per key: `/alpha/billing/subscriptions` → Go or unknown plan = CLI,
+> Goat/Pro/Provider/Max/Ultra/Teams = Provider API, which also falls back to the CLI on an
+> early `upgrade_required`. Empty responses: pi-ai's lazy stream turns a thrown `LlmError`
+> into an uncoded `PI_AI_ERROR`, so the old throw never reached the retry policy. The
+> boundary now settles a content-free answer with no content blocks, which DSH itself
+> classifies as `EMPTY_RESPONSE`, on `streamSimple` too, and the profile retry policy lists
+> `EMPTY_RESPONSE`. Real turn: scratch copy of `web` without `@mars-sea`, own `DSH_HOME`,
+> free port, `commandcode`/`deepseek/deepseek-v4-flash` effort `high`, answered `pong`,
+> `turn/end completed`. `stealth/space-bunny-alpha` is retired upstream (403 "free stealth
+> preview has ended"). The duplicate-adapter skip stays as a cheap safety net.
 
 Add a `kind: commandcode` account to the `web` profile's `opencodeAccounts` so
 our plugin registers the route alongside the existing one. Two providers may
