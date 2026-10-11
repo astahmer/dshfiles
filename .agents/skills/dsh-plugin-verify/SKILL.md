@@ -84,4 +84,19 @@ UI work must not regress `plans/ade/perf-baseline.md` (palette open, keystroke f
 `@dshfiles` stylesheet). The guard is `tooling/dshx/e2e/features/palette-performance.feature`
 (`pnpm --dir tooling/dshx test:e2e`).
 
+## 6. After history surgery
+
+A consolidated or rebased line can join two variants of one change and still merge cleanly, so a green gate from
+*before* the rewrite proves nothing about the tree *after* it. Split the check in two:
+
+```sh
+jj diff --from <pre-surgery-tip> --to <post-surgery-tip> --stat   # 0 files => same code, gates still hold
+jj diff --from <base> --to <tip> --summary                        # for the lint/fmt drift remainder
+```
+
+- 0 files: the earlier `contract -> build -> typecheck -> test` run still describes the tree; report it as carried
+  over, not re-run.
+- Anything else: re-run the four gates on the new tip before trusting it. A revision split must pass the same
+  0-file gate against the tip it replaced.
+
 Report: build/typecheck/test results, import check, what probe/scratch showed, and whether a user restart is needed.
