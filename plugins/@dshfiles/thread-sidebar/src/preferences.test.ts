@@ -23,6 +23,20 @@ test('older preferences gain attention modes and default child-thread actions to
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, turnFinishedDisplay: 'section' }), null)
 })
 
+test('archive undo defaults on and rejects durations outside one through thirty seconds', () => {
+  const { archiveUndoEnabled, archiveUndoDurationSeconds, ...older } = DEFAULT_PREFERENCES
+  const parsed = decodePreferences(older)
+
+  assert.ok(parsed)
+  assert.equal(parsed.archiveUndoEnabled, archiveUndoEnabled)
+  assert.equal(parsed.archiveUndoDurationSeconds, archiveUndoDurationSeconds)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoEnabled: false })?.archiveUndoEnabled, false)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 1 })?.archiveUndoDurationSeconds, 1)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 30 })?.archiveUndoDurationSeconds, 30)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 0 }), null)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 31 }), null)
+})
+
 test('valid saved split heights persist and invalid heights are rejected', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 384 })
   const invalidStored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 24 })
