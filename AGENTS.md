@@ -498,8 +498,9 @@ across work that predates any single change (measured 2026-10-11: ~270 files wit
 lint findings, ~148 unformatted). Do not read that as your regression:
 `pnpm run check:diff` lints and format-checks only the paths your revision
 touches (`jj diff --from @- --to @`, override with `--from`/`--to`), and
-`pnpm run check:green` runs every other gate without `lint`/`fmt:check`, so it
-can actually be green. `pnpm run check` stays the full superset.
+`pnpm run check:green` runs every other gate without `lint`/`fmt:check`, so its
+result is not decided by baseline lint/format drift. `pnpm run check` stays the
+full superset.
 
 `pnpm run check:plugins:cached` runs the four plugin gates and records the
 outcome under `.jj-gates/<fingerprint>.json`, keyed by the content diff against

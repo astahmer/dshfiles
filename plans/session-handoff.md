@@ -37,10 +37,12 @@ delete this file when empty.
   were hand-patched in `lib/types/types.d.ts`; the runtime was not — `updateAttention` is present but
   `lastTurnFailureAt` is absent, so thread-sidebar's "latest turn failures" projection reports nothing at runtime.
   Fix with `DSH_SOURCE_ROOT=<canonical deepseek-harness checkout> pnpm run sync:core-api-session-controller`.
-- [ ] `pnpm run check:dshx` is red on specs the communication redesign left behind: the line's `8e975fb8df49`
-  rewrote `tooling/dshx/packages/dshx/src/communication/service.ts` and dropped `notifyAgent` / `deliverPending`,
-  but `tests/communication-service.spec.ts` and `tests/communication-diagnostics.spec.ts:131` still assert them →
-  3 type errors. Port or retire those specs (they are the only red in `pnpm run check:green`).
+- [ ] `pnpm run check:dshx` still fails, now one step later (2026-10-11): `build`, `typecheck` and `test` pass (57
+  files / 571 tests) after `fix(dshx): align the communication specs with the passive delivery model` — the
+  `notifyAgent` / `deliverPending` / schema-v2 assertions are gone. The remaining red is `features:check` with 81
+  findings: 75 declared scenarios without an `@scenario` tag, 4 orphan tags, 1 duplicate tag and 1 missing test
+  reference. That is the catalog work owned by [plugin-e2e-coverage.md](plugin-e2e-coverage.md); `check:green` cannot
+  be green until it lands.
 - [ ] Global `jj` skill triggers ("unify the history", "spine branch", "linear history") are edited in the sources
   but not deployed: the AGENTS repo needs `jj bookmark set main` + push, then `nix flake update agents` +
   `nixapply`. `~/.agents` is a read-only Nix build, so applying alone does not pick up the base-skill change.
