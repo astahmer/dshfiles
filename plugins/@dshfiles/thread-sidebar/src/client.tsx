@@ -369,13 +369,8 @@ const ChildThreadList = (props: {
                 </span>
               )}
               {props.rowStyle.time ? (
-                <span className={cn(
-                  'dshx:shrink-0 dshx:text-xs dshx:tabular-nums',
-                  failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
-                )}>
-                  {failed && failureAt !== undefined
-                    ? `${t('threadSidebarFailed')} · ${formatAge(failureAt)}`
-                    : formatAge(child.updatedAt)}
+                <span className={cn('dshx:shrink-0 dshx:text-xs dshx:tabular-nums', failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>
+                  {failed && failureAt !== undefined ? `${t('threadSidebarFailed')} · ${formatAge(failureAt)}` : formatAge(child.updatedAt)}
                 </span>
               ) : null}
             </button>

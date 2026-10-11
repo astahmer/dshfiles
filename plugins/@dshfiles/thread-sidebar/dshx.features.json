@@ -67,9 +67,7 @@
           "key": "attentionColors",
           "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"warning\",\"turnFinished\":\"success\"}",
           "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
-          "coveredBy": [
-            "thread-sidebar.attention-colors"
-          ]
+          "coveredBy": ["thread-sidebar.attention-colors"]
         },
         {
           "key": "parkedSessionIds",
