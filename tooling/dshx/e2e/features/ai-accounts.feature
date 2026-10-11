@@ -8,6 +8,12 @@ Feature: AI Accounts
     When the AI Accounts settings section is opened
     Then the rate-limit recovery failover can be changed and restored
 
+  @scenario:ai-accounts.quota-retry-settings
+  Scenario: Configure the exhausted-limit retry choice
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When the AI Accounts settings section is opened
+    Then the exhausted-limit retry default is off and the inline choice is on
+
   @scenario:ai-accounts.usage-window-layout
   Scenario: Configure how account quota windows are displayed
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

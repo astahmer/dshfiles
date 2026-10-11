@@ -426,6 +426,11 @@ export const aiAccountsApi = defineApi({
       input: z.object({ continuationId: z.string().uuid() }),
       output: z.object({ accepted: z.boolean() }),
     }),
+    /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
+    setQuotaContinuationAutoRetry: method({
+      input: z.object({ continuationId: z.string().uuid(), sessionId: z.string().trim().min(1).max(256), enabled: z.boolean() }),
+      output: z.object({ updated: z.boolean() }),
+    }),
     /** The cached models.dev price catalog: when it was fetched and how many models it prices. */
     pricingStatus: method({ input: z.void(), output: pricingStatusSchema }),
     /** Refetch models.dev now; a failure keeps the last catalog and reports why. */

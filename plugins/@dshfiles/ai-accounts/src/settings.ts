@@ -49,6 +49,10 @@ export const aiAccountsSettings = defineSettings({
     modelsPageAccounts: Schema.boolean().default(true),
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
     codexLunaReserve: Schema.boolean().default(true),
+    /** Default for retrying a quota-blocked turn automatically when its known reset arrives. */
+    autoRetryQuotaDefault: Schema.boolean().default(false),
+    /** Show a per-turn automatic-retry checkbox beside exhausted-limit errors. */
+    showQuotaRetryChoice: Schema.boolean().default(true),
     /** What each kind of failed model request on an account route does next. */
     failureRecovery: Schema.object({
       transport: kindPolicySetting(DEFAULT_RECOVERY_POLICY.transport, 'Connection resets, timeouts, 5xx and replay-buffer overflows.'),
@@ -148,4 +152,18 @@ export const readRecoverySettings = (): {
 } => {
   const parsed = recoverySettingsSchema.parse(readLiveSettings())
   return { policy: parsed.failureRecovery, usageOrder: parsed.usageOrder, hiddenUsageAccounts: parsed.hiddenUsageAccounts }
+}
+
+const quotaRetrySettingsSchema = z.object({
+  autoRetryQuotaDefault: z.boolean().catch(false),
+  showQuotaRetryChoice: z.boolean().catch(true),
+})
+
+/** Quota retry defaults; old or unregistered Hosts remain opted out and show the turn-level option. */
+export const readQuotaRetrySettings = (): {
+  readonly autoRetryDefault: boolean
+  readonly showChoice: boolean
+} => {
+  const parsed = quotaRetrySettingsSchema.parse(readLiveSettings())
+  return { autoRetryDefault: parsed.autoRetryQuotaDefault, showChoice: parsed.showQuotaRetryChoice }
 }

@@ -281,6 +281,30 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       </Group>
 
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
+      {!preferences.failureRecovery.exhausted.failover ? (
+        <Group description="For exhausted limits when automatic account failover is off. Automatic retry needs a known provider reset." title="Quota retry">
+          <Row hint="Pre-check the per-turn choice. The default is off." label="Automatically retry after reset by default">
+            {id => (
+              <Switch
+                checked={preferences.autoRetryQuotaDefault}
+                disabled={readOnly}
+                id={id}
+                onCheckedChange={value => write(settings.set('autoRetryQuotaDefault', value))}
+              />
+            )}
+          </Row>
+          <Row hint="Show a checkbox with the exhausted-limit message so each turn can override the default." label="Show the per-turn choice">
+            {id => (
+              <Switch
+                checked={preferences.showQuotaRetryChoice}
+                disabled={readOnly}
+                id={id}
+                onCheckedChange={value => write(settings.set('showQuotaRetryChoice', value))}
+              />
+            )}
+          </Row>
+        </Group>
+      ) : null}
 
       <Group description="Where current quota is shown." title="Usage surfaces">
         <Row hint="Meters above the sidebar foot (one button on the collapsed rail); click one for the account cards." label="Sidebar usage">

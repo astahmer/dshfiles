@@ -167,6 +167,7 @@ export const accountsHostApi = aiAccountsApi.host({
   },
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
   resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
+  setQuotaContinuationAutoRetry: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).setAutoRetry(input.continuationId, input.sessionId, input.enabled),
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 

@@ -61,8 +61,9 @@ type QuotaContinuationService = {
   start(): () => void
   close(): Promise<void>
   list(): Promise<{ scheduleAvailable: boolean; continuations: QuotaContinuationSummary[] }>
-  recordFailure(agent: QuotaFailureAgent, accountId: string): Promise<void>
+  recordFailure(agent: QuotaFailureAgent, accountId: string, autoRetry: boolean): Promise<void>
   resume(continuationId: string): Promise<{ accepted: boolean }>
+  setAutoRetry(continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }>
   snooze(continuationId: string, duration: SnoozeDuration): Promise<{ updated: boolean }>
 }
 
@@ -185,7 +186,15 @@ const createQuotaContinuationService = ({
   }
 
   const ensureScheduled = async (record: QuotaContinuationRecord): Promise<void> => {
-    if (record.state !== 'waiting' || record.resetAt === null) return
+    if (record.state !== 'waiting') return
+    if (!record.autoRetry || record.resetAt === null) {
+      await cancelScheduled(record)
+      if (record.scheduleId !== null) {
+        const storage = await table()
+        await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: null } : current))
+      }
+      return
+    }
     const scheduler = schedule()
     if (scheduler === undefined) return
     try {
@@ -229,6 +238,7 @@ const createQuotaContinuationService = ({
     accountId: record.accountId,
     failedAt: record.failedAt,
     resetAt: record.resetAt,
+    autoRetry: record.autoRetry,
     snoozedUntil: record.snoozedUntil,
     state: record.state === 'queued' ? 'queued' : 'waiting',
     scheduled: scheduleAvailable && record.scheduleId !== null,
@@ -424,7 +434,7 @@ const createQuotaContinuationService = ({
     }
   }
 
-  const recordFailure = async (agent: QuotaFailureAgent, accountId: string): Promise<void> => {
+  const recordFailure = async (agent: QuotaFailureAgent, accountId: string, autoRetry: boolean): Promise<void> => {
     try {
       const resetAt = await readResetAt(accountId).catch(() => null)
       await serialize(agent.id, async () => {
@@ -448,6 +458,7 @@ const createQuotaContinuationService = ({
           failedSeq: agent.session.seq,
           failedAt: nowAtFailure,
           resetAt,
+          autoRetry: autoRetry && resetAt !== null,
           snoozedUntil: null,
           scheduleId: null,
           queueSource: null,
@@ -515,6 +526,23 @@ const createQuotaContinuationService = ({
         }
         return { accepted: false }
       }
+    })
+  }
+
+  const setAutoRetry = async (continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }> => {
+    const storage = await table()
+    const record = storage.get(continuationId)
+    if (record === undefined || record.sessionId !== sessionId || record.state !== 'waiting' || (enabled && record.resetAt === null)) return { updated: false }
+
+    return serialize(record.sessionId, async () => {
+      const current = storage.get(continuationId)
+      if (current === undefined || current.sessionId !== sessionId || current.state !== 'waiting' || (enabled && current.resetAt === null))
+        return { updated: false }
+      const updated = { ...current, autoRetry: enabled, scheduleId: null }
+      await storage.put(continuationId, updated)
+      await cancelScheduled(current)
+      await ensureScheduled(updated)
+      return { updated: true }
     })
   }
 
@@ -602,7 +630,7 @@ const createQuotaContinuationService = ({
     }
   }
 
-  return { start, close, list, recordFailure, resume, snooze }
+  return { start, close, list, recordFailure, resume, setAutoRetry, snooze }
 }
 
 export { createQuotaContinuationService, type QuotaContinuationService, type QuotaFailureAgent, type SnoozeDuration }

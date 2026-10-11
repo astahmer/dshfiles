@@ -25,6 +25,8 @@ export const usePreferences = () => {
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     codexLunaReserve: value?.codexLunaReserve ?? true,
+    autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? false,
+    showQuotaRetryChoice: value?.showQuotaRetryChoice ?? true,
     failureRecovery: recoveryPolicySchema.parse(value?.failureRecovery),
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,
     costEstimates: value?.costEstimates ?? DEFAULT_CLIENT_SETTINGS.costEstimates,

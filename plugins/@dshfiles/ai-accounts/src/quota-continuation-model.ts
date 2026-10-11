@@ -10,6 +10,7 @@ export const quotaContinuationRecordSchema = z
     failedSeq: z.number().int().safe().nonnegative(),
     failedAt: z.number().int().safe().nonnegative(),
     resetAt: z.number().int().safe().nonnegative().nullable(),
+    autoRetry: z.boolean().default(false),
     snoozedUntil: z.number().int().safe().nonnegative().nullable(),
     scheduleId: z.string().trim().min(1).max(128).nullable(),
     queueSource: z.enum(['manual', 'schedule']).nullable(),
@@ -26,6 +27,7 @@ export const quotaContinuationSummarySchema = z
     accountId: z.string().trim().min(1).max(64),
     failedAt: z.number().int().safe().nonnegative(),
     resetAt: z.number().int().safe().nonnegative().nullable(),
+    autoRetry: z.boolean().catch(false),
     snoozedUntil: z.number().int().safe().nonnegative().nullable(),
   })
   .extend({

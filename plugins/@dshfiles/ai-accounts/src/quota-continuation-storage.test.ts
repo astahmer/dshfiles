@@ -36,7 +36,7 @@ describe('quota continuation storage', () => {
     try {
       firstContext = await openContext(root)
       firstService = createQuotaContinuationService({ context: firstContext, readResetAt: async () => null })
-      await firstService.recordFailure(failureAgent, 'codex_work')
+      await firstService.recordFailure(failureAgent, 'codex_work', false)
       const firstResult = await firstService.list()
       expect(firstResult).toMatchObject({
         scheduleAvailable: false,
@@ -94,7 +94,7 @@ describe('quota continuation storage', () => {
       context = await openContext(root)
       service = createQuotaContinuationService({ context, readResetAt: async () => null })
       stop = service.start()
-      await service.recordFailure(failureAgent, 'codex_work')
+      await service.recordFailure(failureAgent, 'codex_work', false)
       const [record] = (await service.list()).continuations
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')

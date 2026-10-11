@@ -82,7 +82,7 @@ describe('quota continuation service', () => {
         schedule: scheduler.schedule,
         now,
       })
-      await firstService.recordFailure(agent, 'codex_work')
+      await firstService.recordFailure(agent, 'codex_work', true)
       const [record] = (await firstService.list()).continuations
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')
@@ -135,6 +135,39 @@ describe('quota continuation service', () => {
     }
   })
 
+  it('lets one waiting continuation opt into and out of retry-at-reset', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-opt-in-'))
+    const now = () => 3_000_000
+    const resetAt = now() + 90_000
+    const sessionId = SessionId('quota-opt-in-session')
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => resetAt, schedule: scheduler.schedule, now })
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', false)
+      const [initial] = (await service.list()).continuations
+      expect(initial).toMatchObject({ autoRetry: false, scheduled: false })
+      if (initial === undefined) throw new Error('Quota continuation was not stored.')
+      expect(scheduler.requests).toHaveLength(0)
+      await expect(service.setAutoRetry(initial.continuationId, SessionId('other-session'), true)).resolves.toEqual({ updated: false })
+
+      await expect(service.setAutoRetry(initial.continuationId, sessionId, true)).resolves.toEqual({ updated: true })
+      expect((await service.list()).continuations[0]).toMatchObject({ autoRetry: true, scheduled: true })
+      expect(scheduler.requests[0]?.after_seconds).toBe(90)
+
+      await expect(service.setAutoRetry(initial.continuationId, sessionId, false)).resolves.toEqual({ updated: true })
+      expect((await service.list()).continuations[0]).toMatchObject({ autoRetry: false, scheduled: false })
+      expect(scheduler.rows.get(sessionId)).toHaveLength(0)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps unknown resets manual and queues one stable request through Session Controller', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-quota-manual-'))
     const now = () => 2_000_000
@@ -160,12 +193,13 @@ describe('quota continuation service', () => {
         sessionController,
         now,
       })
-      await service.recordFailure(createFailureAgent(sessionId), 'codex_work')
+      await service.recordFailure(createFailureAgent(sessionId), 'codex_work', false)
       const [record] = (await service.list()).continuations
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')
-      expect(record).toMatchObject({ resetAt: null, ready: false, scheduled: false })
+      expect(record).toMatchObject({ resetAt: null, autoRetry: false, ready: false, scheduled: false })
       expect(scheduler.requests).toHaveLength(0)
+      await expect(service.setAutoRetry(record.continuationId, sessionId, true)).resolves.toEqual({ updated: false })
 
       await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: true })
       await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: true })
@@ -209,7 +243,7 @@ describe('quota continuation service', () => {
           },
         },
       })
-      await service.recordFailure(createFailureAgent(sessionId, sequenceAfterFailedPrompt), 'codex_work')
+      await service.recordFailure(createFailureAgent(sessionId, sequenceAfterFailedPrompt), 'codex_work', false)
       const [record] = (await service.list()).continuations
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')

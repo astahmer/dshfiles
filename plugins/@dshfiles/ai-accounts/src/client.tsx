@@ -19,6 +19,7 @@ import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
 import { CredentialRecoveryMessage } from './credential-recovery-message.js'
+import { QuotaRetryMessage } from './quota-retry-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 import { useSyncExternalStore } from 'react'
@@ -119,6 +120,11 @@ export default defineClientPlugin({
         actionLabel={translate('credentialRecoveryAction')}
       />
     )
+    const QuotaRetryMessageView = (props: { readonly turn: TurnLocation; readonly sessionId: string }): JSX.Element => (
+      <PluginQueryProvider>
+        <QuotaRetryMessage turn={props.turn} sessionId={props.sessionId} />
+      </PluginQueryProvider>
+    )
     const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
       <PluginQueryProvider>
         <AiAccountsSettingsSection close={props.close} openAccounts={openAccounts} />
@@ -159,6 +165,16 @@ export default defineClientPlugin({
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-credential-recovery', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
       CredentialRecoveryMessageView,
+    )
+    api.ui.register(
+      {
+        name: 'conversation.chat.turnTail',
+        id: 'ai-accounts-quota-retry',
+        order: 20,
+        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
+        inject: sessionId => ({ sessionId }),
+      },
+      QuotaRetryMessageView,
     )
 
     api.ui.register(

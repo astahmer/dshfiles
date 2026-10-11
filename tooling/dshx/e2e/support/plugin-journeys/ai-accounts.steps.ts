@@ -39,6 +39,20 @@ Then('the usage windows per account can be configured and restored', async ({ pa
   await finishJourneyAssertions(page)
 })
 
+Then('the exhausted-limit retry default is off and the inline choice is on', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-quota-retry-settings', async () => {
+    const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
+    const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
+    await failover.click()
+    await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toBeVisible()
+    await expect(page.getByRole('switch', { name: 'Automatically retry after reset by default' })).not.toBeChecked()
+    await expect(page.getByRole('switch', { name: 'Show the per-turn choice' })).toBeChecked()
+    await failover.click()
+    await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the rate-limit recovery failover can be changed and restored', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-rate-limit-failover-toggle', async () => {
     const rateLimit = page.getByRole('group', { name: /Rate limited/ })

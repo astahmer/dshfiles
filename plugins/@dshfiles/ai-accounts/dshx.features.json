@@ -296,6 +296,48 @@
       ]
     },
     {
+      "id": "quota-auto-retry",
+      "title": "Retry exhausted quota when its reset arrives",
+      "summary": "Explain exhausted provider limits inline and let each eligible turn opt into retrying at its known reset, with global default and visibility preferences.",
+      "surfaces": ["client", "host", "settings", "storage"],
+      "configuration": [
+        {
+          "key": "autoRetryQuotaDefault",
+          "defaultValue": "false",
+          "constraints": "Boolean; pre-check the per-turn retry choice when exhausted-limit failover is disabled.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.quota-retry-settings"]
+        },
+        {
+          "key": "showQuotaRetryChoice",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the per-turn checkbox only when exhausted-limit failover is disabled.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.quota-retry-settings"]
+        }
+      ],
+      "states": ["quota-exhausted", "retry-choice-visible", "waiting-for-reset", "retry-queued", "reset-unknown"],
+      "failureModes": [
+        "Automatic retry stays off by default and cannot be enabled without a known reset time.",
+        "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
+        "The inline choice is absent while automatic exhausted-limit failover is enabled."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-auto-retry",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "lets one waiting continuation opt into and out of retry-at-reset"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.quota-retry-settings",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ]
+    },
+    {
       "id": "credential-recovery",
       "title": "Open credential setup from failed turns",
       "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",

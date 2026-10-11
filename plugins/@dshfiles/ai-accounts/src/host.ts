@@ -8,7 +8,7 @@ import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { resolveClaudeInferenceToken } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readRecoverySettings } from './settings.js'
+import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readQuotaRetrySettings, readRecoverySettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
@@ -550,8 +550,11 @@ export default definePlugin({
                 if (action.kind === 'pass') return next()
                 if (action.kind === 'give-up') {
                   const decision = action.then === 'dsh' ? await next() : undefined
-                  if (decision === undefined && (action.failureKind === 'rateLimit' || action.failureKind === 'exhausted')) {
-                    await quotaContinuations.recordFailure(agent, action.account)
+                  if (decision === undefined && action.failureKind === 'rateLimit') {
+                    await quotaContinuations.recordFailure(agent, action.account, true)
+                  }
+                  if (decision === undefined && action.failureKind === 'exhausted' && !readRecoverySettings().policy.exhausted.failover) {
+                    await quotaContinuations.recordFailure(agent, action.account, readQuotaRetrySettings().autoRetryDefault)
                   }
                   return decision
                 }
