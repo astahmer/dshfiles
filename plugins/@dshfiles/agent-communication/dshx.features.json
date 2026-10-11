@@ -3,12 +3,12 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover live agents and topics",
-      "summary": "List active agents and workspace topics without exposing peer message contents in notifications.",
-      "surfaces": ["tool", "host"],
+      "title": "Discover Agents and workspace channels",
+      "summary": "Show live runtime status and whether each Agent actually has its workspace subscription.",
+      "surfaces": ["tool", "host", "client"],
       "configuration": [],
-      "states": ["no-agents", "live-agents", "workspace-topic-available"],
-      "failureModes": ["The requested agent is no longer live.", "A workspace topic cannot be derived when the agent has no working directory."],
+      "states": ["no-agents", "live-agent", "workspace-subscribed", "workspace-subscription-missing", "opted-out"],
+      "failureModes": ["A missing workspace cwd cannot derive a workspace topic.", "An Agent absent from the live registry is not assumed to be complete."],
       "externalDependencies": [],
       "verification": [
         {
@@ -18,55 +18,96 @@
         },
         {
           "kind": "unit-test",
-          "id": "agent-communication.agent-directory-unit-topics",
-          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
-          "testName": "lists named topics without exposing private inbox subscriptions"
+          "id": "agent-communication.lifecycle-workspace-subscribers",
+          "file": "plugins/@dshfiles/agent-communication/src/agent-lifecycle.test.ts",
+          "testName": "subscribes every Agent in a shared working directory exactly once"
         }
       ]
     },
     {
-      "id": "topic-delivery-policy",
-      "title": "Apply topic delivery and steering policy",
-      "summary": "Quiet stores only, queue delivers a non-interrupting follow-up, and steer is allowed only for urgent messages from an allowlisted sender.",
-      "surfaces": ["tool", "host"],
+      "id": "passive-messaging",
+      "title": "Store and browse passive messages",
+      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
+      "surfaces": ["tool", "host", "storage", "client"],
       "configuration": [],
-      "states": ["quiet", "queued", "steered", "not-allowlisted"],
-      "failureModes": ["Delivery fails after a recipient exits.", "Untrusted peer text is mistaken for instructions."],
+      "states": ["passive", "unread", "read", "acknowledged", "paged", "searched"],
+      "failureModes": ["Peer text remains untrusted data.", "A stale cursor requires refreshing the conversation."],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
-          "id": "agent-communication.delivery-policy",
+          "id": "agent-communication.passive-messaging",
           "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
         },
         {
           "kind": "unit-test",
-          "id": "agent-communication.delivery-policy-unit-modes",
+          "id": "agent-communication.service-passive-read-receipts",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
-          "testName": "delivers queued and allowlisted steering notifications but keeps quiet messages durable"
+          "testName": "stores topic messages passively and tracks explicit inbox reads separately from acknowledgements"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.service-browser-pagination",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "pages and searches stored conversations without marking messages read"
+        }
+      ]
+    },
+    {
+      "id": "human-browser",
+      "title": "Post messages from the communication browser",
+      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "surfaces": ["host", "client", "storage"],
+      "configuration": [],
+      "states": ["channel-message", "direct-message", "zero-recipients", "offline-recipient", "passive-arrival"],
+      "failureModes": ["Invalid or ambiguous targets are rejected.", "A successful post may have zero captured recipients."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-communication.message-browser",
+          "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.api-browser-post",
+          "file": "plugins/@dshfiles/agent-communication/src/api-operations.test.ts",
+          "testName": "browses pages without reading or acknowledging and posts as a browser principal"
         }
       ]
     },
     {
       "id": "durable-inbox",
       "title": "Read and acknowledge direct messages",
-      "summary": "Read bounded durable inbox records, send direct messages, and acknowledge records so they no longer appear in later reads.",
+      "summary": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
-      "states": ["pending", "read", "acknowledged"],
-      "failureModes": ["An inactive target rejects direct send.", "Malformed or hostile peer text must remain quoted data."],
+      "states": ["pending", "read", "acknowledged", "reopened"],
+      "failureModes": ["A message recipient mismatch cannot acknowledge another Agent's message.", "Legacy notifications are discarded during passive-delivery migration."],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
-          "id": "agent-communication.inbox",
+          "id": "agent-communication.workspace-health",
           "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
         },
         {
           "kind": "unit-test",
-          "id": "agent-communication.inbox-unit-durable-ack",
+          "id": "agent-communication.inbox-durable-ack",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
-          "testName": "keeps direct messages pending until the recipient acknowledges them after reopen"
+          "testName": "keeps direct messages available after reopen until the recipient acknowledges them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.legacy-passive-migration",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "migrates old queued and steered records to passive delivery without replaying notifications"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.schema-one-passive-migration",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "migrates schema version 1 records to passive delivery without notification replay"
         }
       ]
     }

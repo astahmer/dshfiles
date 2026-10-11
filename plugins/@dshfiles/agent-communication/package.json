@@ -2,7 +2,7 @@
   "name": "@dshfiles/agent-communication",
   "version": "0.1.0",
   "private": true,
-  "description": "Durable topic and direct messaging for independent DSH Agents, with quiet-by-default delivery.",
+  "description": "A passive communication browser and durable topic/direct inbox for independent DSH Agents.",
   "files": [
     "dist",
     "cordis.patch.yml"

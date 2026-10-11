@@ -3,11 +3,14 @@ import {
   type CommunicationAgent,
   type CommunicationDiagnosticSubscription,
   type CommunicationDiagnostics,
+  type CommunicationMessage,
   type CommunicationMessageBody,
+  type CommunicationMessagePage,
   type CommunicationMessageRecipients,
+  type CommunicationPrincipal,
   type CommunicationService,
 } from '@dshfiles/dshx/communication'
-import type { AgentCommunicationSubscriptionInput } from './api.js'
+import { postMessageReceiptSchema, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput, type AgentCommunicationSubscriptionInput } from './api.js'
 
 export const createAgentCommunicationOperations = (input: {
   readonly service: () => CommunicationService
@@ -21,6 +24,34 @@ export const createAgentCommunicationOperations = (input: {
 
   return {
     diagnostics: (limit?: number): Promise<CommunicationDiagnostics> => input.service().diagnostics({ agents: input.listAgents(), limit: limit ?? 20 }),
+    browseMessages: (request: AgentCommunicationBrowseInput): Promise<CommunicationMessagePage> => input.service().browseMessages(request),
+    postMessage: async (request: AgentCommunicationPostInput) => {
+      const sender: CommunicationPrincipal = { kind: 'external', id: 'communication-browser' }
+      let message: CommunicationMessage
+      if (request.topic !== undefined) {
+        message = await input.service().publish({
+          sender,
+          topic: request.topic,
+          text: request.text,
+          ...(request.priority === undefined ? {} : { priority: request.priority }),
+        })
+      } else if (request.agentId !== undefined) {
+        message = await input.service().send({
+          sender,
+          toAgentId: request.agentId,
+          text: request.text,
+          ...(request.priority === undefined ? {} : { priority: request.priority }),
+        })
+      } else {
+        throw new CommunicationError('invalid-message-target', 'Choose a topic or direct Agent.')
+      }
+      return postMessageReceiptSchema.parse({
+        messageId: message.id,
+        topic: message.topic,
+        recipientCount: message.recipients.length,
+        createdAt: message.createdAt,
+      })
+    },
     messageRecipients: (messageId: string): Promise<CommunicationMessageRecipients> => input.service().messageRecipients(messageId),
     revealMessageBody: (messageId: string): Promise<CommunicationMessageBody> => input.service().revealMessageBody(messageId),
     setSubscription: async (request: AgentCommunicationSubscriptionInput): Promise<CommunicationDiagnosticSubscription> => {

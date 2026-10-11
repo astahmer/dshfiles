@@ -215,6 +215,8 @@ const communicationOperations = createAgentCommunicationOperations({
 
 const api = agentCommunicationApi.host({
   diagnostics: ({ input }) => communicationOperations.diagnostics(input.limit),
+  browseMessages: ({ input }) => communicationOperations.browseMessages(input),
+  postMessage: ({ input }) => communicationOperations.postMessage(input),
   messageRecipients: ({ input }) => communicationOperations.messageRecipients(input.messageId),
   revealMessageBody: ({ input }) => communicationOperations.revealMessageBody(input.messageId),
   setSubscription: ({ input }) => communicationOperations.setSubscription(input),
@@ -263,6 +265,10 @@ const setupHost = (context: Context): Effect<void> => {
   hostContext = context
   const service = createCommunicationService()
   communicationService = service
+  context.on('agent/created', async ({ agent }) => {
+    await initializeAgent(agent)
+    return undefined
+  })
 
   return {
     async *[Symbol.asyncIterator]() {
@@ -283,6 +289,7 @@ const setupHost = (context: Context): Effect<void> => {
             })),
         })
         bridge = activeBridge
+        for (const agent of context.agents.list()) await initializeAgent(agent)
         yield async () => {
           try {
             await activeBridge.close()
@@ -290,11 +297,6 @@ const setupHost = (context: Context): Effect<void> => {
             clearHostContext()
           }
         }
-        context.on('agent/created', async ({ agent }) => {
-          await initializeAgent(agent)
-          return undefined
-        })
-        for (const agent of context.agents.list()) await initializeAgent(agent)
       } catch (error) {
         try {
           if (bridge !== undefined) await bridge.close()

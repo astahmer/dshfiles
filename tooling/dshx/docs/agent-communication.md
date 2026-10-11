@@ -14,14 +14,15 @@ flowchart LR
   M[MCP stdio client] --> S
   S --> P
   P --> D[Private durable state]
-  P --> R[DSH Agent followup or steer API]
+  P --> R[Explicit read during natural Agent execution]
 ```
 
 The service in `@dshfiles/dshx/communication` owns topic subscriptions,
-message persistence, inbox reads, acknowledgements, retention, and delivery
-receipts. The CLI and MCP server are adapters over the same Host bridge. Agent
-tools call the same service in process and take sender identity from DSH's
-`ToolExecution.agent`; tool arguments cannot choose or impersonate a sender.
+message persistence, inbox reads, acknowledgements, retention, and passive
+recipient metadata. The CLI and MCP server are adapters over the same Host
+bridge. Agent tools call the same service in process and take sender identity
+from DSH's `ToolExecution.agent`; tool arguments cannot choose or impersonate a
+sender.
 
 The Host bridge uses a Unix domain socket under
 `$DSH_HOME/runtime/dshx/communication` (or `~/.dsh` when `DSH_HOME` is unset).
@@ -31,34 +32,32 @@ principals; DSH Agent identities are taken from the Host tool execution.
 
 ## Delivery behavior
 
-- Agents automatically subscribe to `workspace/<sha256-prefix>` derived from
-  their resolved Session working directory. The path itself is not stored in
-  the topic or message. Agents with the same working directory discover one
-  another without being created by a shared lead Agent.
+- On Host startup, the plugin enumerates existing live Agents and subscribes
+  each one to `workspace/<sha256-prefix>` derived from its resolved Session
+  working directory. The `agent/created` event uses the same idempotent path.
+  The path itself is not stored in the topic or message.
 - Agents also get a private inbox for direct messages. Both automatic
-  subscriptions use queue delivery.
-- The private inbox cannot be unsubscribed because direct messages are
-  addressed to it; subscribe to `inbox` with `quiet` delivery to mute notices
-  while keeping messages available to poll.
-- `quiet` stores messages without adding a Session message. The Agent can read
-  them with `dshx_comm_inbox` when convenient.
-- `queue` adds a content-free DSH follow-up notice. It does not interrupt the
-  current request. The Agent fetches the peer text from its inbox by message id.
-- `steer` is Agent-only and requires the receiver to name allowed sender
-  Session ids. Only an `urgent` message from one of those Agent ids calls DSH's
-  native `Agent.steer`; other messages still use queued follow-up delivery.
+  subscriptions use passive delivery.
+- Every arrival is a durable record only. It never appends a Session/user
+  message, calls `Agent.followup()` or `Agent.steer()`, or replays a pending
+  notification when an Agent appears. Completed turns remain completed.
+- `dshx_comm_inbox` is an explicit read performed during a natural Agent
+  execution. It records `readAt` but does not acknowledge; only the recipient's
+  `dshx_comm_ack` hides a message from later inbox reads.
+- `quiet`, `queue`, and `steer` exist only as legacy migration/input values.
+  The service maps them to passive delivery. `urgent` is metadata only.
 - Unsubscribing from a workspace topic persists an automatic-join opt-out.
   Explicitly subscribing to a workspace topic again clears that opt-out.
-- Peer message bodies are untrusted data. Notices do not include the body, and
-  Agent inbox output quotes the body as JSON. A recipient must still apply its
-  own task and user policy before acting on peer content.
+- Peer message bodies are untrusted data. Agent inbox output quotes the body as
+  JSON. A recipient must still apply its own task and user policy before acting
+  on peer content.
 
 External CLI/MCP principals are local names, separate from DSH Agent ids. The
 default CLI name is `cli`; MCP defaults to `mcp.default`. Use
 `--principal <name>` to keep multiple external inboxes separate. External
-subscribers can select `quiet` or `queue`; they cannot request steering.
-External MCP clients discover `comm_*` tools and poll their own inbox. The
-stdio process does not expose a network listener.
+principals use passive delivery; legacy delivery flags cannot request DSH
+execution. External MCP clients discover `comm_*` tools and poll their own
+inbox. The stdio process does not expose a network listener.
 
 ## Observability
 
@@ -66,26 +65,26 @@ The Host records each Agent communication-tool invocation with operation,
 Agent identity, tool/root call ids, outcome, duration, timestamp, and a bounded
 error code. It never records tool arguments or message text. Activity history is
 bounded to 5,000 events and 30 days; it begins with the first recorded tool
-call, so older use cannot be inferred. Existing message and notification state
-remains separate evidence of message lifecycle.
+call, so older use cannot be inferred. Message reads and acknowledgements remain
+separate state; notification receipts are not used.
 
 `dshx comm report` returns bounded, metadata-only health, Agent, topic,
 subscription, message-lifecycle, and tool-activity data. It is read-only and
 never prints message bodies. A missing bridge or an empty event history is not
 proof that Agents never used the capability.
 
-The owned `@dshfiles/agent-communication` bundle adds a sidebar inspector for
-live Agents, topics, subscriptions, recent tool activity, and message-recipient
-status. It uses the Host API; the browser never reads the state file. Message
-bodies stay hidden in reports and lists until a per-message reveal action.
-Delivery changes, unsubscribe/rejoin, and acknowledgements are scoped and
-confirmed. `steer` requires selecting live sender Agents; current sender IDs are
-not returned by diagnostics, so an edit requires selecting the desired set
-again. The UI intentionally adds no publish, send, or bulk-delete controls.
+The owned `@dshfiles/agent-communication` bundle adds a channel/direct-message
+browser with debounced server-side search, cursor pagination, visible untrusted
+message text, recipient read/acknowledgement context, and live Agent status. It
+uses the Host API; the browser never reads the state file. Users can post to a
+channel (including starting one) or direct inbox. A post is a passive stored
+record and reports the current recipient count; it does not start or resume
+Agent work. Diagnostics and bounded tool activity live in a secondary view.
 
-The bridge setup is gated on DSH supplying live Agents to the Host plugin. An
-empty Session or unavailable report is not evidence that the integration is
-broken or that communication was not used.
+The Host bridge starts independently of the number of live Agents. Diagnostics
+report live Agent workspace topics and actual stored subscriptions separately;
+a missing subscription is not mistaken for a populated channel. An empty
+runtime or unavailable report is not proof that the capability was never used.
 
 ## Commands
 
@@ -93,7 +92,7 @@ broken or that communication was not used.
 dshx comm agents --json
 dshx comm topics --json
 dshx comm report --limit 20 --json
-dshx comm subscribe release-notes --delivery quiet
+dshx comm subscribe release-notes
 dshx comm publish release-notes "Review the compatibility notes"
 dshx comm send <dsh-session-id> "The build finished; please review"
 dshx comm inbox --limit 20 --json
@@ -109,16 +108,14 @@ for protocol frames and reports startup errors to stderr.
 
 Message bodies are limited to 12,000 characters. State is private JSON, written
 atomically with mode `0600`, capped at 5,000 retained messages and activity
-events and 16 MiB, with messages and activity pruned after 30 days. Acknowledgements and notification receipts are
-idempotent. Delivery is at-least-once across a Host crash in the narrow window
-between DSH accepting a follow-up and the receipt being persisted; notice text
-contains a stable communication id so Agents can recognize a repeated notice.
+events and 16 MiB, with messages and activity pruned after 30 days. Acknowledgements are idempotent. Legacy notification receipts are discarded
+when schema versions 1 or 2 migrate to version 3 passive delivery.
 
 ## Candidate decision
 
-| Candidate                       | Fit for independent Sessions, durable topics, quiet delivery                                                                      | Decision                                                    |
+| Candidate                       | Fit for independent Sessions, durable topics, passive arrivals                                                                    | Decision                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| DSH Agent Team                  | Experimental team lifecycle is centered on lead-created peers and team coordination; it is not this general topic/inbox boundary. | Reuse only the native Agent queue/steer APIs.               |
+| DSH Agent Team                  | Experimental team lifecycle is centered on lead-created peers and team coordination; it is not this general topic/inbox boundary. | Do not route passive message arrivals into Agent execution. |
 | Marketplace `dsh-agent-message` | Its published package generation was not verified against installed DSH `0.2.0-rc.2`.                                             | Do not install unchanged.                                   |
 | Marketplace `dsh-interconnect`  | Dynamic peer subscriptions are relevant, but its current source and lifecycle contracts were not verified against this Host.      | Keep as a future comparison, not a runtime dependency.      |
 | Koinon                          | Useful orchestration reference, with a separate local peer protocol and credential boundary.                                      | Do not couple DSH to it.                                    |
