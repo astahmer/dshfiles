@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, hostApiDiagnosticsForPage, hostOutputFor, recordAssertion } from '../steps.js'
 
 interface JujutsuFixture {
   readonly temporaryRoot: string
@@ -122,8 +122,33 @@ const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<vo
   const path = picker.getByRole('textbox', { name: /enter a folder path/i })
   await path.fill(fixture.repositoryPath)
   await path.press('Enter')
-  await picker.getByRole('listbox', { name: 'Folders', exact: true }).waitFor({ state: 'visible' })
-  await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  const selectFolder = picker.getByRole('button', { name: 'Select this folder', exact: true })
+  const listingError = picker.getByRole('alert')
+  try {
+    await expect
+      .poll(async () => {
+        if (await selectFolder.isVisible().catch(() => false)) return 'ready'
+        if (await listingError.isVisible().catch(() => false)) return 'error'
+        return 'pending'
+      }, { timeout: 15_000 })
+      .not.toBe('pending')
+  } catch (cause) {
+    const diagnostics = await hostApiDiagnosticsForPage(page)
+    const hostOutput = hostOutputFor(page)
+      .split(/\r?\n/)
+      .filter(line => /directory|workspace|error|api/i.test(line))
+      .slice(-20)
+    throw new Error(`Folder listing did not settle. API diagnostics: ${JSON.stringify(diagnostics.lines)}\nHost output: ${hostOutput.join('\n')}`, { cause })
+  }
+  if (await listingError.isVisible()) {
+    const diagnostics = await hostApiDiagnosticsForPage(page)
+    const hostOutput = hostOutputFor(page)
+      .split(/\r?\n/)
+      .filter(line => /directory|workspace|error|api/i.test(line))
+      .slice(-20)
+    throw new Error(`Host rejected the disposable fixture folder. API diagnostics: ${JSON.stringify(diagnostics.lines)}\nHost output: ${hostOutput.join('\n')}`)
+  }
+  await selectFolder.click()
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible()
 }
