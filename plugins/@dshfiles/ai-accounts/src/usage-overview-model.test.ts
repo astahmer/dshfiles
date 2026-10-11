@@ -68,6 +68,10 @@ describe('usage overview', () => {
 
   it('takes the tightest window across enabled accounts only', () => {
     expect(stripItems(usage, noLayout).map(item => [item.instanceId, item.percentRemaining])).toEqual([['codex', 53]])
+    expect(stripItems(usage, noLayout)[0]?.windows?.map(window => [window.label, window.percentRemaining])).toEqual([
+      ['Current session', 69],
+      ['Weekly limit', 53],
+    ])
     expect(stripItems(null, noLayout)).toEqual([])
   })
 

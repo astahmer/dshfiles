@@ -95,6 +95,7 @@ export interface QuotaSummaryItem {
   readonly exhausted: boolean
   /** The ordinary limit is spent and requests draw on Luna Reserve. */
   readonly onReserve: boolean
+  readonly windows?: readonly UsageWindow[]
 }
 
 const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSITIVE_INFINITY
@@ -117,6 +118,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
       resetsAt: reserve.resetsAt,
       exhausted: false,
       onReserve: true,
+      windows: sortWindows(card.usage.windows),
     }
   }
   const ordinary = card.usage.windows.filter(window => window.reserve !== true)
@@ -137,6 +139,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
     resetsAt: binding.resetsAt,
     exhausted: spent.length > 0,
     onReserve: false,
+    windows: sortWindows(card.usage.windows),
   }
 }
 

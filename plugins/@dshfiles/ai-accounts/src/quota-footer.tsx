@@ -6,22 +6,35 @@ import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
-import { usePreferences, type MeterLabel } from './use-preferences.js'
+import { usePreferences, type MeterLabel, type UsageWindowLayout } from './use-preferences.js'
 import { UsageOverview, useNow } from './usage-overview.js'
 import { formatResetShort, meterLines, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
 
-const describeItem = (item: QuotaSummaryItem, now: number): string => {
-  const reset = formatResetShort(item.resetsAt, now)
-  const resetText = reset === null ? '' : reset === 'now' ? ', resetting now' : `, resets in ${reset}`
-  if (item.exhausted) return `${item.displayName}: ${item.windowLabel} limit reached${resetText}`
-  const reserve = item.onReserve ? ' (weekly limit spent)' : ''
-  return `${item.displayName}: ${String(Math.round(item.percentRemaining))}% left on ${item.windowLabel}${reserve}${resetText}`
+const describeItem = (item: QuotaSummaryItem, now: number, windowLayout: UsageWindowLayout = 'binding'): string => {
+  const accountWindows = item.windows ?? [{ label: item.windowLabel, percentRemaining: item.percentRemaining, resetsAt: item.resetsAt }]
+  const windows = windowLayout === 'binding' ? [accountWindows.find(window => window.label === item.windowLabel)] : accountWindows
+  const descriptions = windows.flatMap(window => {
+    if (window === undefined) return []
+    const reset = formatResetShort(window.resetsAt, now)
+    const resetText = reset === null ? '' : reset === 'now' ? ', resetting now' : `, resets in ${reset}`
+    const percent = Math.round(window.percentRemaining)
+    const status = percent <= 0 ? 'limit reached' : `${String(percent)}% left`
+    return [`${window.label}: ${status}${resetText}`]
+  })
+  return `${item.displayName}: ${descriptions.join('; ')}`
 }
 
-/** Glyph, then percent left over the time to its reset, stacked like a menubar meter; the setting may keep one line. */
-const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: number; readonly label: MeterLabel }): JSX.Element => {
+/** One provider glyph followed by the selected account quota windows. */
+const SummaryItem = (props: {
+  readonly item: QuotaSummaryItem
+  readonly now: number
+  readonly label: MeterLabel
+  readonly windowLayout?: UsageWindowLayout
+}): JSX.Element => {
   const lines = meterLines(props.item, props.now, props.label)
   const tone = props.item.exhausted ? 'critical' : quotaTone(props.item.percentRemaining)
+  const windowLayout = props.windowLayout ?? 'binding'
+  const windows = windowLayout === 'binding' ? [] : (props.item.windows ?? [])
   return (
     <span
       className={cn(
@@ -31,24 +44,42 @@ const SummaryItem = (props: { readonly item: QuotaSummaryItem; readonly now: num
       )}
     >
       <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
-      <span className="dshx:flex dshx:flex-col dshx:items-start dshx:leading-none">
-        {lines.percent === null ? null : (
-          <span className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', props.item.onReserve ? 'dshx:text-info' : QUOTA_TONE_TEXT[tone])}>
-            {lines.percent}
-          </span>
-        )}
-        {lines.reset === null ? null : (
-          <span
-            className={cn(
-              'dshx:tabular-nums',
-              lines.percent === null ? 'dshx:text-[11px] dshx:font-semibold' : 'dshx:text-[10px]',
-              props.item.exhausted ? 'dshx:text-destructive' : lines.percent === null ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground',
-            )}
-          >
-            {lines.reset}
-          </span>
-        )}
-      </span>
+      {windowLayout === 'binding' ? (
+        <span className="dshx:flex dshx:flex-col dshx:items-start dshx:leading-none">
+          {lines.percent === null ? null : (
+            <span className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', props.item.onReserve ? 'dshx:text-info' : QUOTA_TONE_TEXT[tone])}>
+              {lines.percent}
+            </span>
+          )}
+          {lines.reset === null ? null : (
+            <span
+              className={cn(
+                'dshx:tabular-nums',
+                lines.percent === null ? 'dshx:text-[11px] dshx:font-semibold' : 'dshx:text-[10px]',
+                props.item.exhausted ? 'dshx:text-destructive' : lines.percent === null ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground',
+              )}
+            >
+              {lines.reset}
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className={cn('dshx:flex dshx:gap-1', windowLayout === 'vertical' ? 'dshx:flex-col' : 'dshx:flex-row dshx:items-center')}>
+          {windows.map(window => {
+            const exhausted = Math.round(window.percentRemaining) <= 0
+            const windowTone = exhausted ? 'critical' : quotaTone(window.percentRemaining)
+            return (
+              <span
+                className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[windowTone])}
+                key={window.label}
+                title={window.label}
+              >
+                {String(Math.round(window.percentRemaining))}%
+              </span>
+            )
+          })}
+        </span>
+      )}
     </span>
   )
 }
@@ -90,13 +121,13 @@ const UsagePopoverContent = (props: {
 
 /**
  * The wide usage surface: a wrapping strip with one meter per visible account
- * (its binding window's percent left and time to reset), in the user's order;
+ * (the governing window by default), in the user's order;
  * drag to reorder, right-click to move or hide, click to open the popover. The
  * thread sidebar seats it above its foot; the stock sidebar stacks footer
  * actions above Settings, so there it renders in place.
  */
 export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { footerButton, meterLabel } = usePreferences()
+  const { footerButton, meterLabel, usageWindowLayout } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage({ enabled: footerButton })
@@ -106,7 +137,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
   if (!footerButton) return null
   const items = stripItems(usage, arrangement.layout)
   const shownIds = items.map(item => item.instanceId)
-  const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
+  const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
   return (
     <Popover onOpenChange={setOpen} open={open}>
@@ -134,13 +165,13 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
               >
                 <button
                   aria-expanded={open}
-                  aria-label={describeItem(item, now)}
-                  className={cn(meterButtonClass, open && 'dshx:text-foreground')}
+                  aria-label={describeItem(item, now, usageWindowLayout)}
+                  className={cn(meterButtonClass, usageWindowLayout === 'vertical' && 'dshx:h-auto dshx:min-h-8 dshx:py-1', open && 'dshx:text-foreground')}
                   onClick={() => setOpen(current => !current)}
-                  title={describeItem(item, now)}
+                  title={describeItem(item, now, usageWindowLayout)}
                   type="button"
                 >
-                  <SummaryItem item={item} label={meterLabel} now={now} />
+                  <SummaryItem item={item} label={meterLabel} now={now} windowLayout={usageWindowLayout} />
                 </button>
               </ArrangeableAccount>
             ))
