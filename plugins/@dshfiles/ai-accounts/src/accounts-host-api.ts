@@ -4,7 +4,16 @@ import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
 import { aiAccountsApi, baseModelName, isKeyEnvName, type AccountsFile, type AccountsUsage } from './api.js'
-import { accountFilePath, buildAccountsFile, readAccountFile, readAccountIdentity, removeAccount, setDistribution, upsertAccount } from './account-store.js'
+import {
+  accountFilePath,
+  buildAccountsFile,
+  moveAccount,
+  readAccountFile,
+  readAccountIdentity,
+  removeAccount,
+  setDistribution,
+  upsertAccount,
+} from './account-store.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
@@ -91,6 +100,11 @@ export const accountsHostApi = aiAccountsApi.host({
   remove: async ({ input, ctx }) => {
     await removeAccount(input.instanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
+  },
+  moveAccount: async ({ input, ctx }) => {
+    await moveAccount(input.instanceId, input.direction)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },

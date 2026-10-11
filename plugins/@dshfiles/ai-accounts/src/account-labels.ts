@@ -51,10 +51,10 @@ export const DISTRIBUTION_LABEL = {
 } satisfies Record<AccountsFile['distribution'], string>
 
 export const DISTRIBUTION_HINT = {
-  sticky: 'Keep each conversation on one account to reuse its prompt cache. Switch only if that account is unavailable.',
-  priority: 'Use accounts in list order. Stay on the first available account until it is rate-limited.',
-  'round-robin': 'Move to the next available account on every request.',
-  balanced: 'Choose randomly, favoring accounts used least recently.',
+  sticky: 'Keep each conversation on its selected account to reuse its prompt cache. Switch only if that account is unavailable.',
+  priority: 'Use compatible accounts for the selected provider and model in account-list order. Stay on the first available until it is rate-limited.',
+  'round-robin': 'Move to the next available account with the same provider and model on every request.',
+  balanced: 'Choose among compatible accounts, favoring accounts used least recently.',
 } satisfies Record<AccountsFile['distribution'], string>
 
 /** What connects a new account, for the notice the rail shows after creating one. */

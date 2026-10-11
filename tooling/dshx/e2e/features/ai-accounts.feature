@@ -25,3 +25,9 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When a provider request fails because its credential is missing
     Then the inline credential action opens AI Accounts
+
+  @scenario:ai-accounts.priority-order
+  Scenario: Reorder accounts used by Priority routing
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When two Codex accounts are added with Priority distribution
+    Then the account order controls Priority routing

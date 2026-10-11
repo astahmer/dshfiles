@@ -17,6 +17,8 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
 
 export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
 
+export const accountOrderDirectionSchema = z.enum(['earlier', 'later'])
+
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
 export const accountStateSchema = z.enum(['healthy', 'cooling', 'disabled', 'unconfigured'])
@@ -256,6 +258,7 @@ export type AccountProfile = z.infer<typeof accountProfileSchema>
 export type AccountDraft = z.infer<typeof accountDraftSchema>
 export type AccountsFile = z.infer<typeof accountsFileSchema>
 export type AccountKind = z.infer<typeof accountKindSchema>
+export type AccountOrderDirection = z.infer<typeof accountOrderDirectionSchema>
 export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>
 export type UsageHistoryMeta = z.infer<typeof usageMetaSchema>
 
@@ -316,7 +319,12 @@ export const aiAccountsApi = defineApi({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: accountsFileSchema,
     }),
-    /** Change how requests are spread across accounts. */
+    /** Reorder one account within its provider group. */
+    moveAccount: method({
+      input: z.object({ instanceId: z.string().min(1).max(64), direction: accountOrderDirectionSchema }),
+      output: accountsFileSchema,
+    }),
+    /** Change how requests are spread across compatible account routes. */
     setDistribution: method({
       input: z.object({ distribution: accountsFileSchema.shape.distribution }),
       output: accountsFileSchema,

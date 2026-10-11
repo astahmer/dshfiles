@@ -60,11 +60,16 @@ export interface AccountPoolOptions {
 export interface AccountPool {
   put(account: PoolAccountInput): void
   replace(accounts: readonly PoolAccountInput[]): void
-  acquire(conversationKey: string | undefined, now?: number): PoolAccount | undefined
+  acquire(input: {
+    readonly conversationKey?: string
+    readonly candidateIds?: readonly string[]
+    readonly scopeKey?: string
+    readonly now?: number
+  }): PoolAccount | undefined
   noteServed(accountId: string): void
   noteRateLimited(accountId: string, retryAfterMs: number | undefined, now?: number): void
   isHealthy(accountId: string, now?: number): boolean
-  bindRoute(conversationKey: string, from: string, to: string): void
+  bindRoute(conversationKey: string, from: string, to: string, failedAccountId?: string): void
   routeFor(conversationKey: string | undefined, provider: string, now?: number): string
   unbind(conversationKey: string | undefined): void
   setDistribution(next: Distribution): void
@@ -79,18 +84,22 @@ const idleSeconds = (lastUsedAt: number, now: number): number => Math.max((now -
 export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool => {
   const accounts = new Map<string, PoolAccount>()
   const affinity = new Map<string, string>()
-  /** Conversation → the account that took over its chosen route after a fail-over. */
-  const routeBindings = new Map<string, { readonly from: string; readonly to: string }>()
+  /** Conversation → the account that took over its selected route after a fail-over. */
+  const routeBindings = new Map<string, { readonly from: string; readonly failed: string; readonly to: string }>()
   const defaultCooldownMs = options.cooldownMs ?? DEFAULT_COOLDOWN_MS
-  let cursor = 0
+  const roundRobinCursors = new Map<string, number>()
   const requested = options.distribution ?? DEFAULT_DISTRIBUTION
   let mode: Distribution = DISTRIBUTIONS.includes(requested) ? requested : DEFAULT_DISTRIBUTION
 
-  const eligible = (now: number): PoolAccount[] => [...accounts.values()].filter(account => account.enabled && account.cooldownUntil <= now)
+  const eligible = (now: number, candidateIds?: readonly string[]): PoolAccount[] => {
+    const candidates = candidateIds === undefined ? undefined : new Set(candidateIds)
+    return [...accounts.values()].filter(account => account.enabled && account.cooldownUntil <= now && (candidates === undefined || candidates.has(account.id)))
+  }
 
-  const pickRoundRobin = (pool: readonly PoolAccount[]): PoolAccount | undefined => {
+  const pickRoundRobin = (pool: readonly PoolAccount[], scopeKey: string): PoolAccount | undefined => {
+    const cursor = roundRobinCursors.get(scopeKey) ?? 0
     const account = pool[cursor % pool.length]
-    cursor = (cursor + 1) % Math.max(pool.length, 1)
+    roundRobinCursors.set(scopeKey, (cursor + 1) % Math.max(pool.length, 1))
     return account
   }
 
@@ -159,9 +168,8 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
         if (reconciled.get(accountId)?.enabled !== true) affinity.delete(conversationKey)
       }
       for (const [conversationKey, binding] of routeBindings) {
-        if (reconciled.get(binding.to)?.enabled !== true) routeBindings.delete(conversationKey)
+        if (reconciled.get(binding.failed)?.enabled !== true || reconciled.get(binding.to)?.enabled !== true) routeBindings.delete(conversationKey)
       }
-      cursor %= Math.max(accounts.size, 1)
     },
 
     /**
@@ -170,9 +178,11 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
      * caller rebinds, which is what makes a rate-limited conversation hop to a
      * fresh account instead of failing.
      */
-    acquire(conversationKey, now = Date.now()) {
-      const pool = eligible(now)
+    acquire(input) {
+      const now = input.now ?? Date.now()
+      const pool = eligible(now, input.candidateIds)
       if (pool.length === 0) return undefined
+      const conversationKey = input.conversationKey
       if (mode === 'sticky' && conversationKey !== undefined && conversationKey !== '') {
         const boundId = affinity.get(conversationKey)
         const bound = pool.find(account => account.id === boundId)
@@ -182,7 +192,8 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
         }
         if (boundId !== undefined) affinity.delete(conversationKey)
       }
-      const account = mode === 'balanced' ? pickBalanced(pool, now) : mode === 'priority' ? pool[0] : pickRoundRobin(pool)
+      const scopeKey = input.scopeKey ?? 'all'
+      const account = mode === 'balanced' ? pickBalanced(pool, now) : mode === 'priority' ? pool[0] : pickRoundRobin(pool, scopeKey)
       if (account === undefined) return undefined
       if (mode === 'sticky') bindAffinity(conversationKey, account.id)
       return account
@@ -212,23 +223,23 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       return account !== undefined && account.enabled && account.cooldownUntil <= now
     },
 
-    bindRoute(conversationKey, from, to) {
+    bindRoute(conversationKey, from, to, failedAccountId = from) {
       if (from === to) routeBindings.delete(conversationKey)
-      else routeBindings.set(conversationKey, { from, to })
+      else routeBindings.set(conversationKey, { from, failed: failedAccountId, to })
     },
 
     /**
-     * The account that serves a conversation's chosen route on the wire. A
-     * fail-over holds until the chosen account's cooldown ends, so a recovered
-     * account takes its conversations back instead of draining the stand-in.
+     * The account that serves a conversation's selected route on the wire. A
+     * fail-over holds until the account that failed recovers, even when request
+     * distribution selected a different physical account than the picker route.
      */
     routeFor(conversationKey, provider, now = Date.now()) {
       if (conversationKey === undefined) return provider
       const binding = routeBindings.get(conversationKey)
       if (binding === undefined || binding.from !== provider) return provider
-      const chosen = accounts.get(provider)
+      const failed = accounts.get(binding.failed)
       const standIn = accounts.get(binding.to)
-      if ((chosen?.enabled === true && chosen.cooldownUntil <= now) || standIn?.enabled !== true) {
+      if (failed?.enabled !== true || failed.cooldownUntil <= now || standIn?.enabled !== true) {
         routeBindings.delete(conversationKey)
         return provider
       }
@@ -258,7 +269,7 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       accounts.clear()
       affinity.clear()
       routeBindings.clear()
-      cursor = 0
+      roundRobinCursors.clear()
     },
 
     describe() {

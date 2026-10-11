@@ -71,6 +71,16 @@ distribution, and the history schedule.
 Accounts can also be listed, enabled and edited at the bottom of
 **Settings › Models**.
 
+Request distribution is one global policy applied within the selected provider
+kind and compatible model capabilities; it never mixes unrelated providers or
+models. The model
+picker and transcript keep the provider you selected while the Host chooses the
+account that serves the request. Sticky keeps that account for the conversation
+and fails over only while it is unavailable. Priority chooses the first healthy
+compatible account in account-list order; move accounts up or down within each
+provider group to change that order. Round-robin advances within each compatible
+provider/model group, while Balanced favors accounts used least recently.
+
 ## Usage
 
 A usage strip sits above the sidebar foot (the thread sidebar's
@@ -105,15 +115,17 @@ failed request on an account route does, per kind: connection failure
 (resets, timeouts, 5xx, Envoy replay-buffer overflow), rate limit, usage
 exhausted, sign-in failure, request too large. The options run in order:
 retry the same account (count and doubling backoff), continue on Luna Reserve
-(Codex), fail over to the next account of the same provider that offers the
-model (usage-strip order, hidden accounts skipped), wait out a declared reset,
-resend earlier images as file placeholders, then fail the turn or hand the
-failure to DSH's own retry and compaction. Defaults: connection → retry twice,
-then fail over; exhausted → Luna Reserve, then fail over; rate limit → fail
-over, then wait up to a minute; sign-in and oversized stay with DSH. A
-fail-over swaps the account on the wire only, cools the failed account, and
-returns the conversation to it once it recovers. Each step shows as a retry
-row in the turn. Large tool outputs are never trimmed.
+(Codex), fail over to the next account of the same provider kind that offers
+the model (Priority uses account-list order; other modes use usage-strip order;
+hidden accounts are skipped), wait out a declared reset, resend earlier images
+as file placeholders, then fail the turn or hand the failure to DSH's own retry
+and compaction. Defaults: connection → retry twice, then fail over; exhausted →
+Luna Reserve, then fail over; rate limit → fail over, then wait up to a minute;
+sign-in and oversized stay with DSH. A fail-over swaps the account on the wire
+only and cools the account that failed. The retry uses its stand-in; Sticky
+returns to the selected account once it recovers, while non-sticky modes choose
+again on the next request. Each step shows as a retry row in the turn. Large
+tool outputs are never trimmed.
 
 When a turn ends with an authentication failure (including an invalid API key
 or a missing credential), an inline **Add or fix credentials** action opens the

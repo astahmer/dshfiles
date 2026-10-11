@@ -93,6 +93,7 @@ export const createFailureRecovery = (deps: {
       readonly turn: number
       readonly step: number
       readonly provider: string
+      readonly routedAccountId?: string
       readonly model: string | undefined
       readonly failure: LlmFailure
       /** Whether the request still re-sends an image the model has already answered. */
@@ -103,7 +104,7 @@ export const createFailureRecovery = (deps: {
       const failureKind = classifyFailure(input.failure)
       if (failureKind === undefined) return { kind: 'pass' }
       const now = input.now ?? Date.now()
-      const account = deps.pool.routeFor(input.conversationKey, input.provider, now)
+      const account = input.routedAccountId ?? deps.pool.routeFor(input.conversationKey, input.provider, now)
       const policy = deps.readPolicy()[failureKind]
       const state = stateFor(input.conversationKey, input.turn, input.step)
       const candidates = policy.failover
@@ -127,7 +128,7 @@ export const createFailureRecovery = (deps: {
       if (step.kind === 'luna-reserve') deps.lunaReserve.engage(account)
       if (step.kind === 'failover') {
         deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
-        deps.pool.bindRoute(input.conversationKey, input.provider, step.to)
+        deps.pool.bindRoute(input.conversationKey, input.provider, step.to, account)
       }
       if (step.kind === 'shrink') state.shrink = true
       state.attempts += 1

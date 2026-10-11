@@ -40,13 +40,13 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced account pools with cooldown-aware failover.",
+      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
           "key": "distribution",
           "defaultValue": "sticky",
-          "constraints": "One of sticky, priority, round-robin, or balanced.",
+          "constraints": "One of sticky, priority, round-robin, or balanced; non-sticky modes distribute within compatible accounts of the same provider kind and model.",
           "choices": ["sticky", "priority", "round-robin", "balanced"],
           "coveredBy": ["ai-accounts.pool-failover"]
         },
@@ -64,10 +64,11 @@
           "coveredBy": ["ai-accounts.model-curation"]
         }
       ],
-      "states": ["available", "cooling-down", "rebound", "no-eligible-account"],
+      "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order"],
       "failureModes": [
-        "A provider rate limit cools the selected account and may rebind the request.",
-        "All eligible accounts are cooling down and no route can be selected."
+        "A provider rate limit cools the account that served the request and may rebind its retry.",
+        "All eligible accounts are cooling down and no route can be selected.",
+        "Distribution never mixes provider kinds or models with incompatible request capabilities."
       ],
       "externalDependencies": [
         {
@@ -86,6 +87,23 @@
           "kind": "gherkin",
           "id": "ai-accounts.pool-failover",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.request-distribution",
+          "file": "plugins/@dshfiles/ai-accounts/src/request-account-routing.test.ts",
+          "testName": "routes Priority through the first healthy same-provider account that offers the model"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.priority-order-storage",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-store-prime.test.ts",
+          "testName": "moves an account within its provider order without changing other accounts"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.priority-order",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
           "kind": "gherkin",

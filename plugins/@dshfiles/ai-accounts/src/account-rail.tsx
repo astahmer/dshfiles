@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { AccountGroup } from './account-group.js'
-import { KIND_ACCENT, KIND_GROUPS, KIND_LABEL } from './account-labels.js'
+import { KIND_ACCENT, KIND_GROUPS, KIND_LABEL, routedKind } from './account-labels.js'
 import type { AccountsFile } from './api.js'
 import { NativeProvidersList } from './native-providers-list.js'
 import { ProviderMark } from './panel-primitives.js'
@@ -33,13 +33,18 @@ export const AccountRail = (props: { readonly state: AccountsPanelState; readonl
     {props.file.accounts.length === 0 ? (
       <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">Add an account to publish its own model route.</p>
     ) : null}
+    {props.file.accounts.some(account => routedKind(account.kind)) ? (
+      <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">Priority follows this order within each provider.</p>
+    ) : null}
     {KIND_GROUPS.map(kind => (
       <AccountGroup
         accounts={props.file.accounts.filter(profile => profile.kind === kind)}
         key={kind}
         kind={kind}
+        onMove={(instanceId, direction) => void props.state.moveAccount(instanceId, direction)}
         onSelect={props.state.setSelectedId}
         onToggle={profile => void props.state.toggleEnabled(profile)}
+        reorderingDisabled={props.state.dirty || props.state.saving || props.state.reordering}
         selectedId={props.state.selectedId}
       />
     ))}

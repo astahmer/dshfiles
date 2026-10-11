@@ -67,3 +67,28 @@ Then('the rate-limit recovery failover can be changed and restored', async ({ pa
   })
   await finishJourneyAssertions(page)
 })
+
+When('two Codex accounts are added with Priority distribution', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
+  for (const accountName of ['Codex 1', 'Codex 2']) {
+    await page.getByRole('button', { name: 'Add account', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+    await expect(page.getByRole('heading', { name: accountName, exact: true })).toBeVisible()
+  }
+  const distribution = page.getByRole('combobox', { name: 'Request distribution' })
+  await distribution.click()
+  await page.getByRole('option', { name: /Priority/ }).click()
+  await expect(distribution).toHaveText('Priority')
+})
+
+Then('the account order controls Priority routing', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-priority-order', async () => {
+    const moveCodexEarlier = page.getByRole('button', { name: 'Move Codex 2 earlier in account order', exact: true })
+    await expect(moveCodexEarlier).toBeEnabled()
+    await moveCodexEarlier.click()
+    await expect(moveCodexEarlier).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Move Codex 2 later in account order', exact: true })).toBeEnabled()
+  })
+  await finishJourneyAssertions(page)
+})

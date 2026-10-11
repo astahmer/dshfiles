@@ -6,7 +6,7 @@ import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-dra
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { aiAccountsApi, isKeyEnvName, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
+import { aiAccountsApi, isKeyEnvName, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
@@ -115,6 +115,12 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
       setSelectedId(input.draft.instanceId)
     },
   })
+  const moveAccountMutation = useMutation({
+    mutationFn: (input: { readonly instanceId: string; readonly direction: AccountOrderDirection }) => accounts.moveAccount(input),
+    onMutate: () => setNotice(null),
+    onSuccess: next => setFile(next),
+    onError: error => setNotice(`Could not reorder account: ${String(error)}`),
+  })
 
   const save = async (next: AccountDraft): Promise<boolean> => {
     const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
@@ -211,6 +217,10 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     }
   }
 
+  const moveAccount = (instanceId: string, direction: AccountOrderDirection): void => {
+    moveAccountMutation.mutate({ instanceId, direction })
+  }
+
   const toggleEnabled = async (profile: AccountProfile) => {
     setFile(await accounts.save({ draft: { ...toDraft(profile), enabled: !profile.enabled } }))
   }
@@ -291,9 +301,11 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     notice: notice ?? (fileQuery.isError && file === null ? 'The account host did not answer.' : null),
     setNotice,
     saving: saveMutation.isPending,
+    reordering: moveAccountMutation.isPending,
     load,
     save,
     persist,
+    moveAccount,
     toggleEnabled,
     remove,
     createAccount,

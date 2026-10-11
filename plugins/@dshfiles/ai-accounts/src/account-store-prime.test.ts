@@ -94,4 +94,15 @@ describe('account store priming', () => {
     expect(unprimed.accounts).toHaveLength(0)
     expect(primed.accounts).toHaveLength(1)
   })
+
+  it('moves an account within its provider order without changing other accounts', async () => {
+    const claude = { ...accountDraft, instanceId: 'claude-work', kind: 'claude', displayName: 'Claude Work', homePath: '~/.claude-work' }
+    const secondCodex = { ...accountDraft, instanceId: 'codex-second', displayName: 'Codex Second' }
+    const store = await loadStoreWith([accountDraft, claude, secondCodex])
+
+    const moved = await store.moveAccount('codex-test', 'later')
+
+    expect(moved.accounts.map(account => account.instanceId)).toEqual(['codex-second', 'claude-work', 'codex-test'])
+    expect(moved.accounts.filter(account => account.kind === 'codex').map(account => account.instanceId)).toEqual(['codex-second', 'codex-test'])
+  })
 })

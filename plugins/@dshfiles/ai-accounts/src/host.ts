@@ -35,6 +35,7 @@ import { LlmError, resolveImageAttachmentAccess, type LlmFailure } from '@deepse
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { createFailureRecovery, offloadResentImages, type RecoveryAction } from './failure-recovery.js'
+import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
 import type { LlmRetryEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
 import { randomUUID } from 'node:crypto'
@@ -261,25 +262,36 @@ export default definePlugin({
       pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
     }
 
-    const offersModel = (id: string, model: string): boolean =>
-      profiles
-        .get(id)
-        ?.piProvider?.getModels()
-        .some(candidate => candidate.id === model) === true
+    const modelForRoute = (provider: string, modelId: string) =>
+      profiles.get(provider)?.piProvider?.getModels().find(candidate => candidate.id === modelId)
+    const modelsCompatible = (sourceProvider: string, candidateProvider: string, modelId: string): boolean => {
+      const source = modelForRoute(sourceProvider, modelId)
+      const candidate = modelForRoute(candidateProvider, modelId)
+      if (source === undefined || candidate === undefined) return false
+      return (
+        source.api === candidate.api &&
+        source.reasoning === candidate.reasoning &&
+        source.contextWindow === candidate.contextWindow &&
+        source.maxTokens === candidate.maxTokens &&
+        JSON.stringify([...source.input].sort()) === JSON.stringify([...candidate.input].sort()) &&
+        JSON.stringify(source.inputLimits ?? null) === JSON.stringify(candidate.inputLimits ?? null) &&
+        JSON.stringify(source.thinkingLevelMap ?? null) === JSON.stringify(candidate.thinkingLevelMap ?? null)
+      )
+    }
     const recovery = createFailureRecovery({
       pool,
       isAccountRoute: provider => routes.has(provider),
       readPolicy: () => readRecoverySettings().policy,
-      // Same provider kind and the same model, in the order the usage strip
-      // lists accounts; accounts hidden there never take over a conversation.
       failoverCandidates: ({ from, model }) => {
-        const source = routes.get(from)
-        if (source === undefined) return []
         const settings = readRecoverySettings()
-        const hidden = new Set(settings.hiddenUsageAccounts)
-        return [...new Set([...settings.usageOrder, ...routes.keys()])].filter(id => {
-          const route = routes.get(id)
-          return route !== undefined && route.enabled && route.kind === source.kind && !hidden.has(id) && (model === undefined || offersModel(id, model))
+        return failoverAccountIds({
+          from,
+          model,
+          routes,
+          distribution: pool.distribution(),
+          usageOrder: settings.usageOrder,
+          hiddenAccountIds: settings.hiddenUsageAccounts,
+          modelsCompatible,
         })
       },
       lunaReserve: {
@@ -298,6 +310,23 @@ export default definePlugin({
       },
       newRetryId: () => randomUUID(),
     })
+    const activeAccountRoutes = new Map<
+      string,
+      {
+        readonly turn: number
+        readonly step: number
+        readonly provider: string
+        readonly model: string
+        accountId: string
+      }
+    >()
+    const accountForRequest = (options: GenerateOptions): string => {
+      const active = options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId)
+      if (options.purpose === undefined && active?.provider === options.provider && active.model === options.model) {
+        return active.accountId
+      }
+      return recovery.routeFor(options.sessionId, options.provider)
+    }
 
     const llm = ctx.get('llm')
     if (llm === undefined) return
@@ -385,8 +414,9 @@ export default definePlugin({
       },
       {
         reasoningDefaults,
-        routeFor: options => recovery.routeFor(options.sessionId, options.provider),
-        imageRequestPricing: (provider, model) => (routes.get(provider)?.kind === COMMANDCODE_KIND ? CommandCodeCapabilities.imageRequestPricing(model) : undefined),
+        routeFor: accountForRequest,
+        imageRequestPricing: (provider, model) =>
+          routes.get(provider)?.kind === COMMANDCODE_KIND ? CommandCodeCapabilities.imageRequestPricing(model) : undefined,
       },
     )
 
@@ -513,7 +543,7 @@ export default definePlugin({
         ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
-          const accountId = routes.has(options.provider) ? recovery.routeFor(options.sessionId, options.provider) : undefined
+          const accountId = routes.has(options.provider) ? accountForRequest(options) : undefined
           return creditServedAttempt(next(), { pool, accountId })
         }),
       )
@@ -528,6 +558,36 @@ export default definePlugin({
           const id = agent.id
           perAgent.get(id)?.()
           const dispose = agent.ctx.effect(() => {
+            // Wrap later request selectors so routing sees their final logical provider and model.
+            const offRequest = agent.ctx.on(
+              'agent/request',
+              async ({ turn, step }, next) => {
+                const request = await next()
+                if (!routes.has(request.provider)) {
+                  activeAccountRoutes.delete(id)
+                  return request
+                }
+                const distribution = pool.distribution()
+                if (distribution !== 'sticky') pool.bindRoute(id, request.provider, request.provider)
+                const accountId =
+                  distribution === 'sticky'
+                    ? recovery.routeFor(id, request.provider)
+                    : selectRequestAccount({
+                        provider: request.provider,
+                        model: request.model,
+                        conversationKey: id,
+                        routes,
+                        pool,
+                        modelsCompatible,
+                      })
+                activeAccountRoutes.set(id, { turn, step, provider: request.provider, model: request.model, accountId })
+                return request
+              },
+              { prepend: true },
+            )
+            const offTurnStopping = agent.ctx.on('agent/turn-stopping', () => {
+              activeAccountRoutes.delete(id)
+            })
             const offRequestMessages = agent.ctx.on('agent/request-messages', async ({ turn, step }, next) => {
               const messages = await next()
               return recovery.shrinkActive(id, turn, step) ? offloadResentImages(messages) : messages
@@ -538,15 +598,27 @@ export default definePlugin({
               'agent/request-error',
               async ({ turn, step, provider, failure, signal }, next) => {
                 const surface = agent.session.deriveMessages()
+                const active = activeAccountRoutes.get(id)
+                const routedAccountId =
+                  active?.turn === turn && active.step === step && active.provider === provider ? active.accountId : undefined
                 const action = recovery.recover({
                   conversationKey: id,
                   turn,
                   step,
                   provider,
+                  ...(routedAccountId === undefined ? {} : { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
                   canShrink: offloadResentImages(surface) !== surface,
                 })
+                if (
+                  action.kind === 'retry' &&
+                  action.step.kind === 'failover' &&
+                  routedAccountId !== undefined &&
+                  active !== undefined
+                ) {
+                  active.accountId = action.step.to
+                }
                 if (action.kind === 'pass') return next()
                 if (action.kind === 'give-up') {
                   const decision = action.then === 'dsh' ? await next() : undefined
@@ -570,8 +642,14 @@ export default definePlugin({
               },
               { prepend: true },
             )
-            agent.ctx.on('agent/disposed', () => recovery.forget(id))
+            agent.ctx.on('agent/disposed', () => {
+              activeAccountRoutes.delete(id)
+              recovery.forget(id)
+            })
             return () => {
+              activeAccountRoutes.delete(id)
+              offRequest()
+              offTurnStopping()
               offRequestError()
               offRequestMessages()
             }

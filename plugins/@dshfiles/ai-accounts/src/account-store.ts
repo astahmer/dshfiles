@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
+import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import { codexAccountHome, describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
@@ -295,6 +295,25 @@ export const removeAccount = async (instanceId: string): Promise<AccountStoreFil
     ...file,
     accounts: file.accounts.filter(account => account.instanceId !== instanceId),
   })
+}
+
+export const moveAccount = async (instanceId: string, direction: AccountOrderDirection): Promise<AccountStoreFile> => {
+  const file = await readAccountFile()
+  const currentIndex = file.accounts.findIndex(account => account.instanceId === instanceId)
+  const current = file.accounts[currentIndex]
+  if (current === undefined) throw new Error(`Account '${instanceId}' is no longer available.`)
+
+  const indexesInGroup = file.accounts.flatMap((account, index) => (account.kind === current.kind ? [index] : []))
+  const positionInGroup = indexesInGroup.indexOf(currentIndex)
+  const nextIndex = indexesInGroup[positionInGroup + (direction === 'earlier' ? -1 : 1)]
+  if (nextIndex === undefined) return file
+  const next = file.accounts[nextIndex]
+  if (next === undefined) return file
+
+  const accounts = [...file.accounts]
+  accounts[currentIndex] = next
+  accounts[nextIndex] = current
+  return writeAccountFile({ ...file, accounts })
 }
 
 export const setDistribution = async (distribution: AccountsFile['distribution']): Promise<AccountStoreFile> => {

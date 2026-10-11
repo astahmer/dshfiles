@@ -65,6 +65,27 @@ describe('failure recovery through the account pool', () => {
     expect(recovery.routeFor('session', 'codex', NOW)).toBe('codex_spare')
   })
 
+  it('attributes a distributed failure and recovery binding to the physical account', () => {
+    const { pool, recovery } = setup()
+
+    const action = recovery.recover({
+      conversationKey: 'session',
+      turn: 1,
+      step: 1,
+      provider: 'codex_spare',
+      routedAccountId: 'codex_work',
+      model: 'gpt-6',
+      failure: rateLimit,
+      canShrink: false,
+      now: NOW,
+    })
+
+    expect(action).toMatchObject({ kind: 'retry', account: 'codex_work', step: { kind: 'failover', to: 'codex' } })
+    expect(pool.isHealthy('codex_work', NOW)).toBe(false)
+    expect(recovery.routeFor('session', 'codex_spare', NOW)).toBe('codex')
+    expect(recovery.routeFor('session', 'codex_spare', NOW + 61_000)).toBe('codex_spare')
+  })
+
   it('never fails over to another provider kind or a hidden account', () => {
     const { fail } = setup({ hidden: ['codex_work', 'codex_spare'] })
     expect(fail(rateLimit)).toMatchObject({ kind: 'retry', step: { kind: 'wait', delayMs: 60_000 } })

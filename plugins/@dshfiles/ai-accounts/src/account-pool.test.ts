@@ -8,7 +8,7 @@ describe('account pool route reconciliation', () => {
     pool.put({ id: 'opencode-one', kind: 'opencode-go', label: 'OpenCode One' })
     pool.put({ id: 'opencode-two', kind: 'opencode-go', label: 'OpenCode Two' })
 
-    expect(pool.acquire('conversation-one')?.id).toBe('opencode-one')
+    expect(pool.acquire({ conversationKey: 'conversation-one' })?.id).toBe('opencode-one')
     pool.noteRateLimited('opencode-one', 60_000)
     pool.replace([
       { id: 'opencode-one', kind: 'opencode-go', label: 'Renamed Account' },
@@ -19,7 +19,19 @@ describe('account pool route reconciliation', () => {
       { id: 'opencode-one', label: 'Renamed Account', state: 'cooling' },
       { id: 'opencode-two', label: 'OpenCode Two', state: 'healthy' },
     ])
-    expect(pool.acquire('conversation-one')?.id).toBe('opencode-two')
+    expect(pool.acquire({ conversationKey: 'conversation-one' })?.id).toBe('opencode-two')
+  })
+
+  it('holds a distributed failover until the physical account recovers', () => {
+    const pool = createAccountPool()
+    pool.put({ id: 'codex-selected', kind: 'codex', label: 'Codex Selected' })
+    pool.put({ id: 'codex-failed', kind: 'codex', label: 'Codex Failed' })
+    pool.put({ id: 'codex-stand-in', kind: 'codex', label: 'Codex Stand-in' })
+    pool.noteRateLimited('codex-failed', 60_000, 1_000)
+    pool.bindRoute('conversation-one', 'codex-selected', 'codex-stand-in', 'codex-failed')
+
+    expect(pool.routeFor('conversation-one', 'codex-selected', 1_001)).toBe('codex-stand-in')
+    expect(pool.routeFor('conversation-one', 'codex-selected', 61_001)).toBe('codex-selected')
   })
 
   it('drops removed routes and disables accounts without resetting other health', () => {
@@ -36,7 +48,7 @@ describe('account pool route reconciliation', () => {
       { id: 'opencode-one', enabled: false, state: 'disabled' },
       { id: 'commandcode-one', state: 'cooling' },
     ])
-    expect(pool.acquire('conversation-one')?.id).toBeUndefined()
+    expect(pool.acquire({ conversationKey: 'conversation-one' })?.id).toBeUndefined()
 
     pool.replace([{ id: 'commandcode-one', kind: 'commandcode', label: 'Command Code One' }])
     expect(pool.describe().map(account => account.id)).toEqual(['commandcode-one'])
