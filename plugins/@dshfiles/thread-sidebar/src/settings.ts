@@ -67,6 +67,14 @@ export const threadSidebarSettings = defineSettings({
       .max(50)
       .default(DEFAULT_PREFERENCES.maxChildren)
       .description('Child threads listed under a parent before the expandable "more" line.'),
+    archiveUndoEnabled: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.archiveUndoEnabled)
+      .description('Show a temporary undo notice after manually archiving threads.'),
+    archiveUndoDurationSeconds: Schema.natural()
+      .min(1)
+      .max(30)
+      .default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds)
+      .description('How long the manual archive undo notice stays visible, in seconds.'),
     autoArchiveEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.autoArchiveEnabled).description('Archive idle threads automatically.'),
     idleMinutes: Schema.natural()
       .min(15)
