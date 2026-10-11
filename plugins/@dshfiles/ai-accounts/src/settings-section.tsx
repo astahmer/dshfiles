@@ -28,6 +28,11 @@ const METER_LABELS = [
   { value: 'percent', label: '% left' },
   { value: 'reset', label: 'Time to reset' },
 ] as const
+const USAGE_WINDOW_LAYOUTS = [
+  { value: 'binding', label: 'Most relevant window' },
+  { value: 'horizontal', label: 'All windows horizontally' },
+  { value: 'vertical', label: 'All windows vertically' },
+] as const
 
 const RETRY_COUNTS = [0, 1, 2, 3, 5] as const
 const BACKOFF_MS = [500, 1_000, 2_000, 5_000, 10_000] as const
@@ -283,7 +288,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             <Switch checked={preferences.footerButton} disabled={readOnly} id={id} onCheckedChange={value => write(settings.set('footerButton', value))} />
           )}
         </Row>
-        <Row hint="What each sidebar meter shows, on the strip and the collapsed rail button." label="Meter shows">
+        <Row hint="Controls the governing window and collapsed rail; all-window layouts show percentages." label="Meter shows">
           {id => (
             <Select
               disabled={readOnly || !preferences.footerButton}
@@ -298,6 +303,32 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
               </SelectTrigger>
               <SelectContent>
                 {METER_LABELS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Row>
+        <Row
+          hint="Choose which quota windows appear for each account in the wide sidebar strip. The collapsed rail still shows the most critical window."
+          label="Windows per account"
+        >
+          {id => (
+            <Select
+              disabled={readOnly || !preferences.footerButton}
+              onValueChange={value => {
+                const layout = USAGE_WINDOW_LAYOUTS.find(candidate => candidate.value === value)?.value
+                if (layout !== undefined) write(settings.set('usageWindowLayout', layout))
+              }}
+              value={preferences.usageWindowLayout}
+            >
+              <SelectTrigger className="dshx:w-52" id={id} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {USAGE_WINDOW_LAYOUTS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

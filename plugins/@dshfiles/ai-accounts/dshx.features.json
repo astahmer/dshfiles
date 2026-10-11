@@ -121,6 +121,13 @@
           "coveredBy": ["ai-accounts.quota-display"]
         },
         {
+          "key": "usageWindowLayout",
+          "defaultValue": "binding",
+          "constraints": "One of binding, horizontal, or vertical; multi-window layouts show every quota window for the account.",
+          "choices": ["binding", "horizontal", "vertical"],
+          "coveredBy": ["ai-accounts.usage-window-layout"]
+        },
+        {
           "key": "usageOrder",
           "defaultValue": "[]",
           "constraints": "Ordered account ID list; unknown IDs are ignored.",
@@ -154,6 +161,11 @@
           "kind": "gherkin",
           "id": "ai-accounts.quota-display",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.usage-window-layout",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]
     },

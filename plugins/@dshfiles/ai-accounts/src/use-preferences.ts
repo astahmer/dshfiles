@@ -5,6 +5,8 @@ import { DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './se
 
 const meterLabelSchema = z.enum(['both', 'percent', 'reset']).catch('both')
 export type MeterLabel = z.infer<typeof meterLabelSchema>
+const usageWindowLayoutSchema = z.enum(['binding', 'horizontal', 'vertical']).catch('binding')
+export type UsageWindowLayout = z.infer<typeof usageWindowLayoutSchema>
 
 /** The accounts preferences with defaults filled in while Settings loads or is unavailable. */
 export const usePreferences = () => {
@@ -18,6 +20,7 @@ export const usePreferences = () => {
     usageRefreshMs: (value?.usageRefreshSeconds ?? DEFAULT_CLIENT_SETTINGS.usageRefreshSeconds) * 1000,
     footerButton: value?.footerButton ?? DEFAULT_CLIENT_SETTINGS.footerButton,
     meterLabel: meterLabelSchema.parse(value?.meterLabel),
+    usageWindowLayout: usageWindowLayoutSchema.parse(value?.usageWindowLayout),
     usageOrder: Array.isArray(value?.usageOrder) ? value.usageOrder.filter(id => typeof id === 'string') : [],
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,

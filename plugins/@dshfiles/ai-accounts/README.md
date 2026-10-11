@@ -75,12 +75,13 @@ Accounts can also be listed, enabled and edited at the bottom of
 
 A usage strip sits above the sidebar foot (the thread sidebar's
 `sidebar.footer.above` seat; with the stock sidebar it renders in place among
-the footer actions): one meter per account (its binding
-window's percent left over the time to its reset), wrapping onto more lines as
-accounts grow; the collapsed rail shows one button with the most critical
-account. A spent limit draws as a red "Limit reached" pill. Settings › AI Accounts
-› Meter shows picks percent left, time to reset, or both (the default) for the
-strip and the rail button. Clicking a meter
+the footer actions): one meter per account, wrapping onto more lines as
+accounts grow. By default, each shows the account's governing window; Settings
+› AI Accounts › Windows per account can show every quota window horizontally or
+vertically. The collapsed rail always shows one button with the most critical
+account. A spent limit draws as a red "Limit reached" pill. Settings › AI
+Accounts › Meter shows picks percent left, time to reset, or both (the default)
+for the strip and the rail button. Clicking a meter
 opens the popover, which filters by provider and lists one card per enabled
 account with quota, each showing its machine, session, weekly and monthly bars,
 reset times and snapshot age; accounts with a spent window carry a "Limit

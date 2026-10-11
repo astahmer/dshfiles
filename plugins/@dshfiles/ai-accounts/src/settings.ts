@@ -37,6 +37,8 @@ export const aiAccountsSettings = defineSettings({
     footerButton: Schema.boolean().default(true),
     /** What each sidebar usage meter shows: percent left, time to its reset, or both stacked. */
     meterLabel: Schema.union(['both', 'percent', 'reset']).default('both'),
+    /** Show the governing quota window only, or all account windows side by side/stacked in the wide sidebar strip. */
+    usageWindowLayout: Schema.union(['binding', 'horizontal', 'vertical']).default('binding'),
     /** Account ids in the order the usage strip and popover list them; unlisted accounts follow. */
     usageOrder: Schema.array(Schema.string()).default([]),
     /** Account ids the usage strip and popover leave out. */

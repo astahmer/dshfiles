@@ -25,6 +25,20 @@ When('the AI Accounts settings section is opened', async ({ page }: { page: Page
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
+Then('the usage windows per account can be configured and restored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-usage-window-layout', async () => {
+    const layout = page.getByRole('combobox', { name: 'Windows per account' })
+    await expect(layout).toHaveText('Most relevant window')
+    await layout.click()
+    await page.getByRole('option', { name: 'All windows vertically', exact: true }).click()
+    await expect(layout).toHaveText('All windows vertically')
+    await layout.click()
+    await page.getByRole('option', { name: 'Most relevant window', exact: true }).click()
+    await expect(layout).toHaveText('Most relevant window')
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the rate-limit recovery failover can be changed and restored', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-rate-limit-failover-toggle', async () => {
     const rateLimit = page.getByRole('group', { name: /Rate limited/ })
