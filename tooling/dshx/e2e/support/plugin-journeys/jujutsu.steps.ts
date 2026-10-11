@@ -110,7 +110,28 @@ const fixtureFor = (page: Page): JujutsuFixture => {
 const revisionRow = (page: Page, description: string) =>
   page.getByRole('region', { name: 'Revisions', exact: true }).first().locator('article').filter({ hasText: description })
 
-const dragHandleFor = (page: Page, description: string) => revisionRow(page, description).locator('div[draggable="true"]')
+const dispatchDrop = async (
+  page: Page,
+  input: { readonly source: string; readonly target: string; readonly kind: 'revision' | 'bookmark' },
+): Promise<boolean> =>
+  page.evaluate(({ source, target, kind }) => {
+    const findRow = (description: string): HTMLElement | undefined =>
+      Array.from(document.querySelectorAll<HTMLElement>('[role="region"] article')).find(row => row.textContent?.includes(description))
+    const sourceRow = findRow(source)
+    const targetRow = findRow(target)
+    const dragSource = sourceRow?.querySelector<HTMLElement>(kind === 'bookmark' ? 'span[draggable="true"]' : 'div[draggable="true"]')
+    if (sourceRow === undefined || targetRow === undefined || dragSource === null || dragSource === undefined) {
+      throw new Error('The expected Jujutsu drag source or target row is missing.')
+    }
+    const dataTransfer = new DataTransfer()
+    dragSource.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }))
+    targetRow.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }))
+    targetRow.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }))
+    const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer })
+    targetRow.dispatchEvent(drop)
+    dragSource.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }))
+    return drop.defaultPrevented
+  }, input)
 
 const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
   await page.evaluate(
@@ -139,15 +160,14 @@ Then('revision and bookmark moves preview in the target context without changing
   const fixture = fixtureFor(page)
   const before = snapshotRepository(fixture)
 
-  console.log('Jujutsu E2E: descendant revision drop')
-  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.childDescription), { timeout: 10_000 })
-  await recordAssertion(page, 'jujutsu-descendant-drop-shows-actionable-feedback', () =>
-    expect(page.getByText(invalidDropMessage, { exact: true })).toBeVisible({ timeout: 8_000 }),
-  )
+  await recordAssertion(page, 'jujutsu-descendant-drop-is-cancelled-by-the-row-handler', async () => {
+    await expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.childDescription, kind: 'revision' })).toBe(true)
+    await expect(page.getByText(invalidDropMessage, { exact: true })).toBeVisible({ timeout: 8_000 })
+  })
 
-  console.log('Jujutsu E2E: valid branch drop')
-  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.targetDescription), { timeout: 10_000 })
-  console.log('Jujutsu E2E: branch drop returned')
+  await recordAssertion(page, 'jujutsu-valid-branch-drop-is-cancelled-by-the-row-handler', async () =>
+    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'revision' })).toBe(true),
+  )
   const branchPreview = page.getByRole('group', { name: 'Preview branch rebase', exact: true })
   await recordAssertion(page, 'jujutsu-rebase-drop-renders-context-and-host-preview', async () => {
     await expect(branchPreview).toBeVisible({ timeout: 8_000 })
@@ -167,8 +187,9 @@ Then('revision and bookmark moves preview in the target context without changing
   await branchPreview.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(branchPreview).toBeHidden()
 
-  const bookmark = revisionRow(page, fixture.sourceDescription).locator('span[draggable="true"]').filter({ hasText: bookmarkName })
-  await bookmark.dragTo(await dragHandleFor(page, fixture.targetDescription))
+  await recordAssertion(page, 'jujutsu-bookmark-drop-is-cancelled-by-the-row-handler', async () =>
+    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'bookmark' })).toBe(true),
+  )
   const bookmarkPreview = page.getByRole('group', { name: 'Preview bookmark move', exact: true })
   await recordAssertion(page, 'jujutsu-bookmark-drop-renders-target-context-preview', async () => {
     await expect(bookmarkPreview).toBeVisible()
