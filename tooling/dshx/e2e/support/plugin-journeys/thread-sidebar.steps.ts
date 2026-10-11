@@ -68,9 +68,11 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
   let screenshotClip: { x: number; y: number; width: number; height: number } | undefined
   let layoutEvidence: string | undefined
   await recordAssertion(page, 'thread-sidebar-archive-notice-overlays-thread-list', async () => {
-    await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
-    await expect(transientNotice).toBeVisible()
-    const undoButton = transientNotice.getByRole('button', { name: 'Undo', exact: true })
+    const archivedMessage = transientNotice.getByText('Thread archived.', { exact: true })
+    const noticeAlert = transientNotice.getByRole('alert')
+    await expect(archivedMessage).toBeVisible()
+    await expect(noticeAlert).toBeVisible()
+    const undoButton = noticeAlert.getByRole('button', { name: 'Undo', exact: true })
     await expect(undoButton).toBeVisible()
     const transientNoticeLayout = await transientNotice.evaluate(element => {
       const style = getComputedStyle(element)
@@ -79,8 +81,10 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
     const sidebarPosition = await threadSidebar(page).evaluate(element => getComputedStyle(element).position)
     const sidebarBounds = await threadSidebar(page).boundingBox()
     const noticeBounds = await transientNotice.boundingBox()
+    const alertBounds = await noticeAlert.boundingBox()
+    const archivedMessageBounds = await archivedMessage.boundingBox()
     const undoButtonBounds = await undoButton.boundingBox()
-    if (sidebarBounds === null || noticeBounds === null || undoButtonBounds === null) {
+    if (sidebarBounds === null || noticeBounds === null || alertBounds === null || archivedMessageBounds === null || undoButtonBounds === null) {
       throw new Error('The archive notice or sidebar has no layout box.')
     }
     const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
@@ -90,12 +94,27 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
     expect(noticeBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
     expect(noticeBounds.x + noticeBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
     expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual(sidebarBounds.y + sidebarBounds.height)
-    expect(undoButtonBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
-    expect(undoButtonBounds.x + undoButtonBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
+    expect(alertBounds.width).toBeLessThan(sidebarBounds.width)
+    expect(alertBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
+    expect(alertBounds.x + alertBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
+    expect(archivedMessageBounds.x).toBeGreaterThanOrEqual(alertBounds.x)
+    expect(archivedMessageBounds.x + archivedMessageBounds.width).toBeLessThanOrEqual(alertBounds.x + alertBounds.width)
+    expect(undoButtonBounds.x).toBeGreaterThanOrEqual(alertBounds.x)
+    expect(undoButtonBounds.x + undoButtonBounds.width).toBeLessThanOrEqual(alertBounds.x + alertBounds.width)
     expect(undoButtonBounds.y + undoButtonBounds.height).toBeLessThanOrEqual(sidebarBounds.y + sidebarBounds.height)
     expect(scrollPaneTopAfterArchive).toBe(scrollPaneTopBeforeArchive)
     layoutEvidence = JSON.stringify(
-      { transientNoticeLayout, sidebarPosition, sidebarBounds, noticeBounds, undoButtonBounds, scrollPaneTopBeforeArchive, scrollPaneTopAfterArchive },
+      {
+        transientNoticeLayout,
+        sidebarPosition,
+        sidebarBounds,
+        noticeBounds,
+        alertBounds,
+        archivedMessageBounds,
+        undoButtonBounds,
+        scrollPaneTopBeforeArchive,
+        scrollPaneTopAfterArchive,
+      },
       null,
       2,
     )
