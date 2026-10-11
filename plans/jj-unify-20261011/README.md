@@ -187,3 +187,23 @@ duplicate change-ids.
   re-introduced already-resolved conflicts. The safe move for an interior
   marker is `jj new <tip>` **inside that workspace**; only head slots should be
   moved with `jj rebase -r`.
+
+## Follow-up cleanup (same session)
+
+- Swept the 44 orphan empty markers (the line's empty commits that no live
+  workspace holds as `@`): `jj abandon <ids>` rebased 171 descendants and left
+  the tree byte-identical, so only markers disappeared. Empty commits on the
+  line went 86 → 42 (exactly one slot per live workspace).
+- Described the 12 non-empty commits that had no description or were still
+  `wip` (thread-sidebar vitest config, workspace-folder-picker plan, agent
+  communication lifecycle split + descendant projection, settings-search owner
+  plan, native header-utility work, archive-notice journey steps, core
+  session-controller refresh, probe-profile docs).
+- Folded the concurrent agents' tips back onto the line (`jj rebase -r <tip>`);
+  the line is single-headed again after each fold. Live agents keep committing,
+  so a new tip can appear at any time — that is new work, not a duplicate.
+- Change-id coverage check after the sweep: the six change-ids that vanished
+  were the line's *empty* copies; every file they touched is present at the tip
+  (verified: no duplicate scenario in `thread-sidebar.feature`, no
+  `parented-agent` state left in the agent-communication catalogue, lockfile
+  present).
