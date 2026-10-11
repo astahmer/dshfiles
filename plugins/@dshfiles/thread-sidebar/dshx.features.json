@@ -215,19 +215,40 @@
     {
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
-      "summary": "Show a temporary notice after manual archive and restore exactly the threads archived by that action when Undo is selected.",
-      "surfaces": ["client", "host", "integration"],
-      "configuration": [],
-      "states": ["archived", "undo-available", "restored", "restore-failed"],
+      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread without restoring it.",
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [
+        {
+          "key": "archiveUndoEnabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; show or hide manual archive undo notices.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
+        },
+        {
+          "key": "archiveUndoDurationSeconds",
+          "defaultValue": "5",
+          "constraints": "Integer from 1 through 30 seconds.",
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
+        }
+      ],
+      "states": ["archived", "undo-available", "archived-open", "restored", "restore-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
-        "A partial restore reports failure without hiding the remaining archive state."
+        "A partial restore reports failure without hiding the remaining archive state.",
+        "Disabling the undo notice does not prevent archival.",
+        "Opening an archived thread leaves it archived."
       ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
           "id": "thread-sidebar.archive-undo",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.archive-undo-preferences",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         }
       ]

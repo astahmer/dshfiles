@@ -28,8 +28,7 @@ const startBlankThread = async (page: Page): Promise<string> => {
 }
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
-  await threadSidebar(page).getByRole('button').first().click()
-  await page.getByRole('menuitemcheckbox', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
@@ -42,13 +41,22 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
   if (currentThreadId(page) === null) await startBlankThread(page)
   await page.getByRole('textbox').first().fill(prompt)
   await page.getByRole('textbox').first().press('Enter')
+  const archivedThreadId = currentThreadId(page)
+  if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
   await expect(targetRow).toHaveCount(1)
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
-  await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
+  const archivedSection = threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })
+  await expect(archivedSection).toBeVisible()
+  await archivedSection.click()
+  const openArchivedThread = targetRow.locator('button').first()
+  await expect(openArchivedThread).toBeEnabled()
+  await openArchivedThread.click()
+  await expect.poll(() => currentThreadId(page)).toBe(archivedThreadId)
+  await expect(archivedSection).toBeVisible()
   await threadSidebar(page).getByRole('button', { name: 'Undo', exact: true }).click()
   await expect(threadSidebar(page).getByText('Thread restored.', { exact: true })).toBeVisible()
 })
@@ -59,6 +67,53 @@ Then('the thread is restored from the archive notice', async ({ page }: { page: 
     await expect(threadSidebar(page).getByRole('button', { name: 'Archived (0)', exact: true })).toHaveCount(0)
     await expect(targetRow).toHaveCount(1)
     await expect(targetRow.getByRole('button', { name: 'Restore', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('archive undo settings are changed and threads are archived', async ({ page }: { page: Page }) => {
+  await openSidebarSettings(page)
+  const undoEnabled = sidebarSettings(page).getByRole('checkbox', { name: 'Show an undo notice after archiving' })
+  const undoDuration = sidebarSettings(page).getByRole('spinbutton', { name: 'Undo notice duration (seconds)' })
+  await expect(undoEnabled).toBeChecked()
+  await undoDuration.fill('2')
+  await expect(undoDuration).toHaveValue('2')
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+
+  await startBlankThread(page)
+  const timedPrompt = 'thread sidebar archive duration e2e target'
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(timedPrompt)
+  await composer.press('Enter')
+  const timedRow = threadSidebar(page).locator('article').filter({ hasText: timedPrompt })
+  await expect(timedRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await timedRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  const archivedNotice = threadSidebar(page).getByText('Thread archived.', { exact: true })
+  await expect(archivedNotice).toBeVisible()
+  await expect(archivedNotice).toBeHidden({ timeout: 4_000 })
+
+  await openSidebarSettings(page)
+  await undoEnabled.uncheck()
+  await expect(undoEnabled).not.toBeChecked()
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+
+  await startBlankThread(page)
+  const disabledPrompt = 'thread sidebar archive disabled e2e target'
+  await page.getByRole('textbox').first().fill(disabledPrompt)
+  await page.getByRole('textbox').first().press('Enter')
+  const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
+  await expect(disabledRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await disabledRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toHaveCount(0)
+})
+
+Then('archive undo settings control the temporary notice', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-archive-undo-preferences-respected', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

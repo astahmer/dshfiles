@@ -9,6 +9,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is archived and immediately undone
     Then the thread is restored from the archive notice
 
+  @scenario:thread-sidebar.archive-undo-preferences
+  Scenario: Configure the manual archive undo notice
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When archive undo settings are changed and threads are archived
+    Then archive undo settings control the temporary notice
+
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
