@@ -139,10 +139,12 @@ Then('revision and bookmark moves preview in the target context without changing
   const fixture = fixtureFor(page)
   const before = snapshotRepository(fixture)
 
-  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.childDescription))
+  console.log('Jujutsu E2E: descendant revision drop')
+  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.childDescription), { timeout: 10_000 })
   await recordAssertion(page, 'jujutsu-descendant-drop-shows-actionable-feedback', () => expect(page.getByText(invalidDropMessage, { exact: true })).toBeVisible())
 
-  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.targetDescription))
+  console.log('Jujutsu E2E: valid branch drop')
+  await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.targetDescription), { timeout: 10_000 })
   const branchPreview = page.getByRole('group', { name: 'Preview branch rebase', exact: true })
   await recordAssertion(page, 'jujutsu-rebase-drop-renders-context-and-host-preview', async () => {
     await expect(branchPreview).toBeVisible()
