@@ -105,3 +105,85 @@ Recovery: `jj op revert c3578c66203d` plus the following ops undoes this cleanup
 step by step; `jj op restore ca737a5c7b5f…` returns to the three-chain state
 (before the cleanup, 19:19:19 — also discards any other agent's ops since then).
 `jj op revert 8b2ba8af6db5` and later restores the single unsplit tip revision.
+
+## Second consolidation — 2026-10-11 (late session)
+
+The line forked again after the closeout above. Two whole copies of the trunk
+existed above `main` — one clean and one carrying `.jjconflict-*` materialized
+conflict artifacts in every commit — plus 13 strand heads and 215 stale copies,
+for 501–732 visible descendants of `main` and 36–83 heads.
+
+Result: one line, one head, zero conflicts, 42 live workspaces on it, no
+duplicate change-ids.
+
+### How it was built
+
+- Canonical chain = the single longest path above `main` (139 commits). Every
+  other live commit was deduplicated **by change-id** against it; the 145
+  off-line change groups reduced to 6, all empty, so no non-empty change was
+  dropped.
+- 31 unique changes not in the canonical chain were rebased onto its tip with
+  `jj rebase -s` (`jj rebase` drops inherited `.jjconflict-*` entries because
+  they cancel in the change diff; a git patch of the same commit does not).
+- Conflicts resolved by hand, oldest first:
+  - `plugins/@dshfiles/thread-sidebar/dshx.features.json` — union: the line's
+    newer catalogue plus the restored `thread-list-views` (with the new
+    `custom-views`/`viewPresets` entries) and `session-header-actions`
+    features that `9f6ce49c` had removed as collateral; also restored
+    `session-header-actions-unit-toolbar-placement` and
+    `thread-children-and-links-unit-thread-mention-token`.
+  - `plugins/@dshfiles/agent-communication/{package.json,dshx.features.json,src/live-agent-directory.ts}`
+    — union: both dependency sets and both exports
+    (`projectRegisteredWorkspace` + `projectDurableSubagentDescendants`).
+  - `tooling/dshx/e2e/support/steps.ts` — kept both the 2- and 3-argument
+    `isolated plugin composition` step definitions.
+  - `plans/settings-search-native-owner/README.md` and
+    `plans/thread-search-host-profile/README.md` — took the newer variant of
+    each (the recovery/current-workspace text).
+  - `plugins/@dshfiles/thread-sidebar/src/client.tsx` — kept the line's
+    `data-testid="thread-sidebar-transient-notice"` block.
+- 554 stale/duplicate commits were abandoned in one operation; every workspace
+  `@` was then stacked at the tip (head slots with `jj rebase -r`, interior
+  markers with `jj new` in their workspace), and the three dead workspaces whose
+  directories were gone (`agent-communication-overhaul`, `spine-integration`,
+  and the temporary `spine-rebuild`) were forgotten.
+
+### Final state
+
+- `main` = `xspqskqt/0` (`e4cf4d45…`), untouched.
+- `integration-spine` = tip of the line (single target; the three-way conflict
+  is resolved).
+- `heads(main::)` = 1, `conflicts(main::)` = 0, duplicate change-ids = 0.
+- 42 workspaces, all on the spine (`pnpm run jj:workspaces`: on spine 42,
+  off spine 0, conflicted 0).
+- Coverage check: 170 distinct changes that existed above `main` before the
+  surgery are all on the line; the only off-line non-empty commits were
+  duplicates of line commits.
+
+### Remaining, on purpose
+
+- 85 empty commits remain on the line: one slot per live workspace plus the
+  older workspace markers the canonical chain already carried. They are single
+  markers, not duplicate checkpoints; `pnpm run jj:sweep --apply
+  --abandon-empty` drops the orphans once their workspaces are done.
+- The `recovery-*` bookmarks (`recovery-20261005`,
+  `recovery/unify-20261007/*`, `recovery-disk-20261007/*`) point at lines that
+  forked **below** `main`; they are unrelated pre-base refs and were left
+  untouched, so they are not part of this line.
+- Concurrent agents committed while this ran; their new work
+  (`soqqtyozmnsv` "undo through the transient archive notice", `llrtzuno`,
+  `vnqkomlt`, `rqnlkvzzwmrn`) was rebased onto the line rather than dropped.
+
+### Recovery
+
+- Before any of this surgery: `jj op restore e6edba261989…`.
+- After the 554-commit prune, before the slot stacking:
+  `jj op restore e04890fc8d2b…` (this is also the state the session restored to
+  after an intermediate mistake; it discards later ops, including the slot
+  stacking).
+- The abandoned revisions stay reachable from the operation log until GC.
+- One mistake worth recording: moving an *interior* workspace marker with
+  `jj rebase -r` re-applies every commit above it onto a different parent and
+  re-introduced already-resolved conflicts. The safe move for an interior
+  marker is `jj new <tip>` **inside that workspace**; only head slots should be
+  moved with `jj rebase -r`.
