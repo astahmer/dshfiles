@@ -44,12 +44,25 @@ test('success notices dismiss after three seconds', () => {
 
 test('undo notices stay visible for their requested duration', () => {
   vi.useFakeTimers()
-  const undoNotice: SidebarNotice = { tone: 'success', message: 'Thread archived.', durationMs: 5_000 }
+  const undoNotice: SidebarNotice = { tone: 'success', message: 'Thread archived.', durationMs: 2_000 }
   const state = createNoticeState(undoNotice)
   const dispose = scheduleSuccessNoticeDismissal(undoNotice, state.update)
 
-  vi.advanceTimersByTime(4_999)
+  vi.advanceTimersByTime(1_999)
   assert.equal(state.current, undoNotice)
+  vi.advanceTimersByTime(1)
+  assert.equal(state.current, null)
+  dispose?.()
+})
+
+test('a configured partial-archive notice also expires after its selected duration', () => {
+  vi.useFakeTimers()
+  const partialArchiveNotice: SidebarNotice = { tone: 'danger', message: 'One thread failed.', durationMs: 1_250 }
+  const state = createNoticeState(partialArchiveNotice)
+  const dispose = scheduleSuccessNoticeDismissal(partialArchiveNotice, state.update)
+
+  vi.advanceTimersByTime(1_249)
+  assert.equal(state.current, partialArchiveNotice)
   vi.advanceTimersByTime(1)
   assert.equal(state.current, null)
   dispose?.()
