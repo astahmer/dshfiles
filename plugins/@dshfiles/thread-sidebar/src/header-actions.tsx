@@ -4,10 +4,25 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { MoreHorizontalIcon } from '@dshfiles/plugin-ui/icons'
-import { isThreadMuted, setThreadMute, clearThreadMute, snoozeDurations, threadNotificationPreferences, DEFAULT_THREAD_NOTIFICATION_PREFERENCES } from './thread-notifications.js'
+import {
+  isThreadMuted,
+  setThreadMute,
+  clearThreadMute,
+  snoozeDurations,
+  threadNotificationPreferences,
+  DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
+} from './thread-notifications.js'
 import { useState } from 'react'
 import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
@@ -20,9 +35,9 @@ interface HeaderThreadActionsInjected {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'>
-  & PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
-  & HeaderThreadActionsInjected
+type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useWorkspaces'> &
+  PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> &
+  HeaderThreadActionsInjected
 
 /** Session-scoped copy of the thread-list management actions for the header overflow. */
 export const HeaderThreadActions = ({
@@ -107,15 +122,26 @@ export const HeaderThreadActions = ({
                 {snoozeDurations.map(duration => (
                   <DropdownMenuItem
                     key={duration.milliseconds}
-                    onSelect={() => { updateMute(Date.now() + duration.milliseconds) }}
+                    onSelect={() => {
+                      updateMute(Date.now() + duration.milliseconds)
+                    }}
                   >
                     {t('threadSidebarSnoozeFor')} {t(duration.label)}
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuItem onSelect={() => { updateMute(null) }}>{t('threadSidebarMuteUntilEnabled')}</DropdownMenuItem>
-                <DropdownMenuItem disabled={!muted} onSelect={() => {
-                  threadNotificationPreferences.set(clearThreadMute(notificationPreferences, sessionId))
-                }}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    updateMute(null)
+                  }}
+                >
+                  {t('threadSidebarMuteUntilEnabled')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!muted}
+                  onSelect={() => {
+                    threadNotificationPreferences.set(clearThreadMute(notificationPreferences, sessionId))
+                  }}
+                >
                   {t('threadSidebarUnmute')}
                 </DropdownMenuItem>
               </DropdownMenuSubContent>

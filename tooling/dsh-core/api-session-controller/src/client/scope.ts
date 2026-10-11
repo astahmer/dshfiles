@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TypertRemoteScopeApi } from '@deepseek-ai/dsh-typert-protocol'
 
 /** Client Cordis Context carrying one Agent identity and its scoped Remote namespaces. */
-export type AgentContext = Omit<Context, 'remote'> & {
+export type AgentContext = Context & {
   readonly remote: ClientRemote & TypertRemoteScopeApi<'agent'>
 }
 
