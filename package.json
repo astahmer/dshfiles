@@ -14,14 +14,16 @@
     "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && pnpm --dir plugins/@dshfiles/project-checks run verify:scratch",
     "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
     "verify:dsh-customization:a11y": "node scripts/dsh-customization-a11y.mjs",
-    "check": "pnpm run typecheck:scripts && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:plugin-boot && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch && pnpm run lint && pnpm run fmt:check",
+    "check": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:plugin-boot && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch && pnpm run lint && pnpm run fmt:check",
     "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
     "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json",
     "check:plugin-boot": "pnpm --dir tooling/dshx run test:boot",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "profile:sync": "node scripts/profile-sync.ts",
-    "profile:boot": "node scripts/profile-boot.ts"
+    "profile:boot": "node scripts/profile-boot.ts",
+    "test:web-profile-contract": "node --test scripts/verify-web-profile-contract.test.mjs",
+    "verify:web-profile-contract": "node scripts/verify-web-profile-contract.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
