@@ -23,6 +23,7 @@ export const DSH_PACKAGES = {
   conversation: '@deepseek-ai/dsh-client-ui-conversation',
   layout: '@deepseek-ai/dsh-client-ui-layout',
   locale: '@deepseek-ai/dsh-client-locale',
+  modelSelection: '@deepseek-ai/dsh-client-ui-model-selection',
   remotes: '@deepseek-ai/dsh-api-gateway',
   renderer: '@deepseek-ai/dsh-client-ui-renderer',
   slotContracts: '@deepseek-ai/dsh-client-ui-slots',
@@ -46,6 +47,7 @@ export const CLIENT_AUTHORING_TOOLCHAIN = {
 export const CLIENT_SERVICES = {
   locale: { packageName: DSH_PACKAGES.locale, availability: 'provided' },
   slots: { packageName: DSH_PACKAGES.renderer, availability: 'provided' },
+  modelDirectories: { packageName: DSH_PACKAGES.modelSelection, availability: 'provided' },
   sessions: { packageName: DSH_PACKAGES.sessionController, availability: 'optional' },
   layout: { packageName: DSH_PACKAGES.layout, availability: 'optional' },
   shortcuts: { packageName: DSH_PACKAGES.shortcuts, availability: 'optional' },
@@ -75,6 +77,10 @@ export const CLIENT_CAPABILITIES = {
   composer: {
     cordisServices: CLIENT_CAPABILITY_INJECTIONS.composer,
     providers: [CLIENT_SERVICES.slots.packageName, DSH_PACKAGES.conversation],
+  },
+  models: {
+    cordisServices: CLIENT_CAPABILITY_INJECTIONS.models,
+    providers: [CLIENT_SERVICES.modelDirectories.packageName],
   },
   rpc: {
     cordisServices: CLIENT_CAPABILITY_INJECTIONS.rpc,

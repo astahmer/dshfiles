@@ -6,7 +6,8 @@ export const CLIENT_CAPABILITY_INJECTIONS = {
   panels: ['slots', 'layout'],
   sidebar: ['slots', 'layout'],
   composer: ['slots'],
-  rpc: ['connection'],
+  models: ['modelDirectories'],
+  rpc: ['connection']
 } as const
 
 export const HOST_CAPABILITY_INJECTIONS = {

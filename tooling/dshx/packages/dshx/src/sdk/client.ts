@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
 import { createApiClient } from '../api/runtime.js'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
@@ -56,8 +57,13 @@ export interface ComposerApi {
   registerAction(definition: ComposerActionDefinition): () => void
 }
 
+export interface ModelDirectoryApi {
+  readonly directoryFor: ModelDirectoryResolver['directoryFor']
+}
+
 export interface ClientCapabilities {
   readonly ui: UiApi
+  readonly models: ModelDirectoryApi
   readonly panels: PanelsApi
   /** Sidebar panels use the same native main view/navigation pairing. */
   readonly sidebar: PanelsApi
@@ -116,6 +122,9 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
       return { show: () => ctx.layout.selectPanel(id), dispose }
     },
   }
+  const models: ModelDirectoryApi = {
+    directoryFor: sessionId => ctx.modelDirectories.directoryFor(sessionId),
+  }
   const capabilities: {
     -readonly [Key in keyof ClientCapabilities]?: ClientCapabilities[Key]
   } = {}
@@ -123,6 +132,9 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
     switch (capability) {
       case 'ui':
         capabilities.ui = ui
+        break
+      case 'models':
+        capabilities.models = models
         break
       case 'panels':
         capabilities.panels = panels
