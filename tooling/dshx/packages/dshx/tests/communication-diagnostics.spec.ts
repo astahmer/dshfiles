@@ -56,7 +56,6 @@ describe('communication diagnostics', () => {
       messageCount: 1,
       pendingMessageCount: 1,
       pendingRecipientCount: 1,
-      unnotifiedRecipientCount: 1,
       activity: {
         trackingStartedAt: now,
         oldestRetainedAt: now,
@@ -76,7 +75,7 @@ describe('communication diagnostics', () => {
     expect(recipients).toMatchObject({
       messageId,
       recipientCount: 1,
-      recipients: [{ principal: reader, delivery: 'queue', notifiedAt: null, acknowledgedAt: null, allowSteerFromCount: 0 }],
+      recipients: [{ principal: reader, delivery: 'passive', readAt: null, acknowledgedAt: null }],
     })
     expect(await service.revealMessageBody(messageId)).toEqual({ messageId, text: 'private-message-body' })
     expect(await readFile(path, 'utf8')).toBe(beforeReport)
@@ -120,15 +119,19 @@ describe('communication diagnostics', () => {
     await service.subscribe({ kind: 'agent', id: 'agent-reader' }, { topic: 'builds.ready' })
     const upgraded = communicationStateSchema.parse(JSON.parse(await readFile(path, 'utf8')))
     expect(upgraded).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       activityStartedAt: null,
       activityEvents: [],
       workspaceOptOuts: ['agent-opted-out'],
     })
-    expect(upgraded.messages).toMatchObject([{ text: 'legacy message body' }])
+    expect(upgraded).not.toHaveProperty('notifications')
+    expect(upgraded.messages).toMatchObject([{ text: 'legacy message body', recipients: [{ principal, delivery: 'passive', readAt: null }] }])
+    expect(upgraded.subscriptions).toMatchObject([
+      { principal, topic: 'workspace/demo', delivery: 'passive' },
+      { principal, topic: 'builds.ready', delivery: 'passive' },
+    ])
     expect(upgraded.subscriptions).toHaveLength(2)
     expect(upgraded.acknowledgements).toHaveLength(1)
-    expect(upgraded.notifications).toHaveLength(1)
   })
 
   it('reports workspace opt-out state and clears it when the Agent rejoins', async () => {
