@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+/** Keep this structural target local so the plugin builds with older client typings. */
 export interface SettingsSearchTarget {
   readonly entryId: string
   readonly fieldPath: readonly string[]

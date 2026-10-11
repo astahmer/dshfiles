@@ -203,9 +203,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
               <ChevronRightIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
             </button>
           ))}
-          {namespaceGroups.length === 0 && mirror.status === 'ready' && (
-            <p className="dshx:px-2 dshx:text-sm dshx:text-muted-foreground">{t('noEntries')}</p>
-          )}
+          {namespaceGroups.length === 0 && mirror.status === 'ready' && <p className="dshx:px-2 dshx:text-sm dshx:text-muted-foreground">{t('noEntries')}</p>}
         </section>
       )}
       {trimmedQuery.length === 0 && browseEntryId !== null && (
@@ -215,10 +213,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
         </Button>
       )}
       {visibleResults.length > 0 && (
-        <section
-          aria-label={t('matchingSettings')}
-          className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card"
-        >
+        <section aria-label={t('matchingSettings')} className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card">
           {visibleResults.map((result, index) => (
             <button
               aria-current={index === boundedActiveIndex ? 'true' : undefined}
@@ -230,9 +225,7 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
             >
               <span className="dshx:truncate dshx:text-sm dshx:font-medium">{result.title}</span>
               <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{result.context}</span>
-              {result.description.length > 0 && (
-                <span className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">{result.description}</span>
-              )}
+              {result.description.length > 0 && <span className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">{result.description}</span>}
               {result.options.length > 0 && (
                 <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
                   {t('optionsLabel')}{' '}

@@ -1,7 +1,8 @@
 Feature: Settings Search
 
-  The Settings Search plugin indexes live Host settings and edits them through
-  the real typed configuration form.
+  The Settings Search plugin indexes live Host settings, opens an exact native
+  owner route when available, and keeps a typed editor fallback for other fields
+  and older shells.
 
   @scenario:settings-search.settings-index-search
   Scenario: Search the Settings index for a real setting
@@ -27,7 +28,7 @@ Feature: Settings Search
     Then a valid numeric value can be saved and its inherited value restored
 
   @scenario:settings-search.owner-route
-  Scenario: Open the Appearance preference through its native owner
+  Scenario: Open Appearance through the native route when the shell supports it
     Given the isolated plugin profile "@dshfiles/settings-search" is booted
     When the Settings navigation search opens and receives focus
     When the ui-theme preference is opened from navigation results

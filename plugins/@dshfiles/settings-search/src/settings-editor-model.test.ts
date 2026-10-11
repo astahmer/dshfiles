@@ -85,8 +85,7 @@ describe('settings field editor model', () => {
         4: { type: 'object', dict: { preference: 3 }, meta: {} },
       },
     }
-    const result = describeSettingsTargets([{ ns: 'ui-theme', schema: themeSchema }])
-      .find(setting => setting.target.fieldPath.join('.') === 'preference')
+    const result = describeSettingsTargets([{ ns: 'ui-theme', schema: themeSchema }]).find(setting => setting.target.fieldPath.join('.') === 'preference')
     if (result === undefined) throw new Error('Expected the Appearance preference in the settings index')
     const node = schemaNodeAtPath(themeSchema, ['preference'])
     const choices = result.options

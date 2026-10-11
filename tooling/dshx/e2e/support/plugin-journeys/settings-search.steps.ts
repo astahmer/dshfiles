@@ -29,7 +29,9 @@ When('the Settings Search section is opened', async ({ page }: { page: Page }) =
       return {
         dialogs,
         settingsTarget: target === null ? null : { tag: target.tagName, role: target.getAttribute('role'), className: String(target.className) },
-        reconnectButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('button[aria-label*="reconnect" i]'), item => item.getAttribute('aria-label')),
+        reconnectButtons: Array.from(document.querySelectorAll<HTMLButtonElement>('button[aria-label*="reconnect" i]'), item =>
+          item.getAttribute('aria-label'),
+        ),
       }
     })
     const message = error instanceof Error ? error.message : String(error)
@@ -66,13 +68,14 @@ When('Settings are searched for {string}', async ({ page }: { page: Page }, sett
 })
 
 When('the maxResults setting is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: /maxResults/ }).first().click()
+  await page
+    .getByRole('button', { name: /maxResults/ })
+    .first()
+    .click()
 })
 
 Then('the settings index shows the maxResults setting', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'settings-index-shows-max-results', () =>
-    expect(page.getByRole('button', { name: /maxResults/ }).first()).toBeVisible(),
-  )
+  await recordAssertion(page, 'settings-index-shows-max-results', () => expect(page.getByRole('button', { name: /maxResults/ }).first()).toBeVisible())
   await finishJourneyAssertions(page)
 })
 
@@ -95,7 +98,7 @@ Then('the selected navigation setting exposes its live typed editor', async ({ p
 Then('the Appearance preference uses its native owner or typed fallback', async ({ page }: { page: Page }) => {
   const dialog = page.getByRole('dialog')
   const fallback = dialog.getByRole('region', { name: /preference/i }).last()
-  if (await fallback.count() > 0) {
+  if ((await fallback.count()) > 0) {
     await recordAssertion(page, 'search-fallback-keeps-referenced-union-as-choice-control', async () => {
       await expect(fallback).toBeVisible()
       await expect(fallback.getByRole('combobox', { name: 'Current value' })).toBeVisible()
@@ -107,6 +110,7 @@ Then('the Appearance preference uses its native owner or typed fallback', async 
       await expect(dialog.getByRole('button', { name: 'Light', exact: true })).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'Dark', exact: true })).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'System', exact: true })).toBeVisible()
+      await expect(dialog.locator('button[aria-pressed="true"]')).toBeFocused()
     })
   }
   await finishJourneyAssertions(page)

@@ -29,7 +29,8 @@ export const schemaNodeAtPath = (schema: unknown, path: readonly string[]): Reco
   const refs = objectRecord(envelope.refs)
   if (refs === null || !Number.isInteger(envelope.uid)) return null
   const resolve = (reference: unknown): Record<string, unknown> | null => {
-    if (objectRecord(reference) !== null) return reference as Record<string, unknown>
+    const object = objectRecord(reference)
+    if (object !== null) return object
     if (typeof reference !== 'number' || !Number.isInteger(reference)) return null
     return objectRecord(refs[String(reference)])
   }
