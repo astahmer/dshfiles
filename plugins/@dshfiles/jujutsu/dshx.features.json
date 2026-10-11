@@ -132,6 +132,11 @@
           "kind": "gherkin",
           "id": "jujutsu.diff-review",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.copy-ids",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ]
     },
@@ -185,6 +190,11 @@
           "kind": "gherkin",
           "id": "jujutsu.composer-context",
           "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.drag-drop-preview",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {
           "kind": "unit-test",
