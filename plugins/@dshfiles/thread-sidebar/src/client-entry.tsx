@@ -14,6 +14,7 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { useEffect, useRef } from 'react'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
+import { HeaderThreadActions } from './header-actions.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
@@ -312,6 +313,24 @@ export default defineClient({
         decorate(ThreadMentionInput),
       ),
     )
+
+    ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register(
+      {
+        name: 'conversation.session.header.utilities',
+        id: 'thread-sidebar-actions',
+        order: 100,
+        label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarContextMenu'),
+        locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        inject: () => ({
+          archiveSession: (sessionId: SessionSummary['id']) =>
+            archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
+          unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
+          pinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.pinSession(sessionId),
+          unpinSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unpinSession(sessionId),
+        }),
+      },
+      decorate(HeaderThreadActions),
+    ))
 
     ctx.slots.inject('sidebar', () =>
       ctx.slots.register(
