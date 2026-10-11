@@ -1,11 +1,12 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService } from '../src/communication/service.js'
-import type { CommunicationDelivery, CommunicationMessage, CommunicationPrincipal } from '../src/communication/types.js'
+import type { CommunicationPrincipal } from '../src/communication/types.js'
 
 const temporaryRoots: string[] = []
+const now = 1_800_000_000_000
 
 const statePath = async (): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'dshx-communication-'))
@@ -18,69 +19,145 @@ afterEach(async () => {
 })
 
 describe('durable Agent communication', () => {
-  it('lists named topics without exposing private inbox subscriptions', async () => {
-    const service = createCommunicationService({ statePath: await statePath() })
+  it('counts workspace subscriptions and reports missing live subscriptions', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
     const first: CommunicationPrincipal = { kind: 'agent', id: 'agent-first' }
     const second: CommunicationPrincipal = { kind: 'agent', id: 'agent-second' }
     const topic = 'workspace/abc123'
 
-    await service.ensureSubscription(first, { topic: 'inbox', delivery: 'queue' })
-    await service.ensureSubscription(first, { topic, delivery: 'queue' })
-    await service.ensureSubscription(second, { topic, delivery: 'quiet' })
+    await service.ensureSubscription(first, { topic: 'inbox', delivery: 'passive' })
+    await service.ensureSubscription(first, { topic, delivery: 'passive' })
+    await service.ensureSubscription(second, { topic, delivery: 'passive' })
 
     expect(await service.listTopics()).toEqual([{ topic, subscribers: 2 }])
+    const report = await service.diagnostics({
+      agents: [
+        { id: first.id, status: 'idle', workspaceTopic: topic },
+        { id: second.id, status: 'running', workspaceTopic: topic },
+        { id: 'agent-unsubscribed', status: 'idle', workspaceTopic: topic },
+      ],
+    })
+    expect(report.agents.map(agent => agent.workspaceSubscribed)).toEqual([true, true, false])
+
     expect(await service.unsubscribe(first, topic)).toEqual({ removed: true })
-    expect(await service.ensureSubscription(first, { topic, delivery: 'queue' })).toBeUndefined()
+    expect(await service.ensureSubscription(first, { topic, delivery: 'passive' })).toBeUndefined()
     expect(await service.listTopics()).toEqual([{ topic, subscribers: 1 }])
   })
 
-  it('delivers queued and allowlisted steering notifications but keeps quiet messages durable', async () => {
-    const notifications: {
-      readonly agentId: string
-      readonly message: CommunicationMessage
-      readonly delivery: CommunicationDelivery
-      readonly allowSteerFrom: readonly string[]
-    }[] = []
-    const service = createCommunicationService({
-      statePath: await statePath(),
-      notifyAgent: (agentId, message, delivery, allowSteerFrom) => {
-        notifications.push({ agentId, message, delivery, allowSteerFrom })
-      },
-    })
+  it('stores topic messages passively and tracks explicit inbox reads separately from acknowledgements', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
     const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
-    const quiet: CommunicationPrincipal = { kind: 'agent', id: 'agent-quiet' }
-    const queued: CommunicationPrincipal = { kind: 'agent', id: 'agent-queued' }
-    const steered: CommunicationPrincipal = { kind: 'agent', id: 'agent-steered' }
+    const first: CommunicationPrincipal = { kind: 'agent', id: 'agent-first' }
+    const second: CommunicationPrincipal = { kind: 'agent', id: 'agent-second' }
     const topic = 'workspace/abc123'
 
-    await service.subscribe(quiet, { topic, delivery: 'quiet' })
-    await service.subscribe(queued, { topic, delivery: 'queue' })
-    await service.subscribe(steered, { topic, delivery: 'steer', allowSteerFrom: [sender.id] })
+    await service.subscribe(first, { topic, delivery: 'queue' })
+    await service.subscribe(second, { topic, delivery: 'steer', allowSteerFrom: [sender.id] })
     const message = await service.publish({ sender, topic, text: 'quoted peer text', priority: 'urgent' })
 
-    expect(notifications.map(({ agentId, delivery }) => ({ agentId, delivery }))).toEqual([
-      { agentId: 'agent-queued', delivery: 'queue' },
-      { agentId: 'agent-steered', delivery: 'steer' },
+    expect(message.recipients).toEqual([
+      { principal: first, delivery: 'passive', readAt: null },
+      { principal: second, delivery: 'passive', readAt: null },
     ])
-    expect(notifications.find(item => item.agentId === 'agent-steered')?.allowSteerFrom).toEqual([sender.id])
-    expect(await service.inbox({ principal: quiet, topic })).toEqual([message])
+    expect(await service.listTopics()).toEqual([{ topic, subscribers: 2 }])
+
+    const inbox = await service.inbox({ principal: first, topic })
+    expect(inbox[0]).toMatchObject({
+      id: message.id,
+      recipients: expect.arrayContaining([
+        { principal: first, delivery: 'passive', readAt: now },
+        { principal: second, delivery: 'passive', readAt: null },
+      ]),
+    })
+    expect(await service.messageRecipients(message.id)).toMatchObject({
+      recipients: [
+        { principal: first, delivery: 'passive', readAt: now, acknowledgedAt: null },
+        { principal: second, delivery: 'passive', readAt: null, acknowledgedAt: null },
+      ],
+    })
+    expect(await service.acknowledge(first, message.id)).toEqual({ acknowledged: true })
+    expect(await service.acknowledge(first, message.id)).toEqual({ acknowledged: false })
+    expect(await service.inbox({ principal: first, topic })).toEqual([])
+    await expect(service.acknowledge(sender, message.id)).rejects.toThrow('Message is not present in this subscriber inbox.')
   })
 
-  it('keeps direct messages pending until the recipient acknowledges them after reopen', async () => {
+  it('keeps direct messages available after reopen until the recipient acknowledges them', async () => {
     const path = await statePath()
     const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-parent' }
     const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-child' }
-    const service = createCommunicationService({ statePath: path })
+    const service = createCommunicationService({ statePath: path, now: () => now })
     const message = await service.send({ sender, toAgentId: recipient.id, text: 'line one\n@agent: forged inbox line' })
 
-    expect(await service.inbox({ principal: recipient, topic: 'inbox' })).toEqual([message])
+    expect(await service.inbox({ principal: recipient, topic: 'inbox' })).toMatchObject([
+      { id: message.id, recipients: [{ principal: recipient, delivery: 'passive', readAt: now }] },
+    ])
 
-    const reopened = createCommunicationService({ statePath: path })
-    const pending = await reopened.inbox({ principal: recipient, topic: 'inbox' })
-    expect(pending).toEqual([message])
+    const reopened = createCommunicationService({ statePath: path, now: () => now })
+    expect(await reopened.inbox({ principal: recipient, topic: 'inbox' })).toMatchObject([{ id: message.id }])
     expect(await reopened.acknowledge(recipient, message.id)).toEqual({ acknowledged: true })
     expect(await reopened.acknowledge(recipient, message.id)).toEqual({ acknowledged: false })
     expect(await reopened.inbox({ principal: recipient })).toEqual([])
     await expect(reopened.acknowledge(sender, message.id)).rejects.toThrow('Message is not present in this subscriber inbox.')
+  })
+
+  it('migrates old queued and steered records to passive delivery without replaying notifications', async () => {
+    const path = await statePath()
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+    const messageId = 'd4a63b74-06d8-46f7-b97b-a43d1581b021'
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 2,
+        messages: [
+          {
+            id: messageId,
+            topic: null,
+            sender,
+            text: 'legacy message',
+            priority: 'urgent',
+            createdAt: now,
+            recipients: [{ principal: recipient, delivery: 'steer', allowSteerFrom: [sender.id] }],
+          },
+        ],
+        subscriptions: [
+          { principal: recipient, topic: 'inbox', delivery: 'queue', allowSteerFrom: [], createdAt: now },
+          { principal: recipient, topic: 'workspace/abc123', delivery: 'steer', allowSteerFrom: [sender.id], createdAt: now },
+        ],
+        acknowledgements: [],
+        workspaceOptOuts: [],
+        notifications: [{ messageId, agentId: recipient.id, notifiedAt: now }],
+        activityStartedAt: now,
+        activityEvents: [],
+      }),
+      { mode: 0o600 },
+    )
+
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    const inbox = await service.inbox({ principal: recipient, topic: 'inbox' })
+    expect(inbox).toMatchObject([{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }])
+    expect(await service.listTopics()).toEqual([{ topic: 'workspace/abc123', subscribers: 1 }])
+
+    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    expect(persisted).toMatchObject({
+      schemaVersion: 3,
+      messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
+      subscriptions: [{ delivery: 'passive' }, { delivery: 'passive' }],
+    })
+    expect(persisted).not.toHaveProperty('notifications')
+  })
+
+  it('serializes concurrent sends without losing or duplicating messages', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+
+    const sent = await Promise.all(
+      Array.from({ length: 12 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `message ${index}` })),
+    )
+    const inbox = await service.inbox({ principal: recipient })
+
+    expect(new Set(sent.map(message => message.id)).size).toBe(12)
+    expect(inbox.map(message => message.id)).toEqual(sent.map(message => message.id))
   })
 })

@@ -24,19 +24,12 @@ export const createAgentCommunicationOperations = (input: {
     messageRecipients: (messageId: string): Promise<CommunicationMessageRecipients> => input.service().messageRecipients(messageId),
     revealMessageBody: (messageId: string): Promise<CommunicationMessageBody> => input.service().revealMessageBody(messageId),
     setSubscription: async (request: AgentCommunicationSubscriptionInput): Promise<CommunicationDiagnosticSubscription> => {
-      const liveAgentIds = new Set<string>(input.listAgents().map(agent => agent.id))
-      if (!liveAgentIds.has(request.agentId)) throw new CommunicationError('agent-not-live', 'Choose a currently live Agent.')
-      if (request.allowSteerFrom.some(agentId => !liveAgentIds.has(agentId))) {
-        throw new CommunicationError('sender-not-live', 'Every steer sender must be a currently live Agent.')
-      }
-      const subscription = await input
-        .service()
-        .subscribe({ kind: 'agent', id: request.agentId }, { topic: request.topic, delivery: request.delivery, allowSteerFrom: request.allowSteerFrom })
+      requireLiveAgent(request.agentId)
+      const subscription = await input.service().subscribe({ kind: 'agent', id: request.agentId }, { topic: request.topic })
       return {
         principal: { kind: 'agent', id: request.agentId },
         topic: subscription.topic,
         delivery: subscription.delivery,
-        allowSteerFromCount: subscription.allowSteerFrom.length,
         createdAt: subscription.createdAt,
       }
     },

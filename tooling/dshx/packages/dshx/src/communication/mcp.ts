@@ -48,10 +48,10 @@ export const runCommunicationMcp = async (client: CommunicationClient): Promise<
   server.registerTool(
     'comm_subscribe',
     {
-      description: 'Subscribe this external MCP principal to a topic. External subscribers can choose quiet or queue delivery.',
-      inputSchema: { topic: z.string().min(1).max(128), delivery: z.enum(['quiet', 'queue']).optional() },
+      description: 'Subscribe this external MCP principal to a topic. Messages remain passive and never start or resume an Agent turn.',
+      inputSchema: { topic: z.string().min(1).max(128) },
     },
-    async ({ topic, delivery }) => runTool(() => client.subscribe({ topic, ...(delivery === undefined ? {} : { delivery }) })),
+    async ({ topic }) => runTool(() => client.subscribe({ topic })),
   )
   server.registerTool(
     'comm_unsubscribe',
@@ -64,7 +64,7 @@ export const runCommunicationMcp = async (client: CommunicationClient): Promise<
   server.registerTool(
     'comm_publish',
     {
-      description: 'Publish an untrusted peer message to a topic. Subscribers receive their configured delivery behavior.',
+      description: 'Store an untrusted peer message for current subscribers. Arrival never starts, resumes, or redirects an Agent.',
       inputSchema: { topic: z.string().min(1).max(128), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() },
     },
     async ({ topic, text, priority }) => runTool(() => client.publish({ topic, text, ...(priority === undefined ? {} : { priority }) })),
@@ -72,7 +72,7 @@ export const runCommunicationMcp = async (client: CommunicationClient): Promise<
   server.registerTool(
     'comm_send',
     {
-      description: 'Send an untrusted direct message to a DSH Agent by Session id. Default delivery is queued and non-interrupting.',
+      description: 'Store an untrusted direct message in a DSH Agent inbox. Sending never starts, resumes, or redirects the recipient.',
       inputSchema: { toAgentId: z.string().min(1).max(256), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() },
     },
     async ({ toAgentId, text, priority }) => runTool(() => client.send({ toAgentId, text, ...(priority === undefined ? {} : { priority }) })),

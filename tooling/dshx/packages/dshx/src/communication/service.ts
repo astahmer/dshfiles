@@ -14,12 +14,15 @@ import {
   communicationMessageRecipientsSchema,
   communicationDiagnosticMessageSchema,
   communicationDiagnosticSubscriptionSchema,
+  communicationDeliverySchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
   communicationStateSchema,
   communicationStateV1Schema,
+  communicationStateV2Schema,
   communicationSubscriptionSchema,
   communicationTopicSchema,
+  legacyCommunicationDeliverySchema,
   type CommunicationActivityEvent,
   type CommunicationActivityOperation,
   type CommunicationAgent,
@@ -31,6 +34,8 @@ import {
   type CommunicationPrincipal,
   type CommunicationState,
   type CommunicationStateV1,
+  type CommunicationStateV2,
+  type LegacyCommunicationDelivery,
   type CommunicationSubscription,
   type CommunicationTopic,
 } from './types.js'
@@ -42,7 +47,6 @@ const MAX_DIAGNOSTIC_ROWS = 100
 const MAX_STATE_BYTES = 16 * 1024 * 1024
 const MAX_SUBSCRIPTIONS = 5_000
 const MAX_ACKNOWLEDGEMENTS = 100_000
-const MAX_NOTIFICATIONS = 100_000
 
 const topicSchema = z
   .string()
@@ -73,7 +77,7 @@ const directMessageInputSchema = z
 const subscriptionInputSchema = z
   .object({
     topic: topicSchema,
-    delivery: z.enum(['quiet', 'queue', 'steer']).default('queue'),
+    delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]).default('passive'),
     allowSteerFrom: z.array(z.string().min(1).max(256)).max(64).default([]),
   })
   .strict()
@@ -81,12 +85,6 @@ const subscriptionInputSchema = z
 export interface CommunicationServiceOptions {
   readonly statePath?: string
   readonly now?: () => number
-  readonly notifyAgent?: (
-    agentId: string,
-    message: CommunicationMessage,
-    delivery: CommunicationDelivery,
-    allowSteerFrom: readonly string[],
-  ) => Promise<void> | void
 }
 
 export interface CommunicationPublishInput {
@@ -120,7 +118,7 @@ export interface CommunicationActivityInput {
   readonly errorCode?: string | null
 }
 
-const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [communicationStateV1Schema, communicationStateSchema])
+const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [communicationStateV1Schema, communicationStateV2Schema, communicationStateSchema])
 
 export class CommunicationError extends Error {
   constructor(
@@ -133,12 +131,11 @@ export class CommunicationError extends Error {
 }
 
 const initialState = (): CommunicationState => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   messages: [],
   subscriptions: [],
   acknowledgements: [],
   workspaceOptOuts: [],
-  notifications: [],
   activityStartedAt: null,
   activityEvents: [],
 })
@@ -156,12 +153,11 @@ const cleanState = (state: CommunicationState, now: number): CommunicationState 
   const survivingIds = new Set(messages.map(message => message.id))
   const activityEvents = state.activityEvents.filter(event => event.occurredAt >= now - MESSAGE_RETENTION_MS).slice(-MAX_ACTIVITY_EVENTS)
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     messages,
     subscriptions: state.subscriptions.slice(-MAX_SUBSCRIPTIONS),
     acknowledgements: state.acknowledgements.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_ACKNOWLEDGEMENTS),
     workspaceOptOuts: [...new Set(state.workspaceOptOuts)].slice(-10_000),
-    notifications: state.notifications.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_NOTIFICATIONS),
     activityStartedAt: state.activityStartedAt,
     activityEvents,
   }
@@ -177,16 +173,24 @@ const assertTopic = (topic: string, privateAllowed = false): string => {
 
 const messageId = (): string => randomUUID()
 
-const migrateLegacyState = (state: CommunicationStateV1): CommunicationState => ({
-  schemaVersion: 2,
-  messages: state.messages,
-  subscriptions: state.subscriptions,
-  acknowledgements: state.acknowledgements,
-  workspaceOptOuts: state.workspaceOptOuts,
-  notifications: state.notifications,
-  activityStartedAt: null,
-  activityEvents: [],
-})
+const migrateLegacyState = (state: CommunicationStateV1 | CommunicationStateV2): CommunicationState =>
+  communicationStateSchema.parse({
+    schemaVersion: 3,
+    messages: state.messages.map(message => ({
+      ...message,
+      recipients: message.recipients.map(recipient => ({ principal: recipient.principal, delivery: 'passive', readAt: null })),
+    })),
+    subscriptions: state.subscriptions.map(subscription => ({
+      principal: subscription.principal,
+      topic: subscription.topic,
+      delivery: 'passive',
+      createdAt: subscription.createdAt,
+    })),
+    acknowledgements: state.acknowledgements,
+    workspaceOptOuts: state.workspaceOptOuts,
+    activityStartedAt: state.schemaVersion === 1 ? null : state.activityStartedAt,
+    activityEvents: state.schemaVersion === 1 ? [] : state.activityEvents,
+  })
 
 const topicsForState = (state: CommunicationState): readonly CommunicationTopic[] => {
   const counts = new Map<string, Set<string>>()
@@ -204,14 +208,11 @@ const topicsForState = (state: CommunicationState): readonly CommunicationTopic[
 export class CommunicationService {
   readonly #statePath: string
   readonly #now: () => number
-  readonly #notifyAgent?: CommunicationServiceOptions['notifyAgent']
-  readonly #inFlightNotifications = new Set<string>()
   #writes: Promise<void> = Promise.resolve()
 
   constructor(options: CommunicationServiceOptions = {}) {
     this.#statePath = options.statePath ?? defaultStatePath()
     this.#now = options.now ?? Date.now
-    this.#notifyAgent = options.notifyAgent
   }
 
   async listTopics(): Promise<readonly CommunicationTopic[]> {
@@ -250,22 +251,15 @@ export class CommunicationService {
     const agents = z.array(communicationAgentSchema).parse(input.agents)
     const topics = topicsForState(state)
     const acknowledgements = new Map(state.acknowledgements.map(entry => [`${entry.messageId}:${principalKey(entry.principal)}`, entry.acknowledgedAt]))
-    const notifications = new Map(state.notifications.map(entry => [`${entry.messageId}:${entry.agentId}`, entry.notifiedAt]))
     let pendingMessageCount = 0
     let pendingRecipientCount = 0
-    let unnotifiedRecipientCount = 0
 
     for (const message of state.messages) {
       let hasPendingRecipient = false
       for (const recipient of message.recipients) {
-        const recipientKey = principalKey(recipient.principal)
-        if (!acknowledgements.has(`${message.id}:${recipientKey}`)) {
-          pendingRecipientCount += 1
-          hasPendingRecipient = true
-        }
-        if (recipient.principal.kind === 'agent' && recipient.delivery !== 'quiet' && !notifications.has(`${message.id}:${recipient.principal.id}`)) {
-          unnotifiedRecipientCount += 1
-        }
+        if (acknowledgements.has(`${message.id}:${principalKey(recipient.principal)}`)) continue
+        pendingRecipientCount += 1
+        hasPendingRecipient = true
       }
       if (hasPendingRecipient) pendingMessageCount += 1
     }
@@ -275,9 +269,6 @@ export class CommunicationService {
       .reverse()
       .map(message => {
         const pendingRecipients = message.recipients.filter(recipient => !acknowledgements.has(`${message.id}:${principalKey(recipient.principal)}`))
-        const unnotifiedRecipients = message.recipients.filter(
-          recipient => recipient.principal.kind === 'agent' && recipient.delivery !== 'quiet' && !notifications.has(`${message.id}:${recipient.principal.id}`),
-        )
         return communicationDiagnosticMessageSchema.parse({
           id: message.id,
           topic: message.topic,
@@ -286,7 +277,6 @@ export class CommunicationService {
           createdAt: message.createdAt,
           recipientCount: message.recipients.length,
           pendingRecipientCount: pendingRecipients.length,
-          unnotifiedRecipientCount: unnotifiedRecipients.length,
         })
       })
     const subscriptions = [...state.subscriptions]
@@ -297,7 +287,6 @@ export class CommunicationService {
           principal: subscription.principal,
           topic: subscription.topic,
           delivery: subscription.delivery,
-          allowSteerFromCount: subscription.allowSteerFrom.length,
           createdAt: subscription.createdAt,
         }),
       )
@@ -311,6 +300,10 @@ export class CommunicationService {
           status: agent.status,
           workspaceTopic: agent.workspaceTopic ?? null,
           workspaceOptedOut: state.workspaceOptOuts.includes(agent.id),
+          workspaceSubscribed:
+            agent.workspaceTopic !== undefined &&
+            agent.workspaceTopic !== null &&
+            state.subscriptions.some(subscription => subscription.topic === agent.workspaceTopic && principalKey(subscription.principal) === `agent:${agent.id}`),
         }),
       ),
       topicCount: topics.length,
@@ -320,7 +313,6 @@ export class CommunicationService {
       messageCount: state.messages.length,
       pendingMessageCount,
       pendingRecipientCount,
-      unnotifiedRecipientCount,
       recentMessages,
       activity: {
         trackingStartedAt: state.activityStartedAt,
@@ -337,7 +329,6 @@ export class CommunicationService {
     const acknowledgements = new Map(
       state.acknowledgements.filter(entry => entry.messageId === message.id).map(entry => [principalKey(entry.principal), entry.acknowledgedAt]),
     )
-    const notifications = new Map(state.notifications.filter(entry => entry.messageId === message.id).map(entry => [entry.agentId, entry.notifiedAt]))
     return communicationMessageRecipientsSchema.parse({
       messageId: message.id,
       recipientCount: message.recipients.length,
@@ -345,9 +336,8 @@ export class CommunicationService {
         communicationDiagnosticRecipientSchema.parse({
           principal: recipient.principal,
           delivery: recipient.delivery,
-          notifiedAt: recipient.principal.kind === 'agent' ? (notifications.get(recipient.principal.id) ?? null) : null,
+          readAt: recipient.readAt,
           acknowledgedAt: acknowledgements.get(principalKey(recipient.principal)) ?? null,
-          allowSteerFromCount: recipient.allowSteerFrom.length,
         }),
       ),
     })
@@ -360,28 +350,22 @@ export class CommunicationService {
 
   async subscribe(
     principalInput: CommunicationPrincipal,
-    input: { readonly topic: string; readonly delivery?: CommunicationDelivery; readonly allowSteerFrom?: readonly string[] },
+    input: {
+      readonly topic: string
+      readonly delivery?: CommunicationDelivery | LegacyCommunicationDelivery
+      readonly allowSteerFrom?: readonly string[]
+    },
   ): Promise<CommunicationSubscription> {
     const principal = communicationPrincipalSchema.parse(principalInput)
     const parsed = subscriptionInputSchema.parse({ ...input, allowSteerFrom: input.allowSteerFrom ?? [] })
     if (parsed.topic === 'inbox' && principal.kind !== 'agent') {
       throw new CommunicationError('invalid-topic', 'Only a DSH Agent can subscribe to its private inbox.')
     }
-    if (parsed.delivery !== 'steer' && parsed.allowSteerFrom.length > 0) {
-      throw new CommunicationError('invalid-steer-policy', 'A sender allowlist is only valid when steer delivery is enabled.')
-    }
-    if (principal.kind === 'external' && parsed.delivery === 'steer') {
-      throw new CommunicationError('invalid-delivery', 'External subscribers cannot steer a DSH Agent.')
-    }
-    if (parsed.delivery === 'steer' && parsed.allowSteerFrom.length === 0) {
-      throw new CommunicationError('sender-allowlist-required', 'Steer delivery requires at least one explicitly allowed sender id.')
-    }
     const now = this.#now()
     const subscription = communicationSubscriptionSchema.parse({
       principal,
       topic: parsed.topic,
-      delivery: parsed.delivery,
-      allowSteerFrom: [...new Set(parsed.allowSteerFrom)],
+      delivery: 'passive',
       createdAt: now,
     })
     await this.#updateState(state => {
@@ -420,7 +404,7 @@ export class CommunicationService {
     const principal = communicationPrincipalSchema.parse(principalInput)
     const topic = assertTopic(topicInput, true)
     if (topic === 'inbox') {
-      throw new CommunicationError('private-inbox-always-available', 'The private inbox cannot be unsubscribed; set its delivery to quiet to mute notices.')
+      throw new CommunicationError('private-inbox-always-available', 'The private inbox is always available and never triggers an Agent turn.')
     }
     let removed = false
     await this.#updateState(state => {
@@ -445,8 +429,8 @@ export class CommunicationService {
         .filter(subscription => subscription.topic === topic && principalKey(subscription.principal) !== principalKey(sender))
         .map(subscription => ({
           principal: subscription.principal,
-          delivery: subscription.delivery,
-          allowSteerFrom: subscription.allowSteerFrom,
+          delivery: 'passive',
+          readAt: null,
         }))
       const item = communicationMessageSchema.parse({
         id: messageId(),
@@ -459,7 +443,6 @@ export class CommunicationService {
       })
       return { state: { ...state, messages: [...state.messages, item] }, value: item }
     })
-    await this.#deliverPending(message)
     return message
   }
 
@@ -471,7 +454,6 @@ export class CommunicationService {
       throw new CommunicationError('self-message', 'A DSH Agent cannot send a direct message to itself.')
     }
     const message = await this.#updateState(state => {
-      const inboxSubscription = state.subscriptions.find(item => item.topic === 'inbox' && principalKey(item.principal) === principalKey(recipient))
       const item = communicationMessageSchema.parse({
         id: messageId(),
         topic: null,
@@ -479,17 +461,10 @@ export class CommunicationService {
         text: parsed.text,
         priority: parsed.priority,
         createdAt: this.#now(),
-        recipients: [
-          {
-            principal: recipient,
-            delivery: inboxSubscription?.delivery ?? 'queue',
-            allowSteerFrom: inboxSubscription?.allowSteerFrom ?? [],
-          },
-        ],
+        recipients: [{ principal: recipient, delivery: 'passive', readAt: null }],
       })
       return { state: { ...state, messages: [...state.messages, item] }, value: item }
     })
-    await this.#deliverPending(message)
     return message
   }
 
@@ -500,13 +475,33 @@ export class CommunicationService {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
       throw new CommunicationError('invalid-limit', 'Inbox limit must be an integer from 1 to 500.')
     }
-    const state = await this.#readState()
-    const acked = new Set(state.acknowledgements.filter(entry => principalKey(entry.principal) === principalKey(principal)).map(entry => entry.messageId))
-    return state.messages
-      .filter(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalKey(principal)))
-      .filter(message => !acked.has(message.id))
-      .filter(message => topic === undefined || (topic === 'inbox' ? message.topic === null : message.topic === topic))
-      .slice(-limit)
+    return this.#updateState(state => {
+      const principalId = principalKey(principal)
+      const acknowledgedMessageIds = new Set(
+        state.acknowledgements.filter(entry => principalKey(entry.principal) === principalId).map(entry => entry.messageId),
+      )
+      const matchingMessages = state.messages
+        .filter(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId))
+        .filter(message => !acknowledgedMessageIds.has(message.id))
+        .filter(message => topic === undefined || (topic === 'inbox' ? message.topic === null : message.topic === topic))
+        .slice(-limit)
+      if (!matchingMessages.some(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId && recipient.readAt === null))) {
+        return { state, value: matchingMessages }
+      }
+      const matchingMessageIds = new Set(matchingMessages.map(message => message.id))
+      const readAt = this.#now()
+      const messages = state.messages.map(message => {
+        if (!matchingMessageIds.has(message.id)) return message
+        return {
+          ...message,
+          recipients: message.recipients.map(recipient =>
+            principalKey(recipient.principal) === principalId ? { ...recipient, readAt: recipient.readAt ?? readAt } : recipient,
+          ),
+        }
+      })
+      const items = messages.filter(message => matchingMessageIds.has(message.id))
+      return { state: { ...state, messages }, value: items }
+    })
   }
 
   async acknowledge(principalInput: CommunicationPrincipal, messageIdInput: string): Promise<{ readonly acknowledged: boolean }> {
@@ -529,40 +524,6 @@ export class CommunicationService {
       return { state, value: undefined }
     })
     return { acknowledged }
-  }
-
-  async deliverPending(agentId: string): Promise<void> {
-    if (this.#notifyAgent === undefined) return
-    const state = await this.#readState()
-    const notifications = state.messages.filter(message =>
-      message.recipients.some(recipient => recipient.principal.kind === 'agent' && recipient.principal.id === agentId && recipient.delivery !== 'quiet'),
-    )
-    for (const message of notifications) await this.#deliverPending(message, agentId)
-  }
-
-  async #deliverPending(message: CommunicationMessage, onlyAgentId?: string): Promise<void> {
-    if (this.#notifyAgent === undefined) return
-    for (const recipient of message.recipients) {
-      if (recipient.principal.kind !== 'agent' || recipient.delivery === 'quiet') continue
-      if (onlyAgentId !== undefined && recipient.principal.id !== onlyAgentId) continue
-      const notificationKey = `${message.id}:${recipient.principal.id}`
-      if (this.#inFlightNotifications.has(notificationKey)) continue
-      const state = await this.#readState()
-      const alreadyNotified = state.notifications.some(entry => entry.messageId === message.id && entry.agentId === recipient.principal.id)
-      if (alreadyNotified) continue
-      this.#inFlightNotifications.add(notificationKey)
-      try {
-        await this.#notifyAgent(recipient.principal.id, message, recipient.delivery, recipient.allowSteerFrom)
-        await this.#updateState(current => ({
-          state: { ...current, notifications: [...current.notifications, { messageId: message.id, agentId: recipient.principal.id, notifiedAt: this.#now() }] },
-          value: undefined,
-        }))
-      } catch {
-        // The durable inbox remains authoritative; agent creation retries notice delivery.
-      } finally {
-        this.#inFlightNotifications.delete(notificationKey)
-      }
-    }
   }
 
   async #readMessage(messageIdInput: string): Promise<{ readonly state: CommunicationState; readonly message: CommunicationMessage }> {
@@ -606,7 +567,7 @@ export class CommunicationService {
     try {
       const value: unknown = JSON.parse(text)
       const persistedState = persistedCommunicationStateSchema.parse(value)
-      const state = persistedState.schemaVersion === 1 ? migrateLegacyState(persistedState) : persistedState
+      const state = persistedState.schemaVersion === 3 ? persistedState : migrateLegacyState(persistedState)
       return cleanState(state, this.#now())
     } catch {
       throw new CommunicationError('state-unreadable', 'Communication state is invalid or unreadable; it was left untouched.')
@@ -617,6 +578,7 @@ export class CommunicationService {
     const operation = this.#writes.then(async () => {
       const current = cleanState(await this.#readState(), this.#now())
       const updated = update(current)
+      if (updated.state === current) return updated.value
       const parsed = communicationStateSchema.parse(cleanState(updated.state, this.#now()))
       const serialized = `${JSON.stringify(parsed)}\n`
       if (Buffer.byteLength(serialized) > MAX_STATE_BYTES) {

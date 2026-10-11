@@ -8,10 +8,6 @@ import { createAgentCommunicationOperations } from './api-operations.js'
 
 const temporaryRoots: string[] = []
 
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
-})
-
 const createTestOperations = async () => {
   const root = await mkdtemp(join(tmpdir(), 'agent-communication-api-'))
   temporaryRoots.push(root)
@@ -23,43 +19,26 @@ const createTestOperations = async () => {
   return { service, operations: createAgentCommunicationOperations({ service: () => service, listAgents: () => agents }) }
 }
 
+afterEach(async () => {
+  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
+
 describe('Agent communication API operations', () => {
-  it('rejects unknown targets and steer senders before writing a subscription', async () => {
+  it('only subscribes live Agents and configures passive delivery', async () => {
     const { service, operations } = await createTestOperations()
-    const missingTarget: AgentCommunicationSubscriptionInput = {
-      agentId: 'agent-unknown',
-      topic: 'workspace/demo',
-      delivery: 'queue',
-      allowSteerFrom: [],
-    }
-    const missingSender: AgentCommunicationSubscriptionInput = {
-      agentId: 'agent-reader',
-      topic: 'workspace/demo',
-      delivery: 'steer',
-      allowSteerFrom: ['agent-unknown'],
-    }
+    const missingTarget: AgentCommunicationSubscriptionInput = { agentId: 'agent-unknown', topic: 'workspace/demo' }
+    const request: AgentCommunicationSubscriptionInput = { agentId: 'agent-reader', topic: 'workspace/demo' }
 
     await expect(operations.setSubscription(missingTarget)).rejects.toMatchObject({ code: 'agent-not-live' })
-    await expect(operations.setSubscription(missingSender)).rejects.toMatchObject({ code: 'sender-not-live' })
-    expect((await service.diagnostics({ agents: [] })).subscriptionCount).toBe(0)
-  })
-
-  it('returns only sender counts when saving an explicit steer allowlist', async () => {
-    const { operations } = await createTestOperations()
-    const request: AgentCommunicationSubscriptionInput = {
-      agentId: 'agent-reader',
-      topic: 'workspace/demo',
-      delivery: 'steer',
-      allowSteerFrom: ['agent-sender'],
-    }
+    expect(await service.diagnostics({ agents: [] })).toMatchObject({ subscriptionCount: 0 })
 
     const saved = await operations.setSubscription(request)
     const report = await operations.diagnostics(20)
 
-    expect(saved).toMatchObject({ principal: { kind: 'agent', id: 'agent-reader' }, topic: 'workspace/demo', delivery: 'steer', allowSteerFromCount: 1 })
+    expect(saved).toMatchObject({ principal: { kind: 'agent', id: 'agent-reader' }, topic: 'workspace/demo', delivery: 'passive' })
     expect(saved).not.toHaveProperty('allowSteerFrom')
-    expect(report.subscriptions).toMatchObject([{ principal: { id: 'agent-reader' }, allowSteerFromCount: 1 }])
-    expect(report.agents[0]).toMatchObject({ id: 'agent-reader', workspaceTopic: 'workspace/demo', workspaceOptedOut: false })
+    expect(report.subscriptions).toMatchObject([{ principal: { id: 'agent-reader' }, delivery: 'passive' }])
+    expect(report.agents[0]).toMatchObject({ id: 'agent-reader', workspaceTopic: 'workspace/demo', workspaceOptedOut: false, workspaceSubscribed: true })
   })
 
   it('requires a live Agent to unsubscribe and only acknowledges a message recipient', async () => {

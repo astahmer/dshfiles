@@ -1,7 +1,10 @@
 import { z } from 'zod'
 
-export const communicationDeliverySchema = z.enum(['quiet', 'queue', 'steer'])
+export const communicationDeliverySchema = z.literal('passive')
 export type CommunicationDelivery = z.infer<typeof communicationDeliverySchema>
+
+export const legacyCommunicationDeliverySchema = z.enum(['quiet', 'queue', 'steer'])
+export type LegacyCommunicationDelivery = z.infer<typeof legacyCommunicationDeliverySchema>
 
 export const communicationPrioritySchema = z.enum(['normal', 'urgent'])
 export type CommunicationPriority = z.infer<typeof communicationPrioritySchema>
@@ -26,7 +29,6 @@ export const communicationSubscriptionSchema = z
     principal: communicationPrincipalSchema,
     topic: z.string().min(1).max(128),
     delivery: communicationDeliverySchema,
-    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
     createdAt: z.number().int().nonnegative(),
   })
   .strict()
@@ -36,7 +38,7 @@ export const communicationRecipientSchema = z
   .object({
     principal: communicationPrincipalSchema,
     delivery: communicationDeliverySchema,
-    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
+    readAt: z.number().int().nonnegative().nullable(),
   })
   .strict()
 export type CommunicationRecipient = z.infer<typeof communicationRecipientSchema>
@@ -67,6 +69,7 @@ export const communicationDiagnosticAgentSchema = communicationAgentSchema
   .extend({
     workspaceTopic: z.string().min(1).max(128).nullable(),
     workspaceOptedOut: z.boolean(),
+    workspaceSubscribed: z.boolean(),
   })
   .strict()
 export type CommunicationDiagnosticAgent = z.infer<typeof communicationDiagnosticAgentSchema>
@@ -102,6 +105,36 @@ const communicationNotificationSchema = z
   })
   .strict()
 
+const legacyCommunicationSubscriptionSchema = z
+  .object({
+    principal: communicationPrincipalSchema,
+    topic: z.string().min(1).max(128),
+    delivery: legacyCommunicationDeliverySchema,
+    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
+    createdAt: z.number().int().nonnegative(),
+  })
+  .strict()
+
+const legacyCommunicationRecipientSchema = z
+  .object({
+    principal: communicationPrincipalSchema,
+    delivery: legacyCommunicationDeliverySchema,
+    allowSteerFrom: z.array(z.string().min(1).max(256)).max(64),
+  })
+  .strict()
+
+const legacyCommunicationMessageSchema = z
+  .object({
+    id: z.string().uuid(),
+    topic: z.string().min(1).max(128).nullable(),
+    sender: communicationPrincipalSchema,
+    text: z.string().min(1).max(12_000),
+    priority: communicationPrioritySchema,
+    createdAt: z.number().int().nonnegative(),
+    recipients: z.array(legacyCommunicationRecipientSchema).max(512),
+  })
+  .strict()
+
 export const communicationActivityOperationSchema = z.enum([
   'dshx_comm_agents',
   'dshx_comm_topics',
@@ -132,8 +165,8 @@ export type CommunicationActivityEvent = z.infer<typeof communicationActivityEve
 export const communicationStateV1Schema = z
   .object({
     schemaVersion: z.literal(1),
-    messages: z.array(communicationMessageSchema).max(5_000),
-    subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
+    messages: z.array(legacyCommunicationMessageSchema).max(5_000),
+    subscriptions: z.array(legacyCommunicationSubscriptionSchema).max(5_000),
     acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
     workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
     notifications: z.array(communicationNotificationSchema).max(100_000),
@@ -141,14 +174,27 @@ export const communicationStateV1Schema = z
   .strict()
 export type CommunicationStateV1 = z.infer<typeof communicationStateV1Schema>
 
-export const communicationStateSchema = z
+export const communicationStateV2Schema = z
   .object({
     schemaVersion: z.literal(2),
+    messages: z.array(legacyCommunicationMessageSchema).max(5_000),
+    subscriptions: z.array(legacyCommunicationSubscriptionSchema).max(5_000),
+    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
+    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
+    notifications: z.array(communicationNotificationSchema).max(100_000),
+    activityStartedAt: z.number().int().nonnegative().nullable(),
+    activityEvents: z.array(communicationActivityEventSchema).max(5_000),
+  })
+  .strict()
+export type CommunicationStateV2 = z.infer<typeof communicationStateV2Schema>
+
+export const communicationStateSchema = z
+  .object({
+    schemaVersion: z.literal(3),
     messages: z.array(communicationMessageSchema).max(5_000),
     subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
     acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
     workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
-    notifications: z.array(communicationNotificationSchema).max(100_000),
     activityStartedAt: z.number().int().nonnegative().nullable(),
     activityEvents: z.array(communicationActivityEventSchema).max(5_000),
   })
@@ -159,9 +205,8 @@ export const communicationDiagnosticRecipientSchema = z
   .object({
     principal: communicationPrincipalSchema,
     delivery: communicationDeliverySchema,
-    notifiedAt: z.number().int().nonnegative().nullable(),
+    readAt: z.number().int().nonnegative().nullable(),
     acknowledgedAt: z.number().int().nonnegative().nullable(),
-    allowSteerFromCount: z.number().int().nonnegative().max(64),
   })
   .strict()
 export type CommunicationDiagnosticRecipient = z.infer<typeof communicationDiagnosticRecipientSchema>
@@ -188,7 +233,6 @@ export const communicationDiagnosticSubscriptionSchema = z
     principal: communicationPrincipalSchema,
     topic: z.string().min(1).max(128),
     delivery: communicationDeliverySchema,
-    allowSteerFromCount: z.number().int().nonnegative().max(64),
     createdAt: z.number().int().nonnegative(),
   })
   .strict()
@@ -203,7 +247,6 @@ export const communicationDiagnosticMessageSchema = z
     createdAt: z.number().int().nonnegative(),
     recipientCount: z.number().int().nonnegative().max(512),
     pendingRecipientCount: z.number().int().nonnegative().max(512),
-    unnotifiedRecipientCount: z.number().int().nonnegative().max(512),
   })
   .strict()
 export type CommunicationDiagnosticMessage = z.infer<typeof communicationDiagnosticMessageSchema>
@@ -220,7 +263,6 @@ export const communicationDiagnosticsSchema = z
     messageCount: z.number().int().nonnegative(),
     pendingMessageCount: z.number().int().nonnegative(),
     pendingRecipientCount: z.number().int().nonnegative(),
-    unnotifiedRecipientCount: z.number().int().nonnegative(),
     recentMessages: z.array(communicationDiagnosticMessageSchema).max(100),
     activity: z
       .object({

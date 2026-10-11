@@ -1,6 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import {
-  communicationDeliverySchema,
   communicationDiagnosticSubscriptionSchema,
   communicationDiagnosticsSchema,
   communicationMessageBodySchema,
@@ -16,13 +15,8 @@ export const subscriptionInputSchema = z
   .object({
     agentId: agentIdSchema,
     topic: topicSchema,
-    delivery: communicationDeliverySchema,
-    allowSteerFrom: z.array(agentIdSchema).max(64),
   })
   .strict()
-  .refine(input => (input.delivery === 'steer' ? input.allowSteerFrom.length > 0 : input.allowSteerFrom.length === 0), {
-    message: 'Steer delivery requires an explicit sender allowlist; other delivery modes do not accept one.',
-  })
 
 export type AgentCommunicationSubscriptionInput = z.infer<typeof subscriptionInputSchema>
 

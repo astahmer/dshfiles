@@ -1,0 +1,54 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { createCommunicationService } from '@dshfiles/dshx/communication'
+import { communicationWorkspaceTopic, initializeCommunicationAgent } from './agent-lifecycle.js'
+
+const temporaryRoots: string[] = []
+
+afterEach(async () => {
+  await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
+
+describe('communication Agent initialization', () => {
+  it('subscribes every Agent in a shared working directory exactly once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'agent-communication-lifecycle-'))
+    temporaryRoots.push(root)
+    const service = createCommunicationService({ statePath: join(root, 'state.json') })
+    const workspaceCwd = join(root, 'jj-workspace')
+    const agents = Array.from({ length: 26 }, (_, index) => ({ id: `session-${index}`, workspaceCwd }))
+
+    await Promise.all(
+      agents.flatMap(agent => [
+        initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.workspaceCwd }),
+        initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.workspaceCwd }),
+      ]),
+    )
+
+    const workspaceTopic = communicationWorkspaceTopic(workspaceCwd)
+    expect(workspaceTopic).toMatch(/^workspace\/[a-f0-9]{24}$/)
+    expect(await service.listTopics()).toEqual([{ topic: workspaceTopic, subscribers: agents.length }])
+
+    const report = await service.diagnostics({
+      agents: agents.map(agent => ({ id: agent.id, status: 'idle', workspaceTopic })),
+    })
+    expect(report.subscriptionCount).toBe(agents.length * 2)
+    expect(report.agents.every(agent => agent.workspaceSubscribed)).toBe(true)
+    expect(report.topics).toEqual([{ topic: workspaceTopic, subscribers: agents.length }])
+  })
+
+  it('keeps inbox available without inventing a workspace for sessions without cwd', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'agent-communication-lifecycle-'))
+    temporaryRoots.push(root)
+    const service = createCommunicationService({ statePath: join(root, 'state.json') })
+
+    await initializeCommunicationAgent({ service, agentId: 'session-no-cwd', workspaceCwd: undefined })
+
+    expect(await service.listTopics()).toEqual([])
+    expect(await service.diagnostics({ agents: [{ id: 'session-no-cwd', workspaceTopic: null }] })).toMatchObject({
+      subscriptionCount: 1,
+      agents: [{ workspaceTopic: null, workspaceSubscribed: false }],
+    })
+  })
+})
