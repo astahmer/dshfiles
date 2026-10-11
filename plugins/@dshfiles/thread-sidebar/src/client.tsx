@@ -70,7 +70,7 @@ import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
-import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
+import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, UNDO_NOTICE_DURATION_MS, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -819,12 +819,39 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       unarchive: props.unarchiveSession,
     } satisfies Record<RowOperation, (sessionId: SessionSummary['id']) => Promise<void>>
     let failed = false
+    const archivedIds: SessionSummary['id'][] = []
     for (const targetId of targetIdsToChange) {
       try {
         await actions[operation](targetId)
+        if (operation === 'archive') archivedIds.push(targetId)
       } catch {
         failed = true
       }
+    }
+    if (operation === 'archive' && archivedIds.length > 0) {
+      setNotice({
+        tone: failed ? 'danger' : 'success',
+        message: props.tSidebar(failed ? 'threadSidebarActionFailure' : 'threadSidebarArchivedNotice'),
+        actionLabel: props.tSidebar('threadSidebarUndo'),
+        durationMs: UNDO_NOTICE_DURATION_MS,
+        onAction: () => {
+          void (async () => {
+            let undoFailed = false
+            for (const archivedId of archivedIds) {
+              try {
+                await props.unarchiveSession(archivedId)
+              } catch {
+                undoFailed = true
+              }
+            }
+            setNotice({
+              tone: undoFailed ? 'danger' : 'success',
+              message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarRestoredNotice'),
+            })
+          })()
+        },
+      })
+      return
     }
     setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
   }
@@ -1499,7 +1526,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           <div className="dshx:grid dshx:gap-2 dshx:px-2 dshx:pb-2">
             {notice !== null ? (
               <Alert variant={notice.tone === 'danger' ? 'destructive' : notice.tone} className={noticeClass}>
-                <SidebarNoticeMessage message={notice.message} />
+                <div className="dshx:flex dshx:items-center dshx:gap-2">
+                  <SidebarNoticeMessage message={notice.message} />
+                  {notice.actionLabel !== undefined && notice.onAction !== undefined ? (
+                    <Button size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-xs" onClick={notice.onAction}>
+                      {notice.actionLabel}
+                    </Button>
+                  ) : null}
+                </div>
               </Alert>
             ) : null}
             {storageWarning ? (

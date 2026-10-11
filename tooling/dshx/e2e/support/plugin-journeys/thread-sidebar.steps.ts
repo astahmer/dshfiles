@@ -37,6 +37,32 @@ When('a blank Host thread is started', async ({ page }: { page: Page }) => {
   await startBlankThread(page)
 })
 
+When('a nonblank Host thread is archived and immediately undone', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar archive undo e2e target'
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  await page.getByRole('textbox').first().fill(prompt)
+  await page.getByRole('textbox').first().press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
+  await threadSidebar(page).getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(threadSidebar(page).getByText('Thread restored.', { exact: true })).toBeVisible()
+})
+
+Then('the thread is restored from the archive notice', async ({ page }: { page: Page }) => {
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar archive undo e2e target' })
+  await recordAssertion(page, 'thread-sidebar-archive-undo-restores-thread', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Archived (0)', exact: true })).toHaveCount(0)
+    await expect(targetRow).toHaveCount(1)
+    await expect(targetRow.getByRole('button', { name: 'Restore', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('a nonblank Host thread is parked from its context menu', async ({ page }: { page: Page }) => {
   const prompt = 'thread sidebar park e2e target'
   if (currentThreadId(page) === null) await startBlankThread(page)

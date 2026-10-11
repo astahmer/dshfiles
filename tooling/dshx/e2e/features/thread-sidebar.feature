@@ -3,6 +3,12 @@ Feature: Thread sidebar journeys
   These journeys use a fresh isolated Host profile with no provider credentials.
   Blank sessions and settings are created or changed only through the real UI.
 
+  @scenario:thread-sidebar.archive-undo
+  Scenario: Undo a manual archive from its temporary notice
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is archived and immediately undone
+    Then the thread is restored from the archive notice
+
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

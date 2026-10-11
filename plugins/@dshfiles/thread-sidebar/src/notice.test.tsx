@@ -42,6 +42,19 @@ test('success notices dismiss after three seconds', () => {
   dispose?.()
 })
 
+test('undo notices stay visible for their requested duration', () => {
+  vi.useFakeTimers()
+  const undoNotice: SidebarNotice = { tone: 'success', message: 'Thread archived.', durationMs: 5_000 }
+  const state = createNoticeState(undoNotice)
+  const dispose = scheduleSuccessNoticeDismissal(undoNotice, state.update)
+
+  vi.advanceTimersByTime(4_999)
+  assert.equal(state.current, undoNotice)
+  vi.advanceTimersByTime(1)
+  assert.equal(state.current, null)
+  dispose?.()
+})
+
 test('a success timeout does not dismiss a replacement notice', () => {
   vi.useFakeTimers()
   const successNotice: SidebarNotice = { tone: 'success', message: 'Thread link copied.' }
