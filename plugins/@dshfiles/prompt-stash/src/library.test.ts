@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_PROMPT_TEXT_LENGTH, readPromptLibrary, removePromptIfCurrent, serializePromptLibrary, writePromptIfCurrent, type SavedPrompt } from './library.js'
+import {
+  MAX_PROMPT_TEXT_LENGTH,
+  defaultPromptTitle,
+  readPromptLibrary,
+  removePromptIfCurrent,
+  serializePromptLibrary,
+  writePromptIfCurrent,
+  type SavedPrompt,
+} from './library.js'
 
 const firstPrompt: SavedPrompt = {
   id: '11f94d55-8639-4f42-94ca-7b218778e4a1',
@@ -10,6 +18,12 @@ const firstPrompt: SavedPrompt = {
 }
 
 describe('saved prompt library', () => {
+  it('uses the first prompt line as an optional default label', () => {
+    expect(defaultPromptTitle('  Review this patch\nCheck edge cases.')).toBe('Review this patch')
+    expect(defaultPromptTitle('x'.repeat(120))).toBe(`${'x'.repeat(99)}…`)
+    expect(defaultPromptTitle('  ')).toBe('Saved prompt')
+  })
+
   it('starts empty when the browser has no saved library', () => {
     expect(readPromptLibrary(null)).toEqual({ ok: true, prompts: [] })
   })

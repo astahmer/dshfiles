@@ -13,6 +13,7 @@ import {
   MAX_PROMPTS,
   MAX_PROMPT_TEXT_LENGTH,
   MAX_PROMPT_TITLE_LENGTH,
+  defaultPromptTitle,
   PROMPT_LIBRARY_STORAGE_KEY,
   readPromptLibrary,
   removePromptIfCurrent,
@@ -162,9 +163,9 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const saveEditor = (saveAsCopy: boolean): void => {
     if (editor === null) return
     if (libraryState !== 'ready') return
-    const title = editor.title.trim()
-    if (title.length === 0 || editor.text.trim().length === 0) {
-      setNotice('Add a title and prompt text before saving.')
+    const title = editor.title.trim() || defaultPromptTitle(editor.text)
+    if (editor.text.trim().length === 0) {
+      setNotice('Add prompt text before saving.')
       return
     }
 
@@ -314,7 +315,12 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           Prompts
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" side="top" className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0" aria-labelledby={triggerId}>
+      <PopoverContent
+        align="end"
+        side="top"
+        className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0"
+        aria-labelledby={triggerId}
+      >
         <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' ? 'recent' : 'saved')} className="dshx:gap-0">
           <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3 dshx:px-3 dshx:pt-3">
             <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
@@ -363,7 +369,13 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                 <CommandList className="dshx:max-h-80 dshx:p-1">
                   <CommandEmpty className="dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">No matches.</CommandEmpty>
                   {recentPrompts.map(prompt => (
-                    <CommandItem key={prompt.id} value={`${prompt.id} ${prompt.text}`} disabled={hasInserted} onSelect={() => insertRecentPrompt(prompt.id)} className="dshx:flex-col dshx:items-start dshx:gap-0.5">
+                    <CommandItem
+                      key={prompt.id}
+                      value={`${prompt.id} ${prompt.text}`}
+                      disabled={hasInserted}
+                      onSelect={() => insertRecentPrompt(prompt.id)}
+                      className="dshx:flex-col dshx:items-start dshx:gap-0.5"
+                    >
                       <span className="dshx:text-xs dshx:text-muted-foreground">Sent message · {new Date(prompt.time).toLocaleString()}</span>
                       <span className="dshx:line-clamp-2 dshx:w-full dshx:text-sm">{prompt.text.slice(0, 180)}</span>
                     </CommandItem>
@@ -405,7 +417,13 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                           onKeyDown={event => event.stopPropagation()}
                           onClick={event => event.stopPropagation()}
                         >
-                          <Button type="button" variant="ghost" size="xs" className="dshx:text-muted-foreground dshx:hover:text-foreground" onClick={() => beginEdit(prompt)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            className="dshx:text-muted-foreground dshx:hover:text-foreground"
+                            onClick={() => beginEdit(prompt)}
+                          >
                             Edit
                           </Button>
                           <Button
@@ -437,33 +455,37 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                   saveEditor(false)
                 }}
               >
-                <Field className="dshx:gap-1.5">
-                  <FieldLabel htmlFor={titleId}>Title</FieldLabel>
+                <Field orientation="vertical" className="dshx:flex dshx:w-full dshx:flex-col dshx:items-stretch dshx:gap-1.5">
+                  <FieldLabel htmlFor={titleId}>Label (optional)</FieldLabel>
                   <Input
                     id={titleId}
-                    className="dshx:h-7 dshx:text-sm dshx:md:text-sm"
+                    className="dshx:h-8 dshx:w-full dshx:text-sm dshx:md:text-sm"
                     maxLength={MAX_PROMPT_TITLE_LENGTH}
-                    required
+                    placeholder="Defaults to the first line"
                     value={editor.title}
                     onChange={event => updateEditor('title', event.currentTarget.value)}
                   />
                 </Field>
-                <Field className="dshx:gap-1.5">
+                <Field orientation="vertical" className="dshx:flex dshx:w-full dshx:flex-col dshx:items-stretch dshx:gap-1.5">
                   <FieldLabel htmlFor={textId}>Prompt text</FieldLabel>
                   <Textarea
                     id={textId}
-                    className="dshx:max-h-64 dshx:min-h-32 dshx:text-sm dshx:md:text-sm"
+                    className="dshx:min-h-36 dshx:w-full dshx:text-sm dshx:md:text-sm"
                     maxLength={MAX_PROMPT_TEXT_LENGTH}
                     required
                     rows={8}
                     value={editor.text}
                     onChange={event => updateEditor('text', event.currentTarget.value)}
                   />
-                  <FieldDescription className="dshx:text-right dshx:text-xs">
+                  <FieldDescription className="dshx:w-full dshx:text-right dshx:text-xs">
                     {editor.text.length} of {MAX_PROMPT_TEXT_LENGTH} characters
                   </FieldDescription>
                 </Field>
-                {editor.stale ? <p className="dshx:rounded-md dshx:bg-warning/15 dshx:px-2 dshx:py-1.5 dshx:text-xs">The saved version changed elsewhere. Your edits remain here.</p> : null}
+                {editor.stale ? (
+                  <p className="dshx:rounded-md dshx:bg-warning/15 dshx:px-2 dshx:py-1.5 dshx:text-xs">
+                    The saved version changed elsewhere. Your edits remain here.
+                  </p>
+                ) : null}
                 <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
                   <Button type="button" variant="ghost" size="sm" onClick={() => setEditor(null)}>
                     Cancel

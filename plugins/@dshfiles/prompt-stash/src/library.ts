@@ -39,6 +39,12 @@ const legacyDraftsSchema = z.object({ schemaVersion: z.literal(1), drafts: z.arr
 
 export type SavedPrompt = z.infer<typeof promptSchema>
 
+export const defaultPromptTitle = (text: string): string => {
+  const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? ''
+  const title = firstLine.length === 0 ? 'Saved prompt' : firstLine
+  return title.length > MAX_PROMPT_TITLE_LENGTH ? `${title.slice(0, MAX_PROMPT_TITLE_LENGTH - 1)}…` : title
+}
+
 export type PromptLibraryRead = { readonly ok: true; readonly prompts: readonly SavedPrompt[] } | { readonly ok: false }
 
 export type PromptMutation =
