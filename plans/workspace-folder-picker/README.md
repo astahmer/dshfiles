@@ -21,8 +21,8 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 
 ## Workspace handoff
 
-- DSH Files workspace: `workspace-folder-picker-browser-latest`, `/Users/astahmer/dev/dshfiles-workspace-folder-picker-browser-latest`; based on `integration-spine` at `a2fa36be`. Current `@` is `dd4d4378` with the plugin patch and README changes.
-- DSH Core workspace: `workspace-directory-browser`, `/Users/astahmer/dev/dsh-core-directory-browser-scope`; base `202ccfee2205a18f30d65f2bb4e46eb2fe5a8180`, current `@` `fad6c7ac`.
+- DSH Files workspace: `workspace-folder-picker-browser-latest`, `/Users/astahmer/dev/dshfiles-workspace-folder-picker-browser-latest`; feature revision `a3304278` is based on `integration-spine`/`main` at `abcf899c`; its current `@` is empty `e7327ea6`.
+- DSH Core workspace: `workspace-directory-browser`, `/Users/astahmer/dev/dsh-core-directory-browser-scope`; hybrid-picker revision `e6ea3062` is based on `202ccfee`; its current `@` is empty `3e2311a3`.
 - The earlier DSH Files workspace `workspace-folder-picker-browser-clean` remains preserved and untouched. The separate Core `directory-picker-config` workspace also remains untouched.
 - Do not edit the default DSH Files workspace, sync the live profile, or restart the live DSH process.
 
