@@ -127,7 +127,7 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
 - Long runs: commit and tick the plan's checkboxes after each milestone, and
   keep a `plans/<topic>/README.md` progress table with a "Resume here" line.
 
-### T3 threads and JJ workspaces
+### Threads and JJ workspaces
 
 - This repository uses one shared JJ store. Parallel checkouts created with
   `jj workspace add` may sit beside the repository directory; they are still
@@ -147,10 +147,10 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   workspace in that existing store, not an ad-hoc clone, and record its root
   and workspace path in the handoff.
 - Before editing, verify `jj root`, `jj status`, and `jj workspace list` from
-  that path. Record the T3 thread ID, workspace name, and absolute path in the
+  that path. Record the thread ID, workspace name, and absolute path in the
   task handoff. Do not use an ad-hoc copy or a T3-generated project directory
   as a code checkout.
-- Create the JJ workspace before launching an independent top-level T3 thread.
+- Create the JJ workspace before launching an independent top-level thread.
   Keep the thread in this dshfiles project (`workspaceStrategy: { type: "root" }`)
   and put the workspace name and absolute path in its task message. T3's
   `existing_worktree` strategy is Git-worktree-oriented; do not pass it a JJ
@@ -158,7 +158,7 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `jj root` confirms it belongs to this shared JJ repository. Do not use a
   scratch thread or an unlinked project directory for repository code.
 - Run every edit and JJ command from the named workspace path. T3 metadata does
-  not record a plain JJ workspace, so record the T3 thread ID, JJ workspace
+  not record a plain JJ workspace, so record the thread ID, JJ workspace
   name, and absolute path in the task handoff, then verify `jj root`,
   `jj status`, and `jj workspace list` from that path before editing. Treat
   `branch: null` / `worktreePath: null` in T3 metadata as unbound, not as proof
