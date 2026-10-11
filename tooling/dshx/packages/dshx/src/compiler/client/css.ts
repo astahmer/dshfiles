@@ -21,15 +21,25 @@ const SHARED_SHEET_OWNER = 'dshx:shared-css'
  * injected once. Each plugin keeps an empty owned marker `style[data-plugin]` for the Host's HMR/disposal
  * bookkeeping; the shared sheet is owned by no plugin and is removed once no marker references its hash.
  */
-function materializer(packageId: string, css: string): string {
+function sharedCssHash(css: string): string {
+  return createHash('sha256').update(css).digest('hex').slice(0, 16)
+}
+
+/**
+ * `suppliedHash` is the sheet hash a shared-runtime supplier injects; when it matches, this package only emits its
+ * ownership marker and relies on the supplier, which the Host materializes first, for the sheet itself.
+ */
+function materializer(packageId: string, css: string, suppliedHash: string | undefined): string {
   if (css === '') return ''
   const styleId = `${packageId}/client.css`
-  const hash = createHash('sha256').update(css).digest('hex').slice(0, 16)
-  return `if(typeof document!=="undefined"){const select=(name,value)=>"style["+name+"="+JSON.stringify(value)+"]";const hash=${JSON.stringify(hash)};if(document.querySelector(select("data-plugin-css",${JSON.stringify(styleId)}))===null){const marker=document.createElement("style");marker.dataset.plugin=${JSON.stringify(packageId)};marker.dataset.pluginCss=${JSON.stringify(styleId)};marker.dataset.dshxCss=hash;document.head.appendChild(marker)}if(document.querySelector(select("data-dshx-shared-css",hash))===null){const sheet=document.createElement("style");sheet.dataset.plugin=${JSON.stringify(SHARED_SHEET_OWNER)};sheet.dataset.dshxSharedCss=hash;sheet.textContent=${JSON.stringify(css)};document.head.appendChild(sheet)}const key=Symbol.for("dshx.sharedCss.v1");if(globalThis[key]===undefined&&typeof MutationObserver!=="undefined"){globalThis[key]=new MutationObserver(records=>{for(const record of records)for(const node of record.removedNodes){const removed=node.dataset?.dshxCss;if(removed!==undefined&&document.querySelector(select("data-dshx-css",removed))===null)document.querySelector(select("data-dshx-shared-css",removed))?.remove()}});globalThis[key].observe(document.head,{childList:true})}}`
+  const hash = sharedCssHash(css)
+  const sheet = hash === suppliedHash ? '' : `if(document.querySelector(select("data-dshx-shared-css",hash))===null){const sheet=document.createElement("style");sheet.dataset.plugin=${JSON.stringify(SHARED_SHEET_OWNER)};sheet.dataset.dshxSharedCss=hash;sheet.textContent=${JSON.stringify(css)};document.head.appendChild(sheet)}`
+  return `if(typeof document!=="undefined"){const select=(name,value)=>"style["+name+"="+JSON.stringify(value)+"]";const hash=${JSON.stringify(hash)};if(document.querySelector(select("data-plugin-css",${JSON.stringify(styleId)}))===null){const marker=document.createElement("style");marker.dataset.plugin=${JSON.stringify(packageId)};marker.dataset.pluginCss=${JSON.stringify(styleId)};marker.dataset.dshxCss=hash;document.head.appendChild(marker)}${sheet}const key=Symbol.for("dshx.sharedCss.v1");if(globalThis[key]===undefined&&typeof MutationObserver!=="undefined"){globalThis[key]=new MutationObserver(records=>{for(const record of records)for(const node of record.removedNodes){const removed=node.dataset?.dshxCss;if(removed!==undefined&&document.querySelector(select("data-dshx-css",removed))===null)document.querySelector(select("data-dshx-shared-css",removed))?.remove()}});globalThis[key].observe(document.head,{childList:true})}}`
 }
 
 /** Fold Vite's one native CSS asset into the lazy Client factory. */
-export function clientCssPlugin(packageId: string, outDir: string): Plugin {
+export function clientCssPlugin(options: { readonly packageId: string; readonly outDir: string; readonly suppliedHash?: string; readonly onSheet?: (hash: string | undefined) => void }): Plugin {
+  const { packageId, outDir } = options
   let pendingMaterializer = ''
   return {
     name: 'dshx-client-css-fold',
@@ -45,7 +55,9 @@ export function clientCssPlugin(packageId: string, outDir: string): Plugin {
       }
       const chunk = chunks[0]
       if (chunk === undefined || chunk.type !== 'chunk') return
-      pendingMaterializer = css[0] === undefined ? '' : materializer(packageId, cssSource(css[0][1]))
+      const source = css[0] === undefined ? '' : cssSource(css[0][1])
+      options.onSheet?.(source === '' ? undefined : sharedCssHash(source))
+      pendingMaterializer = materializer(packageId, source, options.suppliedHash)
       if (css[0] !== undefined) delete bundle[css[0][0]]
     },
     async writeBundle() {

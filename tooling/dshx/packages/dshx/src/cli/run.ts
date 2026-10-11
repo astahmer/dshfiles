@@ -381,6 +381,8 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         declarations: project.build.declarations ?? true,
         minify: project.build.minify ?? false,
         bundleDependencies: project.clientBundleDependencies ?? [],
+        ...(project.clientShared === undefined ? {} : { shared: project.clientShared }),
+        ...(project.clientSharedRuntime === undefined ? {} : { sharedRuntime: project.clientSharedRuntime }),
         ...(project.clientVitePlugins === undefined ? {} : { vite: { plugins: project.clientVitePlugins } }),
         external,
         inject,

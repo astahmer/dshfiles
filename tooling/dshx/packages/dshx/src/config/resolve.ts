@@ -10,6 +10,7 @@ const PACKAGE_FILENAME = 'package.json'
 const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
 const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
+const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -110,6 +111,37 @@ function optionalPackageNames(value: unknown, field: string, file: string): read
   return names
 }
 
+function validateSharedRuntime(client: Record<string, unknown>, file: string): void {
+  const packageName = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/
+  if (client.shared !== undefined && (typeof client.shared !== 'string' || !packageName.test(client.shared))) {
+    throw new DshxError('DSHX4004', 'client.shared must be the package id of a shared-runtime supplier.', {
+      file,
+      hint: 'Use client: { shared: "@scope/shared-runtime" }.',
+    })
+  }
+  if (client.sharedRuntime === undefined) return
+  if (client.shared !== undefined) {
+    throw new DshxError('DSHX4004', 'client.shared and client.sharedRuntime cannot be combined.', {
+      file,
+      hint: 'A supplier provides modules; a consumer uses them. Keep one role per package.',
+    })
+  }
+  const provide = isObject(client.sharedRuntime) ? client.sharedRuntime.provide : undefined
+  if (
+    !isObject(client.sharedRuntime) ||
+    !Array.isArray(provide) ||
+    provide.length === 0 ||
+    provide.some(name => typeof name !== 'string' || name.trim() !== name || name === '' || name.startsWith('.') || name.startsWith('@deepseek-ai/cordis')) ||
+    new Set(provide).size !== provide.length
+  ) {
+    throw new DshxError('DSHX4004', 'client.sharedRuntime.provide must list unique bare module specifiers.', {
+      file,
+      hint: 'Use client: { sharedRuntime: { provide: ["zod", "@tanstack/react-query"] } }.',
+    })
+  }
+  rejectUnknownKeys(client.sharedRuntime, new Set(['provide']), 'client.sharedRuntime', file)
+}
+
 function validateConfig(value: unknown, file: string): DshxConfig {
   if (!isObject(value)) {
     throw new DshxError('DSHX4003', 'dshx.config.ts must default-export an object.', {
@@ -130,7 +162,7 @@ function validateConfig(value: unknown, file: string): DshxConfig {
         hint: `Replace the removed string shorthand with ${field}: { entry: "src/${field}.ts${field === 'client' ? 'x' : ''}" }.`,
       })
     }
-    rejectUnknownKeys(candidate, HOST_FACE_KEYS, field, file)
+    rejectUnknownKeys(candidate, field === 'client' ? CLIENT_FACE_KEYS : HOST_FACE_KEYS, field, file)
     optionalNonEmptyString(candidate.entry, `${field}.entry`, file)
     optionalPackageNames(candidate.bundleDependencies, `${field}.bundleDependencies`, file)
     if (candidate.vite !== undefined) {
@@ -149,6 +181,8 @@ function validateConfig(value: unknown, file: string): DshxConfig {
       }
     }
   }
+
+  if (isObject(value.client)) validateSharedRuntime(value.client, file)
 
   if (value.dev !== undefined) {
     if (!isObject(value.dev)) {
@@ -306,6 +340,10 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(clientEntry === undefined ? {} : { clientEntry }),
     hostBundleDependencies,
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
+    ...(loaded.config.client === false || loaded.config.client?.shared === undefined ? {} : { clientShared: loaded.config.client.shared }),
+    ...(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined
+      ? {}
+      : { clientSharedRuntime: loaded.config.client.sharedRuntime.provide }),
     ...(hostVitePlugins.length === 0 ? {} : { hostVitePlugins }),
     ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
     outDir: resolve(root, 'dist'),

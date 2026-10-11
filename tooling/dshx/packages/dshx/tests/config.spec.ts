@@ -165,6 +165,26 @@ describe('resolveDshxConfig', () => {
     }
   })
 
+  it('normalizes shared-runtime roles and rejects ambiguous ones', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/client.tsx')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { shared: '@test/runtime' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientShared: '@test/runtime' })
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { sharedRuntime: { provide: ['zod', 'radix-ui'] } } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientSharedRuntime: ['zod', 'radix-ui'] })
+    for (const client of [
+      "{ shared: 'Not A Package' }",
+      "{ shared: '@test/runtime', sharedRuntime: { provide: ['zod'] } }",
+      '{ sharedRuntime: { provide: [] } }',
+      "{ sharedRuntime: { provide: ['zod', 'zod'] } }",
+      "{ sharedRuntime: { provide: ['./local'] } }",
+      "{ sharedRuntime: { provide: ['zod'], extra: true } }",
+    ]) {
+      await writeFile(resolve(root, 'dshx.config.ts'), `export default { client: ${client} }\n`)
+      await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({ code: 'DSHX4004' })
+    }
+  })
+
   it('resolves any independently enabled Host or Client entry', async () => {
     const hostProject = await temporaryProject({ name: '@test/host', type: 'module' })
     const hostEntry = await source(hostProject.root, 'src/host.ts')

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
@@ -1210,6 +1210,109 @@ describe('client compiler', () => {
         outDir: 'dist',
       }),
     ).rejects.toThrow('DSHX1203')
+  })
+
+  it('shares supplier modules and the supplier sheet through the module table', async () => {
+    const project = async (name: string, client: string, external: readonly string[]): Promise<string> => {
+      const root = await mkdtemp(resolve(tmpdir(), 'dshx-shared-'))
+      temporaryDirectories.push(root)
+      await mkdir(resolve(root, 'src'), { recursive: true })
+      await mkdir(resolve(root, 'node_modules/shared-lib'), { recursive: true })
+      await writeFile(
+        resolve(root, 'package.json'),
+        JSON.stringify({ name, version: '0.0.0', type: 'module', dsh: { client: { platform: 'web', inject: [], external } } }),
+      )
+      await writeFile(resolve(root, 'node_modules/shared-lib/package.json'), JSON.stringify({ name: 'shared-lib', type: 'module', exports: './index.js' }))
+      await writeFile(resolve(root, 'node_modules/shared-lib/index.js'), `export const named = 'named-from-${name}'\nexport default 'default-from-${name}'\n`)
+      await writeFile(resolve(root, 'src/client.css'), '.shared-sheet { color: #123456 }\n')
+      await writeFile(resolve(root, 'src/client.ts'), client)
+      return root
+    }
+    const supplierRoot = await project(
+      '@dshx/shared-runtime',
+      "import { defineClient } from '@dshfiles/dshx/client'\nimport './client.css'\nexport default defineClient({ setup() {} })\n",
+      [],
+    )
+    await buildClient({ packageId: '@dshx/shared-runtime', root: supplierRoot, entry: 'src/client.ts', outDir: 'dist', sharedRuntime: ['shared-lib'] })
+    const manifest = JSON.parse(await readFile(resolve(supplierRoot, 'dist/shared-runtime.json'), 'utf8')) as { supplier: string; modules: Record<string, string[]>; cssHash: string }
+    expect(manifest).toMatchObject({ supplier: '@dshx/shared-runtime', modules: { 'shared-lib': ['default', 'named'] } })
+    expect(manifest.cssHash).toMatch(/^[0-9a-f]{16}$/)
+
+    const consumerClient = [
+      "import { defineClient } from '@dshfiles/dshx/client'",
+      "import fallback, { named } from 'shared-lib'",
+      "import './client.css'",
+      'globalThis.probe = [fallback, named]',
+      'export default defineClient({ setup() {} })',
+      '',
+    ].join('\n')
+    const consumerRoot = await project('@dshx/consumer', consumerClient, ['@dshx/shared-runtime'])
+    await mkdir(resolve(consumerRoot, 'node_modules/@dshx'), { recursive: true })
+    await symlink(supplierRoot, resolve(consumerRoot, 'node_modules/@dshx/shared-runtime'), 'dir')
+    const consumerOptions = { packageId: '@dshx/consumer', root: consumerRoot, entry: 'src/client.ts', outDir: 'dist', shared: '@dshx/shared-runtime' }
+    await expect(buildClient(consumerOptions)).rejects.toMatchObject({ code: 'DSHX1208' })
+    await buildClient({ ...consumerOptions, external: ['@dshx/shared-runtime'] })
+    const consumerCode = await readFile(resolve(consumerRoot, 'dist/client.js'), 'utf8')
+    expect(consumerCode).toContain('require("@dshx/shared-runtime")')
+    expect(consumerCode).not.toContain('named-from-@dshx/consumer')
+    expect(consumerCode).not.toContain('#123456')
+
+    const factories = new Map<string, (requireModule: (id: string) => unknown) => unknown>()
+    const materialized = new Map<string, unknown>()
+    const requireModule = (id: string): unknown => {
+      if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
+      return materialized.get(id)
+    }
+    const styles: Array<{ dataset: Record<string, string>; textContent: string }> = []
+    const sandbox = {
+      document: {
+        querySelector: (selector: string) => {
+          const match = /^style\[data-([\w-]+)="(.*)"\]$/.exec(selector)
+          const key = match?.[1]?.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())
+          return styles.find(style => key !== undefined && style.dataset[key] === match?.[2]) ?? null
+        },
+        createElement: () => ({ dataset: {}, textContent: '' }),
+        head: { appendChild: (style: { dataset: Record<string, string>; textContent: string }) => styles.push(style) },
+      },
+      window: { __ModuleLoader__: { load: (value: { id: string; factory: (requireModule: (id: string) => unknown) => unknown }) => factories.set(value.id, value.factory) } },
+      globalThis: {} as Record<string, unknown>,
+    }
+    sandbox.globalThis = sandbox as unknown as Record<string, unknown>
+    vm.runInNewContext(await readFile(resolve(supplierRoot, 'dist/client.js'), 'utf8'), sandbox)
+    vm.runInNewContext(consumerCode, sandbox)
+    requireModule('@dshx/consumer')
+    expect((sandbox as unknown as { probe: unknown }).probe).toEqual(['default-from-@dshx/shared-runtime', 'named-from-@dshx/shared-runtime'])
+    expect(styles.map(style => [style.dataset.plugin, style.textContent.includes('#123456')])).toEqual([
+      ['@dshx/shared-runtime', false],
+      ['dshx:shared-css', true],
+      ['@dshx/consumer', false],
+    ])
+    expect(styles[2]?.dataset.dshxCss).toBe(manifest.cssHash)
+  })
+
+  it('keeps its own sheet when the supplier sheet differs', async () => {
+    const supplierRoot = await mkdtemp(resolve(tmpdir(), 'dshx-shared-'))
+    temporaryDirectories.push(supplierRoot)
+    await mkdir(resolve(supplierRoot, 'src'), { recursive: true })
+    await mkdir(resolve(supplierRoot, 'node_modules/shared-lib'), { recursive: true })
+    await writeFile(resolve(supplierRoot, 'package.json'), JSON.stringify({ name: '@dshx/shared-runtime', version: '0.0.0', type: 'module', dsh: { client: { platform: 'web', inject: [], external: [] } } }))
+    await writeFile(resolve(supplierRoot, 'node_modules/shared-lib/package.json'), JSON.stringify({ name: 'shared-lib', type: 'module', exports: './index.js' }))
+    await writeFile(resolve(supplierRoot, 'node_modules/shared-lib/index.js'), 'export const named = 1\n')
+    await writeFile(resolve(supplierRoot, 'src/client.ts'), "import { defineClient } from '@dshfiles/dshx/client'\nexport default defineClient({ setup() {} })\n")
+    await buildClient({ packageId: '@dshx/shared-runtime', root: supplierRoot, entry: 'src/client.ts', outDir: 'dist', sharedRuntime: ['shared-lib'] })
+
+    const consumerRoot = await mkdtemp(resolve(tmpdir(), 'dshx-shared-'))
+    temporaryDirectories.push(consumerRoot)
+    await mkdir(resolve(consumerRoot, 'src'), { recursive: true })
+    await mkdir(resolve(consumerRoot, 'node_modules/@dshx'), { recursive: true })
+    await symlink(supplierRoot, resolve(consumerRoot, 'node_modules/@dshx/shared-runtime'), 'dir')
+    await writeFile(resolve(consumerRoot, 'package.json'), JSON.stringify({ name: '@dshx/consumer', version: '0.0.0', type: 'module', dsh: { client: { platform: 'web', inject: [], external: ['@dshx/shared-runtime'] } } }))
+    await writeFile(resolve(consumerRoot, 'src/client.css'), '.own-sheet { color: #654321 }\n')
+    await writeFile(resolve(consumerRoot, 'src/client.ts'), "import { defineClient } from '@dshfiles/dshx/client'\nimport './client.css'\nexport default defineClient({ setup() {} })\n")
+    await buildClient({ packageId: '@dshx/consumer', root: consumerRoot, entry: 'src/client.ts', outDir: 'dist', shared: '@dshx/shared-runtime', external: ['@dshx/shared-runtime'] })
+    const code = await readFile(resolve(consumerRoot, 'dist/client.js'), 'utf8')
+    expect(code).toContain('#654321')
+    expect(code).toContain('require("@dshx/shared-runtime")')
   })
 
   it('does not remove the Host artifact from the shared output directory', async () => {

@@ -96,6 +96,27 @@ DSHX fixes `cssCodeSplit: false` and `publicDir: false`, and inlines imported im
 
 Loading the registration script alone does not create the style; it is created when the lazy factory materializes. Official DSH plugin ownership removes the old element during HMR/disposal. The final Client output allows one JavaScript file, an optional sourcemap, declarations, and no independent CSS, asset, worker, WASM, or additional chunk.
 
+## Shared runtime (opt-in)
+
+Every Client chunk otherwise inlines its own copy of each third-party module and of its stylesheet. Plugins built from the same libraries can share one copy through the DSH module table, which already loads a package that another package lists in `dsh.client.external` before that consumer:
+
+```ts
+// supplier: an ordinary Client-only package with its own Loader row
+export default defineConfig({
+  client: { sharedRuntime: { provide: ['zod', '@tanstack/react-query', '@radix-ui/react-dialog'] } },
+})
+
+// consumer: also add the supplier to dependencies and to dsh.client.external
+export default defineConfig({ client: { shared: '@scope/shared-runtime' } })
+```
+
+- The supplier's chunk exports `sharedModules` (one namespace per provided specifier) and writes `dist/shared-runtime.json`: each module's export names and the hash of its stylesheet.
+- In a consumer, an import whose specifier exactly matches a provided module resolves to a small side-effect-free facade over `require(supplier).sharedModules[specifier]`. Other specifiers, subpaths included, stay private. A `bundleDependencies` entry wins over the supplier.
+- When the consumer's CSS hash equals the supplier's, the consumer only emits its ownership marker and the supplier injects the sheet. A consumer whose CSS differs keeps injecting its own sheet.
+- Build the supplier first. A missing manifest, or a supplier not listed in `dsh.client.external`, fails the build (`DSHX1208`, `DSHX4233`).
+- A supplier module is shared by every consumer, so its module-level state is shared too: keep anything meant to be per-plugin (a per-bundle QueryClient, for example) in the consumer's own code.
+- The Host must install the supplier: a consumer built with `shared` does not activate in a profile without it. To go back, drop `shared` and rebuild.
+
 ## Tailwind v4 without Preflight
 
 Tailwind is optional and remains a generated-project dev dependency. Configure the standard plugin as shown above, then import a CSS-first stylesheet:

@@ -10,6 +10,7 @@ import { DshxError } from '../../diagnostics.js'
 import { artifactDeclarationPlugin, buildReport, buildWatcher, kernelBoundaryPlugin, resolveUserPlugins } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { clientCssPlugin } from './css.js'
+import { SharedRuntime } from './shared-runtime.js'
 import {
   CLIENT_SDK_PROVIDERS,
   CLIENT_SETUP_SERVICE_CAPABILITIES,
@@ -62,6 +63,10 @@ export interface BuildClientOptions {
   readonly vite?: ViteExtensionOptions
   readonly bundleDependencies?: readonly string[]
   readonly external?: readonly string[]
+  /** Package id of the shared-runtime supplier whose modules replace private copies. */
+  readonly shared?: string
+  /** Exact module specifiers this package supplies as a shared runtime. */
+  readonly sharedRuntime?: readonly string[]
   /** Package edges declared by dsh.client.inject. */
   readonly inject?: readonly string[]
   /**
@@ -197,6 +202,8 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
         'export function apply(ctx, config) { return plugin.apply(ctx, config) }',
+        ...(options.sharedRuntime === undefined ? [] : [SharedRuntime.supplierEntryExport()]),
+        ...(options.shared === undefined ? [] : [SharedRuntime.consumerEntryImport(options.shared)]),
         '',
       ].join('\n')
     },
@@ -456,6 +463,8 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
   }
   const isBundled = (source: string): boolean => bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
   const external = (source: string): boolean => externals.has(source) && !isBundled(source)
+  const supplier = options.shared === undefined ? undefined : await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
+  let sheetHash: string | undefined
   const assetsInlineLimit = (): boolean => true
   const output = {
     format: 'cjs',
@@ -481,7 +490,20 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
       clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
       artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
-      clientCssPlugin(options.packageId, paths.outDir),
+      ...(supplier === undefined || options.shared === undefined
+        ? []
+        : [SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies })]),
+      ...(options.sharedRuntime === undefined
+        ? []
+        : [SharedRuntime.supplierPlugin({ packageId: options.packageId, root: paths.root, provide: options.sharedRuntime, outDir: paths.outDir, cssHash: () => sheetHash })]),
+      clientCssPlugin({
+        packageId: options.packageId,
+        outDir: paths.outDir,
+        ...(supplier?.cssHash === undefined ? {} : { suppliedHash: supplier.cssHash }),
+        onSheet: hash => {
+          sheetHash = hash
+        },
+      }),
       clientCapabilitiesPlugin(options),
       kernelBoundaryPlugin({
         face: 'client',

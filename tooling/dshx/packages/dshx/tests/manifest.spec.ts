@@ -215,6 +215,19 @@ describe('checkProjectManifest', () => {
     expect(diagnostics.filter(item => item.code === 'DSHX4215')).toHaveLength(3)
   })
 
+  it('requires the shared-runtime supplier in dsh.client.external', async () => {
+    const root = await temporaryProject()
+    const manifest = fullManifest()
+    await writeManifest(root, manifest)
+    const resolved = await resolveDshxConfig({ cwd: root })
+    const missing = await checkProjectManifest({ ...resolved, clientShared: '@test/runtime' })
+    expect(missing.filter(item => item.code === 'DSHX4233')).toHaveLength(1)
+    ;(manifest.dsh as { client: Record<string, unknown> }).client = { ...(manifest.dsh as { client: Record<string, unknown> }).client, external: ['@test/runtime'] }
+    await writeManifest(root, manifest)
+    const declared = await checkProjectManifest({ ...(await resolveDshxConfig({ cwd: root })), clientShared: '@test/runtime' })
+    expect(declared.filter(item => item.code === 'DSHX4233')).toHaveLength(0)
+  })
+
   it('previews the hook-driven Settings provider edge through the local Client graph', async () => {
     const root = await temporaryProject()
     await writeFile(

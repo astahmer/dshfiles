@@ -15,11 +15,24 @@ export interface DshxFaceConfig {
 /** Host package roots that DSHX should embed in its single Host artifact. */
 export interface DshxHostConfig extends DshxFaceConfig {}
 
+/** Client face options, including the opt-in shared runtime on either side. */
+export interface DshxClientConfig extends DshxFaceConfig {
+  /**
+   * Package id of a shared-runtime supplier. Every module it provides resolves to the supplier's copy instead of a
+   * private one; the supplier must be listed in `dsh.client.external` and built first.
+   */
+  readonly shared?: string
+  /** Make this package a shared-runtime supplier for the listed exact module specifiers. */
+  readonly sharedRuntime?: {
+    readonly provide: readonly string[]
+  }
+}
+
 /** User-authored DSHX project exceptions. */
 export interface DshxConfig {
   readonly name?: string
   readonly host?: false | DshxHostConfig
-  readonly client?: false | DshxFaceConfig
+  readonly client?: false | DshxClientConfig
   readonly profile?: string
   readonly dev?: {
     readonly hostRestart?: 'manual' | 'auto'
@@ -54,6 +67,8 @@ export interface ResolvedDshxConfig {
   readonly hostBundleDependencies?: readonly string[]
   readonly clientBundleDependencies?: readonly string[]
   readonly clientVitePlugins?: readonly PluginOption[]
+  readonly clientShared?: string
+  readonly clientSharedRuntime?: readonly string[]
   readonly outDir: string
   readonly profile: string
   readonly dev: {

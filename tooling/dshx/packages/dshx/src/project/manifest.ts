@@ -247,6 +247,17 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
       )
     }
   }
+  if (config.clientShared !== undefined && !(external ?? []).includes(config.clientShared)) {
+    diagnostics.push(
+      issue(
+        'DSHX4233',
+        'error',
+        `client.shared uses ${JSON.stringify(config.clientShared)}, but dsh.client.external does not request it.`,
+        file,
+        `Add ${JSON.stringify(config.clientShared)} to dsh.client.external so the Host loads the shared-runtime supplier before this package.`,
+      ),
+    )
+  }
   if (external === undefined) return
 
   const baseline = new Set([...compatibility.client.platformModules, ...compatibility.client.preloadedExternals])
