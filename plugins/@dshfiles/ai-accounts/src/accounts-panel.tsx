@@ -38,6 +38,11 @@ export const AccountsPanel = (props: {
   return (
     <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-hidden dshx:px-6 dshx:py-3.5">
       <AccountsToolbar file={state.file} state={state} />
+      {state.notice === null ? null : (
+        <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
+          {state.notice}
+        </p>
+      )}
 
       <QuotaContinuations accountId={state.selectedId} />
 
@@ -54,8 +59,8 @@ export const AccountsPanel = (props: {
               </EmptyMedia>
               <EmptyTitle className="dshx:text-base">Your accounts, side by side.</EmptyTitle>
               <EmptyDescription>
-                Create a Codex, Claude, GitHub Copilot, OpenCode Go, Command Code or Cursor profile. Each subscription becomes its own route in the model picker; Cursor tracks
-                quota for the Cursor Agent runtime.
+                Create a Codex, Claude, GitHub Copilot, OpenCode Go, Command Code or Cursor profile. Each subscription becomes its own route in the model
+                picker; Cursor tracks quota for the Cursor Agent runtime.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

@@ -11,6 +11,12 @@ const credential = {
 } as const
 
 describe('GitHub Copilot credential records', () => {
+  it('encodes route slugs into valid, collision-free DSH credential keys', () => {
+    const underscored = copilotCredentialKey('github-copilot_work')
+    expect(String(underscored)).toMatch(/^ai-accounts\/github-copilot-[a-f0-9]+$/u)
+    expect(underscored).not.toEqual(copilotCredentialKey('github-copilot-work'))
+  })
+
   it('stores each subscription under an account-scoped DSH credential record', async () => {
     const records = new Map<string, CredentialRecord>()
     const provider = {

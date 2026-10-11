@@ -61,7 +61,7 @@ export const createCopilotLoginService = (input: {
           return
         }
         if (event.type === 'progress') {
-          states.set(instanceId, { ...state(instanceId), message: event.message.slice(0, 300) })
+          states.set(instanceId, { ...state(instanceId), message: 'Waiting for GitHub authorization…' })
         }
       },
     })

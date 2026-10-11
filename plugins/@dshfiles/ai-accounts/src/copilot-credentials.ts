@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { z } from 'zod'
@@ -14,7 +15,7 @@ const credentialSchema = z
   })
   .passthrough()
 
-export const copilotCredentialKey = (instanceId: string) => credentialKey('ai-accounts', `github-copilot-${instanceId}`)
+export const copilotCredentialKey = (instanceId: string) => credentialKey('ai-accounts', `github-copilot-${Buffer.from(instanceId, 'utf8').toString('hex')}`)
 
 export const readCopilotCredential = async (
   provider: Pick<CredentialProvider, 'readRecord'> | undefined,
