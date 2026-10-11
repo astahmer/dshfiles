@@ -17,11 +17,12 @@ port, and a workspace registration callback.
 ```
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
-`disabled`, and `mode`. The default `projects` mode shows registered projects
-and switches to browsing when the query starts with `/`. `directories` starts
-in folder browsing and hides project choices and project registration. Recent
-folders (previously chosen paths listed after the projects) yield a `directory`
-selection.
+`disabled`, `mode`, and `showNativePicker`. The default `projects` mode shows
+registered projects and switches to browsing when the query starts with `/`.
+`directories` starts in folder browsing and hides project choices and project
+registration. Set `showNativePicker` to `false` when the injected Host backend
+has no native chooser. Recent folders (previously chosen paths listed after the
+projects) yield a `directory` selection.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:

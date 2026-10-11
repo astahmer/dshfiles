@@ -48,6 +48,7 @@ export interface ProjectFolderPickerProps {
   readonly onSelect: (selection: ProjectFolderSelection) => void
   readonly onClose: () => void
   readonly mode?: 'projects' | 'directories'
+  readonly showNativePicker?: boolean
   readonly disabled?: boolean
   readonly title?: string
   /**
@@ -256,10 +257,12 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               value={query}
             />
           </div>
-          <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
-            <FolderOpenIcon aria-hidden />
-            Browse…
-          </Button>
+          {props.showNativePicker !== false && (
+            <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
+              <FolderOpenIcon aria-hidden />
+              Browse…
+            </Button>
+          )}
         </div>
         {pathMode ? (
           <>
