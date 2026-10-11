@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "shared-client-runtime",
+      "title": "Share the client UI runtime",
+      "summary": "Load one shared copy of the Client UI modules and stylesheet before dependent UI plugins mount.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["available", "failed"],
+      "failureModes": ["The shared runtime bundle fails to load before dependent Client plugins mount."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "shared-runtime.client-boot",
+          "featureFile": "tooling/dshx/e2e/features/shared-runtime.feature"
+        }
+      ]
+    }
+  ]
+}

@@ -100,5 +100,8 @@
       "platform": "web",
       "inject": []
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }
