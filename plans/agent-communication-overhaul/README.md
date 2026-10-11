@@ -25,4 +25,4 @@
 
 ## Resume here
 
-Review the owned-path diff and create focused JJ checkpoints. Plugin source/build, migration/API tests, and isolated browser E2E are verified; report the 83 unrelated feature-catalog issues, missing DSH core build artifact, and partial UI-consumer rebuild separately. Live Host verification remains intentionally unperformed; do not restart or deploy it.
+Implementation and focused JJ checkpoints are complete. Plugin source/build, migration/API tests, and all 4 isolated browser scenarios pass. Remaining external gates: 83 unrelated feature-catalog issues; DSHX/other-consumer builds blocked by the missing `@deepseek-ai/dsh-api-session-controller/client` artifact; live Host intentionally unverified and untouched.
