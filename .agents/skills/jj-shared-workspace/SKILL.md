@@ -57,6 +57,11 @@ AGENTS.md (`@` mid-line, `--use-destination-message`):
   server writes to this store too.
 - `jj abandon '<base>:: & ~::<tip>'` prints `Deleted bookmarks:` and re-creates abandoned workspace `@`s on the
   nearest visible ancestor, which can sit below the base. Sweep `jj workspace list` so no `@` is left off the line.
+- Snapshot every workspace before the first rewrite (`jj status` inside each); an edit that was never snapshotted
+  is not in the store. A rewrite orphans each live `@` that was a child of the tip, so re-fold after every pass:
+  `jj rebase -r <stray-head> -d <tip>`, then abandon the duplicate copy. Agents keep committing — expect repeats.
+- Move an interior `@` with `jj new <tip>` **inside that workspace**. `jj rebase -r` on an interior revision
+  re-applies everything above it and re-introduces conflicts you already resolved.
 
 - Check the board before and after: `pnpm run jj:workspaces` lists every
   workspace's `@` with on-spine / ahead / off-spine, conflicts and empty slots.
@@ -64,4 +69,13 @@ AGENTS.md (`@` mid-line, `--use-destination-message`):
   them and `--abandon-empty` also drops their orphan slot (directories stay on
   disk).
 
-Full recipe: `jj-history-consolidation`. Spine record: `plans/jj-unify-20261011/README.md`.
+## After the line is one head
+
+- `main` and `integration-spine` both point at the tip, and each workspace `@` is its own empty slot on the line.
+- Resolve a conflicted `integration-spine` before running repo scripts
+  (`jj bookmark set integration-spine -r <tip> --allow-backwards`): a conflicted bookmark is not a usable revset
+  name and breaks `pnpm run jj:workspaces`.
+- The cached plugin gate keys on the revision's content (`jj diff --from root() --to <rev>`), not on where `main`
+  points — do not reintroduce a `main`-based cache key.
+
+Full recipe: `jj-history-consolidation`.
