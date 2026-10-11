@@ -47,9 +47,9 @@ Feature: Thread sidebar journeys
     Then the policy settings survive a browser reload
 
   @scenario:thread-sidebar.manual-unread
-  Scenario: Manual unread clears when a thread is reopened
+  Scenario: Manual unread stays per-thread and clears on reopen
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When a nonblank thread is marked unread and reopened
+    When one thread is marked unread and another thread is opened
     Then its unread marker clears on open
 
   @scenario:thread-sidebar.auto-archive-overrides

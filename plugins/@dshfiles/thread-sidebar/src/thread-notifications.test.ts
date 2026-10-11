@@ -91,3 +91,14 @@ test('opening a thread clears its needs-you and manual unread markers while keep
     manuallyUnreadSessionIds: [],
   })
 })
+
+test('opening one thread preserves another thread unread marker', () => {
+  const firstUnread = markThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'first')
+  const bothUnread = markThreadUnread(firstUnread, 'second')
+  const secondSeen = markThreadSeen(bothUnread, 'second')
+
+  assert.equal(isThreadUnread(bothUnread, 'first', false), true)
+  assert.equal(isThreadUnread(bothUnread, 'second', false), true)
+  assert.equal(isThreadUnread(secondSeen, 'first', false), true)
+  assert.equal(isThreadUnread(secondSeen, 'second', false), false)
+})

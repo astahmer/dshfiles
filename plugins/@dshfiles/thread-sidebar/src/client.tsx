@@ -23,6 +23,8 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
@@ -60,12 +62,16 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
+  autoArchiveOverrideForSession,
   isAutoArchiveCandidate,
   isAttentionSessionIncluded,
   nextIdleTransitionAt,
   parseSessionIds,
   sessionLineage,
   sectionForSession,
+  setAutoArchiveOverride as updateAutoArchiveOverride,
+  shouldScanForAutoArchive,
+  type AutoArchiveOverride,
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
@@ -253,6 +259,7 @@ interface RowActions {
   readonly setNotificationMute: (sessionId: SessionSummary['id'], mutedUntil: number | null) => void
   readonly clearNotificationMute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
+  readonly setAutoArchiveOverride: (sessionId: SessionSummary['id'], override: AutoArchiveOverride) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -272,6 +279,7 @@ interface RowStyle {
 interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
+  readonly autoArchiveOverride: AutoArchiveOverride
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly archived: boolean
   readonly pinned: boolean
@@ -666,6 +674,41 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuSub>
+          <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+            <ContextMenuRadioGroup value={props.autoArchiveOverride}>
+              <ContextMenuRadioItem
+                value="inherit"
+                onSelect={event => {
+                  event.preventDefault()
+                  props.actions.setAutoArchiveOverride(session.id, 'inherit')
+                }}
+              >
+                {t('threadSidebarAutoSettleInherit')}
+              </ContextMenuRadioItem>
+              <ContextMenuRadioItem
+                value="enabled"
+                onSelect={event => {
+                  event.preventDefault()
+                  props.actions.setAutoArchiveOverride(session.id, 'enabled')
+                }}
+              >
+                {t('threadSidebarAutoSettleEnabled')}
+              </ContextMenuRadioItem>
+              <ContextMenuRadioItem
+                value="disabled"
+                onSelect={event => {
+                  event.preventDefault()
+                  props.actions.setAutoArchiveOverride(session.id, 'disabled')
+                }}
+              >
+                {t('threadSidebarAutoSettleDisabled')}
+              </ContextMenuRadioItem>
+            </ContextMenuRadioGroup>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
           <ContextMenuSubTrigger>{t('threadSidebarNotifications')}</ContextMenuSubTrigger>
           <ContextMenuSubContent className="dshx-root dshx:min-w-44">
             {snoozeDurations.map(duration => (
@@ -760,11 +803,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
   const unreadSessionIds = useMemo(
     () =>
-      new Set(
-        sessions
-          .filter(session => isThreadUnread(notificationPreferences, session.id, Boolean(session.attention?.unread)))
-          .map(session => session.id),
-      ),
+      new Set(sessions.filter(session => isThreadUnread(notificationPreferences, session.id, Boolean(session.attention?.unread))).map(session => session.id)),
     [notificationPreferences, sessions],
   )
 
@@ -1040,7 +1079,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const runAutoArchive = async (): Promise<void> => {
     const latest = latestAutoArchive.current
-    if (archiveInFlight.current || latest === null || !latest.preferences.autoArchiveEnabled) return
+    if (archiveInFlight.current || latest === null || !shouldScanForAutoArchive(latest.preferences)) return
     archiveInFlight.current = true
     let failed = false
     try {
@@ -1081,12 +1120,19 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   useEffect(() => {
-    if (!preferences.autoArchiveEnabled) return
+    if (!shouldScanForAutoArchive(preferences)) return
     if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
     void runAutoArchive()
     const timer = window.setInterval(() => void runAutoArchive(), preferences.scanIntervalMinutes * 60_000)
     return () => window.clearInterval(timer)
-  }, [preferences.autoArchiveEnabled, preferences.scanIntervalMinutes, sessionState.phase, workspaceState.phase])
+  }, [
+    preferences.autoArchiveEnabled,
+    preferences.autoArchiveDisabledSessionIds,
+    preferences.autoArchiveSessionIds,
+    preferences.scanIntervalMinutes,
+    sessionState.phase,
+    workspaceState.phase,
+  ])
 
   const threadTree = useMemo(() => {
     const listed: SessionSummary[] = []
@@ -1464,8 +1510,26 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
 
-  const latestRowActions = useRef({ openThread, mutateSession, toggleParked, copyContextValue, props, sessionsById: sessionState.byId })
-  latestRowActions.current = { openThread, mutateSession, toggleParked, copyContextValue, props, sessionsById: sessionState.byId }
+  const latestRowActions = useRef({
+    openThread,
+    mutateSession,
+    toggleParked,
+    copyContextValue,
+    props,
+    sessionsById: sessionState.byId,
+    preferences,
+    changePreferences,
+  })
+  latestRowActions.current = {
+    openThread,
+    mutateSession,
+    toggleParked,
+    copyContextValue,
+    props,
+    sessionsById: sessionState.byId,
+    preferences,
+    changePreferences,
+  }
   useEffect(() => {
     setPaletteRecentLimit(preferences.paletteRecentLimit)
   }, [preferences.paletteRecentLimit])
@@ -1544,6 +1608,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
         threadNotificationPreferences.set(markThreadUnread(current, sessionId))
       },
+      setAutoArchiveOverride: (sessionId, override) => {
+        const current = latestRowActions.current
+        const next = updateAutoArchiveOverride(current.preferences, sessionId, override)
+        current.changePreferences({
+          autoArchiveSessionIds: next.autoArchiveSessionIds,
+          autoArchiveDisabledSessionIds: next.autoArchiveDisabledSessionIds,
+        })
+      },
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -1571,6 +1643,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         key={session.id}
         session={session}
         unread={unreadSessionIds.has(session.id)}
+        autoArchiveOverride={autoArchiveOverrideForSession(preferences, session.id)}
         unreadSessionIds={unreadSessionIds}
         archived={archivedSessionIds.has(session.id)}
         pinned={pinnedSessionIds.has(session.id)}

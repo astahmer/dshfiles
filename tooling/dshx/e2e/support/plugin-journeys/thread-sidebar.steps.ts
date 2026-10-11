@@ -1,6 +1,14 @@
 import { expect, type Page, type TestInfo } from '@playwright/test'
+import { z } from 'zod'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+
+const createdSessionResponseSchema = z.object({
+  result: z.object({
+    ok: z.literal(true),
+    value: z.object({ sessionId: z.string().min(1) }),
+  }),
+})
 
 interface ThreadHistoryJourney {
   readonly firstThreadId: string
@@ -18,19 +26,18 @@ const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
 
 const startBlankThread = async (page: Page): Promise<string> => {
-  const createResponsePromise = page.waitForResponse(response => {
-    const request = response.request()
-    return request.method() === 'POST' && request.postData()?.includes('session/create') === true
-  }, { timeout: 15_000 })
+  const createResponsePromise = page.waitForResponse(
+    response => {
+      const request = response.request()
+      return request.method() === 'POST' && request.postData()?.includes('session/create') === true
+    },
+    { timeout: 15_000 },
+  )
   await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
   const createResponse = await createResponsePromise
-  const body: unknown = await createResponse.json()
-  const rpcResult = typeof body === 'object' && body !== null && 'result' in body ? body.result : undefined
-  const result =
-    typeof rpcResult === 'object' && rpcResult !== null && 'ok' in rpcResult && rpcResult.ok === true && 'value' in rpcResult ? rpcResult.value : undefined
-  const createdThreadId =
-    typeof result === 'object' && result !== null && 'sessionId' in result && typeof result.sessionId === 'string' ? result.sessionId : null
-  if (createdThreadId === null) throw new Error('The Host did not return a session ID after New thread was clicked.')
+  const parsedResponse = createdSessionResponseSchema.safeParse(await createResponse.json())
+  if (!parsedResponse.success) throw new Error('The Host returned an invalid session ID after New thread was clicked.')
+  const createdThreadId = parsedResponse.data.result.value.sessionId
   await expect.poll(() => currentThreadId(page)).toBe(createdThreadId)
   await expect(page.getByRole('textbox').first()).toBeVisible()
   return createdThreadId
@@ -358,30 +365,38 @@ Then('the policy settings survive a browser reload', async ({ page }: { page: Pa
   await finishJourneyAssertions(page)
 })
 
-When('a nonblank thread is marked unread and reopened', async ({ page }: { page: Page }) => {
+When('one thread is marked unread and another thread is opened', async ({ page }: { page: Page }) => {
   const targetThreadId = await startBlankThread(page)
-  const prompt = 'thread sidebar manual unread e2e target'
+  const targetPrompt = 'thread sidebar primary unread e2e target'
   const composer = page.getByRole('textbox').first()
-  await composer.fill(prompt)
+  await composer.fill(targetPrompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar primary unread' })
   await expect(targetRow).toHaveCount(1)
-  await startBlankThread(page)
-  await targetRow.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
-  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+
+  const otherThreadId = await startBlankThread(page)
+  const otherPrompt = 'thread sidebar sibling unread e2e target'
+  await composer.fill(otherPrompt)
+  await composer.press('Enter')
+  const otherRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar sibling unread' })
+  await expect(otherRow).toHaveCount(1)
+
   await targetRow.getByRole('button').first().click()
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
-  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+
+  await otherRow.getByRole('button').first().click()
+  await expect.poll(() => currentThreadId(page)).toBe(otherThreadId)
+  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+
   await targetRow.getByRole('button').first().click()
-  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+  await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
 })
 
 Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar primary unread' })
   await recordAssertion(page, 'thread-sidebar-manual-unread-clears-on-open', async () => {
     await expect(targetRow).toHaveCount(1)
     await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
@@ -395,7 +410,7 @@ When('auto-archive is enabled for one thread while global auto-archive stays off
   const composer = page.getByRole('textbox').first()
   await composer.fill(prompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
   await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
@@ -419,7 +434,7 @@ Then('the per-thread override survives reload without changing the global settin
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
-  await recordAssertion(page, 'thread-sidebar-per-thread-auto-archive-enablement-survives-reload', async () => {
+  await recordAssertion(page, 'thread-sidebar-per-thread-auto-archive-survives-reload', async () => {
     await expect(page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
