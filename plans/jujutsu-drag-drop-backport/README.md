@@ -10,8 +10,8 @@ Workspace created at base `vktwsnrw` (`631856515829cc5d1f25295d2406dea9f7028e36`
 | Add contextual rebase/bookmark previews and click-to-target move | complete | Host prepare/confirm remains the mutation boundary; previews stay pinned across filters, retain details while confirming, and can be cancelled before confirm. |
 | Fix Mine-only ancestry and improve ID copying | complete | Hidden immutable ancestry bridges with dashed rails; full change ID and this-revision commit ID have distinct labels and clipboard feedback. |
 | Review push-marker evidence boundary | complete | UI reports only the most recent JJ push-command invocation; it does not attribute a pushed revision. |
-| Validate plugin, import, and meaningful UI journey | in progress | Targeted browser run exposed a lost untracked step helper; restore, run in isolated profile, and report known catalog baseline failures separately. |
-| Describe focused revisions and prepare handoff | pending | Split only owned paths; do not rewrite or integrate over active writers. |
+| Validate plugin, import, and meaningful UI journey | in progress | Typecheck, 100 tests, build, and Host import pass. Feature tags/catalog entries are recognized; 82 unrelated coverage baseline issues remain. Isolated browser journey now registers a disposable repo and reaches its graph, but the full interaction scenario still needs a successful run. |
+| Describe focused revisions and prepare handoff | in progress | Source and E2E changes are split into described revisions. Keep source workspace intact; do not integrate across active writers without tree-preservation proof. |
 
 ## Deferred decision
 
@@ -19,4 +19,4 @@ Do not change revision branch ordering in this work. Compare BB recency ordering
 
 ## Resume here
 
-Finish plugin type/test/build and host-import checks, run the isolated Jujutsu browser journeys, then split owned paths and leave an integration handoff. Revision ordering remains explicitly deferred.
+Finish the isolated preview and ID journeys, rebuild all plugin-ui dependents after UI class changes, run format and feature checks, then record source commit IDs and exact integration handoff. Do not integrate while shared writers are active. Revision ordering remains explicitly deferred.
