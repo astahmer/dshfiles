@@ -9,7 +9,6 @@ export interface SidebarNotice {
 }
 
 export const SUCCESS_NOTICE_DURATION_MS = 3_000
-export const UNDO_NOTICE_DURATION_MS = 5_000
 
 export const SidebarNoticeMessage = (props: { readonly message: string }): JSX.Element => (
   <AlertDescription className="dshx:text-xs dshx:whitespace-nowrap">{props.message}</AlertDescription>
