@@ -1,3 +1,4 @@
+import type { SubagentDescendantListEntry } from '@deepseek-ai/dsh-subagent'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
@@ -62,3 +63,26 @@ export const projectRegisteredWorkspace = (workspace: Pick<Workspace, 'id' | 'ti
   workspace_id: workspace.id,
   workspace_title: workspace.title,
 })
+
+export const projectDurableSubagentDescendants = (entries: readonly SubagentDescendantListEntry[]) =>
+  entries.map(entry => {
+    if (entry.kind === 'diagnostic') {
+      return {
+        kind: 'diagnostic',
+        id: entry.id,
+        parent_session_id: entry.parentId,
+        depth: entry.depth,
+        reason: entry.reason,
+      }
+    }
+
+    return {
+      kind: 'child',
+      id: entry.id,
+      parent_session_id: entry.parentId,
+      depth: entry.depth,
+      mode: entry.mode,
+      activity: entry.activity,
+      has_children: entry.hasChildren,
+    }
+  })
