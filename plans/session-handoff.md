@@ -21,4 +21,3 @@ delete this file when empty.
 - [ ] Repo `pnpm lint` / `fmt:check` leftovers outside touched files.
 - [ ] ADE leftovers and dock-everything/workbench panel kinds — [ade/README.md](ade/README.md), [ade/docking.md](ade/docking.md).
 - [ ] Delete `plugins/@dshfiles/plugin-marketplace` after `nixapply` + restart; delete `~/.dsh/profiles/scratch-jj`.
-- [ ] ADE P0.5 shared runtime approved by the user (2026-10-11): `@dshfiles/shared-runtime` supplier plugin + dshx `sharedRuntime.provide` / consumer `shared` + CSS-hash skip; plugin-ui stays a build-time library; needs profile sync + restart.
