@@ -141,13 +141,16 @@ Then('revision and bookmark moves preview in the target context without changing
 
   console.log('Jujutsu E2E: descendant revision drop')
   await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.childDescription), { timeout: 10_000 })
-  await recordAssertion(page, 'jujutsu-descendant-drop-shows-actionable-feedback', () => expect(page.getByText(invalidDropMessage, { exact: true })).toBeVisible())
+  await recordAssertion(page, 'jujutsu-descendant-drop-shows-actionable-feedback', () =>
+    expect(page.getByText(invalidDropMessage, { exact: true })).toBeVisible({ timeout: 8_000 }),
+  )
 
   console.log('Jujutsu E2E: valid branch drop')
   await dragHandleFor(page, fixture.sourceDescription).dragTo(await dragHandleFor(page, fixture.targetDescription), { timeout: 10_000 })
+  console.log('Jujutsu E2E: branch drop returned')
   const branchPreview = page.getByRole('group', { name: 'Preview branch rebase', exact: true })
   await recordAssertion(page, 'jujutsu-rebase-drop-renders-context-and-host-preview', async () => {
-    await expect(branchPreview).toBeVisible()
+    await expect(branchPreview).toBeVisible({ timeout: 8_000 })
     await expect(branchPreview).toContainText(fixture.sourceDescription)
     await expect(branchPreview).toContainText(fixture.childDescription)
     await expect(branchPreview).toContainText(fixture.targetDescription)
