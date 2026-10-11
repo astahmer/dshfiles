@@ -78,4 +78,26 @@ AGENTS.md (`@` mid-line, `--use-destination-message`):
 - The cached plugin gate keys on the revision's content (`jj diff --from root() --to <rev>`), not on where `main`
   points — do not reintroduce a `main`-based cache key.
 
+## Concurrent writers fork the line
+
+Two writers on one store (another agent, or the VisualJJ branching server) make jj record **divergent
+operations** and reconcile them by keeping both results: one change-id, two commit-ids. The symptom is a
+second head and a workspace `@` sitting on the copy that is not on the line.
+
+```sh
+jj op log -n 20 -T 'id.short() ++ " " ++ description.first_line() ++ "\n"' | grep reconcile
+jj log -r '<base>::' -T 'change_id ++ "\n"' | sort | uniq -d          # twins
+jj workspace list -T 'name ++ "\t" ++ target.change_id().short() ++ "\t" ++ target.conflict() ++ "\n"'
+```
+
+Keep the copy a live workspace holds (or the one on the line), fold the stray, drop the twin:
+
+```sh
+jj rebase -r <stray-head> -d <tip>
+jj abandon <duplicate-copy>        # that workspace's @ resets to an ancestor
+```
+
+Then re-check one head and zero duplicate change-ids. Treat every new `reconcile divergent operations` line as
+"scan for twins now", and keep the surgery window short — this is a race, not a bug in your plan.
+
 Full recipe: `jj-history-consolidation`.
