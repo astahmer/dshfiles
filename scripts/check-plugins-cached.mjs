@@ -14,17 +14,11 @@ const flag = (name, fallback) => {
 const jj = (args) =>
   execFileSync("jj", args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 }).trimEnd();
 
-const base = flag("--base", "main");
 const rev = flag("--rev", "@");
 const force = process.argv.includes("--force");
 
-const content = jj(["diff", "--from", base, "--to", rev, "--git"]);
-const fingerprint = createHash("sha256")
-  .update(base)
-  .update("\0")
-  .update(content)
-  .digest("hex")
-  .slice(0, 16);
+const content = jj(["diff", "--from", "root()", "--to", rev, "--git"]);
+const fingerprint = createHash("sha256").update(content).digest("hex").slice(0, 16);
 const cacheFile = `${cacheDir}/${fingerprint}.json`;
 
 const printGates = (record, verb) => {
@@ -60,7 +54,6 @@ for (const gate of gates) {
 mkdirSync(cacheDir, { recursive: true });
 const record = {
   fingerprint,
-  base,
   rev,
   tree: jj(["log", "-r", rev, "--no-graph", "-T", "commit_id"]),
   recordedAt: new Date().toISOString(),
