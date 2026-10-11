@@ -41,7 +41,7 @@ export const HeaderThreadActions = ({
   const { preferences, updatePreferences } = usePreferences()
   const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const [actionFailed, setActionFailed] = useState(false)
-  if (session === undefined) return null
+  if (session === undefined || session.blank) return null
 
   const archived = workspaceState.archivedSessionIds.includes(sessionId)
   const pinned = workspaceState.pinnedSessionIds.includes(sessionId)
@@ -128,11 +128,6 @@ export const HeaderThreadActions = ({
             </DropdownMenuItem>
           </>
         )}
-        {actionFailed ? (
-          <div className="dshx:px-2 dshx:py-1.5 dshx:text-destructive" role="alert">
-            {t('threadSidebarActionFailure')}
-          </div>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )
