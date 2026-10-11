@@ -17,6 +17,8 @@ export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished
 export type AttentionColors = Record<AttentionColorKey, AttentionColor>
 
 export interface SidebarPreferences {
+  archiveUndoEnabled: boolean
+  archiveUndoDurationSeconds: number
   autoArchiveEnabled: boolean
   idleMinutes: number
   scanIntervalMinutes: number
@@ -63,6 +65,8 @@ export interface SidebarPreferences {
 export type ThreadRowDensity = 'compact' | 'comfortable'
 
 export const DEFAULT_PREFERENCES: SidebarPreferences = {
+  archiveUndoEnabled: true,
+  archiveUndoDurationSeconds: 5,
   autoArchiveEnabled: false,
   idleMinutes: 120,
   scanIntervalMinutes: 10,
