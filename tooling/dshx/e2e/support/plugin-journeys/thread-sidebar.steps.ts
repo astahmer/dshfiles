@@ -288,6 +288,67 @@ Then('the policy settings survive a browser reload', async ({ page }: { page: Pa
   await finishJourneyAssertions(page)
 })
 
+When('a nonblank thread is marked unread and reopened', async ({ page }: { page: Page }) => {
+  const targetThreadId = await startBlankThread(page)
+  const prompt = 'thread sidebar manual unread e2e target'
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await startBlankThread(page)
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mark as unread', exact: true }).click()
+  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+  await targetRow.getByRole('button').first().click()
+  await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
+})
+
+Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e target' })
+  await recordAssertion(page, 'thread-sidebar-manual-unread-clears-on-open', async () => {
+    await expect(targetRow).toHaveCount(1)
+    await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('auto-archive is enabled for one thread while global auto-archive stays off', async ({ page }: { page: Page }) => {
+  const targetThreadId = await startBlankThread(page)
+  const prompt = 'thread sidebar auto archive override e2e target'
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await openSidebarSettings(page)
+  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
+  const enableForThread = page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })
+  await enableForThread.click()
+  await expect(enableForThread).toHaveAttribute('aria-checked', 'true')
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
+})
+
+Then('the per-thread override survives reload without changing the global setting', async ({ page }: { page: Page }) => {
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override e2e target' })
+  await openSidebarSettings(page)
+  await recordAssertion(page, 'thread-sidebar-global-auto-archive-remains-off', async () => {
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
+  })
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-per-thread-auto-archive-enablement-survives-reload', async () => {
+    await expect(page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('an attention status color is changed in Sidebar settings', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Warning', exact: true }).click()

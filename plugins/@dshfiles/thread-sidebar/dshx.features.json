@@ -65,7 +65,7 @@
         },
         {
           "key": "attentionColors",
-          "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"warning\",\"turnFinished\":\"success\"}",
+          "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"info\",\"turnFinished\":\"success\"}",
           "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
           "coveredBy": ["thread-sidebar.attention-colors"]
         },
@@ -89,11 +89,10 @@
           "coveredBy": ["thread-sidebar.classification"]
         }
       ],
-      "states": ["active", "pinned", "parked", "inactive", "archived", "failed"],
+      "states": ["active", "pinned", "parked", "inactive", "archived"],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
-        "Activity uses session metadata timestamps and may reflect metadata updates.",
-        "Latest durable turn failures stay visible until a later non-error turn; errors without a durable turn/end are omitted."
+        "Activity uses session metadata timestamps and may reflect metadata updates."
       ],
       "externalDependencies": [],
       "verification": [
@@ -111,23 +110,6 @@
           "kind": "gherkin",
           "id": "thread-sidebar.attention-colors",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "thread-sidebar.latest-turn-failure",
-          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.latest-turn-failure-unit-red-dot",
-          "file": "plugins/@dshfiles/thread-sidebar/src/attention-presentation.test.ts",
-          "testName": "marks a failed latest turn red, but lets current work take over"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.latest-turn-failure-unit-host-projection",
-          "file": "tooling/dsh-core/api-session-controller/tests/session-projections.host.spec.ts",
-          "testName": "projects latest turn failures into list metadata and clears them on later non-error turns"
         },
         {
           "kind": "unit-test",
@@ -211,7 +193,7 @@
     {
       "id": "idle-archive-policy",
       "title": "Automatically archive eligible idle threads",
-      "summary": "Apply an opt-in idle policy while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
+      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -242,8 +224,20 @@
         {
           "key": "excludedSessionIds",
           "defaultValue": "[]",
-          "constraints": "Session ID exclusion list.",
-          "coveredBy": ["thread-sidebar.idle-archive"]
+          "constraints": "Session ID exclusion list; safety exclusions cannot be bypassed by thread overrides.",
+          "coveredBy": ["thread-sidebar.idle-archive", "thread-sidebar.auto-archive-overrides"]
+        },
+        {
+          "key": "autoArchiveSessionIds",
+          "defaultValue": "[]",
+          "constraints": "Session ID allow-list; enables per-thread auto-archive even when global policy is off.",
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
+        },
+        {
+          "key": "autoArchiveDisabledSessionIds",
+          "defaultValue": "[]",
+          "constraints": "Session ID deny-list; disables auto-archive for one thread without changing global exclusions.",
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "workspaceFilter",
@@ -252,9 +246,11 @@
           "coveredBy": ["thread-sidebar.idle-archive"]
         }
       ],
-      "states": ["disabled", "eligible", "excluded", "archived", "archive-failed"],
+      "states": ["disabled", "eligible", "per-thread-enabled", "per-thread-disabled", "excluded", "archived", "archive-failed"],
       "failureModes": [
         "Running, blank, pinned, parked, or excluded sessions are never automatically archived.",
+        "Per-thread enable still respects session and workspace safety exclusions.",
+        "Per-thread disable does not alter global session exclusions.",
         "A failed archive leaves the session visible and reports the failure."
       ],
       "externalDependencies": [],
@@ -263,6 +259,17 @@
           "kind": "gherkin",
           "id": "thread-sidebar.idle-archive",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.auto-archive-overrides",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-per-thread-overrides",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "per-thread auto-archive override inherits, enables, disables, and resets without losing other overrides"
         },
         {
           "kind": "unit-test",
@@ -281,6 +288,38 @@
           "id": "thread-sidebar.idle-archive-policy-unit-archive-never-stops-host",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "archive adapter explicitly refuses to stop Host activity"
+        }
+      ]
+    },
+    {
+      "id": "manual-unread",
+      "title": "Keep selected threads manually unread",
+      "summary": "Mark a thread unread independently of Host attention state, then clear both unread sources when that thread is opened.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["read", "manual-unread", "host-unread"],
+      "failureModes": [
+        "Manual unread state remains separate from Host-owned attention state.",
+        "Opening a thread clears its manual unread marker and marks Host attention read."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.manual-unread",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.manual-unread-unit-seen-clears-local-marker",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "opening a thread clears its needs-you and manual unread markers while keeping mute settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.manual-unread-unit-host-and-manual-unread-remain-distinct",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "manual unread is separate from Host unread and clears when thread is opened"
         }
       ]
     },
@@ -539,6 +578,12 @@
           "id": "thread-sidebar.thread-children-and-links-unit-sanitized-thread-link",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-url.test.ts",
           "testName": "copied thread links retain the app path and omit transient credentials and fragments"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-thread-mention-token",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread reference keeps the native session mention and title presentation"
         }
       ]
     },
@@ -577,60 +622,6 @@
           "id": "thread-sidebar.pending-host-restart-unit-host-vs-client-restart-detection",
           "file": "plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts",
           "testName": "only Host code or manifest changes since boot need a restart, not client rebuilds or identical rebuilds"
-        }
-      ]
-    },
-    {
-      "id": "thread-reference-mention",
-      "title": "Insert cross-session references into the composer",
-      "summary": "Resolve a target Host session and insert its native reference chip at the active composer’s captured selection.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
-      "configuration": [],
-      "states": [
-        "captured",
-        "resolving",
-        "inserted",
-        "unavailable",
-        "failed"
-      ],
-      "failureModes": [
-        "Unresolvable targets and canceled requests never change the draft.",
-        "Error diagnostics expose only bounded, non-sensitive fields."
-      ],
-      "externalDependencies": [],
-      "verification": [
-        {
-          "kind": "gherkin",
-          "id": "thread-sidebar.mention-insertion",
-          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.thread-reference-mention-unit-native-reference-presentation",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread reference keeps the native session mention and title presentation"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.thread-reference-mention-unit-request-decode",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread mention requests decode only a non-empty session id"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.thread-reference-mention-unit-safe-diagnostics",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread mention failure diagnostics expose only safe identity fields"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.thread-reference-mention-unit-classified-diagnostics",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
-          "testName": "thread mention classifies Remote preflight errors without logging their messages"
         }
       ]
     }

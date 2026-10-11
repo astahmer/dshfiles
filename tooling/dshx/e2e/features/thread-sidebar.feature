@@ -46,6 +46,18 @@ Feature: Thread sidebar journeys
     When auto-archive is enabled with a new idle threshold and scan interval
     Then the policy settings survive a browser reload
 
+  @scenario:thread-sidebar.manual-unread
+  Scenario: Manual unread clears when a thread is reopened
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank thread is marked unread and reopened
+    Then its unread marker clears on open
+
+  @scenario:thread-sidebar.auto-archive-overrides
+  Scenario: Per-thread auto-archive overrides the global opt-in
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When auto-archive is enabled for one thread while global auto-archive stays off
+    Then the per-thread override survives reload without changing the global setting
+
   @scenario:thread-sidebar.attention-colors
   Scenario: Attention status colors are configurable and saved
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
