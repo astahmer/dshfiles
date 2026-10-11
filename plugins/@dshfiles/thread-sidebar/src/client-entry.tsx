@@ -348,13 +348,6 @@ export default defineClient({
                   action: { type: 'mark-read' },
                 })
               ).ok,
-            setSnoozed: async (sessionId: SessionSummary['id'], snoozed: boolean) =>
-              (
-                await ctx.sessions.updateAttention({
-                  sessionId,
-                  action: { type: 'set-snoozed', snoozed },
-                })
-              ).ok,
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
           }),
         },

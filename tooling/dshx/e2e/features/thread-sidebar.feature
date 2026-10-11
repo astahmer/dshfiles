@@ -3,6 +3,12 @@ Feature: Thread sidebar journeys
   These journeys use a fresh isolated Host profile with no provider credentials.
   Blank sessions and settings are created or changed only through the real UI.
 
+  @scenario:thread-sidebar.park-context-menu
+  Scenario: Park a thread from its context menu and keep it parked
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is parked from its context menu
+    Then the Host thread stays parked after reload without an attention error
+
   @scenario:thread-sidebar.classification
   Scenario: Blank Host sessions stay out of classified thread rows
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

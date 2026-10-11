@@ -4,7 +4,7 @@
     {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Group active, pinned, parked, inactive, and archived threads by project; pin/archive through Host APIs and keep parking browser-local.",
+      "summary": "Group active, pinned, parked, inactive, and archived threads by project; park with sidebar preferences and pin/archive through Host APIs.",
       "surfaces": [
         "client",
         "host",
@@ -112,7 +112,19 @@
         {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
-          "constraints": "Browser-local parked session ID list; not synchronized to Host.",
+          "constraints": "Parked session IDs in sidebar preferences; not updated through Host session attention.",
+          "coveredBy": [
+            "thread-sidebar.classification"
+          ]
+        },
+        {
+          "key": "applyActionsToChildThreads",
+          "defaultValue": "true",
+          "constraints": "Boolean; apply manual actions to every descendant when acting on a parent thread.",
+          "choices": [
+            "true",
+            "false"
+          ],
           "coveredBy": [
             "thread-sidebar.classification"
           ]
@@ -134,7 +146,7 @@
         "archived"
       ],
       "failureModes": [
-        "Park state remains local and is not mistaken for a durable Host operation.",
+        "Parking updates sidebar preferences without depending on Host session-attention mutations.",
         "Activity uses session metadata timestamps and may reflect metadata updates."
       ],
       "externalDependencies": [],
@@ -143,6 +155,17 @@
           "kind": "gherkin",
           "id": "thread-sidebar.classification",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.park-context-menu",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-classification-unit-child-action-preference-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older preferences gain attention modes and default child-thread actions to enabled"
         },
         {
           "kind": "unit-test",
@@ -571,9 +594,27 @@
         },
         {
           "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-action-cascade",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "thread actions include every descendant by default and can be limited to the selected thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-action-cycle-bound",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "thread action targets remain unique when parent links contain a cycle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-cross-section-child-nesting",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "children stay nested under their parent even when sidebar sections differ"
+        },
+        {
+          "kind": "unit-test",
           "id": "thread-sidebar.thread-children-and-links-unit-child-cycle-bound",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
-          "testName": "a refused ancestor does not adopt the child, and a parent cycle stays bounded"
+          "testName": "a parent cycle stays bounded"
         },
         {
           "kind": "unit-test",

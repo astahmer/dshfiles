@@ -33,6 +33,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -44,7 +45,7 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ActivityIcon, BellOffIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, BellIcon, BellOffIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
@@ -67,7 +68,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
-import { groupThreadChildren, visibleChildren } from './thread-children.js'
+import { groupThreadChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
@@ -89,7 +90,6 @@ type InjectedActions = {
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   markRead: (sessionId: SessionSummary['id']) => Promise<boolean>
-  setSnoozed: (sessionId: SessionSummary['id'], snoozed: boolean) => Promise<boolean>
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -447,6 +447,33 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     </Button>,
                   )}
                   {withTooltip(
+                    t(props.muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications'),
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-xs" aria-label={t(props.muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications')}>
+                          {props.muted ? <BellOffIcon className="dshx:size-3.5" /> : <BellIcon className="dshx:size-3.5" />}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarNotifications')}>
+                        {snoozeDurations.map(duration => (
+                          <DropdownMenuItem
+                            key={duration.milliseconds}
+                            onSelect={() => props.actions.setNotificationMute(session.id, Date.now() + duration.milliseconds)}
+                          >
+                            {t('threadSidebarSnoozeFor')} {t(duration.label)}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuItem onSelect={() => props.actions.setNotificationMute(session.id, null)}>
+                          {t('threadSidebarMuteUntilEnabled')}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem disabled={!props.muted} onSelect={() => props.actions.clearNotificationMute(session.id)}>
+                          {t('threadSidebarUnmute')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>,
+                  )}
+                  {withTooltip(
                     t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
                     <Button
                       variant="ghost"
@@ -553,7 +580,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
   const archiveInFlight = useRef(false)
-  const legacyParkMigrationAttempts = useRef(new Set<SessionSummary['id']>())
   const readMarkAttempts = useRef(new Map<SessionSummary['id'], number>())
   const previousStatus = useRef<Readonly<Record<string, ThreadAttentionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
@@ -580,15 +606,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     [props.tSidebar, workspaceState.items],
   )
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
-  const parkedSessionIds = useMemo(() => {
-    const localFallback = setIncludes(preferences.parkedSessionIds)
-    return new Set(
-      sessions.flatMap(session => {
-        const parked = session.attention === null || session.attention === undefined ? localFallback.has(session.id) : session.attention.snoozed
-        return parked ? [session.id] : []
-      }),
-    )
-  }, [preferences.parkedSessionIds, sessions])
+  const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
   const attentionSessions = useMemo(
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
@@ -602,32 +620,6 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     threadNotificationPreferences.set(markThreadSeen(current, selectedSession.id))
   }, [selectedSession?.id])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
-
-  useEffect(() => {
-    if (sessionState.phase !== 'ready') return
-    const legacyParked = setIncludes(preferences.parkedSessionIds)
-    for (const session of sessions) {
-      if (
-        !legacyParked.has(session.id) ||
-        (session.attention !== null && session.attention !== undefined) ||
-        legacyParkMigrationAttempts.current.has(session.id)
-      )
-        continue
-      legacyParkMigrationAttempts.current.add(session.id)
-      void props
-        .setSnoozed(session.id, true)
-        .then(success => {
-          if (!success) {
-            legacyParkMigrationAttempts.current.delete(session.id)
-            setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
-          }
-        })
-        .catch(() => {
-          legacyParkMigrationAttempts.current.delete(session.id)
-          setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
-        })
-    }
-  }, [preferences.parkedSessionIds, props.setSnoozed, props.tSidebar, sessionState.phase, sessions])
 
   useEffect(() => {
     const attention = selectedSession?.attention
@@ -720,13 +712,38 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     )
   }
 
-  const mutateSession = async (sessionId: SessionSummary['id'], operation: (sessionId: SessionSummary['id']) => Promise<void>): Promise<void> => {
-    try {
-      await operation(sessionId)
-      setNotice(null)
-    } catch {
-      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarArchiveFailure') })
+  const mutateSession = async (sessionId: SessionSummary['id'], operation: RowOperation): Promise<void> => {
+    const actionThreads = Object.values(sessionState.byId).filter(session => !session.blank)
+    const targetIds = threadActionTargetIds({
+      threadId: sessionId,
+      threads: actionThreads,
+      cascadeToChildren: preferences.applyActionsToChildThreads,
+    })
+    const targetIdsToChange = targetIds.filter(targetId => {
+      if (operation === 'pin') return !pinnedSessionIds.has(targetId)
+      if (operation === 'unpin') return pinnedSessionIds.has(targetId)
+      if (operation === 'archive') return !archivedSessionIds.has(targetId)
+      return archivedSessionIds.has(targetId)
+    })
+    if (operation === 'archive' && targetIdsToChange.some(targetId => sessionState.byId[targetId]?.running)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
     }
+    const actions = {
+      pin: props.pinSession,
+      unpin: props.unpinSession,
+      archive: props.archiveSession,
+      unarchive: props.unarchiveSession,
+    } satisfies Record<RowOperation, (sessionId: SessionSummary['id']) => Promise<void>>
+    let failed = false
+    for (const targetId of targetIdsToChange) {
+      try {
+        await actions[operation](targetId)
+      } catch {
+        failed = true
+      }
+    }
+    setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
   }
 
   const openThread = (sessionId: SessionSummary['id']): void => {
@@ -748,15 +765,18 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
-    void props
-      .setSnoozed(sessionId, !parkedSessionIds.has(sessionId))
-      .then(success => {
-        if (!success) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
-        else setNotice(null)
-      })
-      .catch(() => {
-        setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarAttentionFailure') })
-      })
+    const shouldPark = !parkedSessionIds.has(sessionId)
+    const next = new Set(preferences.parkedSessionIds)
+    for (const targetId of threadActionTargetIds({
+      threadId: sessionId,
+      threads: Object.values(sessionState.byId).filter(session => !session.blank),
+      cascadeToChildren: preferences.applyActionsToChildThreads,
+    })) {
+      if (shouldPark) next.add(targetId)
+      else next.delete(targetId)
+    }
+    changePreferences({ parkedSessionIds: [...next] })
+    setNotice(null)
   }
 
   const changeDesktopNotifications = async (enabled: boolean): Promise<void> => {
@@ -848,12 +868,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       listed.push(session)
     }
-    return groupThreadChildren({
-      threads: listed,
-      canNest: (child, ancestor) => archivedSessionIds.has(child.id) === archivedSessionIds.has(ancestor.id),
-    })
-  }, [archivedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
+    return groupThreadChildren({ threads: listed })
+  }, [preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
 
+  const rootThreadIds = useMemo(() => new Set(threadTree.roots.map(session => session.id)), [threadTree.roots])
   const sectionEntries = useMemo(
     () =>
       threadTree.roots.map(session => ({
@@ -957,11 +975,19 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
   const groupedAttentionRows = useMemo(
     () => ({
-      approvalNeeded: preferences.approvalNeededDisplay === 'group' ? approvalNeededRows : [],
-      inputNeeded: preferences.inputNeededDisplay === 'group' ? needsInputRows : [],
-      turnFinished: preferences.turnFinishedDisplay === 'group' ? turnFinishedRows : [],
+      approvalNeeded: preferences.approvalNeededDisplay === 'group' ? approvalNeededRows.filter(session => rootThreadIds.has(session.id)) : [],
+      inputNeeded: preferences.inputNeededDisplay === 'group' ? needsInputRows.filter(session => rootThreadIds.has(session.id)) : [],
+      turnFinished: preferences.turnFinishedDisplay === 'group' ? turnFinishedRows.filter(session => rootThreadIds.has(session.id)) : [],
     }),
-    [approvalNeededRows, needsInputRows, preferences.approvalNeededDisplay, preferences.inputNeededDisplay, preferences.turnFinishedDisplay, turnFinishedRows],
+    [
+      approvalNeededRows,
+      needsInputRows,
+      preferences.approvalNeededDisplay,
+      preferences.inputNeededDisplay,
+      preferences.turnFinishedDisplay,
+      rootThreadIds,
+      turnFinishedRows,
+    ],
   )
   const attentionIds = useMemo(
     () =>
@@ -1085,7 +1111,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           const thread = context.thread
           if (thread === null) return
           const session = Object.values(latestRowActions.current.sessionsById).find(candidate => candidate.id === thread.id)
-          if (session !== undefined) await latestRowActions.current.props.pinSession(session.id)
+          if (session !== undefined) await latestRowActions.current.mutateSession(session.id, 'pin')
         },
       },
       {
@@ -1099,7 +1125,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           const thread = context.thread
           if (thread === null) return
           const session = Object.values(latestRowActions.current.sessionsById).find(candidate => candidate.id === thread.id)
-          if (session !== undefined) await latestRowActions.current.props.unpinSession(session.id)
+          if (session !== undefined) await latestRowActions.current.mutateSession(session.id, 'unpin')
         },
       },
     ]
@@ -1108,15 +1134,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }, [])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
-    const operations = {
-      pin: () => latestRowActions.current.props.pinSession,
-      unpin: () => latestRowActions.current.props.unpinSession,
-      archive: () => latestRowActions.current.props.archiveSession,
-      unarchive: () => latestRowActions.current.props.unarchiveSession,
-    } satisfies Record<RowOperation, () => (sessionId: SessionSummary['id']) => Promise<void>>
     return {
       open: sessionId => latestRowActions.current.openThread(sessionId),
-      mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operations[operation]()),
+      mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operation),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
       toggleChildren: sessionId => setClosedParents(current => toggleSetMember(current, sessionId)),
@@ -1286,6 +1306,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               <Checkbox checked={preferences.autoArchiveEnabled} onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
             </Label>
+            <Label className="dshx:font-normal dshx:leading-snug">
+              <Checkbox
+                checked={preferences.applyActionsToChildThreads}
+                onCheckedChange={checked => changePreferences({ applyActionsToChildThreads: checked === true })}
+              />
+              {props.tSidebar('threadSidebarApplyActionsToChildren')}
+            </Label>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarApplyActionsToChildrenHint')}</p>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox checked={notificationPreferences.enabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
               {props.tSidebar('threadSidebarDesktopNotifications')}

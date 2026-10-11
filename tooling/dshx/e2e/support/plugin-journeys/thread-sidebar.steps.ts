@@ -37,6 +37,46 @@ When('a blank Host thread is started', async ({ page }: { page: Page }) => {
   await startBlankThread(page)
 })
 
+When('a nonblank Host thread is parked from its context menu', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar park e2e target'
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  await expect(targetRow).toHaveCount(1)
+  await targetRow.hover()
+  await targetRow.getByRole('button', { name: 'Thread notifications', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Snooze for 15 minutes', exact: true }).click()
+  await expect(targetRow.getByRole('button', { name: 'Notifications muted', exact: true })).toBeVisible()
+  await targetRow.getByRole('button', { name: 'Notifications muted', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Turn notifications back on', exact: true }).click()
+  await expect(targetRow.getByRole('button', { name: 'Thread notifications', exact: true })).toBeVisible()
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Park', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+  await expect(targetRow).toHaveCount(1)
+})
+
+Then('the Host thread stays parked after reload without an attention error', async ({ page }: { page: Page }) => {
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar park e2e target' })
+  await recordAssertion(page, 'thread-sidebar-context-menu-parking-succeeds', async () => {
+    await expect(threadSidebar(page).getByText('The Host could not update this thread’s read or parked state.', { exact: true })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await expect(targetRow).toHaveCount(1)
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-context-menu-parking-survives-reload', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await expect(targetRow).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the Active section is folded and reopened', async ({ page }: { page: Page }) => {
   const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')
