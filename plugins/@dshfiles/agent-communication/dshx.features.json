@@ -144,8 +144,14 @@
       "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
       "surfaces": ["tool", "host", "storage", "client"],
       "configuration": [],
-      "states": ["passive", "unread", "read", "acknowledged", "paged", "searched"],
-      "failureModes": ["Peer text remains untrusted data.", "A stale cursor requires refreshing the conversation."],
+      "states": ["passive", "unread", "read", "acknowledged", "paged", "searched", "notice-intent", "request-intent", "idempotent-retry"],
+      "failureModes": [
+        "Peer text remains untrusted data.",
+        "A stale cursor requires refreshing the conversation.",
+        "intent and priority are metadata only; neither starts, resumes, or redirects an Agent.",
+        "A dedupeKey is scoped to one sender and one target; reusing it for a different target stores a new message.",
+        "A completed recipient stays completed; a stored message is read only during a later natural execution."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -164,6 +170,72 @@
           "id": "agent-communication.service-browser-pagination",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
           "testName": "pages and searches stored conversations without marking messages read"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.service-intent-metadata",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "records intent and correlation metadata without changing passive delivery"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.service-dedupe-retry",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "returns the stored message for a repeated sender-scoped dedupe key instead of storing a duplicate"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.service-schema-three-migration",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "migrates schema version 3 messages to notice intent without replaying them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.inbox-intent-label",
+          "file": "plugins/@dshfiles/agent-communication/src/messages.test.ts",
+          "testName": "labels the recorded intent so a request is distinguishable from a notice"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-two-active-agents",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "A: two active agents share information without redirecting either conversation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-completed-recipient",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "B: a message to a completed agent stays durable and never resumes or replays it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-read-only-inspection",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "C: orchestrator inspection is read-only and never resumes the inspected agents"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-request-vs-notice",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "D: a request intent is distinguishable from a notice and still never delegates work"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-concurrent-ordering",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "E: concurrent senders keep ordering, attribution, and idempotent retries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-stale-and-reopen",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "F: stale ids and reopened state neither lose messages nor replay them as new instructions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.integration-workspace-handoff",
+          "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
+          "testName": "G: a completed workspace agent is not reopened to gather integration context"
         }
       ]
     },

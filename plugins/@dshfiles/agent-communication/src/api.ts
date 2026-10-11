@@ -38,6 +38,7 @@ export const postMessageInputSchema = z
     topic: topicSchema.optional(),
     agentId: agentIdSchema.optional(),
     text: z.string().trim().min(1).max(12_000),
+    intent: z.enum(['notice', 'request']).optional(),
     priority: z.enum(['normal', 'urgent']).optional(),
   })
   .strict()
@@ -48,6 +49,7 @@ export const postMessageReceiptSchema = z
   .object({
     messageId: messageIdSchema,
     topic: topicSchema.nullable(),
+    intent: z.enum(['notice', 'request']),
     recipientCount: z.number().int().nonnegative().max(512),
     createdAt: z.number().int().nonnegative(),
   })

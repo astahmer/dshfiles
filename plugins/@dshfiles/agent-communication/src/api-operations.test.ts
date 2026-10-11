@@ -66,6 +66,7 @@ describe('Agent communication API operations', () => {
     if (legacyDiagnostics.success) {
       expect(legacyDiagnostics.data.agents[0]?.workspaceSubscribed).toBeUndefined()
       expect(legacyDiagnostics.data.subscriptions[0]?.delivery).toBe('queue')
+      expect(legacyDiagnostics.data.recentMessages[0]?.intent).toBe('notice')
     }
 
     expect(

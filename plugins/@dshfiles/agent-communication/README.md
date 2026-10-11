@@ -1,8 +1,10 @@
 # DSH Agent communication
 
-This owned DSH bundle provides durable topic channels and direct Agent inboxes. Incoming messages are passive records: arrival never adds a Session/user message, calls `Agent.followup()` or `Agent.steer()`, or replays a notification when an Agent is created. Completed turns stay completed. Priority—including `urgent`—is descriptive metadata only.
+This owned DSH bundle provides durable topic channels and direct Agent inboxes. Incoming messages are passive records: arrival never adds a Session/user message, calls `Agent.followup()` or `Agent.steer()`, or replays a notification when an Agent is created. Completed turns stay completed. `priority` (`normal`/`urgent`) and `intent` (`notice`/`request`) are descriptive metadata only; a `request` records that the sender asks for action and still starts no turn.
 
 Agents in the same resolved working directory are subscribed to `workspace/<hash>` during Host startup and `agent/created`. Every Agent also has a private `inbox` for direct messages. A normal Agent execution can explicitly read its inbox with `dshx_comm_inbox`; reading records `readAt`, but only `dshx_comm_ack` hides a message from later inbox reads. Peer text is returned as quoted JSON and remains untrusted.
+
+`dshx_comm_publish` and `dshx_comm_send` accept an optional sender-scoped `dedupeKey` and an opaque `correlationId`. A retry with the same `dedupeKey` returns the stored message instead of storing a duplicate; `correlationId` groups related messages for later readers and timelines. Both are metadata: neither changes delivery, and neither starts or resumes an Agent.
 
 The Agent tools are:
 
@@ -31,6 +33,8 @@ dshx comm topics --json
 dshx comm mcp --principal editor
 ```
 
-Persisted schema versions 1 and 2 migrate to version 3. Legacy `quiet`, `queue`, and `steer` policies are normalized to passive delivery, and notification replay state is removed. Legacy delivery options are accepted only at the compatibility boundary and never cause execution.
+Persisted schema versions 1, 2, and 3 migrate to version 4, which records `intent`, `correlationId`, and `dedupeKey`. Legacy `quiet`, `queue`, and `steer` policies are normalized to passive delivery, and notification replay state is removed. Legacy delivery options are accepted only at the compatibility boundary and never cause execution.
+
+When a second DSH instance shares the same `DSH_HOME`, only one process can own the local CLI/MCP socket bridge. The other instance logs a warning, keeps its in-process Agent tools, and does not fail activation.
 
 A report or activity-history gap is not proof of non-use. The Host bridge only reports Agents registered with DSH. Host source changes require a user-controlled restart; do not restart the live web profile as part of plugin development. See the [full communication design and activation guide](../../../tooling/dshx/docs/agent-communication.md).

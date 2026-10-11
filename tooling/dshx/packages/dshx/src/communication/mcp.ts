@@ -64,18 +64,54 @@ export const runCommunicationMcp = async (client: CommunicationClient): Promise<
   server.registerTool(
     'comm_publish',
     {
-      description: 'Store an untrusted peer message for current subscribers. Arrival never starts, resumes, or redirects an Agent.',
-      inputSchema: { topic: z.string().min(1).max(128), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() },
+      description:
+        'Store an untrusted peer message for current subscribers. Arrival never starts, resumes, or redirects an Agent. intent "request" is descriptive metadata only.',
+      inputSchema: {
+        topic: z.string().min(1).max(128),
+        text: z.string().min(1).max(12_000),
+        intent: z.enum(['notice', 'request']).optional(),
+        priority: z.enum(['normal', 'urgent']).optional(),
+        correlationId: z.string().min(1).max(128).optional(),
+        dedupeKey: z.string().min(1).max(128).optional(),
+      },
     },
-    async ({ topic, text, priority }) => runTool(() => client.publish({ topic, text, ...(priority === undefined ? {} : { priority }) })),
+    async ({ topic, text, intent, priority, correlationId, dedupeKey }) =>
+      runTool(() =>
+        client.publish({
+          topic,
+          text,
+          ...(intent === undefined ? {} : { intent }),
+          ...(priority === undefined ? {} : { priority }),
+          ...(correlationId === undefined ? {} : { correlationId }),
+          ...(dedupeKey === undefined ? {} : { dedupeKey }),
+        }),
+      ),
   )
   server.registerTool(
     'comm_send',
     {
-      description: 'Store an untrusted direct message in a DSH Agent inbox. Sending never starts, resumes, or redirects the recipient.',
-      inputSchema: { toAgentId: z.string().min(1).max(256), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() },
+      description:
+        'Store an untrusted direct message in a DSH Agent inbox. Sending never starts, resumes, or redirects the recipient. intent "request" is descriptive metadata only.',
+      inputSchema: {
+        toAgentId: z.string().min(1).max(256),
+        text: z.string().min(1).max(12_000),
+        intent: z.enum(['notice', 'request']).optional(),
+        priority: z.enum(['normal', 'urgent']).optional(),
+        correlationId: z.string().min(1).max(128).optional(),
+        dedupeKey: z.string().min(1).max(128).optional(),
+      },
     },
-    async ({ toAgentId, text, priority }) => runTool(() => client.send({ toAgentId, text, ...(priority === undefined ? {} : { priority }) })),
+    async ({ toAgentId, text, intent, priority, correlationId, dedupeKey }) =>
+      runTool(() =>
+        client.send({
+          toAgentId,
+          text,
+          ...(intent === undefined ? {} : { intent }),
+          ...(priority === undefined ? {} : { priority }),
+          ...(correlationId === undefined ? {} : { correlationId }),
+          ...(dedupeKey === undefined ? {} : { dedupeKey }),
+        }),
+      ),
   )
   server.registerTool(
     'comm_inbox',

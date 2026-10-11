@@ -27,12 +27,14 @@ export const createAgentCommunicationOperations = (input: {
     browseMessages: (request: AgentCommunicationBrowseInput): Promise<CommunicationMessagePage> => input.service().browseMessages(request),
     postMessage: async (request: AgentCommunicationPostInput) => {
       const sender: CommunicationPrincipal = { kind: 'external', id: 'communication-browser' }
+      const intent = request.intent === undefined ? {} : { intent: request.intent }
       let message: CommunicationMessage
       if (request.topic !== undefined) {
         message = await input.service().publish({
           sender,
           topic: request.topic,
           text: request.text,
+          ...intent,
           ...(request.priority === undefined ? {} : { priority: request.priority }),
         })
       } else if (request.agentId !== undefined) {
@@ -40,6 +42,7 @@ export const createAgentCommunicationOperations = (input: {
           sender,
           toAgentId: request.agentId,
           text: request.text,
+          ...intent,
           ...(request.priority === undefined ? {} : { priority: request.priority }),
         })
       } else {
@@ -48,6 +51,7 @@ export const createAgentCommunicationOperations = (input: {
       return postMessageReceiptSchema.parse({
         messageId: message.id,
         topic: message.topic,
+        intent: message.intent,
         recipientCount: message.recipients.length,
         createdAt: message.createdAt,
       })

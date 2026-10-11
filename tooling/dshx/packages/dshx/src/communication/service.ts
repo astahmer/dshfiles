@@ -11,6 +11,7 @@ import {
   communicationDiagnosticRecipientSchema,
   communicationDiagnosticsSchema,
   communicationMessageBodySchema,
+  communicationMessageIntentSchema,
   communicationMessagePageSchema,
   communicationMessageRecipientsSchema,
   communicationDiagnosticMessageSchema,
@@ -21,6 +22,7 @@ import {
   communicationStateSchema,
   communicationStateV1Schema,
   communicationStateV2Schema,
+  communicationStateV3Schema,
   communicationSubscriptionSchema,
   communicationTopicSchema,
   legacyCommunicationDeliverySchema,
@@ -31,12 +33,14 @@ import {
   type CommunicationDiagnostics,
   type CommunicationMessage,
   type CommunicationMessageBody,
+  type CommunicationMessageIntent,
   type CommunicationMessagePage,
   type CommunicationMessageRecipients,
   type CommunicationPrincipal,
   type CommunicationState,
   type CommunicationStateV1,
   type CommunicationStateV2,
+  type CommunicationStateV3,
   type LegacyCommunicationDelivery,
   type CommunicationSubscription,
   type CommunicationTopic,
@@ -64,7 +68,10 @@ const messageInputSchema = z
   .object({
     topic: topicSchema,
     text: z.string().trim().min(1).max(12_000),
+    intent: communicationMessageIntentSchema.default('notice'),
     priority: z.enum(['normal', 'urgent']).default('normal'),
+    correlationId: z.string().min(1).max(128).optional(),
+    dedupeKey: z.string().min(1).max(128).optional(),
   })
   .strict()
 
@@ -72,7 +79,10 @@ const directMessageInputSchema = z
   .object({
     toAgentId: z.string().min(1).max(256),
     text: z.string().trim().min(1).max(12_000),
+    intent: communicationMessageIntentSchema.default('notice'),
     priority: z.enum(['normal', 'urgent']).default('normal'),
+    correlationId: z.string().min(1).max(128).optional(),
+    dedupeKey: z.string().min(1).max(128).optional(),
   })
   .strict()
 
@@ -93,14 +103,20 @@ export interface CommunicationPublishInput {
   readonly sender: CommunicationPrincipal
   readonly topic: string
   readonly text: string
+  readonly intent?: CommunicationMessageIntent
   readonly priority?: 'normal' | 'urgent'
+  readonly correlationId?: string
+  readonly dedupeKey?: string
 }
 
 export interface CommunicationSendInput {
   readonly sender: CommunicationPrincipal
   readonly toAgentId: string
   readonly text: string
+  readonly intent?: CommunicationMessageIntent
   readonly priority?: 'normal' | 'urgent'
+  readonly correlationId?: string
+  readonly dedupeKey?: string
 }
 
 export interface CommunicationInboxInput {
@@ -128,7 +144,12 @@ export interface CommunicationActivityInput {
   readonly errorCode?: string | null
 }
 
-const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [communicationStateV1Schema, communicationStateV2Schema, communicationStateSchema])
+const persistedCommunicationStateSchema = z.discriminatedUnion('schemaVersion', [
+  communicationStateV1Schema,
+  communicationStateV2Schema,
+  communicationStateV3Schema,
+  communicationStateSchema,
+])
 
 export class CommunicationError extends Error {
   constructor(
@@ -141,7 +162,7 @@ export class CommunicationError extends Error {
 }
 
 const initialState = (): CommunicationState => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   messages: [],
   subscriptions: [],
   acknowledgements: [],
@@ -163,7 +184,7 @@ const cleanState = (state: CommunicationState, now: number): CommunicationState 
   const survivingIds = new Set(messages.map(message => message.id))
   const activityEvents = state.activityEvents.filter(event => event.occurredAt >= now - MESSAGE_RETENTION_MS).slice(-MAX_ACTIVITY_EVENTS)
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     messages,
     subscriptions: state.subscriptions.slice(-MAX_SUBSCRIPTIONS),
     acknowledgements: state.acknowledgements.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_ACKNOWLEDGEMENTS),
@@ -183,12 +204,15 @@ const assertTopic = (topic: string, privateAllowed = false): string => {
 
 const messageId = (): string => randomUUID()
 
-const migrateLegacyState = (state: CommunicationStateV1 | CommunicationStateV2): CommunicationState =>
+const migrateLegacyState = (state: CommunicationStateV1 | CommunicationStateV2 | CommunicationStateV3): CommunicationState =>
   communicationStateSchema.parse({
-    schemaVersion: 3,
+    schemaVersion: 4,
     messages: state.messages.map(message => ({
       ...message,
-      recipients: message.recipients.map(recipient => ({ principal: recipient.principal, delivery: 'passive', readAt: null })),
+      intent: 'notice',
+      correlationId: null,
+      dedupeKey: null,
+      recipients: message.recipients.map(recipient => ({ principal: recipient.principal, delivery: 'passive', readAt: 'readAt' in recipient ? recipient.readAt : null })),
     })),
     subscriptions: state.subscriptions.map(subscription => ({
       principal: subscription.principal,
@@ -326,6 +350,7 @@ export class CommunicationService {
           id: message.id,
           topic: message.topic,
           sender: message.sender,
+          intent: message.intent,
           priority: message.priority,
           createdAt: message.createdAt,
           recipientCount: message.recipients.length,
@@ -475,11 +500,24 @@ export class CommunicationService {
 
   async publish(input: CommunicationPublishInput): Promise<CommunicationMessage> {
     const sender = communicationPrincipalSchema.parse(input.sender)
-    const parsed = messageInputSchema.parse({ topic: input.topic, text: input.text, priority: input.priority })
+    const parsed = messageInputSchema.parse({
+      topic: input.topic,
+      text: input.text,
+      intent: input.intent,
+      priority: input.priority,
+      correlationId: input.correlationId,
+      dedupeKey: input.dedupeKey,
+    })
     const topic = assertTopic(parsed.topic)
+    const senderKey = principalKey(sender)
     const message = await this.#updateState(state => {
+      const duplicate =
+        parsed.dedupeKey === undefined
+          ? undefined
+          : state.messages.find(item => item.dedupeKey === parsed.dedupeKey && item.topic === topic && principalKey(item.sender) === senderKey)
+      if (duplicate !== undefined) return { state, value: duplicate }
       const recipients = state.subscriptions
-        .filter(subscription => subscription.topic === topic && principalKey(subscription.principal) !== principalKey(sender))
+        .filter(subscription => subscription.topic === topic && principalKey(subscription.principal) !== senderKey)
         .map(subscription => ({
           principal: subscription.principal,
           delivery: 'passive',
@@ -490,7 +528,10 @@ export class CommunicationService {
         topic,
         sender,
         text: parsed.text,
+        intent: parsed.intent,
         priority: parsed.priority,
+        correlationId: parsed.correlationId ?? null,
+        dedupeKey: parsed.dedupeKey ?? null,
         createdAt: this.#now(),
         recipients,
       })
@@ -501,18 +542,40 @@ export class CommunicationService {
 
   async send(input: CommunicationSendInput): Promise<CommunicationMessage> {
     const sender = communicationPrincipalSchema.parse(input.sender)
-    const parsed = directMessageInputSchema.parse({ toAgentId: input.toAgentId, text: input.text, priority: input.priority })
+    const parsed = directMessageInputSchema.parse({
+      toAgentId: input.toAgentId,
+      text: input.text,
+      intent: input.intent,
+      priority: input.priority,
+      correlationId: input.correlationId,
+      dedupeKey: input.dedupeKey,
+    })
     const recipient: CommunicationPrincipal = { kind: 'agent', id: parsed.toAgentId }
-    if (principalKey(sender) === principalKey(recipient)) {
+    const senderKey = principalKey(sender)
+    if (senderKey === principalKey(recipient)) {
       throw new CommunicationError('self-message', 'A DSH Agent cannot send a direct message to itself.')
     }
     const message = await this.#updateState(state => {
+      const duplicate =
+        parsed.dedupeKey === undefined
+          ? undefined
+          : state.messages.find(
+              item =>
+                item.dedupeKey === parsed.dedupeKey &&
+                item.topic === null &&
+                principalKey(item.sender) === senderKey &&
+                item.recipients.some(entry => entry.principal.kind === 'agent' && entry.principal.id === parsed.toAgentId),
+            )
+      if (duplicate !== undefined) return { state, value: duplicate }
       const item = communicationMessageSchema.parse({
         id: messageId(),
         topic: null,
         sender,
         text: parsed.text,
+        intent: parsed.intent,
         priority: parsed.priority,
+        correlationId: parsed.correlationId ?? null,
+        dedupeKey: parsed.dedupeKey ?? null,
         createdAt: this.#now(),
         recipients: [{ principal: recipient, delivery: 'passive', readAt: null }],
       })
@@ -620,7 +683,7 @@ export class CommunicationService {
     try {
       const value: unknown = JSON.parse(text)
       const persistedState = persistedCommunicationStateSchema.parse(value)
-      const state = persistedState.schemaVersion === 3 ? persistedState : migrateLegacyState(persistedState)
+      const state = persistedState.schemaVersion === 4 ? persistedState : migrateLegacyState(persistedState)
       return cleanState(state, this.#now())
     } catch {
       throw new CommunicationError('state-unreadable', 'Communication state is invalid or unreadable; it was left untouched.')

@@ -119,7 +119,7 @@ describe('communication diagnostics', () => {
     await service.subscribe({ kind: 'agent', id: 'agent-reader' }, { topic: 'builds.ready' })
     const upgraded = communicationStateSchema.parse(JSON.parse(await readFile(path, 'utf8')))
     expect(upgraded).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       activityStartedAt: null,
       activityEvents: [],
       workspaceOptOuts: ['agent-opted-out'],

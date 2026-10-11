@@ -130,6 +130,9 @@ const MessageRow = (props: {
         </time>
       </div>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+        <Badge variant={props.message.intent === 'request' ? 'default' : 'outline'}>
+          {props.message.intent === 'request' ? props.t('request') : props.t('notice')}
+        </Badge>
         <Badge variant="outline">{props.message.priority === 'urgent' ? props.t('urgent') : props.t('normal')}</Badge>
         <Badge variant="secondary">{props.t('recipientCount', { count: props.message.recipients.length })}</Badge>
       </div>
@@ -273,6 +276,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const [selection, setSelection] = useState<ConversationSelection>({ kind: 'all' })
   const [search, setSearch] = useState('')
   const [draft, setDraft] = useState('')
+  const [draftIntent, setDraftIntent] = useState<'notice' | 'request'>('notice')
   const [newTopic, setNewTopic] = useState('')
   const [directTarget, setDirectTarget] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
@@ -388,12 +392,12 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const submitMessage = (): void => {
     if (draft.trim().length === 0 || sendMutation.isPending) return
     let input: AgentCommunicationPostInput
-    if (selection.kind === 'topic') input = { topic: selection.topic, text: draft }
-    else if (selection.kind === 'direct') input = { agentId: selection.agentId, text: draft }
+    if (selection.kind === 'topic') input = { topic: selection.topic, text: draft, intent: draftIntent }
+    else if (selection.kind === 'direct') input = { agentId: selection.agentId, text: draft, intent: draftIntent }
     else {
       const topic = newTopic.trim()
       if (topic.length === 0) return
-      input = { topic, text: draft }
+      input = { topic, text: draft, intent: draftIntent }
     }
     setReceiptCount(null)
     sendMutation.mutate({ input, selection, queryKey: conversationKey })
@@ -402,6 +406,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     setSelection(next)
     setSelectedMessageId(null)
     setDraft('')
+    setDraftIntent('notice')
     setNewTopic('')
     setDirectTarget('')
     setReceiptCount(null)
@@ -593,6 +598,30 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         }}
                         className="dshx:min-h-24 dshx:resize-y"
                       />
+                      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                        <span className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={draftIntent === 'notice' ? 'secondary' : 'outline'}
+                          aria-pressed={draftIntent === 'notice'}
+                          disabled={sendMutation.isPending}
+                          onClick={() => setDraftIntent('notice')}
+                        >
+                          {t('notice')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={draftIntent === 'request' ? 'secondary' : 'outline'}
+                          aria-pressed={draftIntent === 'request'}
+                          disabled={sendMutation.isPending}
+                          onClick={() => setDraftIntent('request')}
+                        >
+                          {t('request')}
+                        </Button>
+                      </div>
+                      <p className="dshx:text-xs dshx:text-muted-foreground">{t('intentHint')}</p>
                       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
                         <p className="dshx:text-xs dshx:text-muted-foreground">
                           {selection.kind === 'topic'
@@ -632,6 +661,12 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
                           <p className="dshx:break-all dshx:text-sm">{selectedMessage.topic ?? t('directMessages')}</p>
+                        </div>
+                        <div>
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</p>
+                          <Badge variant={selectedMessage.intent === 'request' ? 'default' : 'outline'}>
+                            {selectedMessage.intent === 'request' ? t('request') : t('notice')}
+                          </Badge>
                         </div>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('priority')}</p>

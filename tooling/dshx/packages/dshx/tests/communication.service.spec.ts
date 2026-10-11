@@ -196,7 +196,7 @@ describe('durable Agent communication', () => {
 
     const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
     expect(persisted).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
       subscriptions: [{ delivery: 'passive' }, { delivery: 'passive' }],
     })
@@ -236,13 +236,99 @@ describe('durable Agent communication', () => {
     expect(inbox).toMatchObject([{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }])
     const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
     expect(persisted).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
       subscriptions: [{ delivery: 'passive' }],
       activityStartedAt: null,
       activityEvents: [],
     })
     expect(persisted).not.toHaveProperty('notifications')
+  })
+
+  it('records intent and correlation metadata without changing passive delivery', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+
+    const notice = await service.send({ sender, toAgentId: recipient.id, text: 'Build finished.' })
+    const request = await service.send({
+      sender,
+      toAgentId: recipient.id,
+      text: 'Please review the build.',
+      intent: 'request',
+      correlationId: 'release-42',
+    })
+
+    expect(notice).toMatchObject({ intent: 'notice', correlationId: null, dedupeKey: null })
+    expect(request).toMatchObject({
+      intent: 'request',
+      correlationId: 'release-42',
+      recipients: [{ principal: recipient, delivery: 'passive', readAt: null }],
+    })
+    expect((await service.inbox({ principal: recipient })).map(message => message.id)).toEqual([notice.id, request.id])
+  })
+
+  it('returns the stored message for a repeated sender-scoped dedupe key instead of storing a duplicate', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+
+    const first = await service.send({ sender, toAgentId: recipient.id, text: 'Retry me.', dedupeKey: 'task-7-delivery' })
+    const retry = await service.send({ sender, toAgentId: recipient.id, text: 'Retry me.', dedupeKey: 'task-7-delivery' })
+    const otherSender = await service.send({
+      sender: { kind: 'agent', id: 'agent-other' },
+      toAgentId: recipient.id,
+      text: 'Retry me.',
+      dedupeKey: 'task-7-delivery',
+    })
+    const otherTarget = await service.send({ sender, toAgentId: 'agent-third', text: 'Retry me.', dedupeKey: 'task-7-delivery' })
+    const noKey = await service.send({ sender, toAgentId: recipient.id, text: 'Retry me.' })
+
+    expect(retry.id).toBe(first.id)
+    expect(otherSender.id).not.toBe(first.id)
+    expect(otherTarget.id).not.toBe(first.id)
+    expect(noKey.id).not.toBe(first.id)
+    expect(await service.browseMessages({ agentId: recipient.id })).toMatchObject({ totalMatching: 3 })
+  })
+
+  it('migrates schema version 3 messages to notice intent without replaying them', async () => {
+    const path = await statePath()
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+    const messageId = '0e1f3b8c-3f2a-4c8e-9a5d-8f0b1c2d3e4f'
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 3,
+        messages: [
+          {
+            id: messageId,
+            topic: null,
+            sender,
+            text: 'schema-three message',
+            priority: 'normal',
+            createdAt: now,
+            recipients: [{ principal: recipient, delivery: 'passive', readAt: null }],
+          },
+        ],
+        subscriptions: [{ principal: recipient, topic: 'inbox', delivery: 'passive', createdAt: now }],
+        acknowledgements: [],
+        workspaceOptOuts: [],
+        activityStartedAt: null,
+        activityEvents: [],
+      }),
+      { mode: 0o600 },
+    )
+
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    expect(await service.inbox({ principal: recipient, topic: 'inbox' })).toMatchObject([
+      { id: messageId, intent: 'notice', correlationId: null, dedupeKey: null },
+    ])
+    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    expect(persisted).toMatchObject({
+      schemaVersion: 4,
+      messages: [{ id: messageId, intent: 'notice', correlationId: null, dedupeKey: null }],
+    })
   })
 
   it('serializes concurrent sends without losing or duplicating messages', async () => {

@@ -10,7 +10,10 @@ const peerMessage = (overrides: Partial<CommunicationMessage> = {}): Communicati
     topic: 'release-notes',
     sender: { kind: 'agent', id: 'session-a' },
     text: injection,
+    intent: 'notice',
     priority: 'normal',
+    correlationId: null,
+    dedupeKey: null,
     createdAt: 0,
     recipients: [],
     ...overrides,
@@ -21,6 +24,11 @@ describe('peer message formatting', () => {
     const inbox = formatInbox([peerMessage()])
     expect(inbox).not.toContain('DSHX-COMM:')
     expect(inbox).toContain(`Untrusted peer text as JSON: ${JSON.stringify(injection)}`)
+  })
+
+  it('labels the recorded intent so a request is distinguishable from a notice', () => {
+    expect(formatInbox([peerMessage({ intent: 'request' })])).toContain('| request |')
+    expect(formatInbox([peerMessage()])).toContain('| notice |')
   })
 
   it('JSON-encodes peer text so it cannot forge inbox lines', () => {

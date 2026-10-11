@@ -41,6 +41,11 @@ principals; DSH Agent identities are taken from the Host tool execution.
 - Every arrival is a durable record only. It never appends a Session/user
   message, calls `Agent.followup()` or `Agent.steer()`, or replays a pending
   notification when an Agent appears. Completed turns remain completed.
+- `intent` (`notice`/`request`) records whether the sender shares information or
+  asks for action. It is metadata: a `request` starts no turn. An optional
+  sender-scoped `dedupeKey` makes a repeated publish/send return the stored
+  message instead of storing a duplicate, and an opaque `correlationId` groups
+  related messages for later readers and timelines.
 - `dshx_comm_inbox` is an explicit read performed during a natural Agent
   execution. It records `readAt` but does not acknowledge; only the recipient's
   `dshx_comm_ack` hides a message from later inbox reads.
@@ -51,6 +56,10 @@ principals; DSH Agent identities are taken from the Host tool execution.
 - Peer message bodies are untrusted data. Agent inbox output quotes the body as
   JSON. A recipient must still apply its own task and user policy before acting
   on peer content.
+- When two DSH instances share one `DSH_HOME`, only the first owns the local
+  socket bridge. A later instance logs `host-already-active` as a warning and
+  keeps its in-process Agent tools instead of failing activation; external
+  CLI/MCP clients keep talking to the owning instance.
 
 External CLI/MCP principals are local names, separate from DSH Agent ids. The
 default CLI name is `cli`; MCP defaults to `mcp.default`. Use
@@ -109,7 +118,8 @@ for protocol frames and reports startup errors to stderr.
 Message bodies are limited to 12,000 characters. State is private JSON, written
 atomically with mode `0600`, capped at 5,000 retained messages and activity
 events and 16 MiB, with messages and activity pruned after 30 days. Acknowledgements are idempotent. Legacy notification receipts are discarded
-when schema versions 1 or 2 migrate to version 3 passive delivery.
+when schema versions 1, 2, or 3 migrate to version 4, which adds `intent`,
+`correlationId`, and `dedupeKey` to each stored message.
 
 ## Candidate decision
 

@@ -43,13 +43,31 @@ export const communicationRecipientSchema = z
   .strict()
 export type CommunicationRecipient = z.infer<typeof communicationRecipientSchema>
 
-export const communicationMessageSchema = z
+export const communicationMessageIntentSchema = z.enum(['notice', 'request'])
+export type CommunicationMessageIntent = z.infer<typeof communicationMessageIntentSchema>
+
+const communicationMessageV3Schema = z
   .object({
     id: z.string().uuid(),
     topic: z.string().min(1).max(128).nullable(),
     sender: communicationPrincipalSchema,
     text: z.string().min(1).max(12_000),
     priority: communicationPrioritySchema,
+    createdAt: z.number().int().nonnegative(),
+    recipients: z.array(communicationRecipientSchema).max(512),
+  })
+  .strict()
+
+export const communicationMessageSchema = z
+  .object({
+    id: z.string().uuid(),
+    topic: z.string().min(1).max(128).nullable(),
+    sender: communicationPrincipalSchema,
+    text: z.string().min(1).max(12_000),
+    intent: communicationMessageIntentSchema.default('notice'),
+    priority: communicationPrioritySchema,
+    correlationId: z.string().min(1).max(128).nullable().default(null),
+    dedupeKey: z.string().min(1).max(128).nullable().default(null),
     createdAt: z.number().int().nonnegative(),
     recipients: z.array(communicationRecipientSchema).max(512),
   })
@@ -199,9 +217,22 @@ export const communicationStateV2Schema = z
   .strict()
 export type CommunicationStateV2 = z.infer<typeof communicationStateV2Schema>
 
-export const communicationStateSchema = z
+export const communicationStateV3Schema = z
   .object({
     schemaVersion: z.literal(3),
+    messages: z.array(communicationMessageV3Schema).max(5_000),
+    subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
+    acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
+    workspaceOptOuts: z.array(z.string().min(1).max(256)).max(10_000),
+    activityStartedAt: z.number().int().nonnegative().nullable(),
+    activityEvents: z.array(communicationActivityEventSchema).max(5_000),
+  })
+  .strict()
+export type CommunicationStateV3 = z.infer<typeof communicationStateV3Schema>
+
+export const communicationStateSchema = z
+  .object({
+    schemaVersion: z.literal(4),
     messages: z.array(communicationMessageSchema).max(5_000),
     subscriptions: z.array(communicationSubscriptionSchema).max(5_000),
     acknowledgements: z.array(communicationAcknowledgementSchema).max(100_000),
@@ -257,6 +288,7 @@ export const communicationDiagnosticMessageSchema = z
     id: z.string().uuid(),
     topic: z.string().min(1).max(128).nullable(),
     sender: communicationPrincipalSchema,
+    intent: communicationMessageIntentSchema.default('notice'),
     priority: communicationPrioritySchema,
     createdAt: z.number().int().nonnegative(),
     recipientCount: z.number().int().nonnegative().max(512),

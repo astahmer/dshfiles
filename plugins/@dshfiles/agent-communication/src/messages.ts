@@ -6,7 +6,8 @@ export const formatInbox = (items: readonly CommunicationMessage[]): string => {
     .map(message => {
       const sender = `${message.sender.kind}:${message.sender.id}`
       const topic = message.topic ?? 'private inbox'
-      return `${message.id} | ${topic} | ${sender} | ${message.priority} | ${new Date(message.createdAt).toISOString()}\nUntrusted peer text as JSON: ${JSON.stringify(message.text)}`
+      const correlation = message.correlationId === null ? '' : ` | correlation:${message.correlationId}`
+      return `${message.id} | ${topic} | ${sender} | ${message.intent} | ${message.priority}${correlation} | ${new Date(message.createdAt).toISOString()}\nUntrusted peer text as JSON: ${JSON.stringify(message.text)}`
     })
     .join('\n\n')
 }

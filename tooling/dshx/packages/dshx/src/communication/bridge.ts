@@ -8,17 +8,21 @@ import { acceptJsonLine, JsonLineTransportError, requestJsonLine, writeJsonLine 
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
+  communicationDeliverySchema,
   communicationDiagnosticsSchema,
   communicationInboxSchema,
+  communicationMessageIntentSchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
   communicationSubscriptionSchema,
   communicationTopicSchema,
+  legacyCommunicationDeliverySchema,
   type CommunicationAgent,
   type CommunicationDelivery,
   type CommunicationDiagnostics,
   type CommunicationInbox,
   type CommunicationMessage,
+  type CommunicationMessageIntent,
   type CommunicationPrincipal,
   type CommunicationSubscription,
   type CommunicationTopic,
@@ -67,8 +71,22 @@ export interface CommunicationClient {
     readonly allowSteerFrom?: readonly string[]
   }): Promise<CommunicationSubscription>
   unsubscribe(topic: string): Promise<{ readonly removed: boolean }>
-  publish(input: { readonly topic: string; readonly text: string; readonly priority?: 'normal' | 'urgent' }): Promise<CommunicationMessage>
-  send(input: { readonly toAgentId: string; readonly text: string; readonly priority?: 'normal' | 'urgent' }): Promise<CommunicationMessage>
+  publish(input: {
+    readonly topic: string
+    readonly text: string
+    readonly intent?: CommunicationMessageIntent
+    readonly priority?: 'normal' | 'urgent'
+    readonly correlationId?: string
+    readonly dedupeKey?: string
+  }): Promise<CommunicationMessage>
+  send(input: {
+    readonly toAgentId: string
+    readonly text: string
+    readonly intent?: CommunicationMessageIntent
+    readonly priority?: 'normal' | 'urgent'
+    readonly correlationId?: string
+    readonly dedupeKey?: string
+  }): Promise<CommunicationMessage>
   inbox(input?: { readonly topic?: string; readonly limit?: number }): Promise<CommunicationInbox>
   acknowledge(messageId: string): Promise<{ readonly acknowledged: boolean }>
 }
@@ -152,7 +170,7 @@ const dispatch = async (
     const input = z
       .object({
         topic: z.string().min(1).max(128),
-        delivery: z.enum(['quiet', 'queue', 'steer']).optional(),
+        delivery: z.union([communicationDeliverySchema, legacyCommunicationDeliverySchema]).optional(),
         allowSteerFrom: z.array(z.string().min(1).max(256)).max(64).optional(),
       })
       .strict()
@@ -172,26 +190,46 @@ const dispatch = async (
   }
   if (request.operation === 'publish') {
     const input = z
-      .object({ topic: z.string().min(1).max(128), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() })
+      .object({
+        topic: z.string().min(1).max(128),
+        text: z.string().min(1).max(12_000),
+        intent: communicationMessageIntentSchema.optional(),
+        priority: z.enum(['normal', 'urgent']).optional(),
+        correlationId: z.string().min(1).max(128).optional(),
+        dedupeKey: z.string().min(1).max(128).optional(),
+      })
       .strict()
       .parse(request.input)
     return service.publish({
       sender: request.principal,
       topic: input.topic,
       text: input.text,
+      ...(input.intent === undefined ? {} : { intent: input.intent }),
       ...(input.priority === undefined ? {} : { priority: input.priority }),
+      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
+      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'send') {
     const input = z
-      .object({ toAgentId: z.string().min(1).max(256), text: z.string().min(1).max(12_000), priority: z.enum(['normal', 'urgent']).optional() })
+      .object({
+        toAgentId: z.string().min(1).max(256),
+        text: z.string().min(1).max(12_000),
+        intent: communicationMessageIntentSchema.optional(),
+        priority: z.enum(['normal', 'urgent']).optional(),
+        correlationId: z.string().min(1).max(128).optional(),
+        dedupeKey: z.string().min(1).max(128).optional(),
+      })
       .strict()
       .parse(request.input)
     return service.send({
       sender: request.principal,
       toAgentId: input.toAgentId,
       text: input.text,
+      ...(input.intent === undefined ? {} : { intent: input.intent }),
       ...(input.priority === undefined ? {} : { priority: input.priority }),
+      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
+      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'inbox') {
