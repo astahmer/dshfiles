@@ -339,6 +339,11 @@ export const aiAccountsApi = defineApi({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: copilotLoginStateSchema,
     }),
+    /** Cancel a device-code flow that has not completed. */
+    cancelCopilotLogin: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      output: z.object({ cancelled: z.literal(true) }),
+    }),
     /** Remove one Copilot account's stored OAuth grant. */
     signOutCopilot: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),

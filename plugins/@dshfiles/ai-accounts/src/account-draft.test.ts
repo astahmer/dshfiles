@@ -9,6 +9,7 @@ describe('account draft defaults', () => {
     expect(first.apiKeyEnv).toBe('OPENCODE_GO_WORK_API_KEY')
     expect(second.apiKeyEnv).toBe(first.apiKeyEnv)
     expect(newAccountDraft({ kind: 'codex', existing: [] }).apiKeyEnv).toBe('')
+    expect(newAccountDraft({ kind: 'github-copilot', existing: [] }).apiKeyEnv).toBe('')
   })
 
   it('normalizes reference names to a valid bounded API-key identifier', () => {

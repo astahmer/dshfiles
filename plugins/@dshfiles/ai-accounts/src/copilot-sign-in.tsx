@@ -30,6 +30,17 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
     mutationFn: () => accounts.beginCopilotLogin({ instanceId: props.instanceId }),
     onSuccess: next => queryClient.setQueryData(queryKey, next),
   })
+  const cancel = useMutation({
+    mutationFn: () => accounts.cancelCopilotLogin({ instanceId: props.instanceId }),
+    onSuccess: () =>
+      queryClient.setQueryData(queryKey, {
+        instanceId: props.instanceId,
+        status: 'idle',
+        userCode: null,
+        verificationUri: null,
+        message: 'GitHub sign-in was cancelled.',
+      } satisfies CopilotLoginState),
+  })
   const signOut = useMutation({
     mutationFn: () => accounts.signOutCopilot({ instanceId: props.instanceId }),
     onSuccess: async () => {
@@ -56,7 +67,7 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
   }, [queryClient, status.status])
 
   const active = status.status === 'starting' || status.status === 'waiting'
-  const error = begin.error !== null || signOut.error !== null || status.status === 'error'
+  const error = begin.error !== null || cancel.error !== null || signOut.error !== null || status.status === 'error'
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -69,23 +80,47 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
             {signOut.isPending ? 'Disconnecting…' : 'Disconnect GitHub'}
           </Button>
         )}
+        {active ? (
+          <Button disabled={cancel.isPending} onClick={() => cancel.mutate()} size="sm" type="button" variant="outline">
+            Cancel sign-in
+          </Button>
+        ) : null}
         {status.verificationUri === null ? null : (
-          <a className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-sm dshx:underline" href={status.verificationUri} rel="noreferrer" target="_blank">
+          <a
+            className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-sm dshx:underline"
+            href={status.verificationUri}
+            rel="noreferrer"
+            target="_blank"
+          >
             Open GitHub <ExternalLinkIcon />
           </a>
         )}
       </div>
       {status.userCode === null ? null : (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <code className="dshx:rounded dshx:bg-background dshx:px-2 dshx:py-1 dshx:font-mono! dshx:text-base dshx:font-semibold dshx:tracking-widest">{status.userCode}</code>
+          <code className="dshx:rounded dshx:bg-background dshx:px-2 dshx:py-1 dshx:font-mono! dshx:text-base dshx:font-semibold dshx:tracking-widest">
+            {status.userCode}
+          </code>
           <Button onClick={() => void writeClipboard(status.userCode ?? '')} size="xs" type="button" variant="outline">
             Copy code
           </Button>
         </div>
       )}
-      {status.message === null ? null : <p className={error ? 'dshx:text-xs dshx:text-destructive' : 'dshx:text-xs dshx:text-muted-foreground'} role="status">{status.message}</p>}
-      {begin.isError || signOut.isError ? <p className="dshx:text-xs dshx:text-destructive" role="alert">Could not update GitHub Copilot sign-in. Try again.</p> : null}
-      {statusQuery.isError ? <p className="dshx:text-xs dshx:text-muted-foreground" role="status">Sign-in status will refresh when the Host is available.</p> : null}
+      {status.message === null ? null : (
+        <p className={error ? 'dshx:text-xs dshx:text-destructive' : 'dshx:text-xs dshx:text-muted-foreground'} role="status">
+          {status.message}
+        </p>
+      )}
+      {begin.isError || cancel.isError || signOut.isError ? (
+        <p className="dshx:text-xs dshx:text-destructive" role="alert">
+          Could not update GitHub Copilot sign-in. Try again.
+        </p>
+      ) : null}
+      {statusQuery.isError ? (
+        <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
+          Sign-in status will refresh when the Host is available.
+        </p>
+      ) : null}
     </div>
   )
 }

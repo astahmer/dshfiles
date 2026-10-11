@@ -260,7 +260,11 @@ export default definePlugin({
       pool.put({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })
     }
 
-    const offersModel = (id: string, model: string): boolean => profiles.get(id)?.piProvider?.getModels().some(candidate => candidate.id === model) === true
+    const offersModel = (id: string, model: string): boolean =>
+      profiles
+        .get(id)
+        ?.piProvider?.getModels()
+        .some(candidate => candidate.id === model) === true
     const recovery = createFailureRecovery({
       pool,
       isAccountRoute: provider => routes.has(provider),
@@ -341,7 +345,10 @@ export default definePlugin({
               await materializeCodexShadowHome(route.layout)
               return readCodexOAuthCredential(route.layout.effectiveHomePath)
             },
-            list: async () => [...routes].filter(([, route]) => route.kind === CODEX_KIND || route.kind === GITHUB_COPILOT_KIND).map(([id]) => ({ providerId: id, type: 'oauth' as const })),
+            list: async () =>
+              [...routes]
+                .filter(([, route]) => route.kind === CODEX_KIND || route.kind === GITHUB_COPILOT_KIND)
+                .map(([id]) => ({ providerId: id, type: 'oauth' as const })),
             modify: async (provider, mutate) => {
               const route = routes.get(provider)
               if (route?.kind === GITHUB_COPILOT_KIND) {
@@ -386,11 +393,7 @@ export default definePlugin({
       const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
         if (route.kind === COMMANDCODE_KIND) {
           const entries = await fetchCommandCodeCatalog({
-            ...discoveryCatalogOptions(
-              request,
-              { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) },
-              await resolveCredential(keyEnvFor(route)),
-            ),
+            ...discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }, await resolveCredential(keyEnvFor(route))),
             signal,
           })
           return entries.map(entry => ({
@@ -409,7 +412,12 @@ export default definePlugin({
     let registeredProviders: ReadonlySet<string> = new Set()
     const applyRouteSnapshot = (sourceFile: ReturnType<typeof readAccountFileSync>): void => {
       const nextConfig = configFromAccountsFile(sourceFile)
-      const takenProviders = new Set(llm.listProviders().map(provider => provider.id).filter(id => !registeredProviders.has(id)))
+      const takenProviders = new Set(
+        llm
+          .listProviders()
+          .map(provider => provider.id)
+          .filter(id => !registeredProviders.has(id)),
+      )
       const { routes: nextRoutes, rejected } = buildRoutes(nextConfig, { takenProviders })
       for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
       runtime.rejectedRoutes = rejected
@@ -615,7 +623,13 @@ const cancellableDelay = (delayMs: number, signal: AbortSignal): Promise<boolean
  */
 const retryNotice = (
   action: Extract<RecoveryAction, { kind: 'retry' }>,
-  context: { readonly retryId: RetryId; readonly turn: number; readonly step: number; readonly failure: LlmFailure; readonly label: (accountId: string) => string },
+  context: {
+    readonly retryId: RetryId
+    readonly turn: number
+    readonly step: number
+    readonly failure: LlmFailure
+    readonly label: (accountId: string) => string
+  },
 ): Extract<LlmRetryEventData, { mode: 'normal' }> => {
   const from = context.label(action.account)
   const cause = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)

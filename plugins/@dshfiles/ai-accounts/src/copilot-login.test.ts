@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { copilotCredentialKey } from './copilot-credentials.js'
 import { createCopilotLoginService } from './copilot-login.js'
 
-const credential = { type: 'oauth', access: 'copilot-access-token', refresh: 'github-refresh-token', expires: 1_900_000_000_000, availableModelIds: ['gpt-6-luna'] } as const
+const credential = {
+  type: 'oauth',
+  access: 'copilot-access-token',
+  refresh: 'github-refresh-token',
+  expires: 1_900_000_000_000,
+  availableModelIds: ['gpt-6-luna'],
+} as const
 
 const createCredentialProvider = () => {
   const records = new Map<string, CredentialRecord>()
@@ -16,7 +22,9 @@ const createCredentialProvider = () => {
         if (next !== undefined) records.set(key.toString(), next)
         return next
       },
-      deleteRecord: async (key: { toString(): string }) => { records.delete(key.toString()) },
+      deleteRecord: async (key: { toString(): string }) => {
+        records.delete(key.toString())
+      },
     },
   }
 }

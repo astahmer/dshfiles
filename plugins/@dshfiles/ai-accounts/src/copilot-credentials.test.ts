@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import { copilotCredentialKey, deleteCopilotCredential, modifyCopilotCredential, readCopilotCredential } from './copilot-credentials.js'
 
-const credential = { type: 'oauth', access: 'copilot-access-token', refresh: 'github-refresh-token', expires: 1_900_000_000_000, availableModelIds: ['gpt-6-luna'] } as const
+const credential = {
+  type: 'oauth',
+  access: 'copilot-access-token',
+  refresh: 'github-refresh-token',
+  expires: 1_900_000_000_000,
+  availableModelIds: ['gpt-6-luna'],
+} as const
 
 describe('GitHub Copilot credential records', () => {
   it('stores each subscription under an account-scoped DSH credential record', async () => {
@@ -14,7 +20,9 @@ describe('GitHub Copilot credential records', () => {
         if (next !== undefined) records.set(key.toString(), next)
         return next
       },
-      deleteRecord: async (key: { toString(): string }) => { records.delete(key.toString()) },
+      deleteRecord: async (key: { toString(): string }) => {
+        records.delete(key.toString())
+      },
     }
 
     const stored = await modifyCopilotCredential(provider, 'copilot-personal', async () => credential)

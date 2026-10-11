@@ -3,14 +3,16 @@ import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { z } from 'zod'
 import type { OAuthCredential } from '@earendil-works/pi-ai'
 
-const credentialSchema = z.object({
-  type: z.literal('oauth'),
-  access: z.string().min(1),
-  refresh: z.string().min(1),
-  expires: z.number(),
-  availableModelIds: z.array(z.string()).optional(),
-  enterpriseUrl: z.string().optional(),
-}).passthrough()
+const credentialSchema = z
+  .object({
+    type: z.literal('oauth'),
+    access: z.string().min(1),
+    refresh: z.string().min(1),
+    expires: z.number(),
+    availableModelIds: z.array(z.string()).optional(),
+    enterpriseUrl: z.string().optional(),
+  })
+  .passthrough()
 
 export const copilotCredentialKey = (instanceId: string) => credentialKey('ai-accounts', `github-copilot-${instanceId}`)
 

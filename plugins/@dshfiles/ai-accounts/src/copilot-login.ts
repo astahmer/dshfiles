@@ -83,6 +83,11 @@ export const createCopilotLoginService = (input: {
     return state(instanceId)
   }
 
+  const cancelLogin = (instanceId: string): void => {
+    cancel(instanceId)
+    states.set(instanceId, { ...initialState(instanceId), message: 'GitHub sign-in was cancelled.' })
+  }
+
   const signOut = async (instanceId: string): Promise<void> => {
     if (!input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
     cancel(instanceId)
@@ -94,6 +99,7 @@ export const createCopilotLoginService = (input: {
   return {
     begin,
     state,
+    cancel: cancelLogin,
     signOut,
     dispose: (): void => {
       for (const controller of controllers.values()) controller.abort()

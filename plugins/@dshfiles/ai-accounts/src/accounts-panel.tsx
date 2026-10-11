@@ -54,7 +54,7 @@ export const AccountsPanel = (props: {
               </EmptyMedia>
               <EmptyTitle className="dshx:text-base">Your accounts, side by side.</EmptyTitle>
               <EmptyDescription>
-                Create a Codex, Claude, OpenCode Go, Command Code or Cursor profile. Each subscription becomes its own route in the model picker; Cursor tracks
+                Create a Codex, Claude, GitHub Copilot, OpenCode Go, Command Code or Cursor profile. Each subscription becomes its own route in the model picker; Cursor tracks
                 quota for the Cursor Agent runtime.
               </EmptyDescription>
             </EmptyHeader>

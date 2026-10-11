@@ -50,7 +50,7 @@ export const AccountRail = (props: { readonly state: AccountsPanelState; readonl
       <NativeProvidersList compact />
     </section>
     <p className="dshx:mt-auto dshx:px-2 dshx:pt-3.5 dshx:text-xs dshx:text-muted-foreground">
-      Credentials stay in each provider&apos;s own account directory.
+      Credentials stay in their provider&apos;s configured credential store.
     </p>
   </aside>
 )

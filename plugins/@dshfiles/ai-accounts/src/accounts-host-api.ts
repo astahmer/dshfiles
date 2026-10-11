@@ -102,6 +102,10 @@ export const accountsHostApi = aiAccountsApi.host({
   identity: async ({ input }) => readAccountIdentity(input.instanceId),
   beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
   copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
+  cancelCopilotLogin: async ({ input, ctx }) => {
+    copilotLoginFor(ctx).cancel(input.instanceId)
+    return { cancelled: true }
+  },
   signOutCopilot: async ({ input, ctx }) => {
     await copilotLoginFor(ctx).signOut(input.instanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
