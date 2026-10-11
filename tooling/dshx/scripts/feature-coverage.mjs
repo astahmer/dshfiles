@@ -53,25 +53,47 @@ const collectScenarioTags = async () => {
   const entries = await readdir(featureRoot, { withFileTypes: true })
   const featureFiles = new Set()
   const tags = new Map()
+  const scenarioTags = new Map()
+  const misplacedTags = []
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.feature')) continue
     const featureFile = resolve(featureRoot, entry.name)
     featureFiles.add(featureFile)
     const source = await readFile(featureFile, 'utf8')
-    for (const line of source.split(/\r?\n/)) {
-      if (!/^\s*@/.test(line)) continue
-      for (const match of line.matchAll(/@scenario:([a-z0-9][a-z0-9.-]*)/g)) {
-        const files = tags.get(match[1]) ?? []
-        files.push(featureFile)
-        tags.set(match[1], files)
+    const pendingTags = []
+    const lines = source.split(/\r?\n/)
+    for (const [index, line] of lines.entries()) {
+      if (/^\s*@/.test(line)) {
+        for (const match of line.matchAll(/@scenario:([a-z0-9][a-z0-9.-]*)/g)) {
+          const tag = { id: match[1], featureFile, line: index + 1 }
+          const files = tags.get(tag.id) ?? []
+          files.push(featureFile)
+          tags.set(tag.id, files)
+          pendingTags.push(tag)
+        }
+        continue
       }
+      if (/^\s*Scenario(?: Outline)?:/.test(line)) {
+        for (const tag of pendingTags) {
+          const files = scenarioTags.get(tag.id) ?? []
+          files.push(featureFile)
+          scenarioTags.set(tag.id, files)
+        }
+        pendingTags.length = 0
+        continue
+      }
+      const content = line.trim()
+      if (content === '' || content.startsWith('#')) continue
+      misplacedTags.push(...pendingTags)
+      pendingTags.length = 0
     }
+    misplacedTags.push(...pendingTags)
   }
-  return { featureFiles, tags }
+  return { featureFiles, tags, scenarioTags, misplacedTags }
 }
 
 const packages = await collectPackages()
-const { featureFiles, tags: scenarioTags } = await collectScenarioTags()
+const { featureFiles, tags: allScenarioTags, scenarioTags, misplacedTags } = await collectScenarioTags()
 const errors = []
 const catalogs = []
 const declaredVerificationIds = new Set()
