@@ -19,6 +19,7 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
         directoryPicker={props.directoryPicker}
         disabled={props.busy}
         mode="directories"
+        showNativePicker={false}
         onClose={props.onCancel}
         onRegisterWorkspace={props.registerWorkspace}
         onSelect={selection => props.onPicked(selection.canonicalPath)}
@@ -32,7 +33,7 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
 
 export default defineClient({
   name: '@dshfiles/workspace-folder-picker',
-  inject: ['slots', 'remote'],
+  inject: ['slots', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(ctx, decorate) {
     const ports = createWorkspacePickerPorts(ctx.remote)
     for (const name of directoryFlowSlotNames) {

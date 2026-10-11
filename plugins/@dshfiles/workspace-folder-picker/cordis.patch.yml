@@ -1,3 +1,6 @@
+- id: directory-picker
+  config:
+    backend: browse
 - insert:
     - id: dshfiles-workspace-folder-picker
       name: '@dshfiles/workspace-folder-picker'

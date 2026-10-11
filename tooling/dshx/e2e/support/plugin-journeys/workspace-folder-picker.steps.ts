@@ -19,6 +19,7 @@ Then('the picker starts in folder browsing mode without project actions', async 
   await recordAssertion(page, 'folder-path-input-is-selected-mode', () => expect(dialog.getByRole('textbox', { name: 'Enter a folder path' })).toBeVisible())
   await recordAssertion(page, 'folder-list-is-rendered', () => expect(dialog.getByRole('listbox', { name: 'Folders' })).toBeVisible())
   await recordAssertion(page, 'host-home-directory-is-listed', () => expect(dialog.locator('p').filter({ hasText: /^\// })).toBeVisible())
+  await recordAssertion(page, 'native-chooser-is-not-offered', () => expect(dialog.getByRole('button', { name: 'Browse…' })).toHaveCount(0))
   await recordAssertion(page, 'project-actions-are-not-offered', async () => {
     await expect(dialog.getByText('Register project', { exact: true })).toHaveCount(0)
     await expect(dialog.getByRole('listbox', { name: 'Projects and recent folders' })).toHaveCount(0)
