@@ -128,6 +128,11 @@ export const HeaderThreadActions = ({
             </DropdownMenuItem>
           </>
         )}
+        {actionFailed ? (
+          <div className="dshx:px-2 dshx:py-1.5 dshx:text-destructive" role="alert">
+            {t('threadSidebarActionFailure')}
+          </div>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )
