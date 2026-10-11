@@ -132,6 +132,8 @@ const waitForJson = async (path, label) => {
 try {
   await mkdir(fixtureWorkspacePath, { recursive: true })
   await writeFile(resolve(fixtureWorkspacePath, 'review.md'), '# Cold-resume target\nKeep this line fixed.\n')
+  await writeFile(resolve(fixtureWorkspacePath, 'review-stale.md'), '# Stale target\nThis excerpt will change.\n')
+  await writeFile(resolve(fixtureWorkspacePath, 'review-cancel.md'), '# Cancel target\nThis request may be cancelled.\n')
   await scratch.install()
   const environment = isolatedHostEnvironment(scratch.home, scratch.profileRoot)
   const dump = spawnSync('dsh', ['--profile', profileName, '--dump-config'], {
@@ -149,20 +151,42 @@ try {
   assert.ok(prepared.parentSessionId, 'The pending feedback state omitted the parent session id.')
   assert.ok(prepared.childSessionId, 'The pending feedback state omitted the child session id.')
   assert.ok(prepared.feedbackId, 'The pending feedback state omitted the durable feedback id.')
-  process.stdout.write('PASS: Agent Questions composed, activated, and persisted provider-backed child feedback on a fresh DSH scratch Host.\n')
+  assert.ok(prepared.currentFeedbackId, 'The pending feedback state omitted the current feedback id.')
+  assert.ok(prepared.staleFeedbackId, 'The pending feedback state omitted the stale-anchor id.')
+  assert.ok(prepared.cancelledFeedbackId, 'The pending feedback state omitted the cancelled feedback id.')
+  assert.ok(prepared.questionId, 'The pending question state omitted the reattachment id.')
+  assert.equal(prepared.parentQuestionToolPassed, true)
+  assert.equal(prepared.expiryRecommendedPassed, true)
+  assert.equal(prepared.expiryDeferredPassed, true)
+  assert.equal(prepared.feedbackToolsPassed, true)
+  assert.equal(prepared.oversizedBatchRejected, true)
+  process.stdout.write('PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.\n')
   await stopHost()
   await startHost()
   const result = await waitForJson(fixtureResultPath, 'The cold-resume result')
   assert.deepEqual(result, {
     passed: true,
     parentQuestionToolPassed: true,
+    unauthorizedQuestionAnswerRejected: true,
+    questionReattachedAfterRestart: true,
+    expiryRecommendedPassed: true,
+    expiryDeferredPassed: true,
+    feedbackSubmitReadCancelPassed: true,
+    feedbackResolvedAfterRestart: true,
+    staleAnchorRejected: true,
+    oversizedBatchRejected: true,
     childAbsentAtHostRestart: true,
     childResumedAfterResolution: true,
     childProviderCalls: 2,
-    feedbackStatus: 'resolved',
+    feedbackStatuses: {
+      current: 'resolved',
+      stale: 'stale',
+      cancelled: 'rejected',
+      coldResume: 'resolved',
+    },
     parentNotified: true,
   })
-  process.stdout.write('PASS: Parent feedback cold-resumed the persisted provider-backed child after Host restart and retrieved its durable resolution.\n')
+  process.stdout.write('PASS: Pending questions and feedback cold-resumed; the parent answered, resolved current/stale feedback, and the child retrieved durable receipts.\n')
 } finally {
   await stopHost()
   await scratch.cleanup()
