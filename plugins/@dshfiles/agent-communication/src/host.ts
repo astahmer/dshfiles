@@ -12,7 +12,8 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
-import { communicationWorkspaceTopic, initializeCommunicationAgent } from './agent-lifecycle.js'
+import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { communicationWorkspaceTopic, findOwnedLiveAgents, observeLiveAgent } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
 
 const summaryOutputSchema = {
@@ -35,7 +36,8 @@ const principalForAgent = (agent: Agent | undefined): CommunicationPrincipal => 
 
 const agentListTool = defineTool({
   name: 'dshx_comm_agents',
-  description: 'List live DSH Agents and their Session ids. Use this to find a recipient for a direct peer message.',
+  description:
+    'List live DSH Agents and Session ids for direct peer-message discovery. Also list this caller’s direct and transitive runtime-owned descendants with status, runtime owner, creation time, and an opaque same-cwd workspace topic. This point-in-time view exposes no durable parent lineage, task text, or history; idle or absent does not mean complete.',
   parameters: {},
   output: summaryOutput,
   execute: async (_args, execution) =>
@@ -44,8 +46,32 @@ const agentListTool = defineTool({
       operation: 'dshx_comm_agents',
       run: async () => {
         if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
-        const items = hostContext.agents.list().map(agent => ({ id: agent.id, status: agent.status }))
-        return { summary: JSON.stringify({ agents: items }) }
+        const registry = hostContext.agents
+        const liveAgents = registry.list()
+        const items = liveAgents.map(agent => ({ id: agent.id, status: agent.status }))
+        const ownedDescendants =
+          execution.agent === undefined
+            ? []
+            : findOwnedLiveAgents({
+                caller: execution.agent,
+                liveAgents,
+                isOwnedBy: (candidate, owner) => registry.isOwnedBy(candidate.id, owner),
+              }).map(({ agent, owner }) => {
+                const observation = observeLiveAgent({
+                  id: agent.id,
+                  status: agent.status,
+                  createdAt: agent.session.header.createdAt,
+                  cwd: agent.session.header.cwd,
+                })
+                return {
+                  id: observation.id,
+                  status: observation.status,
+                  created_at: observation.createdAt,
+                  runtime_owner_session_id: owner.id,
+                  workspace_topic: observation.workspaceTopic,
+                }
+              })
+        return { summary: JSON.stringify({ agents: items, owned_descendants: ownedDescendants }) }
       },
     }),
 })
@@ -131,8 +157,7 @@ const publishTool = defineTool({
 
 const sendTool = defineTool({
   name: 'dshx_comm_send',
-  description:
-    'Store untrusted peer text in a DSH Agent inbox. Sending never adds a Session message or starts, resumes, or redirects the recipient.',
+  description: 'Store untrusted peer text in a DSH Agent inbox. Sending never adds a Session message or starts, resumes, or redirects the recipient.',
   parameters: {
     toAgentId: { type: 'string', required: true, description: 'Recipient DSH Agent Session id.' },
     text: { type: 'string', required: true, description: 'Message text, up to 12,000 characters.' },

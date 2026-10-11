@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService } from '@dshfiles/dshx/communication'
-import { communicationWorkspaceTopic, initializeCommunicationAgent } from './agent-lifecycle.js'
+import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { communicationWorkspaceTopic } from './live-agent-directory.js'
 
 const temporaryRoots: string[] = []
 

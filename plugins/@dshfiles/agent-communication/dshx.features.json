@@ -4,11 +4,18 @@
     {
       "id": "agent-directory",
       "title": "Discover Agents and workspace channels",
-      "summary": "Show live runtime status and whether each Agent actually has its workspace subscription.",
+      "summary": "Show live peer status and runtime-authorized descendants with runtime-owner and opaque same-cwd workspace metadata, without reading task text or history.",
       "surfaces": ["tool", "host", "client"],
       "configuration": [],
-      "states": ["no-agents", "live-agent", "workspace-subscribed", "workspace-subscription-missing", "opted-out"],
-      "failureModes": ["A missing workspace cwd cannot derive a workspace topic.", "An Agent absent from the live registry is not assumed to be complete."],
+      "states": ["no-agents", "live-agent", "owned-descendants", "workspace-subscribed", "workspace-subscription-missing", "parented-agent", "opted-out"],
+      "failureModes": [
+        "A missing workspace cwd cannot derive a workspace topic.",
+        "A workspace topic hashes cwd and is not a canonical JJ workspace id.",
+        "Only current runtime-owned descendants receive the extended metadata; completed or resumed Sessions are outside this live relation.",
+        "Runtime ownership does not authorize durable parent lineage; only the live runtime owner id is exposed.",
+        "The live registry contains no task or transcript history.",
+        "An Agent absent from the live registry is not assumed to be complete."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -21,6 +28,18 @@
           "id": "agent-communication.lifecycle-workspace-subscribers",
           "file": "plugins/@dshfiles/agent-communication/src/agent-lifecycle.test.ts",
           "testName": "subscribes every Agent in a shared working directory exactly once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.live-agent-metadata",
+          "file": "plugins/@dshfiles/agent-communication/src/live-agent-directory.test.ts",
+          "testName": "returns bounded live metadata with a hashed workspace topic and no path or transcript fields"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.runtime-owned-descendants",
+          "file": "plugins/@dshfiles/agent-communication/src/live-agent-directory.test.ts",
+          "testName": "includes only the caller’s direct and transitive runtime-owned descendants"
         }
       ]
     },
@@ -83,7 +102,10 @@
       "surfaces": ["tool", "host", "storage"],
       "configuration": [],
       "states": ["pending", "read", "acknowledged", "reopened"],
-      "failureModes": ["A message recipient mismatch cannot acknowledge another Agent's message.", "Legacy notifications are discarded during passive-delivery migration."],
+      "failureModes": [
+        "A message recipient mismatch cannot acknowledge another Agent's message.",
+        "Legacy notifications are discarded during passive-delivery migration."
+      ],
       "externalDependencies": [],
       "verification": [
         {

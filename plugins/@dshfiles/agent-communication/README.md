@@ -11,6 +11,8 @@ The Agent tools are:
 - `dshx_comm_publish` and `dshx_comm_send`
 - `dshx_comm_inbox` and `dshx_comm_ack`
 
+`dshx_comm_agents` preserves the live peer directory (`id` and current runtime status) and adds `owned_descendants` for the calling Agent's direct and transitive runtime-owned descendants only. That scoped list includes current status, creation time, the exact runtime owner Session id, and an opaque `workspace_topic` hash derived from the resolved working directory. Durable parent links are intentionally omitted; runtime ownership does not grant access to arbitrary Session lineage. The hash groups identical working directories; it is not a canonical JJ workspace id or a path. The tool reads no task text, transcript events, or completed Sessions. `idle` and absence from the live registry do not establish completion.
+
 The communication browser provides channel and direct-conversation navigation, bounded search and pagination, message context, recipient read/acknowledgement status, Agent runtime status, and a secondary diagnostics/activity view. A human can post to a channel or direct inbox; the receipt reports how many current recipients matched. Posting does not create or resume Agent work. An idle Agent is not assumed to be finished, and an Agent absent from the live registry is not assumed to be complete.
 
 Workspace subscriptions and offline inboxes are retained rather than garbage-collected based on `idle` or absence from the live registry: those facts cannot prove a Session is stale. Message and activity retention is bounded to 30 days and 5,000 entries. Diagnostics compare active Agents' workspace topics with their stored subscriptions, so a missing subscription is visible instead of silently counted as a valid channel member.

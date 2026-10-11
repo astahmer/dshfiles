@@ -1,0 +1,46 @@
+import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
+
+export const communicationWorkspaceTopic = (cwd: string | undefined): string | undefined => {
+  if (cwd === undefined || cwd.length === 0) return undefined
+  const digest = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 24)
+  return `workspace/${digest}`
+}
+
+interface LiveAgentDirectoryRecord {
+  readonly id: string
+  readonly status: string
+  readonly createdAt: number
+  readonly cwd?: string
+}
+
+export const findOwnedLiveAgents = <Agent extends { readonly id: string }>(input: {
+  readonly caller: Agent
+  readonly liveAgents: readonly Agent[]
+  readonly isOwnedBy: (candidate: Agent, owner: Agent) => boolean
+}) => {
+  const visited = new Set([input.caller.id])
+  const pendingOwners = [input.caller]
+  const descendants: Array<{ readonly agent: Agent; readonly owner: Agent }> = []
+
+  while (pendingOwners.length > 0) {
+    const owner = pendingOwners.shift()
+    if (owner === undefined) continue
+
+    for (const candidate of input.liveAgents) {
+      if (visited.has(candidate.id) || !input.isOwnedBy(candidate, owner)) continue
+      visited.add(candidate.id)
+      descendants.push({ agent: candidate, owner })
+      pendingOwners.push(candidate)
+    }
+  }
+
+  return descendants
+}
+
+export const observeLiveAgent = (agent: LiveAgentDirectoryRecord) => ({
+  id: agent.id,
+  status: agent.status,
+  createdAt: agent.createdAt,
+  workspaceTopic: communicationWorkspaceTopic(agent.cwd) ?? null,
+})
