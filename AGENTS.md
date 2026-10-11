@@ -202,6 +202,17 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   fixed revision snapshot into an integration workspace, rebase that copy onto
   `main`, and retain the source workspace until tree equality and status prove
   it safe to forget.
+- A workspace's `@` is a permanent empty slot on the line, so parked workspaces
+  accumulate. `pnpm run jj:workspaces` prints the board — every workspace's
+  commit, whether it is on the spine, ahead of it or off-spine, plus conflicts
+  and empty slots; off-spine rows are the ones that would fork the line.
+  `pnpm run jj:sweep` dry-runs the stale ones through `jjw`; `--apply` forgets
+  them (their directories stay on disk) and `--abandon-empty` also drops their
+  now-orphan slot. Never sweep a workspace whose work has not landed.
+- History churn leaves abandoned revisions reachable from the operation log
+  until garbage collection. `jj util gc` reclaims them, but that removes the
+  op-log recovery path permanently — run it only once no rollback is still
+  wanted, and never `jj op restore` a shared store to clean up.
 
 ### Integration closeout
 

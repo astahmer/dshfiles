@@ -19,6 +19,8 @@
     "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch",
     "check:diff": "node scripts/check-diff.mjs",
     "check:plugins:cached": "node scripts/check-plugins-cached.mjs",
+    "jj:workspaces": "node scripts/jj-workspaces.mjs",
+    "jj:sweep": "node scripts/jj-workspace-sweep.mjs",
     "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
     "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json",

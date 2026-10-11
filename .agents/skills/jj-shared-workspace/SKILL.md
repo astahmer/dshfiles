@@ -58,4 +58,10 @@ AGENTS.md (`@` mid-line, `--use-destination-message`):
 - `jj abandon '<base>:: & ~::<tip>'` prints `Deleted bookmarks:` and re-creates abandoned workspace `@`s on the
   nearest visible ancestor, which can sit below the base. Sweep `jj workspace list` so no `@` is left off the line.
 
+- Check the board before and after: `pnpm run jj:workspaces` lists every
+  workspace's `@` with on-spine / ahead / off-spine, conflicts and empty slots.
+  `pnpm run jj:sweep` dry-runs the stale ones through `jjw`; `--apply` forgets
+  them and `--abandon-empty` also drops their orphan slot (directories stay on
+  disk).
+
 Full recipe: `jj-history-consolidation`. Spine record: `plans/jj-unify-20261011/README.md`.
