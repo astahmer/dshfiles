@@ -4,32 +4,32 @@ import { groupThreadChildren, visibleChildren, type ThreadNode } from './thread-
 
 const thread = (id: string, updatedAt: number, parentId?: string): ThreadNode => (parentId === undefined ? { id, updatedAt } : { id, updatedAt, parentId })
 const ids = (threads: readonly ThreadNode[] | undefined): string[] => (threads ?? []).map(item => item.id)
-const nestAll = (): boolean => true
-
 test('subagents and their own children fold under the top-most listed ancestor, newest first', () => {
-  const tree = groupThreadChildren({
-    threads: [thread('parent', 10), thread('child-a', 5, 'parent'), thread('grandchild', 9, 'child-a'), thread('solo', 8)],
-    canNest: nestAll,
-  })
+  const tree = groupThreadChildren({ threads: [thread('parent', 10), thread('child-a', 5, 'parent'), thread('grandchild', 9, 'child-a'), thread('solo', 8)] })
   assert.deepEqual(ids(tree.roots), ['parent', 'solo'])
   assert.deepEqual(ids(tree.childrenByRoot.get('parent')), ['grandchild', 'child-a'])
 })
 
 test('a child whose parent is not listed stays its own row', () => {
-  const tree = groupThreadChildren({ threads: [thread('orphan', 1, 'missing')], canNest: nestAll })
+  const tree = groupThreadChildren({ threads: [thread('orphan', 1, 'missing')] })
   assert.deepEqual(ids(tree.roots), ['orphan'])
   assert.equal(tree.childrenByRoot.size, 0)
 })
 
-test('a refused ancestor does not adopt the child, and a parent cycle stays bounded', () => {
-  const archived = new Set(['parent'])
-  const refused = groupThreadChildren({
-    threads: [thread('parent', 1), thread('child', 2, 'parent')],
-    canNest: (child, ancestor) => archived.has(child.id) === archived.has(ancestor.id),
+test('children stay nested under their parent even when sidebar sections differ', () => {
+  const tree = groupThreadChildren({
+    threads: [
+      { ...thread('parent', 1), section: 'active' },
+      { ...thread('child', 2, 'parent'), section: 'inactive' },
+      { ...thread('archived-child', 3, 'parent'), section: 'archived' },
+    ],
   })
-  assert.deepEqual(ids(refused.roots), ['parent', 'child'])
+  assert.deepEqual(ids(tree.roots), ['parent'])
+  assert.deepEqual(ids(tree.childrenByRoot.get('parent')), ['archived-child', 'child'])
+})
 
-  const cycle = groupThreadChildren({ threads: [thread('a', 1, 'b'), thread('b', 2, 'a')], canNest: nestAll })
+test('a parent cycle stays bounded', () => {
+  const cycle = groupThreadChildren({ threads: [thread('a', 1, 'b'), thread('b', 2, 'a')] })
   assert.equal(cycle.roots.length + [...cycle.childrenByRoot.values()].flat().length, 2)
 })
 

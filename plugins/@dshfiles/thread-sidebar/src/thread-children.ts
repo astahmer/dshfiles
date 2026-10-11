@@ -12,15 +12,12 @@ export interface ThreadTree<Thread extends ThreadNode> {
 }
 
 /**
- * Fold every thread under its top-most ancestor that is itself listed, as BB shows
- * subagents under the thread that spawned them. A child whose ancestors are all
- * missing (filtered, blank, or archived away from it) stays a root row, and a
- * visited set keeps corrupt parent cycles bounded.
+ * Fold every thread under its top-most ancestor that is itself listed, regardless
+ * of which sidebar section would otherwise contain it. A child whose ancestors
+ * are all missing (filtered or blank) stays a root row, and a visited set keeps
+ * corrupt parent cycles bounded.
  */
-export const groupThreadChildren = <Thread extends ThreadNode>(options: {
-  readonly threads: readonly Thread[]
-  readonly canNest: (child: Thread, ancestor: Thread) => boolean
-}): ThreadTree<Thread> => {
+export const groupThreadChildren = <Thread extends ThreadNode>(options: { readonly threads: readonly Thread[] }): ThreadTree<Thread> => {
   const listed = new Map(options.threads.map(thread => [thread.id, thread]))
   const rootOf = (thread: Thread): Thread | undefined => {
     let root: Thread | undefined
@@ -30,7 +27,7 @@ export const groupThreadChildren = <Thread extends ThreadNode>(options: {
       visited.add(cursor)
       const ancestor = listed.get(cursor)
       if (ancestor === undefined) break
-      if (options.canNest(thread, ancestor)) root = ancestor
+      root = ancestor
       cursor = ancestor.parentId
     }
     return root
