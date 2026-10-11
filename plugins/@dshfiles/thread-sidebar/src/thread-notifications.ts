@@ -5,12 +5,14 @@ export interface ThreadNotificationPreferences {
   readonly enabled: boolean
   readonly needsYouAt: Readonly<Record<string, number>>
   readonly mutedUntil: Readonly<Record<string, number | null>>
+  readonly manuallyUnreadSessionIds: string[]
 }
 
 export const DEFAULT_THREAD_NOTIFICATION_PREFERENCES: ThreadNotificationPreferences = {
   enabled: false,
   needsYouAt: {},
   mutedUntil: {},
+  manuallyUnreadSessionIds: [],
 }
 
 const timestampMap = z.record(z.string().min(1).max(256), z.number().int().nonnegative()).refine(value => Object.keys(value).length <= 5000)
@@ -18,7 +20,14 @@ const muteMap = z.record(z.string().min(1).max(256), z.number().int().nonnegativ
 
 export const threadNotificationPreferences = createStoredValue({
   key: 'dshfiles.thread-sidebar.notifications.v1',
-  schema: z.object({ enabled: z.boolean(), needsYouAt: timestampMap, mutedUntil: muteMap }).strict(),
+  schema: z
+    .object({
+      enabled: z.boolean(),
+      needsYouAt: timestampMap,
+      mutedUntil: muteMap,
+      manuallyUnreadSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
+    })
+    .strict(),
   fallback: DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
 })
 
@@ -78,10 +87,22 @@ export const clearThreadMute = (preferences: ThreadNotificationPreferences, sess
   return { ...preferences, mutedUntil }
 }
 
+export const isThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string, hostUnread: boolean): boolean =>
+  hostUnread || preferences.manuallyUnreadSessionIds.includes(sessionId)
+
+export const markThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string): ThreadNotificationPreferences => ({
+  ...preferences,
+  manuallyUnreadSessionIds: [...new Set([...preferences.manuallyUnreadSessionIds, sessionId])],
+})
+
 export const markThreadSeen = (preferences: ThreadNotificationPreferences, sessionId: string): ThreadNotificationPreferences => {
   const needsYouAt = { ...preferences.needsYouAt }
   delete needsYouAt[sessionId]
-  return { ...preferences, needsYouAt }
+  return {
+    ...preferences,
+    needsYouAt,
+    manuallyUnreadSessionIds: preferences.manuallyUnreadSessionIds.filter(id => id !== sessionId),
+  }
 }
 
 export const clearExpiredThreadMutes = (preferences: ThreadNotificationPreferences, now: number): ThreadNotificationPreferences => ({

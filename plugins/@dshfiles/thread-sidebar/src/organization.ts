@@ -24,6 +24,8 @@ export interface SidebarPreferences {
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
+  autoArchiveSessionIds: string[]
+  autoArchiveDisabledSessionIds: string[]
   parkedSessionIds: string[]
   collapsedSections: SidebarSection[]
   workspaceFilter: string | null
@@ -72,6 +74,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
+  autoArchiveSessionIds: [],
+  autoArchiveDisabledSessionIds: [],
   parkedSessionIds: [],
   // Keep every working section open; archived threads stay folded until requested.
   collapsedSections: ['archived'],
@@ -127,6 +131,27 @@ export interface AutoArchiveContext {
   archivedSessionIds: ReadonlySet<string>
   pinnedSessionIds: ReadonlySet<string>
 }
+
+export type AutoArchiveOverride = 'inherit' | 'enabled' | 'disabled'
+
+export const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
+  if (preferences.autoArchiveDisabledSessionIds.includes(sessionId)) return 'disabled'
+  if (preferences.autoArchiveSessionIds.includes(sessionId)) return 'enabled'
+  return 'inherit'
+}
+
+export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
+  ...preferences,
+  autoArchiveSessionIds:
+    override === 'enabled' ? [...new Set([...preferences.autoArchiveSessionIds, sessionId])] : preferences.autoArchiveSessionIds.filter(id => id !== sessionId),
+  autoArchiveDisabledSessionIds:
+    override === 'disabled'
+      ? [...new Set([...preferences.autoArchiveDisabledSessionIds, sessionId])]
+      : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
+})
+
+export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean =>
+  preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -277,11 +302,14 @@ export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'r
 }
 
 export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
-  if (!preferences.autoArchiveEnabled || session.running || session.blank) return false
+  if (session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
   if (preferences.excludedSessionIds.includes(session.id)) return false
   if (workspaceId !== undefined && preferences.excludedWorkspaceIds.includes(workspaceId)) return false
+  const override = autoArchiveOverrideForSession(preferences, session.id)
+  if (override === 'disabled') return false
+  if (!preferences.autoArchiveEnabled && override !== 'enabled') return false
 
   return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
 }

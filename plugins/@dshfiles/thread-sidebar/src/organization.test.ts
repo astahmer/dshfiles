@@ -4,6 +4,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { test, vi } from 'vitest'
 import {
   archiveWithoutStopping,
+  autoArchiveOverrideForSession,
   dropIndexAt,
   fitItems,
   type AutoArchiveContext,
@@ -18,6 +19,8 @@ import {
   parseSessionIds,
   sessionLineage,
   sectionForSession,
+  setAutoArchiveOverride,
+  shouldScanForAutoArchive,
   type SidebarPreferences,
   type SidebarSection,
   workspaceForLineage,
@@ -146,6 +149,41 @@ test('auto archive requires an old, idle, nonblank, unpinned, unparked, included
   assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedSessionIds: ['idle'] } }), false)
   assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedWorkspaceIds: ['project-a'] } }), false)
   assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, autoArchiveEnabled: false } }), false)
+})
+
+test('per-thread auto-archive override inherits, enables, disables, and resets without losing other overrides', () => {
+  const idleCandidate: AutoArchiveContext = {
+    session: sessionSummary({ id: 'thread', updatedAt: now - 120 * 60_000 }),
+    workspaceId: undefined,
+    now,
+    preferences: DEFAULT_PREFERENCES,
+    ...idSets,
+  }
+  assert.equal(autoArchiveOverrideForSession(DEFAULT_PREFERENCES, 'thread'), 'inherit')
+  assert.equal(shouldScanForAutoArchive(DEFAULT_PREFERENCES), false)
+
+  const enabled = setAutoArchiveOverride(DEFAULT_PREFERENCES, 'thread', 'enabled')
+  assert.equal(autoArchiveOverrideForSession(enabled, 'thread'), 'enabled')
+  assert.equal(shouldScanForAutoArchive(enabled), true)
+  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: enabled }), true)
+
+  const disabled = setAutoArchiveOverride({ ...preferences, autoArchiveSessionIds: ['other'], excludedSessionIds: ['globally-excluded'] }, 'thread', 'disabled')
+  assert.equal(autoArchiveOverrideForSession(disabled, 'thread'), 'disabled')
+  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: disabled }), false)
+  const inherited = setAutoArchiveOverride(disabled, 'thread', 'inherit')
+  assert.equal(autoArchiveOverrideForSession(inherited, 'thread'), 'inherit')
+  assert.deepEqual(inherited.autoArchiveSessionIds, ['other'])
+  assert.deepEqual(inherited.autoArchiveDisabledSessionIds, [])
+  assert.deepEqual(inherited.excludedSessionIds, ['globally-excluded'])
+  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: { ...enabled, excludedSessionIds: ['thread'] } }), false)
+  assert.equal(
+    isAutoArchiveCandidate({
+      ...idleCandidate,
+      workspaceId: 'excluded-project',
+      preferences: { ...enabled, excludedWorkspaceIds: ['excluded-project'] },
+    }),
+    false,
+  )
 })
 
 test('session exclusion input trims, splits, and deduplicates ids without logging them', () => {

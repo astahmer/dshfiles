@@ -5,7 +5,9 @@ import {
   clearThreadMute,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
   isThreadMuted,
+  isThreadUnread,
   markThreadSeen,
+  markThreadUnread,
   setThreadMute,
   threadAttentionTransitions,
 } from './thread-notifications.js'
@@ -71,7 +73,21 @@ test('timed snooze expires, while permanent mute lasts until cleared', () => {
   assert.deepEqual(clearExpiredThreadMutes(muted, 100).mutedUntil, { forever: null })
   assert.deepEqual(clearThreadMute(muted, 'forever').mutedUntil, { timed: 100 })
 })
-test('opening a thread clears its needs-you marker and keeps mute settings', () => {
+test('manual unread is separate from Host unread and clears when thread is opened', () => {
+  const markedUnread = markThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread')
+  assert.equal(isThreadUnread(markedUnread, 'thread', false), true)
+  assert.equal(isThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread', true), true)
+  assert.equal(isThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread', false), false)
+  assert.deepEqual(markThreadSeen(markedUnread, 'thread').manuallyUnreadSessionIds, [])
+  assert.deepEqual(markThreadUnread(markedUnread, 'thread').manuallyUnreadSessionIds, ['thread'])
+})
+
+test('opening a thread clears its needs-you and manual unread markers while keeping mute settings', () => {
   const muted = setThreadMute({ ...DEFAULT_THREAD_NOTIFICATION_PREFERENCES, needsYouAt: { thread: 123 } }, 'thread', null)
-  assert.deepEqual(markThreadSeen(muted, 'thread'), { ...muted, needsYouAt: {} })
+  const markedUnread = markThreadUnread(muted, 'thread')
+  assert.deepEqual(markThreadSeen(markedUnread, 'thread'), {
+    ...markedUnread,
+    needsYouAt: {},
+    manuallyUnreadSessionIds: [],
+  })
 })

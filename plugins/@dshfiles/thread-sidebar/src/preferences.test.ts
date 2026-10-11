@@ -37,6 +37,21 @@ test('archive undo defaults on and rejects durations outside one through thirty 
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 31 }), null)
 })
 
+test('older preferences default per-thread auto-archive overrides to inherit global behavior', () => {
+  const { autoArchiveSessionIds, autoArchiveDisabledSessionIds, ...older } = DEFAULT_PREFERENCES
+  assert.deepEqual(autoArchiveSessionIds, [])
+  assert.deepEqual(autoArchiveDisabledSessionIds, [])
+  assert.deepEqual(decodePreferences(older)?.autoArchiveSessionIds, [])
+  assert.deepEqual(decodePreferences(older)?.autoArchiveDisabledSessionIds, [])
+  const saved = decodePreferences({
+    ...DEFAULT_PREFERENCES,
+    autoArchiveSessionIds: ['enabled-thread'],
+    autoArchiveDisabledSessionIds: ['disabled-thread'],
+  })
+  assert.deepEqual(saved?.autoArchiveSessionIds, ['enabled-thread'])
+  assert.deepEqual(saved?.autoArchiveDisabledSessionIds, ['disabled-thread'])
+})
+
 test('valid saved split heights persist and invalid heights are rejected', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 384 })
   const invalidStored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: 24 })

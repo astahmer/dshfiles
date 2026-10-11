@@ -13,7 +13,10 @@ stream. Pin, unpin, archive, and restore call that controller directly.
 Auto-archive is off by default; when enabled, the configured scan interval
 checks the same idle threshold and only calls
 `archiveSession(sessionId, { stopActivity: false })`. It skips running, blank,
-archived, pinned, parked, excluded-session, and excluded-project entries.
+archived, pinned, parked, excluded-session, and excluded-project entries. A
+thread menu can inherit the global setting, explicitly auto-archive that thread,
+or exclude it; explicit per-thread enables still honor excluded projects and
+other safety checks.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). User-facing fields
@@ -93,12 +96,19 @@ no such seat, so an occupant keeps a footer-action fallback and registers throug
 (record / disable / reset, with Host-conflict and duplicate warnings), which a
 generated text field cannot capture.
 
-Every thread row also exposes **Copy thread ID**, **Copy thread link**, and a
-per-thread **Thread notifications** menu. Notifications can be snoozed for 15
-minutes, 1, 3, 8, or 24 hours, muted until manually re-enabled, or unmuted.
-Snoozes and mutes affect alerts only; they do not hide attention rows.
-Desktop notifications are opt-in in Sidebar settings and show the thread title.
-Mute, snooze, and unseen-completion state are saved in this browser. The sidebar separates **Approval needed**, **Input needed**, and **Turn finished**.
+Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
+unread**, per-thread auto-settle behavior, and a **Thread notifications** menu.
+Opening a thread marks Host attention read and clears its manual unread marker;
+new Host attention can mark it unread again. Manual unread markers are saved in
+this browser, separate from lifecycle and attention state. Auto-settle can
+inherit the global auto-archive setting, explicitly enable auto-archive for one
+thread, or exclude that thread; the global idle threshold and safety exclusions
+still apply. Notifications can be snoozed for 15 minutes, 1, 3, 8, or 24 hours,
+muted until manually re-enabled, or unmuted. Snoozes and mutes affect alerts
+only; they do not hide attention rows. Desktop notifications are opt-in in
+Sidebar settings and show the thread title. Mute, snooze, and unseen-completion
+state are saved in this browser. The sidebar separates **Approval needed**,
+**Input needed**, and **Turn finished**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Both use the Client's
 explicit Session pending-interaction status. Unknown interaction kinds and
