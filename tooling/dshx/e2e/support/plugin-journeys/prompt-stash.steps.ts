@@ -15,7 +15,7 @@ const openPromptLibrary = async ({ page }: { page: Page }): Promise<void> => {
 
 const createSavedPrompt = async ({ page, title, text }: { page: Page; title: string; text: string }): Promise<void> => {
   await page.getByRole('button', { name: 'New prompt', exact: true }).click()
-  await page.getByLabel('Title', { exact: true }).fill(title)
+  await page.getByLabel('Label (optional)', { exact: true }).fill(title)
   await page.getByLabel('Prompt text', { exact: true }).fill(text)
   await page.getByRole('button', { name: 'Save prompt', exact: true }).click()
   await expect(promptOption({ page, title })).toBeVisible()
@@ -48,12 +48,15 @@ Then('only the saved prompt {string} is listed', async ({ page }: { page: Page }
   })
 })
 
-When('the saved prompt {string} is edited to {string} with text {string}', async ({ page }: { page: Page }, currentTitle: string, title: string, text: string) => {
-  await openPromptForEditing({ page, title: currentTitle })
-  await page.getByLabel('Title', { exact: true }).fill(title)
-  await page.getByLabel('Prompt text', { exact: true }).fill(text)
-  await page.getByRole('button', { name: 'Save prompt', exact: true }).click()
-})
+When(
+  'the saved prompt {string} is edited to {string} with text {string}',
+  async ({ page }: { page: Page }, currentTitle: string, title: string, text: string) => {
+    await openPromptForEditing({ page, title: currentTitle })
+    await page.getByLabel('Label (optional)', { exact: true }).fill(title)
+    await page.getByLabel('Prompt text', { exact: true }).fill(text)
+    await page.getByRole('button', { name: 'Save prompt', exact: true }).click()
+  },
+)
 
 Then('the saved prompt {string} is listed with text {string}', async ({ page }: { page: Page }, title: string, text: string) => {
   await recordAssertion(page, 'prompt-library-edit-is-visible-in-list', async () => {
@@ -90,7 +93,7 @@ When('the saved prompt {string} is opened for editing', async ({ page }: { page:
 })
 
 When('the prompt editor is changed to title {string} and text {string}', async ({ page }: { page: Page }, title: string, text: string) => {
-  await page.getByLabel('Title', { exact: true }).fill(title)
+  await page.getByLabel('Label (optional)', { exact: true }).fill(title)
   await page.getByLabel('Prompt text', { exact: true }).fill(text)
 })
 
@@ -114,7 +117,7 @@ When(
 
       await openPromptLibrary({ page: otherTab })
       await openPromptForEditing({ page: otherTab, title: currentTitle })
-      await otherTab.getByLabel('Title', { exact: true }).fill(title)
+      await otherTab.getByLabel('Label (optional)', { exact: true }).fill(title)
       await otherTab.getByLabel('Prompt text', { exact: true }).fill(text)
       await otherTab.getByRole('button', { name: 'Save prompt', exact: true }).click()
       await expect(promptOption({ page: otherTab, title })).toBeVisible()
@@ -127,7 +130,7 @@ When(
 Then('the local editor is marked stale and keeps its edits', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'prompt-library-conflict-preserves-local-editor', async () => {
     await expect(page.getByText('The saved version changed elsewhere. Your edits remain here.', { exact: true })).toBeVisible()
-    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Local draft')
+    await expect(page.getByLabel('Label (optional)', { exact: true })).toHaveValue('Local draft')
     await expect(page.getByLabel('Prompt text', { exact: true })).toHaveValue('Local edits stay in this editor.')
     await expect(page.getByRole('button', { name: 'Save as new copy', exact: true })).toBeVisible()
   })
