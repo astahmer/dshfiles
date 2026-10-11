@@ -6,11 +6,11 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 
 | Milestone | Status | Evidence |
 |---|---|---|
-| Reproduce and choose scope | Done | Header and sidebar scratch journeys opened the custom dialog; Host listing failed on macOS native backend. Scope is Add Workspace only. |
-| Add a hybrid Host capability | In progress | Compose native `pick` with bounded browse `list/createDirectory`; add Host/API and real Loader-composition regression tests. |
-| Wire the owned plugin and web seed | Pending | Opt this plugin into `backend: hybrid`; preserve the default auto mode and include the plugin only after core behavior passes. |
-| Verify isolated composition and browser journeys | Pending | Run both focused journeys against local Core packages and a disposable DSH home. |
-| Promote and report restart boundary | Pending | No live server restart; Host/profile composition changes require a user-controlled restart. |
+| Reproduce and choose scope | Done | Published-package scratch journeys opened the custom dialog but Host listing failed; this confirms the old native-only capability cannot serve the in-app browser. Scope remains Add Workspace only. |
+| Add a hybrid Host capability | Done | Host/API and Loader-composition regressions pass; focused Host typecheck plus canonical Host/Client/Web builds pass. Three changed Core README translation pairs pass scoped verification. The default `auto` path remains unchanged. |
+| Wire the owned plugin and web seed | Done | Plugin patch opts into `backend: hybrid`; README documents preserved native picking. Plugin typecheck/build/import pass; Vitest has no unit tests. Workspace `contract` passed; broad plugin build remains blocked by an unrelated missing vendored `@deepseek-ai/dsh-session-format-catalog` artifact in `@dshfiles/dsh-core-runtime`. |
+| Verify isolated composition and browser journeys | In progress | Published-package journeys reach Add Workspace but the Host list request fails (`This folder could not be opened`) because rc.2 lacks the hybrid capability. Full local-Core scratch returns HTTP 200 but client boot fails on missing `@deepseek-ai/dsh-session/surface`; 27 dependent client entries remain pending. Core Web E2E cannot start: missing `native/system/.../system.node` and Session Controller import. No live profile was touched. |
+| Promote and report restart boundary | Pending | Do not sync or restart the live profile; Core Host/profile composition changes require a user-controlled restart. |
 
 ## Decisions
 
@@ -21,12 +21,11 @@ Keep the in-app folder chooser for **Add Workspace** while preserving native Fin
 
 ## Workspace handoff
 
-- DSH Files thread: `session-639492a5-cb11-4bb2-ad3f-f55a4d7a0aca`
-- DSH Files workspace: `workspace-folder-picker-browser-clean`, `/Users/astahmer/dev/dshfiles-workspace-folder-picker-browser-clean`; base `d475f6da36e8ede31e60d0cd541dd1a550e26e47`.
-- DSH Core workspace: `workspace-directory-browser`, `/Users/astahmer/dev/dsh-core-directory-browser-scope`; base `202ccfee2205a18f30d65f2bb4e46eb2fe5a8180`.
-- The default DSH Files workspace has unresolved shared conflicts and an unrelated lockfile edit; it remains untouched. An accidental empty workspace on that conflicted base was forgotten; its directory was preserved. Use only the clean workspace above.
-- The separate `directory-picker-config` DSH Core workspace remains untouched.
+- DSH Files workspace: `workspace-folder-picker-browser-latest`, `/Users/astahmer/dev/dshfiles-workspace-folder-picker-browser-latest`; based on `integration-spine` at `a2fa36be`. Current `@` is `dd4d4378` with the plugin patch and README changes.
+- DSH Core workspace: `workspace-directory-browser`, `/Users/astahmer/dev/dsh-core-directory-browser-scope`; base `202ccfee2205a18f30d65f2bb4e46eb2fe5a8180`, current `@` `fad6c7ac`.
+- The earlier DSH Files workspace `workspace-folder-picker-browser-clean` remains preserved and untouched. The separate Core `directory-picker-config` workspace also remains untouched.
+- Do not edit the default DSH Files workspace, sync the live profile, or restart the live DSH process.
 
 ## Resume here
 
-Implement the hybrid capability provider and opt-in Auto composition in `workspace-directory-browser`; test native/browse dispatch and real Loader composition before changing the plugin seed.
+Close out focused Core/plugin checks and the path-scope security review, then split only owned JJ paths. Browser acceptance remains open: the published runtime lacks this unshipped hybrid contract, while the scratch source runtime has unrelated Client module and native-binding failures. Re-run the two Add Workspace journeys plus create/select/registration after a package-coherent Core runtime is available; do not promote or restart live DSH.

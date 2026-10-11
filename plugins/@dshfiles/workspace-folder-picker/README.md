@@ -3,9 +3,10 @@
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in
 directory-browsing mode. Its bundle configures the adaptive Host picker to use
-the browse backend, so the flow can list the Host home directory immediately,
-let the operator navigate folders, and submit the selected path to the
-workspace owner's existing registration callback.
+the hybrid backend, so Add Workspace can list the Host home directory
+immediately, let the operator navigate folders, and submit the selected path
+to the workspace owner's existing registration callback while other flows
+keep native picking available.
 
 The chooser intentionally does not show registered projects or the
 "Register project" action: this entry point adds a workspace rather than
