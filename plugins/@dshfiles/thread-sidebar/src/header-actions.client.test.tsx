@@ -89,7 +89,7 @@ describe('HeaderThreadActions', () => {
 
   it('opens the notification action and snoozes the current thread', () => {
     mount('notifications')
-    fireEvent.click(screen.getByRole('button', { name: 'Thread notifications' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Thread notifications' }), { key: 'ArrowDown' })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze for 15 minutes' }))
     expect(threadNotificationPreferences.get()?.mutedUntil.s1).toBeGreaterThan(Date.now())
   })
