@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
-import { bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
+import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
 import {
@@ -188,6 +188,24 @@ const visitScratchProfile = async (page: Page, profile: BootedProfile): Promise<
   }
 }
 
+const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
+  profiles.set(page, profile)
+  try {
+    await visitScratchProfile(page, profile)
+    const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
+    await expect(previewNotice).toBeVisible()
+    await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
+    await expect(previewNotice).toBeHidden()
+    await dismissProviderSetupDuringStartup(page)
+    completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
+    await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
+  } catch (error) {
+    await profile.close()
+    profiles.delete(page)
+    throw error
+  }
+}
+
 Given('the web profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootProfile('web')
   profiles.set(page, profile)
@@ -204,23 +222,21 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
 })
 
 Given('the isolated plugin profile {string} is booted', async ({ page }: { page: Page }, packageId: string) => {
-  const profile = await bootPluginProfile(packageId)
-  profiles.set(page, profile)
-  try {
-    await visitScratchProfile(page, profile)
-    const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
-    await expect(previewNotice).toBeVisible()
-    await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
-    await expect(previewNotice).toBeHidden()
-    await dismissProviderSetupDuringStartup(page)
+  await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
+})
 
-    completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
-    await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
-  } catch (error) {
-    await profile.close()
-    profiles.delete(page)
-    throw error
-  }
+Given('the isolated plugin composition {string} and {string} with external bundle {string} is booted', async (
+  { page }: { page: Page },
+  packageId: string,
+  companionPackageId: string,
+  externalBundleId: string,
+) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: [packageId, companionPackageId],
+    profileLabel: `${packageId}+${companionPackageId}+${externalBundleId}`,
+    additionalBundleIds: [externalBundleId],
+  })
+  await visitIsolatedPluginProfile(page, profile)
 })
 
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {

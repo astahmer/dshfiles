@@ -18,3 +18,8 @@
       name: '@dshfiles/dsh-core-runtime'
       config:
         sessionPersistenceRoot: !!js dshHomePath('sessions')
+    - id: session-query-sqlite
+      name: '@deepseek-ai/dsh-session-query-sqlite'
+      config:
+        path: ':memory:'
+        openAt: first-search

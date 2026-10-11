@@ -121,7 +121,10 @@ const installProfile = async (profileRoot: string, homeRoot: string, expectedPac
   }
 }
 
-const prepareBootProfiles = async (localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]]): Promise<PreparedBootProfile> => {
+const prepareBootProfiles = async (
+  localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]],
+  additionalBundleIds: readonly string[] = [],
+): Promise<PreparedBootProfile> => {
   const sourceHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const sourceProfileRoot = join(sourceHome, 'profiles', 'web')
   const sourceManifest = ProfilePackage.parse(JSON.parse(await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
@@ -141,7 +144,8 @@ const prepareBootProfiles = async (localBundles: readonly [BootProfileBundle, ..
 
   const [firstBundle, ...remainingBundles] = localBundles
   const packageIds: [string, ...string[]] = [firstBundle.packageId, ...remainingBundles.map(bundle => bundle.packageId)]
-  if (new Set(packageIds).size !== packageIds.length) throw new Error('A scratch profile cannot contain duplicate local bundle ids.')
+  const expectedBundles: [string, ...string[]] = [packageIds[0], ...packageIds.slice(1), ...additionalBundleIds]
+  if (new Set(expectedBundles).size !== expectedBundles.length) throw new Error('A scratch profile cannot contain duplicate bundle ids.')
 
   const homeRoot = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
   const profileRoot = join(homeRoot, 'profiles', PROFILE_NAME)
@@ -149,7 +153,7 @@ const prepareBootProfiles = async (localBundles: readonly [BootProfileBundle, ..
   try {
     await mkdir(profileRoot, { recursive: true })
     const dependencies = Object.fromEntries(Object.entries(sourceManifest.dependencies).filter(([name]) => !name.startsWith('@dshfiles/')))
-    const bundles = [...new Set([...BASE_BUNDLES, ...packageIds])]
+    const bundles = [...new Set([...BASE_BUNDLES, ...expectedBundles])]
     for (const bundle of localBundles) dependencies[bundle.packageId] = `link:${resolve(bundle.projectRoot)}`
     const manifest = {
       name: 'dshx-boot-profile',
@@ -167,7 +171,7 @@ const prepareBootProfiles = async (localBundles: readonly [BootProfileBundle, ..
       homeRoot,
       profileRoot,
       profile: PROFILE_NAME,
-      expectedBundles: packageIds,
+      expectedBundles,
       async dispose() {
         if (disposed) return
         disposed = true
@@ -183,5 +187,7 @@ const prepareBootProfiles = async (localBundles: readonly [BootProfileBundle, ..
 export const prepareBootProfile = async (projectRoot: string, packageId: string): Promise<PreparedBootProfile> =>
   prepareBootProfiles([{ projectRoot, packageId }])
 
-export const prepareComposedBootProfile = async (localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]]): Promise<PreparedBootProfile> =>
-  prepareBootProfiles(localBundles)
+export const prepareComposedBootProfile = async (
+  localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]],
+  additionalBundleIds: readonly string[] = [],
+): Promise<PreparedBootProfile> => prepareBootProfiles(localBundles, additionalBundleIds)

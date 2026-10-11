@@ -93,7 +93,7 @@ const resolveLocalBundleDependencies = (target: LocalBootBundle, available: read
 }
 
 export const buildPlugin = async (projectRoot: string, packageId: string): Promise<void> => {
-  const child = spawnOwnedProcess('pnpm', ['exec', 'dshx', 'build'], {
+  const child = spawnOwnedProcess('pnpm', ['run', 'build'], {
     cwd: projectRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -254,18 +254,37 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
   }
 }
 
-export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> => {
+export const bootComposedPluginProfile = async ({
+  packageIds,
+  profileLabel,
+  timeoutMs = 90_000,
+  additionalBundleIds = [],
+}: {
+  readonly packageIds: readonly [string, ...string[]]
+  readonly profileLabel: string
+  readonly timeoutMs?: number
+  readonly additionalBundleIds?: readonly string[]
+}): Promise<BootedProfile> => {
   const availableBundles = await listLocalBootBundles()
-  const bundle = availableBundles.find(candidate => candidate.packageId === packageId)
-  if (bundle === undefined) throw new Error(`Owned plugin bundle ${packageId} was not found.`)
-  const profileBundles = resolveLocalBundleDependencies(bundle, availableBundles)
-  for (const profileBundle of profileBundles) await buildPlugin(profileBundle.projectRoot, profileBundle.packageId)
-  const prepared = await prepareComposedBootProfile(profileBundles)
-  const expectedClientEntries = bundle.hasClient ? [bundle.packageId] : []
+  const profileBundles = new Map<string, LocalBootBundle>()
+  for (const packageId of packageIds) {
+    const bundle = availableBundles.find(candidate => candidate.packageId === packageId)
+    if (bundle === undefined) throw new Error(`Owned plugin bundle ${packageId} was not found.`)
+    for (const dependency of resolveLocalBundleDependencies(bundle, availableBundles)) {
+      profileBundles.set(dependency.packageId, dependency)
+    }
+  }
+  const bundles = [...profileBundles.values()]
+  for (const bundle of bundles) await buildPlugin(bundle.projectRoot, bundle.packageId)
+  const prepared = await prepareComposedBootProfile(bundles, additionalBundleIds)
+  const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
-    return await startScratchProfile(prepared, bundle.packageId, expectedClientEntries, timeoutMs)
+    return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
   } catch (error) {
     await prepared.dispose()
     throw error
   }
 }
+
+export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> =>
+  bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, timeoutMs })

@@ -7,6 +7,7 @@
 import type { MessageId } from '@deepseek-ai/dsh-llm'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-session-projection/types'
 import type { Session, SessionEventMap, UserMessage } from '@deepseek-ai/dsh-session'
 import type {
   AgentEventDispatch,
@@ -16,6 +17,16 @@ import type {
   InboxWireState,
 } from '@deepseek-ai/dsh-agent'
 import { z } from 'zod'
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    inbox: InboxState
+  }
+
+  interface SessionProjectionMap {
+    inbox: InboxWireState
+  }
+}
 
 /** Wire validation for pending agent input reconstructed from durable inbox splices. */
 export const inboxProjectionSchema = z.object({
