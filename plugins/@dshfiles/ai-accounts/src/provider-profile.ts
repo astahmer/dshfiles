@@ -1,4 +1,4 @@
-import type { GenerateOptions, LlmImageRequestPricing, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmImageRequestPricing, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
@@ -132,15 +132,8 @@ async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChun
 }
 
 /**
- * One default per model, not one per route.
- *
- * pi-ai materializes a default effort through the route-wide `profile.reasoning`
- * field, so a per-model pin cannot be expressed there without reshuffling every
- * other model the account serves. The adapter's `stream` entry point sees the
- * fully-assembled request after the loop built it, so overriding there applies
- * exactly one pin — the caller's explicit choice still wins, a different model
- * on the same route keeps the provider default, and an effort-only switch
- * (no provider or model change) stays silent the way `sameRoute` wants.
+ * Keeps account-specific model defaults visible to the catalog and applies
+ * them only when a completed request does not already carry an explicit effort.
  */
 export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
@@ -171,6 +164,19 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     return this.pricingFor?.(provider, model) ?? super.imageRequestPricing(provider, model)
   }
 
+  private withModelDefault(model: LlmResolvedModelInfo): LlmResolvedModelInfo {
+    const defaultEffort = this.reasoningDefaults.get(model.provider)?.[model.id]
+    if (defaultEffort === undefined || model.reasoning === undefined || !model.reasoning.efforts.some(effort => effort.id === defaultEffort)) return model
+    return {
+      ...model,
+      reasoning: { ...model.reasoning, defaultEffort: ReasoningEffortId(defaultEffort) },
+    }
+  }
+
+  override async resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo> {
+    return this.withModelDefault(await super.resolveModel(provider, model, signal))
+  }
+
   private wireCall(options: GenerateOptions): GenerateOptions {
     const provider = this.routeFor(options)
     return pinnedCall(provider === options.provider ? options : { ...options, provider }, this.reasoningDefaults)
@@ -183,6 +189,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
   override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return super.prepareCall(provider, model, signal).then(call => ({
       ...call,
+      model: this.withModelDefault(call.model),
       stream: (options: GenerateOptions) => retryableUpstreamReplayOverflow(call.stream(this.wireCall(options))),
     }))
   }

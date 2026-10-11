@@ -44,6 +44,56 @@ describe('account provider profiles', () => {
     expect((await adapter.resolveModel('codex-emialex', 'gpt-6.1-codex-spark')).inputModalities).toEqual(['text'])
   })
 
+  it('publishes each Codex account model pin as that route model default', async () => {
+    const modelId = 'gpt-6-luna'
+    const profiles = new Map([
+      [
+        'codex-alex2',
+        buildProfile({
+          upstream: openaiCodexProvider(),
+          provider: 'codex-alex2',
+          displayName: 'Codex Alex2',
+          additionalModelIds: [modelId],
+          reasoningDefaults: { [modelId]: 'max' },
+        }),
+      ],
+      [
+        'codex-emialex',
+        buildProfile({
+          upstream: openaiCodexProvider(),
+          provider: 'codex-emialex',
+          displayName: 'CodexEmiAlex',
+          additionalModelIds: [modelId],
+          reasoningDefaults: { [modelId]: 'high' },
+        }),
+      ],
+    ])
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => profiles,
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: {
+            read: async () => undefined,
+            list: async () => [],
+            modify: async () => undefined,
+            delete: async () => undefined,
+          },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      {
+        reasoningDefaults: new Map([
+          ['codex-alex2', { [modelId]: 'max' }],
+          ['codex-emialex', { [modelId]: 'high' }],
+        ]),
+      },
+    )
+
+    await expect(adapter.resolveModel('codex-alex2', modelId)).resolves.toMatchObject({ reasoning: { defaultEffort: 'max' } })
+    await expect(adapter.resolveModel('codex-emialex', modelId)).resolves.toMatchObject({ reasoning: { defaultEffort: 'high' } })
+  })
+
   it('uses GitHub Copilot model metadata for each account route', () => {
     const profile = buildProfile({
       upstream: githubCopilotProvider(),
@@ -91,7 +141,12 @@ describe('account provider profiles', () => {
   })
 
   it('retries a content-free settlement instead of ending the turn', () => {
-    const profile = buildProfile({ upstream: createCommandCodeProvider(), provider: 'commandcode-work', displayName: 'Command Code Work', additionalModelIds: [] })
+    const profile = buildProfile({
+      upstream: createCommandCodeProvider(),
+      provider: 'commandcode-work',
+      displayName: 'Command Code Work',
+      additionalModelIds: [],
+    })
     expect(profile.retryPolicy).toMatchObject({ mode: 'normal', retryableCodes: expect.arrayContaining(['EMPTY_RESPONSE']) })
   })
 

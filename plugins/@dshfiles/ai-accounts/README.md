@@ -69,7 +69,9 @@ delay, the usage refresh interval, the sidebar and edge surfaces, request
 distribution, and the history schedule.
 
 Accounts can also be listed, enabled and edited at the bottom of
-**Settings › Models**.
+**Settings › Models**. Per-account model reasoning defaults are exposed to the
+model catalog and picker, and are applied on route selection as well as request
+dispatch; an explicit session effort still takes precedence.
 
 Request distribution is one global policy applied within the selected provider
 kind and compatible model capabilities; it never mixes unrelated providers or
