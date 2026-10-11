@@ -257,7 +257,10 @@ Its typed surface is a strong default, not a guarantee. Its most reliable value
 is `dshx inspect` — read the real runtime instead of guessing whether a slot or
 service exists. Every plugin joins the workspace contract
 (`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
-`typecheck` scripts, `strict` and `noUncheckedIndexedAccess`.
+`typecheck` scripts, `strict` and `noUncheckedIndexedAccess`. Every plugin must
+also have at least one meaningful end-to-end journey that verifies its
+user-visible behavior in the running DSH client; unit tests and successful
+builds do not replace E2E coverage.
 
 ### Plugin UI and state
 
