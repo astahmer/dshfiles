@@ -619,9 +619,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Revert onto @
           </ContextMenuItem>
         )}
-        {!revision.immutable && (
-          <ContextMenuItem onSelect={() => setMoveSource(revision)}>Rebase branch onto…</ContextMenuItem>
-        )}
+        {!revision.immutable && <ContextMenuItem onSelect={() => setMoveSource(revision)}>Rebase branch onto…</ContextMenuItem>}
         {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
             Rebase onto main
@@ -965,7 +963,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           role="region"
         >
           {moveSource !== null && (
-            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-primary/30 dshx:bg-primary/5 dshx:px-3 dshx:py-2 dshx:text-xs" role="status">
+            <div
+              className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-primary/30 dshx:bg-primary/5 dshx:px-3 dshx:py-2 dshx:text-xs"
+              role="status"
+            >
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
                 Choose a destination for {moveSource.shortestChangeId} · {firstLine(moveSource.description)}. Press Escape to cancel.
               </span>
@@ -1743,7 +1744,9 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
       {props.preview?.summary ?? 'Preparing a state-bound preview…'}
     </p>
     {props.preview !== undefined && (
-      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">{props.preview.detail}</pre>
+      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
+        {props.preview.detail}
+      </pre>
     )}
     <div className="dshx:flex dshx:justify-end dshx:gap-2">
       <Button onClick={props.onCancel} size="sm" type="button" variant="outline">

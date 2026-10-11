@@ -73,9 +73,7 @@ export const revisionActionMachine = setup({
     context: {} as RevisionActionContext,
     events: {} as RevisionActionEvent,
     input: {} as { readonly client: RevisionActionClient },
-    emitted: {} as
-      | { readonly type: 'confirmed'; readonly workspacePath: string | null }
-      | { readonly type: 'settled'; readonly repoId: string },
+    emitted: {} as { readonly type: 'confirmed'; readonly workspacePath: string | null } | { readonly type: 'settled'; readonly repoId: string },
   },
   actors: {
     prepare: fromPromise<ActionPreview, { readonly client: RevisionActionClient; readonly repoId: string; readonly action: Mutation }>(({ input, signal }) =>
@@ -96,7 +94,10 @@ export const revisionActionMachine = setup({
   states: {
     idle: {
       on: {
-        'drag.start': { target: 'dragging', actions: assign(({ event }) => ({ dragOrigin: event.origin, dropTarget: null, dropPresentation: null, error: null })) },
+        'drag.start': {
+          target: 'dragging',
+          actions: assign(({ event }) => ({ dragOrigin: event.origin, dropTarget: null, dropPresentation: null, error: null })),
+        },
         prepare: {
           target: 'preparing',
           actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, dropPresentation: event.presentation, error: null })),
@@ -136,12 +137,15 @@ export const revisionActionMachine = setup({
           return { client: context.client, repoId: context.repoId, action: context.action }
         },
         onDone: { target: 'previewing', actions: assign(({ event }) => ({ preview: event.output })) },
-        onError: { target: 'idle', actions: assign(({ context, event }) => ({
-          ...idleContext,
-          action: null,
-          error: failureMessage(event.error, 'Could not prepare this action.'),
-          repoId: context.repoId,
-        })) },
+        onError: {
+          target: 'idle',
+          actions: assign(({ context, event }) => ({
+            ...idleContext,
+            action: null,
+            error: failureMessage(event.error, 'Could not prepare this action.'),
+            repoId: context.repoId,
+          })),
+        },
       },
     },
     previewing: {
@@ -150,7 +154,14 @@ export const revisionActionMachine = setup({
         cancel: { target: 'idle', actions: assign(({ context }) => ({ ...idleContext, repoId: context.repoId, error: null })) },
         prepare: {
           target: 'preparing',
-          actions: assign(({ event }) => ({ repoId: event.repoId, action: event.action, dropPresentation: event.presentation, dropTarget: event.presentation?.destinationId ?? null, preview: null, error: null })),
+          actions: assign(({ event }) => ({
+            repoId: event.repoId,
+            action: event.action,
+            dropPresentation: event.presentation,
+            dropTarget: event.presentation?.destinationId ?? null,
+            preview: null,
+            error: null,
+          })),
         },
       },
     },

@@ -88,7 +88,9 @@ const createFixture = async (page: Page): Promise<JujutsuFixture> => {
       sourceCommitId,
       '--template',
       'self.change_id().normal_hex() ++ "|" ++ self.commit_id().short(64)',
-    ]).trim().split('|')
+    ])
+      .trim()
+      .split('|')
     const changeId = ids[0]
     const commitId = ids[1]
     if (changeId === undefined || commitId === undefined) throw new Error('JJ did not return both fixture revision IDs.')
@@ -134,10 +136,7 @@ const dispatchDrop = async (
   }, input)
 
 const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
-  await page.evaluate(
-    ({ key, path }) => localStorage.setItem(key, JSON.stringify(path)),
-    { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath },
-  )
+  await page.evaluate(({ key, path }) => localStorage.setItem(key, JSON.stringify(path)), { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath })
   await page.reload()
   await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
@@ -212,9 +211,7 @@ Then('revision and bookmark moves preview in the target context without changing
   await branchPreview.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(branchPreview).toBeHidden()
 
-  await recordAssertion(page, 'jujutsu-cancelled-moves-preserve-commit-parents-and-bookmark-target', () =>
-    expect(snapshotRepository(fixture)).toBe(before),
-  )
+  await recordAssertion(page, 'jujutsu-cancelled-moves-preserve-commit-parents-and-bookmark-target', () => expect(snapshotRepository(fixture)).toBe(before))
   await finishJourneyAssertions(page)
 })
 
