@@ -12,6 +12,9 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import './client.css'
 import { createEditorStore } from './editor-store.js'
+import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
+import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
+import { EDITOR_OPEN_FILE_LINKS_OWNER_ID, EDITOR_OPEN_FILE_LINKS_TARGET_ROUTE } from './editor-settings-route.js'
 import { EditorPanel } from './editor-panel.js'
 import { FileTree } from './file-tree.js'
 import {
@@ -23,6 +26,7 @@ import {
   openFileRequestSchema,
   parseSessionFileAddress,
 } from './open-file.js'
+import { openFileLinksPreference } from './open-file-links-preference.js'
 import { editorSettings } from './settings.js'
 import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
 
@@ -36,9 +40,6 @@ const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 
 // Open requests arrive while no editor surface is mounted, so the setting is mirrored where the event handler reads it.
 const placement = createStoredValue({ key: 'dshfiles-editor:placement', schema: z.enum(['workbench', 'right-panel']), fallback: 'workbench' })
-// Read by the synchronous `canOpen` of the file-link claim, so it is mirrored the same way.
-const openFileLinks = createStoredValue({ key: 'dshfiles-editor:open-file-links', schema: z.boolean(), fallback: true })
-
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.
 const loadEngine = () => import('./monaco-engine.js').then(module => module.monacoEngine)
 
@@ -60,8 +61,25 @@ const clientSessionsSchema = z.object({
 
 export default defineClient({
   name: '@dshfiles/editor',
+  locales: [editorSettingsLocale],
   inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles'],
   setup(ctx, decorate) {
+    const targetRegistry = ctx.get('settingsTargets')
+    if (targetRegistry !== undefined) {
+      ctx.effect(() => targetRegistry.register(EDITOR_OPEN_FILE_LINKS_TARGET_ROUTE), 'dshfiles-editor: open-file-links settings target')
+    }
+    ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.general.item',
+          id: EDITOR_OPEN_FILE_LINKS_OWNER_ID,
+          order: 18,
+          locale: EDITOR_SETTINGS_LOCALE_NAMESPACE,
+        },
+        decorate(EditorOpenFileLinksSetting),
+      ),
+    )
+
     const clientSessions = clientSessionsSchema.safeParse(ctx.sessions)
     const store = createEditorStore({
       remote: ctx.remote,
@@ -109,7 +127,7 @@ export default defineClient({
         if (configured !== undefined) placement.set(configured)
       }, [configured])
       useEffect(() => {
-        if (claimLinks !== undefined) openFileLinks.set(claimLinks)
+        if (claimLinks !== undefined) openFileLinksPreference.set(claimLinks)
       }, [claimLinks])
       return <EditorPanel loadEngine={loadEngine} remote={ctx.remote} sessionId={sessionId} store={store} />
     }
@@ -183,7 +201,7 @@ export default defineClient({
           kind: FILE_LINK_KIND,
           patterns: ['dsh-resource://file/**'],
           priority: 'extension',
-          canOpen: address => openFileLinks.get() && editorClaimsFileAddress(address),
+          canOpen: address => openFileLinksPreference.get() && editorClaimsFileAddress(address),
           title: address => parseSessionFileAddress(address)?.path.split('/').at(-1) ?? 'File',
         }),
       'dshfiles-editor: claim file links',

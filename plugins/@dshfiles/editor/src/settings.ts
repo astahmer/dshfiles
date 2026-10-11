@@ -1,8 +1,9 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
+import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 
 export const editorSettings = defineSettings({
-  namespace: 'dshfiles-editor',
+  namespace: EDITOR_SETTINGS_NAMESPACE,
   schema: Schema.object({
     editorPlacement: Schema.union([
       Schema.const('workbench').description('Workbench (dockable main-area panel)'),
