@@ -2,17 +2,18 @@
  * The empty-response guard, and the failure that motivated it.
  *
  * `pi-ai-empty.test.ts` proves pi-ai's own transport settles a reasoning-only
- * response as `stopReason: 'stop'` with no content. This proves our provider
- * boundary converts that into a classified `LlmError` before it reaches DSH, so
- * the retry policy sees a failed attempt instead of a finished turn.
+ * response as `stopReason: 'stop'` with no answer. This proves our provider
+ * boundary settles it with no content blocks at all, which DSH classifies as
+ * `EMPTY_RESPONSE` (a code the profile's retry policy lists) instead of a
+ * finished turn. Both transports are covered: the CLI endpoint and the
+ * Provider API.
  *
- * No network: `fetch` is replaced with a synthetic SSE body, so every result
- * comes from the real transport plus our real wrapper.
+ * No network: `fetch` is replaced with synthetic bodies, so every result comes
+ * from the real transports plus our real wrapper.
  */
 import { describe, expect, it } from 'vitest'
-import { LlmError } from '@deepseek-ai/dsh-llm'
 import { createCommandCodeProvider } from './commandcode-provider.js'
-import { describeEmptyResponse, isEmptyCompletion, settlementAnswered } from './empty-response.js'
+import { isEmptyCompletion, settlementAnswered } from './empty-response.js'
 
 const frame = (delta: Record<string, unknown>, finish: string | null): string => {
   const chunk = {
@@ -52,44 +53,36 @@ const whitespaceOnly = (): string =>
   ].join('')
 
 interface Outcome {
-  readonly threw: boolean
-  readonly code?: string
-  readonly message?: string
   readonly deltas: readonly string[]
-  readonly settled?: readonly { type?: string; text?: string }[]
+  readonly settled: { readonly content: readonly { type?: string; text?: string }[]; readonly stopReason: string }
 }
 
-const MODEL = 'stealth/space-bunny-alpha'
+const MODEL = 'gpt-6-luna'
 
-const run = async (body: string): Promise<Outcome> => {
-  const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
-  try {
-    const provider = createCommandCodeProvider()
-    // `getModels()` is the sync catalog; the fallback entry is the OpenAI shape,
-    // which is the one this transport serves.
-    const model = provider.getModels().find(candidate => candidate.id === MODEL) ?? provider.getModels()[0]
-    if (model === undefined) throw new Error('Command Code provider advertised no models.')
-    const deltas: string[] = []
-    let settled: readonly { type?: string; text?: string }[] | undefined
-    for await (const event of provider.stream(model, { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 0 }] } as never, {
-      apiKey: 'test-key',
-    })) {
-      if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_delta') deltas.push(event.type)
-      if (event.type === 'done') settled = (event.message as { content?: readonly { type?: string; text?: string }[] }).content
-    }
-    return { threw: false, deltas, settled }
-  } catch (error) {
-    return {
-      threw: true,
-      ...(error instanceof LlmError ? { code: error.code } : {}),
-      message: error instanceof Error ? error.message : String(error),
-      deltas: [],
-    }
-  } finally {
-    globalThis.fetch = originalFetch
+const ndjson = (...parts: readonly Record<string, unknown>[]): string => parts.map(part => JSON.stringify(part)).join('\n')
+
+/** `planId` decides the transport: a Pro plan uses the Provider API (SSE), anything else the CLI endpoint (NDJSON). */
+const run = async (body: string, planId: string): Promise<Outcome> => {
+  const stubFetch = async (resource: string | URL | Request): Promise<Response> => {
+    const url = new URL(resource instanceof Request ? resource.url : resource)
+    if (url.pathname === '/alpha/billing/subscriptions') return Response.json({ data: { planId } })
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
   }
+  const provider = createCommandCodeProvider()
+  const model = provider.describeModel(MODEL)
+  const deltas: string[] = []
+  const stream = provider.streamSimple(model, { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 0 }] } as never, {
+    apiKey: `key-${planId}`,
+    fetch: stubFetch as typeof fetch,
+  })
+  for await (const event of stream) {
+    if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_delta') deltas.push(event.type)
+  }
+  return { deltas, settled: await stream.result() }
 }
+
+const PRO = 'individual-pro-v1'
+const GO = 'individual-go-v1'
 
 describe('settlement classification', () => {
   it('treats answer text as an answer', () => {
@@ -120,36 +113,43 @@ describe('settlement classification', () => {
     expect(isEmptyCompletion({ content: [{ type: 'toolCall' }], stopReason: 'toolUse' })).toBe(false)
   })
 
-  it('names the model and both stop reasons', () => {
-    expect(describeEmptyResponse({ model: 'stealth/space-bunny-alpha', stopReason: 'stop', rawStopReason: 'stop' })).toContain('stealth/space-bunny-alpha')
-  })
 })
 
-describe('Command Code provider: empty response becomes a classified failure', () => {
+describe('Command Code provider: empty response settles as a classified failure', () => {
   it('the control: a response with answer text still completes', async () => {
-    const result = await run(answered())
-    expect({ threw: result.threw, code: result.code }).toMatchObject({ threw: false })
-    expect(result.deltas).toContain('text_delta')
+    const result = await run(answered(), PRO)
+    expect(result.settled.stopReason).toBe('stop')
+    expect(result.settled.content.map(block => block.type)).toEqual(['thinking', 'text'])
   })
 
   it('the control: a plain text response is undisturbed', async () => {
-    const result = await run(textOnly())
-    expect({ threw: result.threw, code: result.code }).toMatchObject({ threw: false })
-    expect(result.deltas).toContain('text_delta')
+    const result = await run(textOnly(), PRO)
+    expect(result.settled.content).toEqual([{ type: 'text', text: 'the answer' }])
   })
 
-  it('raises EMPTY_RESPONSE instead of ending the turn silently', async () => {
-    const result = await run(reasoningOnly())
-    expect({ threw: result.threw, code: result.code }).toMatchObject({ threw: true, code: 'EMPTY_RESPONSE' })
+  it('settles a reasoning-only Provider API response with no content, which DSH files as EMPTY_RESPONSE', async () => {
+    const result = await run(reasoningOnly(), PRO)
+    expect(result.deltas).toContain('thinking_delta')
+    expect(result.settled).toMatchObject({ stopReason: 'stop', content: [] })
   })
 
-  it('a whitespace-only response still raises', async () => {
-    // pi-ai drops whitespace-only blocks before settlement
-    // (openai-completions.js:964 filters on `block.text.trim()`), so the
-    // settlement carries no text block at all and the guard sees an empty
-    // completion. The unit case above pins the classification independently of
-    // that upstream filtering.
-    const result = await run(whitespaceOnly())
-    expect({ threw: result.threw, code: result.code }).toMatchObject({ threw: true, code: 'EMPTY_RESPONSE' })
+  it('a whitespace-only response settles the same way', async () => {
+    const result = await run(whitespaceOnly(), PRO)
+    expect(result.settled).toMatchObject({ stopReason: 'stop', content: [] })
+  })
+
+  it('settles a reasoning-only CLI response with no content', async () => {
+    const result = await run(ndjson({ type: 'reasoning-delta', text: 'thinking' }, { type: 'finish', finishReason: 'stop' }), GO)
+    expect(result.settled).toMatchObject({ stopReason: 'stop', content: [] })
+  })
+
+  it('also catches a CLI response cut off by the output limit before any answer', async () => {
+    const result = await run(ndjson({ type: 'reasoning-delta', text: 'thinking' }, { type: 'finish', finishReason: 'length' }), GO)
+    expect(result.settled).toMatchObject({ stopReason: 'stop', content: [] })
+  })
+
+  it('the control: a CLI answer keeps its content', async () => {
+    const result = await run(ndjson({ type: 'reasoning-delta', text: 'thinking' }, { type: 'text-delta', text: 'done' }, { type: 'finish', finishReason: 'stop' }), GO)
+    expect(result.settled.content.map(block => block.type)).toEqual(['thinking', 'text'])
   })
 })

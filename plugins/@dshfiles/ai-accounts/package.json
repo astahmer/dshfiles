@@ -6,7 +6,8 @@
   "files": [
     "dist",
     "cordis.patch.yml",
-    "locale"
+    "locale",
+    "NOTICE"
   ],
   "type": "module",
   "main": "./dist/index.js",

@@ -10,12 +10,10 @@
  *
  * Nothing upstream classifies this. pi-ai exposes `maxRetries` but no
  * `retryableCodes`, so the transport has no vocabulary for "this attempt
- * failed" even when it should. Raising a coded `LlmError` here is what puts the
- * attempt back in front of the retry policy instead of in front of the user.
+ * failed" even when it should. Settling the attempt with no content, which DSH
+ * classifies as `EMPTY_RESPONSE`, is what puts it back in front of the retry
+ * policy instead of in front of the user.
  */
-
-/** Stable provider-neutral code, matching what a retry policy lists. */
-export const EMPTY_RESPONSE_CODE = 'EMPTY_RESPONSE'
 
 interface SettlementBlock {
   readonly type?: string
@@ -45,15 +43,6 @@ export const settlementAnswered = (message: Settlement | undefined): boolean => 
   })
 }
 
-export interface EmptyResponseDetail {
-  /** The model that produced nothing, for a message a human can act on. */
-  readonly model: string | undefined
-  /** pi-ai's own stop reason, kept because `length` means something different. */
-  readonly stopReason: string | undefined
-  /** Raw provider finish reason, when one was reported. */
-  readonly rawStopReason: string | undefined
-}
-
 /**
  * True when this settlement is a failed attempt rather than a finished turn.
  *
@@ -66,12 +55,3 @@ export const isEmptyCompletion = (message: Settlement | undefined): boolean => {
   if (reason !== 'stop' && reason !== 'length') return false
   return !settlementAnswered(message)
 }
-
-export const describeEmptyResponse = (detail: EmptyResponseDetail): string =>
-  [
-    `Command Code returned no answer text or tool call for model "${detail.model ?? 'unknown'}"`,
-    detail.stopReason === undefined ? undefined : `stop_reason=${detail.stopReason}`,
-    detail.rawStopReason === undefined ? undefined : `finish_reason=${detail.rawStopReason}`,
-  ]
-    .filter(part => part !== undefined)
-    .join(', ')

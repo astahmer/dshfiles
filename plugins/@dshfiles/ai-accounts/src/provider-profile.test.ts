@@ -77,17 +77,22 @@ describe('account provider profiles', () => {
     })
   })
 
-  it('uses compatible request formats for dynamically discovered Command Code models', () => {
+  it('builds a discovered Command Code model from its own capabilities, not a neighbour', () => {
     const profile = buildProfile({
       upstream: createCommandCodeProvider(),
       provider: 'commandcode-work',
       displayName: 'Command Code Work',
-      additionalModelIds: ['openai/custom-model', 'anthropic/claude-custom'],
+      additionalModelIds: ['zai-org/GLM-5.2', 'vendor/unknown-model'],
     })
     const models = modelsFor(profile)
+    const glm = models.find(model => model.id === 'zai-org/GLM-5.2')
+    expect(glm).toMatchObject({ api: 'commandcode', provider: 'commandcode-work', reasoning: true, thinkingLevelMap: { low: null, high: 'high', max: 'max' } })
+    expect(models.find(model => model.id === 'vendor/unknown-model')).toMatchObject({ api: 'commandcode', reasoning: false })
+  })
 
-    expect(models.find(model => model.id === 'openai/custom-model')?.api).toBe('openai-completions')
-    expect(models.find(model => model.id === 'anthropic/claude-custom')?.api).toBe('anthropic-messages')
+  it('retries a content-free settlement instead of ending the turn', () => {
+    const profile = buildProfile({ upstream: createCommandCodeProvider(), provider: 'commandcode-work', displayName: 'Command Code Work', additionalModelIds: [] })
+    expect(profile.retryPolicy).toMatchObject({ mode: 'normal', retryableCodes: expect.arrayContaining(['EMPTY_RESPONSE']) })
   })
 
   it('removes hidden models from routes while UI fallback retains IDs for recovery', () => {

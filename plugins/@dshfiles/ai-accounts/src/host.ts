@@ -16,6 +16,7 @@ export { accountsSnapshot } from './accounts-host-api.js'
 import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
+import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { discoveryCatalogOptions, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
@@ -382,7 +383,11 @@ export default definePlugin({
           },
         },
       },
-      { reasoningDefaults, routeFor: options => recovery.routeFor(options.sessionId, options.provider) },
+      {
+        reasoningDefaults,
+        routeFor: options => recovery.routeFor(options.sessionId, options.provider),
+        imageRequestPricing: (provider, model) => (routes.get(provider)?.kind === COMMANDCODE_KIND ? CommandCodeCapabilities.imageRequestPricing(model) : undefined),
+      },
     )
 
     let adapterRegistration: AdapterRegistrationHandle | undefined
@@ -398,9 +403,9 @@ export default definePlugin({
           })
           return entries.map(entry => ({
             id: entry.id,
-            contextWindow: 128_000,
-            maxTokens: 8_192,
-            inputModalities: ['text'],
+            contextWindow: entry.contextWindow ?? 128_000,
+            maxTokens: CommandCodeCapabilities.maxOutputTokens(entry.id),
+            inputModalities: CommandCodeCapabilities.readsImages(entry.id) ? ['text', 'image'] : ['text'],
           }))
         }
         const modelIds = await fetchOpenCodeGoCatalog(signal)

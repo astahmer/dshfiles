@@ -1,4 +1,4 @@
-import type { GenerateOptions, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmImageRequestPricing, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
@@ -7,6 +7,7 @@ import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai
 import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
+import type { createCommandCodeProvider } from './commandcode-provider.js'
 
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
@@ -22,6 +23,7 @@ export const buildProfile = (params: {
     | ReturnType<typeof opencodeGoProvider>
     | ReturnType<typeof anthropicProvider>
     | ReturnType<typeof githubCopilotProvider>
+    | ReturnType<typeof createCommandCodeProvider>
   readonly provider: string
   readonly displayName: string
   readonly additionalModelIds: readonly string[]
@@ -40,6 +42,12 @@ export const buildProfile = (params: {
   const models = upstreamModels.map(model => ({ ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }))
   for (const id of new Set(params.additionalModelIds)) {
     if (models.some(model => model.id === id)) continue
+    // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
+    const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id) : undefined
+    if (described !== undefined) {
+      models.push({ ...described, provider: params.provider, name: accountModelName(params.provider, id) })
+      continue
+    }
     const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
     const gptFamily = /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(id)?.[1]
     const familyTemplate = gptFamily === undefined ? undefined : upstreamModels.findLast(model => /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(model.id)?.[1] === gptFamily)
@@ -81,7 +89,8 @@ export const buildProfile = (params: {
     retryPolicy: {
       mode: 'normal',
       maxRetries: 2,
-      retryableCodes: ['RATE_LIMIT', 'OVERLOADED', 'TRANSPORT', 'TIMEOUT'],
+      // EMPTY_RESPONSE: a stop with no answer is a failed attempt, never a finished turn.
+      retryableCodes: ['RATE_LIMIT', 'OVERLOADED', 'TRANSPORT', 'TIMEOUT', 'EMPTY_RESPONSE'],
       initialDelayMs: 1_000,
       maxDelayMs: 30_000,
       jitterRatio: 0.2,
@@ -136,6 +145,7 @@ async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChun
 export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
   private readonly routeFor: (options: GenerateOptions) => string
+  private readonly pricingFor: ((provider: string, model: string) => LlmImageRequestPricing | undefined) | undefined
 
   constructor(
     config: ConstructorParameters<typeof PiAiAdapter>[0],
@@ -147,11 +157,18 @@ export class EffortPinnedAdapter extends PiAiAdapter {
        * request header and the transcript keep the route the user chose.
        */
       routeFor?: (options: GenerateOptions) => string
+      /** Route-owned visual-token pricing; routes without one keep the neutral estimate. */
+      imageRequestPricing?: (provider: string, model: string) => LlmImageRequestPricing | undefined
     },
   ) {
     super(config)
     this.reasoningDefaults = deps.reasoningDefaults
     this.routeFor = deps.routeFor ?? (options => options.provider)
+    this.pricingFor = deps.imageRequestPricing
+  }
+
+  override imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined {
+    return this.pricingFor?.(provider, model) ?? super.imageRequestPricing(provider, model)
   }
 
   private wireCall(options: GenerateOptions): GenerateOptions {

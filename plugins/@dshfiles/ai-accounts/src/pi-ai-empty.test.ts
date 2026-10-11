@@ -100,8 +100,8 @@ describe('pi-ai openai-completions: a reasoning-only completion', () => {
   //
   // It must not be made to pass. Deleting the assertion would erase the evidence
   // that the defect is upstream and that our guard, not pi-ai, is what stops the
-  // goal livelock. `src/empty-response.test.ts` proves the same response raises
-  // `EMPTY_RESPONSE` once it passes through `createCommandCodeProvider`, so the
+  // goal livelock. `src/empty-response.test.ts` proves the same response settles as
+  // DSH's `EMPTY_RESPONSE` once it passes through `createCommandCodeProvider`, so the
   // two files together say where the fix lives: at our boundary, not in a
   // dependency we do not control.
   it('reports a reasoning-only response as a successful empty turn (upstream defect)', async () => {
