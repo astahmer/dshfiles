@@ -37,7 +37,13 @@ import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { createFailureRecovery, offloadResentImages, type RecoveryAction } from './failure-recovery.js'
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
-import type { LlmRetryEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
+import type { LlmRetryEventData, LlmRetryStartedEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    'llm/retry': LlmRetryEventData
+    'llm/retry-started': LlmRetryStartedEventData
+  }
+}
 import { randomUUID } from 'node:crypto'
 import { materializeCodexShadowHome } from './codex-home.js'
 import { readCodexAccessToken } from './read-codex-token.js'

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx build",
+    "build": "pnpm --dir ../../plugins --filter @deepseek-ai/dsh-agent run build && pnpm --dir ../dsh-core/session run build && pnpm --dir ../../plugins --filter @deepseek-ai/dsh-agent-loop run build && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx build",
     "lint": "pnpm --dir ../.. run lint",
     "format:check": "pnpm --dir ../.. run fmt:check",
     "deps:check": "knip",
@@ -15,13 +15,14 @@
     "test:feature-coverage": "node --test scripts/feature-coverage.test.mjs",
     "features:check": "node --experimental-strip-types scripts/feature-coverage.mjs --check",
     "features:report": "node --experimental-strip-types scripts/feature-coverage.mjs --report",
-    "check": "pnpm run build && pnpm run typecheck && pnpm run test && pnpm run features:check && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test && pnpm run test:boot",
+    "check": "pnpm run build && pnpm run typecheck && pnpm run test && pnpm run features:check && pnpm --filter create-dshx typecheck && pnpm --filter create-dshx test && node scripts/boot-check-web.mjs",
     "test:boot": "pnpm run build && node scripts/boot-check-web.mjs",
     "test:e2e": "pnpm run build && pnpm run test:e2e:gen && playwright test --config=playwright.e2e.config.ts",
     "test:e2e:boot": "pnpm run test:boot && pnpm run test:e2e",
     "test:e2e:gen": "bddgen test --config=playwright.e2e.config.ts"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@types/node": "catalog:",
     "knip": "6.32.2",
     "typescript": "catalog:",

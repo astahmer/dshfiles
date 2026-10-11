@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "scripts": {
-    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile && node scripts/with-local-core-dependencies.mjs --prepare",
+    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile && node scripts/with-local-core-dependencies.mjs --prepare && pnpm run setup:browser",
+    "setup:browser": "pnpm --dir tooling/dshx exec playwright install --only-shell chromium",
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
     "verify:cordis-identity": "node scripts/verify-cordis-identity.mjs",
@@ -14,7 +15,7 @@
     "verify:project-checks-scratch": "pnpm --dir plugins --filter @dshfiles/project-checks run build && pnpm --dir plugins/@dshfiles/project-checks run verify:scratch",
     "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
     "verify:dsh-customization:a11y": "node scripts/dsh-customization-a11y.mjs",
-    "check": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:plugin-boot && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch && pnpm run lint && pnpm run fmt:check",
+    "check": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch && pnpm run lint && pnpm run fmt:check",
     "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
     "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json",

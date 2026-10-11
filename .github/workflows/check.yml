@@ -1,0 +1,37 @@
+name: Required checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pnpm-check:
+    name: pnpm check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            tooling/dshx/pnpm-lock.yaml
+            plugins/pnpm-lock.yaml
+      - run: pnpm install:all
+      - name: Install Playwright Chromium
+        run: pnpm --dir tooling/dshx exec playwright install --with-deps --only-shell chromium
+      - run: pnpm check

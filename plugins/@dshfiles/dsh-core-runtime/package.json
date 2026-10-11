@@ -57,7 +57,7 @@
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-agent": "link:../../../tooling/dsh-core/agent",
     "@deepseek-ai/dsh-agent-loop": "link:../../../tooling/dsh-core/agent-loop",
-    "@deepseek-ai/dsh-api-session-controller": "link:../../../tooling/dsh-core/api-session-controller",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-store": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "link:../../../tooling/dsh-core/session",
     "@deepseek-ai/dsh-session-persistence": "link:../../../tooling/dsh-core/session-persistence",
