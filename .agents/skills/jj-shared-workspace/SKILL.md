@@ -40,3 +40,20 @@ A usage-limit stop must lose nothing:
 - After each milestone: `jj split` your paths and tick the plan's checkboxes in the same revision.
 - Keep `plans/<topic>/README.md` with a progress table and a **Resume here** line naming the next step
   (see `plans/optmem/README.md`).
+
+## Whole-graph surgery in the shared store
+
+Consolidating everything above a base revision rewrites other agents' working copies, so the usual rules change:
+
+- `jj log -r @` first. If `@` is not a head, writing any file here amends a mid-line revision and rebases the
+  whole subtree under everyone. Do file work in a scratch `jj workspace add`, or move `@` to the tip first.
+- Rebuild with `jj duplicate -r <immutable commit-id> -o <tip>`. Rebasing a set of planned commit ids goes stale
+  as soon as one step hole-fills its descendants.
+- Back out only your own steps with `jj op revert <op-id>`; `jj op restore` also discards every other agent's
+  operation since that point. Expect stray `reconcile divergent operations` entries — the VisualJJ branching
+  server writes to this store too.
+- `jj abandon '<base>:: & ~::<tip>'` prints `Deleted bookmarks:` and re-creates abandoned workspace `@`s on the
+  nearest visible ancestor, which can sit below the base. Sweep `jj workspace list` so no `@` is left off the line.
+- Add `--use-destination-message` to `jj squash`; a bare `jj squash` waits on an editor.
+
+The full recipe lives in the `jj-history-consolidation` skill.
