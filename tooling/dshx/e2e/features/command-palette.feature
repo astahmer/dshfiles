@@ -10,6 +10,15 @@ Feature: Command palette
     When the palette query is "e2e-no-session-match"
     Then thread search reports no matches
 
+  @scenario:command-palette.content-search
+  Scenario: Content search finds a real user message and opens its thread
+    Given the isolated plugin composition "@dshfiles/command-palette" and "@dshfiles/dsh-core-runtime" with external bundle "@deepseek-ai/dsh-session-query-sqlite" is booted
+    Then the Web UI mounts without a plugin failure card
+    When a searchable user message is sent to a new thread
+    When the command palette is opened
+    When the palette query is "#dshx-content-search-e2e-marker"
+    Then thread content search finds the message and opens its thread
+
   @scenario:command-palette.file-search
   Scenario: File search explains that the Editor integration is unavailable
     Given the isolated plugin profile "@dshfiles/command-palette" is booted
