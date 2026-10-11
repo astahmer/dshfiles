@@ -12,7 +12,7 @@ Feature: Command palette
 
   @scenario:command-palette.content-search
   Scenario: Content search finds a real user message and opens its thread
-    Given the isolated plugin composition "@dshfiles/command-palette" and "@dshfiles/dsh-core-runtime" with external bundle "@deepseek-ai/dsh-session-query-sqlite" is booted
+    Given the isolated plugin composition "@dshfiles/command-palette" and "@dshfiles/dsh-core-runtime" is booted
     Then the Web UI mounts without a plugin failure card
     When a searchable user message is sent to a new thread
     When the command palette is opened
