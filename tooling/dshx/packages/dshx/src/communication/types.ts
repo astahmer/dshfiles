@@ -146,6 +146,8 @@ const legacyCommunicationMessageSchema = z
 
 export const communicationActivityOperationSchema = z.enum([
   'dshx_comm_agents',
+  'dshx_comm_workspace',
+  'dshx_comm_history',
   'dshx_comm_topics',
   'dshx_comm_subscribe',
   'dshx_comm_unsubscribe',

@@ -19,6 +19,38 @@ afterEach(async () => {
 })
 
 describe('durable Agent communication', () => {
+  it('persists the workspace lookup operation through the activity schema', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+
+    await service.recordActivity({
+      principal: { kind: 'agent', id: 'agent-parent' },
+      operation: 'dshx_comm_workspace',
+      outcome: 'success',
+      occurredAt: now,
+      durationMs: 12,
+      callId: 'workspace-query-call',
+    })
+
+    const report = await service.diagnostics({ agents: [], limit: 1 })
+    expect(report.activity.events[0]?.operation).toBe('dshx_comm_workspace')
+  })
+
+  it('persists the history search operation through the activity schema', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+
+    await service.recordActivity({
+      principal: { kind: 'agent', id: 'agent-parent' },
+      operation: 'dshx_comm_history',
+      outcome: 'success',
+      occurredAt: now,
+      durationMs: 12,
+      callId: 'history-search-call',
+    })
+
+    const report = await service.diagnostics({ agents: [], limit: 1 })
+    expect(report.activity.events[0]?.operation).toBe('dshx_comm_history')
+  })
+
   it('counts workspace subscriptions and reports missing live subscriptions', async () => {
     const service = createCommunicationService({ statePath: await statePath(), now: () => now })
     const first: CommunicationPrincipal = { kind: 'agent', id: 'agent-first' }
@@ -104,20 +136,15 @@ describe('durable Agent communication', () => {
     const service = createCommunicationService({ statePath: await statePath(), now: () => now })
     const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-parent' }
     const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-child' }
-    const sent = await Promise.all(
-      Array.from({ length: 6 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `Page item ${index}` })),
-    )
+    const sent = await Promise.all(Array.from({ length: 6 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `Page item ${index}` })))
 
     const newest = await service.browseMessages({ agentId: recipient.id, limit: 2 })
     expect(newest.items.map(message => message.text)).toEqual(['Page item 4', 'Page item 5'])
     expect(newest.totalMatching).toBe(6)
     expect(newest.nextCursor).toBe(newest.items[0]?.id)
 
-    const older = await service.browseMessages({
-      agentId: recipient.id,
-      ...(newest.nextCursor === null ? {} : { beforeId: newest.nextCursor }),
-      limit: 2,
-    })
+    const olderQuery = newest.nextCursor === null ? { agentId: recipient.id, limit: 2 } : { agentId: recipient.id, beforeId: newest.nextCursor, limit: 2 }
+    const older = await service.browseMessages(olderQuery)
     expect(older.items.map(message => message.text)).toEqual(['Page item 2', 'Page item 3'])
     expect(older.items.some(message => newest.items.some(newer => newer.id === message.id))).toBe(false)
     expect(await service.browseMessages({ agentId: recipient.id, search: 'ITEM 3' })).toMatchObject({
@@ -196,9 +223,7 @@ describe('durable Agent communication', () => {
             recipients: [{ principal: recipient, delivery: 'queue', allowSteerFrom: [] }],
           },
         ],
-        subscriptions: [
-          { principal: recipient, topic: 'inbox', delivery: 'queue', allowSteerFrom: [], createdAt: now },
-        ],
+        subscriptions: [{ principal: recipient, topic: 'inbox', delivery: 'queue', allowSteerFrom: [], createdAt: now }],
         acknowledgements: [],
         workspaceOptOuts: [],
         notifications: [{ messageId, agentId: recipient.id, notifiedAt: now }],
@@ -225,9 +250,7 @@ describe('durable Agent communication', () => {
     const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
     const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
 
-    const sent = await Promise.all(
-      Array.from({ length: 12 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `message ${index}` })),
-    )
+    const sent = await Promise.all(Array.from({ length: 12 }, (_, index) => service.send({ sender, toAgentId: recipient.id, text: `message ${index}` })))
     const inbox = await service.inbox({ principal: recipient })
 
     expect(new Set(sent.map(message => message.id)).size).toBe(12)

@@ -3,20 +3,55 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "Show live peer status and runtime-authorized descendants with runtime-owner and opaque same-cwd workspace metadata, without reading task text or history.",
+      "title": "Discover Agents, history, and workspace channels",
+      "summary": "List live peers and runtime-owner-scoped descendants, search bounded visible history, and resolve one existing DSH Workspace identity without exposing the Session cwd.",
       "surfaces": ["tool", "host", "client"],
       "configuration": [],
-      "states": ["no-agents", "live-agent", "owned-descendants", "workspace-subscribed", "workspace-subscription-missing", "parented-agent", "opted-out"],
+      "states": [
+        "no-agents",
+        "live-agent",
+        "owned-descendants",
+        "workspace-subscribed",
+        "workspace-subscription-missing",
+        "workspace-context-requested",
+        "workspace-not-owned",
+        "workspace-registered",
+        "workspace-unregistered",
+        "workspace-service-unavailable",
+        "workspace-missing-cwd",
+        "workspace-lookup-failed",
+        "history-search-results",
+        "history-search-caller-unavailable",
+        "history-search-not-owned",
+        "history-search-service-unavailable",
+        "history-search-cancelled",
+        "history-search-failed",
+        "history-search-more-pages",
+        "history-search-pagination-unavailable",
+        "opted-out"
+      ],
       "failureModes": [
         "A missing workspace cwd cannot derive a workspace topic.",
-        "A workspace topic hashes cwd and is not a canonical JJ workspace id.",
+        "A workspace topic hashes cwd and is not a DSH Workspace registry id or a JJ workspace/revision id.",
         "Only current runtime-owned descendants receive the extended metadata; completed or resumed Sessions are outside this live relation.",
-        "Runtime ownership does not authorize durable parent lineage; only the live runtime owner id is exposed.",
-        "The live registry contains no task or transcript history.",
+        "Workspace lookup accepts only a live runtime-owned descendant id; unknown and unrelated ids receive the same generic not-owned result.",
+        "WorkspaceRegistry.resolveByPath uses the Host-derived cwd read-only and returns only the registered DSH workspace id and title; it never creates a Workspace or exposes a path.",
+        "Missing services, missing cwd, unregistered directories, and failed path resolution are surfaced as statuses without falling back to JJ probing.",
+        "Session history search is separate and includes only visible user and assistant messages; it excludes reasoning blocks, tool arguments, tool results, and the Session header.",
+        "History search is bounded to 10 snippets of at most 280 characters per page. Oversized provider cursors are withheld rather than returned for reuse.",
+        "History snippets may contain private text and remain untrusted; only live runtime-owned descendants are searchable, and snippets are not instructions.",
+        "Session Query search is read-only and does not make the target Session live or interrupt it.",
+        "Task-board access remains available only through existing Agent Teams tools to Team members; arbitrary non-Team child task state is not exposed.",
+        "A DSH Workspace id/title is not a JJ workspace or revision association; no JJ probing or mutation occurs.",
         "An Agent absent from the live registry is not assumed to be complete."
       ],
-      "externalDependencies": [],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-session-query",
+          "boundary": "Read-only Session Query searchEvents service; the Host tool calls it only after runtime ownership authorizes a live descendant.",
+          "deterministicFake": "Unit tests use fixed typed SessionEventSearchPage fixtures to verify bounded projection; no query-service fake is substituted."
+        }
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -40,6 +75,66 @@
           "id": "agent-communication.runtime-owned-descendants",
           "file": "plugins/@dshfiles/agent-communication/src/live-agent-directory.test.ts",
           "testName": "includes only the caller’s direct and transitive runtime-owned descendants"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.workspace-lookup-authorization",
+          "file": "plugins/@dshfiles/agent-communication/src/live-agent-directory.test.ts",
+          "testName": "authorizes single-target workspace lookup only for runtime-owned live descendants"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.workspace-identity-projection",
+          "file": "plugins/@dshfiles/agent-communication/src/live-agent-directory.test.ts",
+          "testName": "projects registered DSH workspace identity without exposing its path or session list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.workspace-lookup-activity",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "persists the workspace lookup operation through the activity schema"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-input-validation",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "validates bounded inputs and normalizes literal queries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-search-filters",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "searches only visible messages with a canonical continuation cursor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-page-projection",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "projects a bounded page without returning the Session header or cwd"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-cursor-bound",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "does not return an oversized provider cursor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-page-size-bound",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "caps projected results at ten matches even if the service returns more"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-empty-cursor",
+          "file": "plugins/@dshfiles/agent-communication/src/session-history.test.ts",
+          "testName": "does not return an empty provider cursor as a usable continuation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.history-search-activity",
+          "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
+          "testName": "persists the history search operation through the activity schema"
         }
       ]
     },

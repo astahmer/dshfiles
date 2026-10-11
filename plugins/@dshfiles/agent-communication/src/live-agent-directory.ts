@@ -1,3 +1,4 @@
+import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 
@@ -38,9 +39,26 @@ export const findOwnedLiveAgents = <Agent extends { readonly id: string }>(input
   return descendants
 }
 
+export const findOwnedLiveAgent = <Agent extends { readonly id: string }>(input: {
+  readonly caller: Agent
+  readonly liveAgents: readonly Agent[]
+  readonly targetId: string
+  readonly isOwnedBy: (candidate: Agent, owner: Agent) => boolean
+}) =>
+  findOwnedLiveAgents({
+    caller: input.caller,
+    liveAgents: input.liveAgents,
+    isOwnedBy: input.isOwnedBy,
+  }).find(({ agent }) => agent.id === input.targetId)
+
 export const observeLiveAgent = (agent: LiveAgentDirectoryRecord) => ({
   id: agent.id,
   status: agent.status,
   createdAt: agent.createdAt,
   workspaceTopic: communicationWorkspaceTopic(agent.cwd) ?? null,
+})
+
+export const projectRegisteredWorkspace = (workspace: Pick<Workspace, 'id' | 'title'>) => ({
+  workspace_id: workspace.id,
+  workspace_title: workspace.title,
 })
