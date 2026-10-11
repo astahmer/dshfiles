@@ -1,7 +1,12 @@
+export interface SessionCostDialogRow {
+  readonly tokens: number | undefined
+  readonly amount: string | undefined
+}
+
 export interface SessionCostDisplayValue {
   readonly amount: string
   readonly description: string
-  readonly rows: readonly { readonly label: string; readonly value: string }[]
+  readonly rows: readonly SessionCostDialogRow[]
 }
 
 const STATS_ROOT = '[data-composer-stats]'
@@ -9,16 +14,31 @@ const DIALOG_TRIGGER = 'button[aria-haspopup="dialog"]'
 const DOCK_ANCHOR = '[data-slot="conversation.composer.dock"]'
 const COST_ATTRIBUTE = 'data-ai-accounts-session-cost'
 
+/** Confirms the native dialog still has the rows represented by this session. */
+export const sessionCostDialogMatches = (values: readonly string[], rows: readonly SessionCostDialogRow[]): boolean => {
+  if (values.length !== rows.length) return false
+  return rows.every((row, index) => {
+    const value = values[index]
+    if (value === undefined) return false
+    if (row.tokens === undefined) return value.includes('%')
+    return value.replace(/\D/g, '') === String(row.tokens)
+  })
+}
+
+interface DialogPair {
+  readonly detail: HTMLElement
+}
+
 /** Appends the estimate to the shipped token-stats button without replacing its owner. */
 export class SessionCostDisplay {
   private readonly doc: Document
   private readonly scope: () => ParentNode | null
   private observer: MutationObserver | undefined
   private value: SessionCostDisplayValue | undefined
-  private host: Element | undefined
-  private node: HTMLSpanElement | undefined
-  private dialog: HTMLDListElement | undefined
-  private dialogRows: HTMLDivElement[] = []
+  private pillHost: Element | undefined
+  private pillNode: HTMLSpanElement | undefined
+  private dialogHost: HTMLDListElement | undefined
+  private dialogPrices = new Map<HTMLElement, HTMLSpanElement>()
 
   constructor(doc: Document, scope: () => ParentNode | null) {
     this.doc = doc
@@ -40,50 +60,49 @@ export class SessionCostDisplay {
   dispose(): void {
     this.observer?.disconnect()
     this.observer = undefined
-    this.node?.remove()
-    this.node = undefined
-    this.host = undefined
-    this.removeDialogRows()
+    this.pillNode?.remove()
+    this.pillNode = undefined
+    this.pillHost = undefined
+    this.clearDialog()
   }
 
   private apply(): void {
     if (this.value === undefined) {
-      this.node?.remove()
-      this.node = undefined
-      this.host = undefined
-      this.removeDialogRows()
+      this.pillNode?.remove()
+      this.pillNode = undefined
+      this.pillHost = undefined
+      this.clearDialog()
       return
     }
 
-    const value = this.value
-    this.applyPill(value)
-    this.applyDialog(value)
+    this.applyPill(this.value)
+    this.applyDialog(this.value)
   }
 
   private applyPill(value: SessionCostDisplayValue): void {
-    if (this.host?.isConnected !== true || this.node?.isConnected !== true) {
+    if (this.pillHost?.isConnected !== true || this.pillNode?.isConnected !== true) {
       const scope = this.scope()
       if (scope === null) return
       const stats = scope.querySelector(STATS_ROOT) ?? scope
       const buttons = stats.querySelectorAll(DIALOG_TRIGGER)
       const host = buttons.item(buttons.length - 1)
       if (host === null) return
-      this.node?.remove()
+      this.pillNode?.remove()
       const node = this.doc.createElement('span')
       node.setAttribute(COST_ATTRIBUTE, '')
       node.textContent = ` · ${value.amount}`
       node.title = value.description
       node.setAttribute('aria-label', value.description)
       host.append(node)
-      this.host = host
-      this.node = node
+      this.pillHost = host
+      this.pillNode = node
       return
     }
 
     const text = ` · ${value.amount}`
-    if (this.node.textContent !== text) this.node.textContent = text
-    if (this.node.title !== value.description) this.node.title = value.description
-    if (this.node.getAttribute('aria-label') !== value.description) this.node.setAttribute('aria-label', value.description)
+    if (this.pillNode.textContent !== text) this.pillNode.textContent = text
+    if (this.pillNode.title !== value.description) this.pillNode.title = value.description
+    if (this.pillNode.getAttribute('aria-label') !== value.description) this.pillNode.setAttribute('aria-label', value.description)
   }
 
   private applyDialog(value: SessionCostDisplayValue): void {
@@ -92,41 +111,75 @@ export class SessionCostDisplay {
     const buttons = stats?.querySelectorAll(DIALOG_TRIGGER)
     const tokenButton = buttons?.item((buttons?.length ?? 0) - 1)
     const ownsOpenDialog = tokenButton?.getAttribute('aria-expanded') === 'true'
-    const dialog = ownsOpenDialog ? this.doc.querySelector<HTMLDListElement>('[data-session-stats-usage]') : null
+    const dialogs = this.doc.querySelectorAll<HTMLDListElement>('[data-session-stats-usage]')
+    const dialog = this.dialogHost?.isConnected === true ? this.dialogHost : ownsOpenDialog && dialogs.length === 1 ? dialogs.item(0) : null
     if (dialog === null) {
-      this.removeDialogRows()
+      this.clearDialog()
       return
     }
-    if (this.dialog !== dialog || this.dialogRows.length !== value.rows.length || this.dialogRows.some(row => !row.isConnected)) {
-      this.removeDialogRows()
-      this.dialog = dialog
-      this.dialogRows = value.rows.map(({ label, value }) => {
-        const row = this.doc.createElement('div')
-        row.setAttribute(COST_ATTRIBUTE, '')
-        row.style.display = 'contents'
-        const term = this.doc.createElement('dt')
-        term.textContent = label
-        const detail = this.doc.createElement('dd')
-        detail.textContent = value
-        row.append(term, detail)
-        dialog.append(row)
-        return row
-      })
+
+    this.pruneDialog(dialog)
+    const pairs = this.dialogPairs(dialog)
+    const rowValues = pairs.map(pair => this.hostValue(pair.detail))
+    if (!sessionCostDialogMatches(rowValues, value.rows)) {
+      this.clearDialog()
       return
     }
-    value.rows.forEach((entry, index) => {
-      const row = this.dialogRows[index]
-      const term = row?.querySelector('dt')
-      const detail = row?.querySelector('dd')
-      if (term !== null && term !== undefined && term.textContent !== entry.label) term.textContent = entry.label
-      if (detail !== null && detail !== undefined && detail.textContent !== entry.value) detail.textContent = entry.value
-    })
+
+    for (const [index, row] of value.rows.entries()) {
+      const pair = pairs[index]
+      if (pair === undefined || row.amount === undefined) continue
+      const price = this.dialogPrices.get(pair.detail) ?? this.createDialogPrice(pair.detail)
+      if (price.parentNode !== pair.detail) pair.detail.append(price)
+      if (price.textContent !== row.amount) price.textContent = row.amount
+    }
+    this.dialogHost = dialog
   }
 
-  private removeDialogRows(): void {
-    for (const row of this.dialogRows) row.remove()
-    this.dialogRows = []
-    this.dialog = undefined
+  private dialogPairs(host: HTMLDListElement): DialogPair[] {
+    const terms = host.querySelectorAll<HTMLElement>(':scope > dt')
+    const details = host.querySelectorAll<HTMLElement>(':scope > dd')
+    const pairs: DialogPair[] = []
+    for (const [index, term] of Array.from(terms).entries()) {
+      const detail = details.item(index)
+      if (detail !== null) pairs.push({ detail })
+    }
+    return pairs
+  }
+
+  private hostValue(detail: HTMLElement): string {
+    return Array.from(detail.childNodes)
+      .filter(node => node !== this.dialogPrices.get(detail))
+      .map(node => node.textContent ?? '')
+      .join('')
+  }
+
+  private createDialogPrice(detail: HTMLElement): HTMLSpanElement {
+    const price = this.doc.createElement('span')
+    price.setAttribute(COST_ATTRIBUTE, '')
+    price.style.marginLeft = '6px'
+    price.style.display = 'inline-block'
+    price.style.minWidth = '56px'
+    price.style.textAlign = 'right'
+    price.style.fontWeight = '500'
+    detail.append(price)
+    this.dialogPrices.set(detail, price)
+    return price
+  }
+
+  private pruneDialog(host: HTMLDListElement): void {
+    if (this.dialogHost !== undefined && this.dialogHost !== host) this.clearDialog()
+    for (const [detail, price] of this.dialogPrices) {
+      if (detail.parentElement === host) continue
+      price.remove()
+      this.dialogPrices.delete(detail)
+    }
+  }
+
+  private clearDialog(): void {
+    for (const price of this.dialogPrices.values()) price.remove()
+    this.dialogPrices.clear()
+    this.dialogHost = undefined
   }
 }
 

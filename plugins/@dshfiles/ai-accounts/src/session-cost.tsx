@@ -67,14 +67,14 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
           amount: amountText(session),
           description: `Estimated session cost ${amountText(session)}. Estimate from published API prices, not an invoice.`,
           rows: [
-            { label: 'Input', tokens: session.tokens.uncachedInputTokens, cost: session.cost.input },
-            { label: 'Output', tokens: session.tokens.outputTokens, cost: session.cost.output },
-            { label: 'Cache read', tokens: session.tokens.cacheReadTokens, cost: session.cost.cacheRead },
-            { label: 'Cache write', tokens: session.tokens.cacheWriteTokens, cost: session.cost.cacheWrite },
-          ]
-            .filter(row => row.tokens > 0)
-            .map(row => ({ label: row.label, value: `${compactTokens(row.tokens)} tok · ${formatUsd(row.cost)}` }))
-            .concat(turn === null || !turn.priced ? [] : [{ label: 'Last turn', value: amountText(turn) }]),
+            ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
+              ? [{ tokens: undefined, amount: undefined }]
+              : []),
+            { tokens: session.tokens.uncachedInputTokens, amount: formatUsd(session.cost.input) },
+            { tokens: session.tokens.cacheReadTokens, amount: formatUsd(session.cost.cacheRead) },
+            ...(session.tokens.cacheWriteTokens > 0 ? [{ tokens: session.tokens.cacheWriteTokens, amount: formatUsd(session.cost.cacheWrite) }] : []),
+            { tokens: session.tokens.outputTokens, amount: formatUsd(session.cost.output) },
+          ],
         }
   const hasInlineValue = inlineValue !== undefined
 
