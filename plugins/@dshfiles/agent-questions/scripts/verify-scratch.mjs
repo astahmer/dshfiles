@@ -154,11 +154,14 @@ try {
   assert.ok(prepared.currentFeedbackId, 'The pending feedback state omitted the current feedback id.')
   assert.ok(prepared.staleFeedbackId, 'The pending feedback state omitted the stale-anchor id.')
   assert.ok(prepared.cancelledFeedbackId, 'The pending feedback state omitted the cancelled feedback id.')
+  assert.ok(prepared.batchFeedbackId, 'The pending feedback state omitted the batch-boundary id.')
   assert.ok(prepared.questionId, 'The pending question state omitted the reattachment id.')
   assert.equal(prepared.parentQuestionToolPassed, true)
   assert.equal(prepared.expiryRecommendedPassed, true)
   assert.equal(prepared.expiryDeferredPassed, true)
   assert.equal(prepared.feedbackToolsPassed, true)
+  assert.equal(prepared.feedbackResolutionToolPassed, true)
+  assert.deepEqual(prepared.feedbackResolutionStatuses, { current: 'resolved', stale: 'stale', cancelled: 'rejected', batch: 'resolved' })
   assert.equal(prepared.oversizedBatchRejected, true)
   process.stdout.write('PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.\n')
   await stopHost()
@@ -173,6 +176,7 @@ try {
     expiryDeferredPassed: true,
     feedbackSubmitReadCancelPassed: true,
     feedbackResolvedAfterRestart: true,
+    feedbackResolutionToolPassed: true,
     staleAnchorRejected: true,
     oversizedBatchRejected: true,
     childAbsentAtHostRestart: true,
@@ -182,6 +186,7 @@ try {
       current: 'resolved',
       stale: 'stale',
       cancelled: 'rejected',
+      batch: 'resolved',
       coldResume: 'resolved',
     },
     parentNotified: true,

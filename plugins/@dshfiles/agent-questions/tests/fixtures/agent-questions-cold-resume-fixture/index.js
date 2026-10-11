@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 const packageName = '@dshfiles/agent-questions-cold-resume-fixture'
 const parentProvider = 'agent-questions-scratch-parent'
 const childProvider = 'agent-questions-scratch-child'
+const toolChildProvider = 'agent-questions-tool-scratch-child'
 const continuationProvider = 'agent-questions-scratch-continuation'
 
 const readJson = async path => {
@@ -75,6 +76,10 @@ export const apply = async context => {
   const firstChildTurnGate = new Promise(resolveGate => {
     releaseFirstChildTurn = resolveGate
   })
+  let releaseToolChildTurn = () => {}
+  const toolChildTurnGate = new Promise(resolveGate => {
+    releaseToolChildTurn = resolveGate
+  })
   const incrementCallCount = async provider => {
     const counts = (await readJson(callCountPath)) ?? {}
     const callCount = (counts[provider] ?? 0) + 1
@@ -93,6 +98,7 @@ export const apply = async context => {
     async *stream(options) {
       const callCount = await incrementCallCount(options.provider)
       if (options.provider === childProvider && callCount === 1) await firstChildTurnGate
+      if (options.provider === toolChildProvider && callCount === 1) await toolChildTurnGate
       const text = options.provider + '-response-' + String(callCount)
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text }
@@ -101,7 +107,7 @@ export const apply = async context => {
       yield { type: 'finish', reason: { kind: 'stop' } }
     },
   }
-  const disposeAdapter = context.llm.registerAdapter([parentProvider, childProvider], adapter)
+  const disposeAdapter = context.llm.registerAdapter([parentProvider, childProvider, toolChildProvider], adapter)
   const continuation = {
     name: continuationProvider,
     capabilities: {
@@ -201,8 +207,25 @@ export const apply = async context => {
         timeoutMs: 120_000,
         signal: new AbortController().signal,
       })
+      const toolChildStarted = await context.subagents.startContinuable({
+        provider: continuationProvider,
+        label: 'Agent Questions public Host tool acceptance',
+        request: {
+          parent,
+          prompt: [{ type: 'text', text: 'Run isolated Agent Questions tool scenarios.' }],
+          agentOptions: { provider: toolChildProvider, model: 'fixture' },
+        },
+        signal: new AbortController().signal,
+      })
+      const toolChild = context.agents.get(toolChildStarted.childId)
+      if (toolChild === undefined || !context.agents.isOwnedBy(toolChild.id, parent)) {
+        throw new Error('The Agent Questions tool-test child was not attached to the direct parent.')
+      }
+      if (toolChild.session.header.cwd !== projectPath) throw new Error('The tool-test child did not inherit the isolated scratch workspace.')
+      await waitForProviderCalls(callCountPath, toolChildProvider, 1)
+
       const recommendedResult = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'ask_parent_question',
         args: {
           question: 'Which safe result should expiry select?',
@@ -221,7 +244,7 @@ export const apply = async context => {
         throw new Error('Question expiry did not select the recommended option.')
       }
       const deferredResult = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'ask_parent_question',
         args: {
           question: 'What should be reviewed later?',
@@ -252,14 +275,14 @@ export const apply = async context => {
       }
       const currentFeedbackCallId = 'current-feedback'
       const currentFeedbackResult = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'submit_markdown_feedback',
         args: currentFeedbackInput,
         callId: currentFeedbackCallId,
       })
       const currentFeedbackId = feedbackIdFrom(currentFeedbackResult, 'Markdown feedback submission')
       const duplicateFeedbackResult = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'submit_markdown_feedback',
         args: currentFeedbackInput,
         callId: currentFeedbackCallId,
@@ -270,7 +293,7 @@ export const apply = async context => {
 
       const staleFeedbackId = feedbackIdFrom(
         await executeTool(context, {
-          agent: child,
+          agent: toolChild,
           name: 'submit_markdown_feedback',
           args: {
             path: 'review-stale.md',
@@ -286,7 +309,7 @@ export const apply = async context => {
 
       const cancelledFeedbackId = feedbackIdFrom(
         await executeTool(context, {
-          agent: child,
+          agent: toolChild,
           name: 'submit_markdown_feedback',
           args: {
             path: 'review-cancel.md',
@@ -299,7 +322,7 @@ export const apply = async context => {
         'Cancellable feedback submission',
       )
       const cancellation = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'cancel_parent_feedback',
         args: { feedbackId: cancelledFeedbackId },
       })
@@ -307,25 +330,43 @@ export const apply = async context => {
         throw new Error('The child could not cancel its own pending feedback.')
       }
       const unsafeFeedback = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'submit_markdown_feedback',
         args: { ...currentFeedbackInput, path: '../outside.md' },
       })
       if (!unsafeFeedback.isError) throw new Error('Markdown feedback accepted a path outside the child workspace.')
 
-      const coldResumeFeedbackId = feedbackIdFrom(
+      const document = await readFile(resolve(projectPath, 'review.md'), 'utf8')
+      const excerpt = document.split(/\r\n|\n|\r/, 1)[0]
+      if (excerpt === undefined || excerpt.length === 0) throw new Error('The cold-resume Markdown anchor is empty.')
+      const coldResumeRecord = await context.parentFeedback.submit({
+        agent: child,
+        operationId: 'cold-resume-feedback',
+        anchor: {
+          kind: 'markdown',
+          path: 'review.md',
+          revision: createHash('sha256').update(document).digest('hex'),
+          startLine: 1,
+          endLine: 1,
+          excerpt,
+        },
+        comment: 'Resolve this after Host restart.',
+        signal: new AbortController().signal,
+      })
+      if (coldResumeRecord.status !== 'pending') throw new Error('The cold-resume feedback did not remain pending.')
+      const coldResumeFeedbackId = coldResumeRecord.feedbackId
+      const batchFeedbackId = feedbackIdFrom(
         await executeTool(context, {
-          agent: child,
+          agent: toolChild,
           name: 'submit_markdown_feedback',
-          args: { ...currentFeedbackInput, comment: 'Resolve this after Host restart.' },
-          callId: 'cold-resume-feedback',
+          args: { ...currentFeedbackInput, comment: 'Read and resolve this batch-boundary record.' },
         }),
-        'Cold-resume feedback submission',
+        'Batch-boundary feedback submission',
       )
       const pendingRead = await executeTool(context, {
-        agent: child,
+        agent: toolChild,
         name: 'get_parent_feedback',
-        args: { feedbackId: coldResumeFeedbackId },
+        args: { feedbackId: batchFeedbackId },
       })
       if (!requireToolSuccess(pendingRead, 'Pending feedback retrieval').includes('is still pending')) {
         throw new Error('The child did not read its pending feedback status.')
@@ -335,15 +376,38 @@ export const apply = async context => {
         name: 'resolve_parent_feedback',
         args: {
           responses: [
-            { feedbackId: coldResumeFeedbackId, disposition: 'accepted' },
+            { feedbackId: batchFeedbackId, disposition: 'accepted' },
             ...Array.from({ length: 20 }, (_, index) => ({ feedbackId: 'missing-' + String(index), disposition: 'accepted' })),
           ],
         },
       })
       if (!oversizedBatch.isError) throw new Error('The Host accepted a feedback batch larger than twenty items.')
+      const resolution = await executeTool(context, {
+        agent: parent,
+        name: 'resolve_parent_feedback',
+        args: {
+          responses: [
+            { feedbackId: currentFeedbackId, disposition: 'accepted', note: 'Accepted in the scratch Host.' },
+            { feedbackId: staleFeedbackId, disposition: 'accepted', note: 'Do not apply a stale excerpt.' },
+            { feedbackId: cancelledFeedbackId, disposition: 'accepted' },
+            { feedbackId: batchFeedbackId, disposition: 'deferred', note: 'Leave this item for later review.' },
+          ],
+        },
+      })
+      const resolutionText = requireToolSuccess(resolution, 'Parent feedback resolution')
+      if (
+        !resolutionText.includes(currentFeedbackId + ': resolved') ||
+        !resolutionText.includes(staleFeedbackId + ': stale') ||
+        !resolutionText.includes(cancelledFeedbackId + ': rejected') ||
+        !resolutionText.includes(batchFeedbackId + ': resolved')
+      ) {
+        throw new Error('Feedback resolution returned unexpected current, stale, cancelled, or deferred statuses: ' + resolutionText)
+      }
 
       releaseFirstChildTurn()
+      releaseToolChildTurn()
       await waitForIdle(child, 'The initial provider-backed child turn')
+      await waitForIdle(toolChild, 'The tool-test child turn')
       await waitForIdle(parent, 'The parent notification turns')
 
       await writeJson(
@@ -356,12 +420,15 @@ export const apply = async context => {
           currentFeedbackId,
           staleFeedbackId,
           cancelledFeedbackId,
+          batchFeedbackId,
           questionId: reattachQuestion.questionId,
           childProviderCalls: initialCalls,
           parentQuestionToolPassed: true,
           expiryRecommendedPassed: true,
           expiryDeferredPassed: true,
           feedbackToolsPassed: true,
+          feedbackResolutionToolPassed: true,
+          feedbackResolutionStatuses: { current: 'resolved', stale: 'stale', cancelled: 'rejected', batch: 'resolved' },
           oversizedBatchRejected: true,
         },
         home,
@@ -375,6 +442,11 @@ export const apply = async context => {
       state.expiryRecommendedPassed !== true ||
       state.expiryDeferredPassed !== true ||
       state.feedbackToolsPassed !== true ||
+      state.feedbackResolutionToolPassed !== true ||
+      state.feedbackResolutionStatuses?.current !== 'resolved' ||
+      state.feedbackResolutionStatuses?.stale !== 'stale' ||
+      state.feedbackResolutionStatuses?.cancelled !== 'rejected' ||
+      state.feedbackResolutionStatuses?.batch !== 'resolved' ||
       state.oversizedBatchRejected !== true
     ) {
       throw new Error('The first Host boot did not verify every question and feedback tool path.')
@@ -395,7 +467,6 @@ export const apply = async context => {
     })
     const child = context.agents.get(state.childSessionId)
     if (child === undefined) throw new Error('Parent resolution did not cold-resume the child.')
-    const resolvedPromise = context.parentFeedback.read({ agent: child, feedbackId: state.feedbackId })
     const reattachedQuestion = executeTool(context, {
       agent: child,
       name: 'ask_parent_question',
@@ -406,12 +477,10 @@ export const apply = async context => {
       name: 'answer_parent_question',
       args: { questionId: state.questionId, answer: 'The pending decision survived Host restart.' },
     })
-    const [resolved, reattachedQuestionResult] = await Promise.all([resolvedPromise, reattachedQuestion])
-    if (resolved.status !== 'resolved' || resolution?.notified !== true) {
+    const reattachedQuestionResult = await reattachedQuestion
+    if (resolution?.status !== 'resolved' || resolution.notified !== true) {
       throw new Error(
-        'Cold-resumed feedback status=' +
-          resolved.status +
-          ', parent status=' +
+        'Cold-resumed parent feedback status=' +
           String(resolution?.status) +
           ', notified=' +
           String(resolution?.notified) +
@@ -425,26 +494,6 @@ export const apply = async context => {
     }
     await waitForProviderCalls(callCountPath, childProvider, 2)
     await waitForIdle(child, 'The cold-resumed provider-backed child turn')
-    const feedbackResolution = await executeTool(context, {
-      agent: parent,
-      name: 'resolve_parent_feedback',
-      args: {
-        responses: [
-          { feedbackId: state.currentFeedbackId, disposition: 'accepted', note: 'Accepted in the scratch Host.' },
-          { feedbackId: state.staleFeedbackId, disposition: 'accepted', note: 'Do not apply a stale excerpt.' },
-          { feedbackId: state.cancelledFeedbackId, disposition: 'accepted' },
-        ],
-      },
-    })
-    const feedbackResolutionText = requireToolSuccess(feedbackResolution, 'Parent feedback tool resolution')
-    if (
-      !feedbackResolutionText.includes(state.currentFeedbackId + ': resolved') ||
-      !feedbackResolutionText.includes(state.staleFeedbackId + ': stale') ||
-      !feedbackResolutionText.includes(state.cancelledFeedbackId + ': rejected')
-    ) {
-      throw new Error('The Host feedback tool returned unexpected current, stale, or cancelled statuses: ' + feedbackResolutionText)
-    }
-
     const childProviderCalls = (await readJson(callCountPath))?.[childProvider] ?? 0
     if (childProviderCalls !== 2) throw new Error('The cold-resumed child did not reach the scratch provider a second time.')
     if (resolution?.status !== 'resolved' || resolution.notified !== true) {
@@ -462,16 +511,18 @@ export const apply = async context => {
         expiryDeferredPassed: true,
         feedbackSubmitReadCancelPassed: true,
         feedbackResolvedAfterRestart: true,
+        feedbackResolutionToolPassed: true,
         staleAnchorRejected: true,
         oversizedBatchRejected: true,
         childAbsentAtHostRestart: true,
         childResumedAfterResolution: true,
         childProviderCalls,
         feedbackStatuses: {
-          current: 'resolved',
-          stale: 'stale',
-          cancelled: 'rejected',
-          coldResume: resolved.status,
+          current: state.feedbackResolutionStatuses.current,
+          stale: state.feedbackResolutionStatuses.stale,
+          cancelled: state.feedbackResolutionStatuses.cancelled,
+          batch: state.feedbackResolutionStatuses.batch,
+          coldResume: resolution.status,
         },
         parentNotified: resolution.notified,
       },
@@ -483,6 +534,7 @@ export const apply = async context => {
     throw error
   } finally {
     releaseFirstChildTurn()
+    releaseToolChildTurn()
     disposeContinuation()
     disposeAdapter()
   }
