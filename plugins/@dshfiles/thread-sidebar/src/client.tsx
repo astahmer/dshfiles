@@ -70,7 +70,7 @@ import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
-import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, UNDO_NOTICE_DURATION_MS, type SidebarNotice } from './sidebar-notice.js'
+import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -352,7 +352,6 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
               )}
-              disabled={archived}
               title={new Date(session.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(session.id)}
             >
@@ -829,11 +828,15 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       }
     }
     if (operation === 'archive' && archivedIds.length > 0) {
+      if (!preferences.archiveUndoEnabled) {
+        setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
+        return
+      }
       setNotice({
         tone: failed ? 'danger' : 'success',
         message: props.tSidebar(failed ? 'threadSidebarActionFailure' : 'threadSidebarArchivedNotice'),
         actionLabel: props.tSidebar('threadSidebarUndo'),
-        durationMs: UNDO_NOTICE_DURATION_MS,
+        durationMs: preferences.archiveUndoDurationSeconds * 1_000,
         onAction: (() => {
           let undoInFlight = false
           return () => {
@@ -1433,6 +1436,30 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarApplyActionsToChildren')}
             </Label>
             <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarApplyActionsToChildrenHint')}</p>
+            <Label className="dshx:font-normal dshx:leading-snug">
+              <Checkbox checked={preferences.archiveUndoEnabled} onCheckedChange={checked => changePreferences({ archiveUndoEnabled: checked === true })} />
+              {props.tSidebar('threadSidebarArchiveUndoEnabled')}
+            </Label>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarArchiveUndoHint')}</p>
+            <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2">
+              <div className="dshx:grid dshx:content-start dshx:gap-1.5">
+                <Label htmlFor={`${settingsId}-archive-undo-duration`} className="dshx:text-xs dshx:font-normal dshx:leading-snug dshx:text-muted-foreground">
+                  {props.tSidebar('threadSidebarArchiveUndoDuration')}
+                </Label>
+                <Input
+                  id={`${settingsId}-archive-undo-duration`}
+                  className="dshx:h-7"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={preferences.archiveUndoDurationSeconds}
+                  onChange={event => {
+                    const value = Number(event.currentTarget.value)
+                    if (Number.isInteger(value) && value >= 1 && value <= 30) changePreferences({ archiveUndoDurationSeconds: value })
+                  }}
+                />
+              </div>
+            </div>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox checked={notificationPreferences.enabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
               {props.tSidebar('threadSidebarDesktopNotifications')}
