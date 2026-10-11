@@ -105,7 +105,9 @@ import {
   clearThreadMute,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
   isThreadMuted,
+  isThreadUnread,
   markThreadSeen,
+  markThreadUnread,
   setThreadMute,
   snoozeDurations,
   threadAttentionTransitions,
@@ -240,6 +242,7 @@ interface RowActions {
   readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
   readonly setNotificationMute: (sessionId: SessionSummary['id'], mutedUntil: number | null) => void
   readonly clearNotificationMute: (sessionId: SessionSummary['id']) => void
+  readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -258,6 +261,8 @@ interface RowStyle {
 
 interface ThreadRowProps {
   readonly session: SessionSummary
+  readonly unread: boolean
+  readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly archived: boolean
   readonly pinned: boolean
   readonly parked: boolean
@@ -292,12 +297,13 @@ const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
 
 const StatusDot = (props: {
   readonly session: SessionSummary
+  readonly unread: boolean
   readonly unreadLabel: string
   readonly failedLabel: string
   readonly attentionLabel: ThreadAttentionLabel | undefined
   readonly attentionColors: AttentionColors
 }): JSX.Element => {
-  const unread = Boolean(props.session.attention?.unread)
+  const unread = props.unread
   const failureAt = lastTurnFailureAt(props.session)
   const failed = failureAt !== undefined && !props.session.running
   const dotClass = attentionDotClass({
@@ -320,6 +326,7 @@ const StatusDot = (props: {
 const ChildThreadList = (props: {
   readonly parentId: SessionSummary['id']
   readonly childThreads: readonly SessionSummary[]
+  readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly allShown: boolean
   readonly selectedChildId: SessionSummary['id'] | undefined
   readonly attentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
@@ -355,12 +362,13 @@ const ChildThreadList = (props: {
             >
               <StatusDot
                 session={child}
+                unread={props.unreadSessionIds.has(child.id)}
                 unreadLabel={t('threadSidebarUnread')}
                 failedLabel={t('threadSidebarFailed')}
                 attentionLabel={attentionLabel}
                 attentionColors={props.rowStyle.attentionColors}
               />
-              <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', child.attention?.unread && 'dshx:font-semibold')}>
+              <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', props.unreadSessionIds.has(child.id) && 'dshx:font-semibold')}>
                 {child.displayTitle}
               </span>
               {attentionLabel === undefined ? null : (
@@ -397,7 +405,7 @@ const ChildThreadList = (props: {
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, rowStyle } = props
   const t = props.actions.translate
-  const unread = Boolean(session.attention?.unread)
+  const unread = props.unread
   const failureAt = lastTurnFailureAt(session)
   const failed = failureAt !== undefined && !session.running
   const compact = rowStyle.density === 'compact'
@@ -426,6 +434,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {rowStyle.statusDot ? (
                     <StatusDot
                       session={session}
+                      unread={unread}
                       unreadLabel={t('threadSidebarUnread')}
                       failedLabel={t('threadSidebarFailed')}
                       attentionLabel={props.attentionLabel}
@@ -623,6 +632,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             <ChildThreadList
               parentId={session.id}
               childThreads={props.childThreads}
+              unreadSessionIds={props.unreadSessionIds}
               allShown={props.allChildrenShown}
               selectedChildId={props.selectedChildId}
               attentionLabels={props.childAttentionLabels}
@@ -639,6 +649,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
         >
           {t('threadSidebarCopyLink')}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
+          {t('threadSidebarMarkUnread')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuSub>
@@ -731,6 +745,15 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const attentionSessions = useMemo(
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
+  )
+  const unreadSessionIds = useMemo(
+    () =>
+      new Set(
+        sessions
+          .filter(session => isThreadUnread(notificationPreferences, session.id, Boolean(session.attention?.unread)))
+          .map(session => session.id),
+      ),
+    [notificationPreferences, sessions],
   )
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
@@ -937,6 +960,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const openThread = (sessionId: SessionSummary['id']): void => {
+    if (selectedSession?.id === sessionId) {
+      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+      threadNotificationPreferences.set(markThreadSeen(current, sessionId))
+    }
     setRouteRequest(null)
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
@@ -1468,6 +1495,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
         threadNotificationPreferences.set(clearThreadMute(current, sessionId))
       },
+      markUnread: sessionId => {
+        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+        threadNotificationPreferences.set(markThreadUnread(current, sessionId))
+      },
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -1494,6 +1525,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       <ThreadRow
         key={session.id}
         session={session}
+        unread={unreadSessionIds.has(session.id)}
+        unreadSessionIds={unreadSessionIds}
         archived={archivedSessionIds.has(session.id)}
         pinned={pinnedSessionIds.has(session.id)}
         parked={parkedSessionIds.has(session.id)}

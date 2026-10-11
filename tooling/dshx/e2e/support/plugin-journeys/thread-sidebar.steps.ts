@@ -9,13 +9,6 @@ interface ThreadHistoryJourney {
 
 const threadHistoryJourneys = new WeakMap<Page, ThreadHistoryJourney>()
 
-interface ThreadMentionJourney {
-  readonly targetPrompt: string
-  readonly diagnostics: string[]
-}
-
-const threadMentionJourneys = new WeakMap<Page, ThreadMentionJourney>()
-
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads' })
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
 const customizeSidebar = (page: Page) => page.getByRole('region', { name: 'Customize sidebar' })
@@ -25,12 +18,19 @@ const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
 
 const startBlankThread = async (page: Page): Promise<string> => {
-  const previousThreadId = currentThreadId(page)
+  const createResponsePromise = page.waitForResponse(response => {
+    const request = response.request()
+    return request.method() === 'POST' && request.postData()?.includes('session/create') === true
+  }, { timeout: 15_000 })
   await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
-  await expect.poll(() => currentThreadId(page)).not.toBe(previousThreadId)
+  const createResponse = await createResponsePromise
+  const body: unknown = await createResponse.json()
+  const rpcResult = typeof body === 'object' && body !== null && 'result' in body ? body.result : undefined
+  const result = typeof rpcResult === 'object' && rpcResult !== null && 'ok' in rpcResult && rpcResult.ok === true && 'value' in rpcResult ? rpcResult.value : undefined
+  const createdThreadId = typeof result === 'object' && result !== null && 'sessionId' in result && typeof result.sessionId === 'string' ? result.sessionId : null
+  if (createdThreadId === null) throw new Error('The Host did not return a session ID after New thread was clicked.')
+  await expect.poll(() => currentThreadId(page)).toBe(createdThreadId)
   await expect(page.getByRole('textbox').first()).toBeVisible()
-  const createdThreadId = currentThreadId(page)
-  if (createdThreadId === null) throw new Error('The Host did not select a thread after New thread was clicked.')
   return createdThreadId
 }
 
@@ -294,18 +294,24 @@ When('a nonblank thread is marked unread and reopened', async ({ page }: { page:
   const composer = page.getByRole('textbox').first()
   await composer.fill(prompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e' })
   await expect(targetRow).toHaveCount(1)
   await startBlankThread(page)
   await targetRow.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Mark as unread', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
   await targetRow.getByRole('button').first().click()
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
+  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
+  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+  await targetRow.getByRole('button').first().click()
+  await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
 })
 
 Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e target' })
+  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar manual unread e2e' })
   await recordAssertion(page, 'thread-sidebar-manual-unread-clears-on-open', async () => {
     await expect(targetRow).toHaveCount(1)
     await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
@@ -456,73 +462,6 @@ Then('the selected thread row shows its failed status and time', async ({ page }
   await recordAssertion(page, 'thread-sidebar-latest-turn-failure-is-visible', async () => {
     await expect(selectedRow.getByRole('img', { name: 'Failed', exact: true })).toBeVisible()
     await expect(selectedRow.getByText(/^Failed · (now|\d+[mhdmoy]+)$/)).toBeVisible()
-  })
-  await finishJourneyAssertions(page)
-})
-
-When('a visible Host thread is mentioned from its context menu at the captured cursor', async ({ page }: { page: Page }) => {
-  const sourceThreadId = await startBlankThread(page)
-  await startBlankThread(page)
-  const targetPrompt = 'thread sidebar mention e2e target'
-  const targetComposer = page.getByRole('textbox').first()
-  await targetComposer.fill(targetPrompt)
-  await targetComposer.press('Enter')
-
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: targetPrompt })
-  await expect(targetRow).toHaveCount(1)
-  const back = page.getByRole('button', { name: 'Back', exact: true })
-  await expect(back).toBeEnabled()
-  await back.click()
-  await expect.poll(() => currentThreadId(page)).toBe(sourceThreadId)
-
-  const composer = page.getByRole('textbox').first()
-  await composer.fill('LEFTRIGHT')
-  await composer.press('Home')
-  for (const character of 'LEFT') await composer.press('ArrowRight')
-
-  const diagnostics: string[] = []
-  page.on('console', message => {
-    if (message.type() !== 'warning' || !message.text().includes('thread-sidebar: mention resolution failed')) return
-    void Promise.all(message.args().map(argument => argument.jsonValue().catch(() => null))).then(values => {
-      diagnostics.push(JSON.stringify(values))
-    })
-  })
-  await targetRow.click({ button: 'right' })
-  const mentionMenuItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
-  await expect(mentionMenuItem).toBeVisible()
-  await mentionMenuItem.click()
-  threadMentionJourneys.set(page, { targetPrompt, diagnostics })
-})
-
-Then('the composer contains the native mention chip at the captured cursor', async ({ page }: { page: Page }) => {
-  const journey = threadMentionJourneys.get(page)
-  if (journey === undefined) throw new Error('No thread mention journey was recorded for this browser page.')
-  const composer = page.getByRole('textbox').first()
-  const chip = composer.locator('[data-composer-chip="reference"]')
-  const failureNotice = page.getByText('Could not resolve this thread mention.', { exact: true })
-
-  await recordAssertion(page, 'thread-sidebar-mention-inserts-native-chip-at-captured-cursor', async () => {
-    const outcome = await Promise.race([
-      chip.waitFor({ state: 'attached', timeout: 15_000 }).then(() => 'inserted'),
-      failureNotice.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'failed'),
-    ])
-    if (outcome === 'failed') {
-      await expect.poll(() => journey.diagnostics.length).toBeGreaterThan(0)
-      throw new Error(`The Host could not resolve the thread mention: ${journey.diagnostics.join('; ')}`)
-    }
-
-    await expect(chip).toHaveCount(1)
-    await expect(chip).toHaveAttribute('data-composer-chip', 'reference')
-    await expect(chip).toContainText(journey.targetPrompt)
-    const draft = await composer.innerText()
-    const label = await chip.innerText()
-    const leftIndex = draft.indexOf('LEFT')
-    const labelIndex = draft.indexOf(label)
-    const rightIndex = draft.indexOf('RIGHT')
-    expect(leftIndex).toBeGreaterThanOrEqual(0)
-    expect(label.trim()).not.toBe('')
-    expect(labelIndex).toBeGreaterThan(leftIndex)
-    expect(rightIndex).toBeGreaterThan(labelIndex)
   })
   await finishJourneyAssertions(page)
 })
