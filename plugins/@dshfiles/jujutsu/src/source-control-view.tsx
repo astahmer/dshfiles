@@ -32,6 +32,7 @@ import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { sourceControlGroups } from './source-control.js'
 import { openInEditor } from './open-in-editor.js'
+import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 
 interface SourceControlViewProps {
   readonly repoId: string
@@ -83,8 +84,10 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
   const groups = useMemo(() => sourceControlGroups(props.revisions, props.ancestorCount), [props.revisions, props.ancestorCount])
   const commitIds = groups.map(group => group.revision.commitId)
   const filesQuery = useQuery({
-    queryKey: ['jujutsu', props.repoId, 'revision-files', commitIds.join(',')],
+    queryKey: jujutsuQueryKeys.revisionFiles(props.repositoryRoot, commitIds),
     queryFn: ({ signal }) => api.revisionFiles({ repoId: props.repoId, commitIds }, { signal }),
+    staleTime: JUJUTSU_QUERY_STALE_TIME,
+    gcTime: JUJUTSU_QUERY_GC_TIME,
     enabled: commitIds.length > 0,
     ...props.refreshOptions,
   })
@@ -314,10 +317,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                             <FileDiffIcon />
                           </IconAction>
                           {file.status !== 'D' && (
-                            <IconAction
-                              label="Open in editor"
-                              onClick={() => openInEditor({ path: file.path, cwd: props.repositoryRoot })}
-                            >
+                            <IconAction label="Open in editor" onClick={() => openInEditor({ path: file.path, cwd: props.repositoryRoot })}>
                               <FilePenLineIcon />
                             </IconAction>
                           )}

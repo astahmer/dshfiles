@@ -98,6 +98,7 @@ import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
+import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { SessionForkPanel } from './session-fork-panel.js'
@@ -146,11 +147,8 @@ const COMPACT_BADGE = 'dshx:h-4 dshx:max-w-40 dshx:rounded-sm dshx:px-1.5 dshx:p
 const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.array(z.string()), fallback: [] })
 const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: z.string(), fallback: '' })
 
-const jujutsuKeys = {
-  repository: (repoId: string) => ['jujutsu', repoId] as const,
-  state: (repoId: string, limit: number) => ['jujutsu', repoId, 'state', limit] as const,
-  details: (repoId: string, commitId: string) => ['jujutsu', repoId, 'details', commitId] as const,
-}
+const REPOSITORY_ID_LIMIT = 32
+const REPOSITORY_QUERY_CACHE = { staleTime: JUJUTSU_QUERY_STALE_TIME, gcTime: JUJUTSU_QUERY_GC_TIME }
 
 const throwReadFailure = <Output extends object>(result: Output | ReadFailure): Output => {
   if ('failure' in result) throw new Error(result.failure.message)
@@ -202,6 +200,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
+  const repositoryRootsById = useRef(new Map<string, string>())
   const [path, setPath] = useState(() => (sidePanel ? sidePanelRepository.takePending() : null) ?? storedRepoPath.get())
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
@@ -248,7 +247,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const confirmed = actionActor.on('confirmed', event => {
       if (event.workspacePath !== null) setProvisionedPath(event.workspacePath)
     })
-    const settled = actionActor.on('settled', event => void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(event.repoId) }))
+    const settled = actionActor.on('settled', event => {
+      const root = repositoryRootsById.current.get(event.repoId)
+      if (root !== undefined) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(root) })
+    })
     return () => {
       confirmed.unsubscribe()
       settled.unsubscribe()
@@ -258,6 +260,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const registerMutation = useMutation({
     mutationFn: (repositoryPath: string) => api.registerRepository({ path: repositoryPath }),
     onSuccess: registered => {
+      repositoryRootsById.current.set(registered.repoId, registered.root)
+      while (repositoryRootsById.current.size > REPOSITORY_ID_LIMIT) {
+        const oldestRepoId = repositoryRootsById.current.keys().next().value
+        if (oldestRepoId === undefined) break
+        repositoryRootsById.current.delete(oldestRepoId)
+      }
       sendAction({ type: 'reset' })
       setProvisionedPath(null)
       setRepoId(registered.repoId)
@@ -270,7 +278,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setRepoHistory(nextHistory)
       storedRepoHistory.set(nextHistory)
       storedRepoPath.set(registered.root)
-      void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(registered.repoId) })
     },
   })
 
@@ -278,13 +285,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     preferences,
     paused: registerMutation.isPending || actionBusy || preview !== undefined,
     onBecameVisible: () => {
-      if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
+      if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
     },
   })
 
   const stateQuery = useQuery({
-    queryKey: jujutsuKeys.state(repoId ?? '', preferences.revisionLimit),
+    queryKey: jujutsuQueryKeys.state(path, preferences.revisionLimit),
     queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal })),
+    ...REPOSITORY_QUERY_CACHE,
     enabled: repoId !== null,
     ...autoRefresh.queryOptions,
   })
@@ -296,16 +304,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state, selection])
 
   const detailsQuery = useQuery({
-    queryKey: jujutsuKeys.details(repoId ?? '', selectedRevision?.commitId ?? ''),
+    queryKey: jujutsuQueryKeys.details(path, selectedRevision?.commitId ?? ''),
     queryFn: async ({ signal }) => throwReadFailure(await api.details({ repoId: repoId ?? '', commitId: selectedRevision?.commitId ?? '' }, { signal })),
+    ...REPOSITORY_QUERY_CACHE,
     enabled: repoId !== null && selectedRevision !== undefined,
   })
   const details = detailsQuery.data
   const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
 
   const fullDiffQuery = useQuery({
-    queryKey: jujutsuKeys.details(repoId ?? '', fullDiff?.commitId ?? ''),
+    queryKey: jujutsuQueryKeys.details(path, fullDiff?.commitId ?? ''),
     queryFn: async ({ signal }) => throwReadFailure(await api.details({ repoId: repoId ?? '', commitId: fullDiff?.commitId ?? '' }, { signal })),
+    ...REPOSITORY_QUERY_CACHE,
     enabled: repoId !== null && fullDiff !== null,
   })
 
@@ -384,8 +394,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     return graphOrder.filter(revision => branchIds.has(revision.commitId))
   }, [dropPresentation, state, graphOrder])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
-  const dropSourceRevision = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.sourceId)
-  const dropDestinationRevision = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.destinationId)
 
   const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
   const listScrollRef = useRef<HTMLDivElement | null>(null)
@@ -493,7 +501,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const confirmPreview = (): void => sendAction({ type: 'confirm' })
 
   const refreshRepository = (): void => {
-    if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuKeys.repository(repoId) })
+    if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
   }
 
   const openFullDiff = (revision: Revision, focusPath: string | null): void =>
@@ -932,28 +940,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
         </div>
-        {dropPresentation !== null && (
-          <div className="dshx:flex-none dshx:border-b dshx:px-3 dshx:py-2">
-            <InlineDropPreview
-              branch={dropPresentation.kind === 'rebase' ? previewBranch : []}
-              busy={actionBusy}
-              destinationLabel={
-                dropDestinationRevision === undefined
-                  ? dropPresentation.destinationId.slice(0, 12)
-                  : `${dropDestinationRevision.shortestChangeId} · ${firstLine(dropDestinationRevision.description)}`
-              }
-              onCancel={() => sendAction({ type: 'cancel' })}
-              onConfirm={confirmPreview}
-              presentation={dropPresentation}
-              preview={preview}
-              sourceLabel={
-                dropSourceRevision === undefined
-                  ? dropPresentation.sourceId.slice(0, 12)
-                  : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`
-              }
-            />
-          </div>
-        )}
         <div
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
@@ -981,6 +967,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               if (item === undefined) return null
               const sticky = virtualRow.index === stickyDayIndex
               const rowDropPresentation = item.kind === 'revision' && dropPresentation?.destinationId === item.revision.commitId ? dropPresentation : null
+              const dropSourceRevision = rowDropPresentation === null ? undefined : revisionsByCommitId.get(rowDropPresentation.sourceId)
               return (
                 <div
                   className={sticky ? 'dshx:sticky dshx:top-0 dshx:z-10' : 'dshx:absolute dshx:top-0 dshx:left-0 dshx:w-full'}
@@ -1018,7 +1005,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       bookmarkMenu={bookmarkMenu}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
-                      expanded={selectedRevision?.commitId === item.revision.commitId}
+                      expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
                       menu={revisionMenu(item.revision)}
@@ -1034,6 +1021,22 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
+                      {rowDropPresentation !== null && (
+                        <InlineDropPreview
+                          branch={rowDropPresentation.kind === 'rebase' ? previewBranch : []}
+                          busy={actionBusy}
+                          destinationLabel={`${item.revision.shortestChangeId} · ${firstLine(item.revision.description)}`}
+                          onCancel={() => sendAction({ type: 'cancel' })}
+                          onConfirm={confirmPreview}
+                          presentation={rowDropPresentation}
+                          preview={preview}
+                          sourceLabel={
+                            dropSourceRevision === undefined
+                              ? rowDropPresentation.sourceId.slice(0, 12)
+                              : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`
+                          }
+                        />
+                      )}
                     </RevisionRow>
                   )}
                 </div>
@@ -1310,6 +1313,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             onSelect={selected => {
               setPickerOpen(false)
               autoRegisterPath.current = selected.canonicalPath
+              setRepoId(null)
               setPath(selected.canonicalPath)
               registerMutation.mutate(selected.canonicalPath)
             }}
