@@ -21,11 +21,16 @@
 
 The three unregistered workspace directories remain on disk at the canonical line tree. Old source snapshots remain recoverable by the commit IDs above. No unrelated workspaces or commits were abandoned.
 
+## Marketplace recheck (2026-10-16)
+
+- dsh-market has partial matches: [`dsh-reasoning-effort`](https://dshmarket.com/p/Mu-scorpio/dsh-reasoning-effort/) documents provider grouping and a composer slider, but not search; [`dsh-model-picker`](https://dshmarket.com/p/ZZJQ678/dsh-model-picker/) documents search/grouping and per-model effort, but says DSH Web is untested; [`genius-alray/dsh-model-picker`](https://dshmarket.com/p/genius-alray/dsh-model-picker/) has fuzzy search/grouping and a level dropdown, not an inline slider, and its README says it is unmaintained after DSH 0.2 added native search.
+- An exact community match exists outside dsh-market: [`@bittersmilezzz/dsh-model-selector` v0.3.8](https://dsh.pub/en/plugins/dsh-model-selector/), pinned at [`5cb5108`](https://github.com/bitterSmilezzz/dsh-model-selector/tree/5cb5108ceb89c36f4554ac290cd98ddf328352d4). Its peer ranges include DSH 0.2.0-rc.2 and its source uses the official `ModelDirectory`/model-selection client contract; it has search, provider groups, and an inline effort slider. It also auto-selects the strongest effort on some model switches. The user chose to keep the DSH-owned `-fixed` implementation, so no third-party bundle was adopted or ported.
+
 ## Validation and remaining gates
 
-- Passed earlier: plugin unit tests (4), lint, formatting, E2E feature generation, and workspace contract check.
+- Passed earlier: plugin unit tests (4), lint, formatting, E2E feature generation, and workspace contract check. This round's direct Vitest run passed all 4 tests after the local session package build.
 - Picker-specific feature-catalog errors were fixed. The broad coverage report still has 88 unrelated baseline issues.
-- Build/typecheck remain blocked by unavailable generated `@deepseek-ai/dsh-api-session-controller/client` and `/types` artifacts and DSHX CSS ambient types. Related implicit-any errors follow from those missing upstream artifacts.
+- The DSHX build now reaches one unresolved import: `@deepseek-ai/dsh-api-session-controller/client`. Plugin typecheck/build/import remain blocked; the last typecheck also reported missing `/types` and DSHX CSS ambient declarations. The local API package is a flattened source copy whose project references point to absent sibling/core paths. Its API/session source differs from the canonical core checkout, so copying that checkout's generated declarations would not be source-faithful.
 - No isolated probe/browser runtime verification was completed. No live profile was modified or restarted.
 
 ## Recovery
@@ -40,4 +45,4 @@ jj workspace add /Users/astahmer/dev/dshfiles-model-effort-picker-recovery \
 
 ## Resume here
 
-Resolve or generate the missing API/session-controller type artifacts, rerun the plugin build and typecheck, then perform isolated probe verification before any profile promotion.
+Find a source-faithful way to generate the local API session-controller declarations without copying mismatched outputs; rerun DSHX build, plugin typecheck/build/import, then verify in an isolated probe/browser before any profile promotion.
