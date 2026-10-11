@@ -8,6 +8,22 @@ description: Build and verify an owned DSH plugin without touching the live inst
 Never restart or kill the live `web` DSH on `127.0.0.1:3080` (see AGENTS.md). Verify in `probe` or a throwaway
 scratch profile.
 
+## 0. Workspace preflight
+
+Identity and stale-artifact failures read like plugin bugs. Clear them first:
+
+```sh
+fnm exec --using="$(cat .node-version)" pnpm --dir plugins install --frozen-lockfile   # lockfile matches the tree
+fnm exec --using="$(cat .node-version)" pnpm --dir plugins run contract                # every package has build/test/typecheck
+ls -l plugins/node_modules/@deepseek-ai/dsh-api-session-controller                    # must link into tooling/dsh-core
+```
+
+A `link:` override that resolved to the published `0.2.0-rc.2`, a
+`tooling/dsh-core/*/lib` older than the `src/` beside it, or a plugin package
+without a `test` script all fail in ways that look like plugin code. AGENTS.md
+holds the rules (dshx fork, vendored core) and the exact overrides to keep in
+step; diff the failing paths against your own change before editing the plugin.
+
 ## 1. Build and import-check
 
 ```sh

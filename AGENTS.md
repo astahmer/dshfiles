@@ -119,6 +119,12 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   yours. Commit only your own paths with `jj split -m "…" <paths>` (one
   described revision per logical change, `Co-Authored-By` trailer); check
   `jj log -r 'conflicts()'` after rebases. Skill: `jj-shared-workspace`.
+- **`@` is not always a head.** Run `jj log -r @` before editing files here: when
+  the checkout's working copy sits mid-history, writing any file amends that
+  revision and rebases its whole subtree under every other agent. Move `@` to the
+  tip first, or do the file work in a scratch `jj workspace add`.
+- Pass `-m` to `jj describe` and `jj squash`, or `--use-destination-message` to
+  `jj squash`. A bare `jj squash` opens an editor and hangs the agent shell.
 - When finishing work in a named workspace, try to integrate its described
   change into the latest relevant branch tip so other workspaces can build on
   it. Preserve active writers; if integration risks rewriting unrelated work or
@@ -133,11 +139,19 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   `jj workspace add` may sit beside the repository directory; they are still
   linked and versioned when `jj workspace list` shows them.
 - For independent code work, create a named workspace from this repository,
-  based on the intended local revision:
+  based on the intended local revision — the current spine tip, not `main`,
+  which sits at the base of a long line:
 
   ```sh
-  jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r main
+  jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r integration-spine
   ```
+
+- The history above `main` is one line again: `main` = `xspqskqt/0`, the line's
+  tip is bookmarked `integration-spine`, and every live workspace `@` sits on it.
+  `plans/jj-unify-20261011/README.md` records how it was consolidated, what was
+  dropped, and the recovery operations. New work continues from the spine tip; a
+  workspace based on `main` forks below every consolidated change. Keep the line
+  single-headed — branch off it, do not duplicate branches next to it.
 
 - Before editing code in another repository, inspect its `jj root` and
   `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
@@ -346,6 +360,19 @@ console.log(r.resolve('@deepseek-ai/cordis').split('.pnpm/')[1])"
 
 If those disagree, pin the versions and add `dedupePeerDependents: true`.
 
+The same trap bites the other `@deepseek-ai/dsh-*` packages this checkout
+vendors. `@deepseek-ai/dsh-api-session-controller` must resolve to
+`tooling/dsh-core/api-session-controller` in **both** `plugins/` and
+`tooling/dshx/`: the published `0.2.0-rc.2` lags the checkout's client contract,
+and pinning it there fails the plugins typecheck with `Property 'attention' does
+not exist on type 'SessionSummary'` (or `updateAttention`, or the
+workspace-restore methods). Keep the `link:` overrides in
+`plugins/pnpm-workspace.yaml`, `plugins/@dshfiles/dsh-core-runtime/package.json`,
+`tooling/dshx/pnpm-workspace.yaml`, and `tooling/dshx/packages/dshx/package.json`
+in step, then regenerate both lockfiles with
+`pnpm --dir plugins install --no-frozen-lockfile` and the same in `tooling/dshx`.
+`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` from a frozen install is exactly this drift.
+
 Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
 package row, `dist/index.js` for the host half, `dist/client.js` for the browser
 half. That part is stable regardless of which build tool produced it.
@@ -363,6 +390,24 @@ it without the rest of the adopted plugin set.
 
 Creator mode (DSH's in-app plugin authoring preset) is not declared on this
 profile.
+
+### Vendored DSH core packages
+
+`tooling/dsh-core/*` are vendored copies of DSH core packages, not plugins.
+`tooling/dsh-core/api-session-controller/lib` is generated build output the
+checkout does not track; refresh it from the canonical DSH checkout with
+
+```sh
+DSH_SOURCE_ROOT=<canonical deepseek-harness checkout> pnpm run sync:core-api-session-controller
+```
+
+When a typecheck reports that `SessionListMetadata`, `SessionSummary`, or
+`ISessions` is missing a field that `tooling/dsh-core/*/src` defines
+(`lastTurnFailureAt`, `updateAttention`, the workspace-restore methods), the
+stale `lib/` is the cause — refresh it instead of editing plugin code. Editing
+the local `.d.ts` by hand only unblocks this checkout: the runtime bundle stays
+old, so the projection behind the field keeps reporting nothing until the real
+sync runs.
 
 ## Shell command batching
 
@@ -419,6 +464,20 @@ A plugin that installs is not a plugin that works.
   `lsof -nP -iTCP:3080 -sTCP:LISTEN` before debugging a boot failure.
 - Prefer `dsh --profile web --dump-config` over reading installed plugin source
   to learn what a profile actually loads.
+
+### Repository check baseline
+
+The gates that matter for a plugin change, run from `plugins/`:
+`pnpm run contract`, `pnpm run build`, `pnpm run typecheck`, `pnpm run test` —
+the same order `check:plugins` uses. All four pass on a healthy tree; run them
+on the merged tree after any history surgery, because a linearized history can
+join two variants of one change and still merge cleanly.
+
+The root `pnpm run check` additionally runs `lint` and `fmt:check`, which fail
+across work that predates any single change (measured 2026-10-11: ~270 files with
+lint findings, ~148 unformatted). Do not read that as your regression: intersect
+the failing paths with your own diff (`jj diff --from <base> --to @ --summary`)
+and report the remainder as baseline drift.
 
 ### Owned-plugin completion means live-profile verification
 
