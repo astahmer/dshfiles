@@ -100,12 +100,6 @@ Feature: Thread sidebar journeys
     When a visible Host thread is mentioned from its context menu at the captured cursor
     Then the composer contains the native mention chip at the captured cursor
 
-  @scenario:thread-sidebar.mention-insertion
-  Scenario: Mentioning a visible Host thread inserts a native chip at the captured cursor
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When a visible Host thread is mentioned from its context menu at the captured cursor
-    Then the composer contains the native mention chip at the captured cursor
-
   @scenario:thread-sidebar.restart-confirmation
   Scenario: No restart action is offered without pending Host changes
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

@@ -65,6 +65,16 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page 
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toBeVisible()
+  const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
+  await expect(transientNotice).toBeVisible()
+  const transientNoticeLayout = await transientNotice.evaluate(element => {
+    const style = getComputedStyle(element)
+    return { position: style.position, bottom: Number.parseFloat(style.bottom) }
+  })
+  expect(transientNoticeLayout.position).toBe('absolute')
+  expect(transientNoticeLayout.bottom).toBeGreaterThan(0)
+  const sidebarPosition = await threadSidebar(page).evaluate(element => getComputedStyle(element).position)
+  expect(sidebarPosition).toBe('relative')
   const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   expect(scrollPaneTopAfterArchive).toBe(scrollPaneTopBeforeArchive)
   const archivedSection = threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })

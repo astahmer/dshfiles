@@ -1905,7 +1905,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         ) : null}
 
         {isTransientNotice && noticeAlert !== null ? (
-          <div className="dshx:pointer-events-none dshx:absolute dshx:inset-x-2 dshx:bottom-3 dshx:z-20 dshx:flex dshx:justify-center">
+          <div data-testid="thread-sidebar-transient-notice" className="dshx:pointer-events-none dshx:absolute dshx:inset-x-2 dshx:bottom-3 dshx:z-20 dshx:flex dshx:justify-center">
             {noticeAlert}
           </div>
         ) : null}
