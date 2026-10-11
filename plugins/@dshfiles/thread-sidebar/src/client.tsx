@@ -61,6 +61,7 @@ import {
   type ThreadRowDensity,
   workspaceForLineage,
 } from './organization.js'
+import { attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
 import { toggleCollapsedSection } from './preferences.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
@@ -98,7 +99,6 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
-type ThreadAttentionLabel = 'threadSidebarApprovalNeeded' | 'threadSidebarInputNeeded' | 'threadSidebarTurnFinished'
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
 
 const attentionPreferenceRows: readonly { key: AttentionDisplayPreferenceKey; label: ThreadAttentionLabel }[] = [
@@ -221,17 +221,16 @@ const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   </Tooltip>
 )
 
-const statusDotClass = (session: SessionSummary): string => {
-  if (session.attention?.unread) return 'dshx:bg-primary'
-  if (session.running) return 'dshx:animate-pulse dshx:bg-info'
-  return 'dshx:bg-muted-foreground/45'
-}
-
-const StatusDot = (props: { readonly session: SessionSummary; readonly unreadLabel: string }): JSX.Element => {
+const StatusDot = (props: {
+  readonly session: SessionSummary
+  readonly unreadLabel: string
+  readonly attentionLabel: ThreadAttentionLabel | undefined
+}): JSX.Element => {
   const unread = Boolean(props.session.attention?.unread)
+  const dotClass = attentionDotClass({ attentionLabel: props.attentionLabel, unread, running: props.session.running })
   return (
     <span
-      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', statusDotClass(props.session))}
+      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', dotClass)}
       role={unread ? 'img' : undefined}
       aria-label={unread ? props.unreadLabel : undefined}
       aria-hidden={unread ? undefined : true}
@@ -273,12 +272,12 @@ const ChildThreadList = (props: {
               title={new Date(child.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(child.id)}
             >
-              <StatusDot session={child} unreadLabel={t('threadSidebarUnread')} />
+              <StatusDot session={child} unreadLabel={t('threadSidebarUnread')} attentionLabel={attentionLabel} />
               <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', child.attention?.unread && 'dshx:font-semibold')}>
                 {child.displayTitle}
               </span>
               {attentionLabel === undefined ? null : (
-                <span className="dshx:shrink-0 dshx:text-[10px] dshx:font-medium dshx:text-primary">{t(attentionLabel)}</span>
+                <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel))}>{t(attentionLabel)}</span>
               )}
               {props.rowStyle.time ? (
                 <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
@@ -332,7 +331,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             >
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} /> : null}
+                  {rowStyle.statusDot ? <StatusDot session={session} unreadLabel={t('threadSidebarUnread')} attentionLabel={props.attentionLabel} /> : null}
                   <span
                     className={cn(
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
@@ -346,7 +345,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <BellOffIcon className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" aria-label={t('threadSidebarNotificationsMuted')} />
                   ) : null}
                   {props.attentionLabel === undefined ? null : (
-                    <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:text-primary">{t(props.attentionLabel)}</span>
+                    <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel))}>
+                      {t(props.attentionLabel)}
+                    </span>
                   )}
                   {rowStyle.time ? (
                     <span
@@ -408,9 +409,18 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 onClick={() => props.actions.toggleChildren(session.id)}
               >
                 <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
-                  {props.childThreads.slice(0, 3).map(child => (
-                    <span key={child.id} className={cn('dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background', statusDotClass(child))} />
-                  ))}
+                  {props.childThreads.slice(0, 3).map(child => {
+                    const attentionLabel = props.childAttentionLabels.get(child.id)
+                    return (
+                      <span
+                        key={child.id}
+                        className={cn(
+                          'dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background',
+                          attentionDotClass({ attentionLabel, unread: Boolean(child.attention?.unread), running: child.running }),
+                        )}
+                      />
+                    )
+                  })}
                 </span>
                 <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
                 {props.childrenOpen ? (
@@ -1430,8 +1440,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-primary')}>
-                <span className="dshx:whitespace-nowrap dshx:font-medium">{props.tSidebar('threadSidebarApprovalNeeded')}</span>
+              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarApprovalNeeded'))}>
+                  {props.tSidebar('threadSidebarApprovalNeeded')}
+                </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.approvalNeeded.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
               </div>
@@ -1440,8 +1452,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           {groupedAttentionRows.inputNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInputNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-primary')}>
-                <span className="dshx:whitespace-nowrap dshx:font-medium">{props.tSidebar('threadSidebarInputNeeded')}</span>
+              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarInputNeeded'))}>
+                  {props.tSidebar('threadSidebarInputNeeded')}
+                </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.inputNeeded.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
               </div>
@@ -1450,8 +1464,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           {groupedAttentionRows.turnFinished.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarTurnFinished')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-primary')}>
-                <span className="dshx:whitespace-nowrap dshx:font-medium">{props.tSidebar('threadSidebarTurnFinished')}</span>
+              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarTurnFinished'))}>
+                  {props.tSidebar('threadSidebarTurnFinished')}
+                </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.turnFinished.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
               </div>
