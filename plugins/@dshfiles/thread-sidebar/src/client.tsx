@@ -98,7 +98,17 @@ import {
   type ThreadStatusFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import { DEFAULT_THREAD_VIEW_PREFERENCES, decodeThreadViewPreferences, threadViewPreferences, updateThreadViewPreferences } from './thread-view-preferences.js'
+import {
+  activeThreadView,
+  DEFAULT_THREAD_VIEW_SETTINGS,
+  decodeThreadViewPreferences,
+  selectThreadView,
+  threadViewPreferences,
+  updateThreadViewPreferences,
+  updateThreadViewSettings,
+  type ThreadViewSettings,
+} from './thread-view-preferences.js'
+import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
   clearExpiredThreadMutes,
@@ -701,7 +711,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const threadView = threadViewPreferences.useValue() ?? DEFAULT_THREAD_VIEW_PREFERENCES
+  const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
+  const threadViewSettings = threadViewPreferences.useValue() ?? DEFAULT_THREAD_VIEW_SETTINGS
+  const threadView = activeThreadView(threadViewSettings)
   const [threadViewStorageWarning, setThreadViewStorageWarning] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
@@ -1122,7 +1134,16 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
   const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries.map(entry => entry.activity)), [sectionEntries])
-  const workingThreadCount = useMemo(() => sourceFilteredThreadEntries.filter(entry => entry.activity.running).length, [sourceFilteredThreadEntries])
+  const workingThreadCountsBySource = useMemo(
+    () => ({
+      all: sectionEntries.filter(entry => entry.activity.running).length,
+      main: sectionEntries.filter(entry => entry.activity.running && matchesThreadSourceFilter(entry.session, 'main')).length,
+      subagents: [...childThreadEntries, ...sectionEntries.filter(entry => matchesThreadSourceFilter(entry.session, 'subagents'))].filter(
+        entry => entry.activity.running,
+      ).length,
+    }),
+    [childThreadEntries, sectionEntries],
+  )
   const nextMuteExpiry = useMemo(
     () =>
       Object.values(notificationPreferences.mutedUntil)
@@ -1398,18 +1419,42 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const updateThreadView = (patch: Partial<ThreadViewPreferences>): void => {
     setThreadViewStorageWarning(!updateThreadViewPreferences(patch))
   }
+  const saveThreadViewSettings = (settings: ThreadViewSettings): boolean => {
+    const saved = updateThreadViewSettings(settings)
+    setThreadViewStorageWarning(!saved)
+    return saved
+  }
+  const updateThreadViewControls = (patch: Partial<Pick<ThreadViewSettings, 'showGroupControl' | 'showFilterControl'>>): void => {
+    saveThreadViewSettings({ ...threadViewSettings, ...patch })
+  }
+  const selectThreadViewPreset = (viewId: string): void => {
+    if (viewId === threadViewSettings.activeViewId) return
+    saveThreadViewSettings(selectThreadView(threadViewSettings, viewId))
+  }
   const selectThreadGroupBy = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({ ...threadView, groupBy: value })
+    const decoded = decodeThreadViewPreferences({
+      groupBy: value,
+      statusFilter: threadView.statusFilter,
+      sourceFilter: threadView.sourceFilter,
+    })
     if (decoded === null) return
     updateThreadView({ groupBy: decoded.groupBy })
   }
   const selectThreadStatusFilter = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({ ...threadView, statusFilter: value })
+    const decoded = decodeThreadViewPreferences({
+      groupBy: threadView.groupBy,
+      statusFilter: value,
+      sourceFilter: threadView.sourceFilter,
+    })
     if (decoded === null) return
     updateThreadView({ statusFilter: decoded.statusFilter })
   }
   const selectThreadSourceFilter = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({ ...threadView, sourceFilter: value })
+    const decoded = decodeThreadViewPreferences({
+      groupBy: threadView.groupBy,
+      statusFilter: threadView.statusFilter,
+      sourceFilter: value,
+    })
     if (decoded === null) return
     updateThreadView({ sourceFilter: decoded.sourceFilter })
   }
@@ -1686,87 +1731,96 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               <Settings2Icon />
             </Button>
           </div>
-          <div role="group" className="dshx:grid dshx:grid-cols-2 dshx:gap-1 dshx:pt-1" aria-label={props.tSidebar('threadSidebarListView')}>
-            <Button
-              type="button"
-              variant={threadView.statusFilter === 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              aria-pressed={threadView.statusFilter === 'all'}
-              onClick={() => updateThreadView({ statusFilter: 'all' })}
-            >
-              {props.tSidebar('threadSidebarAllThreads')}
-            </Button>
-            <Button
-              type="button"
-              variant={threadView.statusFilter === 'working' ? 'secondary' : 'ghost'}
-              size="sm"
-              aria-pressed={threadView.statusFilter === 'working'}
-              onClick={() => updateThreadView({ statusFilter: 'working' })}
-            >
-              {props.tSidebar('threadSidebarWorking')} ({workingThreadCount})
-            </Button>
-          </div>
-          <div className="dshx:grid dshx:grid-cols-2 dshx:gap-1 dshx:pt-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+          <div role="group" className="dshx:flex dshx:gap-1 dshx:overflow-x-auto dshx:pt-1" aria-label={props.tSidebar('threadSidebarListView')}>
+            {threadViewSettings.views
+              .filter(view => view.enabled)
+              .map(view => (
                 <Button
+                  key={view.id}
                   type="button"
-                  variant="outline"
+                  variant={view.id === threadView.id ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
-                  aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                  className="dshx:min-w-20 dshx:flex-1 dshx:shrink-0"
+                  aria-pressed={view.id === threadView.id}
+                  onClick={() => selectThreadViewPreset(view.id)}
                 >
-                  <span className="dshx:truncate">
-                    {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
-                  </span>
+                  <span className="dshx:truncate">{threadViewPresetLabel(view, props.tSidebar)}</span>
+                  {view.statusFilter === 'working' ? <span className="dshx:shrink-0">({workingThreadCountsBySource[view.sourceFilter]})</span> : null}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
-                <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                  {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
-                    <DropdownMenuRadioItem key={groupBy} value={groupBy}>
-                      {props.tSidebar(threadGroupLabelKeys[groupBy])}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
-                  aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
-                >
-                  <span className="dshx:truncate">
-                    {props.tSidebar('threadSidebarFilter')}: {activeFilterSummary}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
-                <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={threadView.statusFilter} onValueChange={selectThreadStatusFilter}>
-                  {THREAD_STATUS_FILTER_OPTIONS.map(filter => (
-                    <DropdownMenuRadioItem key={filter} value={filter}>
-                      {props.tSidebar(threadStatusFilterLabelKeys[filter])}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
-                  {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
-                    <DropdownMenuRadioItem key={filter} value={filter}>
-                      {props.tSidebar(threadSourceFilterLabelKeys[filter])}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              ))}
           </div>
+          {threadViewSettings.showGroupControl || threadViewSettings.showFilterControl ? (
+            <div
+              className={cn(
+                'dshx:grid dshx:gap-1 dshx:pt-1',
+                threadViewSettings.showGroupControl && threadViewSettings.showFilterControl ? 'dshx:grid-cols-2' : 'dshx:grid-cols-1',
+              )}
+            >
+              {threadViewSettings.showGroupControl ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
+                      aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+                    >
+                      <span className="dshx:truncate">
+                        {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
+                      {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                        <DropdownMenuRadioItem key={groupBy} value={groupBy}>
+                          {props.tSidebar(threadGroupLabelKeys[groupBy])}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {threadViewSettings.showFilterControl ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="dshx:min-w-0 dshx:justify-start dshx:text-xs"
+                      aria-label={`${props.tSidebar('threadSidebarFilter')}: ${activeFilterSummary}`}
+                    >
+                      <span className="dshx:truncate">
+                        {props.tSidebar('threadSidebarFilter')}: {activeFilterSummary}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={threadView.statusFilter} onValueChange={selectThreadStatusFilter}>
+                      {THREAD_STATUS_FILTER_OPTIONS.map(filter => (
+                        <DropdownMenuRadioItem key={filter} value={filter}>
+                          {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
+                      {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
+                        <DropdownMenuRadioItem key={filter} value={filter}>
+                          {props.tSidebar(threadSourceFilterLabelKeys[filter])}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         {settingsOpen ? (
@@ -1774,6 +1828,28 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             className="dshx:mx-2 dshx:mb-2 dshx:grid dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3"
             aria-label={props.tSidebar('threadSidebarSettings')}
           >
+            <fieldset className="dshx:grid dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
+              <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarViewControls')}</legend>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowGroupControl')}
+                  checked={threadViewSettings.showGroupControl}
+                  onCheckedChange={checked => updateThreadViewControls({ showGroupControl: checked === true })}
+                />
+                {props.tSidebar('threadSidebarShowGroupControl')}
+              </Label>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowFilterControl')}
+                  checked={threadViewSettings.showFilterControl}
+                  onCheckedChange={checked => updateThreadViewControls({ showFilterControl: checked === true })}
+                />
+                {props.tSidebar('threadSidebarShowFilterControl')}
+              </Label>
+              <Button className="dshx:justify-start" onClick={() => setViewsManagerOpen(true)} size="sm" type="button" variant="outline">
+                {props.tSidebar('threadSidebarManageViews')}
+              </Button>
+            </fieldset>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox checked={preferences.autoArchiveEnabled} onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
@@ -2032,6 +2108,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
         </div>
       </section>
+      <ThreadViewManager
+        onOpenChange={setViewsManagerOpen}
+        onSettingsChange={saveThreadViewSettings}
+        open={viewsManagerOpen}
+        settings={threadViewSettings}
+        t={props.tSidebar}
+      />
     </TooltipProvider>
   )
 }
