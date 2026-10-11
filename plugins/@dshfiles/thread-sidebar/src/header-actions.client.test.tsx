@@ -7,20 +7,35 @@ import { threadNotificationPreferences, DEFAULT_THREAD_NOTIFICATION_PREFERENCES 
 import { SidebarStateProvider } from './sidebar-state.js'
 
 const labels: Readonly<Record<string, string>> = {
-  threadSidebarContextMenu: 'Thread actions', threadSidebarPin: 'Pin', threadSidebarUnpin: 'Unpin',
-  threadSidebarPark: 'Park', threadSidebarUnpark: 'Unpark', threadSidebarArchive: 'Archive',
-  threadSidebarRestore: 'Restore', threadSidebarNotifications: 'Thread notifications',
-  threadSidebarNotificationsMuted: 'Notifications muted', threadSidebarSnoozeFor: 'Snooze for',
-  threadSidebarSnooze15Minutes: '15 minutes', threadSidebarSnooze1Hour: '1 hour',
-  threadSidebarSnooze3Hours: '3 hours', threadSidebarSnooze8Hours: '8 hours',
-  threadSidebarSnooze24Hours: '24 hours', threadSidebarMuteUntilEnabled: 'Mute until enabled',
-  threadSidebarUnmute: 'Turn notifications back on', threadSidebarActionFailure: 'Could not update thread',
+  threadSidebarContextMenu: 'Thread actions',
+  threadSidebarPin: 'Pin',
+  threadSidebarUnpin: 'Unpin',
+  threadSidebarPark: 'Park',
+  threadSidebarUnpark: 'Unpark',
+  threadSidebarArchive: 'Archive',
+  threadSidebarRestore: 'Restore',
+  threadSidebarNotifications: 'Thread notifications',
+  threadSidebarNotificationsMuted: 'Notifications muted',
+  threadSidebarSnoozeFor: 'Snooze for',
+  threadSidebarSnooze15Minutes: '15 minutes',
+  threadSidebarSnooze1Hour: '1 hour',
+  threadSidebarSnooze3Hours: '3 hours',
+  threadSidebarSnooze8Hours: '8 hours',
+  threadSidebarSnooze24Hours: '24 hours',
+  threadSidebarMuteUntilEnabled: 'Mute until enabled',
+  threadSidebarUnmute: 'Turn notifications back on',
+  threadSidebarActionFailure: 'Could not update thread',
 }
 
 const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean }) => {
   const session = {
-    id: 's1', title: 'Thread', displayTitle: 'Thread', cwd: '/workspace', updatedAt: 1,
-    running: options?.running ?? false, blank: options?.blank ?? false,
+    id: 's1',
+    title: 'Thread',
+    displayTitle: 'Thread',
+    cwd: '/workspace',
+    updatedAt: 1,
+    running: options?.running ?? false,
+    blank: options?.blank ?? false,
   }
   const pinSession = vi.fn(async () => {
     if (options?.failPin === true) throw new Error('pin failed')
@@ -28,15 +43,22 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
   const props = {
     sessionId: 's1',
     useSessions: <Value,>(select: (state: unknown) => Value) => select({ ids: ['s1'], byId: { s1: session } }),
-    useWorkspaces: <Value,>(select: (state: unknown) => Value) => select({
-      archivedSessionIds: options?.archived ? ['s1'] : [], pinnedSessionIds: [],
-    }),
-    archiveSession: vi.fn(async () => {}), unarchiveSession: vi.fn(async () => {}), pinSession,
-    unpinSession: vi.fn(async () => {}), t: (key: string) => labels[key] ?? key,
+    useWorkspaces: <Value,>(select: (state: unknown) => Value) =>
+      select({
+        archivedSessionIds: options?.archived ? ['s1'] : [],
+        pinnedSessionIds: [],
+      }),
+    archiveSession: vi.fn(async () => {}),
+    unarchiveSession: vi.fn(async () => {}),
+    pinSession,
+    unpinSession: vi.fn(async () => {}),
+    t: (key: string) => labels[key] ?? key,
   }
+  // SAFETY: The fixture provides the selector fields this component consumes.
+  const headerActionProps = props as Parameters<typeof HeaderThreadActions>[0]
   const view = render(
     <SidebarStateProvider>
-      <HeaderThreadActions {...(props as Parameters<typeof HeaderThreadActions>[0])} />
+      <HeaderThreadActions {...headerActionProps} />
     </SidebarStateProvider>,
   )
   return { ...view, pinSession }
