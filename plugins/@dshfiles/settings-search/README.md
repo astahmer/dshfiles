@@ -9,40 +9,33 @@ settings categories, using schema titles when present; choosing one browses
 that entry's searchable fields. Secret paths and their descendants are
 excluded.
 
-Selecting a result opens a focused editor backed by
-`ctx.configForms.get(entryId)`. The editor reads the current Host-backed
-snapshot, writes a typed path operation with the snapshot revision, and can
-remove a user override to restore the inherited value. Finite schema choices
-open as a typed select. The selected field control receives focus when the
-editor opens. It edits the real settings entry instead of creating a second
-stored form. The native settings shell remains in charge of categories,
-onboarding, launchers, and shortcuts.
+Selecting a result first asks the Settings shell for a native owner of that exact `{ entryId, fieldPath }` target. When one is registered, the shell opens its normal section and row; the owner focuses its native control. Otherwise, the plugin opens a typed editor backed by `ctx.configForms.get(entryId)`. The fallback reads the current Host-backed snapshot, writes a typed path operation with the snapshot revision, and can remove a user override to restore the inherited value. Finite schema choices remain selects, booleans remain switches, and strings use single-line inputs. It edits the real settings entry instead of creating a second stored form.
 
 ## Navigation search
 
 The plugin also occupies the Settings title seat (`settings.header`, shadowed at
 priority -1) with a compact search field above the section navigation. Results
 are ranked (title, then section, then description and options), listed inline
-under the field, and focus on open. Choosing a result opens the same live
-editor over the content column, because the title seat has no way to switch the
-shell's active section. The **settings-search** Settings entry controls whether
-the field shows, whether it takes focus when Settings opens, and how many
-results it lists.
+under the field, and focus on open. The shell opens a native owner when one
+advertises the exact target; unsupported or ambiguous targets use the same
+revision-guarded editor fallback. The **settings-search** Settings entry
+controls whether the field shows, whether it takes focus when Settings opens,
+and how many results it lists.
 
-## Host navigation boundary
+## Native owner routing
 
-The Host Settings contract routes a field target `{ entryId, fieldPath }` to a
-unique `settings.section` registration that advertises the entry in
-`metadata.settingsTargets`. It opens that section and delivers the same target
-with a request id; the section owns locating and focusing its native control,
-then acknowledges the request. When no unique section advertises the entry,
-Settings Search keeps its live Host-backed editor for that exact field path.
-This package does not use DOM selectors or duplicate the underlying setting
-data.
+The Client `ui-settings` package provides `ctx.settingsTargets`. A feature
+registers `{ entryId, fieldPath, sectionId, ownerId }` for each native control
+and withdraws the route with that row's slot registration. The shell resolves
+only one exact live match, selects its section, and passes the target to the
+owning section; the General section renders only that owner row. The row owns
+finding and focusing its control. Unknown or ambiguous targets return `false`
+so Settings Search keeps the live Host-backed typed editor. This path uses slot
+ownership, not DOM selectors or duplicated setting data.
 
-The Host describe mirror carries each namespace's schema and ancestor field
-labels. Settings Search uses the Host's section metadata for native routing;
-results show the owning entry id followed by schema section context.
+Older Settings shells do not provide the optional target callback. The plugin
+keeps the typed fallback for those runtimes, including referenced schema choices
+from the full search result.
 
 ## Marketplace decision and compatibility
 
@@ -55,9 +48,8 @@ there is no rc.2 section-owner API for that direct jump. The candidate was not
 adopted or ported; this package is built with the local `@dshfiles/dshx` fork
 and the installed rc.2 `ConfigForms`/slot APIs.
 
-The published rc.2 Settings declarations do not include the target route. This
-implementation depends on the companion DSH core change; the package peer
-range must be raised to the release that carries that contract before
-activation. The plugin owns one `settings.section` contribution. The parent
-composition must add `@dshfiles/settings-search` and its package dependency;
-root manifests and profile composition are intentionally not changed here.
+The optional target callback is a Client Settings contract; older rc.2 shells
+remain compatible and use the typed editor fallback. The plugin owns one
+`settings.section` contribution. The parent composition must add
+`@dshfiles/settings-search` and its package dependency; root manifests and
+profile composition are intentionally not changed here.

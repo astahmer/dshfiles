@@ -19,10 +19,16 @@ Feature: Settings Search
 
   @scenario:settings-search.typed-edit
   @scenario:settings-search.reset-override
-  @scenario:settings-search.owner-route
   Scenario: Save a numeric setting and restore its inherited value
     Given the isolated plugin profile "@dshfiles/settings-search" is booted
     When the Settings Search section is opened
     When Settings are searched for "maxResults"
     When the maxResults setting is opened
     Then a valid numeric value can be saved and its inherited value restored
+
+  @scenario:settings-search.owner-route
+  Scenario: Open the Appearance preference through its native owner
+    Given the isolated plugin profile "@dshfiles/settings-search" is booted
+    When the Settings navigation search opens and receives focus
+    When the ui-theme preference is opened from navigation results
+    Then the Appearance preference uses its native owner or typed fallback

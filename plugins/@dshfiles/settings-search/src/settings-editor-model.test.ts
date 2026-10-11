@@ -9,7 +9,7 @@ import {
   settingsEditorKind,
   unsetOperationForSettingsTarget,
 } from './settings-editor-model.js'
-import { settingsChoiceOptions } from './settings-index.js'
+import { describeSettingsTargets, settingsChoiceOptions } from './settings-index.js'
 
 /**
  * The wire shape: `schema.toJSON()` is a `refs` table keyed by uid, `uid` is the
@@ -72,5 +72,28 @@ describe('settings field editor model', () => {
     expect(formatSettingsDraft('queue', 'choice', choices)).toBe('1')
     expect(parseSettingsDraft('0', 'choice', choices)).toEqual({ ok: true, value: 'steer' })
     expect(parseSettingsDraft('2', 'choice', choices).ok).toBe(false)
+  })
+
+  it('keeps referenced union options from the indexed result in the fallback editor', () => {
+    const themeSchema = {
+      uid: 4,
+      refs: {
+        0: { type: 'const', value: 'light', meta: { label: 'Light' } },
+        1: { type: 'const', value: 'dark', meta: { label: 'Dark' } },
+        2: { type: 'const', value: 'system', meta: { label: 'System' } },
+        3: { type: 'union', list: [0, 1, 2], meta: { label: 'Preference' } },
+        4: { type: 'object', dict: { preference: 3 }, meta: {} },
+      },
+    }
+    const result = describeSettingsTargets([{ ns: 'ui-theme', schema: themeSchema }])
+      .find(setting => setting.target.fieldPath.join('.') === 'preference')
+    if (result === undefined) throw new Error('Expected the Appearance preference in the settings index')
+    const node = schemaNodeAtPath(themeSchema, ['preference'])
+    const choices = result.options
+
+    expect(choices.map(choice => choice.label)).toEqual(['Light', 'Dark', 'System'])
+    expect(settingsEditorKind(node, 'light', choices)).toBe('choice')
+    expect(formatSettingsDraft('light', 'choice', choices)).toBe('0')
+    expect(parseSettingsDraft('1', 'choice', choices)).toEqual({ ok: true, value: 'dark' })
   })
 })

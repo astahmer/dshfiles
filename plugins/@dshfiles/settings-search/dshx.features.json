@@ -143,6 +143,12 @@
           "id": "settings-search.typed-setting-editor-unit-constant-union-options",
           "file": "plugins/@dshfiles/settings-search/src/settings-editor-model.test.ts",
           "testName": "uses typed select choices for union-of-constant schema fields"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-search.typed-setting-editor-unit-referenced-union-options",
+          "file": "plugins/@dshfiles/settings-search/src/settings-editor-model.test.ts",
+          "testName": "keeps referenced union options from the indexed result in the fallback editor"
         }
       ]
     }

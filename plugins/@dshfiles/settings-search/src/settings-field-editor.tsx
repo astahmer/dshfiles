@@ -1,7 +1,7 @@
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useAppForm, useStore } from '@dshfiles/plugin-ui/form'
 import { PluginQueryProvider, errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useState, useSyncExternalStore } from 'react'
 import {
   formatSettingsDraft,
   hasSettingsPath,
@@ -12,7 +12,7 @@ import {
   settingsEditorKind,
   unsetOperationForSettingsTarget,
 } from './settings-editor-model.js'
-import { settingsChoiceOptions, type SettingsSearchNamespace, type SettingsSearchResult } from './settings-index.js'
+import type { SettingsSearchNamespace, SettingsSearchResult } from './settings-index.js'
 import type { SettingsSearchTranslate } from './locales.js'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -44,10 +44,7 @@ const SettingsFieldEditorContent = (props: SettingsFieldEditorProps): JSX.Elemen
   )
   const path = props.result.target.fieldPath
   const schema = schemaNodeAtPath(props.namespace.schema, path)
-  const choices = useMemo(
-    () => settingsChoiceOptions(schemaNodeAtPath(props.namespace.schema, props.result.target.fieldPath)),
-    [props.namespace.schema, props.result.id],
-  )
+  const choices = props.result.options
   const value = readSettingsPath(snapshot.value, path)
   const kind = settingsEditorKind(schema, value, choices)
   const overridden = hasSettingsPath(snapshot.user, path)
@@ -188,15 +185,26 @@ const SettingsFieldEditorContent = (props: SettingsFieldEditorProps): JSX.Elemen
                 value={draft}
               />
             )}
-            {(kind === 'string' || kind === 'json') && (
-              <Textarea
+            {kind === 'string' && (
+              <Input
                 autoComplete="off"
                 autoFocus
-                className={kind === 'string' ? 'dshx:min-h-20' : 'dshx:min-h-28 dshx:font-mono! dshx:text-xs'}
                 disabled={!canWrite}
                 id={valueId}
                 onChange={event => updateDraft(event.currentTarget.value)}
-                rows={kind === 'string' ? 4 : 6}
+                type="text"
+                value={draft}
+              />
+            )}
+            {kind === 'json' && (
+              <Textarea
+                autoComplete="off"
+                autoFocus
+                className="dshx:min-h-28 dshx:font-mono! dshx:text-xs"
+                disabled={!canWrite}
+                id={valueId}
+                onChange={event => updateDraft(event.currentTarget.value)}
+                rows={6}
                 value={draft}
               />
             )}

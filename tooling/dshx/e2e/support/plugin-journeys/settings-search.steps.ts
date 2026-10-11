@@ -52,6 +52,15 @@ When('the maxResults setting is opened with Enter', async ({ page }: { page: Pag
   await navigationSearch.press('Enter')
 })
 
+When('the ui-theme preference is opened from navigation results', async ({ page }: { page: Page }) => {
+  const navigation = page.getByRole('dialog').getByRole('navigation')
+  const navigationSearch = navigation.getByRole('searchbox', { name: 'Search settings' })
+  await navigationSearch.fill('light')
+  const preferenceResult = navigation.getByRole('button', { name: /preference.*ui-theme/i }).first()
+  await expect(preferenceResult).toBeVisible()
+  await preferenceResult.click()
+})
+
 When('Settings are searched for {string}', async ({ page }: { page: Page }, settingName: string) => {
   await settingsPageSearch(page).fill(settingName)
 })
@@ -80,6 +89,26 @@ Then('the selected navigation setting exposes its live typed editor', async ({ p
     await expect(region).toBeHidden()
     await expect(page.getByRole('dialog').getByRole('navigation').getByRole('searchbox', { name: 'Search settings' })).toBeFocused()
   })
+  await finishJourneyAssertions(page)
+})
+
+Then('the Appearance preference uses its native owner or typed fallback', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog')
+  const fallback = dialog.getByRole('region', { name: /preference/i }).last()
+  if (await fallback.count() > 0) {
+    await recordAssertion(page, 'search-fallback-keeps-referenced-union-as-choice-control', async () => {
+      await expect(fallback).toBeVisible()
+      await expect(fallback.getByRole('combobox', { name: 'Current value' })).toBeVisible()
+      await expect(fallback.getByRole('textbox')).toHaveCount(0)
+    })
+  } else {
+    await recordAssertion(page, 'search-opens-native-appearance-controls', async () => {
+      await expect(dialog.getByText('Appearance', { exact: true })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Light', exact: true })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Dark', exact: true })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'System', exact: true })).toBeVisible()
+    })
+  }
   await finishJourneyAssertions(page)
 })
 

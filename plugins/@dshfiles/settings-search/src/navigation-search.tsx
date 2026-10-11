@@ -1,7 +1,7 @@
 import type { ConfigForm, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useSettings } from '@dshfiles/dshx/client'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { searchSettingsTargets, type SettingsSearchResult } from './settings-index.js'
+import { searchSettingsTargets, type SettingsSearchResult, type SettingsTargetOpener } from './settings-index.js'
 import type { SettingsSearchTranslate } from './locales.js'
 import { SettingsFieldEditor } from './settings-field-editor.js'
 import { settingsSearchSettings } from './settings.js'
@@ -16,6 +16,7 @@ const DEFAULT_NAV_WIDTH = 188
 interface SettingsNavigationSearchProps {
   readonly describe: SettingsDescribeFace
   readonly getForm: (entryId: string) => ConfigForm<unknown>
+  readonly openSettingsTarget?: SettingsTargetOpener
   readonly t: SettingsSearchTranslate
 }
 
@@ -25,9 +26,8 @@ interface OpenEditor {
 }
 
 /**
- * Occupies the Settings title seat above the section navigation (BB parity: a compact search field over the nav
- * with results inline). The seat cannot switch the shell's active section, so a chosen result opens its live
- * editor over the content column inside the same dialog instead of navigating to the owning section.
+ * Occupies the Settings title seat above the section navigation. A selected result opens its native owner when
+ * one advertises the exact field target; unsupported targets keep the revision-guarded editor fallback.
  */
 export const SettingsNavigationSearch = (props: SettingsNavigationSearchProps): JSX.Element => {
   const t = props.t
@@ -57,6 +57,10 @@ export const SettingsNavigationSearch = (props: SettingsNavigationSearchProps): 
   const editorNamespace = editor === null ? undefined : namespaces.find(namespace => namespace.ns === editor.result.target.entryId)
 
   const openEditor = (result: SettingsSearchResult): void => {
+    if (props.openSettingsTarget?.(result.target) === true) {
+      setEditor(null)
+      return
+    }
     const nav = rootRef.current?.closest('nav')
     setEditor({ result, left: nav?.getBoundingClientRect().width ?? DEFAULT_NAV_WIDTH })
   }

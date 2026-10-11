@@ -5,6 +5,8 @@ export interface SettingsSearchTarget {
   readonly fieldPath: readonly string[]
 }
 
+export type SettingsTargetOpener = (target: SettingsSearchTarget) => boolean
+
 export interface SettingsSecretPath {
   readonly path: readonly string[]
   readonly set: boolean

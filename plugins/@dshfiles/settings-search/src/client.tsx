@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm, SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { defineClient } from '@dshfiles/dshx/client'
-import { searchSettingsTargets, settingsNamespaceTitle, type SettingsSearchResult } from './settings-index.js'
+import { searchSettingsTargets, settingsNamespaceTitle, type SettingsSearchResult, type SettingsTargetOpener } from './settings-index.js'
 import { SETTINGS_SEARCH_LOCALE_NAMESPACE, settingsSearchLocale, type SettingsSearchTranslate } from './locales.js'
 import { SettingsFieldEditor } from './settings-field-editor.js'
 import { SettingsNavigationSearch } from './navigation-search.js'
@@ -27,6 +27,7 @@ const scrollActiveIntoView = (element: HTMLButtonElement | null): void => {
 interface SettingsSearchPanelProps {
   readonly describe: SettingsDescribeFace
   readonly getForm: (entryId: string) => ConfigForm<unknown>
+  readonly openSettingsTarget?: SettingsTargetOpener
   readonly t: SettingsSearchTranslate
 }
 
@@ -60,6 +61,10 @@ const SettingsSearchPanel = (props: SettingsSearchPanelProps): JSX.Element => {
   const selectedTarget = selected === null ? undefined : allResults.find(result => result.id === selected.id)
 
   const selectResult = (result: SettingsSearchResult): void => {
+    if (props.openSettingsTarget?.(result.target) === true) {
+      setSelected(null)
+      return
+    }
     setSelected(result)
   }
 
@@ -273,15 +278,17 @@ export default defineClient({
           label: () => translate('sectionLabel'),
           locale: SETTINGS_SEARCH_LOCALE_NAMESPACE,
         },
-        ({ t }) => <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} t={t} />,
+        ({ t, openSettingsTarget }: { readonly t: SettingsSearchTranslate; readonly openSettingsTarget?: SettingsTargetOpener }) => (
+          <SettingsSearchPanel describe={ctx.configForms.describe()} getForm={getForm} openSettingsTarget={openSettingsTarget} t={t} />
+        ),
       ),
     )
     // The shell's title seat is a single cell; priority -1 shadows its plain title so the search sits above the nav.
     ctx.slots.inject('settings.header', () =>
       ctx.slots.register(
         { name: 'settings.header', priority: -1, locale: SETTINGS_SEARCH_LOCALE_NAMESPACE },
-        decorate(({ t }: { readonly t: SettingsSearchTranslate }) => (
-          <SettingsNavigationSearch describe={ctx.configForms.describe()} getForm={getForm} t={t} />
+        decorate(({ t, openSettingsTarget }: { readonly t: SettingsSearchTranslate; readonly openSettingsTarget?: SettingsTargetOpener }) => (
+          <SettingsNavigationSearch describe={ctx.configForms.describe()} getForm={getForm} openSettingsTarget={openSettingsTarget} t={t} />
         )),
       ),
     )
