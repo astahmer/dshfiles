@@ -1,0 +1,68 @@
+name: Plugin E2E coverage
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage-audit:
+    name: Inventory, feature map, and BDD discovery
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: tooling/dshx/pnpm-lock.yaml
+
+      - name: Install the DSHX workspace
+        run: pnpm install --frozen-lockfile
+        working-directory: tooling/dshx
+
+      - name: Test dynamic plugin inventory
+        run: pnpm run test:inventory
+        working-directory: tooling/dshx
+
+      - name: Test feature catalog invariants
+        run: pnpm run test:feature-coverage
+        working-directory: tooling/dshx
+
+      - name: Generate the coverage report
+        continue-on-error: true
+        run: pnpm run features:report > "$RUNNER_TEMP/plugin-feature-coverage.md" 2>&1
+        working-directory: tooling/dshx
+
+      - name: Generate and list Gherkin browser tests
+        run: |
+          pnpm run test:e2e:gen
+          pnpm exec playwright test --config=playwright.e2e.config.ts --list > "$RUNNER_TEMP/plugin-browser-tests.txt"
+        working-directory: tooling/dshx
+
+      - name: Enforce complete feature mapping
+        run: pnpm run features:check
+        working-directory: tooling/dshx
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-e2e-coverage-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/plugin-feature-coverage.md
+            ${{ runner.temp }}/plugin-browser-tests.txt
+          if-no-files-found: warn
+          retention-days: 14
