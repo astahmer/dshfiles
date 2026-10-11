@@ -1,21 +1,27 @@
-Feature: Agent communication inspector
+Feature: Agent communication browser
 
-  The inspector loads diagnostics from a real isolated DSH Host without an external model call.
+  The browser runs against a real isolated Host with an idle Session, stores peer text durably, and does not create Agent execution.
 
   @scenario:agent-communication.host-report
-  Scenario: The empty Host report is available and explicit
+  Scenario: The Host report remains explicit with a live idle Agent
     Given the isolated plugin profile "@dshfiles/agent-communication" is booted
     When the Agent communication panel is opened
-    Then diagnostics show the connected Host and truthful empty history
+    Then diagnostics show the connected Host and truthful activity history
 
-  @scenario:agent-communication.delivery-policy
-  Scenario: The subscription controls do not invent delivery policies
+  @scenario:agent-communication.message-browser
+  Scenario: A human can browse a stored channel message without starting an Agent
     Given the isolated plugin profile "@dshfiles/agent-communication" is booted
     When the Agent communication panel is opened
-    Then subscription controls show no configured delivery policy
+    Then a human post is browsable and remains passive
 
-  @scenario:agent-communication.inbox
-  Scenario: The durable inbox reports an empty message history
+  @scenario:agent-communication.passive-messaging
+  Scenario: A direct message to an offline Agent remains durable and unread
     Given the isolated plugin profile "@dshfiles/agent-communication" is booted
     When the Agent communication panel is opened
-    Then the inbox reports no recent messages
+    Then an offline direct message remains unread until its recipient reads it
+
+  @scenario:agent-communication.workspace-health
+  Scenario: Workspace diagnostics show actual subscriptions without claiming completion
+    Given the isolated plugin profile "@dshfiles/agent-communication" is booted
+    When the Agent communication panel is opened
+    Then workspace diagnostics show the active Agent's workspace subscription
