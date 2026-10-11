@@ -64,7 +64,7 @@ export default defineClient({
   locales: [editorSettingsLocale],
   inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles'],
   setup(ctx, decorate) {
-    const targetRegistry = ctx.get('settingsTargets')
+    const targetRegistry = ctx.get('settingsTargets', false)
     if (targetRegistry !== undefined) {
       ctx.effect(() => targetRegistry.register(EDITOR_OPEN_FILE_LINKS_TARGET_ROUTE), 'dshfiles-editor: open-file-links settings target')
     }
