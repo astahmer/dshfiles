@@ -224,6 +224,11 @@ const formatAge = (updatedAt: number): string => {
   return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
+const lastTurnFailureAt = (session: SessionSummary): number | undefined => {
+  const value = session.projectionValues?.sessionListMetadata?.lastTurnFailureAt
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 type RowOperation = 'pin' | 'unpin' | 'archive' | 'unarchive'
 
 interface RowActions {
@@ -288,17 +293,26 @@ const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
 const StatusDot = (props: {
   readonly session: SessionSummary
   readonly unreadLabel: string
+  readonly failedLabel: string
   readonly attentionLabel: ThreadAttentionLabel | undefined
   readonly attentionColors: AttentionColors
 }): JSX.Element => {
   const unread = Boolean(props.session.attention?.unread)
-  const dotClass = attentionDotClass({ attentionLabel: props.attentionLabel, attentionColors: props.attentionColors, unread, running: props.session.running })
+  const failureAt = lastTurnFailureAt(props.session)
+  const failed = failureAt !== undefined && !props.session.running
+  const dotClass = attentionDotClass({
+    attentionLabel: props.attentionLabel,
+    attentionColors: props.attentionColors,
+    unread,
+    running: props.session.running,
+    failed,
+  })
   return (
     <span
       className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', dotClass)}
-      role={unread ? 'img' : undefined}
-      aria-label={unread ? props.unreadLabel : undefined}
-      aria-hidden={unread ? undefined : true}
+      role={unread || failed ? 'img' : undefined}
+      aria-label={failed ? props.failedLabel : unread ? props.unreadLabel : undefined}
+      aria-hidden={unread || failed ? undefined : true}
     />
   )
 }
@@ -328,18 +342,21 @@ const ChildThreadList = (props: {
     <ul className="dshx:mb-1 dshx:ml-3.5 dshx:flex dshx:flex-col dshx:border-l dshx:pl-1.5" aria-label={t('threadSidebarChildThreads')}>
       {shown.map(child => {
         const attentionLabel = props.attentionLabels.get(child.id)
+        const failureAt = lastTurnFailureAt(child)
+        const failed = failureAt !== undefined && !child.running
         return (
           <li key={child.id}>
             <button
               type="button"
               className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
               data-selected={child.id === props.selectedChildId}
-              title={new Date(child.updatedAt).toLocaleString()}
+              title={new Date(failed && failureAt !== undefined ? failureAt : child.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(child.id)}
             >
               <StatusDot
                 session={child}
                 unreadLabel={t('threadSidebarUnread')}
+                failedLabel={t('threadSidebarFailed')}
                 attentionLabel={attentionLabel}
                 attentionColors={props.rowStyle.attentionColors}
               />
@@ -352,7 +369,14 @@ const ChildThreadList = (props: {
                 </span>
               )}
               {props.rowStyle.time ? (
-                <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
+                <span className={cn(
+                  'dshx:shrink-0 dshx:text-xs dshx:tabular-nums',
+                  failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
+                )}>
+                  {failed && failureAt !== undefined
+                    ? `${t('threadSidebarFailed')} · ${formatAge(failureAt)}`
+                    : formatAge(child.updatedAt)}
+                </span>
               ) : null}
             </button>
           </li>
@@ -379,6 +403,8 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, rowStyle } = props
   const t = props.actions.translate
   const unread = Boolean(session.attention?.unread)
+  const failureAt = lastTurnFailureAt(session)
+  const failed = failureAt !== undefined && !session.running
   const compact = rowStyle.density === 'compact'
   const childCount = props.childThreads.length
   const showProject = rowStyle.project || props.parentTitle !== undefined
@@ -397,7 +423,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
               )}
-              title={new Date(session.updatedAt).toLocaleString()}
+              title={new Date(failed && failureAt !== undefined ? failureAt : session.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(session.id)}
             >
               {headLine ? (
@@ -406,6 +432,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <StatusDot
                       session={session}
                       unreadLabel={t('threadSidebarUnread')}
+                      failedLabel={t('threadSidebarFailed')}
                       attentionLabel={props.attentionLabel}
                       attentionColors={rowStyle.attentionColors}
                     />
@@ -430,12 +457,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {rowStyle.time ? (
                     <span
                       className={cn(
-                        'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                        'dshx:shrink-0 dshx:text-xs dshx:tabular-nums',
+                        failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
                         session.running && 'dshx:font-medium dshx:text-info',
                       )}
                     >
-                      {session.running ? `${t('threadSidebarWorking')} · ` : ''}
-                      {props.age}
+                      {failed && failureAt !== undefined
+                        ? `${t('threadSidebarFailed')} · ${formatAge(failureAt)}`
+                        : `${session.running ? `${t('threadSidebarWorking')} · ` : ''}${props.age}`}
                     </span>
                   ) : null}
                 </span>

@@ -453,6 +453,7 @@ describe('session.history projections block', () => {
     expect(after.projections.values.sessionListMetadata).toEqual({
       blank: true,
       lastPromptAt: session.eventAt(SessionSeq(session.seq - 1))?.time,
+      lastTurnFailureAt: null,
     })
   })
 
@@ -465,7 +466,7 @@ describe('session.history projections block', () => {
     await fiber.await()
     await vi.waitFor(() => {
       expect(ctx.sessionProjections.snapshot(session).values.sessionListMetadata)
-        .toEqual({ blank: true, lastPromptAt: null })
+        .toEqual({ blank: true, lastPromptAt: null, lastTurnFailureAt: null })
     })
     await fiber.dispose()
     expect('sessionListMetadata' in ctx.sessionProjections.snapshot(session).values).toBe(false)
@@ -487,8 +488,34 @@ describe('session.list projections column', () => {
     expect(row?.projections?.values.sessionListMetadata).toEqual({
       blank: false,
       lastPromptAt: session.eventAt(SessionSeq(session.seq - 1))?.time,
+      lastTurnFailureAt: null,
     })
     expect(row?.projections?.asOfSeq).toBe(session.seq - 1)
+  })
+
+  it('projects latest turn failures into list metadata and clears them on later non-error turns', async () => {
+    const { ctx, session } = await harness(true)
+    const gateway = remote(ctx)
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    session.append('turn/start', { turn: 1 })
+    session.append('turn/end', {
+      turn: 1,
+      reason: { kind: 'error', error: { message: 'private failure detail', code: 'UNKNOWN' } },
+    })
+    const failureAt = session.eventAt(SessionSeq(session.seq - 1))?.time
+    const failed = await gateway.list(request({}))
+    if (!failed.ok) throw new Error('unreachable')
+    const failedRow = failed.value.items.find(item => item.sessionId === session.id)
+    expect(failedRow?.projections?.values.sessionListMetadata).toMatchObject({ lastTurnFailureAt: failureAt })
+    expect(JSON.stringify(failedRow)).not.toContain('private failure detail')
+
+    session.append('turn/start', { turn: 2 })
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    const completed = await gateway.list(request({}))
+    if (!completed.ok) throw new Error('unreachable')
+    const completedRow = completed.value.items.find(item => item.sessionId === session.id)
+    expect(completedRow?.projections?.values.sessionListMetadata).toMatchObject({ lastTurnFailureAt: null })
   })
 
   it('lists the latest preset selected by a blank Session instead of its creation preset', async () => {

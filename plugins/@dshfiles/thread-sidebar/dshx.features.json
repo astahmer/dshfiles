@@ -98,10 +98,11 @@
           "coveredBy": ["thread-sidebar.classification"]
         }
       ],
-      "states": ["active", "pinned", "parked", "inactive", "archived"],
+      "states": ["active", "pinned", "parked", "inactive", "archived", "failed"],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
-        "Activity uses session metadata timestamps and may reflect metadata updates."
+        "Activity uses session metadata timestamps and may reflect metadata updates.",
+        "Latest durable turn failures stay visible until a later non-error turn; errors without a durable turn/end are omitted."
       ],
       "externalDependencies": [],
       "verification": [
@@ -119,6 +120,23 @@
           "kind": "gherkin",
           "id": "thread-sidebar.attention-colors",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.latest-turn-failure",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.latest-turn-failure-unit-red-dot",
+          "file": "plugins/@dshfiles/thread-sidebar/src/attention-presentation.test.ts",
+          "testName": "marks a failed latest turn red, but lets current work take over"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.latest-turn-failure-unit-host-projection",
+          "file": "tooling/dsh-core/api-session-controller/tests/session-projections.host.spec.ts",
+          "testName": "projects latest turn failures into list metadata and clears them on later non-error turns"
         },
         {
           "kind": "unit-test",

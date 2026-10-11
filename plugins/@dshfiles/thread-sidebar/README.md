@@ -117,8 +117,9 @@ available in its conversation composer and returns to its configured attention
 display when that thread is no longer selected. Opening a finished thread clears
 its local completion marker. Completion alerts are observable only while the
 DSH page is connected, so offline completion notifications are not replayed
-after reconnect. Per-thread errors are not included because the sidebar's
-session-status hook does not expose a durable error status.
+after reconnect. A failed latest turn shows a destructive dot and **Failed · time**
+in its row, using its durable turn-end timestamp. The row exposes failure time,
+not error details. Errors without a durable `turn/end` event are not shown.
 
 Child sessions render with increasing indentation and a direct “child of …”
 label. The sidebar follows DSH's durable `parentId` chain, so the presentation

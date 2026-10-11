@@ -30,6 +30,7 @@ type SessionAttentionReconciler = (
 const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
   blank: z.boolean(),
   lastPromptAt: z.number().nullable(),
+  lastTurnFailureAt: z.number().nullable().default(null),
 })
 
 const imageLimitsSchema = z.object({
@@ -55,9 +56,12 @@ export function applySessionListMetadata(
   const lastPromptAt = event.type === 'user/message' && event.data.source.kind === 'user'
     ? event.time
     : state.lastPromptAt
-  return blank === state.blank && lastPromptAt === state.lastPromptAt
+  const lastTurnFailureAt = event.type === 'turn/end'
+    ? event.data.reason.kind === 'error' ? event.time : null
+    : state.lastTurnFailureAt ?? null
+  return blank === state.blank && lastPromptAt === state.lastPromptAt && lastTurnFailureAt === state.lastTurnFailureAt
     ? state
-    : { blank, lastPromptAt }
+    : { blank, lastPromptAt, lastTurnFailureAt }
 }
 
 /**
@@ -91,7 +95,7 @@ export class ApiSessionList {
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
-      init: () => ({ blank: true, lastPromptAt: null }),
+      init: () => ({ blank: true, lastPromptAt: null, lastTurnFailureAt: null }),
       apply: applySessionListMetadata,
       wire: { viewSchema: sessionListMetadataSchema, view: state => state },
       stateVersion: 1,

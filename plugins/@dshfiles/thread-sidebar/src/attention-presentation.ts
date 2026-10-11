@@ -7,6 +7,7 @@ export interface ThreadStatusVisualInput {
   readonly attentionColors: AttentionColors
   readonly unread: boolean
   readonly running: boolean
+  readonly failed: boolean
 }
 
 const attentionColorKeys = {
@@ -37,6 +38,7 @@ export const attentionLabelClass = (label: ThreadAttentionLabel, attentionColors
   `${attentionTextClasses[attentionColors[attentionColorKeys[label]]]}/80`
 
 export const attentionDotClass = (input: ThreadStatusVisualInput): string => {
+  if (input.failed && !input.running) return attentionDotClasses.danger
   if (input.attentionLabel !== undefined) return attentionDotClasses[input.attentionColors[attentionColorKeys[input.attentionLabel]]]
   if (input.unread) return 'dshx:bg-primary'
   if (input.running) return 'dshx:animate-pulse dshx:bg-info'

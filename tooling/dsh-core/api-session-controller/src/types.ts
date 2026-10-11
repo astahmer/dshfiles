@@ -47,6 +47,8 @@ export interface SessionListMetadata {
   readonly blank: boolean
   /** Latest human-authored prompt time in the folded prefix. */
   readonly lastPromptAt: number | null
+  /** Latest failed turn's event time, or null when the latest turn did not fail. */
+  readonly lastTurnFailureAt?: number | null
 }
 
 /** Durable Session attention state exposed to every connected Client. */
