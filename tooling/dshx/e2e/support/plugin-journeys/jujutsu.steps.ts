@@ -1,7 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -62,7 +61,9 @@ const snapshotRepository = (fixture: JujutsuFixture): string =>
   ]).trim()
 
 const createFixture = async (page: Page): Promise<JujutsuFixture> => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), 'dshx-jujutsu-e2e-'))
+  const fixtureParent = join(process.cwd(), 'test-results')
+  await mkdir(fixtureParent, { recursive: true })
+  const temporaryRoot = await mkdtemp(join(fixtureParent, 'dshx-jujutsu-e2e-'))
   const repositoryPath = join(temporaryRoot, 'repo')
   await mkdir(repositoryPath)
   try {
