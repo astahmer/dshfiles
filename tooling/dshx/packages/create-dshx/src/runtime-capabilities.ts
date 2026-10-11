@@ -7,7 +7,7 @@ export const CLIENT_CAPABILITY_INJECTIONS = {
   sidebar: ['slots', 'layout'],
   composer: ['slots'],
   models: ['modelDirectories'],
-  rpc: ['connection']
+  rpc: ['connection'],
 } as const
 
 export const HOST_CAPABILITY_INJECTIONS = {
