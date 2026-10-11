@@ -333,7 +333,6 @@ export default defineClient({
           name: 'conversation.session.header.utilities',
           id: `thread-sidebar-${action}`,
           order,
-          defaultPlacement: 'overflow',
           label,
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
           inject: () => ({ action, archiveSession, unarchiveSession, pinSession, unpinSession }),

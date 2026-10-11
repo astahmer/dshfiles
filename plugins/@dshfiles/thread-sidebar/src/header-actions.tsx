@@ -35,17 +35,15 @@ interface HeaderThreadActionsInjected {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type HeaderThreadActionsProps = Pick<
-  PropsRuntime<'conversation.session.header.utilities'>,
-  'sessionId' | 'useSessions' | 'useWorkspaces' | 'placement'
-> & PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> & HeaderThreadActionsInjected
+type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'>
+  & PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+  & HeaderThreadActionsInjected
 
 export const HeaderThreadActions = ({
   action,
   sessionId,
   useSessions,
   useWorkspaces,
-  placement,
   archiveSession,
   unarchiveSession,
   pinSession,
@@ -103,12 +101,13 @@ export const HeaderThreadActions = ({
     <Button
       type="button"
       variant="ghost"
-      size={placement === 'toolbar' ? 'icon-sm' : 'sm'}
+      size="sm"
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
     >
-      {placement === 'toolbar' ? icon : label}
+      {icon}
+      {label}
     </Button>
   )
   const error = actionFailed ? (
