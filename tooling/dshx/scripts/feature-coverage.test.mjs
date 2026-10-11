@@ -80,7 +80,10 @@ test('rejects scenario tags attached to a Feature instead of a Scenario', async 
     const result = runCheck(root)
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Declared Gherkin scenario demo\.boot-profile has no @scenario tag/)
-    assert.match(result.stderr, /Misplaced @scenario:demo\.boot-profile tag in tooling\/dshx\/e2e\/features\/demo\.feature:1; scenario tags must annotate a Scenario or Scenario Outline/)
+    assert.match(
+      result.stderr,
+      /Misplaced @scenario:demo\.boot-profile tag in tooling\/dshx\/e2e\/features\/demo\.feature:1; scenario tags must annotate a Scenario or Scenario Outline/,
+    )
   })
 })
 
