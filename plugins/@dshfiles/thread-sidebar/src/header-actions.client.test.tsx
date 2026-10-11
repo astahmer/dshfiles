@@ -26,10 +26,7 @@ const labels: Readonly<Record<string, string>> = {
   threadSidebarActionFailure: 'Could not update thread',
 }
 
-const mount = (
-  action: HeaderThreadActionKind,
-  options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; placement?: 'toolbar' | 'overflow' },
-) => {
+const mount = (action: HeaderThreadActionKind, options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean }) => {
   const session = {
     id: 's1',
     title: 'Thread',
@@ -44,7 +41,6 @@ const mount = (
   })
   const props = {
     action,
-    placement: options?.placement ?? 'overflow',
     sessionId: 's1',
     useSessions: <Value,>(select: (state: unknown) => Value) => select({ ids: ['s1'], byId: { s1: session } }),
     useWorkspaces: <Value,>(select: (state: unknown) => Value) =>
@@ -101,13 +97,6 @@ describe('HeaderThreadActions', () => {
     cleanup()
     mount('pin', { blank: true })
     expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
-  })
-
-  it('renders a compact toolbar action when moved out of overflow', () => {
-    mount('pin', { placement: 'toolbar' })
-    const pin = screen.getByRole('button', { name: 'Pin' })
-    expect(pin.getAttribute('data-size')).toBe('icon-sm')
-    expect(screen.queryByRole('button', { name: 'Thread actions' })).toBeNull()
   })
 
   it('disables park and archive while a thread is running', () => {

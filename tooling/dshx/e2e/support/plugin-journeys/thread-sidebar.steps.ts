@@ -85,6 +85,10 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
       const style = getComputedStyle(element)
       return { position: style.position, bottom: Number.parseFloat(style.bottom) }
     })
+    const noticeStyle = await noticeAlert.evaluate(element => {
+      const style = getComputedStyle(element)
+      return { display: style.display, backgroundColor: style.backgroundColor }
+    })
     const sidebarPosition = await threadSidebar(page).evaluate(element => getComputedStyle(element).position)
     const sidebarBounds = await threadSidebar(page).boundingBox()
     const noticeBounds = await transientNotice.boundingBox()
@@ -97,6 +101,9 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
     const scrollPaneTopAfterArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
     expect(transientNoticeLayout.position).toBe('absolute')
     expect(transientNoticeLayout.bottom).toBeGreaterThan(0)
+    expect(noticeStyle.display).toBe('flex')
+    expect(noticeStyle.backgroundColor).toMatch(/^rgb\(/)
+    expect(undoButtonBounds.x).toBeGreaterThan(archivedMessageBounds.x + archivedMessageBounds.width)
     expect(sidebarPosition).toBe('relative')
     expect(noticeBounds.x).toBeGreaterThanOrEqual(sidebarBounds.x)
     expect(noticeBounds.x + noticeBounds.width).toBeLessThanOrEqual(sidebarBounds.x + sidebarBounds.width)
@@ -113,6 +120,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
     layoutEvidence = JSON.stringify(
       {
         transientNoticeLayout,
+        noticeStyle,
         sidebarPosition,
         sidebarBounds,
         noticeBounds,

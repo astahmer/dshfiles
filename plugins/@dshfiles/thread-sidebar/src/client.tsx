@@ -1749,12 +1749,20 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     notice === null ? null : (
       <Alert
         variant={notice.tone === 'danger' ? 'destructive' : notice.tone}
-        className={cn(noticeClass, isTransientNotice && 'dshx:grid-cols-1 dshx:pointer-events-auto dshx:max-w-full dshx:shadow-lg')}
+        className={cn(
+          noticeClass,
+          isTransientNotice &&
+            'dshx:flex dshx:w-fit dshx:max-w-full dshx:pointer-events-auto dshx:items-center dshx:gap-2 dshx:border-border dshx:bg-card dshx:text-card-foreground dshx:shadow-lg',
+        )}
       >
-        <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <SidebarNoticeMessage message={notice.message} />
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          {isTransientNotice ? (
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground">{notice.message}</span>
+          ) : (
+            <SidebarNoticeMessage message={notice.message} />
+          )}
           {notice.actionLabel !== undefined && notice.onAction !== undefined ? (
-            <Button size="sm" variant="ghost" className="dshx:h-6 dshx:px-1.5 dshx:text-xs" onClick={notice.onAction}>
+            <Button size="xs" variant="outline" onClick={notice.onAction}>
               {notice.actionLabel}
             </Button>
           ) : null}

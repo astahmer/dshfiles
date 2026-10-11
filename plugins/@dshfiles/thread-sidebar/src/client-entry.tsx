@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -149,8 +148,7 @@ export default defineClient({
       useEffect(() => {
         const sessionContext = ctx.sessions.scope(props.sessionId)
         if (sessionContext === undefined) return
-        const sessionContextForConversation = sessionContext as Context
-        const input = ctx.conversation.input.for(sessionContextForConversation)
+        const input = ctx.conversation.input.for(sessionContext)
         const capture = (): void => {
           insertion.current = props.inputActions.captureInsertion()
         }
@@ -328,17 +326,19 @@ export default defineClient({
       if (!result.ok) throw new Error(result.error.code)
     }
     const registerHeaderAction = (action: HeaderThreadActionKind, order: number, label: () => string): void => {
-      ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register(
-        {
-          name: 'conversation.session.header.utilities',
-          id: `thread-sidebar-${action}`,
-          order,
-          label,
-          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
-          inject: () => ({ action, archiveSession, unarchiveSession, pinSession, unpinSession }),
-        },
-        decorate(HeaderThreadActions),
-      ))
+      ctx.slots.inject('conversation.session.header.utilities', () =>
+        ctx.slots.register(
+          {
+            name: 'conversation.session.header.utilities',
+            id: `thread-sidebar-${action}`,
+            order,
+            label,
+            locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+            inject: () => ({ action, archiveSession, unarchiveSession, pinSession, unpinSession }),
+          },
+          decorate(HeaderThreadActions),
+        ),
+      )
     }
     registerHeaderAction('pin', 100, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarPin'))
     registerHeaderAction('park', 101, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarPark'))
