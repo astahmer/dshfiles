@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config'
 // (same pnpm react@18.3.1 instance) instead of adding a dependency here.
 export default defineConfig({
   test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     alias: {
       'react-dom/server': fileURLToPath(new URL('../plugin-ui/node_modules/react-dom/server.node.js', import.meta.url)),
     },
