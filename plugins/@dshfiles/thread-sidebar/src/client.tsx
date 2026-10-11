@@ -45,7 +45,17 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ActivityIcon, BellIcon, BellOffIcon, ChevronDownIcon, ChevronUpIcon, CirclePauseIcon, LinkIcon, MonitorIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ActivityIcon,
+  BellIcon,
+  BellOffIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CirclePauseIcon,
+  LinkIcon,
+  MonitorIcon,
+  Settings2Icon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import {
@@ -74,6 +84,7 @@ import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotic
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
+import { workingThreadIds } from './working-threads.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
   clearExpiredThreadMutes,
@@ -617,6 +628,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [threadListView, setThreadListView] = useState<'all' | 'working'>('all')
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
@@ -1003,6 +1015,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [threadTree],
   )
+  const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries.map(entry => entry.activity)), [sectionEntries])
   const nextMuteExpiry = useMemo(
     () =>
       Object.values(notificationPreferences.mutedUntil)
@@ -1093,9 +1106,18 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
   const groupedAttentionRows = useMemo(
     () => ({
-      approvalNeeded: preferences.approvalNeededDisplay === 'group' ? approvalNeededRows.filter(session => rootThreadIds.has(session.id)) : [],
-      inputNeeded: preferences.inputNeededDisplay === 'group' ? needsInputRows.filter(session => rootThreadIds.has(session.id)) : [],
-      turnFinished: preferences.turnFinishedDisplay === 'group' ? turnFinishedRows.filter(session => rootThreadIds.has(session.id)) : [],
+      approvalNeeded:
+        preferences.approvalNeededDisplay === 'group'
+          ? approvalNeededRows.filter(session => rootThreadIds.has(session.id) && (threadListView === 'all' || currentWorkingThreadIds.has(session.id)))
+          : [],
+      inputNeeded:
+        preferences.inputNeededDisplay === 'group'
+          ? needsInputRows.filter(session => rootThreadIds.has(session.id) && (threadListView === 'all' || currentWorkingThreadIds.has(session.id)))
+          : [],
+      turnFinished:
+        preferences.turnFinishedDisplay === 'group'
+          ? turnFinishedRows.filter(session => rootThreadIds.has(session.id) && (threadListView === 'all' || currentWorkingThreadIds.has(session.id)))
+          : [],
     }),
     [
       approvalNeededRows,
@@ -1104,6 +1126,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       preferences.inputNeededDisplay,
       preferences.turnFinishedDisplay,
       rootThreadIds,
+      currentWorkingThreadIds,
+      threadListView,
       turnFinishedRows,
     ],
   )
@@ -1130,6 +1154,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
     for (const { session, activity } of sectionEntries) {
       if (attentionIds.has(session.id)) continue
+      if (threadListView === 'working' && !currentWorkingThreadIds.has(session.id)) continue
       const section = sectionForSession({
         session: activity,
         archivedSessionIds,
@@ -1146,7 +1171,18 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
     )
     return rows
-  }, [archivedSessionIds, attentionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, sectionEntries, workspaceState.pinnedSessionIds])
+  }, [
+    archivedSessionIds,
+    attentionIds,
+    currentWorkingThreadIds,
+    now,
+    parkedSessionIds,
+    pinnedSessionIds,
+    preferences.idleMinutes,
+    sectionEntries,
+    threadListView,
+    workspaceState.pinnedSessionIds,
+  ])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -1390,33 +1426,61 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         aria-label={props.tSidebar('threadSidebarTitle')}
       >
         <header className="dshx:px-2 dshx:py-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="dshx:h-8 dshx:w-full dshx:justify-between dshx:px-2.5 dshx:text-base dshx:font-medium dshx:data-[settings-open=true]:text-muted-foreground"
-                data-settings-open={settingsOpen}
-              >
-                <span className="dshx:truncate">{projectFilterLabel}</span>
-                <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
-                  <IconChevronDownOutlineRegular size={14} />
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="dshx-root dshx:w-(--radix-dropdown-menu-trigger-width) dshx:min-w-56">
-              <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
-                {projectOptions.map(option => (
-                  <DropdownMenuRadioItem key={option.id} value={option.id}>
-                    <span className="dshx:truncate">{option.label}</span>
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
-                {props.tSidebar('threadSidebarSettings')}
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="dshx:flex dshx:items-center dshx:gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:px-2.5 dshx:text-base dshx:font-medium">
+                  <span className="dshx:truncate">{projectFilterLabel}</span>
+                  <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
+                    <IconChevronDownOutlineRegular size={14} />
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="dshx-root dshx:w-(--radix-dropdown-menu-trigger-width) dshx:min-w-56">
+                <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
+                  {projectOptions.map(option => (
+                    <DropdownMenuRadioItem key={option.id} value={option.id}>
+                      <span className="dshx:truncate">{option.label}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
+                  {props.tSidebar('threadSidebarSettings')}
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              type="button"
+              size="icon"
+              variant={settingsOpen ? 'secondary' : 'ghost'}
+              aria-label={props.tSidebar('threadSidebarSettings')}
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen(current => !current)}
+            >
+              <Settings2Icon />
+            </Button>
+          </div>
+          <div role="group" className="dshx:grid dshx:grid-cols-2 dshx:gap-1 dshx:pt-1" aria-label={props.tSidebar('threadSidebarListView')}>
+            <Button
+              type="button"
+              variant={threadListView === 'all' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={threadListView === 'all'}
+              onClick={() => setThreadListView('all')}
+            >
+              {props.tSidebar('threadSidebarAllThreads')}
+            </Button>
+            <Button
+              type="button"
+              variant={threadListView === 'working' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={threadListView === 'working'}
+              onClick={() => setThreadListView('working')}
+            >
+              {props.tSidebar('threadSidebarWorking')} ({currentWorkingThreadIds.size})
+            </Button>
+          </div>
         </header>
 
         {settingsOpen ? (
@@ -1657,7 +1721,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           [...rowsBySection.values()].every(rows => rows.length === 0) ? (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
-                {props.tSidebar('threadSidebarEmpty')}
+                {props.tSidebar(threadListView === 'working' ? 'threadSidebarNoWorkingThreads' : 'threadSidebarEmpty')}
               </EmptyTitle>
             </Empty>
           ) : null}
