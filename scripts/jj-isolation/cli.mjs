@@ -13,7 +13,7 @@ const USAGE = `jj-isolation — refuse jj operations that would rewrite another 
   jj-isolation check <jj args...>   print the decision as JSON; exit 3 when refused
   jj-isolation recover [--json]     list divergent changes and where their content lives
   jj-isolation preflight [--json]   read-only repository report and migration plan
-  jj-isolation maintenance arm|disarm|status
+  jj-isolation maintenance arm|disarm|status [--ack-running-jj]
                                     fence the store while migrating workspaces
   jj-isolation migrate <name> --base <revset> [--mode auto|leaf-from-current|reset-to-base]
                                     [--apply] [--accept-graft] [--force]
@@ -124,8 +124,13 @@ const armMaintenance = (cwd, argv) => {
     )
   }
   if (preflight.safety.mutatingJjProcesses.length > 0) {
-    throw new Error(
-      `a mutating jj command is in flight; wait for it before arming maintenance mode:\n  ${preflight.safety.mutatingJjProcesses.join('\n  ')}`,
+    if (!argv.includes('--ack-running-jj')) {
+      throw new Error(
+        `a mutating jj command is in flight somewhere on this machine; wait for it before arming maintenance mode, or pass --ack-running-jj once you have confirmed none of them targets this store:\n  ${preflight.safety.mutatingJjProcesses.join('\n  ')}`,
+      )
+    }
+    process.stderr.write(
+      `jj-isolation: --ack-running-jj accepted with ${preflight.safety.mutatingJjProcesses.length} mutating jj command(s) in flight; the fence cannot tell which store they target.\n`,
     )
   }
   if (preflight.safety.runningJjProcesses.length > 0) {

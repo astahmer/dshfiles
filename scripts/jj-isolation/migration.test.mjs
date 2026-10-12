@@ -31,7 +31,7 @@ const cli = (args, cwd, env = {}) =>
   })
 
 const armedGate = cwd => {
-  const result = cli(['maintenance', 'arm', '--quiet-seconds', '0', '--ttl-minutes', '30', '--json'], cwd)
+  const result = cli(['maintenance', 'arm', '--quiet-seconds', '0', '--ttl-minutes', '30', '--ack-running-jj', '--json'], cwd)
   assert.equal(result.status, 0, result.stderr)
   return JSON.parse(result.stdout)
 }
@@ -89,7 +89,7 @@ test('maintenance arm refuses while operations are recent, then fences every wor
   const { repo, mid } = foldedLine()
   writeFeatureFiles({ dir: mid, count: 2, tag: 'm' })
 
-  const notQuiet = cli(['maintenance', 'arm', '--quiet-seconds', '3600'], repo)
+  const notQuiet = cli(['maintenance', 'arm', '--quiet-seconds', '3600', '--ack-running-jj'], repo)
   assert.equal(notQuiet.status, 3)
   assert.match(notQuiet.stderr, /not quiet/)
 

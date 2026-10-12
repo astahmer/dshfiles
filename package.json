@@ -24,7 +24,7 @@
     "jj:isolation:install": "node scripts/jj-isolation/install-shim.mjs",
     "jj:isolation:recover": "node scripts/jj-isolation/cli.mjs recover",
     "jj:isolation:preflight": "node scripts/jj-isolation/cli.mjs preflight",
-    "test:jj-isolation": "node --test scripts/jj-isolation/guard.test.mjs scripts/jj-isolation/isolation.test.mjs scripts/jj-isolation/migration.test.mjs",
+    "test:jj-isolation": "node --test --test-concurrency=1 scripts/jj-isolation/guard.test.mjs scripts/jj-isolation/isolation.test.mjs scripts/jj-isolation/migration.test.mjs",
     "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
     "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json",
