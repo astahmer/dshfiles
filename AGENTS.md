@@ -167,6 +167,29 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   plus a duplicate change-id; fold it with `jj rebase -r <stray-head> -d <tip>`
   and abandon the duplicate copy.
 
+- **A workspace `@` is a leaf, never a link in the line.** Two agents rewriting
+  one change at once makes jj record a divergent change, and the next command in
+  the owning workspace merges it and checks out the sibling copy — deleting the
+  files that only the losing copy snapshotted (`Updated working copy to fresh
+  commit`). Measured 20/20. The rules that remove the race:
+  - Base every workspace on a full commit id or on `integration-spine`, never on
+    `@`, `@-`, a change id, or another workspace's `@`. Never `jj workspace add`
+    without `-r`.
+  - Never fold a workspace `@` into the shared line: it must have no
+    descendants, and must not be an ancestor of `main` or a parent of another
+    workspace's `@`.
+  - Never rewrite a revision another workspace holds as `@` — including by
+    `describe -r`, `split -r`, `squash --into`, `rebase -s`, `abandon`, or
+    `restore --changes-in`. The guard refuses these; the override is for
+    authorized consolidations only.
+  - `jj log` therefore shows one head per workspace. That fan is deliberate: it
+    is what stops another agent's command from rebasing your working copy.
+  - Reads that monitor rather than edit pass `--ignore-working-copy`. Any jj
+    command without it snapshots its `cwd`, so a panel, a coordinator, or a
+    script becomes a second writer racing the agent that owns that workspace.
+  - `scripts/jj-isolation/` enforces this at the `jj` boundary; see
+    `docs/jj/concurrent-workspace-isolation.md`.
+
 - Before editing code in another repository, inspect its `jj root` and
   `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
   changes under `packages/**` belong in the canonical
@@ -207,17 +230,23 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   fixed revision snapshot into an integration workspace, rebase that copy onto
   `main`, and retain the source workspace until tree equality and status prove
   it safe to forget.
-- A workspace's `@` is a permanent empty slot on the line, so parked workspaces
-  accumulate. `pnpm run jj:workspaces` prints the board — every workspace's
+- A workspace `@` is its own leaf commit, so parked workspaces accumulate as
+  extra heads. `pnpm run jj:workspaces` prints the board — every workspace's
   commit, whether it is on the spine, ahead of it or off-spine, plus conflicts
-  and empty slots; off-spine rows are the ones that would fork the line.
-  `pnpm run jj:sweep` dry-runs the stale ones through `jjw`; `--apply` forgets
-  them (their directories stay on disk) and `--abandon-empty` also drops their
-  now-orphan slot. Never sweep a workspace whose work has not landed.
+  and empty slots. `pnpm run jj:sweep` dry-runs the stale ones through `jjw`
+  (every read passes `--ignore-working-copy`, so a dry run writes nothing);
+  `--apply --prove-clean` forgets only workspaces whose directory jjw actually
+  inspected and found clean (their directories stay on disk, and a recovery
+  record is printed), and `--abandon-empty` also drops their now-orphan slot.
+  Never sweep a workspace whose work has not landed, and never infer safety from
+  an idle session or from an empty `@`: `target.empty()` says nothing about the
+  files on disk.
 - History churn leaves abandoned revisions reachable from the operation log
   until garbage collection. `jj util gc` reclaims them, but that removes the
   op-log recovery path permanently — run it only once no rollback is still
-  wanted, and never `jj op restore` a shared store to clean up.
+  wanted, and never `jj op restore` a shared store to clean up. Recover a
+  divergent change with `jj new <kept-commit>` inside its owner
+  (`pnpm run jj:isolation:recover` lists them non-destructively).
 
 ### Integration closeout
 
