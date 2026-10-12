@@ -101,7 +101,10 @@ merge finding.
 ### Remaining gates
 
 - Refresh the vendored core, rebuild `@dshfiles/dshx`, then run
-  `pnpm run check:plugins:cached --force` on this line.
+  `pnpm run check:plugins:cached --force` on this line. The `history-repair`
+  workspace regenerated the vendored `lib/`, but its client-session source
+  divergence was **not** advanced here — see [the repair record
+  below](#2026-10-12--repair-the-vendored-core-artifacts-and-the-typecheck-contracts).
 - `@dshfiles/activity-timeline` and `@dshfiles/jj-integration` are on the line but are **not** in
   `profiles/web/package.json`, so nothing about the live profile changed.
 - `main` and `integration-spine` are local only; no `jj git push` was run.
@@ -112,3 +115,89 @@ The operation bookmark taken before the first rewrite is
 `77dac5cf0de0098f9b86d1b5e9c25bde267baa5543c850c710860482cb8bcf0b4e3bda44fd2a8eedc7483f4cf7cdb38ae3a93cb48833336de9dca8e229bc2a68`.
 `jj op restore <that id>` returns the store to the pre-surgery graph. It also discards every operation
 that any agent recorded after it, so take a fresh bookmark first.
+
+## 2026-10-12 — repair the vendored core artifacts and the typecheck contracts
+
+Isolated workspace `history-repair` (`/Users/astahmer/dev/dshfiles-history-repair`), based on the folded
+line; `main` and `integration-spine` were not advanced.
+
+### Stale artifacts (repaired)
+
+`tooling/dsh-core/api-session-controller/lib` was older than its own `src/` and manifest: the local
+`src/client/contracts.ts` and the local `./client/contracts` / `./client/module` exports had no emitted
+declarations, so `@dshfiles/dshx` could not build (`TS2307: Cannot find module
+'@deepseek-ai/dsh-api-session-controller/client/contracts'`) and every plugin that typechecks through the
+dshx dist failed — the first failure surfaced at `agent-communication` as a misleading
+`CommunicationMessage` "no `intent`" error.
+
+The package was regenerated with the documented generator against a clean, built, pinned checkout:
+
+```sh
+DSH_SOURCE_ROOT=/Users/astahmer/dev/dsh-core-activity-rc2 pnpm run sync:core-api-session-controller
+```
+
+170 outputs, SHA-256 `1024708ddf4d42e4dec7871d08425c7ad98d48b39fb6836ef5e38876170b7a85`, reproduced twice. It
+added exactly the four missing `lib/types/client/contracts.{d.ts,d.ts.map,js,js.map}` files, removed none, and
+is **newer** than what it replaced (`SessionRuntimeSelection` and `fork({ runtimeBinding })` are additions, not
+downgrades). `create-dshx` and `@dshfiles/dshx` then build clean; no tracked file changed (`lib/` and `dist/`
+are gitignored).
+
+### Client Session service separated from the host Context (proposed, not on this line)
+
+The vendored client entry merged the Client Session service into the shared Cordis `Context`
+(`declare module '@deepseek-ai/cordis' { interface Context { sessions: ISessions } }`). Upstream compiles a
+Client package in its own TypeScript project, so that merge never meets the Host `SessionStore` declaration;
+this repository typechecks one package's Host and Client faces in a single program, where the merge shadowed
+the Host store. No newer core branch carries a different arrangement —
+`dsh-core-settings-native-verify-20261011` declares the same merge — so the separation is local to this fork.
+
+`27f7238e` removes the merge from `tooling/dsh-core/api-session-controller/src/client/index.ts`, records the
+divergence in `tooling/dsh-core/FORK.md`, and types the Queue Reorder client editor's context as the
+client-only `ClientContext` from `@dshfiles/dshx/client`, whose `ClientServiceMap.sessions` carries
+`ISessions` — no casts and no duplicated host typing. The generator still emits the Client declarations and
+bundles, `queue-reorder` typechecks, `editor` loses its `ISessions.get` diagnostic (6 → 5), and every other
+package typechecks in that workspace.
+
+**Not advanced onto the consolidated line.** When the separation was transplanted onto the current spine it
+regressed `queue-reorder` (`submission`/`existing` untyped) and `optmem` (`client-entry.tsx` lost the
+`ISessions` shape), because `ClientContext.sessions` is looser than the merged `Context.sessions`. The
+regeneration of the vendored `lib/` is kept in the `history-repair` workspace instead.
+
+### Editor stays explicitly blocked (decision)
+
+`editor` needs `SettingsTargetRoute` and the `settings.general.item` owner prop `target` from a newer
+`@deepseek-ai/dsh-client-ui-settings`. That API is absent from the installed `0.2.0-rc.2` **and** from the
+newest published pre-release `0.2.1-alpha.2` (checked in the published tarball); it exists only in unreleased
+local core work (`dsh-core-settings-native-verify-20261011`, `dsh-core-settings-search-native`,
+`dsh-core-settings-native-integration`), and the pinned generation has no `settingsTargets` service anywhere.
+Vendoring that one package would therefore ship target-routing client JavaScript with no runtime counterpart,
+so `editor` stays blocked rather than shimmed or downgraded. Its client half already degrades when the service
+is absent.
+
+### Activity Timeline high-volume test (fixed)
+
+`ingest` durably rewrites the whole state document per event (read, schema parse, temp write, rename), so 1200
+events cost about 1200 write cycles. The test hit vitest's 5 s default whenever the machine was busy, which is
+why the same file passed alone and failed inside the parallel workspace run. `b9621310` gives the test an
+explicit 30 s budget (this repository's jujutsu integration tests use 20 s) and adds a deterministic bound
+that the persisted document does not grow with the ingested total (`< 1.5×` the 600-event size), which still
+fails a window that stops trimming. Measured for that test: about 0.3 s in a quiet parallel sweep, 1.9 s idle
+standalone, 4.8 s standalone while builds ran, and 5.005 s — exactly the old default timeout — under the
+original loaded run.
+
+### Validation
+
+In the isolated workspace, on the tree carrying `27f7238e` and `b9621310`:
+
+- `pnpm run check:plugins:cached --force` (`7b6668201883afbb`): `contract` PASS; `build` FAIL — the runner
+  stops at `editor`, the only failing package.
+- `--no-bail` sweeps: build fails only in `editor`; typecheck fails only in `editor`; the whole test sweep
+  passes (32 packages).
+- Plugin `dist/` rebuilds stayed inside the isolated workspace; no profile was synced and no live Host was
+  restarted.
+
+### Remaining gates
+
+- `editor` build and typecheck stay blocked on the settings-target contract above.
+- The fix revisions are on this line only: `main` and `integration-spine` still point below them, and the
+  shared checkout's vendored `lib` and `dist` need the same regeneration once the line is advanced.
