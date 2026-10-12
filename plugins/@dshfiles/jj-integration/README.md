@@ -18,9 +18,20 @@ independent agent workspaces ──► durable integration queue ──► canon
   It is read explicitly and never inferred from recent activity.
 - **Integration** uses `jj duplicate <source> --onto <target>`: the source
   revision is never rewritten, so the agent's workspace is untouched.
-- **Single writer**: an in-process mutation queue plus a pid-checked lock file
-  under `$DSH_HOME/runtime/dshfiles/jj-integration/`. A second coordinator
-  process is refused with `integration-busy`.
+- **Single writer**: an in-process mutation queue plus a token-checked lock file
+  in the Jujutsu **store** (`<store>/.dshfiles-jj-integration.lock`, where the
+  store is what `<workspace>/.jj/repo` names). Two coordinators sharing one store
+  are mutually exclusive whatever `DSH_HOME` each was started with; a lock left by
+  a dead pid or older than ten minutes is reclaimed, and a process only releases a
+  lock whose on-disk token is still its own. A second coordinator is refused with
+  `integration-busy`.
+- **Crash-safe staging, no leaked duplicates**: the staging workspace is
+  journalled in the store before `jj workspace add`, so a crash between create and
+  cleanup is reaped on the next run (`integration.staging_reaped`). The canonical
+  bookmark is re-read before it advances and the run is refused with
+  `spine-moved` if another writer moved it, and a duplicate created for a run that
+  then fails is abandoned, with `duplicateAbandoned` / `leakedRevision` recorded
+  on the attempt.
 
 ## State model
 

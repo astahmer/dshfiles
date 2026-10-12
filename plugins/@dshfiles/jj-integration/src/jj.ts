@@ -222,12 +222,12 @@ export const setBookmark = async (
   cwd: string,
   bookmark: string,
   revision: string,
-  signal?: AbortSignal,
+  options: { readonly allowBackwards: boolean; readonly signal?: AbortSignal },
 ): Promise<void> => {
   await run(executor, {
-    args: ['bookmark', 'set', bookmark, '-r', revision, '--allow-backwards'],
+    args: ['bookmark', 'set', bookmark, '-r', revision, ...(options.allowBackwards ? ['--allow-backwards'] : [])],
     cwd,
-    ...(signal === undefined ? {} : { signal }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
     label: `Advance bookmark ${bookmark}`,
   })
 }
@@ -248,24 +248,26 @@ export const addWorkspace = async (input: {
   })
 }
 
-export const forgetWorkspace = async (executor: JjExecutor, cwd: string, name: string, signal?: AbortSignal): Promise<void> => {
-  await run(executor, {
+export const forgetWorkspace = async (executor: JjExecutor, cwd: string, name: string, signal?: AbortSignal): Promise<boolean> => {
+  const result = await run(executor, {
     args: ['workspace', 'forget', name],
     cwd,
     ...(signal === undefined ? {} : { signal }),
     allowFailure: true,
     label: 'Forget staging workspace',
   })
+  return result.exitCode === 0
 }
 
-export const abandonRevision = async (executor: JjExecutor, cwd: string, revision: string, signal?: AbortSignal): Promise<void> => {
-  await run(executor, {
+export const abandonRevision = async (executor: JjExecutor, cwd: string, revision: string, signal?: AbortSignal): Promise<boolean> => {
+  const result = await run(executor, {
     args: ['abandon', revision],
     cwd,
     ...(signal === undefined ? {} : { signal }),
     allowFailure: true,
-    label: 'Abandon staging revision',
+    label: `Abandon revision ${revision}`,
   })
+  return result.exitCode === 0
 }
 
 export const runValidationCommand = async (input: {

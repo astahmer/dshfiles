@@ -50,6 +50,7 @@ export const integrationEventTypeSchema = z.enum([
   'integration.stale',
   'integration.cancelled',
   'integration.failed',
+  'integration.staging_reaped',
 ])
 export type IntegrationEventType = z.infer<typeof integrationEventTypeSchema>
 
@@ -110,6 +111,8 @@ export const integrationAttemptSchema = z
     spineBefore: jjRevisionSchema.nullable(),
     spineAfter: jjRevisionSchema.nullable(),
     resultRevision: jjRevisionSchema.nullable(),
+    duplicateAbandoned: z.boolean().nullable().default(null),
+    leakedRevision: jjRevisionSchema.nullable().default(null),
     conflicts: conflictRecordSchema.nullable(),
     validation: validationRecordSchema,
     error: z.string().max(500).nullable(),
@@ -187,3 +190,23 @@ export const jjIntegrationStateSchema = z
 export type JjIntegrationState = z.infer<typeof jjIntegrationStateSchema>
 
 export const noneValidation = (): ValidationRecord => ({ kind: 'none', revision: null, command: null, exitCode: null, outputExcerpt: '', ranAt: null })
+
+export const integrationLockSchema = z
+  .object({
+    pid: z.number().int().positive(),
+    startedAt: z.number().int().nonnegative(),
+    token: z.string().min(1).max(128).optional(),
+  })
+  .strict()
+export type IntegrationLock = z.infer<typeof integrationLockSchema>
+
+export const stagingJournalEntrySchema = z
+  .object({
+    name: z.string().min(1).max(128),
+    path: z.string().min(1).max(2048),
+    createdAt: z.number().int().nonnegative(),
+  })
+  .strict()
+export type StagingJournalEntry = z.infer<typeof stagingJournalEntrySchema>
+
+export const stagingJournalSchema = z.array(stagingJournalEntrySchema).max(64)

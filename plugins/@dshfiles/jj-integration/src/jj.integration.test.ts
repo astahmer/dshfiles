@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { JjExecutor } from './jj.js'
-import { createJjIntegrationService, type JjIntegrationService } from './service.js'
+import { createJjIntegrationService, repositoryStatePaths, type JjIntegrationService } from './service.js'
+import { jjIntegrationStateSchema, type IntegrationEvent } from './types.js'
 
 interface JjResult {
   readonly exitCode: number
@@ -71,7 +72,9 @@ interface Fixture {
   readonly spine: string
 }
 
-const createFixture = async (options: { readonly validationCommand?: string } = {}): Promise<Fixture> => {
+const createFixture = async (
+  options: { readonly validationCommand?: string; readonly onEvent?: (event: IntegrationEvent) => void } = {},
+): Promise<Fixture> => {
   const root = await temporaryDirectory('jjint-repo-')
   const repo = join(root, 'repo')
   await jjOrThrow(root, ['git', 'init', repo])
@@ -88,6 +91,7 @@ const createFixture = async (options: { readonly validationCommand?: string } = 
       statePath,
       spineBookmark: 'integration-spine',
       ...(options.validationCommand === undefined ? {} : { validationCommand: options.validationCommand }),
+      ...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
     },
   })
   return { repo, statePath, service, spine: 'integration-spine' }
@@ -107,6 +111,27 @@ const commitWork = async (path: string, file: string, content: string, descripti
   await writeFile(join(path, file), content)
   await jjOrThrow(path, ['describe', '-m', description])
 }
+
+const mutableChangeIds = async (cwd: string): Promise<readonly string[]> =>
+  (await jjOrThrow(cwd, ['log', '--no-graph', '-r', 'mutable()', '-T', 'change_id ++ "\\n"']))
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .sort()
+
+const pathExists = async (path: string): Promise<boolean> => access(path).then(() => true, () => false)
+
+const waitForPath = async (path: string, timeoutMs = 20000): Promise<void> => {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await pathExists(path)) return
+    await new Promise(resolveWait => setTimeout(resolveWait, 25))
+  }
+  throw new Error(`Timed out waiting for ${path}`)
+}
+
+const blockingValidationCommand = (marker: string, release: string): string =>
+  `touch ${marker}; while [ ! -f ${release} ]; do sleep 0.05; done`
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
@@ -346,7 +371,8 @@ describe('jj integration coordination (real jj repositories)', () => {
     const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-lock', source: 'agent-tool' })
     const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-lock' })
     const spineBefore = await spineCommit(fixture)
-    await writeFile(`${fixture.statePath}.lock`, JSON.stringify({ pid: process.pid, startedAt: Date.now() }), { mode: 0o600 })
+    const { lockPath } = await repositoryStatePaths(fixture.repo)
+    await writeFile(lockPath, JSON.stringify({ pid: process.pid, startedAt: Date.now(), token: 'peer-coordinator' }), { mode: 0o600 })
 
     await expect(fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-lock' })).rejects.toMatchObject({
       code: 'integration-busy',
@@ -364,6 +390,156 @@ describe('jj integration coordination (real jj repositories)', () => {
     await fixture.service.refreshWorkspace(workspace.id)
     const run = await fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-missing' })
     expect(['failed', 'blocked']).toContain(run.outcome)
+    expect(await spineCommit(fixture)).toBe(spineBefore)
+  })
+
+  it('mutually excludes two coordinators that share a store but not state paths', async () => {
+    const marker = join(await temporaryDirectory('jjint-sync-'), 'started')
+    const release = join(await temporaryDirectory('jjint-sync-'), 'release')
+    const fixture = await createFixture({ validationCommand: blockingValidationCommand(marker, release) })
+    const agentPath = await addAgentWorkspace(fixture, 'ws-shared-store')
+    await commitWork(agentPath, 'shared-store.txt', 'work\n', 'shared store work')
+
+    const second = createJjIntegrationService({
+      executor,
+      executeCommand: commandExecutor,
+      options: { statePath: join(await temporaryDirectory('jjint-state-'), 'state.json'), spineBookmark: 'integration-spine' },
+    })
+    const firstWorkspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-store-a', source: 'agent-tool' })
+    const secondWorkspace = await second.registerWorkspace({ path: agentPath, sessionId: 'session-store-b', source: 'agent-tool' })
+    const first = await fixture.service.submitCandidate({ workspaceId: firstWorkspace.id, sessionId: 'session-store-a' })
+    const secondCandidate = await second.submitCandidate({ workspaceId: secondWorkspace.id, sessionId: 'session-store-b' })
+
+    expect((await repositoryStatePaths(agentPath)).lockPath).toBe((await repositoryStatePaths(fixture.repo)).lockPath)
+
+    const running = fixture.service.runCandidate({ candidateId: first.id, sessionId: 'session-store-a' })
+    try {
+      await waitForPath(marker)
+      await expect(second.runCandidate({ candidateId: secondCandidate.id, sessionId: 'session-store-b' })).rejects.toMatchObject({
+        code: 'integration-busy',
+      })
+    } finally {
+      await writeFile(release, 'go\n')
+    }
+    expect((await running).outcome).toBe('integrated')
+    expect(await spineDescription(fixture)).toBe('shared store work')
+  })
+
+  it('refuses to advance the canonical bookmark when it moved during validation', async () => {
+    const marker = join(await temporaryDirectory('jjint-sync-'), 'started')
+    const release = join(await temporaryDirectory('jjint-sync-'), 'release')
+    const fixture = await createFixture({ validationCommand: blockingValidationCommand(marker, release) })
+    const agentPath = await addAgentWorkspace(fixture, 'ws-spine-moved')
+    await commitWork(agentPath, 'moved.txt', 'work\n', 'spine moved work')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-moved', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-moved' })
+
+    const running = fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-moved' })
+    await waitForPath(marker)
+    let peerCommit = ''
+    try {
+      await jjOrThrow(fixture.repo, ['new', '-m', 'peer advance'])
+      peerCommit = await headCommit(fixture.repo)
+      await jjOrThrow(fixture.repo, ['bookmark', 'set', fixture.spine, '-r', peerCommit, '--allow-backwards'])
+    } finally {
+      await writeFile(release, 'go\n')
+    }
+
+    await expect(running).rejects.toMatchObject({ code: 'spine-moved' })
+    expect(await spineCommit(fixture)).toBe(peerCommit)
+    const candidates = await fixture.service.listCandidates()
+    expect(candidates[0]?.state).toBe('failed')
+    const lastAttempt = candidates[0]?.attempts.at(-1)
+    expect(lastAttempt?.duplicateAbandoned).toBe(true)
+    expect(lastAttempt?.leakedRevision).toBeNull()
+  })
+
+  it('reaps a staging workspace whose cleanup never ran', async () => {
+    const events: IntegrationEvent[] = []
+    const fixture = await createFixture({ onEvent: event => events.push(event) })
+    const agentPath = await addAgentWorkspace(fixture, 'ws-reap')
+    await commitWork(agentPath, 'reap.txt', 'work\n', 'reap work')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-reap', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-reap' })
+
+    const stagingPath = join(await temporaryDirectory('jjint-crash-'), 'staging')
+    const stagingName = 'jjint-validate-crash-probe'
+    await jjOrThrow(fixture.repo, ['workspace', 'add', stagingPath, '--name', stagingName, '-r', 'integration-spine'])
+    const { stagingJournalPath } = await repositoryStatePaths(fixture.repo)
+    await writeFile(stagingJournalPath, `${JSON.stringify([{ name: stagingName, path: stagingPath, createdAt: Date.now() }])}\n`, { mode: 0o600 })
+
+    const run = await fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-reap' })
+    expect(run.outcome).toBe('integrated')
+    expect(await pathExists(stagingPath)).toBe(false)
+    expect(await pathExists(stagingJournalPath)).toBe(false)
+    expect(await jjOrThrow(fixture.repo, ['workspace', 'list'])).not.toContain(stagingName)
+    expect(events.filter(event => event.type === 'integration.staging_reaped').map(event => event.detail)).toEqual([
+      `${stagingName} ${stagingPath}`,
+    ])
+  })
+
+  it('leaves no duplicate head behind when the integration is conflict-blocked', async () => {
+    const fixture = await createFixture()
+    await writeFile(join(fixture.repo, 'shared.txt'), 'base\n')
+    await jjOrThrow(fixture.repo, ['describe', '-m', 'shared base'])
+    const sharedBase = await headCommit(fixture.repo)
+    await jjOrThrow(fixture.repo, ['bookmark', 'set', fixture.spine, '-r', sharedBase, '--allow-backwards'])
+    const agentPath = await addAgentWorkspace(fixture, 'ws-no-leak-conflict', sharedBase)
+    await commitWork(agentPath, 'shared.txt', 'agent version\n', 'agent changes shared')
+
+    await jjOrThrow(fixture.repo, ['new', sharedBase])
+    await commitWork(fixture.repo, 'shared.txt', 'canonical version\n', 'canonical changes shared')
+    await jjOrThrow(fixture.repo, ['bookmark', 'set', fixture.spine, '-r', await headCommit(fixture.repo), '--allow-backwards'])
+    await jjOrThrow(fixture.repo, ['new'])
+
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-no-leak-conflict', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-no-leak-conflict' })
+    const before = await mutableChangeIds(fixture.repo)
+    expect(before.length).toBeGreaterThan(0)
+    const run = await fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-no-leak-conflict' })
+
+    expect(run.outcome).toBe('blocked')
+    expect(await mutableChangeIds(fixture.repo)).toEqual(before)
+    const lastAttempt = run.candidate.attempts.at(-1)
+    expect(lastAttempt?.duplicateAbandoned).toBe(true)
+    expect(lastAttempt?.leakedRevision).toBeNull()
+  })
+
+  it('leaves no duplicate head behind when validation fails', async () => {
+    const fixture = await createFixture({ validationCommand: 'exit 3' })
+    const agentPath = await addAgentWorkspace(fixture, 'ws-no-leak-validation')
+    await commitWork(agentPath, 'validated.txt', 'work\n', 'no leak validation')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-no-leak-validation', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-no-leak-validation' })
+    const before = await mutableChangeIds(fixture.repo)
+    expect(before.length).toBeGreaterThan(0)
+    const run = await fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-no-leak-validation' })
+
+    expect(run.outcome).toBe('failed')
+    expect(await mutableChangeIds(fixture.repo)).toEqual(before)
+    const lastAttempt = run.candidate.attempts.at(-1)
+    expect(lastAttempt?.duplicateAbandoned).toBe(true)
+    expect(lastAttempt?.leakedRevision).toBeNull()
+  })
+
+  it('refuses to run a candidate that is already running', async () => {
+    const fixture = await createFixture()
+    const agentPath = await addAgentWorkspace(fixture, 'ws-running')
+    await commitWork(agentPath, 'running.txt', 'work\n', 'running work')
+    const workspace = await fixture.service.registerWorkspace({ path: agentPath, sessionId: 'session-running', source: 'agent-tool' })
+    const candidate = await fixture.service.submitCandidate({ workspaceId: workspace.id, sessionId: 'session-running' })
+    const spineBefore = await spineCommit(fixture)
+
+    const parsed = jjIntegrationStateSchema.parse(JSON.parse(await readFile(fixture.statePath, 'utf8')))
+    const runningState = {
+      ...parsed,
+      candidates: parsed.candidates.map(item => (item.id === candidate.id ? { ...item, state: 'running' as const } : item)),
+    }
+    await writeFile(fixture.statePath, `${JSON.stringify(runningState)}\n`, { mode: 0o600 })
+
+    await expect(fixture.service.runCandidate({ candidateId: candidate.id, sessionId: 'session-running' })).rejects.toMatchObject({
+      code: 'candidate-running',
+    })
     expect(await spineCommit(fixture)).toBe(spineBefore)
   })
 })

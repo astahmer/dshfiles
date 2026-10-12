@@ -1,24 +1,29 @@
-import { mkdir, open, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
+  integrationLockSchema,
   jjIntegrationStateSchema,
   noneValidation,
+  stagingJournalSchema,
   type ConflictRecord,
   type IntegrationAttempt,
   type IntegrationCandidate,
   type IntegrationEvent,
   type IntegrationEventType,
+  type IntegrationLock,
   type JjIntegrationState,
   type JjRevision,
   type RepositoryRecord,
+  type StagingJournalEntry,
   type ValidationRecord,
   type WorkspaceLifecycle,
   type WorkspaceRecord,
 } from './types.js'
 import {
   JjCommandError,
+  abandonRevision,
   addWorkspace,
   changedFiles,
   conflictFiles,
@@ -39,6 +44,9 @@ import {
 const MAX_EVENTS = 2000
 const MAX_CANDIDATES = 512
 const LOCK_TTL_MS = 10 * 60 * 1000
+const LOCK_GRACE_MS = 5_000
+const LOCK_FILE_NAME = '.dshfiles-jj-integration.lock'
+const STAGING_JOURNAL_FILE_NAME = '.dshfiles-jj-integration.staging.json'
 const STAGING_PREFIX = 'jjint-validate-'
 
 export class IntegrationError extends Error {
@@ -53,7 +61,6 @@ export class IntegrationError extends Error {
 
 export interface JjIntegrationServiceOptions {
   readonly statePath?: string
-  readonly lockPath?: string
   readonly now?: () => number
   readonly spineBookmark?: string
   readonly validationCommand?: string
@@ -75,7 +82,30 @@ const defaultStatePath = (): string => {
   return join(home, 'runtime', 'dshfiles', 'jj-integration', 'state.json')
 }
 
-const defaultLockPath = (statePath: string): string => `${statePath}.lock`
+const jjStorePath = async (root: string): Promise<string> => {
+  const markerPath = join(root, '.jj', 'repo')
+  const markerStats = await stat(markerPath).catch(() => undefined)
+  if (markerStats === undefined) throw new IntegrationError('not-a-jj-repository', `${root} is not a Jujutsu workspace.`)
+  if (markerStats.isDirectory()) return realpath(markerPath)
+  const marker = (await readFile(markerPath, 'utf8')).trim()
+  if (marker.length === 0) throw new IntegrationError('not-a-jj-repository', `The Jujutsu store marker in ${root} is empty.`)
+  const candidates = isAbsolute(marker) ? [marker] : [resolve(dirname(markerPath), marker), resolve(root, marker)]
+  for (const candidate of candidates) {
+    const store = await realpath(candidate).catch(() => undefined)
+    if (store !== undefined) return store
+  }
+  throw new IntegrationError('not-a-jj-repository', `The Jujutsu store for ${root} could not be resolved.`)
+}
+
+export const repositoryStatePaths = async (root: string): Promise<{ readonly lockPath: string; readonly stagingJournalPath: string }> => {
+  const store = await jjStorePath(root)
+  return {
+    lockPath: join(store, LOCK_FILE_NAME),
+    stagingJournalPath: join(store, STAGING_JOURNAL_FILE_NAME),
+  }
+}
+
+const pathExists = async (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
 
 const toRevision = (observed: ObservedRevision): JjRevision => ({
   changeId: observed.changeId,
@@ -91,7 +121,6 @@ const describeError = (error: unknown): string => (error instanceof Error ? erro
 
 export class JjIntegrationService {
   readonly #statePath: string
-  readonly #lockPath: string
   readonly #now: () => number
   readonly #spineBookmark: string
   readonly #validationCommand: string | undefined
@@ -112,7 +141,6 @@ export class JjIntegrationService {
     this.#executor = input.executor
     this.#executeCommand = input.executeCommand
     this.#statePath = options.statePath ?? defaultStatePath()
-    this.#lockPath = options.lockPath ?? defaultLockPath(this.#statePath)
     this.#now = options.now ?? Date.now
     this.#spineBookmark = options.spineBookmark ?? 'integration-spine'
     this.#validationCommand = options.validationCommand
@@ -455,8 +483,25 @@ export class JjIntegrationService {
     readonly sessionId: string | null
     readonly signal?: AbortSignal
   }): Promise<IntegrationRunResult> {
-    return this.#serialize(() =>
-      this.#withLock(async () => {
+    return this.#serialize(async () => {
+      const discovery = await this.#readState()
+      const discovered = discovery.candidates.find(item => item.id === input.candidateId)
+      if (discovered === undefined) throw new IntegrationError('candidate-not-found', 'Integration candidate is not registered.')
+      const discoveredRepository = discovery.repositories.find(item => item.id === discovered.repositoryId)
+      if (discoveredRepository === undefined) throw new IntegrationError('repository-not-found', 'Repository is not registered.')
+      // A registered workspace can be removed between runs, leaving no .jj marker to key the store lock on.
+      const paths = await repositoryStatePaths(discoveredRepository.root).catch(() => undefined)
+      if (paths === undefined) {
+        this.#assertMayRun(discovered, input.sessionId)
+        if (discovered.state === 'integrated' || discovered.state === 'already-integrated') {
+          return { outcome: 'already-integrated', candidate: discovered, detail: 'Candidate was already integrated.' }
+        }
+        if (discovered.state === 'running') {
+          throw new IntegrationError('candidate-running', 'Candidate is already running; wait for that integration to finish or fail before retrying.')
+        }
+        return this.#failCandidate(discovered, 'failed', 'Source workspace is missing or unavailable.')
+      }
+      return this.#withLock(paths.lockPath, async () => {
         const state = await this.#readState()
         const candidate = state.candidates.find(item => item.id === input.candidateId)
         if (candidate === undefined) throw new IntegrationError('candidate-not-found', 'Integration candidate is not registered.')
@@ -464,8 +509,12 @@ export class JjIntegrationService {
         if (candidate.state === 'integrated' || candidate.state === 'already-integrated') {
           return { outcome: 'already-integrated', candidate, detail: 'Candidate was already integrated.' }
         }
+        if (candidate.state === 'running') {
+          throw new IntegrationError('candidate-running', 'Candidate is already running; wait for that integration to finish or fail before retrying.')
+        }
         const repository = state.repositories.find(item => item.id === candidate.repositoryId)
         if (repository === undefined) throw new IntegrationError('repository-not-found', 'Repository is not registered.')
+        await this.#reapStaging(repository, input.signal)
         const workspace = state.workspaces.find(item => item.id === candidate.workspaceId)
         if (workspace === undefined || workspace.missing) {
           return this.#failCandidate(candidate, 'failed', 'Source workspace is missing or unavailable.')
@@ -481,6 +530,15 @@ export class JjIntegrationService {
         if (currentSource === undefined) return this.#failCandidate(candidate, 'failed', 'Source workspace revision could not be resolved.')
         if (currentSource.commitId !== candidate.sourceRevision.commitId) {
           return this.#failCandidate(candidate, 'stale', 'Source revision evolved after this candidate was queued; retry to capture the new revision.')
+        }
+        if (currentSource.conflict) {
+          const files = await conflictFiles(this.#executor, workspace.path, currentSource.changeId, input.signal)
+          const conflict: ConflictRecord = {
+            files: [...files],
+            detectedAt: this.#now(),
+            note: 'The source revision itself is conflicted. Resolve it in the source workspace, then retry.',
+          }
+          return this.#failCandidate(candidate, 'blocked', 'Source revision is conflicted.', { conflict })
         }
         if (await isRevisionEmpty(this.#executor, workspace.path, candidate.sourceRevision.changeId, input.signal)) {
           return this.#failCandidate(candidate, 'blocked', 'Source revision contains no changes; nothing to integrate.')
@@ -525,24 +583,68 @@ export class JjIntegrationService {
             detectedAt: this.#now(),
             note: 'Jujutsu reported a conflict when duplicating the source revision onto the canonical target. Resolve in the source workspace, then retry.',
           }
+          const leak = await this.#abandonDuplicate(repository.root, duplicated, input.signal)
           return this.#failCandidate(running, 'blocked', 'Integration produced conflicts.', {
             resultRevision: toRevision(duplicated),
             conflict,
             spineBefore: spine,
+            duplicateAbandoned: leak.abandoned,
+            leakedRevision: leak.leakedRevision,
           })
         }
-        const validation = await this.#validate(duplicated, repository.root, input.signal)
+        let validation: ValidationRecord
+        try {
+          validation = await this.#validate(duplicated, repository.root, input.signal)
+        } catch (error) {
+          const leak = await this.#abandonDuplicate(repository.root, duplicated, input.signal)
+          return this.#failCandidate(running, 'failed', describeError(error), {
+            resultRevision: toRevision(duplicated),
+            spineBefore: spine,
+            duplicateAbandoned: leak.abandoned,
+            leakedRevision: leak.leakedRevision,
+          })
+        }
         if (validation.kind === 'command' && validation.exitCode !== 0) {
+          const leak = await this.#abandonDuplicate(repository.root, duplicated, input.signal)
           return this.#failCandidate(running, 'failed', 'Validation failed; the canonical bookmark was not advanced.', {
             resultRevision: toRevision(duplicated),
             validation,
             spineBefore: spine,
+            duplicateAbandoned: leak.abandoned,
+            leakedRevision: leak.leakedRevision,
           })
         }
+        const advancedSpine = await this.#resolveOptional(repository.root, repository.spineBookmark, input.signal)
+        if (advancedSpine === undefined || advancedSpine.commitId !== spine.commitId) {
+          const leak = await this.#abandonDuplicate(repository.root, duplicated, input.signal)
+          const moved = new IntegrationError(
+            'spine-moved',
+            `Canonical bookmark ${repository.spineBookmark} moved from ${spine.commitId} to ${advancedSpine?.commitId ?? 'nothing'} before the integration was recorded; nothing was advanced.`,
+          )
+          await this.#failCandidate(running, 'failed', moved.message, {
+            resultRevision: toRevision(duplicated),
+            validation,
+            spineBefore: spine,
+            duplicateAbandoned: leak.abandoned,
+            leakedRevision: leak.leakedRevision,
+          })
+          throw moved
+        }
+        const targetIsDescendant = await isAncestor(this.#executor, repository.root, spine.commitId, duplicated.changeId, input.signal)
         try {
-          await setBookmark(this.#executor, repository.root, repository.spineBookmark, duplicated.changeId, input.signal)
+          await setBookmark(this.#executor, repository.root, repository.spineBookmark, duplicated.changeId, {
+            allowBackwards: targetIsDescendant,
+            ...(input.signal === undefined ? {} : { signal: input.signal }),
+          })
         } catch (error) {
-          return this.#failCandidate(running, 'failed', describeError(error), { resultRevision: toRevision(duplicated), validation, spineBefore: spine })
+          const leak = await this.#abandonDuplicate(repository.root, duplicated, input.signal)
+          return this.#failCandidate(running, 'failed', describeError(error), {
+            resultRevision: toRevision(duplicated),
+            validation,
+            spineBefore: spine,
+            duplicateAbandoned: leak.abandoned,
+            leakedRevision: leak.leakedRevision,
+          })
         }
         const advanced = await this.#resolveOptional(repository.root, repository.spineBookmark, input.signal)
         const finishedAt = this.#now()
@@ -560,6 +662,8 @@ export class JjIntegrationService {
             spineBefore: cleanRevision(spine),
             spineAfter: advanced === undefined ? null : toRevision(advanced),
             resultRevision: toRevision(duplicated),
+            duplicateAbandoned: null,
+            leakedRevision: null,
             conflicts: null,
             validation,
             error: null,
@@ -589,8 +693,8 @@ export class JjIntegrationService {
           events: [],
         }))
         return { outcome: 'integrated', candidate: integrated, detail: `Integrated as ${duplicated.changeId}.` }
-      }),
-    )
+      })
+    })
   }
 
   async retryCandidate(id: string, sessionId: string | null, signal?: AbortSignal): Promise<IntegrationCandidate> {
@@ -676,6 +780,8 @@ export class JjIntegrationService {
     if (command === undefined || this.#executeCommand === undefined) return noneValidation()
     const stagingPath = join(tmpdir(), `${STAGING_PREFIX}${revision.changeId.slice(0, 12)}-${randomUUID().slice(0, 8)}`)
     const stagingName = `${STAGING_PREFIX}${revision.changeId.slice(0, 12)}-${randomUUID().slice(0, 8)}`
+    const journalPath = (await repositoryStatePaths(repositoryRoot)).stagingJournalPath
+    await this.#appendStagingJournal(journalPath, { name: stagingName, path: stagingPath, createdAt: this.#now() })
     try {
       await addWorkspace({
         executor: this.#executor,
@@ -703,7 +809,71 @@ export class JjIntegrationService {
     } finally {
       await forgetWorkspace(this.#executor, repositoryRoot, stagingName, signal).catch(() => undefined)
       await rm(stagingPath, { recursive: true, force: true }).catch(() => undefined)
+      await this.#removeStagingJournalEntry(journalPath, stagingName)
     }
+  }
+
+  async #reapStaging(repository: RepositoryRecord, signal?: AbortSignal): Promise<void> {
+    const journalPath = (await repositoryStatePaths(repository.root)).stagingJournalPath
+    const entries = await this.#readStagingJournal(journalPath)
+    if (entries.length === 0) return
+    const reaped: StagingJournalEntry[] = []
+    const remaining: StagingJournalEntry[] = []
+    for (const entry of entries) {
+      const existed = await pathExists(entry.path)
+      const forgotten = await forgetWorkspace(this.#executor, repository.root, entry.name, signal).catch(() => false)
+      await rm(entry.path, { recursive: true, force: true }).catch(() => undefined)
+      if (existed) reaped.push(entry)
+      if (!forgotten && existed) remaining.push(entry)
+    }
+    if (remaining.length === 0) {
+      await rm(journalPath, { force: true }).catch(() => undefined)
+    } else {
+      await atomicWriteFile(journalPath, `${JSON.stringify(remaining)}\n`)
+    }
+    if (reaped.length === 0) return
+    await this.#updateState(state => ({
+      state,
+      value: undefined,
+      events: reaped.map(entry =>
+        this.#event('integration.staging_reaped', { repositoryId: repository.id, detail: `${entry.name} ${entry.path}` }),
+      ),
+    }))
+  }
+
+  async #readStagingJournal(path: string): Promise<readonly StagingJournalEntry[]> {
+    try {
+      const parsed = stagingJournalSchema.safeParse(JSON.parse(await readFile(path, 'utf8')))
+      return parsed.success ? parsed.data : []
+    } catch {
+      return []
+    }
+  }
+
+  async #appendStagingJournal(path: string, entry: StagingJournalEntry): Promise<void> {
+    const entries = await this.#readStagingJournal(path)
+    await atomicWriteFile(path, `${JSON.stringify([...entries, entry])}\n`)
+  }
+
+  async #removeStagingJournalEntry(path: string, name: string): Promise<void> {
+    const remaining = (await this.#readStagingJournal(path)).filter(entry => entry.name !== name)
+    if (remaining.length === 0) {
+      await rm(path, { force: true }).catch(() => undefined)
+      return
+    }
+    await atomicWriteFile(path, `${JSON.stringify(remaining)}\n`)
+  }
+
+  async #abandonDuplicate(
+    cwd: string,
+    duplicate: ObservedRevision,
+    signal?: AbortSignal,
+  ): Promise<{ readonly abandoned: boolean; readonly leakedRevision: JjRevision | null }> {
+    const abandoned = await abandonRevision(this.#executor, cwd, duplicate.changeId, signal)
+    if (abandoned && !(await revisionExists(this.#executor, cwd, duplicate.changeId, signal))) {
+      return { abandoned: true, leakedRevision: null }
+    }
+    return { abandoned: false, leakedRevision: toRevision(duplicate) }
   }
 
   #assertMayRun(candidate: IntegrationCandidate, sessionId: string | null): void {
@@ -744,6 +914,8 @@ export class JjIntegrationService {
       spineBefore: cleanRevision(spine),
       spineAfter: null,
       resultRevision: null,
+      duplicateAbandoned: null,
+      leakedRevision: null,
       conflicts: null,
       validation: noneValidation(),
       error: null,
@@ -801,6 +973,8 @@ export class JjIntegrationService {
           spineBefore: toRevision(spine),
           spineAfter: toRevision(spine),
           resultRevision: null,
+          duplicateAbandoned: null,
+          leakedRevision: null,
           conflicts: null,
           validation: noneValidation(),
           error: null,
@@ -828,6 +1002,8 @@ export class JjIntegrationService {
       readonly conflict?: ConflictRecord
       readonly validation?: ValidationRecord
       readonly spineBefore?: JjRevision
+      readonly duplicateAbandoned?: boolean
+      readonly leakedRevision?: JjRevision | null
     } = {},
   ): Promise<IntegrationRunResult> {
     const now = this.#now()
@@ -846,6 +1022,8 @@ export class JjIntegrationService {
         spineBefore: cleanRevision(extra.spineBefore),
         spineAfter: null,
         resultRevision: cleanRevision(extra.resultRevision),
+        duplicateAbandoned: extra.duplicateAbandoned ?? null,
+        leakedRevision: cleanRevision(extra.leakedRevision),
         conflicts: extra.conflict ?? null,
         validation,
         error: detail,
@@ -938,49 +1116,69 @@ export class JjIntegrationService {
     return result
   }
 
-  async #withLock<T>(operation: () => Promise<T>): Promise<T> {
-    await this.#acquireLock()
+  async #withLock<T>(lockPath: string, operation: () => Promise<T>): Promise<T> {
+    const token = await this.#acquireLock(lockPath)
     try {
       return await operation()
     } finally {
-      await unlink(this.#lockPath).catch(() => undefined)
+      await this.#releaseLock(lockPath, token)
     }
   }
 
-  async #acquireLock(): Promise<void> {
-    await mkdir(dirname(this.#lockPath), { recursive: true, mode: 0o700 })
+  async #acquireLock(lockPath: string): Promise<string> {
+    await mkdir(dirname(lockPath), { recursive: true, mode: 0o700 })
+    const token = randomUUID()
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const handle = await open(this.#lockPath, 'wx', 0o600)
-        await handle.writeFile(JSON.stringify({ pid: process.pid, startedAt: this.#now() }))
-        await handle.close()
-        return
+        const handle = await open(lockPath, 'wx', 0o600)
+        try {
+          await handle.writeFile(JSON.stringify({ pid: process.pid, startedAt: this.#now(), token }))
+        } finally {
+          await handle.close()
+        }
+        return token
       } catch (error) {
         if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
           throw new IntegrationError('lock-failed', 'Integration lock could not be acquired.')
         }
-        if (attempt > 0 || !(await this.#lockIsStale())) {
-          throw new IntegrationError('integration-busy', 'Another integration is already in progress for this DSH home.')
+        if (attempt > 0 || !(await this.#lockIsStale(lockPath))) {
+          throw new IntegrationError('integration-busy', 'Another integration is already in progress for this Jujutsu store.')
         }
-        await unlink(this.#lockPath).catch(() => undefined)
+        await unlink(lockPath).catch(() => undefined)
       }
     }
-    throw new IntegrationError('integration-busy', 'Another integration is already in progress for this DSH home.')
+    throw new IntegrationError('integration-busy', 'Another integration is already in progress for this Jujutsu store.')
   }
 
-  async #lockIsStale(): Promise<boolean> {
+  async #releaseLock(lockPath: string, token: string): Promise<void> {
+    const raw = await this.#readLock(lockPath)
+    if (raw?.token !== token) return
+    await unlink(lockPath).catch(() => undefined)
+  }
+
+  async #readLock(lockPath: string): Promise<IntegrationLock | undefined> {
     try {
-      const raw = JSON.parse(await readFile(this.#lockPath, 'utf8')) as { readonly pid?: unknown; readonly startedAt?: unknown }
-      const pid = typeof raw.pid === 'number' ? raw.pid : undefined
-      const startedAt = typeof raw.startedAt === 'number' ? raw.startedAt : undefined
-      if (startedAt !== undefined && this.#now() - startedAt > LOCK_TTL_MS) return true
-      if (pid === undefined) return true
-      try {
-        process.kill(pid, 0)
-        return false
-      } catch {
-        return true
-      }
+      const parsed = integrationLockSchema.safeParse(JSON.parse(await readFile(lockPath, 'utf8')))
+      return parsed.success ? parsed.data : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  async #lockIsStale(lockPath: string): Promise<boolean> {
+    const raw = await this.#readLock(lockPath)
+    if (raw === undefined) {
+      // The file exists but does not parse: another process is between its
+      // exclusive create and its write. Treat it as live until it stops changing,
+      // otherwise two coordinators can both believe they hold the lock.
+      const stats = await stat(lockPath).catch(() => undefined)
+      if (stats === undefined) return true
+      return this.#now() - stats.mtimeMs > LOCK_GRACE_MS
+    }
+    if (this.#now() - raw.startedAt > LOCK_TTL_MS) return true
+    try {
+      process.kill(raw.pid, 0)
+      return false
     } catch {
       return true
     }
