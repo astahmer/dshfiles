@@ -370,10 +370,20 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
       })
   }
 
-  /** Resolves once queued captures are appended. */
+  /**
+   * Resolves once queued captures are appended.
+   *
+   * One `await flushing` is not enough: `scheduleFlush` is a no-op while a flush
+   * is in flight or before the runtime is ready, so an event queued by this call
+   * can land after the awaited flush took its batch. Drain until the queue is
+   * empty and nothing is scheduled, which is what the callers actually mean.
+   */
   const settle = async (): Promise<void> => {
-    scheduleFlush()
-    await flushing
+    for (let attempt = 0; attempt < 1_000; attempt += 1) {
+      scheduleFlush()
+      await flushing
+      if (!ready || (queue.length === 0 && !flushScheduled)) return
+    }
   }
 
   /** `session/event` listener: synchronous, never throws, does no I/O on the caller's stack. */
