@@ -139,8 +139,11 @@ export type SummaryRequest = {
   readonly previousBytes: number | null
 }
 
+/** Tokens the provider actually reported for one call; absent when it exposed none, never estimated. */
+export type SummaryUsage = { readonly inputTokens: number; readonly outputTokens: number; readonly totalTokens?: number }
+
 /** `model` is the route that produced this text; concurrent summaries may use different routes. */
-export type SummaryResult = { readonly text: string; readonly model: string }
+export type SummaryResult = { readonly text: string; readonly model: string; readonly usage?: SummaryUsage }
 
 export interface Summarizer {
   summarize(request: SummaryRequest): Promise<SummaryResult>

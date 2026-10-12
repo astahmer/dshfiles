@@ -20,7 +20,7 @@ import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
 import { optmemApi, type OptmemExplorerZoom, type OptmemOverview, type OptmemProject, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
-import { createLlmSummarizer, createRouteResolver, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
+import { createLlmSummarizer, createRouteResolver, routeCooldownMs, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
 import { createMemoryTools } from './tools.ts'
 
 /** Dispatched only by the dshfiles fork agent loop (tooling/dsh-core/FORK.md); stock DSH never fires it. */
@@ -123,8 +123,15 @@ const accountKind = async (provider: string): Promise<string | undefined> => {
 const sessionProviders = new Map<string, string>()
 
 const hostServices = (ctx: Context): HostServices => {
+  /**
+   * Routes a provider rejected for configuration reasons, keyed `provider/model`.
+   * Selecting past them is what stops one incompatible route from being sent
+   * again and again; entries expire so a repaired provider comes back.
+   */
+  const unusableRoutes = new Map<string, { readonly until: number; readonly reason: string }>()
   const routes = createRouteResolver({
     policy: () => summarizerPolicy(currentSettings()),
+    unusable: () => unusableRoutes,
     catalog: () => ({
       sessionProvider: async conversationId => {
         const live = sessionProviders.get(conversationId)
@@ -169,6 +176,11 @@ const hostServices = (ctx: Context): HostServices => {
         },
         resolveRoute: routes.resolve,
         timeoutMs: () => currentSettings().summarizerTimeoutMs,
+        onRouteUnusable: (route, reason) => {
+          unusableRoutes.set(route, { until: Date.now() + routeCooldownMs, reason })
+          ctx.logger.warn('optmem: summary route %s was rejected for configuration reasons; skipping it for %d minutes: %s', route, routeCooldownMs / 60_000, reason)
+        },
+        invalidateRoute: routes.invalidate,
       }),
     summarizerRoute: routes.current,
   }

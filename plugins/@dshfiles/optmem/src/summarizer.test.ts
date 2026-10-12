@@ -2,7 +2,7 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 
 import { optmemSettings } from './settings.ts'
-import { createLlmSummarizer, createRouteResolver, selectSummaryRoute, type RouteCatalog, type SummarizerPolicy } from './summarizer.ts'
+import { classifyProviderFailure, createLlmSummarizer, createRouteResolver, selectSummaryRoute, type RouteCatalog, type SummarizerPolicy } from './summarizer.ts'
 
 const answer = (text: string): StreamChunk[] => [
   { type: 'block-start', index: 0, blockType: 'text' },
@@ -53,6 +53,13 @@ const accountPolicy: SummarizerPolicy = {
 
 const select = (conversationId: string, policy: SummarizerPolicy = accountPolicy, kinds: Readonly<Record<string, string>> = {}) =>
   selectSummaryRoute({ policy, conversationId, catalog: catalog(kinds) })
+
+/** Every conversation resolves to one provider, for cases that only care about the request shape. */
+const anyProviderCatalog = (provider: string): RouteCatalog => ({
+  sessionProvider: async () => provider,
+  providerKind: async () => undefined,
+  models: async id => offered[id] ?? [],
+})
 
 describe('summary route selection', () => {
   it("uses the thread's own provider with that provider kind's cheap model, never the thread's model", async () => {
@@ -226,5 +233,104 @@ describe('llm summarizer', () => {
     })
     await expect(failing.summarize(request)).rejects.toThrow('summary call ended with error: slow down')
     expect(calls).toBe(1)
+  })
+})
+
+describe('provider failure classification', () => {
+  it('treats a rejected configuration as permanent and a busy provider as transient', () => {
+    expect(classifyProviderFailure('HTTP 400 MissingSessionID')).toBe('permanent')
+    expect(classifyProviderFailure('provider rejected the request: BAD_REQUEST')).toBe('permanent')
+    expect(classifyProviderFailure('model not found: gpt-6-luna')).toBe('permanent')
+    expect(classifyProviderFailure('unsupported parameter max_tokens')).toBe('permanent')
+    expect(classifyProviderFailure('HTTP 429 rate limit exceeded')).toBe('transient')
+    expect(classifyProviderFailure('socket hang up')).toBe('transient')
+    expect(classifyProviderFailure('the operation timed out')).toBe('transient')
+  })
+
+  it('stamps the Session for routing when the summary belongs to one', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => anyProviderCatalog('codex-emialex'), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('note')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const sessionId = 'session-11111111-2222-4333-8444-555555555555'
+    await summarizer.summarize({ ...request, conversationId: sessionId })
+    expect(calls[0]?.sessionId).toBe(sessionId)
+  })
+
+  it('omits the Session for a project stream, which is not one', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => anyProviderCatalog('codex-emialex'), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('note')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await summarizer.summarize({ ...request, conversationId: 'project:7ab07f52' })
+    expect(calls[0]?.sessionId).toBeUndefined()
+  })
+
+  it('reports a permanent provider rejection as non-retryable, quarantines the route and drops the cached route', async () => {
+    const quarantined: string[] = []
+    const invalidated: string[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* () {
+        yield { type: 'finish', reason: { kind: 'error', failure: { code: 'invalid_request', message: 'HTTP 400 MissingSessionID', retryable: true } } }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+      onRouteUnusable: (route, reason) => quarantined.push(`${route}: ${reason}`),
+      invalidateRoute: conversationId => invalidated.push(conversationId),
+    })
+    await expect(summarizer.summarize(request)).rejects.toMatchObject({ retryable: false, name: 'ProviderRouteError' })
+    expect(quarantined).toEqual(['codex-emialex/gpt-6-luna: HTTP 400 MissingSessionID'])
+    expect(invalidated).toEqual(['thread-codex'])
+  })
+
+  it('captures the usage the provider actually reported, and omits it when none arrived', async () => {
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const withUsage = createLlmSummarizer({
+      stream: async function* () {
+        yield { type: 'usage', usage: { inputTokens: 120, outputTokens: 40, totalTokens: 160 } }
+        yield* answer('note')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(withUsage.summarize(request)).resolves.toMatchObject({ usage: { inputTokens: 120, outputTokens: 40, totalTokens: 160 } })
+    const withoutUsage = createLlmSummarizer({
+      stream: async function* () {
+        yield* answer('note')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    expect(await withoutUsage.summarize(request)).toEqual({ text: 'note', model: 'codex-emialex/gpt-6-luna' })
+  })
+
+  it('selects past a quarantined route instead of sending the rejected call again', async () => {
+    const policy: SummarizerPolicy = { ...accountPolicy, fallbacks: [{ provider: 'claude_work', model: 'claude-haiku-4-5' }] }
+    const state = await selectSummaryRoute({
+      policy,
+      conversationId: 'thread-codex',
+      catalog: catalog(),
+      skip: route => route.provider === 'codex-emialex',
+    })
+    expect(state).toMatchObject({ kind: 'ready', source: 'fallback', route: { provider: 'claude_work', model: 'claude-haiku-4-5' } })
+  })
+
+  it('reports why every route was skipped when the only candidate is quarantined', async () => {
+    const state = await selectSummaryRoute({ policy: accountPolicy, conversationId: 'thread-codex', catalog: catalog(), skip: () => true })
+    expect(state.kind).toBe('unavailable')
+    expect(state.kind === 'unavailable' ? state.reason : '').toContain('rejected by the provider')
   })
 })
