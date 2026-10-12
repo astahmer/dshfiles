@@ -98,14 +98,36 @@ export class ActivityTimelineService {
   }
 
   async ingestMany(inputs: readonly ActivityIngest[]): Promise<{ readonly ingested: number; readonly duplicates: number }> {
-    let ingested = 0
-    let duplicates = 0
-    for (const input of inputs) {
-      const result = await this.ingest(input)
-      if (result.duplicate) duplicates += 1
-      else ingested += 1
-    }
-    return { ingested, duplicates }
+    if (inputs.length === 0) return { ingested: 0, duplicates: 0 }
+    const events = inputs.map(normalize)
+    const result = await this.#serialize(async () => {
+      const state = await this.#readState()
+      const known = new Set(state.events.map(event => event.id))
+      const fresh: ActivityEvent[] = []
+      let duplicates = 0
+      for (const event of events) {
+        if (known.has(event.id)) {
+          duplicates += 1
+          continue
+        }
+        known.add(event.id)
+        fresh.push(event)
+      }
+      if (fresh.length === 0) {
+        if (duplicates > 0) await this.#writeState({ ...state, duplicateCount: state.duplicateCount + duplicates })
+        return { fresh, duplicates }
+      }
+      const merged = [...state.events, ...fresh].sort((left, right) => left.at - right.at || left.id.localeCompare(right.id)).slice(-this.#maxEvents)
+      await this.#writeState({
+        ...state,
+        events: merged,
+        ingestCount: state.ingestCount + fresh.length,
+        duplicateCount: state.duplicateCount + duplicates,
+      })
+      return { fresh, duplicates }
+    })
+    for (const event of result.fresh) for (const listener of this.#listeners) listener(event)
+    return { ingested: result.fresh.length, duplicates: result.duplicates }
   }
 
   async page(filter: ActivityFilter = {}): Promise<ActivityPage> {
