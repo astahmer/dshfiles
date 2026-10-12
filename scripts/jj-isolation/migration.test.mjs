@@ -206,10 +206,17 @@ test('a slot folded below the spine migrates with an empty leaf; a dirty one is 
   const plan = JSON.parse(cli(['migrate', 'parked', '--base', 'integration-spine'], repo, env).stdout).plan
   assert.equal(plan.mode, 'reset-to-base')
   assert.deepEqual(plan.blockers, [])
+  // The whole point of reset-to-base: the live working copy above `parked` must
+  // not move, because the old @ is never rewritten.
+  const headsBefore = workspaceHeads(repo)
 
   const applied = cli(['migrate', 'parked', '--base', 'integration-spine', '--apply'], repo, env)
   assert.equal(applied.status, 0, applied.stderr)
   assert.equal(JSON.parse(applied.stdout).applied.leafHasNoDescendants, true)
+  const headsAfter = workspaceHeads(repo)
+  assert.equal(headsAfter.default, headsBefore.default, 'a live workspace above a folded slot was rebased')
+  assert.notEqual(headsAfter.parked, headsBefore.parked)
+  assert.equal(applied.stdout.includes('moved during migration'), false)
 
   // The same shape with unsnapshotted files: a snapshot would rewrite an
   // ancestor of the spine, so the plan must refuse.
