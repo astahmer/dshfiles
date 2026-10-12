@@ -110,10 +110,10 @@ export const commitsHolding = ({ cwd, prefix }) =>
     })
 
 export const enableIsolation = (repo, overrides = {}) => {
-  const path = join(repo, '.jj', 'jj-isolation.json')
   const config = { version: 1, base: 'integration-spine', ...overrides }
-  writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`)
-  return path
+  const paths = [join(repo, '.jj', 'jj-isolation.json'), join(repo, '.jj', 'repo', 'jj-isolation.json')]
+  for (const path of paths) writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`)
+  return paths[0]
 }
 
 export const disabledEnv = { JJ_ISOLATION: 'off' }

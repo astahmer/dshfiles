@@ -93,3 +93,43 @@ ancestry.
 `isolation.test.mjs` "S3 control" deliberately runs the bug **without** the guard
 and asserts the files are lost, so the refusal is proven load-bearing rather than
 assumed.
+
+## Rolling out without disrupting agents
+
+```sh
+node scripts/jj-isolation/cli.mjs preflight            # read-only: workspaces, blockers, migration order
+node scripts/jj-isolation/cli.mjs maintenance arm      # fence the store (refuses while ops are recent)
+node scripts/jj-isolation/cli.mjs migrate <name> --base integration-spine            # plan only
+node scripts/jj-isolation/cli.mjs migrate <name> --base integration-spine --apply    # needs the fence
+node scripts/jj-isolation/cli.mjs maintenance disarm --token <token>
+```
+
+`preflight` never writes: every jj call passes `--ignore-working-copy`, and dirt is
+reported as a heuristic (a file newer than jj's last working-copy write) — so
+"detected" is reliable and "not detected" is not proof of clean.
+
+`maintenance arm` refuses unless no operation landed inside `--quiet-seconds`
+(default 120) and no mutating jj command is in flight. While armed, the guard
+refuses every mutating command from every process except the holder of the token,
+and the fence records the operation id and every workspace head so a migration
+aborts rather than proceeding if anything moved underneath it. It re-fences itself
+after each successful migration.
+
+`migrate` has two modes, chosen from the graph:
+
+- `reset-to-base` — the `@` is at or below the frozen base, so its content is
+  already on the spine and the workspace gets a fresh empty leaf. It never
+  rewrites the old `@`, so live workspaces above it do not block it. It refuses
+  when the working copy may hold unsnapshotted changes, because a snapshot would
+  rewrite an ancestor of the spine.
+- `leaf-from-current` — the `@` holds unlanded work, so the leaf copies its whole
+  tree with `jj restore --from <head>` built in a scratch workspace and adopted by
+  a single `jj edit`. Rebase-shaped operations (`jj duplicate --onto`,
+  `jj rebase -r`) would re-apply only the revision's own diff and drop the content
+  of the revisions in between. Live working copies above must migrate first.
+
+Both modes verify the directory content digest is unchanged, that no foreign
+working-copy revision moved, and that the new `@` has no descendants, and both
+print a rollback (`jj edit <previous head>`) plus a recovery note. Because jj
+records no authorship, a leaf whose change would contain paths introduced by a
+workspace below is reported as a warning and requires `--accept-graft`.

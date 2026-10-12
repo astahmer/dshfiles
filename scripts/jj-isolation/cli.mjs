@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { unlinkSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
-import { evaluate, isEnabled, readConfig, rewriteFootprint, workspaceHeads, readJj, DEFAULT_CONFIG } from './guard.mjs'
+import { evaluate, headFingerprint, isEnabled, maintenancePath, readMaintenance, readJj, rewriteFootprint, workspaceHeads } from './guard.mjs'
+import { applyMigration, planMigration } from './migrate.mjs'
+import { buildPreflight, formatPreflight } from './preflight.mjs'
 
 const USAGE = `jj-isolation — refuse jj operations that would rewrite another live workspace's working copy.
 
   jj-isolation run   <jj args...>   decide, then exec the real jj (used by the shim)
   jj-isolation check <jj args...>   print the decision as JSON; exit 3 when refused
   jj-isolation recover [--json]     list divergent changes and where their content lives
+  jj-isolation preflight [--json]   read-only repository report and migration plan
+  jj-isolation maintenance arm|disarm|status
+                                    fence the store while migrating workspaces
+  jj-isolation migrate <name> --base <revset> [--apply] [--accept-graft] [--force]
+                                    move one workspace's @ onto its own leaf
 
 Detection is opt-in per repository: create .jj/jj-isolation.json, or set JJ_ISOLATION=on.
 `
@@ -95,6 +104,85 @@ const recover = (cwd, asJson) => {
   return 3
 }
 
+const flagValueOf = (argv, name, fallback) => {
+  const index = argv.indexOf(name)
+  return index === -1 ? fallback : argv[index + 1]
+}
+
+const armMaintenance = (cwd, argv) => {
+  const quietSeconds = Number(flagValueOf(argv, '--quiet-seconds', '120'))
+  const ttlMinutes = Number(flagValueOf(argv, '--ttl-minutes', '30'))
+  const armedBy = flagValueOf(argv, '--armed-by', process.env.USER ?? 'operator')
+  const reason = flagValueOf(argv, '--reason', 'workspace isolation migration')
+  const preflight = buildPreflight({ cwd, quietSeconds })
+  if (!preflight.safety.quiet) {
+    const newest = preflight.safety.newestOperation
+    throw new Error(
+      `repository is not quiet: ${preflight.safety.recentOperationCount} operation(s) in the last ${quietSeconds}s` +
+        `${newest === undefined ? '' : ` (newest "${newest.description}" ${newest.ageSeconds}s ago)`}. Wait for agents to stop, then re-arm.`,
+    )
+  }
+  if (preflight.safety.mutatingJjProcesses.length > 0) {
+    throw new Error(
+      `a mutating jj command is in flight; wait for it before arming maintenance mode:\n  ${preflight.safety.mutatingJjProcesses.join('\n  ')}`,
+    )
+  }
+  if (preflight.safety.runningJjProcesses.length > 0) {
+    process.stderr.write(
+      `jj-isolation: note: ${preflight.safety.runningJjProcesses.length} long-running jj process(es) exist (e.g. a branching server). They are not fenced by the guard; confirm they are idle.\n`,
+    )
+  }
+  const gate = {
+    version: 1,
+    token: randomUUID(),
+    armedBy,
+    reason,
+    armedAt: new Date().toISOString(),
+    expiresAt: Date.now() + ttlMinutes * 60_000,
+    ...headFingerprint(cwd),
+  }
+  writeFileSync(maintenancePath(cwd), `${JSON.stringify(gate, null, 2)}\n`, { mode: 0o600 })
+  return gate
+}
+
+const disarmMaintenance = (cwd, argv) => {
+  const path = maintenancePath(cwd)
+  const gate = readMaintenance(cwd)
+  if (gate === undefined) return { removed: false, path }
+  const token = flagValueOf(argv, '--token', process.env.JJ_ISOLATION_MAINTENANCE_TOKEN ?? '')
+  if (token !== gate.token && !argv.includes('--force')) {
+    throw new Error(`refusing to disarm: pass --token <token> or --force (gate ${gate.token})`)
+  }
+  unlinkSync(path)
+  return { removed: true, path }
+}
+
+const migrateCommand = (cwd, argv) => {
+  const name = argv.find(argument => !argument.startsWith('-'))
+  if (name === undefined) throw new Error('usage: jj-isolation migrate <workspace-name> --base <revset> [--apply] [--force]')
+  const base = flagValueOf(argv, '--base', 'integration-spine')
+  const plan = planMigration({ repoRoot: cwd, name, base, force: argv.includes('--force'), acceptGraft: argv.includes('--accept-graft') })
+  if (!argv.includes('--apply')) return { planned: true, plan }
+  const gate = readMaintenance(cwd)
+  if (gate === undefined || gate.expired) throw new Error('maintenance mode is not armed (or has expired): run `jj-isolation maintenance arm` first')
+  const applied = applyMigration({ repoRoot: cwd, name, plan, gate, onEvent: message => process.stderr.write(`  ${message}\n`) })
+  // The fence recorded the pre-migration heads and operation id, so re-arm it for
+  // the next workspace instead of failing the start check on our own change.
+  writeFileSync(maintenancePath(cwd), `${JSON.stringify({ ...gate, ...headFingerprint(cwd) }, null, 2)}\n`, { mode: 0o600 })
+  return { planned: false, plan, applied }
+}
+
+const formatMaintenance = gate =>
+  gate === undefined
+    ? 'maintenance: disarmed'
+    : [
+        `maintenance: ${gate.expired ? 'EXPIRED' : 'ARMED'} by ${gate.armedBy ?? '?'} at ${gate.armedAt ?? '?'}`,
+        `  token    ${gate.token}`,
+        `  reason   ${gate.reason ?? '(none)'}`,
+        `  fence    op ${String(gate.opId ?? '').slice(0, 12)} over ${Object.keys(gate.heads ?? {}).length} workspace(s)`,
+        `  expires  ${gate.expiresAt === undefined ? 'never' : new Date(gate.expiresAt).toISOString()}`,
+      ].join('\n')
+
 const [command, ...rest] = process.argv.slice(2)
 if (command === 'run' || command === 'check') {
   const decision = decide(rest)
@@ -106,12 +194,41 @@ if (command === 'run' || command === 'check') {
   if (decision.decision === 'refuse') process.exit(3)
   execRealJj(decision.decision === 'rewrite' ? decision.argv : rest)
 } else if (command === 'recover') {
+  process.exit(recover(process.cwd(), rest.includes('--json')))
+} else if (command === 'preflight') {
   const cwd = process.cwd()
-  readConfig(cwd) ?? DEFAULT_CONFIG
-  process.exit(recover(cwd, rest.includes('--json')))
+  const preflight = buildPreflight({ cwd, quietSeconds: Number(flagValueOf(rest, '--quiet-seconds', '120')) })
+  process.stdout.write(rest.includes('--json') ? `${JSON.stringify(preflight, null, 2)}\n` : `${formatPreflight(preflight)}\n`)
+  process.exit(preflight.safety.quiet ? 0 : 3)
+} else if (command === 'migrate') {
+  try {
+    const result = migrateCommand(process.cwd(), rest)
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+    process.exit(result.planned ? 0 : 0)
+  } catch (error) {
+    process.stderr.write(`jj-isolation: ${error.message}\n`)
+    process.exit(3)
+  }
+} else if (command === 'maintenance') {
+  const action = rest[0]
+  const asJson = rest.includes('--json')
+  try {
+    if (action === 'arm') {
+      const gate = armMaintenance(process.cwd(), rest)
+      process.stdout.write(asJson ? `${JSON.stringify(gate, null, 2)}\n` : `${formatMaintenance(gate)}\n`)
+    } else if (action === 'disarm') {
+      const result = disarmMaintenance(process.cwd(), rest)
+      process.stdout.write(asJson ? `${JSON.stringify(result, null, 2)}\n` : `${result.removed ? `disarmed (${result.path})` : 'maintenance was not armed'}\n`)
+    } else {
+      const gate = readMaintenance(process.cwd())
+      process.stdout.write(asJson ? `${JSON.stringify(gate ?? null, null, 2)}\n` : `${formatMaintenance(gate)}\n`)
+    }
+  } catch (error) {
+    process.stderr.write(`jj-isolation: ${error.message}\n`)
+    process.exit(3)
+  }
 } else if (command === 'footprint') {
-  const cwd = process.cwd()
-  process.stdout.write(`${[...rewriteFootprint(cwd, rest)].join('\n')}\n`)
+  process.stdout.write(`${[...rewriteFootprint(process.cwd(), rest)].join('\n')}\n`)
 } else {
   process.stderr.write(USAGE)
   process.exit(command === undefined || command === '--help' || command === '-h' ? 0 : 2)

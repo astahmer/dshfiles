@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 
 /**
@@ -201,6 +201,9 @@ export const readJj = ({ args, cwd }) => {
 
 export const workspaceHeads = cwd => parseWorkspaceHeads(readJj({ args: ['workspace', 'list', '-T', WORKSPACE_TEMPLATE], cwd }))
 
+/** Same data as `workspaceHeads`, keyed by workspace name. */
+export const workspaceHeadMap = cwd => Object.fromEntries(workspaceHeads(cwd).map(entry => [entry.name, entry.commit]))
+
 export const currentHead = cwd => readJj({ args: ['log', '-r', '@', '--no-graph', '-T', 'commit_id'], cwd }).trim()
 
 export const resolveCommitId = (cwd, revision) => readJj({ args: ['log', '-r', revision, '--no-graph', '-T', 'commit_id'], cwd }).trim().split('\n')[0]?.trim() ?? ''
@@ -227,12 +230,54 @@ export const isAncestorOf = (cwd, ancestor, descendant) => {
   return readJj({ args: ['log', '-r', `${ancestor} & ::${descendant}`, '--no-graph', '-T', 'commit_id'], cwd }).trim().length > 0
 }
 
+/** The shared store directory: `<ws>/.jj/repo` is a directory for the default
+ *  workspace and a file naming the store for every added workspace. */
 export const storeRoot = workspaceRoot => {
   const marker = join(workspaceRoot, '.jj', 'repo')
-  if (!existsSync(marker)) return workspaceRoot
+  if (!existsSync(marker)) return join(workspaceRoot, '.jj')
+  if (statSync(marker).isDirectory()) return marker
   const contents = readFileSync(marker, 'utf8').trim()
-  if (contents.length === 0) return workspaceRoot
-  return isAbsolute(contents) ? contents : resolve(workspaceRoot, contents)
+  if (contents.length === 0) return marker
+  return isAbsolute(contents) ? contents : resolve(join(workspaceRoot, '.jj'), contents)
+}
+
+export const MAINTENANCE_FILE = 'jj-isolation-maintenance.json'
+
+/**
+ * Maintenance mode is a fence, not a request: while it is armed, the guard
+ * refuses mutating commands from every process except the one holding the token.
+ * The fence records the operation id and every workspace head at arm time, so a
+ * migration aborts instead of proceeding when anything moved underneath it.
+ */
+export const maintenancePath = workspaceRoot => join(storeRoot(workspaceRoot), MAINTENANCE_FILE)
+
+export const readMaintenance = workspaceRoot => {
+  const path = maintenancePath(workspaceRoot)
+  if (!existsSync(path)) return undefined
+  try {
+    const gate = JSON.parse(readFileSync(path, 'utf8'))
+    if (typeof gate.token !== 'string' || typeof gate.opId !== 'string') return undefined
+    return { ...gate, expired: typeof gate.expiresAt === 'number' && Date.now() > gate.expiresAt }
+  } catch {
+    return undefined
+  }
+}
+
+export const headFingerprint = cwd => {
+  const heads = Object.fromEntries(workspaceHeads(cwd).map(entry => [entry.name, entry.commit]).sort())
+  return { opId: readJj({ args: ['op', 'log', '-n', '1', '-T', 'id'], cwd }).trim(), heads }
+}
+
+export const fenceHolds = (cwd, gate) => {
+  const current = headFingerprint(cwd)
+  const drifted = Object.entries(current.heads).filter(([name, commit]) => gate.heads?.[name] !== commit)
+  const appeared = Object.entries(current.heads).filter(([name]) => gate.heads?.[name] === undefined)
+  return {
+    ok: current.opId === gate.opId && drifted.length === 0 && appeared.length === 0,
+    current,
+    drifted,
+    appeared,
+  }
 }
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -247,7 +292,12 @@ export const DEFAULT_CONFIG = Object.freeze({
 
 export const readConfig = cwd => {
   const explicit = process.env.JJ_ISOLATION_CONFIG
-  const candidates = explicit === undefined ? [join(cwd, '.jj', 'jj-isolation.json')] : [explicit]
+  // Per-workspace first, then the store-wide file, so enabling a repository
+  // covers every added workspace and not only the one that wrote the file.
+  const candidates =
+    explicit === undefined
+      ? [join(cwd, '.jj', 'jj-isolation.json'), join(storeRoot(cwd), 'jj-isolation.json')]
+      : [explicit]
   for (const path of candidates) {
     if (!existsSync(path)) continue
     try {
@@ -277,6 +327,18 @@ export const evaluate = ({ cwd, argv }) => {
   const { subcommand, rest } = parseArgv(argv)
   if (!MUTATING_SUBCOMMANDS.includes(subcommand)) return allow('not-a-mutating-subcommand')
   const config = readConfig(cwd) ?? DEFAULT_CONFIG
+
+  const gate = readMaintenance(cwd)
+  if (gate !== undefined && !gate.expired) {
+    const token = (process.env.JJ_ISOLATION_MAINTENANCE_TOKEN ?? '').trim()
+    if (token !== gate.token) {
+      return refuse(
+        'maintenance-active',
+        `Maintenance mode is armed by ${gate.armedBy ?? 'an operator'}: ${gate.reason ?? 'workspace migration in progress'}.`,
+        `Mutating jj commands are refused so an in-flight migration cannot race you. Wait for disarm, or ask the operator to disarm the gate.`,
+      )
+    }
+  }
 
   if (subcommand === 'op restore' || subcommand === 'op revert' || subcommand === 'util gc') {
     if (process.env.JJ_ISOLATION_ALLOW_REPO_WIDE === '1') return allow('repo-wide-override')
