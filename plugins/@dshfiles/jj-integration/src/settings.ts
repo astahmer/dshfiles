@@ -80,9 +80,13 @@ export const jjIntegrationSettings = defineSettings({
         .max(3_650)
         .default(7)
         .description('Days without meaningful activity before an idle workspace becomes eligible for cleanup.'),
-      dryRun: Schema.boolean().default(false).description('Report what cleanup would remove and remove nothing. Manual cleanup can also be run as a dry run.'),
+      dryRun: Schema.boolean()
+        .default(true)
+        .description(
+          'Report what cleanup would remove and remove nothing. On by default: unattended deletion stays off until the eligible list has been reviewed against real workspaces. Manual cleanup can also be run as a dry run.',
+        ),
     })
-      .default({ enabled: true, idleAfterDays: 1, deleteAfterDays: 7, dryRun: false })
+      .default({ enabled: true, idleAfterDays: 1, deleteAfterDays: 7, dryRun: true })
       .description(
         'Automatic removal of idle thread workspaces. It removes a registration and a disposable directory only: no revision is abandoned and no bookmark moves.',
       ),
