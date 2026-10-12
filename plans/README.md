@@ -4,38 +4,38 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 
 ## Product and plugin work
 
-| Plan | Scope |
-|---|---|
-| Agent Communication | [Implementation plan](agent-communication-observability.md); [acceptance tracker](agent-communication-observability/README.md). Remaining scratch/browser acceptance. |
-| [Agent communication + session tools integration](agent-communication-integration/README.md) | Audit of the two prior handoffs: passive-coordination invariants, session-tool read-only fixes, shared contracts, and next-handoff gates. |
-| [Jujutsu integration coordinator](jj-integration-coordinator/README.md) | Workspace lifecycle, durable serialized integration queue, canonical bookmark advancement, and real-jj evidence. |
-| [Agent session history](agent-session-history.md) | Discovery and design proposal; no implementation claim. |
-| [Agent session observability](agent-session-observability/README.md) | Read-only cross-session visibility; scoped directory and workspace lookup landed, task/history access and all Session writes pending. |
-| [Async Agent questions](async-agent-questions.md) | Native/root acceptance and unresolved Host boundaries beyond the implemented plugin contract. |
-| [AI Accounts: Claude and Cursor](claude-cursor-accounts.md) | Provider runtime and real-account acceptance gates. |
-| [Command Palette](command-palette/README.md) | Remaining composed UI/style and profile acceptance. |
-| [Queue attachment editing](queue-attachment-editing.md) | Proposed Host-level attachment-preserving edit; not established by the current workaround. |
-| [Command Code route](own-commandcode-route.md) | Remaining provider route and third-party removal gates. |
-| [Session handoff](session-handoff.md) | Open coordinator items without another owning plan (restart prerequisites, follow-ups). |
-| [Settings Search native Editor owner](settings-search-native-owner/README.md) | Native `openFileLinks` owner route for the Editor setting; needs the newer core client contract and a scratch-runtime proof before promotion. |
-| [Workspace folder picker](workspace-folder-picker/README.md) | Isolated journeys pass and the owned bundle is synced to web; live activation awaits a compatible Core rollout and user-controlled restart. |
-| [Plugin boot integrity](plugin-boot-integrity.md) | Cross-plugin profile composition and runtime acceptance. |
+| Plan                                                                                         | Scope                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent Communication                                                                          | [Implementation plan](agent-communication-observability.md); [acceptance tracker](agent-communication-observability/README.md). Remaining scratch/browser acceptance. |
+| [Agent communication + session tools integration](agent-communication-integration/README.md) | Audit of the two prior handoffs: passive-coordination invariants, session-tool read-only fixes, shared contracts, and next-handoff gates.                             |
+| [Jujutsu integration coordinator](jj-integration-coordinator/README.md)                      | Workspace lifecycle, durable serialized integration queue, canonical bookmark advancement, and real-jj evidence.                                                      |
+| [Agent session history](agent-session-history.md)                                            | Discovery and design proposal; no implementation claim.                                                                                                               |
+| [Agent session observability](agent-session-observability/README.md)                         | Read-only cross-session visibility; scoped directory and workspace lookup landed, task/history access and all Session writes pending.                                 |
+| [Async Agent questions](async-agent-questions.md)                                            | Native/root acceptance and unresolved Host boundaries beyond the implemented plugin contract.                                                                         |
+| [AI Accounts: Claude and Cursor](claude-cursor-accounts.md)                                  | Provider runtime and real-account acceptance gates.                                                                                                                   |
+| [Command Palette](command-palette/README.md)                                                 | Remaining composed UI/style and profile acceptance.                                                                                                                   |
+| [Queue attachment editing](queue-attachment-editing.md)                                      | Proposed Host-level attachment-preserving edit; not established by the current workaround.                                                                            |
+| [Command Code route](own-commandcode-route.md)                                               | Remaining provider route and third-party removal gates.                                                                                                               |
+| [Session handoff](session-handoff.md)                                                        | Open coordinator items without another owning plan (restart prerequisites, follow-ups).                                                                               |
+| [Settings Search native Editor owner](settings-search-native-owner/README.md)                | Native `openFileLinks` owner route for the Editor setting; needs the newer core client contract and a scratch-runtime proof before promotion.                         |
+| [Workspace folder picker](workspace-folder-picker/README.md)                                 | Isolated journeys pass and the owned bundle is synced to web; live activation awaits a compatible Core rollout and user-controlled restart.                           |
+| [Plugin boot integrity](plugin-boot-integrity.md)                                            | Cross-plugin profile composition and runtime acceptance.                                                                                                              |
 
 ## Cross-plugin, toolchain, and product research
 
-| Plan | Scope |
-|---|---|
-| ADE | [Roadmap](ade/README.md), [docking evidence](ade/docking.md), [editor notes](ade/editor.md), [performance baseline](ade/perf-baseline.md), [decisions](ade/decisions.md). Shipped behavior is in plugin guides. |
-| DSH customization | [Product brief](dsh-customization/README.md), [integration review](dsh-customization/integration-review.md). Cross-plugin product scope. |
-| [DSH end-to-end testing](dsh-e2e-testing.md) | Test architecture and coverage strategy. |
-| [Host gaps](dsh-host-gaps.md) | Candidate native API gaps across owned plugins. |
-| Exhaustive plugin E2E | [Plan](plugin-e2e-coverage.md), [implementation tracker](plugin-e2e-coverage/README.md). Catalog and browser-journey implementation; acceptance remains open. |
-| Multi-host | [Architecture](multi-host/README.md), [phase tracker](multi-host/implementation.md); completed validation receipts live in the package docs. |
-| [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark plus full-plugin build/repository acceptance gates; backlog/Explorer behavior is in package docs. |
-| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption shortlist. |
-| [Repository hardening](repo-hardening/README.md) | Remaining repo/toolchain hardening tasks. |
-| [Software additions roadmap](software-additions-roadmap.md) | Cross-product roadmap and release gates. |
-| [Desktop shell](desktop-shell/README.md) | Desktop lifecycle and distribution gates. |
+| Plan                                                          | Scope                                                                                                                                                                                                           |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ADE                                                           | [Roadmap](ade/README.md), [docking evidence](ade/docking.md), [editor notes](ade/editor.md), [performance baseline](ade/perf-baseline.md), [decisions](ade/decisions.md). Shipped behavior is in plugin guides. |
+| DSH customization                                             | [Product brief](dsh-customization/README.md), [integration review](dsh-customization/integration-review.md). Cross-plugin product scope.                                                                        |
+| [DSH end-to-end testing](dsh-e2e-testing.md)                  | Test architecture and coverage strategy.                                                                                                                                                                        |
+| [Host gaps](dsh-host-gaps.md)                                 | Candidate native API gaps across owned plugins.                                                                                                                                                                 |
+| Exhaustive plugin E2E                                         | [Plan](plugin-e2e-coverage.md), [implementation tracker](plugin-e2e-coverage/README.md). Catalog and browser-journey implementation; acceptance remains open.                                                   |
+| Multi-host                                                    | [Architecture](multi-host/README.md), [phase tracker](multi-host/implementation.md); completed validation receipts live in the package docs.                                                                    |
+| [OptMem remaining validation](optmem/README.md)               | Quiet 100k-event benchmark plus full-plugin build/repository acceptance gates; backlog/Explorer behavior is in package docs.                                                                                    |
+| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption shortlist.                                                                                                                                                                  |
+| [Repository hardening](repo-hardening/README.md)              | Remaining repo/toolchain hardening tasks.                                                                                                                                                                       |
+| [Software additions roadmap](software-additions-roadmap.md)   | Cross-product roadmap and release gates.                                                                                                                                                                        |
+| [Desktop shell](desktop-shell/README.md)                      | Desktop lifecycle and distribution gates.                                                                                                                                                                       |
 
 ## Index maintenance
 

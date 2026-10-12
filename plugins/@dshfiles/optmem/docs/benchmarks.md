@@ -246,11 +246,11 @@ noisier than the first run.
 20 minutes for the 1-minute load average to fall under 6; it stayed between 17 and 38. The runs went ahead anyway,
 so this is still not a quiet-machine baseline.
 
-| run | 1-min load (start → end) | build from scratch | append        |
-| --- | ------------------------ | ------------------ | ------------- |
-| 1   | 16.9 → 18.3              | 62.4 s             | 5,072 ev/s    |
-| 2   | 18.3 → 16.5              | 70.4 s             | 6,018 ev/s    |
-| 3   | 16.5 → 12.9              | 47.2 s             | 6,080 ev/s    |
+| run | 1-min load (start → end) | build from scratch | append     |
+| --- | ------------------------ | ------------------ | ---------- |
+| 1   | 16.9 → 18.3              | 62.4 s             | 5,072 ev/s |
+| 2   | 18.3 → 16.5              | 70.4 s             | 6,018 ev/s |
+| 3   | 16.5 → 12.9              | 47.2 s             | 6,080 ev/s |
 
 Median of the three runs, each value taken separately:
 
