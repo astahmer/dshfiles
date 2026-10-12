@@ -22,7 +22,9 @@ export const boundedSummary = async (request: {
 }): Promise<BoundedSummary> => {
   let shortest: { readonly text: string; readonly model: string } | undefined
   let previousBytes: number | null = null
+  let attempts = 0
   for (let attempt = 0; attempt <= request.retries; attempt++) {
+    attempts = attempt + 1
     const budget = Math.max(32, Math.floor(request.maxBytes * (1 - 0.2 * attempt)))
     const result = await request.summarizer.summarize({
       kind: request.kind,
@@ -38,8 +40,12 @@ export const boundedSummary = async (request: {
     if (text.length === 0) throw new Error(`summarizer returned an empty ${request.kind} summary for ${request.address}`)
     const bytes = Utf8.byteLength(text)
     if (shortest === undefined || bytes < Utf8.byteLength(shortest.text)) shortest = { text, model: result.model }
-    if (bytes <= request.maxBytes) return { text, model: result.model, clipped: false, calls: attempt + 1 }
+    if (bytes <= request.maxBytes) return { text, model: result.model, clipped: false, calls: attempts }
     previousBytes = bytes
+    // A merge input is already two at-ceiling nodes, so re-asking with a slightly tighter budget cannot produce a
+    // faithful fusion; that retry loop measured as over half of all summary calls at depth. Leaf inputs still differ
+    // enough in size that a stricter budget genuinely helps, so only merges stop early.
+    if (request.kind === 'merge') break
   }
   const best = shortest ?? { text: '', model: 'none' }
   request.logger.warn('optmem summary clipped after retries', {
@@ -47,6 +53,7 @@ export const boundedSummary = async (request: {
     address: request.address,
     bytes: Utf8.byteLength(best.text),
     maxBytes: request.maxBytes,
+    calls: attempts,
   })
-  return { text: Utf8.clip(best.text, request.maxBytes), model: `clipped:${best.model}`, clipped: true, calls: request.retries + 1 }
+  return { text: Utf8.clip(best.text, request.maxBytes), model: `clipped:${best.model}`, clipped: true, calls: attempts }
 }

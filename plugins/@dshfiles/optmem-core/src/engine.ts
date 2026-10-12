@@ -45,6 +45,12 @@ export const defaultMemoryConfig: MemoryConfig = {
   contextEventBytes: 1_024,
   redactLiterals: [],
   excludeTools: [],
+  leafFallbackAfterAttempts: 3,
+  catchUpIntervalMs: 15_000,
+  // Deliberately gentle: recovery is bounded per sweep and rate-limited so a restart never unleashes a whole backlog.
+  catchUpBatchPerStream: 50,
+  maxQueuedPerStream: 500,
+  summaryCallsPerMinute: 60,
 }
 
 export type MemoryEngineOptions = {
@@ -134,7 +140,24 @@ export type MemoryStatus = {
   readonly queueByStream: readonly { readonly stream: StreamId; readonly leaves: number; readonly parents: number; readonly running: number }[]
   readonly failures: { readonly count: number; readonly lastError: string | null; readonly retryInMs: number | null }
   readonly failuresByStream: readonly { readonly stream: StreamId; readonly count: number }[]
-  readonly summarizer: { readonly calls: number; readonly clips: number }
+  /** Failed jobs that will still come back on the backoff timer, per stream. */
+  readonly retryingByStream: readonly { readonly stream: StreamId; readonly count: number }[]
+  readonly summarizer: {
+    readonly calls: number
+    readonly clips: number
+    /** Leaves rebuilt from clipped text after repeated model failure; each one unblocked a stream's view. */
+    readonly fallbacks: number
+    readonly callsLastMinute: number
+    readonly rateLimitPerMinute: number
+  }
+  /** Bounded background recovery: how far the sweeps have got and what they queued. */
+  readonly catchUp: {
+    readonly rounds: number
+    readonly enqueued: number
+    readonly lastScanAt: number | null
+    /** Streams that still have missing leaves, i.e. the backlog is not empty. */
+    readonly streamsWithMissingLeaves: number
+  }
   readonly merges: number
   readonly search: { readonly cursor: number; readonly lag: number; readonly error: string | null } | null
   readonly closed: boolean
@@ -246,10 +269,16 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   const clock: Clock = options.clock ?? { now: () => Date.now() }
   const logger: MemoryLogger = options.logger ?? { warn: () => {} }
 
-  const leafQueue = new Fifo<Job>()
-  const parentQueue = new Fifo<Job>()
+  // Jobs are queued per stream and served round-robin: a stream with a huge backlog cannot starve the others.
+  const queues = new Map<StreamId, { readonly leaves: Fifo<Job>; readonly parents: Fifo<Job> }>()
+  const streamOrder: StreamId[] = []
+  let orderCursor = 0
   const queued = new Set<string>()
   const workByStream = new Map<StreamId, { leaves: number; parents: number; running: number }>()
+  // Bounded background recovery state: how far each stream's sweep has reached, and what it has queued.
+  const scanPositions = new Map<StreamId, number>()
+  const catchUpState = { rounds: 0, enqueued: 0, lastScanAt: null as number | null, streamsWithMissingLeaves: 0 }
+  const rateWindow = { startedAt: 0, calls: 0 }
   const failed = new Map<string, Job>()
   const retryableFailed = new Map<string, Job>()
   const attempts = new Map<string, number>()
@@ -272,6 +301,8 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   let retryTimer: ReturnType<typeof setTimeout> | undefined
   let retryAt: number | null = null
   let consecutiveFailures = 0
+  let catchUpTimer: ReturnType<typeof setTimeout> | undefined
+  let fallbacks = 0
 
   const cacheView = (cached: CachedView): void => {
     const key = viewKey(cached.view.stream, cached.view.kind)
@@ -286,7 +317,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
   }
 
   const isQuiet = (): boolean => running === 0 && indexing === undefined && ![...runners.values()].some(runner => runner.running)
-  const isIdle = (): boolean => isQuiet() && leafQueue.size === 0 && parentQueue.size === 0
+  const isIdle = (): boolean => isQuiet() && queued.size === 0
 
   const checkIdle = (): void => {
     if (isQuiet()) for (const resolve of quietWaiters.splice(0)) resolve()
@@ -333,14 +364,46 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     return state
   }
 
-  const enqueue = (job: Job): void => {
+  const streamQueues = (stream: StreamId): { readonly leaves: Fifo<Job>; readonly parents: Fifo<Job> } => {
+    let queue = queues.get(stream)
+    if (queue === undefined) {
+      queue = { leaves: new Fifo<Job>(), parents: new Fifo<Job>() }
+      queues.set(stream, queue)
+      streamOrder.push(stream)
+    }
+    return queue
+  }
+
+  /** Returns false when the job is already queued or the stream is at its queue ceiling; catch-up retries it later. */
+  const enqueue = (job: Job): boolean => {
     const key = jobKey(job)
-    if (queued.has(key)) return
-    queued.add(key)
+    if (queued.has(key)) return false
     const state = workState(job.stream)
+    if (state.leaves + state.parents + state.running >= config.maxQueuedPerStream) return false
+    queued.add(key)
     if (job.kind === 'leaf') state.leaves++
     else state.parents++
-    ;(job.kind === 'leaf' ? leafQueue : parentQueue).push(job)
+    const queue = streamQueues(job.stream)
+    ;(job.kind === 'leaf' ? queue.leaves : queue.parents).push(job)
+    return true
+  }
+
+  /** Round-robin across streams; parents jump ahead only while a merge batch is waiting on them. */
+  const shiftJob = (): Job | undefined => {
+    const total = streamOrder.length
+    if (total === 0) return undefined
+    const parentsFirst = pendingMerges.size > 0
+    for (let step = 0; step < total; step++) {
+      const index = (orderCursor + step) % total
+      const stream = streamOrder[index]
+      const queue = stream === undefined ? undefined : queues.get(stream)
+      if (queue === undefined) continue
+      const job = parentsFirst ? (queue.parents.shift() ?? queue.leaves.shift()) : (queue.leaves.shift() ?? queue.parents.shift())
+      if (job === undefined) continue
+      orderCursor = (index + 1) % total
+      return job
+    }
+    return undefined
   }
 
   const retryFailed = (): void => {
@@ -367,8 +430,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
 
   const pump = (): void => {
     while (!closed && running < config.concurrency) {
-      // A blocked merge batch waits on parents, so they jump ahead of backlog leaves until it resolves.
-      const job = pendingMerges.size > 0 ? (parentQueue.shift() ?? leafQueue.shift()) : (leafQueue.shift() ?? parentQueue.shift())
+      const job = shiftJob()
       if (!job) return
       const streamWork = workState(job.stream)
       if (job.kind === 'leaf') streamWork.leaves--
@@ -395,6 +457,26 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     }
   }
 
+  /** Rolling-minute cap on model calls; 0 disables it. Waiting here is deliberate backpressure, not a stall. */
+  const reserveSummarySlot = async (): Promise<void> => {
+    const limit = config.summaryCallsPerMinute
+    if (limit <= 0) return
+    for (;;) {
+      const now = clock.now()
+      if (now - rateWindow.startedAt >= 60_000) {
+        rateWindow.startedAt = now
+        rateWindow.calls = 0
+      }
+      if (rateWindow.calls < limit) {
+        rateWindow.calls++
+        return
+      }
+      // Poll in short steps rather than sleeping the whole window: the clock can advance independently, and a long
+      // sleep would also hold a concurrency slot unresponsive.
+      await new Promise<void>(resolve => setTimeout(resolve, Math.min(1_000, Math.max(50, 60_000 - (now - rateWindow.startedAt)))))
+    }
+  }
+
   const summarize = async (request: {
     readonly kind: 'leaf' | 'merge'
     readonly stream: StreamId
@@ -402,6 +484,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     readonly address: NodeAddress
     readonly input: readonly string[]
   }) => {
+    await reserveSummarySlot()
     const { kind, stream, conversationId, address, input } = request
     const summary = await boundedSummary({
       summarizer,
@@ -443,6 +526,33 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (sibling) enqueue({ kind: 'parent', stream, address: TreeMath.parent(address) })
   }
 
+  /**
+   * A node that cannot be summarized must not freeze its stream or retry forever: once it is explicitly
+   * non-retryable or has burned `leafFallbackAfterAttempts`, it is materialized from clipped text.
+   */
+  const fallbackDue = (job: Job, error: unknown): boolean => {
+    const attempt = (attempts.get(jobKey(job)) ?? 0) + 1
+    const permanent = error instanceof Error && 'retryable' in error && error.retryable === false
+    return permanent || attempt >= config.leafFallbackAfterAttempts
+  }
+
+  const buildFallbackLeaf = async (stream: StreamId, pos: number) => {
+    const [entry] = await store.readStream(stream, pos, pos + 1)
+    if (!entry) return undefined
+    // Keep the tail as well as the head: error names and next actions live at the end of tool output.
+    return { text: Utf8.boundHeadTail(`${entry.event.role}: ${entry.event.text}`, config.maxNodeBytes).text, model: 'unsummarized', eventId: entry.event.id }
+  }
+
+  const buildFallbackParent = async (stream: StreamId, address: NodeAddress) => {
+    const children = TreeMath.children(address)
+    if (!children) return undefined
+    const childNodes = await store.getNodes(stream, children)
+    const left = childNodes.find(node => node.address.idx === children[0].idx)
+    const right = childNodes.find(node => node.address.idx === children[1].idx)
+    if (!left || !right) return undefined
+    return { text: Utf8.boundHeadTail(`${left.text}\n${right.text}`, config.maxNodeBytes).text, model: 'unsummarized', eventId: null }
+  }
+
   const runJob = async (job: Job): Promise<void> => {
     const address = job.kind === 'leaf' ? { level: 0, idx: job.pos } : job.address
     const [existing] = await store.getNodes(job.stream, [address])
@@ -450,7 +560,17 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       if (job.kind === 'leaf') await afterNodeSaved(job.stream, address)
       return
     }
-    const built = job.kind === 'leaf' ? await buildLeaf(job.stream, job.pos) : await buildParent(job.stream, job.address)
+    let built
+    try {
+      built = job.kind === 'leaf' ? await buildLeaf(job.stream, job.pos) : await buildParent(job.stream, job.address)
+    } catch (error) {
+      if (!fallbackDue(job, error)) throw error
+      built = job.kind === 'leaf' ? await buildFallbackLeaf(job.stream, job.pos) : await buildFallbackParent(job.stream, job.address)
+      if (built) {
+        fallbacks++
+        logger.warn('optmem node fell back to clipped text', { stream: job.stream, job: jobKey(job), error: errorMessage(error) })
+      }
+    }
     if (!built) return
     await store.saveNode({ ...built, stream: job.stream, address, bytes: Utf8.byteLength(built.text), createdAt: clock.now() })
     await afterNodeSaved(job.stream, address)
@@ -641,24 +761,70 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (!Scopes.canRead(stream, access, conversationProject)) throw new MemoryError('scope-denied', `${stream} is outside this conversation's memory scope`)
   }
 
+  /**
+   * Bounded, fair recovery: sweeps every stream for missing leaves and queues at most one batch per stream, then
+   * repeats on a timer. A long-lived process therefore keeps finding backlog that appeared after `start`, instead of
+   * only recovering at boot.
+   */
+  const catchUpScan = async (): Promise<number> => {
+    if (closed) return 0
+    let enqueuedNow = 0
+    let withMissing = 0
+    for (const { stream, length } of await store.listStreams()) {
+      if (closed) break
+      const { view } = await loadView(stream)
+      const from = Math.max(view.throughPos, scanPositions.get(stream) ?? view.throughPos)
+      const positions = await store.listMissingLeaves(stream, from, config.catchUpBatchPerStream)
+      if (positions.length > 0) withMissing++
+      for (const pos of positions) if (enqueue({ kind: 'leaf', stream, pos })) enqueuedNow++
+      const last = positions[positions.length - 1]
+      const more = positions.length >= config.catchUpBatchPerStream && last !== undefined
+      scanPositions.set(stream, more ? last + 1 : view.throughPos)
+      if (!more) {
+        const parents = await store.listBuildableParents(stream)
+        for (const address of parents.slice(0, config.catchUpBatchPerStream)) if (enqueue({ kind: 'parent', stream, address })) enqueuedNow++
+      }
+      if (view.throughPos < length) markViewDirty(stream)
+    }
+    catchUpState.rounds++
+    catchUpState.enqueued += enqueuedNow
+    catchUpState.lastScanAt = clock.now()
+    catchUpState.streamsWithMissingLeaves = withMissing
+    return enqueuedNow
+  }
+
+  const scheduleCatchUp = (): void => {
+    if (catchUpTimer !== undefined || closed || config.catchUpIntervalMs <= 0) return
+    catchUpTimer = setTimeout(() => {
+      catchUpTimer = undefined
+      void (async () => {
+        try {
+          await catchUpScan()
+          pump()
+        } catch (error) {
+          recordFailure(undefined, error)
+        } finally {
+          scheduleCatchUp()
+          checkIdle()
+        }
+      })()
+    }, config.catchUpIntervalMs)
+  }
+
   const start = async (): Promise<void> => {
     closed = false
-    for (const { stream, length } of await store.listStreams()) {
-      const { view } = await loadView(stream)
-      const { view: compact } = await loadView(stream, 'compact')
-      for (const pos of await store.listMissingLeaves(stream, view.throughPos)) enqueue({ kind: 'leaf', stream, pos })
-      for (const address of await store.listBuildableParents(stream)) enqueue({ kind: 'parent', stream, address })
-      if (view.throughPos < length || view.mergePending || compact.throughPos < length || compact.mergePending) markViewDirty(stream)
-    }
+    await catchUpScan()
     scheduleIndex()
     pump()
+    scheduleCatchUp()
   }
 
   const append = async (inputs: readonly MemoryEventInput[]): Promise<AppendResult> => {
     if (closed) throw new MemoryError('closed', 'memory engine is closed')
     const events = await store.appendEvents(inputs.map(input => normalizeEvent(input, config)))
     for (const event of events) for (const entry of event.entries) enqueue({ kind: 'leaf', stream: entry.stream, pos: entry.pos })
-    retryFailed()
+    // Failed jobs come back on the backoff timer or the next catch-up sweep; re-queuing every failure on every append
+    // re-submitted thousands of doomed model calls per batch.
     pump()
     scheduleIndex()
     return { events, inserted: events.filter(event => event.inserted).length }
@@ -668,6 +834,7 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (closed) throw new MemoryError('closed', 'memory engine is closed')
     const entries = await store.moveStream(request)
     for (const kind of viewKinds) views.delete(viewKey(request.from, kind))
+    scanPositions.delete(request.to)
     for (const entry of entries) enqueue({ kind: 'leaf', stream: entry.stream, pos: entry.pos })
     pump()
     return entries.length
@@ -678,7 +845,8 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     const { view: current } = await loadView(request.stream)
     let barrierTimedOut = false
     if (current.throughPos < length) {
-      retryFailed()
+      // No blanket retryFailed here: on a stuck stream that re-submitted thousands of doomed calls on every turn.
+      // The backoff timer and the catch-up sweep own retries now.
       pump()
       markViewDirty(request.stream)
       barrierTimedOut = !(await waitForView(request.stream, length, request.barrierMs ?? config.barrierMs))
@@ -860,13 +1028,29 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
       .map(([stream, work]) => ({ stream, leaves: work.leaves, parents: work.parents, running: work.running }))
     const failedByStream = new Map<StreamId, number>()
     for (const job of failed.values()) failedByStream.set(job.stream, (failedByStream.get(job.stream) ?? 0) + 1)
+    const retryingByStream = new Map<StreamId, number>()
+    for (const job of retryableFailed.values()) retryingByStream.set(job.stream, (retryingByStream.get(job.stream) ?? 0) + 1)
+    let queuedLeaves = 0
+    let queuedParents = 0
+    for (const work of workByStream.values()) {
+      queuedLeaves += work.leaves
+      queuedParents += work.parents
+    }
     return {
       streams,
-      queue: { leaves: leafQueue.size, parents: parentQueue.size, running, parentsFirst: pendingMerges.size > 0 },
+      queue: { leaves: queuedLeaves, parents: queuedParents, running, parentsFirst: pendingMerges.size > 0 },
       queueByStream,
       failures: { count: failed.size, lastError, retryInMs: retryAt === null ? null : Math.max(0, retryAt - clock.now()) },
       failuresByStream: [...failedByStream.entries()].map(([stream, count]) => ({ stream, count })),
-      summarizer: { calls: summaryCalls, clips: summaryClips },
+      retryingByStream: [...retryingByStream.entries()].map(([stream, count]) => ({ stream, count })),
+      summarizer: {
+        calls: summaryCalls,
+        clips: summaryClips,
+        fallbacks,
+        callsLastMinute: clock.now() - rateWindow.startedAt < 60_000 ? rateWindow.calls : 0,
+        rateLimitPerMinute: config.summaryCallsPerMinute,
+      },
+      catchUp: { ...catchUpState },
       merges,
       search: searchStatus ? { ...searchStatus, error: searchError } : null,
       closed,
@@ -880,6 +1064,8 @@ export const createMemoryEngine = (options: MemoryEngineOptions): MemoryEngine =
     if (retryTimer !== undefined) clearTimeout(retryTimer)
     retryTimer = undefined
     retryAt = null
+    if (catchUpTimer !== undefined) clearTimeout(catchUpTimer)
+    catchUpTimer = undefined
     return isQuiet() ? Promise.resolve() : new Promise(resolve => quietWaiters.push(resolve))
   }
 

@@ -109,7 +109,8 @@ export interface MemoryStore {
   /** First write wins; returns whether this call inserted the node. */
   saveNode(node: MemoryNode): Promise<boolean>
   findLeafByEvent(eventId: number): Promise<MemoryNode | undefined>
-  listMissingLeaves(stream: StreamId, fromPos: number): Promise<readonly number[]>
+  /** Positions at or after `fromPos` with no level-0 node, in stream order; `limit` bounds one catch-up batch. */
+  listMissingLeaves(stream: StreamId, fromPos: number, limit?: number | undefined): Promise<readonly number[]>
   listBuildableParents(stream: StreamId): Promise<readonly NodeAddress[]>
   getView(stream: StreamId, kind?: ViewKind): Promise<ViewState | undefined>
   /** Optimistic: writes only when the stored version equals `expectedVersion`; a `main` view also moves the `leaf` cursor. */
@@ -187,6 +188,20 @@ export type MemoryConfig = {
   readonly contextEventBytes: number
   readonly redactLiterals: readonly string[]
   readonly excludeTools: readonly string[]
+  /**
+   * A leaf whose model call keeps failing is rebuilt from clipped event text with `model: 'unsummarized'` once it
+   * reaches this attempt count (or immediately when the error is explicitly non-retryable). Without it one poisoned
+   * position blocks its stream's view and injected memory forever.
+   */
+  readonly leafFallbackAfterAttempts: number
+  /** Milliseconds between bounded catch-up sweeps for missing leaves and parents. 0 disables the timer. */
+  readonly catchUpIntervalMs: number
+  /** Leaves (and parents) one stream may contribute to a single catch-up sweep. */
+  readonly catchUpBatchPerStream: number
+  /** Upper bound on jobs queued per stream, so one huge backlog cannot flood the scheduler. */
+  readonly maxQueuedPerStream: number
+  /** Model calls allowed per rolling minute across all streams; 0 means unlimited. */
+  readonly summaryCallsPerMinute: number
 }
 
 export type MemoryScope = 'conversation' | 'project' | 'global' | 'all-projects'

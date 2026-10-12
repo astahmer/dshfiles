@@ -22,23 +22,32 @@ const logger = { warn: (message: string) => void warnings.push(message) }
 const base = { logger, kind: 'merge' as const, stream: 'global' as const, conversationId: 'c1', address: '0+2', input: ['a', 'b'], maxBytes: 100, retries: 3 }
 
 describe('boundedSummary', () => {
-  it('retries with a stricter budget until the answer fits', async () => {
+  it('retries a leaf with a stricter budget until the answer fits', async () => {
     const { summarizer, requests } = scripted(['x'.repeat(150), 'y'.repeat(120), 'z'.repeat(90)])
-    const result = await boundedSummary({ ...base, summarizer })
+    const result = await boundedSummary({ ...base, kind: 'leaf', summarizer })
     expect(result).toEqual({ text: 'z'.repeat(90), model: 'scripted-2', clipped: false, calls: 3 })
     expect(requests.map(request => request.maxBytes)).toEqual([100, 80, 60])
     expect(requests.map(request => request.previousBytes)).toEqual([null, 150, 120])
   })
 
-  it('keeps the shortest overshoot and clips it deterministically', async () => {
+  it('stops retrying a merge after the first overshoot and clips deterministically', async () => {
     const { summarizer, requests } = scripted(['a'.repeat(300), 'b'.repeat(140), 'c'.repeat(200)])
     const result = await boundedSummary({ ...base, summarizer })
-    expect(requests).toHaveLength(4)
-    expect(result.clipped).toBe(true)
-    expect(result.text.startsWith('bbb')).toBe(true)
-    expect(result.model).toBe('clipped:scripted-1')
+    // A merge input is already two at-ceiling nodes, so re-asking cannot help; one call instead of four.
+    expect(requests).toHaveLength(1)
+    expect(result).toMatchObject({ clipped: true, model: 'clipped:scripted-0', calls: 1 })
+    expect(result.text.startsWith('aaa')).toBe(true)
     expect(Utf8.byteLength(result.text)).toBeLessThanOrEqual(100)
     expect(warnings).toContain('optmem summary clipped after retries')
+  })
+
+  it('keeps the shortest overshoot when a leaf still clips after every retry', async () => {
+    const { summarizer, requests } = scripted(['a'.repeat(300), 'b'.repeat(140), 'c'.repeat(200)])
+    const result = await boundedSummary({ ...base, kind: 'leaf', summarizer })
+    expect(requests).toHaveLength(4)
+    expect(result).toMatchObject({ clipped: true, model: 'clipped:scripted-1', calls: 4 })
+    expect(result.text.startsWith('bbb')).toBe(true)
+    expect(Utf8.byteLength(result.text)).toBeLessThanOrEqual(100)
   })
 
   it('strips a copied address head', async () => {
