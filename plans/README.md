@@ -17,7 +17,7 @@ Plans belong here while implementation or acceptance work remains. Stable produc
 | [Command Code route](own-commandcode-route.md) | Remaining provider route and third-party removal gates. |
 | [Session handoff](session-handoff.md) | Open coordinator items without another owning plan (restart prerequisites, follow-ups). |
 | [Settings Search native Editor owner](settings-search-native-owner/README.md) | Native `openFileLinks` owner route for the Editor setting; needs the newer core client contract and a scratch-runtime proof before promotion. |
-| [Workspace folder picker](workspace-folder-picker/README.md) | Add-Workspace in-app folder browser; hybrid Host capability and isolated journeys complete, web-profile promotion remains user-controlled. |
+| [Workspace folder picker](workspace-folder-picker/README.md) | Isolated journeys pass and the owned bundle is synced to web; live activation awaits a compatible Core rollout and user-controlled restart. |
 | [Plugin boot integrity](plugin-boot-integrity.md) | Cross-plugin profile composition and runtime acceptance. |
 
 ## Cross-plugin, toolchain, and product research

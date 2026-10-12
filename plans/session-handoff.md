@@ -29,12 +29,15 @@ delete this file when empty.
 - [ ] Host persisted-read concurrency for thread-content search: the installed provider still reads cold persisted
   logs serially. The source patch sets `persistedReadConcurrency: 4` in the canonical Host/provider checkout (not
   this repository), so live search keeps the old concurrency until that core change ships.
-- [ ] Web promotion is deliberately incomplete (decided 2026-10-11): 22 of 30 owned dirs are composed. Missing real
-  bundles: `model-effort-picker`, `cursor-agent` (Cursor ACP driver), `dsh-core-runtime` (opt-in core replacement —
-  intentional default). The other five are libraries pulled in transitively (`plugin-ui`, `optmem-core`,
-  `optmem-sqlite`, `project-folder-picker`, `workspace-folder-picker`). To promote later: add the bundle to the
-  checked-in `profiles/web/package.json` seed, then `pnpm profile:sync --profile web` and `nixapply` so it survives.
-  Evidence: `dsh --profile web --dump-config` → 22 `@dshfiles` rows, matching the seed.
+- [ ] Web profile source integration (2026-10-12): the accepted `workspace-folder-picker` bundle is in the
+  `workspace-folder-picker-browser-latest` seed and installed `~/.dsh/profiles/web`; the installed link points to that
+  named workspace. `dsh --profile web --dump-config` reports 24 unique `@dshfiles` names and `backend: hybrid`.
+  `profile:sync --dry-run` shows 26 owned bundles total, with only `cursor-agent` and `dsh-core-runtime` absent.
+  Canonical `/Users/astahmer/dev/dshfiles/profiles/web/package.json` still lacks the bundle, and its default workspace
+  has unrelated in-flight OptMem changes. Do not rewrite it; integrate both feature code and seed after those changes
+  are safe. Until then, a canonical Nix apply can remove the installed bundle.
+- [ ] Live activation: installed DSH is `0.2.0-rc.2`, which predates the hybrid Host/API change. Keep the live process
+  running; install a compatible Core build before any user-controlled restart. Never restart live DSH.
 - [ ] Vendored core runtime is stale (decided 2026-10-11: not now, no canonical checkout path given):
   `tooling/dsh-core/api-session-controller/lib/index.js` is the Oct 7 22:53 build while `src/` is Oct 11 18:49. Types
   were hand-patched in `lib/types/types.d.ts`; the runtime was not — `updateAttention` is present but
