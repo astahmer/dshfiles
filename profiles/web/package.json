@@ -25,6 +25,7 @@
     "@dshfiles/sidebar-commands": "link:../../../dev/dshfiles/plugins/@dshfiles/sidebar-commands",
     "@dshfiles/thread-sidebar": "link:../../../dev/dshfiles/plugins/@dshfiles/thread-sidebar",
     "@dshfiles/workbench": "link:../../../dev/dshfiles/plugins/@dshfiles/workbench",
+    "@dshfiles/workspace-folder-picker": "link:../../../dev/dshfiles/plugins/@dshfiles/workspace-folder-picker",
     "dsh-our-free-model": "github:Ebony-Vinyl/dsh-our-free-model#e9695299b549e851214e359b27cfb90da3cf6e95",
     "dshmarket": "^1.66.14"
   },
@@ -57,6 +58,7 @@
         "@dshfiles/model-effort-picker",
         "@dshfiles/editor",
         "@dshfiles/workbench",
+        "@dshfiles/workspace-folder-picker",
         "@dshfiles/optmem"
       ]
     }
