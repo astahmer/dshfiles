@@ -1,3 +1,4 @@
+import { hostname } from 'node:os'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -8,6 +9,7 @@ import { jjIntegrationApi } from './api.js'
 import type { JjExecutor, CommandExecutor } from './jj.js'
 import { IntegrationError, createJjIntegrationService, type JjIntegrationService } from './service.js'
 import { createThreadWorkspaceResolver, type WorkspaceIsolationMode } from './thread-isolation.js'
+import { createToolGate } from './tool-gate.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -15,6 +17,8 @@ declare module '@deepseek-ai/cordis' {
     'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
   }
 }
+
+const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
 
 const MAX_OUTPUT = 512 * 1024
 const MAX_STDERR = 64 * 1024
@@ -48,6 +52,31 @@ export const Config = z.object({
     .default({ mode: 'auto' }),
   /** Coordinator-driven integration. Default is explicit; `off` disables coordinator runs. */
   integration: z.object({ mode: z.enum(['auto', 'manual', 'off']).default('manual') }).default({ mode: 'manual' }),
+  /** Exclusive-writer enforcement. Always on for provisioned thread workspaces. */
+  ownership: z
+    .object({
+      /** Seconds a writer lease may stay quiet before another session may reclaim it. */
+      staleAfterSeconds: z.number().int().min(30).max(86_400).default(900),
+      /** Tools a read-only observer may run in a workspace it does not own. */
+      readOnlyTools: z
+        .array(z.string().min(1).max(64))
+        .max(64)
+        .default([
+          'read',
+          'read_image',
+          'glob',
+          'grep',
+          'web_search',
+          'web_fetch',
+          'todo_write',
+          'jj_workspace_list',
+          'jj_workspace_inspect',
+          'jj_integration_list',
+          'jj_integration_inspect',
+          'jj_integration_events',
+        ]),
+    })
+    .prefault({}),
 })
 // The Loader hands a row without stored config `undefined`, and a bare object
 // schema rejects that. `prefault({})` applies every inner default instead.
@@ -96,6 +125,10 @@ const createCommandExecutor = (ctx: Context): CommandExecutor => async input => 
 let service: JjIntegrationService | undefined
 let hostContext: Context | undefined
 let integrationMode: 'auto' | 'manual' | 'off' = 'manual'
+let autoDriverRunning = false
+
+/** Epoch this session last held per workspace, so a transfer fences it. */
+const heldEpochs = new Map<string, number>()
 
 /** Coordinator-driven integration is the only thing `integration.mode` gates; explicit jj use stays available. */
 const requireIntegrationEnabled = (): JjIntegrationService => {
@@ -255,6 +288,62 @@ const integrationEventsTool = defineTool({
   execute: async args => jsonSummary({ events: await requireService().listEvents(args.limit ?? 100) }),
 })
 
+const writerSummary = (record: { readonly name: string; readonly writerEpoch: number; readonly writerLease: unknown; readonly observers: readonly unknown[] }): { summary: string } =>
+  jsonSummary({ workspace: record.name, writerEpoch: record.writerEpoch, writerLease: record.writerLease, observers: record.observers.length })
+
+const workspaceClaimTool = defineTool({
+  name: 'jj_workspace_claim',
+  description:
+    'Take the exclusive writer lease for one registered workspace. A live lease held by another session is refused; a quiet lease is reclaimed and its holder fenced. Only the holder may write in that workspace.',
+  parameters: { workspaceId: { type: 'string', required: true, description: 'Coordinator workspace id from jj_workspace_list.' } },
+  output: summaryOutput,
+  execute: async (args, execution) => writerSummary(await requireService().acquireWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown', host: null })),
+})
+
+const workspaceReleaseTool = defineTool({
+  name: 'jj_workspace_release',
+  description: 'Release your exclusive writer lease on one workspace so another session may claim it. Only the current holder may release it.',
+  parameters: { workspaceId: { type: 'string', required: true } },
+  output: summaryOutput,
+  execute: async (args, execution) => writerSummary(await requireService().releaseWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown' })),
+})
+
+const workspaceTransferTool = defineTool({
+  name: 'jj_workspace_transfer',
+  description:
+    'Move the writer lease of one workspace to another session. A live holder blocks the transfer unless acknowledgeStopped is true; the previous holder is fenced by a new epoch and kept as a read-only observer.',
+  parameters: {
+    workspaceId: { type: 'string', required: true },
+    toSessionId: { type: 'string', required: true },
+    acknowledgeStopped: { type: 'boolean', description: 'Set only when the previous writer has stopped; it fences a live holder.' },
+  },
+  output: summaryOutput,
+  execute: async args =>
+    writerSummary(
+      await requireService().transferWriter({
+        workspaceId: args.workspaceId,
+        toSessionId: args.toSessionId,
+        acknowledgeStopped: args.acknowledgeStopped === true,
+      }),
+    ),
+})
+
+const workspaceObserveTool = defineTool({
+  name: 'jj_workspace_observe',
+  description: 'Register a read-only observer on one workspace. Observers may run read-only tools there and never gain write access.',
+  parameters: { workspaceId: { type: 'string', required: true }, sessionId: { type: 'string', description: 'Defaults to the calling session.' } },
+  output: summaryOutput,
+  execute: async (args, execution) => writerSummary(await requireService().addObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
+})
+
+const workspaceUnobserveTool = defineTool({
+  name: 'jj_workspace_unobserve',
+  description: 'Remove a read-only observer from one workspace.',
+  parameters: { workspaceId: { type: 'string', required: true }, sessionId: { type: 'string', description: 'Defaults to the calling session.' } },
+  output: summaryOutput,
+  execute: async (args, execution) => writerSummary(await requireService().removeObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
+})
+
 const api = jjIntegrationApi.host({
   overview: async () => {
     const { state, spineBookmark } = await requireService().overview()
@@ -313,11 +402,18 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
     executeCommand: createCommandExecutor(context),
     options: {
       spineBookmark: config.spineBookmark,
+      staleWriterMs: config.ownership.staleAfterSeconds * 1000,
+      integrationMode: config.integration.mode,
       allowAnyAgentIntegration: config.allowAnyAgentIntegration,
       coordinatorSessions: config.coordinatorSessions,
       ...(config.validationCommand === undefined ? {} : { validationCommand: config.validationCommand }),
       onEvent: event => {
         context.emit('dshfiles/activity/event', { kind: 'integration', value: event })
+        // Eligibility is explicit: only a workspace the writer marked ready
+        // queues integration, and only when the mode is automatic.
+        if (config.integration.mode === 'auto' && event.type === 'workspace.ready') {
+          setTimeout(() => void driveAutoIntegration(), 0)
+        }
       },
     },
   })
@@ -345,7 +441,9 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
       return bound === undefined ? undefined : { workspaceName: bound.name, path: bound.path }
     },
     rememberBinding: async input => {
-      await active.registerWorkspace({ path: input.path, sessionId: input.sessionId, source: 'session-cwd' })
+      // Provisioned thread workspaces are the only ones ownership is enforced
+      // for, so existing discovered workspaces are never migrated into it.
+      await active.registerWorkspace({ path: input.path, sessionId: input.sessionId, source: 'session-cwd', isolated: true })
     },
   })
   context.provide('sessionWorkspaceResolver', {
@@ -361,6 +459,52 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
       return outcome
     },
   })
+
+  const toolGate = createToolGate({
+    ownershipForPath: path => active.ownershipForPath(path),
+    acquireWriter: input => active.acquireWriter(input),
+    heartbeatWriter: input => active.heartbeatWriter(input),
+    staleAfterMs: config.ownership.staleAfterSeconds * 1000,
+    readOnlyTools: config.ownership.readOnlyTools,
+    hostname,
+    heldEpochs,
+    onDeny: input => {
+      context.emit('dshfiles/activity/event', { kind: 'workspace-ownership', value: input })
+      context.logger.warn('jj-integration: refused %s for %s: %s', input.toolName, input.sessionId, input.reason)
+    },
+    onError: input => {
+      context.logger.error('jj-integration: workspace ownership could not be verified for %s: %s', input.sessionId, describeError(input.error))
+    },
+  })
+
+  context.on('tools/pre-execute', (execution, next) => toolGate(execution, next))
+
+  context.on('session/disposed', session => {
+    heldEpochs.delete(session.id)
+    void active.releaseWriterForSession(session.id).catch(error => {
+      context.logger.debug('jj-integration: could not release writer leases for %s (%s)', session.id, describeError(error))
+    })
+  })
+
+  const driveAutoIntegration = async (): Promise<void> => {
+    if (config.integration.mode !== 'auto' || autoDriverRunning) return
+    autoDriverRunning = true
+    try {
+      for (;;) {
+        const next = (await active.listCandidates()).find(candidate => candidate.state === 'queued')
+        if (next === undefined) break
+        const result = await active.runCandidate({ candidateId: next.id, sessionId: null })
+        context.emit('dshfiles/activity/event', {
+          kind: 'integration',
+          value: { driver: 'auto', candidateId: next.id, outcome: result.outcome, detail: result.detail },
+        })
+      }
+    } catch (error) {
+      context.logger.warn('jj-integration: automatic integration stopped: %s', describeError(error))
+    } finally {
+      autoDriverRunning = false
+    }
+  }
 
   context.on('agent/created', ({ agent }) => {
     void discoverWorkspace(agent, config)
@@ -392,6 +536,11 @@ const host = defineHost({
   tools: [
     workspaceListTool,
     workspaceInspectTool,
+    workspaceClaimTool,
+    workspaceReleaseTool,
+    workspaceTransferTool,
+    workspaceObserveTool,
+    workspaceUnobserveTool,
     workspaceRegisterTool,
     workspaceReadyTool,
     integrationSubmitTool,

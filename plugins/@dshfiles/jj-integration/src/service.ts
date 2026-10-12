@@ -21,6 +21,8 @@ import {
   type WorkspaceLifecycle,
   type WorkspaceRecord,
 } from './types.js'
+import type { WorkspaceOwnershipView } from './ownership.js'
+import { readUnsafeWorkspaces } from './thread-provision.js'
 import {
   JjCommandError,
   abandonRevision,
@@ -67,6 +69,10 @@ export interface JjIntegrationServiceOptions {
   readonly allowAnyAgentIntegration?: boolean
   readonly coordinatorSessions?: readonly string[]
   readonly onEvent?: (event: IntegrationEvent) => void
+  /** A writer lease this quiet may be reclaimed by the next caller. */
+  readonly staleWriterMs?: number
+  /** `off` refuses every coordinator-driven integration; the default allows explicit runs. */
+  readonly integrationMode?: 'auto' | 'manual' | 'off'
 }
 
 export interface IntegrationRunResult {
@@ -107,6 +113,9 @@ export const repositoryStatePaths = async (root: string): Promise<{ readonly loc
 
 const pathExists = async (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
 
+/** Resolve a directory to the identity two spellings of one path share. */
+const canonicalPath = async (path: string): Promise<string> => realpath(path).catch(() => resolve(path))
+
 const toRevision = (observed: ObservedRevision): JjRevision => ({
   changeId: observed.changeId,
   commitId: observed.commitId,
@@ -127,6 +136,8 @@ export class JjIntegrationService {
   readonly #allowAnyAgentIntegration: boolean
   readonly #coordinatorSessions: ReadonlySet<string>
   readonly #onEvent: ((event: IntegrationEvent) => void) | undefined
+  readonly #staleWriterMs: number
+  readonly #integrationMode: 'auto' | 'manual' | 'off'
   readonly #executor: JjExecutor
   readonly #executeCommand: CommandExecutor | undefined
   #writes: Promise<void> = Promise.resolve()
@@ -147,6 +158,8 @@ export class JjIntegrationService {
     this.#allowAnyAgentIntegration = options.allowAnyAgentIntegration ?? false
     this.#coordinatorSessions = new Set(options.coordinatorSessions ?? [])
     this.#onEvent = options.onEvent
+    this.#staleWriterMs = options.staleWriterMs ?? 15 * 60 * 1000
+    this.#integrationMode = options.integrationMode ?? 'manual'
   }
 
   async overview(): Promise<{ readonly state: JjIntegrationState; readonly spineBookmark: string }> {
@@ -171,6 +184,8 @@ export class JjIntegrationService {
     readonly path: string
     readonly sessionId: string | null
     readonly source: 'session-cwd' | 'agent-tool' | 'human'
+    /** True only for a workspace this plugin provisioned for one coding thread. */
+    readonly isolated?: boolean
     readonly signal?: AbortSignal
   }): Promise<WorkspaceRecord> {
     return this.#serialize(async () => {
@@ -180,12 +195,13 @@ export class JjIntegrationService {
       return this.#updateState(state => {
         const repository = state.repositories.find(item => item.root === root) ?? this.#newRepository(root, now)
         const existing = state.workspaces.find(item => item.repositoryId === repository.id && item.path === input.path)
-        const workspace = existing ?? this.#newWorkspace({ repositoryId: repository.id, path: input.path, now })
+        const workspace = existing ?? this.#newWorkspace({ repositoryId: repository.id, path: input.path, now, isolated: input.isolated ?? false })
         const owners = input.sessionId === null ? workspace.owners : attachOwner(workspace.owners, input.sessionId, input.source, now)
         const record: WorkspaceRecord = {
           ...workspace,
           currentRevision: toRevision(revision),
           owners,
+          isolated: workspace.isolated || (input.isolated ?? false),
           lifecycle: workspace.lifecycle === 'created' ? 'active' : workspace.lifecycle,
           updatedAt: now,
           lastObservedAt: now,
@@ -322,6 +338,289 @@ export class JjIntegrationService {
     )
   }
 
+  /** The registered workspace that owns a directory, preferring the most specific match. */
+  async workspaceByPath(path: string): Promise<WorkspaceRecord | undefined> {
+    const state = await this.#readState()
+    const wanted = await canonicalPath(path)
+    let best: WorkspaceRecord | undefined
+    let bestLength = -1
+    for (const workspace of state.workspaces) {
+      if (workspace.missing) continue
+      const candidate = await canonicalPath(workspace.path)
+      if (wanted !== candidate && !wanted.startsWith(`${candidate}/`)) continue
+      if (candidate.length > bestLength) {
+        best = workspace
+        bestLength = candidate.length
+      }
+    }
+    return best
+  }
+
+  /**
+   * Take the exclusive writer lease for one workspace. A live lease held by
+   * another session is refused; a quiet one is reclaimed and its holder fenced.
+   */
+  async acquireWriter(input: {
+    readonly workspaceId: string
+    readonly sessionId: string
+    readonly host?: string | null
+  }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        const now = this.#now()
+        const lease = workspace.writerLease
+        const foreign = lease !== null && lease.sessionId !== input.sessionId
+        if (foreign && !this.#leaseIsStale(lease, now)) {
+          throw new IntegrationError('writer-held', `Workspace "${workspace.name}" already has a live writer; release or transfer it before claiming it.`)
+        }
+        const record = this.#withWriter(workspace, { sessionId: input.sessionId, host: input.host ?? null, now })
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events: [
+            this.#event(foreign ? 'workspace.writer_reclaimed' : 'workspace.writer_acquired', {
+              repositoryId: record.repositoryId,
+              workspaceId: record.id,
+              sessionId: input.sessionId,
+              revisions: { source: record.currentRevision },
+              detail: foreign ? 'previous lease was stale and is now fenced' : null,
+            }),
+          ],
+        }
+      }),
+    )
+  }
+
+  /** Give up the lease. Only its holder may release it. */
+  async releaseWriter(input: { readonly workspaceId: string; readonly sessionId: string }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        const lease = workspace.writerLease
+        if (lease !== null && lease.sessionId !== input.sessionId) {
+          throw new IntegrationError('writer-held', `Workspace "${workspace.name}" is held by another session; only its writer may release it.`)
+        }
+        const now = this.#now()
+        const record: WorkspaceRecord = {
+          ...workspace,
+          writerEpoch: workspace.writerEpoch + 1,
+          writerLease: null,
+          lifecycle: workspace.lifecycle === 'active' ? 'idle' : workspace.lifecycle,
+          updatedAt: now,
+        }
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events: [
+            this.#event('workspace.writer_released', {
+              repositoryId: record.repositoryId,
+              workspaceId: record.id,
+              sessionId: input.sessionId,
+            }),
+          ],
+        }
+      }),
+    )
+  }
+
+  /**
+   * Move the lease to another session. A live holder blocks the transfer unless
+   * the caller states it has stopped; either way the previous holder is fenced
+   * by the new epoch and stays as a read-only observer.
+   */
+  async transferWriter(input: {
+    readonly workspaceId: string
+    readonly toSessionId: string
+    readonly acknowledgeStopped: boolean
+    readonly host?: string | null
+  }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        const now = this.#now()
+        const lease = workspace.writerLease
+        if (lease !== null && lease.sessionId === input.toSessionId) return { state, value: workspace, events: [] }
+        const live = lease !== null && !this.#leaseIsStale(lease, now)
+        if (live && !input.acknowledgeStopped) {
+          throw new IntegrationError('writer-held', `Workspace "${workspace.name}" has a live writer; stop it and pass acknowledgeStopped to fence it, or wait for its lease to go stale.`)
+        }
+        const previous = lease?.sessionId ?? null
+        const fencedObservers = previous === null || previous === input.toSessionId
+          ? workspace.observers
+          : [...workspace.observers.filter(observer => observer.sessionId !== previous), { sessionId: previous, since: now }]
+        const record = this.#withWriter({ ...workspace, observers: fencedObservers }, { sessionId: input.toSessionId, host: input.host ?? null, now })
+        const events = [
+          this.#event('workspace.writer_transferred', {
+            repositoryId: record.repositoryId,
+            workspaceId: record.id,
+            sessionId: input.toSessionId,
+            revisions: { source: record.currentRevision },
+            detail: previous === null ? null : `previous writer ${previous}${live ? ' was fenced' : ' had gone stale'}`,
+          }),
+          ...(previous === null || !live
+            ? []
+            : [this.#event('workspace.writer_fenced', {
+              repositoryId: record.repositoryId,
+              workspaceId: record.id,
+              sessionId: previous,
+              detail: `fenced by transfer to ${input.toSessionId}`,
+            })]),
+        ]
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events,
+        }
+      }),
+    )
+  }
+
+  /** Refresh the lease so it does not look stale. A non-holder is ignored. */
+  async heartbeatWriter(input: { readonly workspaceId: string; readonly sessionId: string }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        const lease = workspace.writerLease
+        if (lease === null || lease.sessionId !== input.sessionId) return { state, value: workspace, events: [] }
+        const now = this.#now()
+        if (now - lease.heartbeatAt < 15_000) return { state, value: workspace, events: [] }
+        const record: WorkspaceRecord = { ...workspace, writerLease: { ...lease, heartbeatAt: now }, updatedAt: now }
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events: [],
+        }
+      }),
+    )
+  }
+
+  /** The ownership view the tool gate decides on, with quarantine already resolved. */
+  async ownershipForPath(path: string): Promise<{ readonly workspaceId: string; readonly view: WorkspaceOwnershipView } | undefined> {
+    const state = await this.#readState()
+    const workspace = await this.workspaceByPath(path)
+    if (workspace === undefined) return undefined
+    const repository = state.repositories.find(item => item.id === workspace.repositoryId)
+    return {
+      workspaceId: workspace.id,
+      view: {
+        workspaceName: workspace.name,
+        isolated: workspace.isolated,
+        unsafe: repository !== undefined && readUnsafeWorkspaces(repository.root).includes(workspace.name),
+        writerEpoch: workspace.writerEpoch,
+        writerLease: workspace.writerLease === null
+          ? null
+          : { sessionId: workspace.writerLease.sessionId, epoch: workspace.writerLease.epoch, heartbeatAt: workspace.writerLease.heartbeatAt },
+        observers: workspace.observers.map(observer => observer.sessionId),
+      },
+    }
+  }
+
+  /** Record a read-only observer. Observers never gain write access. */
+  async addObserver(input: { readonly workspaceId: string; readonly sessionId: string }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        if (workspace.writerLease?.sessionId === input.sessionId) return { state, value: workspace, events: [] }
+        if (workspace.observers.some(observer => observer.sessionId === input.sessionId)) return { state, value: workspace, events: [] }
+        const now = this.#now()
+        const record: WorkspaceRecord = { ...workspace, observers: [...workspace.observers, { sessionId: input.sessionId, since: now }], updatedAt: now }
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events: [this.#event('workspace.observer_added', { repositoryId: record.repositoryId, workspaceId: record.id, sessionId: input.sessionId })],
+        }
+      }),
+    )
+  }
+
+  async removeObserver(input: { readonly workspaceId: string; readonly sessionId: string }): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === input.workspaceId)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        if (!workspace.observers.some(observer => observer.sessionId === input.sessionId)) return { state, value: workspace, events: [] }
+        const now = this.#now()
+        const record: WorkspaceRecord = {
+          ...workspace,
+          observers: workspace.observers.filter(observer => observer.sessionId !== input.sessionId),
+          updatedAt: now,
+        }
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
+          value: record,
+          events: [this.#event('workspace.observer_removed', { repositoryId: record.repositoryId, workspaceId: record.id, sessionId: input.sessionId })],
+        }
+      }),
+    )
+  }
+
+  /** Release every lease this session holds; used when a Session is disposed. */
+  async releaseWriterForSession(sessionId: string): Promise<readonly string[]> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const held = state.workspaces.filter(workspace => workspace.writerLease?.sessionId === sessionId)
+        if (held.length === 0) return { state, value: [], events: [] }
+        const now = this.#now()
+        const released = new Set(held.map(workspace => workspace.id))
+        const workspaces = state.workspaces.map(workspace =>
+          released.has(workspace.id)
+            ? {
+              ...workspace,
+              writerEpoch: workspace.writerEpoch + 1,
+              writerLease: null,
+              lifecycle: workspace.lifecycle === 'active' ? ('idle' as const) : workspace.lifecycle,
+              updatedAt: now,
+            }
+            : workspace,
+        )
+        return {
+          state: { ...state, workspaces },
+          value: held.map(workspace => workspace.id),
+          events: held.map(workspace =>
+            this.#event('workspace.writer_released', {
+              repositoryId: workspace.repositoryId,
+              workspaceId: workspace.id,
+              sessionId,
+              detail: 'session disposed',
+            }),
+          ),
+        }
+      }),
+    )
+  }
+
+  #leaseIsStale(lease: { readonly heartbeatAt: number }, now: number): boolean {
+    return now - lease.heartbeatAt > this.#staleWriterMs
+  }
+
+  #withWriter(
+    workspace: WorkspaceRecord,
+    input: { readonly sessionId: string; readonly host: string | null; readonly now: number; readonly source?: 'session-cwd' | 'agent-tool' | 'human' },
+  ): WorkspaceRecord {
+    const epoch = workspace.writerEpoch + 1
+    return {
+      ...workspace,
+      writerEpoch: epoch,
+      writerLease: {
+        sessionId: input.sessionId,
+        epoch,
+        acquiredAt: input.now,
+        heartbeatAt: input.now,
+        host: input.host,
+      },
+      observers: workspace.observers.filter(observer => observer.sessionId !== input.sessionId),
+      owners: attachOwner(workspace.owners, input.sessionId, input.source ?? 'agent-tool', input.now),
+      lifecycle: 'active',
+      updatedAt: input.now,
+    }
+  }
+
   async markReady(id: string, sessionId: string | null): Promise<WorkspaceRecord> {
     return this.#serialize(() =>
       this.#updateState(state => {
@@ -347,11 +646,13 @@ export class JjIntegrationService {
     readonly signal?: AbortSignal
   }): Promise<IntegrationCandidate> {
     return this.#serialize(async () => {
+      this.#assertIntegrationEnabled()
       const state = await this.#readState()
       const workspace = state.workspaces.find(item => item.id === input.workspaceId)
       if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
       const repository = state.repositories.find(item => item.id === workspace.repositoryId)
       if (repository === undefined) throw new IntegrationError('repository-not-found', 'Repository is not registered.')
+      this.#assertNotQuarantined(repository, workspace)
       const source = input.revision === undefined
         ? await resolveRevision(this.#executor, workspace.path, '@', input.signal)
         : await resolveRevision(this.#executor, workspace.path, input.revision, input.signal)
@@ -484,6 +785,7 @@ export class JjIntegrationService {
     readonly signal?: AbortSignal
   }): Promise<IntegrationRunResult> {
     return this.#serialize(async () => {
+      this.#assertIntegrationEnabled()
       const discovery = await this.#readState()
       const discovered = discovery.candidates.find(item => item.id === input.candidateId)
       if (discovered === undefined) throw new IntegrationError('candidate-not-found', 'Integration candidate is not registered.')
@@ -518,6 +820,11 @@ export class JjIntegrationService {
         const workspace = state.workspaces.find(item => item.id === candidate.workspaceId)
         if (workspace === undefined || workspace.missing) {
           return this.#failCandidate(candidate, 'failed', 'Source workspace is missing or unavailable.')
+        }
+        try {
+          this.#assertNotQuarantined(repository, workspace)
+        } catch (error) {
+          return this.#failCandidate(candidate, 'blocked', describeError(error))
         }
         const dependencies = candidate.dependsOn.map(dependencyId => state.candidates.find(item => item.id === dependencyId))
         const unmet = dependencies.filter(item => item === undefined || (item.state !== 'integrated' && item.state !== 'already-integrated'))
@@ -698,6 +1005,7 @@ export class JjIntegrationService {
   }
 
   async retryCandidate(id: string, sessionId: string | null, signal?: AbortSignal): Promise<IntegrationCandidate> {
+    this.#assertIntegrationEnabled()
     return this.#serialize(async () => {
       const state = await this.#readState()
       const candidate = state.candidates.find(item => item.id === id)
@@ -876,6 +1184,23 @@ export class JjIntegrationService {
     return { abandoned: false, leakedRevision: toRevision(duplicate) }
   }
 
+  /**
+   * A workspace the guard recorded as a folded or stale checkout must never be
+   * integrated: its `@` is an ancestor of the spine, so any snapshot there
+   * rebases the canonical line.
+   */
+  #assertIntegrationEnabled(): void {
+    if (this.#integrationMode === 'off') {
+      throw new IntegrationError('integration-disabled', 'Coordinator-driven integration is disabled by configuration (integration.mode: off).')
+    }
+  }
+
+  #assertNotQuarantined(repository: RepositoryRecord, workspace: WorkspaceRecord): void {
+    if (readUnsafeWorkspaces(repository.root).includes(workspace.name)) {
+      throw new IntegrationError('unsafe-workspace', `Workspace "${workspace.name}" is recorded as unavailable for new work (folded or stale checkout); re-leave it before integrating.`)
+    }
+  }
+
   #assertMayRun(candidate: IntegrationCandidate, sessionId: string | null): void {
     if (sessionId === null) return
     if (this.#allowAnyAgentIntegration) return
@@ -888,7 +1213,7 @@ export class JjIntegrationService {
     return { id: randomUUID(), root, spineBookmark: this.#spineBookmark, createdAt: now, updatedAt: now }
   }
 
-  #newWorkspace(input: { readonly repositoryId: string; readonly path: string; readonly now: number }): WorkspaceRecord {
+  #newWorkspace(input: { readonly repositoryId: string; readonly path: string; readonly now: number; readonly isolated: boolean }): WorkspaceRecord {
     const name = input.path.split('/').filter(segment => segment.length > 0).slice(-1)[0] ?? input.path
     return {
       id: randomUUID(),
@@ -903,6 +1228,10 @@ export class JjIntegrationService {
       lastObservedAt: null,
       missing: false,
       notes: null,
+      isolated: input.isolated,
+      writerEpoch: 0,
+      writerLease: null,
+      observers: [],
     }
   }
 
@@ -953,7 +1282,6 @@ export class JjIntegrationService {
       outcome: input.outcome ?? null,
       detail: input.detail ?? null,
     }
-    this.#onEvent?.(event)
     return event
   }
 
@@ -1083,6 +1411,7 @@ export class JjIntegrationService {
       const directory = dirname(this.#statePath)
       await mkdir(directory, { recursive: true, mode: 0o700 })
       await atomicWriteFile(this.#statePath, serialized)
+      for (const event of updated.events) this.#onEvent?.(event)
       return updated.value
     })
     this.#writes = operation.then(

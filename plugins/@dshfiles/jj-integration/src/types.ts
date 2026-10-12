@@ -34,6 +34,24 @@ export const candidateStateSchema = z.enum([
 ])
 export type CandidateState = z.infer<typeof candidateStateSchema>
 
+export const writerLeaseSchema = z
+  .object({
+    sessionId: z.string().min(1).max(256),
+    /** Monotonic per-workspace writer generation; every transfer and reclaim advances it. */
+    epoch: z.number().int().positive(),
+    acquiredAt: z.number().int().nonnegative(),
+    /** Refreshed while the writer works; a lease this quiet is reclaimable. */
+    heartbeatAt: z.number().int().nonnegative(),
+    host: z.string().min(1).max(256).nullable(),
+  })
+  .strict()
+export type WriterLease = z.infer<typeof writerLeaseSchema>
+
+export const workspaceObserverSchema = z
+  .object({ sessionId: z.string().min(1).max(256), since: z.number().int().nonnegative() })
+  .strict()
+export type WorkspaceObserver = z.infer<typeof workspaceObserverSchema>
+
 export const integrationEventTypeSchema = z.enum([
   'workspace.created',
   'workspace.attached',
@@ -41,6 +59,13 @@ export const integrationEventTypeSchema = z.enum([
   'workspace.refreshed',
   'workspace.ready',
   'workspace.missing',
+  'workspace.writer_acquired',
+  'workspace.writer_reclaimed',
+  'workspace.writer_released',
+  'workspace.writer_transferred',
+  'workspace.writer_fenced',
+  'workspace.observer_added',
+  'workspace.observer_removed',
   'integration.queued',
   'integration.started',
   'integration.blocked',
@@ -78,6 +103,15 @@ export const workspaceRecordSchema = z
     lastObservedAt: z.number().int().nonnegative().nullable(),
     missing: z.boolean(),
     notes: z.string().max(500).nullable(),
+    /**
+     * True only for workspaces this plugin provisioned for one coding thread.
+     * Ownership is enforced for these; workspaces merely discovered from a
+     * Session cwd stay unenforced, so existing sessions are never migrated.
+     */
+    isolated: z.boolean().default(false),
+    writerEpoch: z.number().int().nonnegative().default(0),
+    writerLease: writerLeaseSchema.nullable().default(null),
+    observers: z.array(workspaceObserverSchema).max(64).default([]),
   })
   .strict()
 export type WorkspaceRecord = z.infer<typeof workspaceRecordSchema>

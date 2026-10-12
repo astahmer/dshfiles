@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import type { JjExecutor } from './jj.js'
 
@@ -95,8 +95,24 @@ const workspaceHeads = async (executor: JjExecutor, cwd: string): Promise<readon
     })
 }
 
-const readUnsafe = (repoRoot: string): readonly string[] => {
-  const path = join(repoRoot, '.jj', 'repo', UNSAFE_MARKER)
+/**
+ * The shared Jujutsu store directory for a workspace: `<root>/.jj/repo` is that
+ * directory in the store's own checkout, and a pointer file in every other
+ * workspace, so a marker must be read from where it actually lives.
+ */
+export const jjStoreDirectory = (root: string): string | undefined => {
+  const marker = join(root, '.jj', 'repo')
+  if (!existsSync(marker)) return undefined
+  if (statSync(marker).isDirectory()) return marker
+  const pointer = readFileSync(marker, 'utf8').trim()
+  return pointer.length === 0 ? undefined : resolve(dirname(marker), pointer)
+}
+
+/** Workspace names the guard records as unavailable for new coding work. */
+export const readUnsafeWorkspaces = (workspaceRoot: string): readonly string[] => {
+  const store = jjStoreDirectory(workspaceRoot)
+  if (store === undefined) return []
+  const path = join(store, UNSAFE_MARKER)
   if (!existsSync(path)) return []
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as { unavailableForNewWork?: unknown }
@@ -158,7 +174,7 @@ const provisionInRepository = async (
   workspaceName: string,
   repositoryRoot: string,
 ): Promise<ProvisionOutcome> => {
-  if (readUnsafe(repositoryRoot).includes(workspaceName)) {
+  if (readUnsafeWorkspaces(repositoryRoot).includes(workspaceName)) {
     return { ...base, status: 'refused-unsafe', reason: 'workspace is recorded as unavailable for new coding work' }
   }
 
