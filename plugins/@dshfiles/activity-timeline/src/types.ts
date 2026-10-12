@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const activitySourceSchema = z.enum(['session', 'communication', 'integration', 'system'])
+export const activitySourceSchema = z.enum(['session', 'communication', 'integration', 'workspace', 'system'])
 export type ActivitySource = z.infer<typeof activitySourceSchema>
 
 export const activityLevelSchema = z.enum(['routine', 'notable', 'attention'])

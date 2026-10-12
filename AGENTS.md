@@ -160,12 +160,13 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r integration-spine
   ```
 
-- The history above the consolidation base is one line: `main` and
-  `integration-spine` both point at its tip, and every live workspace `@` sits on
-  it. New work continues from that tip. Keep the line single-headed — branch off
-  it, do not duplicate branches next to it. A fork usually shows up as two heads
-  plus a duplicate change-id; fold it with `jj rebase -r <stray-head> -d <tip>`
-  and abandon the duplicate copy.
+- **The canonical spine is one line; the workspaces around it are a fan.** `main`
+  and `integration-spine` point at the same tip, and every active workspace `@`
+  sits *off* that tip as its own leaf. Branch off the tip; never stack one
+  workspace's `@` on another's. A second head is only a problem when it is a
+  *duplicate* — the same change id twice — which is folded with
+  `jj rebase -r <stray-head> -d <tip>` plus abandoning the copy. Independent
+  leaves are the design, not a defect to unify.
 
 - **A workspace `@` is a leaf, never a link in the line.** Two agents rewriting
   one change at once makes jj record a divergent change, and the next command in
@@ -190,6 +191,31 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   - `scripts/jj-isolation/` enforces this at the `jj` boundary; see
     `docs/jj/concurrent-workspace-isolation.md`.
 
+- **Exclusive writer ownership and serialized integration** are implemented in
+  `plugins/@dshfiles/jj-integration`; `docs/ade/thread-workspace-isolation.md` is
+  the status page.
+  - A workspace this plugin provisioned for one thread (`isolated: true` in its
+    registry) has exactly **one writer**. The lease is durable
+    (`writerEpoch`/`writerLease`), and it is enforced on the core
+    `tools/pre-execute` waterfall: a Session whose cwd is a workspace it does not
+    own is refused **before the tool body runs**, and a check that cannot
+    complete denies. A discovered workspace is never migrated into this.
+  - Other sessions may be **observers**: they may run the read-only tools in
+    `ownership.readOnlyTools` and nothing else.
+  - A lease quiet for `ownership.staleAfterSeconds` (default 900) is reclaimed by
+    the next caller and its holder is **fenced**: the epoch moved, so its writes
+    are denied (`writer-fenced`) while its reads continue. Transferring a live
+    lease needs `acknowledgeStopped`; the previous writer becomes an observer.
+    If a transfer cannot be shown safe, block it — do not force it.
+  - Integration is separate and serialized: one canonical spine writer at a time,
+    contract-checked in a dedicated staging workspace, spine advanced only after
+    validation succeeds. `integration.mode: off` refuses submit, run, and retry
+    in the service itself; a workspace the guard records as unavailable is
+    refused at submit and blocks at run **without moving the spine**.
+  - **Automation is configurable, safety is not.** `workspaceIsolation.mode` and
+    `integration.mode` are each `auto | manual | off` (defaults `auto` and
+    `manual`). Turning integration off leaves ownership enforcement and the jj
+    guard exactly as they were; disabling automation never disables a guard.
 - Before editing code in another repository, inspect its `jj root` and
   `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
   changes under `packages/**` belong in the canonical

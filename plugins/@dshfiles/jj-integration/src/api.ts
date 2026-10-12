@@ -70,5 +70,23 @@ export const jjIntegrationApi = defineApi({
     }),
     refreshWorkspace: method({ input: z.object({ workspaceId: workspaceIdSchema }).strict(), output: workspaceRecordSchema }),
     markReady: method({ input: z.object({ workspaceId: workspaceIdSchema }).strict(), output: workspaceRecordSchema }),
+    submit: method({
+      input: z.object({ workspaceId: workspaceIdSchema, sessionId: z.string().min(1).max(256).nullable() }).strict(),
+      output: integrationCandidateSchema,
+    }),
+    acquireWriter: method({
+      input: z.object({ workspaceId: workspaceIdSchema, sessionId: z.string().min(1).max(256) }).strict(),
+      output: workspaceRecordSchema,
+    }),
+    releaseWriter: method({
+      input: z.object({ workspaceId: workspaceIdSchema, sessionId: z.string().min(1).max(256) }).strict(),
+      output: workspaceRecordSchema,
+    }),
+    transferWriter: method({
+      input: z
+        .object({ workspaceId: workspaceIdSchema, toSessionId: z.string().min(1).max(256), acknowledgeStopped: z.boolean() })
+        .strict(),
+      output: workspaceRecordSchema,
+    }),
   },
 })

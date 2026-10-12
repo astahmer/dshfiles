@@ -184,3 +184,45 @@ Then verify, in this order: `ps eww <pid> | grep PATH` shows the shim first;
   preflight and validation have to be reliable first.
 - Workspace directory collision is refused rather than reused; retiring a
   workspace is still a manual `jj workspace forget`.
+
+## Composer, timeline, docs (part 3)
+
+- `@dshfiles/jj-integration` registers a compact composer status
+  (`conversation.input.overlay`, order 4): `repo / workspace` plus one status —
+  Writable, Read-only, Owned by another writer, Integration pending,
+  Integrating, Needs resolution — and the actions Claim ownership, Request
+  integration, Release ownership, Open integration panel. Every value and every
+  action goes through the existing Host remote (`overview`, `markReady`,
+  `submit`, `acquireWriter`, `releaseWriter`); the chip keeps no state beyond a
+  pending action, so there is no second source of truth.
+- `@dshfiles/activity-timeline` accepts a `workspace` activity source and
+  renders it in the same condensed stream as session, communication and
+  integration events. Workspace provisioning, isolation refusals, ownership
+  acquire/release/transfer/fence, observer changes and quarantined-workspace
+  refusals all arrive as passive events — nothing is injected into a finished
+  conversation.
+- `dshfiles/AGENTS.md` now states the fan-of-leaves spine model (the earlier
+  "one line with every workspace `@` on it" text contradicted it) and documents
+  exclusive writers, observers, fencing, serialized integration and the
+  independent `auto | manual | off` modes. `nixfiles/AGENTS.md` documents that
+  the shim lives in `assets/dsh/start-dsh`, that installing it is not activating
+  it, and the profile-sync path.
+- The `workspaceIsolation.mode` / `integration.mode` values stay in the bundle's
+  native `Config`; they are visible in the composer status and set in the
+  profile. A dshx `settings` entry would need its own Host row (one entry cannot
+  declare both), which is a follow-up rather than a silent second authority.
+
+## Core hook deployment (part 3)
+
+The canonical checkout now builds a complete drop-in for
+`@deepseek-ai/dsh-api-session-controller`: `tsc -b tsconfig.host.json`, the root
+`tsdown --env.DSH_BUILD_FACE host`, `tsc -b tsconfig.client.json`, then
+`tsdown --env.DSH_BUILD_FACE client` **in the package**. Without the client face
+the package ships no `lib/types/client`, and a host-only overlay makes
+`sessionController` fail to mount — that was the earlier failure, now explained.
+
+`packages/api/session-controller/tests/session-workspace-provisioning.host.spec.ts`
+proves the seam with real jj: twenty concurrent `session.create` calls through
+the real controller produce twenty independent workspaces, each Session's cwd is
+its own workspace, each workspace's parent is the frozen base; a missing resolver
+refuses creation, and passthrough keeps the requested directory.

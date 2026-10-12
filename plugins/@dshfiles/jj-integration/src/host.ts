@@ -380,6 +380,15 @@ const api = jjIntegrationApi.host({
   move: ({ input }) => requireService().moveCandidate(input.candidateId, input.direction),
   refreshWorkspace: ({ input }) => requireService().refreshWorkspace(input.workspaceId),
   markReady: ({ input }) => requireService().markReady(input.workspaceId, null),
+  submit: ({ input }) => requireService().submitCandidate({ workspaceId: input.workspaceId, sessionId: input.sessionId }),
+  acquireWriter: ({ input }) => requireService().acquireWriter({ workspaceId: input.workspaceId, sessionId: input.sessionId, host: null }),
+  releaseWriter: ({ input }) => requireService().releaseWriter({ workspaceId: input.workspaceId, sessionId: input.sessionId }),
+  transferWriter: ({ input }) =>
+    requireService().transferWriter({
+      workspaceId: input.workspaceId,
+      toSessionId: input.toSessionId,
+      acknowledgeStopped: input.acknowledgeStopped,
+    }),
 })
 
 const discoverWorkspace = async (agent: Agent, config: JjIntegrationConfig): Promise<void> => {
@@ -409,6 +418,22 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
       ...(config.validationCommand === undefined ? {} : { validationCommand: config.validationCommand }),
       onEvent: event => {
         context.emit('dshfiles/activity/event', { kind: 'integration', value: event })
+        if (event.type.startsWith('workspace.writer_') || event.type.startsWith('workspace.observer_')) {
+          context.emit('dshfiles/activity/event', {
+            kind: 'workspace',
+            value: {
+              id: `workspace:${event.id}`,
+              at: event.at,
+              type: event.type,
+              level: event.type === 'workspace.writer_fenced' ? 'attention' : 'notable',
+              summary: `${event.type.replace('workspace.', '').replaceAll('_', ' ')}${event.sessionId === null ? '' : ` (${event.sessionId})`}`,
+              detail: event.detail,
+              sessionId: event.sessionId,
+              workspaceId: event.workspaceId,
+              workspaceName: null,
+            },
+          })
+        }
         // Eligibility is explicit: only a workspace the writer marked ready
         // queues integration, and only when the mode is automatic.
         if (config.integration.mode === 'auto' && event.type === 'workspace.ready') {
@@ -449,9 +474,25 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
   context.provide('sessionWorkspaceResolver', {
     resolve: async (request: { readonly sessionId: string; readonly requestedCwd: string }) => {
       const outcome = await resolver.resolve(request)
+      const at = Date.now()
       context.emit('dshfiles/activity/event', {
-        kind: 'workspace-isolation',
-        value: { sessionId: request.sessionId, requestedCwd: request.requestedCwd, mode: isolation, outcome },
+        kind: 'workspace',
+        value: {
+          id: `workspace:isolation:${request.sessionId}:${String(at)}`,
+          at,
+          type: outcome.kind === 'resolved' ? 'workspace.provisioned' : outcome.kind === 'refused' ? 'workspace.provision_refused' : 'workspace.refused',
+          level: outcome.kind === 'refused' ? 'attention' : outcome.kind === 'resolved' ? 'notable' : 'routine',
+          summary:
+            outcome.kind === 'resolved'
+              ? `Workspace ready: ${outcome.cwd}`
+              : outcome.kind === 'refused'
+                ? `Workspace isolation refused for ${request.sessionId}`
+                : `Workspace isolation ${isolation === 'off' ? 'disabled' : 'manual'}; Session keeps ${request.requestedCwd}`,
+          detail: outcome.kind === 'refused' ? outcome.reason : `requested ${request.requestedCwd}`,
+          sessionId: request.sessionId,
+          workspaceId: outcome.kind === 'resolved' ? outcome.cwd : null,
+          workspaceName: outcome.kind === 'resolved' ? outcome.cwd.split('/').filter(Boolean).slice(-1)[0] ?? null : null,
+        },
       })
       if (outcome.kind === 'refused') {
         context.logger.warn('jj-integration: refusing session %s workspace isolation: %s', request.sessionId, outcome.reason)
@@ -469,7 +510,21 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
     hostname,
     heldEpochs,
     onDeny: input => {
-      context.emit('dshfiles/activity/event', { kind: 'workspace-ownership', value: input })
+      const at = Date.now()
+      context.emit('dshfiles/activity/event', {
+        kind: 'workspace',
+        value: {
+          id: `workspace:refused:${input.sessionId}:${input.toolName}:${String(at)}`,
+          at,
+          type: input.code === 'unsafe-workspace' ? 'workspace.quarantined' : 'workspace.refused',
+          level: 'attention',
+          summary: `${input.toolName} refused: ${input.code === 'unsafe-workspace' ? 'workspace is quarantined' : 'workspace owned by another writer'}`,
+          detail: input.reason,
+          sessionId: input.sessionId,
+          workspaceId: input.workspaceId,
+          workspaceName: null,
+        },
+      })
       context.logger.warn('jj-integration: refused %s for %s: %s', input.toolName, input.sessionId, input.reason)
     },
     onError: input => {

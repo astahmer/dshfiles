@@ -106,3 +106,43 @@ export const integrationActivity = (input: {
     provenance: 'observed',
   }
 }
+
+export const workspaceActivity = (input: {
+  readonly id: string
+  readonly at: number
+  readonly type:
+    | 'workspace.provisioned'
+    | 'workspace.provision_refused'
+    | 'workspace.writer_acquired'
+    | 'workspace.writer_reclaimed'
+    | 'workspace.writer_released'
+    | 'workspace.writer_transferred'
+    | 'workspace.writer_fenced'
+    | 'workspace.observer_added'
+    | 'workspace.observer_removed'
+    | 'workspace.quarantined'
+    | 'workspace.refused'
+  readonly level: ActivityLevel
+  readonly summary: string
+  readonly detail: string | null
+  readonly sessionId: string | null
+  readonly workspaceId: string | null
+  readonly workspaceName: string | null
+}): ActivityIngest => {
+  const references: ActivityReference[] = []
+  if (input.sessionId !== null) references.push({ kind: 'session', id: input.sessionId, label: null })
+  if (input.workspaceId !== null) references.push({ kind: 'workspace', id: input.workspaceId, label: input.workspaceName })
+  return {
+    id: input.id,
+    at: input.at,
+    source: 'workspace',
+    type: input.type,
+    level: input.level,
+    sessionId: input.sessionId,
+    summary: clamp(input.summary, 200),
+    detail: input.detail === null ? null : clamp(input.detail, 2000),
+    metadata: { workspaceId: input.workspaceId, workspaceName: input.workspaceName },
+    references,
+    provenance: 'observed',
+  }
+}

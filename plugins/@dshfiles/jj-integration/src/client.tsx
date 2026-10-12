@@ -1,10 +1,11 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { JjIntegrationPanel } from './panel.js'
+import { WorkspaceStatusChip } from './workspace-chip.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import './client.css'
 
@@ -21,12 +22,32 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
-  inject: ['slots'],
+  inject: ['slots', 'layout'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
     const label = (): string => translate('title')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label, locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
+    )
+    ctx.slots.inject('conversation.input.overlay', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.input.overlay',
+          id: 'jj-integration-status',
+          order: 4,
+          locale: JJ_INTEGRATION_LOCALE_NAMESPACE,
+          inject: (sessionId: string) => ({ sessionId }),
+        },
+        decorate(props => (
+          <PluginQueryProvider>
+            <WorkspaceStatusChip
+              sessionId={props.sessionId}
+              t={props.t}
+              onOpen={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)}
+            />
+          </PluginQueryProvider>
+        )),
+      ),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(

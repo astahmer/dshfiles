@@ -19,6 +19,7 @@ const statsKey = ['activity-timeline', 'stats'] as const
 
 const sourceVariant = (source: ActivitySource): 'default' | 'secondary' | 'outline' | 'destructive' => {
   if (source === 'integration') return 'default'
+  if (source === 'workspace') return 'destructive'
   if (source === 'communication') return 'secondary'
   if (source === 'session') return 'outline'
   return 'outline'

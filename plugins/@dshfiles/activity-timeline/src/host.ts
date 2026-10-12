@@ -2,7 +2,7 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import { z } from 'zod'
-import { communicationActivity, communicationMessage, integrationActivity, sessionActivity } from './adapters.js'
+import { communicationActivity, communicationMessage, integrationActivity, sessionActivity, workspaceActivity } from './adapters.js'
 import { activityTimelineApi } from './api.js'
 import { createActivityTimelineService, type ActivityTimelineService } from './service.js'
 
@@ -123,7 +123,7 @@ const setupHost = (context: Context): Effect<void> => {
   context.on('dshfiles/activity/event', payload => {
     const parsed = z
       .object({
-        kind: z.enum(['communication-activity', 'communication-message', 'integration']),
+        kind: z.enum(['communication-activity', 'communication-message', 'integration', 'workspace']),
         value: z.unknown(),
       })
       .strict()
@@ -132,6 +132,7 @@ const setupHost = (context: Context): Effect<void> => {
     if (parsed.data.kind === 'communication-activity') void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
     if (parsed.data.kind === 'communication-message') void active.ingest(communicationMessageSafe(parsed.data.value))
     if (parsed.data.kind === 'integration') void active.ingest(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
+    if (parsed.data.kind === 'workspace') void active.ingest(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0]))
     return undefined
   })
   return {
