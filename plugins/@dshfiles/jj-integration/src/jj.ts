@@ -35,11 +35,27 @@ export const parseRevisionLine = (line: string): ObservedRevision => {
   return { changeId, commitId, conflict: conflict === 'true', description: descriptionParts.join(FIELD_SEPARATOR).slice(0, 200) }
 }
 
+const IGNORE_WORKING_COPY = '--ignore-working-copy'
+const READ_ONLY_COMMANDS = new Set(['log', 'diff', 'evolog', 'file', 'resolve', 'root', 'show', 'cat'])
+const READ_ONLY_PAIRS = new Set(['workspace list', 'bookmark list', 'operation log'])
+
+/**
+ * jj snapshots the working copy of its `cwd` at the start of every command unless it is told not to.
+ * This coordinator reads *other* agents' workspaces, so an unflagged read rewrites their working-copy
+ * commit at a moment they do not control and races their own jj process into a divergent change.
+ */
+const withoutWorkingCopyWrite = (args: readonly string[]): readonly string[] => {
+  if (args.includes(IGNORE_WORKING_COPY)) return args
+  const [first = '', second = ''] = args
+  if (READ_ONLY_COMMANDS.has(first) || READ_ONLY_PAIRS.has(`${first} ${second}`)) return [IGNORE_WORKING_COPY, ...args]
+  return args
+}
+
 const run = async (
   executor: JjExecutor,
   input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal; readonly allowFailure?: boolean; readonly label: string },
 ): Promise<JjRunResult> => {
-  const result = await executor({ args: input.args, cwd: input.cwd, ...(input.signal === undefined ? {} : { signal: input.signal }) })
+  const result = await executor({ args: withoutWorkingCopyWrite(input.args), cwd: input.cwd, ...(input.signal === undefined ? {} : { signal: input.signal }) })
   if (result.exitCode !== 0 && input.allowFailure !== true) {
     const stderr = result.stderr.trim()
     if (/doesn't exist|no such revision|Revision .* not found/i.test(stderr)) {

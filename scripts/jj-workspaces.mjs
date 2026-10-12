@@ -10,8 +10,11 @@ const asJson = process.argv.includes("--json");
 const strict = process.argv.includes("--strict");
 const spine = flag("--spine", "integration-spine");
 
+// The board is a read: without --ignore-working-copy every `pnpm run jj:workspaces`
+// would snapshot the invoking workspace and, on a chained line, rebase every
+// descendant working-copy slot.
 const jj = (args) =>
-  execFileSync("jj", args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 }).trimEnd();
+  execFileSync("jj", ["--ignore-working-copy", ...args], { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 }).trimEnd();
 
 const rows = jj([
   "workspace",
