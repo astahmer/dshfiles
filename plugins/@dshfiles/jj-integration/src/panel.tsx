@@ -1,15 +1,16 @@
-import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { IntegrationCandidate, IntegrationEvent, WorkspaceRecord } from './types.js'
 import { useState } from 'react'
-import { jjIntegrationApi, type CandidateDetail } from './api.js'
+import { jjIntegrationApi, type CandidateDetail, type IntegrationOverview } from './api.js'
 import { runHostRequest } from './host-request.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
@@ -18,16 +19,32 @@ const eventsKey = ['jj-integration', 'events'] as const
 const detailKey = ['jj-integration', 'detail'] as const
 
 type PendingAction = { readonly kind: 'run' | 'cancel'; readonly candidateId: string } | null
+type Mode = IntegrationOverview['modes']['isolation']
 
 const shortRevision = (revision: { readonly changeId: string } | null): string => (revision === null ? '—' : revision.changeId.slice(0, 8))
 
 const formatTime = (value: number): string => new Date(value).toLocaleString()
+
+const modeLabel = (mode: Mode, t: JjIntegrationTranslate): string =>
+  mode === 'auto' ? t('modeAuto') : mode === 'manual' ? t('modeManual') : t('modeOff')
+
+const modeVariant = (mode: Mode): 'secondary' | 'outline' | 'destructive' => (mode === 'off' ? 'destructive' : mode === 'auto' ? 'secondary' : 'outline')
 
 const stateVariant = (state: IntegrationCandidate['state']): 'default' | 'secondary' | 'destructive' | 'outline' => {
   if (state === 'blocked' || state === 'failed' || state === 'stale') return 'destructive'
   if (state === 'integrated' || state === 'already-integrated') return 'default'
   if (state === 'running') return 'secondary'
   return 'outline'
+}
+
+/** Why a candidate is not moving, in the order the coordinator resolves them. */
+export const blockerOf = (candidate: IntegrationCandidate): string | null => {
+  if (candidate.conflict !== null) return `${candidate.conflict.files.length} conflicting file(s)`
+  if (candidate.validation.kind === 'command' && candidate.validation.exitCode !== null && candidate.validation.exitCode !== 0) return 'validation failed'
+  if (candidate.dependsOn.length > 0) return `${candidate.dependsOn.length} dependency candidate(s)`
+  if (candidate.error !== null) return candidate.error
+  if (candidate.state === 'stale') return 'source revision moved after queueing'
+  return null
 }
 
 const CandidateRow = (props: {
@@ -46,6 +63,7 @@ const CandidateRow = (props: {
   const t = props.t
   const candidate = props.candidate
   const actionable = candidate.state === 'queued' || candidate.state === 'stale' || candidate.state === 'blocked' || candidate.state === 'failed'
+  const blocker = blockerOf(candidate)
   return (
     <div className="dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2">
@@ -66,7 +84,7 @@ const CandidateRow = (props: {
           {candidate.dependsOn.length === 0 ? null : <Badge variant="outline">{t('dependencies')}: {candidate.dependsOn.length}</Badge>}
         </div>
       </div>
-      {candidate.error === null ? null : <p className="dshx:mt-2 dshx:text-xs dshx:text-destructive">{candidate.error}</p>}
+      {blocker === null ? null : <p className="dshx:mt-2 dshx:text-xs dshx:text-muted-foreground">{t('blocked')}: {blocker}</p>}
       <div className="dshx:mt-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <Button size="sm" variant="outline" onClick={() => props.onInspect(candidate.id)}>{t('source')}</Button>
         {actionable ? (
@@ -135,6 +153,42 @@ const DetailPanel = (props: { readonly detail: CandidateDetail; readonly t: JjIn
   )
 }
 
+const WorkspaceRow = (props: {
+  readonly workspace: WorkspaceRecord
+  readonly busy: boolean
+  readonly t: JjIntegrationTranslate
+  readonly onReady: (workspaceId: string) => void
+}): JSX.Element => {
+  const { workspace, t } = props
+  const writer = workspace.writerLease
+  const ready = workspace.lifecycle === 'ready' || workspace.lifecycle === 'integrating'
+  return (
+    <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
+      <div className="dshx:min-w-0 dshx:flex-1">
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <p className="dshx:font-mono dshx:text-sm dshx:font-semibold">{workspace.name}</p>
+          <Badge variant={workspace.isolated ? 'secondary' : 'outline'}>{workspace.isolated ? t('isolatedWorkspace') : t('sharedWorkspace')}</Badge>
+          {workspace.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
+        </div>
+        <p className="dshx:mt-1 dshx:break-all dshx:text-xs dshx:text-muted-foreground" title={workspace.path}>
+          {workspace.path}
+        </p>
+        <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">
+          {t('currentRevision')}: {shortRevision(workspace.currentRevision)} · {t('chipWriter')}:{' '}
+          {writer === null ? t('unclaimed') : <span className="dshx:font-mono">{writer.sessionId.slice(0, 8)}</span>} · {t('observers')}: {workspace.observers.length} ·{' '}
+          {t('owners')}: {workspace.owners.filter(owner => owner.detachedAt === null).length}
+        </p>
+      </div>
+      <div className="dshx:flex dshx:items-center dshx:gap-2">
+        <Badge variant="outline">{t(workspace.lifecycle === 'integrated' ? 'integratedLifecycle' : workspace.lifecycle)}</Badge>
+        <Button size="sm" variant="outline" disabled={props.busy || ready || workspace.missing} onClick={() => props.onReady(workspace.id)}>
+          {ready ? t('ready') : t('markReady')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export const JjIntegrationPanel = (props: { readonly t: JjIntegrationTranslate }): JSX.Element => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
@@ -162,10 +216,13 @@ export const JjIntegrationPanel = (props: { readonly t: JjIntegrationTranslate }
     },
     retry: false,
   })
+  /** Retry everything the panel shows, so Refresh is a real recovery action. */
   const refresh = async (): Promise<void> => {
-    await queryClient.invalidateQueries({ queryKey: overviewKey })
-    await queryClient.invalidateQueries({ queryKey: eventsKey })
-    if (selectedCandidateId !== null) await queryClient.invalidateQueries({ queryKey: [...detailKey, selectedCandidateId] })
+    await Promise.all([
+      overviewQuery.refetch(),
+      eventsQuery.refetch(),
+      selectedCandidateId === null ? Promise.resolve() : detailQuery.refetch(),
+    ])
   }
   const actionMutation = useMutation({
     mutationFn: (request: { readonly kind: 'run' | 'cancel' | 'retry' | 'move' | 'ready'; readonly candidateId?: string; readonly workspaceId?: string; readonly direction?: 'up' | 'down' }) =>
@@ -181,7 +238,9 @@ export const JjIntegrationPanel = (props: { readonly t: JjIntegrationTranslate }
       }),
     onSuccess: async () => {
       setPending(null)
-      await refresh()
+      await queryClient.invalidateQueries({ queryKey: overviewKey })
+      await queryClient.invalidateQueries({ queryKey: eventsKey })
+      if (selectedCandidateId !== null) await queryClient.invalidateQueries({ queryKey: [...detailKey, selectedCandidateId] })
     },
   })
   const overview = overviewQuery.data
@@ -189,96 +248,132 @@ export const JjIntegrationPanel = (props: { readonly t: JjIntegrationTranslate }
   const candidates = overview?.candidates ?? []
   const busy = actionMutation.isPending
   const detail = detailQuery.data
+  const hasData = overview !== undefined
+  const stale = hasData && overviewQuery.isError
+  const failed = overviewQuery.isError && !hasData
+  const refreshing = overviewQuery.isFetching || eventsQuery.isFetching
 
   return (
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:sm:p-5">
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-        <div>
+        <div className="dshx:min-w-0">
           <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
           <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <Badge variant={overview !== undefined && overviewQuery.error === null ? 'secondary' : 'destructive'}>
-            {overview !== undefined && overviewQuery.error === null ? t('connected') : t('unavailable')}
+          <Badge variant={failed ? 'destructive' : stale ? 'outline' : 'secondary'}>
+            {overviewQuery.isPending && !hasData ? t('loading') : failed ? t('unavailable') : stale ? t('staleData') : t('connected')}
           </Badge>
-          <Button variant="outline" size="sm" disabled={overviewQuery.isFetching} onClick={() => void refresh()}>
-            <RefreshCwIcon aria-hidden /> {t('refresh')}
+          <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+            {refreshing ? <Spinner className="dshx:size-3" /> : <RefreshCwIcon aria-hidden />} {t('refresh')}
           </Button>
         </div>
       </header>
-      {overviewQuery.isPending ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
-      {overviewQuery.error === null ? null : (
-        <Alert variant="destructive"><AlertDescription>{errorMessage(overviewQuery.error, t('loadFailed'))}</AlertDescription></Alert>
-      )}
+
+      {failed ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t('neverLoaded')}</AlertTitle>
+          <AlertDescription className="dshx:flex dshx:flex-col dshx:gap-2">
+            <span>{errorMessage(overviewQuery.error, t('loadFailed'))}</span>
+            <Button variant="outline" size="sm" className="dshx:self-start" disabled={refreshing} onClick={() => void refresh()}>
+              {t('retry')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {stale ? (
+        <Alert>
+          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+            <span>
+              {t('staleData')} · {t('lastUpdated')} {formatTime(overviewQuery.dataUpdatedAt)} · {errorMessage(overviewQuery.error, t('loadFailed'))}
+            </span>
+            <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+              {t('retry')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {actionMutation.error === null ? null : (
-        <Alert variant="destructive"><AlertDescription>{errorMessage(actionMutation.error, t('loadFailed'))}</AlertDescription></Alert>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(actionMutation.error, t('actionFailed'))}</AlertDescription>
+        </Alert>
       )}
+
       {overview === undefined ? null : (
-        <Tabs defaultValue="queue">
-          <TabsList>
-            <TabsTrigger value="queue">{t('queue')} ({candidates.filter(candidate => candidate.state === 'queued' || candidate.state === 'running').length})</TabsTrigger>
-            <TabsTrigger value="workspaces">{t('workspaces')} ({overview.workspaces.length})</TabsTrigger>
-            <TabsTrigger value="history">{t('history')}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="queue">
-            <div className="dshx:grid dshx:gap-3 dshx:xl:grid-cols-[minmax(0,1fr)_22rem]">
-              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-                {candidates.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noCandidates')}</p> : null}
-                {candidates.map(candidate => (
-                  <CandidateRow
-                    key={candidate.id}
-                    candidate={candidate}
-                    workspaceName={workspaceNames.get(candidate.workspaceId) ?? candidate.workspaceId.slice(0, 8)}
+        <>
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
+            <span className="dshx:text-muted-foreground">{t('isolationAutomation')}</span>
+            <Badge variant={modeVariant(overview.modes.isolation)}>{modeLabel(overview.modes.isolation, t)}</Badge>
+            <span className="dshx:text-muted-foreground">{t('integrationAutomation')}</span>
+            <Badge variant={modeVariant(overview.modes.integration)}>{modeLabel(overview.modes.integration, t)}</Badge>
+            <span className="dshx:text-muted-foreground">
+              {overview.modes.integration === 'auto' ? t('modeIntegrationAuto') : overview.modes.integration === 'manual' ? t('modeIntegrationManual') : t('modeIntegrationOff')}
+            </span>
+          </div>
+          <Tabs defaultValue="queue">
+            <TabsList>
+              <TabsTrigger value="queue">{t('queue')} ({candidates.filter(candidate => candidate.state === 'queued' || candidate.state === 'running').length})</TabsTrigger>
+              <TabsTrigger value="workspaces">{t('workspaces')} ({overview.workspaces.length})</TabsTrigger>
+              <TabsTrigger value="history">{t('history')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="queue">
+              <div className="dshx:grid dshx:gap-3 dshx:xl:grid-cols-[minmax(0,1fr)_22rem]">
+                <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
+                  {candidates.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noCandidates')}</p> : null}
+                  {candidates.map(candidate => (
+                    <CandidateRow
+                      key={candidate.id}
+                      candidate={candidate}
+                      workspaceName={workspaceNames.get(candidate.workspaceId) ?? candidate.workspaceId.slice(0, 8)}
+                      busy={busy}
+                      pending={pending}
+                      t={t}
+                      onInspect={setSelectedCandidateId}
+                      onRun={candidateId => actionMutation.mutate({ kind: 'run', candidateId })}
+                      onCancel={candidateId => actionMutation.mutate({ kind: 'cancel', candidateId })}
+                      onRetry={candidateId => actionMutation.mutate({ kind: 'retry', candidateId })}
+                      onMove={(candidateId, direction) => actionMutation.mutate({ kind: 'move', candidateId, direction })}
+                      onRequestAction={setPending}
+                    />
+                  ))}
+                </div>
+                <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
+                  {detailQuery.isPending && selectedCandidateId !== null ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
+                  {detailQuery.error === null ? null : (
+                    <Alert variant="destructive"><AlertDescription>{errorMessage(detailQuery.error, t('loadFailed'))}</AlertDescription></Alert>
+                  )}
+                  {detail === undefined ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('unverified')}</p> : <DetailPanel detail={detail} t={t} />}
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="workspaces">
+              <div className="dshx:flex dshx:flex-col dshx:gap-2">
+                {overview.workspaces.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noWorkspaces')}</p> : null}
+                {overview.workspaces.map(workspace => (
+                  <WorkspaceRow
+                    key={workspace.id}
+                    workspace={workspace}
                     busy={busy}
-                    pending={pending}
                     t={t}
-                    onInspect={setSelectedCandidateId}
-                    onRun={candidateId => actionMutation.mutate({ kind: 'run', candidateId })}
-                    onCancel={candidateId => actionMutation.mutate({ kind: 'cancel', candidateId })}
-                    onRetry={candidateId => actionMutation.mutate({ kind: 'retry', candidateId })}
-                    onMove={(candidateId, direction) => actionMutation.mutate({ kind: 'move', candidateId, direction })}
-                    onRequestAction={setPending}
+                    onReady={workspaceId => actionMutation.mutate({ kind: 'ready', workspaceId })}
                   />
                 ))}
               </div>
-              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-                {detailQuery.isPending && selectedCandidateId !== null ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('loading')}</p> : null}
-                {detail === undefined ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('unverified')}</p> : <DetailPanel detail={detail} t={t} />}
+            </TabsContent>
+            <TabsContent value="history">
+              <div className="dshx:flex dshx:flex-col dshx:gap-2">
+                {(eventsQuery.data?.events ?? []).length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noEvents')}</p> : null}
+                {(eventsQuery.data?.events ?? []).map((event: IntegrationEvent) => (
+                  <div key={event.id} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-2 dshx:text-xs">
+                    <span className="dshx:font-medium">{event.type}</span>
+                    <span className="dshx:text-muted-foreground">{event.detail ?? event.outcome ?? ''}</span>
+                    <span className="dshx:text-muted-foreground">{formatTime(event.at)}</span>
+                  </div>
+                ))}
               </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="workspaces">
-            <div className="dshx:flex dshx:flex-col dshx:gap-2">
-              {overview.workspaces.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noWorkspaces')}</p> : null}
-              {overview.workspaces.map((workspace: WorkspaceRecord) => (
-                <div key={workspace.id} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3">
-                  <div className="dshx:min-w-0">
-                    <p className="dshx:text-sm dshx:font-semibold">{workspace.name}{workspace.missing ? ` · ${t('missing')}` : ''}</p>
-                    <p className="dshx:break-all dshx:text-xs dshx:text-muted-foreground">
-                      {workspace.path} · {t('currentRevision')}: {shortRevision(workspace.currentRevision)} · {t('owners')}: {workspace.owners.length}
-                    </p>
-                  </div>
-                  <div className="dshx:flex dshx:items-center dshx:gap-2">
-                    <Badge variant="outline">{t(workspace.lifecycle === 'integrated' ? 'integratedLifecycle' : workspace.lifecycle)}</Badge>
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => actionMutation.mutate({ kind: 'ready', workspaceId: workspace.id })}>{t('markReady')}</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-          <TabsContent value="history">
-            <div className="dshx:flex dshx:flex-col dshx:gap-2">
-              {(eventsQuery.data?.events ?? []).length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noEvents')}</p> : null}
-              {(eventsQuery.data?.events ?? []).map((event: IntegrationEvent) => (
-                <div key={event.id} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-2 dshx:text-xs">
-                  <span className="dshx:font-medium">{event.type}</span>
-                  <span className="dshx:text-muted-foreground">{event.detail ?? event.outcome ?? ''}</span>
-                  <span className="dshx:text-muted-foreground">{formatTime(event.at)}</span>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        </>
       )}
     </div>
   )

@@ -30,6 +30,13 @@ export const integrationOverviewSchema = z
     repositories: z.array(repositoryRecordSchema).max(64),
     workspaces: z.array(workspaceRecordSchema).max(256),
     candidates: z.array(integrationCandidateSchema).max(512),
+    /** Effective automation, so the UI reports the running mode instead of restating a default. */
+    modes: z
+      .object({
+        isolation: z.enum(['auto', 'manual', 'off']),
+        integration: z.enum(['auto', 'manual', 'off']),
+      })
+      .strict(),
     counts: z
       .object({
         queued: z.number().int().nonnegative(),

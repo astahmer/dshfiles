@@ -29,10 +29,12 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label, locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
     )
-    ctx.slots.inject('conversation.input.overlay', () =>
+    // The composer's existing leading control row, so the status costs no
+    // vertical space and never sits between the user and the input.
+    ctx.slots.inject('conversation.input.left', () =>
       ctx.slots.register(
         {
-          name: 'conversation.input.overlay',
+          name: 'conversation.input.left',
           id: 'jj-integration-status',
           order: 4,
           locale: JJ_INTEGRATION_LOCALE_NAMESPACE,
