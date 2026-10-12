@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { jjIntegrationApi } from './api.js'
 import type { JjExecutor, CommandExecutor } from './jj.js'
 import { IntegrationError, createJjIntegrationService, type JjIntegrationService } from './service.js'
+import { createThreadWorkspaceResolver, type WorkspaceIsolationMode } from './thread-isolation.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -37,6 +38,16 @@ export const Config = z.object({
   allowAnyAgentIntegration: z.boolean().default(false),
   coordinatorSessions: z.array(z.string().min(1).max(256)).max(64).default([]),
   autoDiscoverWorkspaces: z.boolean().default(true),
+  /** Automatic thread-to-workspace isolation. Default is automatic; `off` is an explicit choice. */
+  workspaceIsolation: z
+    .object({
+      mode: z.enum(['auto', 'manual', 'off']).default('auto'),
+      /** Parent directory for thread workspaces; defaults to a sibling of the repository root. */
+      directory: z.string().min(1).max(2048).optional(),
+    })
+    .default({ mode: 'auto' }),
+  /** Coordinator-driven integration. Default is explicit; `off` disables coordinator runs. */
+  integration: z.object({ mode: z.enum(['auto', 'manual', 'off']).default('manual') }).default({ mode: 'manual' }),
 })
 export type JjIntegrationConfig = z.infer<typeof Config>
 
@@ -81,6 +92,15 @@ const createCommandExecutor = (ctx: Context): CommandExecutor => async input => 
 
 let service: JjIntegrationService | undefined
 let hostContext: Context | undefined
+let integrationMode: 'auto' | 'manual' | 'off' = 'manual'
+
+/** Coordinator-driven integration is the only thing `integration.mode` gates; explicit jj use stays available. */
+const requireIntegrationEnabled = (): JjIntegrationService => {
+  if (integrationMode === 'off') {
+    throw new IntegrationError('integration-disabled', 'Coordinator-driven integration is disabled by configuration (integration.mode: off).')
+  }
+  return requireService()
+}
 
 const requireService = (): JjIntegrationService => {
   if (service === undefined) throw new IntegrationError('service-unavailable', 'Jujutsu integration Host is not active.')
@@ -193,7 +213,7 @@ const integrationRunTool = defineTool({
     'Run one queued integration candidate: duplicate the source revision onto the refreshed canonical spine, detect conflicts, run configured validation, and advance the spine bookmark only on success. The source workspace is never modified. Requires the candidate owner or a configured coordinator session.',
   parameters: { candidateId: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => jsonSummary(await requireService().runCandidate({ candidateId: args.candidateId, sessionId: agentIdOf(execution), ...(execution.signal === undefined ? {} : { signal: execution.signal }) })),
+  execute: async (args, execution) => jsonSummary(await requireIntegrationEnabled().runCandidate({ candidateId: args.candidateId, sessionId: agentIdOf(execution), ...(execution.signal === undefined ? {} : { signal: execution.signal }) })),
 })
 
 const integrationRetryTool = defineTool({
@@ -259,7 +279,7 @@ const api = jjIntegrationApi.host({
   },
   events: async ({ input }) => ({ events: [...(await requireService().listEvents(input.limit ?? 100))] }),
   run: async ({ input }) => {
-    const result = await requireService().runCandidate({ candidateId: input.candidateId, sessionId: null })
+    const result = await requireIntegrationEnabled().runCandidate({ candidateId: input.candidateId, sessionId: null })
     const outcome = result.outcome === 'running' ? 'failed' : result.outcome
     return { outcome, candidateId: input.candidateId, detail: result.detail }
   },
@@ -283,8 +303,10 @@ const discoverWorkspace = async (agent: Agent, config: JjIntegrationConfig): Pro
 
 const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> => {
   hostContext = context
+  integrationMode = config.integration.mode
+  const executor = createExecutor(context)
   const active = createJjIntegrationService({
-    executor: createExecutor(context),
+    executor,
     executeCommand: createCommandExecutor(context),
     options: {
       spineBookmark: config.spineBookmark,
@@ -303,6 +325,40 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
     return undefined
   })
   service = active
+
+  // The awaited workspace-resolution boundary. The Host asks this before the
+  // Agent exists, so the first tool call already runs in the provisioned
+  // workspace — or the Session is refused rather than handed the shared checkout.
+  const isolation: WorkspaceIsolationMode = config.workspaceIsolation.mode
+  const resolver = createThreadWorkspaceResolver({
+    mode: isolation,
+    executor,
+    spineRevision: config.spineBookmark,
+    ...(config.workspaceIsolation.directory === undefined ? {} : { workspacesDirectory: config.workspaceIsolation.directory }),
+    findBinding: async sessionId => {
+      const bound = (await active.listWorkspaces()).find(
+        workspace => !workspace.missing && workspace.owners.some(owner => owner.sessionId === sessionId && owner.detachedAt === null),
+      )
+      return bound === undefined ? undefined : { workspaceName: bound.name, path: bound.path }
+    },
+    rememberBinding: async input => {
+      await active.registerWorkspace({ path: input.path, sessionId: input.sessionId, source: 'session-cwd' })
+    },
+  })
+  context.provide('sessionWorkspaceResolver', {
+    resolve: async (request: { readonly sessionId: string; readonly requestedCwd: string }) => {
+      const outcome = await resolver.resolve(request)
+      context.emit('dshfiles/activity/event', {
+        kind: 'workspace-isolation',
+        value: { sessionId: request.sessionId, requestedCwd: request.requestedCwd, mode: isolation, outcome },
+      })
+      if (outcome.kind === 'refused') {
+        context.logger.warn('jj-integration: refusing session %s workspace isolation: %s', request.sessionId, outcome.reason)
+      }
+      return outcome
+    },
+  })
+
   context.on('agent/created', ({ agent }) => {
     void discoverWorkspace(agent, config)
     return undefined
@@ -314,6 +370,7 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
         yield async () => {
           if (service === active) service = undefined
           if (hostContext === context) hostContext = undefined
+          integrationMode = 'manual'
         }
       } catch (error) {
         if (service === active) service = undefined
