@@ -12,7 +12,44 @@ not design.
 | `68e4d85d` | `@dshfiles/jj-integration`: provisioning core, isolation resolver, `workspaceIsolation` / `integration` config, activity events |
 | `28203960` | web profile seed loads `@dshfiles/jj-integration` |
 | `d5a33e7a` | this page |
-| fix revision | `Config.prefault({})` — see "Loader config" below |
+| `a6850401` | `Config.prefault({})` — see "Loader config" below |
+| `3ef5eecb` | `plugins/pnpm-workspace.yaml`: classic virtual store, so plugin typechecks resolve one peer set |
+| `d52d2c32` | exclusive writer leases, `tools/pre-execute` gate, integration guardrails |
+
+## Exclusive ownership (part 2)
+
+One writer per workspace, enforced where work happens:
+
+- The workspace record carries `writerEpoch`, `writerLease` and `observers`.
+  `acquireWriter` / `releaseWriter` / `transferWriter` / `heartbeatWriter` /
+  `addObserver` / `removeObserver` all serialize through the existing state
+  path, so there is no second registry.
+- A live foreign lease is refused (`writer-held`); a lease quiet for
+  `ownership.staleAfterSeconds` is reclaimed by the next caller and its holder
+  **fenced** — the new epoch is ahead of the one that session remembers, and its
+  writes are denied (`writer-fenced`) while it keeps read-only access as an
+  observer.
+- Transfers refuse a live holder unless the caller states it has stopped. The
+  previous writer is fenced and kept as an observer.
+- `createToolGate` runs on the core `tools/pre-execute` waterfall with the
+  agent's Session id and cwd: the first caller of a free workspace takes the
+  lease, the holder is admitted (heartbeat throttled to 15 s), a foreign writer
+  is refused **before the tool body runs**, and a check that cannot complete
+  denies. `session/disposed` releases the leases a session holds.
+- Enforcement applies **only** to workspaces this plugin provisioned for a
+  thread (`isolated: true`). Discovered workspaces keep today's behaviour, so no
+  existing session is migrated. A workspace the guard quarantines is read-only.
+
+## Integration (part 2)
+
+- `integration.mode: off` refuses `submitCandidate`, `runCandidate` and
+  `retryCandidate` in the service itself, not only at the tool.
+- A quarantined source workspace is refused at submit (`unsafe-workspace`) and
+  blocks at run without advancing the spine.
+- Service events now reach `onEvent` exactly once, after the durable write.
+- `integration.mode: auto` reacts to `workspace.ready` only — the explicit
+  eligibility signal — and drains one `queued` candidate at a time through the
+  existing store lock. A completed turn never queues or runs anything.
 
 Canonical DSH checkout (`~/dev/dsh-core-ade-hook`, store `~/dev/dsh-core-activity-rc2`,
 origin `deepseek-ai/deepseek-harness`), local revision `5d2c5a5c` on the
@@ -39,8 +76,14 @@ workspaceIsolation:
   directory: ~      # optional; defaults to a sibling <repo>-threads/
 integration:
   mode: manual      # auto | manual | off   (default manual; off refuses coordinator runs)
+ownership:
+  staleAfterSeconds: 900   # a lease this quiet is reclaimable
+  readOnlyTools: [...]     # what an observer may run in a workspace it does not own
 requireWorkspaceResolver: false   # session-controller: true refuses a Session when no resolver is registered
 ```
+
+Automation and safety are independent: turning `integration.mode` to `off`
+leaves ownership enforcement and the jj guard exactly as they were.
 
 `off` never provisions and never calls jj. `auto` provisions or refuses — a
 provisioning failure never behaves like `off`.
@@ -57,7 +100,12 @@ and no seeded config needs the same treatment.
 
 ## Verified
 
-- `@dshfiles/jj-integration`: **30/30** vitest (9 new: 20 concurrent threads,
+- `@dshfiles/jj-integration`: **49/49** vitest — 8 pure ownership decisions,
+  7 tool-gate cases (owner, acquire, foreign writer, transfer fencing, observer
+  read-only, fail-closed, pass-through), 11 real-jj ownership/integration cases
+  (contention, release authorization, stale reclaim, transfer, restart recovery,
+  discovered-workspace passthrough, quarantine, `off`, spine unchanged), plus the
+  part-1 cases: 20 concurrent threads,
   idempotent retry, live-`@` base refusal, unsafe-marker refusal, non-jj
   passthrough, both partial-registration refusals, and the four resolver modes),
   `tsc --noEmit` clean, `dshx build` exit 0, host bundle imports.
