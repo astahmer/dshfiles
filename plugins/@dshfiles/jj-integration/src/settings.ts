@@ -64,6 +64,28 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'Paths no tool call may name, whatever the tool and whichever workspace it runs in. This is the last known good recovery store: it must outlive the failure it exists for, so a DSH Session cannot rewrite, launch, promote or delete it. Empty disables the guard.',
       ),
+    /**
+     * Cleanup is separate from integration automation on purpose: turning one off
+     * never changes the other, and neither disables ownership enforcement.
+     */
+    workspaceCleanup: Schema.object({
+      enabled: Schema.boolean()
+        .default(true)
+        .description(
+          'Consider provisioned thread workspaces for automatic cleanup. Pinned, leased, attached, uncommitted and unintegrated workspaces are never removed.',
+        ),
+      idleAfterDays: Schema.natural().min(0).max(3_650).default(1).description('Days without meaningful activity before a workspace is reported idle.'),
+      deleteAfterDays: Schema.natural()
+        .min(0)
+        .max(3_650)
+        .default(7)
+        .description('Days without meaningful activity before an idle workspace becomes eligible for cleanup.'),
+      dryRun: Schema.boolean().default(false).description('Report what cleanup would remove and remove nothing. Manual cleanup can also be run as a dry run.'),
+    })
+      .default({ enabled: true, idleAfterDays: 1, deleteAfterDays: 7, dryRun: false })
+      .description(
+        'Automatic removal of idle thread workspaces. It removes a registration and a disposable directory only: no revision is abandoned and no bookmark moves.',
+      ),
   }),
 })
 

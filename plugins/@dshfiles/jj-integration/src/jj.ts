@@ -66,19 +66,17 @@ const run = async (
   return result
 }
 
-export const resolveRevision = async (
-  executor: JjExecutor,
-  cwd: string,
-  revision: string,
-  signal?: AbortSignal,
-): Promise<ObservedRevision> => {
+export const resolveRevision = async (executor: JjExecutor, cwd: string, revision: string, signal?: AbortSignal): Promise<ObservedRevision> => {
   const result = await run(executor, {
     args: ['log', '--no-graph', '-r', revision, '-T', REVISION_TEMPLATE],
     cwd,
     ...(signal === undefined ? {} : { signal }),
     label: `Resolve revision ${revision}`,
   })
-  const line = result.stdout.trim().split('\n').find(candidate => candidate.trim().length > 0)
+  const line = result.stdout
+    .trim()
+    .split('\n')
+    .find(candidate => candidate.trim().length > 0)
   if (line === undefined) throw new JjCommandError('revision-not-found', `Resolve revision ${revision}: no revision matched.`, '')
   return parseRevisionLine(line)
 }
@@ -111,6 +109,37 @@ export const isAncestor = async (
   return result.exitCode === 0 && result.stdout.trim().length > 0
 }
 
+/**
+ * Revisions this workspace holds that the canonical spine does not and that
+ * carry content. A fresh thread workspace always has an empty working-copy
+ * commit as a child of the spine, so the emptiness filter is what makes the
+ * answer mean "work nobody has taken" instead of "not the spine itself".
+ */
+export const revisionsOutsideSpine = async (executor: JjExecutor, cwd: string, spineRevision: string, signal?: AbortSignal): Promise<readonly string[]> => {
+  const result = await run(executor, {
+    args: ['log', '--no-graph', '-r', `::@ & ~::${spineRevision} & ~empty()`, '-T', 'commit_id ++ "\\n"'],
+    cwd,
+    ...(signal === undefined ? {} : { signal }),
+    allowFailure: true,
+    label: 'Check revisions outside the spine',
+  })
+  if (result.exitCode !== 0) return []
+  return result.stdout.split('\n').filter(line => line.trim().length > 0)
+}
+
+/** Working-copy changes that were never committed. A failure to read reports `true`, so cleanup never guesses. */
+export const hasWorkingCopyChanges = async (executor: JjExecutor, cwd: string, signal?: AbortSignal): Promise<boolean> => {
+  const result = await run(executor, {
+    args: ['status'],
+    cwd,
+    ...(signal === undefined ? {} : { signal }),
+    allowFailure: true,
+    label: 'Check working copy changes',
+  })
+  if (result.exitCode !== 0) return true
+  return !/The working copy has no changes/i.test(result.stdout)
+}
+
 export const mutableChangeIds = async (executor: JjExecutor, cwd: string, signal?: AbortSignal): Promise<ReadonlySet<string>> => {
   const result = await run(executor, {
     args: ['log', '--no-graph', '-r', 'mutable()', '-T', 'change_id ++ "\\n"'],
@@ -118,7 +147,12 @@ export const mutableChangeIds = async (executor: JjExecutor, cwd: string, signal
     ...(signal === undefined ? {} : { signal }),
     label: 'List mutable changes',
   })
-  return new Set(result.stdout.split('\n').map(line => line.trim()).filter(line => line.length > 0))
+  return new Set(
+    result.stdout
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0),
+  )
 }
 
 export const duplicateOnto = async (input: {
@@ -169,12 +203,7 @@ export const changedFiles = async (
     .filter(line => line.length > 0)
 }
 
-export const isRevisionEmpty = async (
-  executor: JjExecutor,
-  cwd: string,
-  revision: string,
-  signal?: AbortSignal,
-): Promise<boolean> => {
+export const isRevisionEmpty = async (executor: JjExecutor, cwd: string, revision: string, signal?: AbortSignal): Promise<boolean> => {
   const result = await run(executor, {
     args: ['diff', '--from', `${revision}-`, '--to', revision, '--summary'],
     cwd,

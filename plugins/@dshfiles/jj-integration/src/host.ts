@@ -10,6 +10,7 @@ import { jjIntegrationApi } from './api.js'
 import type { JjExecutor, CommandExecutor } from './jj.js'
 import { IntegrationError, createJjIntegrationService, type JjIntegrationService } from './service.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
+import { daysToMs, type CleanupPolicy } from './cleanup.js'
 import { createThreadWorkspaceResolver, type WorkspaceIsolationMode } from './thread-isolation.js'
 import { createToolGate } from './tool-gate.js'
 
@@ -52,6 +53,7 @@ export interface JjIntegrationConfig {
   readonly workspaceIsolation: { readonly mode: WorkspaceIsolationMode; readonly directory?: string | undefined }
   readonly integration: { readonly mode: 'auto' | 'manual' | 'off' }
   readonly ownership: { readonly staleAfterSeconds: number; readonly readOnlyTools: readonly string[]; readonly protectedPaths: readonly string[] }
+  readonly workspaceCleanup: { readonly enabled: boolean; readonly idleAfterMs: number; readonly deleteAfterMs: number; readonly dryRun: boolean }
 }
 
 const readConfig = (): JjIntegrationConfig => {
@@ -72,8 +74,17 @@ const readConfig = (): JjIntegrationConfig => {
       readOnlyTools: [...settings.readOnlyTools],
       protectedPaths: settings.protectedPaths.map(path => (path.startsWith('~/') ? join(homedir(), path.slice(2)) : path)),
     },
+    workspaceCleanup: {
+      enabled: settings.workspaceCleanup.enabled,
+      idleAfterMs: daysToMs(settings.workspaceCleanup.idleAfterDays),
+      deleteAfterMs: daysToMs(settings.workspaceCleanup.deleteAfterDays),
+      dryRun: settings.workspaceCleanup.dryRun,
+    },
   }
 }
+
+/** Read at use, so a settings change applies to the next sweep and the next manual run. */
+const cleanupPolicy = (): CleanupPolicy => readConfig().workspaceCleanup
 
 const createExecutor =
   (ctx: Context): JjExecutor =>
@@ -435,6 +446,9 @@ const api = jjIntegrationApi.host({
   cancel: ({ input }) => requireService().cancelCandidate(input.candidateId, null),
   move: ({ input }) => requireService().moveCandidate(input.candidateId, input.direction),
   refreshWorkspace: ({ input }) => requireService().refreshWorkspace(input.workspaceId),
+  setWorkspacePinned: ({ input }) => requireService().setWorkspacePinned(input.workspaceId, input.pinned),
+  cleanupPreview: () => requireService().cleanupReport({ policy: cleanupPolicy() }),
+  cleanupRun: ({ input }) => requireService().cleanupWorkspaces({ policy: cleanupPolicy(), dryRun: input.dryRun ?? cleanupPolicy().dryRun }),
   markReady: ({ input }) => requireService().markReady(input.workspaceId, null),
   submit: ({ input }) => requireService().submitCandidate({ workspaceId: input.workspaceId, sessionId: input.sessionId }),
   acquireWriter: ({ input }) => requireService().acquireWriter({ workspaceId: input.workspaceId, sessionId: input.sessionId, host: null }),
@@ -623,16 +637,34 @@ const setupHost = (context: Context): Effect<void> => {
     void discoverWorkspace(agent, config)
     return undefined
   })
+  /**
+   * Cleanup has its own timer, deliberately separate from the integration
+   * driver: either automation can be turned off without changing the other,
+   * and neither touches ownership enforcement.
+   */
+  const cleanupTimer = setInterval(
+    () => {
+      const policy = cleanupPolicy()
+      if (!policy.enabled) return
+      void active
+        .cleanupWorkspaces({ policy, dryRun: policy.dryRun })
+        .catch(error => context.logger.warn('jj-integration: workspace cleanup sweep failed: %o', error))
+    },
+    6 * 60 * 60 * 1000,
+  )
+  cleanupTimer.unref()
   return {
     async *[Symbol.asyncIterator]() {
       try {
         for (const agent of context.agents.list()) void discoverWorkspace(agent, config)
         yield async () => {
+          clearInterval(cleanupTimer)
           if (service === active) service = undefined
           if (hostContext === context) hostContext = undefined
           integrationMode = 'manual'
         }
       } catch (error) {
+        clearInterval(cleanupTimer)
         if (service === active) service = undefined
         if (hostContext === context) hostContext = undefined
         throw error

@@ -1,11 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import {
-  integrationCandidateSchema,
-  integrationEventSchema,
-  repositoryRecordSchema,
-  workspaceRecordSchema,
-} from './types.js'
+import { cleanupReportSchema, integrationCandidateSchema, integrationEventSchema, repositoryRecordSchema, workspaceRecordSchema } from './types.js'
 
 const candidateIdSchema = z.string().uuid()
 const workspaceIdSchema = z.string().uuid()
@@ -76,6 +71,12 @@ export const jjIntegrationApi = defineApi({
       output: integrationCandidateSchema,
     }),
     refreshWorkspace: method({ input: z.object({ workspaceId: workspaceIdSchema }).strict(), output: workspaceRecordSchema }),
+    setWorkspacePinned: method({
+      input: z.object({ workspaceId: workspaceIdSchema, pinned: z.boolean() }).strict(),
+      output: workspaceRecordSchema,
+    }),
+    cleanupPreview: method({ input: z.object({}).strict(), output: cleanupReportSchema }),
+    cleanupRun: method({ input: z.object({ dryRun: z.boolean().optional() }).strict(), output: cleanupReportSchema }),
     markReady: method({ input: z.object({ workspaceId: workspaceIdSchema }).strict(), output: workspaceRecordSchema }),
     submit: method({
       input: z.object({ workspaceId: workspaceIdSchema, sessionId: z.string().min(1).max(256).nullable() }).strict(),
@@ -90,9 +91,7 @@ export const jjIntegrationApi = defineApi({
       output: workspaceRecordSchema,
     }),
     transferWriter: method({
-      input: z
-        .object({ workspaceId: workspaceIdSchema, toSessionId: z.string().min(1).max(256), acknowledgeStopped: z.boolean() })
-        .strict(),
+      input: z.object({ workspaceId: workspaceIdSchema, toSessionId: z.string().min(1).max(256), acknowledgeStopped: z.boolean() }).strict(),
       output: workspaceRecordSchema,
     }),
   },

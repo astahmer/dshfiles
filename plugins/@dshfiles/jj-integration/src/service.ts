@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, open, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -8,6 +9,8 @@ import {
   noneValidation,
   stagingJournalSchema,
   type ConflictRecord,
+  type CleanupEntry,
+  type CleanupReport,
   type IntegrationAttempt,
   type IntegrationCandidate,
   type IntegrationEvent,
@@ -22,6 +25,7 @@ import {
   type WorkspaceRecord,
 } from './types.js'
 import type { WorkspaceOwnershipView } from './ownership.js'
+import { decideCleanup, isDisposableWorkspacePath, type CleanupPolicy } from './cleanup.js'
 import { readUnsafeWorkspaces } from './thread-provision.js'
 import {
   JjCommandError,
@@ -31,10 +35,12 @@ import {
   conflictFiles,
   duplicateOnto,
   forgetWorkspace,
+  hasWorkingCopyChanges,
   isAncestor,
   isRevisionEmpty,
   resolveRevision,
   revisionExists,
+  revisionsOutsideSpine,
   runValidationCommand,
   setBookmark,
   workspaceRoot,
@@ -111,7 +117,11 @@ export const repositoryStatePaths = async (root: string): Promise<{ readonly loc
   }
 }
 
-const pathExists = async (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
+const pathExists = async (path: string): Promise<boolean> =>
+  stat(path).then(
+    () => true,
+    () => false,
+  )
 
 /** Resolve a directory to the identity two spellings of one path share. */
 const canonicalPath = async (path: string): Promise<string> => realpath(path).catch(() => resolve(path))
@@ -123,9 +133,7 @@ const toRevision = (observed: ObservedRevision): JjRevision => ({
 })
 
 const cleanRevision = (revision: JjRevision | null | undefined): JjRevision | null =>
-  revision === null || revision === undefined
-    ? null
-    : { changeId: revision.changeId, commitId: revision.commitId, description: revision.description }
+  revision === null || revision === undefined ? null : { changeId: revision.changeId, commitId: revision.commitId, description: revision.description }
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
 
 export class JjIntegrationService {
@@ -143,11 +151,7 @@ export class JjIntegrationService {
   #writes: Promise<void> = Promise.resolve()
   #mutations: Promise<void> = Promise.resolve()
 
-  constructor(input: {
-    readonly executor: JjExecutor
-    readonly executeCommand?: CommandExecutor
-    readonly options?: JjIntegrationServiceOptions
-  }) {
+  constructor(input: { readonly executor: JjExecutor; readonly executeCommand?: CommandExecutor; readonly options?: JjIntegrationServiceOptions }) {
     const options = input.options ?? {}
     this.#executor = input.executor
     this.#executeCommand = input.executeCommand
@@ -207,12 +211,8 @@ export class JjIntegrationService {
           lastObservedAt: now,
           missing: false,
         }
-        const workspaces = existing === undefined
-          ? [...state.workspaces, record]
-          : state.workspaces.map(item => (item.id === record.id ? record : item))
-        const repositories = state.repositories.some(item => item.id === repository.id)
-          ? state.repositories
-          : [...state.repositories, repository]
+        const workspaces = existing === undefined ? [...state.workspaces, record] : state.workspaces.map(item => (item.id === record.id ? record : item))
+        const repositories = state.repositories.some(item => item.id === repository.id) ? state.repositories : [...state.repositories, repository]
         return {
           state: { ...state, repositories, workspaces },
           value: record,
@@ -258,7 +258,14 @@ export class JjIntegrationService {
             state: { ...current, workspaces: current.workspaces.map(item => (item.id === id ? record : item)) },
             value: record,
             events: changed
-              ? [this.#event('workspace.refreshed', { repositoryId: record.repositoryId, workspaceId: id, revisions: { source: record.currentRevision }, detail: root })]
+              ? [
+                  this.#event('workspace.refreshed', {
+                    repositoryId: record.repositoryId,
+                    workspaceId: id,
+                    revisions: { source: record.currentRevision },
+                    detail: root,
+                  }),
+                ]
               : [],
           }
         })
@@ -273,7 +280,10 @@ export class JjIntegrationService {
     })
   }
 
-  async inspectWorkspace(id: string, signal?: AbortSignal): Promise<{
+  async inspectWorkspace(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{
     readonly workspace: WorkspaceRecord
     readonly repository: RepositoryRecord
     readonly spine: JjRevision | null
@@ -293,17 +303,20 @@ export class JjIntegrationService {
       repository,
       spine: spine === undefined ? null : toRevision(spine),
       source: source === undefined ? null : toRevision(source),
-      sourceInSpine: spine !== undefined && source !== undefined && (await isAncestor(this.#executor, repository.root, source.commitId, spine.commitId, signal)),
-      spineInSource: spine !== undefined && source !== undefined && (await isAncestor(this.#executor, repository.root, spine.commitId, source.commitId, signal)),
+      sourceInSpine:
+        spine !== undefined && source !== undefined && (await isAncestor(this.#executor, repository.root, source.commitId, spine.commitId, signal)),
+      spineInSource:
+        spine !== undefined && source !== undefined && (await isAncestor(this.#executor, repository.root, spine.commitId, source.commitId, signal)),
     }
   }
 
-  async attachSession(id: string, sessionId: string, source: 'session-cwd' | 'agent-tool' | 'human'): Promise<WorkspaceRecord> {    return this.#serialize(() =>
+  async attachSession(id: string, sessionId: string, source: 'session-cwd' | 'agent-tool' | 'human'): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
       this.#updateState(state => {
         const workspace = state.workspaces.find(item => item.id === id)
         if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
         const now = this.#now()
-        const record: WorkspaceRecord = { ...workspace, owners: attachOwner(workspace.owners, sessionId, source, now), updatedAt: now }
+        const record: WorkspaceRecord = { ...workspace, owners: attachOwner(workspace.owners, sessionId, source, now), updatedAt: now, lastActivityAt: now }
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === id ? record : item)) },
           value: record,
@@ -319,15 +332,14 @@ export class JjIntegrationService {
         const workspace = state.workspaces.find(item => item.id === id)
         if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
         const now = this.#now()
-        const owners = workspace.owners.map(owner =>
-          owner.sessionId === sessionId && owner.detachedAt === null ? { ...owner, detachedAt: now } : owner,
-        )
+        const owners = workspace.owners.map(owner => (owner.sessionId === sessionId && owner.detachedAt === null ? { ...owner, detachedAt: now } : owner))
         const stillActive = owners.some(owner => owner.detachedAt === null)
         const record: WorkspaceRecord = {
           ...workspace,
           owners,
           lifecycle: workspace.lifecycle === 'active' && !stillActive ? 'idle' : workspace.lifecycle,
           updatedAt: now,
+          lastActivityAt: now,
         }
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === id ? record : item)) },
@@ -360,11 +372,7 @@ export class JjIntegrationService {
    * Take the exclusive writer lease for one workspace. A live lease held by
    * another session is refused; a quiet one is reclaimed and its holder fenced.
    */
-  async acquireWriter(input: {
-    readonly workspaceId: string
-    readonly sessionId: string
-    readonly host?: string | null
-  }): Promise<WorkspaceRecord> {
+  async acquireWriter(input: { readonly workspaceId: string; readonly sessionId: string; readonly host?: string | null }): Promise<WorkspaceRecord> {
     return this.#serialize(() =>
       this.#updateState(state => {
         const workspace = state.workspaces.find(item => item.id === input.workspaceId)
@@ -410,6 +418,7 @@ export class JjIntegrationService {
           writerLease: null,
           lifecycle: workspace.lifecycle === 'active' ? 'idle' : workspace.lifecycle,
           updatedAt: now,
+          lastActivityAt: now,
         }
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
@@ -446,12 +455,16 @@ export class JjIntegrationService {
         if (lease !== null && lease.sessionId === input.toSessionId) return { state, value: workspace, events: [] }
         const live = lease !== null && !this.#leaseIsStale(lease, now)
         if (live && !input.acknowledgeStopped) {
-          throw new IntegrationError('writer-held', `Workspace "${workspace.name}" has a live writer; stop it and pass acknowledgeStopped to fence it, or wait for its lease to go stale.`)
+          throw new IntegrationError(
+            'writer-held',
+            `Workspace "${workspace.name}" has a live writer; stop it and pass acknowledgeStopped to fence it, or wait for its lease to go stale.`,
+          )
         }
         const previous = lease?.sessionId ?? null
-        const fencedObservers = previous === null || previous === input.toSessionId
-          ? workspace.observers
-          : [...workspace.observers.filter(observer => observer.sessionId !== previous), { sessionId: previous, since: now }]
+        const fencedObservers =
+          previous === null || previous === input.toSessionId
+            ? workspace.observers
+            : [...workspace.observers.filter(observer => observer.sessionId !== previous), { sessionId: previous, since: now }]
         const record = this.#withWriter({ ...workspace, observers: fencedObservers }, { sessionId: input.toSessionId, host: input.host ?? null, now })
         const events = [
           this.#event('workspace.writer_transferred', {
@@ -463,12 +476,14 @@ export class JjIntegrationService {
           }),
           ...(previous === null || !live
             ? []
-            : [this.#event('workspace.writer_fenced', {
-              repositoryId: record.repositoryId,
-              workspaceId: record.id,
-              sessionId: previous,
-              detail: `fenced by transfer to ${input.toSessionId}`,
-            })]),
+            : [
+                this.#event('workspace.writer_fenced', {
+                  repositoryId: record.repositoryId,
+                  workspaceId: record.id,
+                  sessionId: previous,
+                  detail: `fenced by transfer to ${input.toSessionId}`,
+                }),
+              ]),
         ]
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
@@ -489,7 +504,7 @@ export class JjIntegrationService {
         if (lease === null || lease.sessionId !== input.sessionId) return { state, value: workspace, events: [] }
         const now = this.#now()
         if (now - lease.heartbeatAt < 15_000) return { state, value: workspace, events: [] }
-        const record: WorkspaceRecord = { ...workspace, writerLease: { ...lease, heartbeatAt: now }, updatedAt: now }
+        const record: WorkspaceRecord = { ...workspace, writerLease: { ...lease, heartbeatAt: now }, updatedAt: now, lastActivityAt: now }
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === record.id ? record : item)) },
           value: record,
@@ -512,9 +527,10 @@ export class JjIntegrationService {
         isolated: workspace.isolated,
         unsafe: repository !== undefined && readUnsafeWorkspaces(repository.root).includes(workspace.name),
         writerEpoch: workspace.writerEpoch,
-        writerLease: workspace.writerLease === null
-          ? null
-          : { sessionId: workspace.writerLease.sessionId, epoch: workspace.writerLease.epoch, heartbeatAt: workspace.writerLease.heartbeatAt },
+        writerLease:
+          workspace.writerLease === null
+            ? null
+            : { sessionId: workspace.writerLease.sessionId, epoch: workspace.writerLease.epoch, heartbeatAt: workspace.writerLease.heartbeatAt },
         observers: workspace.observers.map(observer => observer.sessionId),
       },
     }
@@ -571,12 +587,12 @@ export class JjIntegrationService {
         const workspaces = state.workspaces.map(workspace =>
           released.has(workspace.id)
             ? {
-              ...workspace,
-              writerEpoch: workspace.writerEpoch + 1,
-              writerLease: null,
-              lifecycle: workspace.lifecycle === 'active' ? ('idle' as const) : workspace.lifecycle,
-              updatedAt: now,
-            }
+                ...workspace,
+                writerEpoch: workspace.writerEpoch + 1,
+                writerLease: null,
+                lifecycle: workspace.lifecycle === 'active' ? ('idle' as const) : workspace.lifecycle,
+                updatedAt: now,
+              }
             : workspace,
         )
         return {
@@ -618,6 +634,7 @@ export class JjIntegrationService {
       owners: attachOwner(workspace.owners, input.sessionId, input.source ?? 'agent-tool', input.now),
       lifecycle: 'active',
       updatedAt: input.now,
+      lastActivityAt: input.now,
     }
   }
 
@@ -627,7 +644,7 @@ export class JjIntegrationService {
         const workspace = state.workspaces.find(item => item.id === id)
         if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
         const now = this.#now()
-        const record: WorkspaceRecord = { ...workspace, lifecycle: 'ready', updatedAt: now }
+        const record: WorkspaceRecord = { ...workspace, lifecycle: 'ready', updatedAt: now, lastActivityAt: now }
         return {
           state: { ...state, workspaces: state.workspaces.map(item => (item.id === id ? record : item)) },
           value: record,
@@ -653,9 +670,10 @@ export class JjIntegrationService {
       const repository = state.repositories.find(item => item.id === workspace.repositoryId)
       if (repository === undefined) throw new IntegrationError('repository-not-found', 'Repository is not registered.')
       this.#assertNotQuarantined(repository, workspace)
-      const source = input.revision === undefined
-        ? await resolveRevision(this.#executor, workspace.path, '@', input.signal)
-        : await resolveRevision(this.#executor, workspace.path, input.revision, input.signal)
+      const source =
+        input.revision === undefined
+          ? await resolveRevision(this.#executor, workspace.path, '@', input.signal)
+          : await resolveRevision(this.#executor, workspace.path, input.revision, input.signal)
       const spine = await resolveRevision(this.#executor, repository.root, repository.spineBookmark, input.signal)
       if (await isRevisionEmpty(this.#executor, workspace.path, source.changeId, input.signal)) {
         throw new IntegrationError('empty-revision', 'The selected source revision contains no changes to integrate.')
@@ -670,10 +688,7 @@ export class JjIntegrationService {
       }
       assertNoDependencyCycle(state.candidates, candidateId, dependsOn)
       const existing = state.candidates.find(
-        candidate =>
-          candidate.repositoryId === repository.id &&
-          candidate.sourceRevision.commitId === source.commitId &&
-          candidate.state !== 'cancelled',
+        candidate => candidate.repositoryId === repository.id && candidate.sourceRevision.commitId === source.commitId && candidate.state !== 'cancelled',
       )
       if (existing !== undefined) return existing
       const now = this.#now()
@@ -722,7 +737,10 @@ export class JjIntegrationService {
     })
   }
 
-  async inspectCandidate(id: string, signal?: AbortSignal): Promise<{
+  async inspectCandidate(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{
     readonly candidate: IntegrationCandidate
     readonly alreadyIntegrated: boolean
     readonly sourceStale: boolean
@@ -744,10 +762,7 @@ export class JjIntegrationService {
       candidate.state === 'already-integrated' ||
       (spine !== undefined && (await isAncestor(this.#executor, repository.root, candidate.sourceRevision.commitId, spine.commitId, signal))) ||
       state.candidates.some(
-        other =>
-          other.id !== candidate.id &&
-          other.state === 'integrated' &&
-          other.sourceRevision.commitId === candidate.sourceRevision.commitId,
+        other => other.id !== candidate.id && other.state === 'integrated' && other.sourceRevision.commitId === candidate.sourceRevision.commitId,
       )
     const sourceMissing = workspace === undefined || workspace.missing
     const sourceStale =
@@ -756,9 +771,7 @@ export class JjIntegrationService {
         workspace.currentRevision.commitId !== candidate.sourceRevision.commitId ||
         !(await revisionExists(this.#executor, workspace.path, candidate.sourceRevision.changeId, signal)))
     const sourceChanged =
-      spine === undefined
-        ? []
-        : await changedFiles(this.#executor, repository.root, spine.commitId, candidate.sourceRevision.commitId, signal).catch(() => [])
+      spine === undefined ? [] : await changedFiles(this.#executor, repository.root, spine.commitId, candidate.sourceRevision.commitId, signal).catch(() => [])
     const spineChanged =
       candidate.spineAtSubmit === null || spine === undefined
         ? []
@@ -779,11 +792,7 @@ export class JjIntegrationService {
     }
   }
 
-  async runCandidate(input: {
-    readonly candidateId: string
-    readonly sessionId: string | null
-    readonly signal?: AbortSignal
-  }): Promise<IntegrationRunResult> {
+  async runCandidate(input: { readonly candidateId: string; readonly sessionId: string | null; readonly signal?: AbortSignal }): Promise<IntegrationRunResult> {
     return this.#serialize(async () => {
       this.#assertIntegrationEnabled()
       const discovery = await this.#readState()
@@ -854,22 +863,26 @@ export class JjIntegrationService {
           return this.#integrateAlready(candidate, spine)
         }
         const startedAt = this.#now()
-        const running = await this.#updateCandidate(candidate.id, current => ({
-          ...current,
-          state: 'running',
-          error: null,
-          updatedAt: startedAt,
-          attempts: [...current.attempts, this.#newAttempt('running', startedAt, spine)],
-        }), [
-          this.#event('integration.started', {
-            repositoryId: repository.id,
-            workspaceId: workspace.id,
-            sessionId: input.sessionId,
-            candidateId: candidate.id,
-            correlationId: candidate.correlationId,
-            revisions: { source: candidate.sourceRevision, spineBefore: spine },
+        const running = await this.#updateCandidate(
+          candidate.id,
+          current => ({
+            ...current,
+            state: 'running',
+            error: null,
+            updatedAt: startedAt,
+            attempts: [...current.attempts, this.#newAttempt('running', startedAt, spine)],
           }),
-        ])
+          [
+            this.#event('integration.started', {
+              repositoryId: repository.id,
+              workspaceId: workspace.id,
+              sessionId: input.sessionId,
+              candidateId: candidate.id,
+              correlationId: candidate.correlationId,
+              revisions: { source: candidate.sourceRevision, spineBefore: spine },
+            }),
+          ],
+        )
         let duplicated: ObservedRevision
         try {
           duplicated = await duplicateOnto({
@@ -955,42 +968,46 @@ export class JjIntegrationService {
         }
         const advanced = await this.#resolveOptional(repository.root, repository.spineBookmark, input.signal)
         const finishedAt = this.#now()
-        const integrated = await this.#updateCandidate(running.id, current => ({
-          ...current,
-          state: 'integrated',
-          resultRevision: toRevision(duplicated),
-          validation,
-          conflict: null,
-          error: null,
-          updatedAt: finishedAt,
-          attempts: replaceLastAttempt(current.attempts, {
-            finishedAt,
-            outcome: 'integrated',
-            spineBefore: cleanRevision(spine),
-            spineAfter: advanced === undefined ? null : toRevision(advanced),
+        const integrated = await this.#updateCandidate(
+          running.id,
+          current => ({
+            ...current,
+            state: 'integrated',
             resultRevision: toRevision(duplicated),
-            duplicateAbandoned: null,
-            leakedRevision: null,
-            conflicts: null,
             validation,
+            conflict: null,
             error: null,
-          }),
-        }), [
-          this.#event('integration.completed', {
-            repositoryId: repository.id,
-            workspaceId: workspace.id,
-            sessionId: input.sessionId,
-            candidateId: candidate.id,
-            correlationId: candidate.correlationId,
-            revisions: {
-              source: candidate.sourceRevision,
-              spineBefore: spine,
+            updatedAt: finishedAt,
+            attempts: replaceLastAttempt(current.attempts, {
+              finishedAt,
+              outcome: 'integrated',
+              spineBefore: cleanRevision(spine),
               spineAfter: advanced === undefined ? null : toRevision(advanced),
-              result: toRevision(duplicated),
-            },
-            outcome: 'integrated',
+              resultRevision: toRevision(duplicated),
+              duplicateAbandoned: null,
+              leakedRevision: null,
+              conflicts: null,
+              validation,
+              error: null,
+            }),
           }),
-        ])
+          [
+            this.#event('integration.completed', {
+              repositoryId: repository.id,
+              workspaceId: workspace.id,
+              sessionId: input.sessionId,
+              candidateId: candidate.id,
+              correlationId: candidate.correlationId,
+              revisions: {
+                source: candidate.sourceRevision,
+                spineBefore: spine,
+                spineAfter: advanced === undefined ? null : toRevision(advanced),
+                result: toRevision(duplicated),
+              },
+              outcome: 'integrated',
+            }),
+          ],
+        )
         await this.#updateState(current => ({
           state: {
             ...current,
@@ -1016,25 +1033,29 @@ export class JjIntegrationService {
       if (workspace === undefined || workspace.missing) throw new IntegrationError('workspace-missing', 'Source workspace is missing or unavailable.')
       const source = await resolveRevision(this.#executor, workspace.path, '@', signal)
       const now = this.#now()
-      return this.#updateCandidate(id, current => ({
-        ...current,
-        state: 'queued',
-        sourceRevision: toRevision(source),
-        error: null,
-        conflict: null,
-        updatedAt: now,
-        queuePosition: current.queuePosition,
-      }), [
-        this.#event('integration.queued', {
-          repositoryId: candidate.repositoryId,
-          workspaceId: candidate.workspaceId,
-          sessionId,
-          candidateId: candidate.id,
-          correlationId: candidate.correlationId,
-          revisions: { source: toRevision(source) },
-          detail: 'retry',
+      return this.#updateCandidate(
+        id,
+        current => ({
+          ...current,
+          state: 'queued',
+          sourceRevision: toRevision(source),
+          error: null,
+          conflict: null,
+          updatedAt: now,
+          queuePosition: current.queuePosition,
         }),
-      ])
+        [
+          this.#event('integration.queued', {
+            repositoryId: candidate.repositoryId,
+            workspaceId: candidate.workspaceId,
+            sessionId,
+            candidateId: candidate.id,
+            correlationId: candidate.correlationId,
+            revisions: { source: toRevision(source) },
+            detail: 'retry',
+          }),
+        ],
+      )
     })
   }
 
@@ -1143,9 +1164,7 @@ export class JjIntegrationService {
     await this.#updateState(state => ({
       state,
       value: undefined,
-      events: reaped.map(entry =>
-        this.#event('integration.staging_reaped', { repositoryId: repository.id, detail: `${entry.name} ${entry.path}` }),
-      ),
+      events: reaped.map(entry => this.#event('integration.staging_reaped', { repositoryId: repository.id, detail: `${entry.name} ${entry.path}` })),
     }))
   }
 
@@ -1202,7 +1221,10 @@ export class JjIntegrationService {
 
   #assertNotQuarantined(repository: RepositoryRecord, workspace: WorkspaceRecord): void {
     if (readUnsafeWorkspaces(repository.root).includes(workspace.name)) {
-      throw new IntegrationError('unsafe-workspace', `Workspace "${workspace.name}" is recorded as unavailable for new work (folded or stale checkout); re-leave it before integrating.`)
+      throw new IntegrationError(
+        'unsafe-workspace',
+        `Workspace "${workspace.name}" is recorded as unavailable for new work (folded or stale checkout); re-leave it before integrating.`,
+      )
     }
   }
 
@@ -1218,8 +1240,205 @@ export class JjIntegrationService {
     return { id: randomUUID(), root, spineBookmark: this.#spineBookmark, createdAt: now, updatedAt: now }
   }
 
+  /**
+   * What a cleanup pass would do, without doing it. Every protection is
+   * evaluated here and again under the repository lock immediately before a
+   * deletion, because a workspace can become busy between the two.
+   */
+  async cleanupReport(options: { readonly policy: CleanupPolicy; readonly signal?: AbortSignal }): Promise<CleanupReport> {
+    const state = await this.#readState()
+    const now = this.#now()
+    const eligible: CleanupEntry[] = []
+    const idle: CleanupEntry[] = []
+    const skipped: CleanupEntry[] = []
+    for (const workspace of state.workspaces) {
+      const entry = await this.#cleanupEntry({
+        workspace,
+        state,
+        policy: options.policy,
+        now,
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      })
+      if (entry.decision === 'eligible') eligible.push(entry)
+      else if (entry.decision === 'idle') idle.push(entry)
+      else skipped.push(entry)
+    }
+    return {
+      dryRun: true,
+      enabled: options.policy.enabled,
+      idleAfterDays: options.policy.idleAfterMs / 86_400_000,
+      deleteAfterDays: options.policy.deleteAfterMs / 86_400_000,
+      eligible,
+      idle,
+      skipped,
+      reclaimableBytes: eligible.reduce((total, entry) => total + entry.bytes, 0),
+      removed: [],
+      failed: [],
+    }
+  }
+
+  /** Run the pass. `dryRun` reports the same entries and removes nothing. */
+  async cleanupWorkspaces(options: { readonly policy: CleanupPolicy; readonly dryRun: boolean; readonly signal?: AbortSignal }): Promise<CleanupReport> {
+    return this.#serialize(async () => {
+      const report = await this.cleanupReport(options)
+      if (options.dryRun || !options.policy.enabled) return report
+      const removed: CleanupEntry[] = []
+      const failed: CleanupEntry[] = []
+      for (const entry of report.eligible) {
+        const failure = await this.#removeWorkspace(entry, options.policy)
+        if (failure === undefined) removed.push(entry)
+        else failed.push({ ...entry, detail: failure.slice(0, 500) })
+      }
+      return { ...report, dryRun: false, removed, failed }
+    })
+  }
+
+  /** Operator pin: cleanup never considers a pinned workspace, and pinning is idempotent. */
+  async setWorkspacePinned(id: string, pinned: boolean): Promise<WorkspaceRecord> {
+    return this.#serialize(() =>
+      this.#updateState(state => {
+        const workspace = state.workspaces.find(item => item.id === id)
+        if (workspace === undefined) throw new IntegrationError('workspace-not-found', 'Workspace is not registered.')
+        const now = this.#now()
+        const record: WorkspaceRecord = { ...workspace, pinned, updatedAt: now }
+        return {
+          state: { ...state, workspaces: state.workspaces.map(item => (item.id === id ? record : item)) },
+          value: record,
+          events: [
+            this.#event(pinned ? 'workspace.pinned' : 'workspace.unpinned', {
+              repositoryId: record.repositoryId,
+              workspaceId: id,
+              sessionId: null,
+              revisions: { source: record.currentRevision },
+              detail: pinned ? 'pinned by the operator' : 'unpinned by the operator',
+            }),
+          ],
+        }
+      }),
+    )
+  }
+
+  async #cleanupEntry(input: {
+    readonly workspace: WorkspaceRecord
+    readonly state: JjIntegrationState
+    readonly policy: CleanupPolicy
+    readonly now: number
+    readonly signal?: AbortSignal
+  }): Promise<CleanupEntry> {
+    const { workspace, state, policy, now } = input
+    const repository = state.repositories.find(item => item.id === workspace.repositoryId)
+    const quarantined = repository === undefined ? false : readUnsafeWorkspaces(repository.root).includes(workspace.name)
+    const pendingIntegration = state.candidates.some(
+      candidate =>
+        candidate.workspaceId === workspace.id &&
+        candidate.state !== 'integrated' &&
+        candidate.state !== 'already-integrated' &&
+        candidate.state !== 'cancelled',
+    )
+    const inspection = workspace.missing || !workspace.isolated ? { uncommitted: false, unique: false } : await this.#inspectForCleanup(workspace, input.signal)
+    const decision = decideCleanup({
+      // A directory that is already gone is reported as missing rather than
+      // letting the failed inspection read as uncommitted work.
+      workspace: existsSync(workspace.path) ? workspace : { ...workspace, missing: true },
+      now,
+      policy,
+      pendingIntegration,
+      quarantined,
+      uncommitted: inspection.uncommitted,
+      uniqueRevisions: inspection.unique,
+    })
+    return {
+      workspaceId: workspace.id,
+      name: workspace.name,
+      path: workspace.path,
+      decision: decision.kind,
+      code: decision.code,
+      detail: decision.detail,
+      idleMs: Math.max(0, now - workspace.lastActivityAt),
+      bytes: decision.kind === 'eligible' ? await this.#directoryBytes(workspace.path) : 0,
+    }
+  }
+
+  async #inspectForCleanup(workspace: WorkspaceRecord, signal?: AbortSignal): Promise<{ readonly uncommitted: boolean; readonly unique: boolean }> {
+    const uncommitted = await hasWorkingCopyChanges(this.#executor, workspace.path, signal).catch(() => true)
+    if (uncommitted) return { uncommitted, unique: false }
+    const unique = (await revisionsOutsideSpine(this.#executor, workspace.path, this.#spineBookmark, signal).catch(() => ['unknown'])).length > 0
+    return { uncommitted, unique }
+  }
+
+  /** Bounded size estimate for the panel; `du` is a summary, never a recursive walk of a checkout. */
+  async #directoryBytes(path: string): Promise<number> {
+    if (this.#executeCommand === undefined) return 0
+    try {
+      const result = await this.#executeCommand({ command: `du -sk ${JSON.stringify(path)}`, cwd: path })
+      const kilobytes = Number.parseInt(result.stdout.trim().split(/\s+/)[0] ?? '', 10)
+      return Number.isSafeInteger(kilobytes) && kilobytes > 0 ? kilobytes * 1024 : 0
+    } catch {
+      return 0
+    }
+  }
+
+  /**
+   * Remove one registration and its disposable directory, under the repository
+   * lock, after re-deciding eligibility on freshly read state. It never
+   * abandons a revision, moves a bookmark, or touches anything outside the
+   * workspace's own directory, and it is idempotent: a workspace that is
+   * already gone reports success.
+   */
+  async #removeWorkspace(entry: CleanupEntry, policy: CleanupPolicy): Promise<string | undefined> {
+    const state = await this.#readState()
+    const workspace = state.workspaces.find(item => item.id === entry.workspaceId)
+    if (workspace === undefined) return undefined
+    const repository = state.repositories.find(item => item.id === workspace.repositoryId)
+    if (repository === undefined) return 'the repository is no longer registered'
+    const paths = await repositoryStatePaths(repository.root)
+    return this.#withLock(paths.lockPath, async () => {
+      const fresh = await this.#readState()
+      const current = fresh.workspaces.find(item => item.id === entry.workspaceId)
+      if (current === undefined) return undefined
+      const inspection = await this.#inspectForCleanup(current)
+      const decision = decideCleanup({
+        workspace: current,
+        now: this.#now(),
+        policy,
+        pendingIntegration: fresh.candidates.some(
+          candidate =>
+            candidate.workspaceId === current.id &&
+            candidate.state !== 'integrated' &&
+            candidate.state !== 'already-integrated' &&
+            candidate.state !== 'cancelled',
+        ),
+        quarantined: readUnsafeWorkspaces(repository.root).includes(current.name),
+        uncommitted: inspection.uncommitted,
+        uniqueRevisions: inspection.unique,
+      })
+      if (decision.kind !== 'eligible') return `no longer eligible: ${decision.detail}`
+      if (!isDisposableWorkspacePath(current.path, repository.root)) return `refusing to delete ${current.path}: it is not a disposable thread workspace`
+      await forgetWorkspace(this.#executor, repository.root, current.name)
+      await rm(current.path, { recursive: true, force: true })
+      await this.#updateState(state => ({
+        state: { ...state, workspaces: state.workspaces.filter(item => item.id !== current.id) },
+        value: undefined,
+        events: [
+          this.#event('workspace.cleaned', {
+            repositoryId: current.repositoryId,
+            workspaceId: current.id,
+            sessionId: null,
+            revisions: { source: current.currentRevision },
+            detail: `${current.path} (${decision.detail})`,
+          }),
+        ],
+      }))
+      return undefined
+    })
+  }
+
   #newWorkspace(input: { readonly repositoryId: string; readonly path: string; readonly now: number; readonly isolated: boolean }): WorkspaceRecord {
-    const name = input.path.split('/').filter(segment => segment.length > 0).slice(-1)[0] ?? input.path
+    const name =
+      input.path
+        .split('/')
+        .filter(segment => segment.length > 0)
+        .slice(-1)[0] ?? input.path
     return {
       id: randomUUID(),
       repositoryId: input.repositoryId,
@@ -1237,6 +1456,8 @@ export class JjIntegrationService {
       writerEpoch: 0,
       writerLease: null,
       observers: [],
+      lastActivityAt: input.now,
+      pinned: false,
     }
   }
 
@@ -1292,37 +1513,41 @@ export class JjIntegrationService {
 
   async #integrateAlready(candidate: IntegrationCandidate, spine: ObservedRevision): Promise<IntegrationRunResult> {
     const now = this.#now()
-    const updated = await this.#updateCandidate(candidate.id, current => ({
-      ...current,
-      state: 'already-integrated',
-      updatedAt: now,
-      error: null,
-      attempts: [
-        ...current.attempts,
-        {
-          startedAt: now,
-          finishedAt: now,
-          outcome: 'already-integrated',
-          spineBefore: toRevision(spine),
-          spineAfter: toRevision(spine),
-          resultRevision: null,
-          duplicateAbandoned: null,
-          leakedRevision: null,
-          conflicts: null,
-          validation: noneValidation(),
-          error: null,
-        },
-      ],
-    }), [
-      this.#event('integration.already_integrated', {
-        repositoryId: candidate.repositoryId,
-        workspaceId: candidate.workspaceId,
-        sessionId: candidate.sourceSessionId,
-        candidateId: candidate.id,
-        correlationId: candidate.correlationId,
-        revisions: { source: candidate.sourceRevision, spineBefore: toRevision(spine) },
+    const updated = await this.#updateCandidate(
+      candidate.id,
+      current => ({
+        ...current,
+        state: 'already-integrated',
+        updatedAt: now,
+        error: null,
+        attempts: [
+          ...current.attempts,
+          {
+            startedAt: now,
+            finishedAt: now,
+            outcome: 'already-integrated',
+            spineBefore: toRevision(spine),
+            spineAfter: toRevision(spine),
+            resultRevision: null,
+            duplicateAbandoned: null,
+            leakedRevision: null,
+            conflicts: null,
+            validation: noneValidation(),
+            error: null,
+          },
+        ],
       }),
-    ])
+      [
+        this.#event('integration.already_integrated', {
+          repositoryId: candidate.repositoryId,
+          workspaceId: candidate.workspaceId,
+          sessionId: candidate.sourceSessionId,
+          candidateId: candidate.id,
+          correlationId: candidate.correlationId,
+          revisions: { source: candidate.sourceRevision, spineBefore: toRevision(spine) },
+        }),
+      ],
+    )
     return { outcome: 'already-integrated', candidate: updated, detail: 'Source revision is already part of the canonical target.' }
   }
 
@@ -1341,41 +1566,51 @@ export class JjIntegrationService {
   ): Promise<IntegrationRunResult> {
     const now = this.#now()
     const validation = extra.validation ?? candidate.validation
-    const updated = await this.#updateCandidate(candidate.id, current => ({
-      ...current,
-      state,
-      resultRevision: extra.resultRevision ?? current.resultRevision,
-      conflict: extra.conflict ?? (state === 'blocked' ? current.conflict : null),
-      validation,
-      error: detail,
-      updatedAt: now,
-      attempts: replaceLastAttempt(current.attempts, {
-        finishedAt: now,
-        outcome: state === 'blocked' ? 'blocked' : state === 'stale' ? 'stale' : 'failed',
-        spineBefore: cleanRevision(extra.spineBefore),
-        spineAfter: null,
-        resultRevision: cleanRevision(extra.resultRevision),
-        duplicateAbandoned: extra.duplicateAbandoned ?? null,
-        leakedRevision: cleanRevision(extra.leakedRevision),
-        conflicts: extra.conflict ?? null,
+    const updated = await this.#updateCandidate(
+      candidate.id,
+      current => ({
+        ...current,
+        state,
+        resultRevision: extra.resultRevision ?? current.resultRevision,
+        conflict: extra.conflict ?? (state === 'blocked' ? current.conflict : null),
         validation,
         error: detail,
+        updatedAt: now,
+        attempts: replaceLastAttempt(current.attempts, {
+          finishedAt: now,
+          outcome: state === 'blocked' ? 'blocked' : state === 'stale' ? 'stale' : 'failed',
+          spineBefore: cleanRevision(extra.spineBefore),
+          spineAfter: null,
+          resultRevision: cleanRevision(extra.resultRevision),
+          duplicateAbandoned: extra.duplicateAbandoned ?? null,
+          leakedRevision: cleanRevision(extra.leakedRevision),
+          conflicts: extra.conflict ?? null,
+          validation,
+          error: detail,
+        }),
       }),
-    }), [
-      this.#event(
-        state === 'blocked' ? 'integration.blocked' : state === 'stale' ? 'integration.stale' : validation.kind === 'command' && validation.exitCode !== 0 ? 'integration.validation_failed' : 'integration.failed',
-        {
-          repositoryId: candidate.repositoryId,
-          workspaceId: candidate.workspaceId,
-          sessionId: candidate.sourceSessionId,
-          candidateId: candidate.id,
-          correlationId: candidate.correlationId,
-          revisions: { source: candidate.sourceRevision, spineBefore: extra.spineBefore ?? null, result: extra.resultRevision ?? null },
-          outcome: state,
-          detail,
-        },
-      ),
-    ])
+      [
+        this.#event(
+          state === 'blocked'
+            ? 'integration.blocked'
+            : state === 'stale'
+              ? 'integration.stale'
+              : validation.kind === 'command' && validation.exitCode !== 0
+                ? 'integration.validation_failed'
+                : 'integration.failed',
+          {
+            repositoryId: candidate.repositoryId,
+            workspaceId: candidate.workspaceId,
+            sessionId: candidate.sourceSessionId,
+            candidateId: candidate.id,
+            correlationId: candidate.correlationId,
+            revisions: { source: candidate.sourceRevision, spineBefore: extra.spineBefore ?? null, result: extra.resultRevision ?? null },
+            outcome: state,
+            detail,
+          },
+        ),
+      ],
+    )
     return { outcome: updated.state === 'stale' ? 'stale' : state === 'blocked' ? 'blocked' : 'failed', candidate: updated, detail }
   }
 
@@ -1573,9 +1808,7 @@ const statePriority: Readonly<Record<IntegrationCandidate['state'], number>> = {
 }
 
 const compareCandidates = (left: IntegrationCandidate, right: IntegrationCandidate): number =>
-  statePriority[left.state] - statePriority[right.state] ||
-  left.queuePosition - right.queuePosition ||
-  left.createdAt - right.createdAt
+  statePriority[left.state] - statePriority[right.state] || left.queuePosition - right.queuePosition || left.createdAt - right.createdAt
 
 export const createJjIntegrationService = (input: {
   readonly executor: JjExecutor

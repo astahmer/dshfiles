@@ -23,6 +23,8 @@ const workspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord =>
   writerEpoch: 0,
   writerLease: null,
   observers: [],
+  lastActivityAt: 1,
+  pinned: false,
   ...overrides,
 })
 

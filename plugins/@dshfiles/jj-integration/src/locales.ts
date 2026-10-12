@@ -124,6 +124,23 @@ const en = {
   settingsSection: 'Workspaces and integration',
   settingsIntro: 'Automation is configurable; ownership enforcement and the jj guard are not.',
   unverified: 'Automation is conservative: integration is manual and serialized.',
+  cleanup: 'Cleanup',
+  cleanupIntro:
+    'Idle thread workspaces can be removed automatically. A workspace with work, a writer, an observer, an open integration or a pin is never removed, and cleanup only forgets a registration and deletes its disposable directory.',
+  cleanupEligible: 'Eligible now',
+  cleanupIdle: 'Idle, not yet eligible',
+  cleanupSkipped: 'Protected',
+  cleanupReclaimable: 'Reclaimable',
+  cleanupRun: 'Run cleanup',
+  cleanupDryRun: 'Dry run',
+  cleanupPreview: 'Refresh',
+  cleanupDisabled: 'Automatic cleanup is off in settings.',
+  cleanupNone: 'No idle thread workspaces.',
+  cleanupRemoved: 'Removed',
+  cleanupFailed: 'Failed',
+  pin: 'Pin',
+  unpin: 'Unpin',
+  pinnedLabel: 'Pinned',
 } as const
 
 const zh = {
@@ -247,6 +264,22 @@ const zh = {
   settingsSection: '工作区与集成',
   settingsIntro: '自动化可配置；所有权强制与 jj 守卫不可关闭。',
   unverified: '自动化保持保守：集成需手动且串行。',
+  cleanup: '清理',
+  cleanupIntro: '空闲的线程工作区可被自动删除。含有工作内容、写入者、观察者、未完成集成或被固定的工作区永不删除；清理只注销注册并删除其一次性目录。',
+  cleanupEligible: '当前可清理',
+  cleanupIdle: '空闲但尚未到期',
+  cleanupSkipped: '受保护',
+  cleanupReclaimable: '可回收',
+  cleanupRun: '执行清理',
+  cleanupDryRun: '演练',
+  cleanupPreview: '刷新',
+  cleanupDisabled: '设置中已关闭自动清理。',
+  cleanupNone: '没有空闲的线程工作区。',
+  cleanupRemoved: '已删除',
+  cleanupFailed: '失败',
+  pin: '固定',
+  unpin: '取消固定',
+  pinnedLabel: '已固定',
 } as const
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

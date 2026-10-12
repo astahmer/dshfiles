@@ -9,29 +9,10 @@ export const jjRevisionSchema = z
   .strict()
 export type JjRevision = z.infer<typeof jjRevisionSchema>
 
-export const workspaceLifecycleSchema = z.enum([
-  'created',
-  'active',
-  'idle',
-  'ready',
-  'integrating',
-  'integrated',
-  'blocked',
-  'abandoned',
-  'archived',
-])
+export const workspaceLifecycleSchema = z.enum(['created', 'active', 'idle', 'ready', 'integrating', 'integrated', 'blocked', 'abandoned', 'archived'])
 export type WorkspaceLifecycle = z.infer<typeof workspaceLifecycleSchema>
 
-export const candidateStateSchema = z.enum([
-  'queued',
-  'running',
-  'blocked',
-  'failed',
-  'integrated',
-  'cancelled',
-  'stale',
-  'already-integrated',
-])
+export const candidateStateSchema = z.enum(['queued', 'running', 'blocked', 'failed', 'integrated', 'cancelled', 'stale', 'already-integrated'])
 export type CandidateState = z.infer<typeof candidateStateSchema>
 
 export const writerLeaseSchema = z
@@ -47,9 +28,7 @@ export const writerLeaseSchema = z
   .strict()
 export type WriterLease = z.infer<typeof writerLeaseSchema>
 
-export const workspaceObserverSchema = z
-  .object({ sessionId: z.string().min(1).max(256), since: z.number().int().nonnegative() })
-  .strict()
+export const workspaceObserverSchema = z.object({ sessionId: z.string().min(1).max(256), since: z.number().int().nonnegative() }).strict()
 export type WorkspaceObserver = z.infer<typeof workspaceObserverSchema>
 
 export const integrationEventTypeSchema = z.enum([
@@ -66,6 +45,10 @@ export const integrationEventTypeSchema = z.enum([
   'workspace.writer_fenced',
   'workspace.observer_added',
   'workspace.observer_removed',
+  'workspace.pinned',
+  'workspace.unpinned',
+  'workspace.cleaned',
+  'workspace.cleanup_skipped',
   'integration.queued',
   'integration.started',
   'integration.blocked',
@@ -112,9 +95,48 @@ export const workspaceRecordSchema = z
     writerEpoch: z.number().int().nonnegative().default(0),
     writerLease: writerLeaseSchema.nullable().default(null),
     observers: z.array(workspaceObserverSchema).max(64).default([]),
+    /**
+     * Last time this workspace saw meaningful activity — a Session attached, a
+     * writer claimed or heartbeated it, or it was marked ready. Cleanup ages
+     * from here, never from the last time a monitor happened to look at it.
+     */
+    lastActivityAt: z.number().int().nonnegative().default(0),
+    /** Operator pin: cleanup never considers a pinned workspace. */
+    pinned: z.boolean().default(false),
   })
   .strict()
 export type WorkspaceRecord = z.infer<typeof workspaceRecordSchema>
+
+/** What a cleanup pass found, without changing anything. */
+export const cleanupEntrySchema = z
+  .object({
+    workspaceId: z.string().uuid(),
+    name: z.string().min(1).max(128),
+    path: z.string().min(1).max(2048),
+    decision: z.enum(['eligible', 'idle', 'skip']),
+    code: z.string().min(1).max(64),
+    detail: z.string().max(500),
+    idleMs: z.number().int().nonnegative(),
+    bytes: z.number().int().nonnegative(),
+  })
+  .strict()
+export type CleanupEntry = z.infer<typeof cleanupEntrySchema>
+
+export const cleanupReportSchema = z
+  .object({
+    dryRun: z.boolean(),
+    enabled: z.boolean(),
+    idleAfterDays: z.number().nonnegative(),
+    deleteAfterDays: z.number().nonnegative(),
+    eligible: z.array(cleanupEntrySchema).max(256),
+    idle: z.array(cleanupEntrySchema).max(256),
+    skipped: z.array(cleanupEntrySchema).max(256),
+    reclaimableBytes: z.number().int().nonnegative(),
+    removed: z.array(cleanupEntrySchema).max(256),
+    failed: z.array(cleanupEntrySchema).max(256),
+  })
+  .strict()
+export type CleanupReport = z.infer<typeof cleanupReportSchema>
 
 export const conflictRecordSchema = z
   .object({
