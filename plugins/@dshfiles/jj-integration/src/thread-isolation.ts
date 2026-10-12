@@ -30,7 +30,8 @@ export interface SessionWorkspaceResolver {
 }
 
 export interface ThreadIsolationOptions {
-  readonly mode: WorkspaceIsolationMode
+  /** Read per resolution, so a settings change applies to the next Session and never to a running one. */
+  readonly mode: () => WorkspaceIsolationMode
   readonly executor: JjExecutor
   /** Bookmark or commit id every new thread workspace is based on. */
   readonly spineRevision: string
@@ -58,11 +59,12 @@ export const threadWorkspacesDirectory = (repositoryRoot: string): string =>
  */
 export const createThreadWorkspaceResolver = (options: ThreadIsolationOptions): SessionWorkspaceResolver => ({
   resolve: async (request) => {
-    if (options.mode === 'off') return { kind: 'passthrough' }
+    const mode = options.mode()
+    if (mode === 'off') return { kind: 'passthrough' }
 
     const binding = await options.findBinding(request.sessionId)
     if (binding !== undefined) return { kind: 'resolved', cwd: binding.path }
-    if (options.mode === 'manual') return { kind: 'passthrough' }
+    if (mode === 'manual') return { kind: 'passthrough' }
 
     const outcome = await provisionThreadWorkspace({
       executor: options.executor,

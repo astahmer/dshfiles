@@ -137,7 +137,7 @@ export class JjIntegrationService {
   readonly #coordinatorSessions: ReadonlySet<string>
   readonly #onEvent: ((event: IntegrationEvent) => void) | undefined
   readonly #staleWriterMs: number
-  readonly #integrationMode: 'auto' | 'manual' | 'off'
+  #integrationMode: 'auto' | 'manual' | 'off'
   readonly #executor: JjExecutor
   readonly #executeCommand: CommandExecutor | undefined
   #writes: Promise<void> = Promise.resolve()
@@ -1182,6 +1182,11 @@ export class JjIntegrationService {
       return { abandoned: true, leakedRevision: null }
     }
     return { abandoned: false, leakedRevision: toRevision(duplicate) }
+  }
+
+  /** Apply a live settings change without recreating the service or its registry. */
+  setIntegrationMode(mode: 'auto' | 'manual' | 'off'): void {
+    this.#integrationMode = mode
   }
 
   /**

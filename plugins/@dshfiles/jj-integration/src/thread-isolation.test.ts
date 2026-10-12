@@ -46,7 +46,7 @@ describe('thread workspace resolution', () => {
     const { root, repo } = mkRepo()
     const store = recorder()
     const resolver = createThreadWorkspaceResolver({
-      mode: 'auto',
+      mode: () => 'auto',
       executor: realJj,
       spineRevision: 'integration-spine',
       findBinding: store.findBinding,
@@ -76,7 +76,7 @@ describe('thread workspace resolution', () => {
     mkdirSync(plain)
     const store = recorder()
     const resolver = createThreadWorkspaceResolver({
-      mode: 'auto',
+      mode: () => 'auto',
       executor: realJj,
       spineRevision: 'integration-spine',
       findBinding: store.findBinding,
@@ -91,7 +91,7 @@ describe('thread workspace resolution', () => {
     const { root, repo } = mkRepo()
     const store = recorder()
     const resolver = createThreadWorkspaceResolver({
-      mode: 'auto',
+      mode: () => 'auto',
       executor: realJj,
       spineRevision: 'no-such-bookmark',
       findBinding: store.findBinding,
@@ -112,7 +112,7 @@ describe('thread workspace resolution', () => {
       return realJj(input)
     }
     const off = createThreadWorkspaceResolver({
-      mode: 'off',
+      mode: () => 'off',
       executor: countingJj,
       spineRevision: 'integration-spine',
       findBinding: store.findBinding,
@@ -123,7 +123,7 @@ describe('thread workspace resolution', () => {
     expect(store.bindings.size).toBe(0)
 
     const manual = createThreadWorkspaceResolver({
-      mode: 'manual',
+      mode: () => 'manual',
       executor: countingJj,
       spineRevision: 'integration-spine',
       findBinding: store.findBinding,

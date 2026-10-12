@@ -4,10 +4,11 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
-import { z } from 'zod'
+import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { jjIntegrationApi } from './api.js'
 import type { JjExecutor, CommandExecutor } from './jj.js'
 import { IntegrationError, createJjIntegrationService, type JjIntegrationService } from './service.js'
+import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { createThreadWorkspaceResolver, type WorkspaceIsolationMode } from './thread-isolation.js'
 import { createToolGate } from './tool-gate.js'
 
@@ -36,52 +37,38 @@ const summaryOutput = {
   },
 }
 
-export const Config = z.object({
-  spineBookmark: z.string().min(1).max(128).default('integration-spine'),
-  validationCommand: z.string().min(1).max(500).optional(),
-  allowAnyAgentIntegration: z.boolean().default(false),
-  coordinatorSessions: z.array(z.string().min(1).max(256)).max(64).default([]),
-  autoDiscoverWorkspaces: z.boolean().default(true),
-  /** Automatic thread-to-workspace isolation. Default is automatic; `off` is an explicit choice. */
-  workspaceIsolation: z
-    .object({
-      mode: z.enum(['auto', 'manual', 'off']).default('auto'),
-      /** Parent directory for thread workspaces; defaults to a sibling of the repository root. */
-      directory: z.string().min(1).max(2048).optional(),
-    })
-    .default({ mode: 'auto' }),
-  /** Coordinator-driven integration. Default is explicit; `off` disables coordinator runs. */
-  integration: z.object({ mode: z.enum(['auto', 'manual', 'off']).default('manual') }).default({ mode: 'manual' }),
-  /** Exclusive-writer enforcement. Always on for provisioned thread workspaces. */
-  ownership: z
-    .object({
-      /** Seconds a writer lease may stay quiet before another session may reclaim it. */
-      staleAfterSeconds: z.number().int().min(30).max(86_400).default(900),
-      /** Tools a read-only observer may run in a workspace it does not own. */
-      readOnlyTools: z
-        .array(z.string().min(1).max(64))
-        .max(64)
-        .default([
-          'read',
-          'read_image',
-          'glob',
-          'grep',
-          'web_search',
-          'web_fetch',
-          'todo_write',
-          'jj_workspace_list',
-          'jj_workspace_inspect',
-          'jj_integration_list',
-          'jj_integration_inspect',
-          'jj_integration_events',
-        ]),
-    })
-    .prefault({}),
-})
-// The Loader hands a row without stored config `undefined`, and a bare object
-// schema rejects that. `prefault({})` applies every inner default instead.
-export const ConfigSchema = Config.prefault({})
-export type JjIntegrationConfig = z.infer<typeof Config>
+/**
+ * The shape the coordinator consumes, built from settings. `workspaceIsolation`
+ * and `integration` are also read live by the mode getters, so changing either
+ * applies without recreating the service; the rest is read at activation.
+ */
+export interface JjIntegrationConfig {
+  readonly spineBookmark: string
+  readonly validationCommand: string | undefined
+  readonly allowAnyAgentIntegration: boolean
+  readonly coordinatorSessions: readonly string[]
+  readonly autoDiscoverWorkspaces: boolean
+  readonly workspaceIsolation: { readonly mode: WorkspaceIsolationMode; readonly directory?: string | undefined }
+  readonly integration: { readonly mode: 'auto' | 'manual' | 'off' }
+  readonly ownership: { readonly staleAfterSeconds: number; readonly readOnlyTools: readonly string[] }
+}
+
+const readConfig = (): JjIntegrationConfig => {
+  const settings = readSettings()
+  return {
+    spineBookmark: settings.spineBookmark,
+    validationCommand: settings.validationCommand === '' ? undefined : settings.validationCommand,
+    allowAnyAgentIntegration: settings.allowAnyAgentIntegration,
+    coordinatorSessions: [...settings.coordinatorSessions],
+    autoDiscoverWorkspaces: settings.autoDiscoverWorkspaces,
+    workspaceIsolation: {
+      mode: settings.workspaceIsolationMode,
+      ...(settings.workspaceIsolationDirectory === '' ? {} : { directory: settings.workspaceIsolationDirectory }),
+    },
+    integration: { mode: settings.integrationMode },
+    ownership: { staleAfterSeconds: settings.staleAfterSeconds, readOnlyTools: [...settings.readOnlyTools] },
+  }
+}
 
 const createExecutor = (ctx: Context): JjExecutor => async input => {
   const executable = await ctx.subprocess.resolveExecutable('jj', undefined, input.signal)
@@ -125,7 +112,43 @@ const createCommandExecutor = (ctx: Context): CommandExecutor => async input => 
 let service: JjIntegrationService | undefined
 let hostContext: Context | undefined
 let integrationMode: 'auto' | 'manual' | 'off' = 'manual'
+let isolationMode: WorkspaceIsolationMode = 'auto'
+let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
 let autoDriverRunning = false
+
+const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
+
+const readSettings = (): JjIntegrationSettings => {
+  try {
+    return settingsScope?.get() ?? defaultSettings
+  } catch {
+    return defaultSettings
+  }
+}
+
+/**
+ * Settings are the only source of these two modes. Integration mode is pushed
+ * into the running service; isolation mode is read per Session, so a change
+ * applies to the next thread and never to a running one.
+ */
+const applySettings = (): void => {
+  const next = readConfig()
+  isolationMode = next.workspaceIsolation.mode
+  integrationMode = next.integration.mode
+  service?.setIntegrationMode(integrationMode)
+}
+
+const ownedSettings = jjIntegrationSettings.host({
+  setup: scope => {
+    settingsScope = scope
+    applySettings()
+    const stopWatching = scope.watch(() => applySettings())
+    return () => {
+      stopWatching()
+      if (settingsScope === scope) settingsScope = undefined
+    }
+  },
+})
 
 /** Epoch this session last held per workspace, so a transfer fences it. */
 const heldEpochs = new Map<string, number>()
@@ -353,6 +376,7 @@ const api = jjIntegrationApi.host({
       repositories: [...state.repositories],
       workspaces: [...state.workspaces],
       candidates: [...(await requireService().listCandidates())],
+      modes: { isolation: isolationMode, integration: integrationMode },
       counts: { queued: count('queued'), running: count('running'), blocked: count('blocked'), integrated: count('integrated') },
     }
   },
@@ -402,9 +426,10 @@ const discoverWorkspace = async (agent: Agent, config: JjIntegrationConfig): Pro
   }
 }
 
-const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> => {
+const setupHost = (context: Context): Effect<void> => {
   hostContext = context
-  integrationMode = config.integration.mode
+  const config = readConfig()
+  applySettings()
   const executor = createExecutor(context)
   const active = createJjIntegrationService({
     executor,
@@ -436,10 +461,9 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
         }
         // Eligibility is explicit: only a workspace the writer marked ready
         // queues integration, and only when the mode is automatic.
-        if (config.integration.mode === 'auto' && event.type === 'workspace.ready') {
+        if (integrationMode === 'auto' && event.type === 'workspace.ready') {
           setTimeout(() => void driveAutoIntegration(), 0)
-        }
-      },
+        }      },
     },
   })
   context.on('dshfiles/activity/backfill', () => {
@@ -449,13 +473,13 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
     return undefined
   })
   service = active
+  applySettings()
 
   // The awaited workspace-resolution boundary. The Host asks this before the
   // Agent exists, so the first tool call already runs in the provisioned
   // workspace — or the Session is refused rather than handed the shared checkout.
-  const isolation: WorkspaceIsolationMode = config.workspaceIsolation.mode
   const resolver = createThreadWorkspaceResolver({
-    mode: isolation,
+    mode: () => isolationMode,
     executor,
     spineRevision: config.spineBookmark,
     ...(config.workspaceIsolation.directory === undefined ? {} : { workspacesDirectory: config.workspaceIsolation.directory }),
@@ -487,7 +511,7 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
               ? `Workspace ready: ${outcome.cwd}`
               : outcome.kind === 'refused'
                 ? `Workspace isolation refused for ${request.sessionId}`
-                : `Workspace isolation ${isolation === 'off' ? 'disabled' : 'manual'}; Session keeps ${request.requestedCwd}`,
+                : `Workspace isolation ${isolationMode === 'off' ? 'disabled' : 'manual'}; Session keeps ${request.requestedCwd}`,
           detail: outcome.kind === 'refused' ? outcome.reason : `requested ${request.requestedCwd}`,
           sessionId: request.sessionId,
           workspaceId: outcome.kind === 'resolved' ? outcome.cwd : null,
@@ -542,7 +566,7 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
   })
 
   const driveAutoIntegration = async (): Promise<void> => {
-    if (config.integration.mode !== 'auto' || autoDriverRunning) return
+    if (integrationMode !== 'auto' || autoDriverRunning) return
     autoDriverRunning = true
     try {
       for (;;) {
@@ -586,7 +610,7 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
 const host = defineHost({
   name: 'jj-integration',
   inject: ['subprocess', 'agents'],
-  Config: ConfigSchema,
+  settings: [ownedSettings],
   apis: [api],
   tools: [
     workspaceListTool,
