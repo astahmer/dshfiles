@@ -36,8 +36,10 @@ delete this file when empty.
   Canonical `/Users/astahmer/dev/dshfiles/profiles/web/package.json` still lacks the bundle, and its default workspace
   has unrelated in-flight OptMem changes. Do not rewrite it; integrate both feature code and seed after those changes
   are safe. Until then, a canonical Nix apply can remove the installed bundle.
-- [ ] Live activation: installed DSH is `0.2.0-rc.2`, which predates the hybrid Host/API change. Keep the live process
-  running; install a compatible Core build before any user-controlled restart. Never restart live DSH.
+- [ ] Live activation: installed DSH is `0.2.0-rc.2`, which predates the hybrid Host/API change. Core commits
+  `e6ea3062` and `25ecf430` remain in `workspace-directory-browser`; that shared Core store has no local `main`
+  bookmark and many active workspaces. Coordinate a safe integration target, install a compatible build, and keep the
+  live process running until the user chooses a restart. Never restart live DSH.
 - [ ] Vendored core runtime is stale (decided 2026-10-11: not now, no canonical checkout path given):
   `tooling/dsh-core/api-session-controller/lib/index.js` is the Oct 7 22:53 build while `src/` is Oct 11 18:49. Types
   were hand-patched in `lib/types/types.d.ts`; the runtime was not — `updateAttention` is present but
