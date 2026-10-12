@@ -73,13 +73,19 @@ describe('route warnings', () => {
     expect(warnings).toEqual([
       { field: 'override', message: 'claude_work does not offer gpt-6-luna.' },
       { field: 'summarizerFallbacks.1', message: 'Provider gone is not configured in DSH.' },
-      { field: 'summarizerFallbacks.3', message: "No configured provider offers nowhere-model; threads whose provider lacks it skip this route." },
+      { field: 'summarizerFallbacks.3', message: 'No configured provider offers nowhere-model; threads whose provider lacks it skip this route.' },
     ])
   })
 
-  it("flags a cheap-model entry none of whose models its providers offer", () => {
+  it('flags a cheap-model entry none of whose models its providers offer', () => {
     const warnings = OptmemSettingsDraft.routeWarnings(
-      { ...base, cheapModels: [{ kind: 'codex', models: ['gpt-9-mini'], effort: 'low' }, { kind: 'claude', models: ['claude-haiku-*'], effort: 'low' }] },
+      {
+        ...base,
+        cheapModels: [
+          { kind: 'codex', models: ['gpt-9-mini'], effort: 'low' },
+          { kind: 'claude', models: ['claude-haiku-*'], effort: 'low' },
+        ],
+      },
       providers,
     )
     expect(warnings).toEqual([{ field: 'cheapModels.0', message: 'codex-emialex offers none of these models; its summaries go to the fallbacks.' }])

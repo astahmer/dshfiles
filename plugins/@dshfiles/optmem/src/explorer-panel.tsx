@@ -6,8 +6,9 @@ import { ArrowDownIcon, ChevronDownIcon, ChevronRightIcon, SearchIcon } from '@d
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { z } from 'zod'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { optmemApi, type OptmemExplorerNode } from './api.ts'
 
@@ -22,7 +23,15 @@ const storedProject = createStoredValue({ key: 'dshfiles.optmem.explorer.project
 
 const nodeLabel = (node: OptmemExplorerNode): string => node.text.replace(/\s+/g, ' ').slice(0, 120)
 const formatTime = (value: number | null | undefined): string => (value === null || value === undefined ? 'Unknown' : new Date(value).toLocaleString())
+const formatMoment = (value: number | null): string => (value === null ? 'none yet' : new Date(value).toLocaleString())
 const formatNumber = (value: number): string => new Intl.NumberFormat().format(value)
+const formatCoverage = (throughPos: number, streamLength: number): string =>
+  streamLength === 0
+    ? 'no stream entries yet'
+    : `${((throughPos / streamLength) * 100).toFixed(1)}% · ${formatNumber(throughPos)} / ${formatNumber(streamLength)} positions`
+const formatRateLimit = (callsLastMinute: number, rateLimitPerMinute: number): string =>
+  `${formatNumber(callsLastMinute)} · ${rateLimitPerMinute === 0 ? 'limit off' : `limit ${formatNumber(rateLimitPerMinute)}/min`}`
+const formatRecoveryInterval = (intervalMs: number): string => (intervalMs === 0 ? 'off · no automatic recovery' : `${formatNumber(intervalMs)} ms`)
 
 export const ExplorerPanel = (props: ExplorerPanelProps): JSX.Element => {
   const api = useApi(optmemApi)
@@ -396,20 +405,42 @@ export const ExplorerPanel = (props: ExplorerPanelProps): JSX.Element => {
                 <Badge variant={pipeline.data.health === 'degraded' ? 'destructive' : 'secondary'}>{pipeline.data.health}</Badge>
                 <span className="dshx:text-xs dshx:text-muted-foreground">Read-only diagnostics · refreshes every 5 seconds</span>
               </div>
-              <dl className="dshx:grid dshx:grid-cols-[max-content_minmax(0,1fr)] dshx:gap-x-5 dshx:gap-y-2 dshx:text-xs">
-                <PipelineFact label="Pending stream entries" value={formatNumber(pipeline.data.pendingLeafJobs)} />
-                <PipelineFact label="Distinct pending events" value={formatNumber(pipeline.data.pendingEvents)} />
-                <PipelineFact label="Estimated leaf model calls" value={formatNumber(pipeline.data.estimatedLeafSummaryCalls)} />
-                <PipelineFact label="Ready merge summaries" value={formatNumber(pipeline.data.pendingMergeJobs)} />
-                <PipelineFact label="Oldest pending event" value={formatTime(pipeline.data.oldestPendingAt)} />
-                <PipelineFact label="Completed summary nodes" value={formatNumber(pipeline.data.completedSummaryNodes)} />
-                <PipelineFact label="Summary nodes / min (10m)" value={(pipeline.data.summariesLastTenMinutes / 10).toFixed(1)} />
-                <PipelineFact label="Paused" value={pipeline.data.paused ? 'Yes' : 'No'} />
-              </dl>
+              <div className="dshx:flex dshx:flex-col dshx:gap-4">
+                <PipelineGroup title="Backlog progress">
+                  <PipelineFact label="Injected view covers" value={formatCoverage(pipeline.data.viewThroughPos, pipeline.data.streamLength)} />
+                  <PipelineFact label="Pending stream entries" value={formatNumber(pipeline.data.pendingLeafJobs)} />
+                  <PipelineFact label="Estimated leaf model calls" value={formatNumber(pipeline.data.estimatedLeafSummaryCalls)} />
+                  <PipelineFact label="Ready merge summaries" value={formatNumber(pipeline.data.pendingMergeJobs)} />
+                  <PipelineFact label="Oldest pending event" value={formatTime(pipeline.data.oldestPendingAt)} />
+                  <PipelineFact label="Completed summary nodes" value={formatNumber(pipeline.data.completedSummaryNodes)} />
+                  <PipelineFact label="Paused" value={pipeline.data.paused ? 'Yes' : 'No'} />
+                </PipelineGroup>
+                <PipelineGroup title="Throughput">
+                  <PipelineFact label="Summary nodes / min · this project (10m)" value={(pipeline.data.summariesLastTenMinutes / 10).toFixed(1)} />
+                  <PipelineFact label="Summary nodes / min · all streams (10m)" value={(pipeline.data.globalSummariesLastTenMinutes / 10).toFixed(1)} />
+                  <PipelineFact label="Last summary produced" value={formatMoment(pipeline.data.lastSummaryAt)} />
+                  <PipelineFact label="Fallbacks to clipped text (this process)" value={formatNumber(pipeline.data.fallbacks)} />
+                </PipelineGroup>
+                <PipelineGroup title="Failures">
+                  <PipelineFact label="Failed summary jobs" value={formatNumber(pipeline.data.failedJobs)} />
+                  <PipelineFact label="Retrying summary jobs" value={formatNumber(pipeline.data.retryingJobs)} />
+                  <PipelineFact label="Unsummarized nodes (clipped text)" value={formatNumber(pipeline.data.unsummarizedNodes)} />
+                  <PipelineFact label="Last error" value={pipeline.data.lastError ?? 'none'} danger={pipeline.data.lastError !== null} />
+                </PipelineGroup>
+                <PipelineGroup title="Cost and recovery">
+                  <PipelineFact
+                    label="Model calls last minute (limit/min)"
+                    value={formatRateLimit(pipeline.data.callsLastMinute, pipeline.data.rateLimitPerMinute)}
+                  />
+                  <PipelineFact label="Recovery sweep interval" value={formatRecoveryInterval(pipeline.data.catchUpIntervalMs)} />
+                  <PipelineFact label="Recovery sweep last scan" value={formatMoment(pipeline.data.catchUpLastScanAt)} />
+                </PipelineGroup>
+              </div>
               <p className="dshx:max-w-3xl dshx:text-xs dshx:text-muted-foreground">
-                Pending entries are missing level-0 nodes per stream; the same captured event can occur in both a conversation and project stream. The estimate
-                counts unique oversized events that do not already have a leaf summary. It does not count future parent work or guarantee the configured route
-                is available.
+                Pending stream entries counts missing level-0 nodes per stream and equals distinct pending events inside a single stream; the same captured
+                event can still land in both a conversation and a project stream, so the pair diverges only across a whole project. The estimate counts unique
+                oversized events that do not already have a leaf summary. It does not count future parent work or guarantee the configured route is available.
+                Nodes rebuilt from clipped head+tail text after repeated failures are kept and served, but are not model-summarized.
               </p>
             </>
           ) : null}
@@ -448,11 +479,18 @@ const TreeRow = (props: {
   </div>
 )
 
-const PipelineFact = (props: { readonly label: string; readonly value: string }): JSX.Element => (
+const PipelineFact = (props: { readonly label: string; readonly value: string; readonly danger?: boolean }): JSX.Element => (
   <>
     <dt className="dshx:text-muted-foreground">{props.label}</dt>
-    <dd className="dshx:break-all dshx:font-mono">{props.value}</dd>
+    <dd className={cn('dshx:break-all dshx:font-mono', props.danger === true ? 'dshx:text-destructive' : undefined)}>{props.value}</dd>
   </>
+)
+
+const PipelineGroup = (props: { readonly title: string; readonly children: ReactNode }): JSX.Element => (
+  <section className="dshx:flex dshx:flex-col dshx:gap-1.5">
+    <h3 className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.title}</h3>
+    <dl className="dshx:grid dshx:grid-cols-[max-content_minmax(0,1fr)] dshx:gap-x-5 dshx:gap-y-2 dshx:text-xs">{props.children}</dl>
+  </section>
 )
 
 const EmptyState = (props: { readonly text: string }): JSX.Element => (

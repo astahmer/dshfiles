@@ -15,7 +15,11 @@ export class SummaryRouting {
   }
 
   /** The cheap-model entry for a provider: exact provider id, then its AI Accounts kind, then the longest id prefix. */
-  static cheapEntryFor<Entry extends { readonly kind: string }>(entries: readonly Entry[], provider: string, accountKind: string | undefined): Entry | undefined {
+  static cheapEntryFor<Entry extends { readonly kind: string }>(
+    entries: readonly Entry[],
+    provider: string,
+    accountKind: string | undefined,
+  ): Entry | undefined {
     return (
       entries.find(entry => entry.kind === provider) ??
       (accountKind === undefined ? undefined : entries.find(entry => entry.kind === accountKind)) ??

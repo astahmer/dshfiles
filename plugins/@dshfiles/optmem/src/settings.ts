@@ -17,7 +17,9 @@ export const optmemSettings = defineSettings({
       Schema.const('full').description('Full: fresh context per turn (needs a fork capability)'),
     ])
       .default('compat')
-      .description('Full mode needs the dshfiles fork core (agent/request-messages); on stock DSH it is reported unsupported and the plugin runs in compatibility mode.'),
+      .description(
+        'Full mode needs the dshfiles fork core (agent/request-messages); on stock DSH it is reported unsupported and the plugin runs in compatibility mode.',
+      ),
     injectUpperBytes: Schema.natural().min(1_024).max(65_536).default(8_192).description('Compact view merge threshold, and the injected memory budget.'),
     injectLowerBytes: Schema.natural().min(512).max(65_536).default(4_096).description('Compact view size a merge batch shrinks to.'),
     injectRefreshBytes: Schema.natural()
@@ -30,12 +32,12 @@ export const optmemSettings = defineSettings({
     viewUpperBytes: Schema.natural().min(4_096).max(1_048_576).default(128_000).description('Main view merge threshold.'),
     viewLowerBytes: Schema.natural().min(2_048).max(1_048_576).default(64_000).description('Main view size a merge batch shrinks to.'),
     maxNodeBytes: Schema.natural().min(128).max(4_096).default(512).description('Byte budget of one memory node (verbatim event or summary).'),
-    summarizerProvider: Schema.string().default('').description(
-      'Override route provider for every summary. Empty uses the provider of the thread being summarized.',
-    ),
-    summarizerModel: Schema.string().default('').description(
-      'Override: one model for every summary (with summarizerProvider). Empty uses the thread\'s provider with its cheap model from cheapModels.',
-    ),
+    summarizerProvider: Schema.string()
+      .default('')
+      .description('Override route provider for every summary. Empty uses the provider of the thread being summarized.'),
+    summarizerModel: Schema.string()
+      .default('')
+      .description("Override: one model for every summary (with summarizerProvider). Empty uses the thread's provider with its cheap model from cheapModels."),
     summarizerEffort: effort.description('Reasoning effort of override summary calls.'),
     cheapModels: Schema.array(
       Schema.object({
@@ -52,22 +54,46 @@ export const optmemSettings = defineSettings({
         { kind: 'deepseek', models: ['deepseek-flash'], effort: '' },
       ])
       .description(
-        'Default routing: summaries use the thread\'s own provider with the first model listed here that the provider offers. A provider with no entry or no offered model goes to summarizerFallbacks.',
+        "Default routing: summaries use the thread's own provider with the first model listed here that the provider offers. A provider with no entry or no offered model goes to summarizerFallbacks.",
       ),
     summarizerFallbacks: Schema.array(
       Schema.object({
-        provider: Schema.string().default('').description('Provider id; empty means the thread\'s provider.'),
+        provider: Schema.string().default('').description("Provider id; empty means the thread's provider."),
         model: Schema.string().required(),
         effort,
       }),
     )
       .default([])
-      .description('Routes tried in order when the override or cheap model is not offered. With none left, summaries wait and retry; the thread\'s own model is never used.'),
+      .description(
+        "Routes tried in order when the override or cheap model is not offered. With none left, summaries wait and retry; the thread's own model is never used.",
+      ),
     summarizerPaused: Schema.boolean()
       .default(false)
       .description('Pause summarizing: no summary call is made; oversized events stay pending and are summarized once resumed.'),
     summarizerConcurrency: Schema.natural().min(1).max(16).default(2).description('Summaries in flight at once.'),
     summarizerTimeoutMs: Schema.natural().min(1_000).max(600_000).default(60_000).description('Timeout of one summary call; failures retry with backoff.'),
+    summaryCallsPerMinute: Schema.natural()
+      .min(0)
+      .max(6_000)
+      .default(60)
+      .description('Model calls allowed per rolling minute across every stream, which caps catch-up cost. 0 means unlimited.'),
+    leafFallbackAfterAttempts: Schema.natural()
+      .min(1)
+      .max(20)
+      .default(3)
+      .description(
+        "After this many failed summary attempts a node is rebuilt from clipped head+tail text and marked unsummarized, so one bad position cannot freeze a stream's view. A non-retryable failure falls back at once.",
+      ),
+    catchUpIntervalMs: Schema.natural()
+      .min(0)
+      .max(600_000)
+      .default(15_000)
+      .description('Background recovery sweep interval. Each sweep queues at most catchUpBatchPerStream per stream. 0 disables automatic backlog recovery.'),
+    catchUpBatchPerStream: Schema.natural()
+      .min(0)
+      .max(5_000)
+      .default(50)
+      .description('Leaves one stream may add per recovery sweep; also bounds how fast a backlog drains.'),
     barrierMs: Schema.natural().min(0).max(60_000).default(5_000).description('Longest wait for pending summaries before a snapshot renders them raw.'),
     toolResultCap: Schema.natural()
       .min(1_024)

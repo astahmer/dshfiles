@@ -113,6 +113,10 @@ const engineKeys = [
   'maxNodeBytes',
   'summarizerConcurrency',
   'summarizerTimeoutMs',
+  'summaryCallsPerMinute',
+  'leafFallbackAfterAttempts',
+  'catchUpIntervalMs',
+  'catchUpBatchPerStream',
   'barrierMs',
   'toolResultCap',
 ] as const
@@ -125,6 +129,11 @@ const engineConfig = (settings: OptmemSettings): Partial<MemoryConfig> => ({
   compactLowerBytes: Math.min(settings.injectLowerBytes, settings.injectUpperBytes),
   concurrency: settings.summarizerConcurrency,
   summaryTimeoutMs: settings.summarizerTimeoutMs,
+  summaryCallsPerMinute: settings.summaryCallsPerMinute,
+  leafFallbackAfterAttempts: settings.leafFallbackAfterAttempts,
+  catchUpIntervalMs: settings.catchUpIntervalMs,
+  catchUpBatchPerStream: settings.catchUpBatchPerStream,
+  maxQueuedPerStream: Math.max(50, settings.catchUpBatchPerStream * 4),
   barrierMs: settings.barrierMs,
   toolResultMaxBytes: settings.toolResultCap,
 })

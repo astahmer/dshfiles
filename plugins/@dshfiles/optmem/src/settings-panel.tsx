@@ -606,6 +606,10 @@ export const OptmemSettingsPanel = (): JSX.Element => {
         </div>
         {numberRow('summarizerConcurrency', 'Concurrent summaries')}
         {numberRow('summarizerTimeoutMs', 'Summary timeout (ms)')}
+        {numberRow('summaryCallsPerMinute', 'Model calls per minute (0 = unlimited)')}
+        {numberRow('leafFallbackAfterAttempts', 'Fall back to clipped text after N failed attempts')}
+        {numberRow('catchUpIntervalMs', 'Recovery sweep interval ms (0 = off)')}
+        {numberRow('catchUpBatchPerStream', 'Leaves per stream per sweep')}
         {numberRow('barrierMs', 'Pending-summary wait (ms)')}
         {providersQuery.error ? (
           <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">Model checks are off: the provider list is unavailable until DSH restarts.</p>

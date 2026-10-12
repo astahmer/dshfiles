@@ -65,7 +65,9 @@ const createConversation = (runtime: OptmemRuntime, id: string) => {
 const gatedSummarizer = () => {
   let release = (): void => {}
   const gate = new Promise<void>(done => (release = done))
-  const summarizer: Summarizer = { summarize: async request => (await gate, { text: Utf8.clip(`S: ${request.input.join(' ')}`, request.maxBytes), model: 'gated' }) }
+  const summarizer: Summarizer = {
+    summarize: async request => (await gate, { text: Utf8.clip(`S: ${request.input.join(' ')}`, request.maxBytes), model: 'gated' }),
+  }
   return { summarizer, release: () => release() }
 }
 

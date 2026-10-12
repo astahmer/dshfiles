@@ -243,6 +243,15 @@ const overview = async (): Promise<OptmemOverview> => {
                     : persisted.pendingLeafJobs + persisted.pendingMergeJobs > 0
                       ? ('waiting' as const)
                       : ('idle' as const),
+          globalSummariesLastTenMinutes: persisted.summariesLastTenMinutes,
+          failedJobs: memory.failures.count,
+          retryingJobs: memory.retryingByStream.reduce((total, item) => total + item.count, 0),
+          lastError: memory.failures.count > 0 ? memory.failures.lastError : null,
+          fallbacks: memory.summarizer.fallbacks,
+          callsLastMinute: memory.summarizer.callsLastMinute,
+          rateLimitPerMinute: memory.summarizer.rateLimitPerMinute,
+          catchUpIntervalMs: currentSettings().catchUpIntervalMs,
+          catchUpLastScanAt: memory.catchUp.lastScanAt,
         }
   const route = host.summarizer
   return {
@@ -408,6 +417,7 @@ const projectPipeline = async (projectId: string): Promise<OptmemOverview['pipel
   const stream = StreamIds.project(projectId)
   const work = status.queueByStream.find(item => item.stream === stream)
   const failures = status.failuresByStream.find(item => item.stream === stream)?.count ?? 0
+  const globalPersisted = runtime.pipelineOverview()
   const paused = currentSettings().summarizerPaused
   const health = !currentSettings().enabled
     ? 'off'
@@ -420,7 +430,20 @@ const projectPipeline = async (projectId: string): Promise<OptmemOverview['pipel
           : persisted.pendingLeafJobs + persisted.pendingMergeJobs > 0 || (work?.leaves ?? 0) + (work?.parents ?? 0) > 0
             ? 'waiting'
             : 'idle'
-  return { ...persisted, paused, health }
+  return {
+    ...persisted,
+    paused,
+    health,
+    globalSummariesLastTenMinutes: globalPersisted?.summariesLastTenMinutes ?? 0,
+    failedJobs: failures,
+    retryingJobs: status.retryingByStream.find(item => item.stream === stream)?.count ?? 0,
+    lastError: failures > 0 ? status.failures.lastError : null,
+    fallbacks: status.summarizer.fallbacks,
+    callsLastMinute: status.summarizer.callsLastMinute,
+    rateLimitPerMinute: status.summarizer.rateLimitPerMinute,
+    catchUpIntervalMs: currentSettings().catchUpIntervalMs,
+    catchUpLastScanAt: status.catchUp.lastScanAt,
+  }
 }
 
 const panelApi = optmemApi.host({

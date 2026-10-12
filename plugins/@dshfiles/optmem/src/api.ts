@@ -32,6 +32,24 @@ export type OptmemOverview = {
     readonly summariesLastTenMinutes: number
     readonly paused: boolean
     readonly health: 'off' | 'starting' | 'paused' | 'processing' | 'waiting' | 'degraded' | 'idle'
+    /** Positions the injected main view covers, against the whole stream: the backlog progress measure. */
+    readonly viewThroughPos: number
+    readonly streamLength: number
+    /** Newest model-produced node, so a stalled stream is distinguishable from an idle one. */
+    readonly lastSummaryAt: number | null
+    /** Nodes materialized from clipped head+tail text after repeated summary failure. */
+    readonly unsummarizedNodes: number
+    /** Summary nodes per ten minutes across every stream, for a project-versus-global comparison. */
+    readonly globalSummariesLastTenMinutes: number
+    readonly failedJobs: number
+    readonly retryingJobs: number
+    /** Why the last summary step failed; null once nothing is failing. */
+    readonly lastError: string | null
+    readonly fallbacks: number
+    readonly callsLastMinute: number
+    readonly rateLimitPerMinute: number
+    readonly catchUpIntervalMs: number
+    readonly catchUpLastScanAt: number | null
   }
   readonly captured: number
   readonly skipped: number
@@ -199,6 +217,21 @@ const pipelineOutput = z
     summariesLastTenMinutes: z.number().int().nonnegative(),
     paused: z.boolean(),
     health: z.enum(['off', 'starting', 'paused', 'processing', 'waiting', 'degraded', 'idle']),
+    // Defaults keep the decode working against a Host started before these fields existed: a rebuilt client hot-reloads
+    // while the running Host is still the old one, and a strict schema would fail the whole call.
+    viewThroughPos: z.number().int().nonnegative().default(0),
+    streamLength: z.number().int().nonnegative().default(0),
+    lastSummaryAt: z.number().int().nonnegative().nullable().default(null),
+    unsummarizedNodes: z.number().int().nonnegative().default(0),
+    globalSummariesLastTenMinutes: z.number().int().nonnegative().default(0),
+    failedJobs: z.number().int().nonnegative().default(0),
+    retryingJobs: z.number().int().nonnegative().default(0),
+    lastError: z.string().nullable().default(null),
+    fallbacks: z.number().int().nonnegative().default(0),
+    callsLastMinute: z.number().int().nonnegative().default(0),
+    rateLimitPerMinute: z.number().int().nonnegative().default(0),
+    catchUpIntervalMs: z.number().int().nonnegative().default(0),
+    catchUpLastScanAt: z.number().int().nonnegative().nullable().default(null),
   })
   .optional()
 
