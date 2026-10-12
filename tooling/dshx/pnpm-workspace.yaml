@@ -1,6 +1,11 @@
 packages:
   - packages/*
 
+# A global virtual store (the user-level `enableGlobalVirtualStore`) leaves every package
+# unable to resolve its own peers, so the `declare module` augmentations this toolchain types
+# plugins against never merge. Pin the classic per-workspace virtual store in both workspaces.
+enableGlobalVirtualStore: false
+
 catalog:
   '@types/node': 22.19.20
   execa: 10.0.1
