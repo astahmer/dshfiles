@@ -1,0 +1,59 @@
+#!/bin/sh
+# dsh-recover — start the last known good DSH.
+#
+# Self-contained on purpose: it reads only the snapshot store, never the
+# repository, the pnpm global install, or the live ~/.dsh profile. That is what
+# makes it work after an agent breaks the main installation.
+#
+#   DSH_LKG_ROOT   store location        (default ~/.dsh-lkg)
+#   DSH_LKG_PORT   listen port           (default 3099)
+#   DSH_LKG_HOME   writable runtime home (default <store>/state/recover)
+set -eu
+
+ROOT="${DSH_LKG_ROOT:-$HOME/.dsh-lkg}"
+PORT="${DSH_LKG_PORT:-3099}"
+LINK="$ROOT/current"
+
+if [ ! -L "$LINK" ]; then
+  echo "dsh-recover: no last known good snapshot at $LINK" >&2
+  echo "dsh-recover: create one with: node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs snapshot" >&2
+  exit 1
+fi
+
+VERSION="$(readlink "$LINK")"
+case "$VERSION" in
+  /*) ;;
+  *) VERSION="$ROOT/$VERSION" ;;
+esac
+if [ ! -d "$VERSION" ]; then
+  echo "dsh-recover: snapshot $VERSION is missing; the store is inconsistent" >&2
+  exit 1
+fi
+
+NODE="$(cat "$VERSION/runtime/node-path" 2>/dev/null || true)"
+if [ ! -x "$NODE" ]; then
+  NODE="$(command -v node || true)"
+fi
+if [ -z "$NODE" ]; then
+  echo "dsh-recover: no node runtime available (recorded path is gone and node is not on PATH)" >&2
+  exit 1
+fi
+
+ENTRY="$VERSION/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js"
+if [ ! -f "$ENTRY" ]; then
+  echo "dsh-recover: snapshot is incomplete, missing $ENTRY" >&2
+  exit 1
+fi
+
+HOME_DIR="${DSH_LKG_HOME:-$ROOT/state/recover}"
+mkdir -p "$HOME_DIR/profiles"
+if [ ! -d "$HOME_DIR/profiles/web" ]; then
+  echo "dsh-recover: preparing writable state in $HOME_DIR (this never touches ~/.dsh)"
+  cp -R "$VERSION/profile" "$HOME_DIR/profiles/web"
+fi
+
+echo "dsh-recover: last known good $(basename "$VERSION")"
+echo "dsh-recover: state $HOME_DIR"
+echo "dsh-recover: the live installation and its sessions are not used by this instance"
+
+exec env DSH_HOME="$HOME_DIR" DSH_LKG_RECOVER=1 "$NODE" "$ENTRY" web --port "$PORT" "$@"
