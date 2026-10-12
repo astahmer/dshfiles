@@ -32,11 +32,11 @@ or `session-persistence-jsonl`.
 - **The fork is really in the artifact.** `dist/index.js` contains
   `agent/request-messages` (3) and `forkFeatures` (2) — the published package
   contains neither.
-- **The row wiring is correct.** A variant whose entry imports nothing activates
-  cleanly in the scratch Host, with no `did not activate` warning. So bundle
-  resolution, the patch, and the profile composition all work.
+- **The row wiring is correct.** A variant whose entry imports nothing evaluates,
+  runs `setup`, and activates with no warning — confirmed by module-level and
+  setup-level `console.error` markers, which both print.
 
-## Blocker — the bundled fork fails to load under DSH's importer
+## Blocker — the module is never evaluated
 
 With the fork bundled, the scratch Host reports:
 
@@ -45,36 +45,47 @@ dsh: warning: 1 entry did not activate
 dshfiles-core-agent-loop (@dshfiles/dsh-core-agent-loop): failed to import
 ```
 
-`failed to import` is emitted when `entry.fiber === undefined`, which is
-**before** `setup` runs. A variant that statically imports the fork agent-loop
-and never calls `ctx.plugin` fails identically, and a version that wrapped
-activation in `try/catch` with `ctx.logger.error` printed nothing — so the
-failure is at module load, not at registration.
+The same markers that print for the working variant **never print** for the fork
+bundle. So DSH's importer fails **before module evaluation**, and:
 
-The same `dist/index.js` imports successfully under plain Node, both from the
-workspace and from the profile directory (`import('@dshfiles/dsh-core-agent-loop')`
-→ `OK`). The difference is DSH's own importer.
+- the loader's own catch — `_init`'s `this.ctx.logger.error(error)` — never
+  fires (patched via an ESM loader hook to also `console.error`, confirmed
+  applied three times; nothing printed);
+- `unhandledRejection` and `uncaughtException` never fire;
+- the cordis logger only buffers (its default exporter pushes into a 1000-entry
+  array), so the real message is not on stdout anywhere.
 
-What the bundle still imports externally after inlining the fork's own
-dependencies (`dsh-brand`, `dsh-scope`, `dsh-session-persistence`,
-`dsh-system-prompt`, `dsh-util-values` — without these it also fails, and they
-are unresolvable from a profile):
+`failed to import` in `dsh-app-boot` is emitted when `entry.fiber === undefined`,
+which is a symptom of that earlier failure, not the cause.
 
-```
-@deepseek-ai/cordis, @deepseek-ai/dsh-agent, @deepseek-ai/dsh-llm,
-@deepseek-ai/dsh-session, @deepseek-ai/dsh-tools, @deepseek-ai/schemastery
-```
+## What is ruled out
 
-Those must stay **shared** with the Host for service identity, but they are not
-resolvable from the profile anchor (`require.resolve` from the profile directory
-fails for all but `schemastery`), and pointing them at the global installation
-did not change the outcome. Adding them to `bundleDependencies` to inline them
-is refused by dshx with `DSHX4005`.
+| hypothesis                       | evidence                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| plugin registration              | a variant that statically imports the fork and never calls `ctx.plugin` fails identically                                                               |
+| plain module loading             | the same `dist/index.js` imports under Node from the workspace **and** from the profile directory                                                       |
+| duplicate cordis / core identity | relinked all six external packages to the **native agent-loop's own `.pnpm` virtual store instances** — same modules the Host uses — and it still fails |
+| a missing export or config       | the row is listed, the patch is correct, and the no-op variant with the same package.json activates                                                     |
 
 ## Next step
 
-Determine the contract DSH's importer has for a profile bundle that carries core
-code: either the exact anchor it resolves bare `@deepseek-ai/*` specifiers from,
-or the supported way to satisfy `DSHX4005` for them. `@dshfiles/dsh-core-runtime`
-sidesteps this by inlining the whole core chain and disabling the native rows —
-which is exactly the trade this bundle exists to avoid.
+Determine what DSH's importer does **before** evaluating a profile bundle, and
+why it silently declines one whose `dist` carries vendored core code. The
+candidate is a pre-bundle/transform step: `dsh-app-boot` reaches Node's internal
+ESM loader through `node-addon-require-builtin`, and inlining the remaining
+`@deepseek-ai/*` imports (approach 3) changes exactly that graph. Inlining is
+viable — `@dshfiles/dsh-core-runtime` already does it — but it pulls a cascade of
+transitive peers that must be declared to satisfy `DSHX4005`
+(`cosmokit`, `dsh-sandbox`, `dsh-timeout`, `dsh-typert-protocol`,
+`dsh-util-crypto` were the next tier after `dsh-agent`, `dsh-session`,
+`dsh-llm`, `dsh-tools`, `schemastery`).
+
+`scripts/probes/dsh-loader-probe-*.mjs` are the loader-hook probes used above:
+they patch the cordis loader to surface its swallowed import error and install
+global rejection handlers.
+
+Run them with:
+
+```sh
+DSH_HOME=<scratch> NODE_OPTIONS="--import scripts/probes/dsh-loader-probe-register.mjs" dsh web --port 3199 --no-open
+```
