@@ -73,7 +73,8 @@ test('preflight is read-only and reports the migration order, blockers and graft
   assert.equal(topEntry.proposedMode, 'leaf-from-current')
   assert.equal(topEntry.graftPathCount, 3, 'the leaf must carry the workspace own work')
   assert.equal(topEntry.warnings.length, 1)
-  assert.match(topEntry.warnings[0], /leaf will contain/)
+  assert.match(topEntry.warnings[0], /would ADD 3 new path/)
+  assert.equal(topEntry.graftExistingCount, 0)
   assert.equal(
     midEntry.blockers.some(blocker => blocker.includes('live foreign working-copy descendant')),
     true,

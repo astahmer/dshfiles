@@ -123,6 +123,37 @@ const MUTATING_TOKEN = /\s(describe|split|squash|rebase|abandon|restore|new|edit
 /** A long-running branching server is normal; an in-flight mutation is not. */
 export const mutatingJjProcesses = lines => lines.filter(line => MUTATING_TOKEN.test(line))
 
+/** Commits between two revisions, newest first, with their descriptions. */
+const commitsBetween = (cwd, from, to, limit = 12) =>
+  readJj({ args: ['log', '-r', `${from}..${to}`, '--no-graph', '-T', 'commit_id ++ "\\t" ++ description.first_line() ++ "\\n"'], cwd })
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, limit)
+    .map(line => {
+      const [commit = '', ...rest] = line.split('\t')
+      return { commit, description: rest.join('\t') }
+    })
+
+/**
+ * jj records no authorship, so the only way to tell whose work a grafted path is
+ * is to show which commits above the base touch it.
+ */
+const attributeGraft = (cwd, base, head, graftPaths) => {
+  const wanted = new Set(graftPaths)
+  if (wanted.size === 0) return {}
+  const attribution = {}
+  for (const entry of commitsBetween(cwd, base, head)) {
+    const touched = readJj({ args: ['diff', '-r', entry.commit, '--name-only'], cwd }).split('\n').filter(Boolean)
+    for (const path of touched) {
+      if (!wanted.has(path)) continue
+      const owners = attribution[path] ?? []
+      if (owners.length < 3) owners.push(`${entry.commit.slice(0, 8)} ${entry.description.slice(0, 48)}`)
+      attribution[path] = owners
+    }
+  }
+  return attribution
+}
+
 const recentOperation = (cwd, seconds) => {
   const rows = readJj({
     args: ['op', 'log', '-n', '5', '--no-graph', '-T', 'self.time().start().local().format("%Y-%m-%dT%H:%M:%S") ++ "\\t" ++ description.first_line() ++ "\\n"'],
@@ -161,6 +192,14 @@ export const buildPreflight = ({ cwd, quietSeconds = 120, dirtLimit = 12 }) => {
         .filter(Boolean)
 
   const baseForMigration = spineCommit
+  const basePaths =
+    spineCommit.length === 0
+      ? new Set()
+      : new Set(
+          readJj({ args: ['file', 'list', '-r', spineCommit, '-T', 'path ++ "\\n"'], cwd })
+            .split('\n')
+            .filter(Boolean),
+        )
   const report = []
   for (const [name, commit] of Object.entries(heads)) {
     const candidateRoot = workspacePaths.get(name)
@@ -183,6 +222,11 @@ export const buildPreflight = ({ cwd, quietSeconds = 120, dirtLimit = 12 }) => {
         : readJj({ args: ['diff', '--from', baseForMigration, '--to', commit, '--name-only'], cwd })
             .split('\n')
             .filter(Boolean)
+    // A path that already exists in the base would have its content changed by the
+    // leaf, which is how an outdated copy of landed work gets re-introduced.
+    const graftExisting = graftPaths.filter(path => basePaths.has(path))
+    const graftNew = graftPaths.filter(path => !basePaths.has(path))
+    const attribution = attributeGraft(cwd, baseForMigration, commit, graftPaths)
     const liveBelow = Object.entries(heads)
       .filter(([otherName, otherCommit]) => otherName !== name && otherCommit !== commit && ancestors.has(otherCommit))
       .map(([otherName]) => otherName)
@@ -209,6 +253,10 @@ export const buildPreflight = ({ cwd, quietSeconds = 120, dirtLimit = 12 }) => {
       changedPathCount: changedPaths.length,
       graftPaths: graftPaths.slice(0, 20),
       graftPathCount: graftPaths.length,
+      graftExistingPaths: graftExisting.slice(0, 20),
+      graftAttribution: attribution,
+      graftExistingCount: graftExisting.length,
+      graftNewCount: graftNew.length,
       liveWorkspacesBelow: liveBelow,
       dirt,
       proposedMode: mode,
@@ -230,8 +278,11 @@ export const buildPreflight = ({ cwd, quietSeconds = 120, dirtLimit = 12 }) => {
         mode === 'reset-to-base' && foreignDescendants.length > 0
           ? `${foreignDescendants.length} live working copy(s) sit above this revision, but reset-to-base does not rewrite it, so they do not block it`
           : undefined,
-        liveBelow.length > 0 && graftPaths.length > 0
-          ? `the leaf will contain ${graftPaths.length} path(s) that also sit above ${liveBelow.join(', ')}: migrate with --accept-graft once confirmed as this workspace's own work`
+        mode === 'leaf-from-current' && graftExisting.length > 0
+          ? `the leaf would CHANGE ${graftExisting.length} path(s) that already exist in the base (${graftExisting.slice(0, 4).join(', ')}): if those are outdated copies of landed work, use --mode reset-to-base instead`
+          : undefined,
+        mode === 'leaf-from-current' && graftNew.length > 0
+          ? `the leaf would ADD ${graftNew.length} new path(s) vs the base (${graftNew.slice(0, 4).join(', ')})${liveBelow.length > 0 ? `, which also sit above ${liveBelow.join(', ')}` : ''}: confirm they are this workspace's own work`
           : undefined,
       ].filter(Boolean),
     })
@@ -283,7 +334,14 @@ export const formatPreflight = preflight => {
     lines.push(`  flags       empty=${entry.empty} conflict=${entry.conflict} is-spine=${entry.isSpine}`)
     lines.push(`  descendants ${entry.descendantCount}${entry.foreignDescendantHeads.length > 0 ? ` (live foreign heads: ${entry.foreignDescendantHeads.join(', ')})` : ''}`)
     lines.push(`  own change  ${entry.changedPathCount} path(s)${entry.changedPaths.length > 0 ? `: ${entry.changedPaths.slice(0, 6).join(', ')}` : ''}`)
-    lines.push(`  leaf graft  ${entry.graftPathCount} path(s) vs base${entry.graftPaths.length > 0 ? `: ${entry.graftPaths.slice(0, 6).join(', ')}` : ''}${entry.liveWorkspacesBelow.length > 0 ? ` (work below: ${entry.liveWorkspacesBelow.join(', ')})` : ''}`)
+    lines.push(
+      `  leaf graft  ${entry.graftPathCount} path(s) vs base (${entry.graftNewCount} new, ${entry.graftExistingCount} would change)` +
+        `${entry.graftPaths.length > 0 ? `: ${entry.graftPaths.slice(0, 6).join(', ')}` : ''}`,
+    )
+    for (const path of entry.graftPaths.slice(0, 4)) {
+      const owners = entry.graftAttribution[path]
+      if (owners !== undefined) lines.push(`    ${path}  <- ${owners.join(' | ')}`)
+    }
     lines.push(`  dirt        ${entry.dirt.detected === undefined ? 'unknown (no .jj/working_copy)' : entry.dirt.detected ? `DETECTED in ${entry.dirt.sample.length} file(s): ${entry.dirt.sample.slice(0, 4).join(', ')}` : 'not detected (not proof of clean)'}`)
     if (entry.blockers.length > 0) lines.push(`  blockers    ${entry.blockers.join(' | ')}`)
     if (entry.warnings.length > 0) lines.push(`  warnings    ${entry.warnings.join(' | ')}`)

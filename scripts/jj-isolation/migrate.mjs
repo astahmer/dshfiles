@@ -117,7 +117,7 @@ export const workspacePathOf = (repoRoot, name) => {
   return entry.path
 }
 
-export const planMigration = ({ repoRoot, name, base, force = false, acceptGraft = false }) => {
+export const planMigration = ({ repoRoot, name, base, mode: requestedMode = 'auto', force = false, acceptGraft = false }) => {
   if (name === 'default') throw new Error('refusing to migrate `default`: it is the repository root checkout, not an agent workspace')
   const target = workspacePathOf(repoRoot, name)
   if (!existsSync(join(target, '.jj'))) throw new Error(`workspace path is not a jj workspace: ${target}`)
@@ -129,7 +129,35 @@ export const planMigration = ({ repoRoot, name, base, force = false, acceptGraft
 
   const isAtOrBelowBase =
     runJj({ cwd: repoRoot, args: ['log', '-r', `${current} & ::${baseCommit}`, '--no-graph', '-T', 'commit_id', '--ignore-working-copy'] }).trim().length > 0
-  const mode = isAtOrBelowBase ? 'reset-to-base' : 'leaf-from-current'
+  const autoMode = isAtOrBelowBase ? 'reset-to-base' : 'leaf-from-current'
+  const mode = requestedMode === 'auto' ? autoMode : requestedMode
+  if (mode === 'reset-to-base' && !isAtOrBelowBase) {
+    // Forcing it is legitimate when the slot only carries outdated copies of
+    // landed work, but it discards the slot's content from the working copy, so
+    // it needs the same explicit acknowledgement as a graft.
+    if (!acceptGraft) {
+      return {
+        workspace: name,
+        path: target,
+        head: current,
+        base: baseCommit,
+        baseName: base,
+        mode,
+        descendantCount: 0,
+        foreignDescendantHeads: [],
+        dirt: dirtSample(target),
+        graftPaths: [],
+        graftPathCount: 0,
+        graftExistingPaths: [],
+        graftExistingCount: 0,
+        graftNewCount: 0,
+        liveWorkspacesBelow: [],
+        warnings: [],
+        blockers: ['--mode reset-to-base discards this @ content from the working copy (it stays in the store); pass --accept-graft to confirm'],
+        steps: [],
+      }
+    }
+  }
 
   const descendants = runJj({ cwd: repoRoot, args: ['log', '-r', `${current}:: & ~${current}`, '--no-graph', '-T', 'commit_id', '--ignore-working-copy'] })
     .split('\n')
@@ -152,7 +180,14 @@ export const planMigration = ({ repoRoot, name, base, force = false, acceptGraft
     runJj({ cwd: repoRoot, args: ['diff', '--from', baseCommit, '--to', current, '--name-only', '--ignore-working-copy'] })
       .split('\n')
       .filter(Boolean)
-  const needsGraftAck = graftPaths.length > 0 && liveBelow.length > 0
+  const basePaths = new Set(
+    runJj({ cwd: repoRoot, args: ['file', 'list', '-r', baseCommit, '-T', 'path ++ "\\n"', '--ignore-working-copy'] })
+      .split('\n')
+      .filter(Boolean),
+  )
+  const graftExisting = graftPaths.filter(path => basePaths.has(path))
+  const graftNew = graftPaths.filter(path => !basePaths.has(path))
+  const needsGraftAck = mode === 'leaf-from-current' && graftPaths.length > 0
 
   const warnings = []
   if (mode === 'reset-to-base' && foreignDescendantHeads.length > 0) {
@@ -160,9 +195,14 @@ export const planMigration = ({ repoRoot, name, base, force = false, acceptGraft
       `${foreignDescendantHeads.length} live working copy(s) sit above this revision (${foreignDescendantHeads.join(', ')}), but reset-to-base does not rewrite it`,
     )
   }
-  if (needsGraftAck) {
+  if (mode === 'leaf-from-current' && graftExisting.length > 0) {
     warnings.push(
-      `the leaf will contain ${graftPaths.length} path(s) that also sit above ${liveBelow.join(', ')} (${graftPaths.slice(0, 4).join(', ')}). Confirm they are this workspace's own work; nothing distinguishes authorship in jj.`,
+      `the leaf would CHANGE ${graftExisting.length} path(s) that already exist in the base (${graftExisting.slice(0, 4).join(', ')}); if those are outdated copies of landed work, use --mode reset-to-base`,
+    )
+  }
+  if (needsGraftAck && graftNew.length > 0) {
+    warnings.push(
+      `the leaf would ADD ${graftNew.length} new path(s) vs the base (${graftNew.slice(0, 4).join(', ')})${liveBelow.length > 0 ? `, which also sit above ${liveBelow.join(', ')}` : ''}. Confirm they are this workspace's own work; jj records no authorship.`,
     )
   }
 
@@ -196,6 +236,9 @@ export const planMigration = ({ repoRoot, name, base, force = false, acceptGraft
     dirt,
     graftPaths: graftPaths.slice(0, 20),
     graftPathCount: graftPaths.length,
+    graftExistingPaths: graftExisting.slice(0, 20),
+    graftExistingCount: graftExisting.length,
+    graftNewCount: graftNew.length,
     liveWorkspacesBelow: liveBelow,
     warnings,
     blockers,

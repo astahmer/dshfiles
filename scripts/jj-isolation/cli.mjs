@@ -15,7 +15,8 @@ const USAGE = `jj-isolation — refuse jj operations that would rewrite another 
   jj-isolation preflight [--json]   read-only repository report and migration plan
   jj-isolation maintenance arm|disarm|status
                                     fence the store while migrating workspaces
-  jj-isolation migrate <name> --base <revset> [--apply] [--accept-graft] [--force]
+  jj-isolation migrate <name> --base <revset> [--mode auto|leaf-from-current|reset-to-base]
+                                    [--apply] [--accept-graft] [--force]
                                     move one workspace's @ onto its own leaf
 
 Detection is opt-in per repository: create .jj/jj-isolation.json, or set JJ_ISOLATION=on.
@@ -161,7 +162,9 @@ const migrateCommand = (cwd, argv) => {
   const name = argv.find(argument => !argument.startsWith('-'))
   if (name === undefined) throw new Error('usage: jj-isolation migrate <workspace-name> --base <revset> [--apply] [--force]')
   const base = flagValueOf(argv, '--base', 'integration-spine')
-  const plan = planMigration({ repoRoot: cwd, name, base, force: argv.includes('--force'), acceptGraft: argv.includes('--accept-graft') })
+  const mode = flagValueOf(argv, '--mode', 'auto')
+  if (!['auto', 'leaf-from-current', 'reset-to-base'].includes(mode)) throw new Error(`--mode must be auto, leaf-from-current or reset-to-base (got ${mode})`)
+  const plan = planMigration({ repoRoot: cwd, name, base, mode, force: argv.includes('--force'), acceptGraft: argv.includes('--accept-graft') })
   if (!argv.includes('--apply')) return { planned: true, plan }
   const gate = readMaintenance(cwd)
   if (gate === undefined || gate.expired) throw new Error('maintenance mode is not armed (or has expired): run `jj-isolation maintenance arm` first')
