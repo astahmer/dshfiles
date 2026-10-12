@@ -1,0 +1,17 @@
+# Replace exactly one row: the agent loop.
+#
+# The loop is where `agent/request-messages` is dispatched, which is the hook
+# OptMem full mode needs. Everything around it stays native on purpose: the
+# session store, JSONL persistence and — most importantly — the session
+# controller that provisions a jj workspace per coding thread and resolves a
+# Session's cwd. Disabling those is what the five-row bridge does, and it is why
+# that bridge cannot be deployed without dropping workspace isolation.
+#
+# The row id changes, so this bundle owns it; the service name `agentLoop` is
+# unchanged, so every dependant still injects the same service.
+- id: agent-loop
+  name: '@deepseek-ai/dsh-agent-loop'
+  disabled: true
+- insert:
+    - id: dshfiles-core-agent-loop
+      name: '@dshfiles/dsh-core-agent-loop'

@@ -1,0 +1,61 @@
+{
+  "name": "@dshfiles/dsh-core-agent-loop",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "dshx check",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "build": "pnpm exec dshx build",
+    "lint": "oxlint src dshx.config.ts",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent-loop": "link:../../../tooling/dsh-core/agent-loop",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "typescript": "^7.0.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent-loop": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-brand": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-scope": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session-persistence": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session-projection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-user-approval": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-util-values": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
