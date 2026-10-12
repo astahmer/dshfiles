@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineHost } from '@dshfiles/dshx/host'
+import { z } from 'zod'
 import { editorApi, MAX_SAVE_BYTES } from './api.js'
 import { editorSettings } from './settings.js'
 import { WorkspaceWriteError, writeWorkspaceFile } from './write-file.js'
@@ -10,11 +11,20 @@ interface StoredSessions {
   stat(sessionId: SessionId): Promise<{ readonly header?: { readonly cwd?: string } } | undefined>
 }
 
+/**
+ * The Host `ctx.sessions` is the session store, but the Client `ISessions` face claims the same
+ * `Context.sessions` name and wins the declaration merge, so the store shape is decoded here.
+ */
+const liveSessionsSchema = z.object({
+  get: z.custom<(sessionId: SessionId) => { readonly header?: { readonly cwd?: string } } | undefined>(value => typeof value === 'function'),
+})
+
 /** The same resolution `workspaceFiles` uses: the live session header first, then the persisted one. */
 const sessionRoot = async (ctx: Context, sessionId: string): Promise<string> => {
   // SAFETY: an unknown id only misses both lookups below, which refuses the save.
   const id = sessionId as SessionId
-  const live = ctx.sessions.get(id)?.header.cwd
+  const liveSessions = liveSessionsSchema.safeParse(ctx.sessions)
+  const live = liveSessions.success ? liveSessions.data.get(id)?.header?.cwd : undefined
   if (live !== undefined) return live
   const persistence: StoredSessions | undefined = ctx.get('sessionPersistence')
   const stored = (await persistence?.stat(id))?.header?.cwd

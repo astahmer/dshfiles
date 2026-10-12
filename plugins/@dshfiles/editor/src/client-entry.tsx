@@ -14,7 +14,7 @@ import './client.css'
 import { createEditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
-import { EDITOR_OPEN_FILE_LINKS_OWNER_ID, EDITOR_OPEN_FILE_LINKS_TARGET_ROUTE } from './editor-settings-route.js'
+import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
 import { EditorPanel } from './editor-panel.js'
 import { FileTree } from './file-tree.js'
 import {
@@ -64,10 +64,6 @@ export default defineClient({
   locales: [editorSettingsLocale],
   inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles'],
   setup(ctx, decorate) {
-    const targetRegistry = ctx.get('settingsTargets', false)
-    if (targetRegistry !== undefined) {
-      ctx.effect(() => targetRegistry.register(EDITOR_OPEN_FILE_LINKS_TARGET_ROUTE), 'dshfiles-editor: open-file-links settings target')
-    }
     ctx.slots.inject('settings.general.item', () =>
       ctx.slots.register(
         {

@@ -3,7 +3,6 @@ import { useSettings } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useEffect, useId, useState } from 'react'
 import type { EditorSettingsTranslate } from './editor-settings-locales.js'
-import { isEditorOpenFileLinksTarget } from './editor-settings-route.js'
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { editorSettings } from './settings.js'
 
@@ -23,11 +22,6 @@ export const EditorOpenFileLinksSetting = (props: EditorOpenFileLinksSettingProp
   useEffect(() => {
     if (configuredOpenFileLinks !== undefined) openFileLinksPreference.set(configuredOpenFileLinks)
   }, [configuredOpenFileLinks])
-
-  useEffect(() => {
-    if (!isEditorOpenFileLinksTarget(props.target) || settings.status !== 'ready' || !settings.writable) return
-    document.getElementById(toggleId)?.focus({ preventScroll: true })
-  }, [props.target, settings.status, settings.writable, toggleId])
 
   const update = async (checked: boolean): Promise<void> => {
     setSaveFailed(false)
