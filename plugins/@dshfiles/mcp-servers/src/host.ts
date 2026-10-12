@@ -12,7 +12,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { mcpServersApi, serverDraftSchema, storedServerSchema, type ManagerSnapshot, type ServerDraft, type ServerView, type StoredServer } from './api.js'
 import { PROVIDERS, searchOfficialRegistry } from './catalog.js'
-import { hasInlineCredential, parseCommandLine } from './command-line.js'
+import { hasInlineCredential, hasUnexpandedTilde, parseCommandLine, UNEXPANDED_TILDE_MESSAGE } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
 import {
   authorizationUrl,
@@ -284,6 +284,7 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
     const [command, ...args] = parseCommandLine(localStart.commandLine)
     if (command === undefined) throw new TypeError('Enter a local start command.')
     if (hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
+    if (hasUnexpandedTilde([command, ...args])) throw new TypeError(UNEXPANDED_TILDE_MESSAGE)
     return {
       id,
       name: draft.name,
@@ -299,6 +300,7 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
   const [command, ...args] = parseCommandLine(draft.commandLine)
   if (command === undefined) throw new TypeError('Enter a command.')
   if (hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
+  if (hasUnexpandedTilde([command, ...args])) throw new TypeError(UNEXPANDED_TILDE_MESSAGE)
   return {
     id,
     name: draft.name,

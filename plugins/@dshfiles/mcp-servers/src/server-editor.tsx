@@ -10,7 +10,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 import type { ServerDraft } from './api.js'
 import type { McpServersTranslate } from './locales.js'
-import { parseServerForm, serverFormSchema, serverNameFromTitle, serverTransports, type ServerFormValues } from './server-form.js'
+import { inheritsHostWorkingDirectory, parseServerForm, serverFormSchema, serverNameFromTitle, serverTransports, type ServerFormValues } from './server-form.js'
 
 export interface ServerEditorProps {
   readonly t: McpServersTranslate
@@ -152,6 +152,15 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                   {field => <field.TextAreaField label={t('envRefs')} monospace placeholder={'{\n  "API_TOKEN": "EXAMPLE_TOKEN"\n}'} />}
                 </form.AppField>
               </Disclosure>
+              <form.Subscribe selector={state => inheritsHostWorkingDirectory(state.values)}>
+                {inherits =>
+                  inherits ? (
+                    <Alert variant="warning">
+                      <AlertDescription>{t('cwdWarning')}</AlertDescription>
+                    </Alert>
+                  ) : null
+                }
+              </form.Subscribe>
               <Disclosure defaultOpen={false} label={t('advancedIdentity')}>
                 {serverNameField}
               </Disclosure>
@@ -212,6 +221,8 @@ export const ServerEditorDialog = (props: {
   readonly hint: string | undefined
   readonly onClose: () => void
   readonly onSave: (draft: ServerDraft) => Promise<unknown>
+  readonly title?: string
+  readonly description?: string
 }): JSX.Element => (
   <Dialog
     onOpenChange={open => {
@@ -221,8 +232,8 @@ export const ServerEditorDialog = (props: {
   >
     <DialogContent className="dshx-root dshx:max-h-[85vh] dshx:overflow-y-auto dshx:sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle>{props.t('customTitle')}</DialogTitle>
-        <DialogDescription>{props.t('customSubtitle')}</DialogDescription>
+        <DialogTitle>{props.title ?? props.t('customTitle')}</DialogTitle>
+        <DialogDescription>{props.description ?? props.t('customSubtitle')}</DialogDescription>
       </DialogHeader>
       <ServerEditor bare defaultValues={props.values} onCancel={props.onClose} onSave={props.onSave} t={props.t} {...(props.hint === undefined ? {} : { hint: props.hint })} />
     </DialogContent>

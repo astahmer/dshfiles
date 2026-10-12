@@ -88,3 +88,8 @@ export const hasInlineCredential = (argv: readonly string[]): boolean => {
   }
   return false
 }
+
+/** The Host spawns argv directly and never runs a shell, so a leading `~` stays a literal directory name. */
+export const hasUnexpandedTilde = (argv: readonly string[]): boolean => argv.some(word => word === '~' || word.startsWith('~/'))
+
+export const UNEXPANDED_TILDE_MESSAGE = 'Use an absolute path: the Host spawns this command directly and never expands a leading ~.'

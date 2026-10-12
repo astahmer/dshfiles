@@ -1,4 +1,4 @@
-import { GlobeIcon, PlusIcon, RefreshCwIcon, SearchIcon, SettingsIcon, SquareTerminalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { GlobeIcon, PencilIcon, PlusIcon, RefreshCwIcon, SearchIcon, SettingsIcon, SquareTerminalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
@@ -6,12 +6,21 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { CatalogBrowser, SignInNotice, type CustomServerRequest } from './catalog-browser.js'
+import type { ServerView } from './api.js'
+import { CatalogBrowser, SignInNotice } from './catalog-browser.js'
 import type { McpServersTranslate } from './locales.js'
 import type { QuickPanelState } from './quick-panel.js'
 import { ServerEditorDialog } from './server-editor.js'
+import { serverFormFromView, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
 import { isClientActive, isConnectionToggleBlocked, lifecycleDotClassName, lifecycleText, localProcessText, matchesServerSearch } from './server-status.js'
+
+interface QuickPanelEditor {
+  readonly key: number
+  readonly mode: 'custom' | 'edit'
+  readonly values: ServerFormValues
+  readonly hint: string | undefined
+}
 
 export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly panel: QuickPanelState; readonly onManage: () => void }): JSX.Element => {
   const t = props.t
@@ -19,7 +28,11 @@ export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly
   const snapshot = useServerSnapshot()
   const actions = useServerActions()
   const [browsing, setBrowsing] = useState(false)
-  const [custom, setCustom] = useState<(CustomServerRequest & { readonly key: number }) | null>(null)
+  const [editor, setEditor] = useState<QuickPanelEditor | null>(null)
+  const openEditor = (mode: QuickPanelEditor['mode'], values: ServerFormValues, hint: string | undefined): void => {
+    props.panel.close()
+    setEditor(current => ({ key: (current?.key ?? 0) + 1, mode, values, hint }))
+  }
   return (
     <>
       {open ? (
@@ -30,6 +43,7 @@ export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly
             setBrowsing(true)
           }}
           onClose={() => props.panel.close()}
+          onEdit={server => openEditor('edit', serverFormFromView(server), undefined)}
           onManage={() => {
             props.panel.close()
             props.onManage()
@@ -42,23 +56,24 @@ export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly
         onClose={() => setBrowsing(false)}
         onCustom={request => {
           setBrowsing(false)
-          setCustom(current => ({ ...request, key: (current?.key ?? 0) + 1 }))
+          openEditor('custom', request.values, request.hint)
         }}
         open={browsing}
         snapshot={snapshot.data}
         t={t}
       />
-      {custom === null ? null : (
+      {editor === null ? null : (
         <ServerEditorDialog
-          hint={custom.hint}
-          key={custom.key}
-          onClose={() => setCustom(null)}
+          {...(editor.mode === 'edit' ? { title: t('editTitle'), description: t('editSubtitle') } : {})}
+          hint={editor.hint}
+          key={editor.key}
+          onClose={() => setEditor(null)}
           onSave={async draft => {
-            if (await actions.save(draft)) setCustom(null)
+            if (await actions.save(draft)) setEditor(null)
           }}
           open
           t={t}
-          values={custom.values}
+          values={editor.values}
         />
       )}
     </>
@@ -71,6 +86,7 @@ interface QuickPanelContentProps {
   readonly onClose: () => void
   readonly onManage: () => void
   readonly onBrowse: () => void
+  readonly onEdit: (server: ServerView) => void
 }
 
 const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JSX.Element => {
@@ -155,6 +171,9 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                     </p>
                     {processText ? <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{processText}</p> : null}
                   </div>
+                  <Button aria-label={`${t('edit')} ${server.name}`} disabled={actions.isPending} onClick={() => props.onEdit(server)} size="icon-sm" variant="ghost">
+                    <PencilIcon className="dshx:size-4" />
+                  </Button>
                   {server.oauth === 'needs-sign-in' ? (
                     <Button disabled={actions.isPending || !server.enabled} onClick={() => actions.signIn(server)} size="sm" variant="outline">
                       {t('signIn')}

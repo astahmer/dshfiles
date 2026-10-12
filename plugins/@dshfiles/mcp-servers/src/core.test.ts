@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
-import { hasInlineCredential, parseCommandLine, formatCommandLine } from './command-line.js'
+import { hasInlineCredential, hasUnexpandedTilde, parseCommandLine, formatCommandLine } from './command-line.js'
 import { serverDraftSchema, type StoredServer } from './api.js'
 import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js'
 import { ManagedLocalCommand } from './local-process.js'
@@ -195,6 +195,13 @@ describe('local command parsing', () => {
     expect(hasInlineCredential(parseCommandLine('node server.js --api-key=do-not-store'))).toBe(true)
     expect(hasInlineCredential(parseCommandLine('node server.js --token value'))).toBe(true)
     expect(hasInlineCredential(parseCommandLine('node server.js --port 3000'))).toBe(false)
+  })
+
+  it('detects tilde paths that no shell will expand', () => {
+    expect(hasUnexpandedTilde(parseCommandLine('node ~/dev/dadabase/dist/mcp/stdio.js'))).toBe(true)
+    expect(hasUnexpandedTilde(parseCommandLine('node ~'))).toBe(true)
+    expect(hasUnexpandedTilde(parseCommandLine('node /Users/astahmer/dev/dadabase/dist/mcp/stdio.js'))).toBe(false)
+    expect(hasUnexpandedTilde(parseCommandLine('node server.js --home /srv/~/data'))).toBe(false)
   })
 })
 

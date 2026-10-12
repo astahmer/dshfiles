@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { blankServerForm, catalogServerDraft, parseServerForm, serverFormFromView, serverFormSchema, uniqueServerName } from './server-form.js'
+import {
+  blankServerForm,
+  catalogServerDraft,
+  inheritsHostWorkingDirectory,
+  parseServerForm,
+  serverFormFromView,
+  serverFormSchema,
+  uniqueServerName,
+  type ServerFormValues,
+} from './server-form.js'
 import { publicServerView } from './server-state.js'
 
 const issueFields = (values: Parameters<typeof parseServerForm>[0]): readonly (string | undefined)[] => {
@@ -75,6 +84,30 @@ describe('server editor form', () => {
     expect(JSON.parse(values.headerRefs)).toEqual({ Authorization: 'REMOTE_TOKEN' })
     expect(JSON.parse(values.startEnvRefs)).toEqual({ ACCESS_TOKEN: 'PROXY_TOKEN' })
     expect(JSON.stringify(values)).not.toContain(secret)
+  })
+
+  it('rejects a tilde command path the Host would pass through literally', () => {
+    const values: ServerFormValues = {
+      ...blankServerForm({ name: 'Dadabase' }),
+      transport: 'stdio',
+      commandLine: 'node ~/dev/dadabase/dist/mcp/stdio.js',
+    }
+    expect(issueFields(values)).toContain('commandLine')
+    expect(serverFormSchema.safeParse(values).error?.issues.some(issue => issue.path[0] === 'commandLine')).toBe(true)
+    expect(issueFields({ ...values, commandLine: 'node /Users/astahmer/dev/dadabase/dist/mcp/stdio.js' })).not.toContain('commandLine')
+    expect(issueFields({ ...values, commandLine: 'node server.js --home ~/data' })).toContain('commandLine')
+  })
+
+  it('reports incomplete quoting as a field issue instead of throwing', () => {
+    const values: ServerFormValues = { ...blankServerForm({ name: 'Local' }), transport: 'stdio', commandLine: 'node "unfinished' }
+    expect(issueFields(values)).toContain('commandLine')
+  })
+
+  it('flags a local command that would inherit the Host working directory', () => {
+    expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio' })).toBe(true)
+    expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio', cwd: '   ' })).toBe(true)
+    expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio', cwd: '/Users/astahmer/dev/dadabase' })).toBe(false)
+    expect(inheritsHostWorkingDirectory(blankServerForm())).toBe(false)
   })
 })
 

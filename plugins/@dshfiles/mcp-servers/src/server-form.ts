@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { serverDraftSchema, type ServerDraft, type ServerView } from './api.js'
+import { hasUnexpandedTilde, parseCommandLine, UNEXPANDED_TILDE_MESSAGE } from './command-line.js'
 
 export const serverTransports = ['streamable-http', 'stdio'] as const
 
@@ -124,6 +125,19 @@ export const serverFormFromView = (server: ServerView): ServerFormValues => {
   }
 }
 
+/** Incomplete quoting is reported as a field issue instead of throwing out of schema validation. */
+const commandArgv = (commandLine: string, issues: ServerFormIssue[]): readonly string[] => {
+  try {
+    return parseCommandLine(commandLine)
+  } catch (error) {
+    issues.push({ field: 'commandLine', message: error instanceof Error ? error.message : 'Enter a valid command line.' })
+    return []
+  }
+}
+
+/** A local command with no working directory runs in the DSH Host directory, so relative paths resolve there instead. */
+export const inheritsHostWorkingDirectory = (values: ServerFormValues): boolean => values.transport === 'stdio' && values.cwd.trim() === ''
+
 /** Builds the API draft for the active transport only, so fields of the other transport never block saving. */
 export const parseServerForm = (values: ServerFormValues): ParsedServerForm => {
   const issues: ServerFormIssue[] = []
@@ -134,6 +148,10 @@ export const parseServerForm = (values: ServerFormValues): ParsedServerForm => {
     return {}
   }
   const base = { id: values.id, name: values.name, serverName: values.serverName, enabled: values.enabled }
+  if (values.transport === 'stdio') {
+    const argv = commandArgv(values.commandLine, issues)
+    if (hasUnexpandedTilde(argv)) issues.push({ field: 'commandLine', message: UNEXPANDED_TILDE_MESSAGE })
+  }
   const candidate =
     values.transport === 'stdio'
       ? { ...base, transport: values.transport, commandLine: values.commandLine, cwd: values.cwd, envRefs: parseReferences('envRefs') }
