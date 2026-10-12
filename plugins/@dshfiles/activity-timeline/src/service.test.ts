@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -161,15 +161,23 @@ describe('activity timeline service', () => {
     expect(noMatch.items).toHaveLength(0)
   })
 
-  it('keeps a bounded in-memory window under high volume', async () => {
-    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now, maxEvents: 500 })
-    await service.ingestMany(Array.from({ length: 1200 }, (_, index) => routine(index, now + index)))
+  // Heavy by design: every ingest durably rewrites the whole state document. The budget absorbs a
+  // fully parallel workspace run, and the size bound still fails a window that stops trimming.
+  it('keeps a bounded in-memory window under high volume', { timeout: 30_000 }, async () => {
+    const path = await statePath()
+    const service = createActivityTimelineService({ statePath: path, now: () => now, maxEvents: 500 })
+    const events = Array.from({ length: 1200 }, (_, index) => routine(index, now + index))
+    await service.ingestMany(events.slice(0, 600))
+    const filledBytes = (await stat(path)).size
+    await service.ingestMany(events.slice(600))
     const stats = await service.stats()
     expect(stats.retained).toBe(500)
     expect(stats.ingested).toBe(1200)
     const page = await service.page({ limit: 200, detailed: true })
     expect(page.items).toHaveLength(200)
     expect(page.totalRetained).toBe(500)
+    // The window trims instead of accumulating: the document does not grow with the ingested total.
+    expect((await stat(path)).size).toBeLessThan(filledBytes * 1.5)
   })
 
   it('does not require any agent, session, or jj source to be present', async () => {
