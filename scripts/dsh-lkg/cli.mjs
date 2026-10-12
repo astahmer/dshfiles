@@ -150,6 +150,9 @@ const healthCheck = async (root, { keepState = false } = {}) => {
   const home = join(STATE, `verify-${randomUUID()}`)
   mkdirSync(home, { recursive: true })
   cloneTree(join(root, 'profile'), join(home, 'profiles', 'web'))
+  // The snapshot's payload is frozen; a state the Host runs from must not be, or
+  // the Host cannot maintain its own profile and the state cannot be removed.
+  thawed(join(home, 'profiles', 'web'))
   const port = await freePort()
   const child = spawn(nodePath, [entry, 'web', '--port', String(port), '--no-open'], {
     env: { ...process.env, DSH_HOME: home, DSH_LKG_RECOVER: '1' },
@@ -177,16 +180,90 @@ const healthCheck = async (root, { keepState = false } = {}) => {
   else checks.push({ name: 'activation', ok: true, detail: 'no activation failures or skipped bundles reported' })
 
   let answered = false
+  let origin
+  let cookie
   if (url !== undefined) {
     try {
       const response = await fetch(url, { redirect: 'manual' })
       answered = response.status === 200 || response.status === 303
+      const parsed = new URL(url)
+      origin = parsed.origin
+      cookie = response.headers.getSetCookie?.()[0] ?? response.headers.get('set-cookie') ?? undefined
       checks.push({ name: 'authenticated-index', ok: answered, detail: `HTTP ${response.status}` })
     } catch (error) {
       checks.push({ name: 'authenticated-index', ok: false, detail: String(error).slice(0, 200) })
     }
   } else {
     checks.push({ name: 'authenticated-index', ok: false, detail: 'the Host never printed a tokenized URL' })
+  }
+
+  /**
+   * A launch URL that answers proves the shell boots, not that the Host works.
+   * These two call the authenticated API the way the client does, then load a
+   * real thread, so a snapshot that serves a page but cannot answer its own
+   * sessions API is refused rather than promoted.
+   */
+  const rpc = async (namespace, method, args) => {
+    const response = await fetch(`${origin}/api/${namespace}/${method}`, {
+      method: 'POST',
+      redirect: 'error',
+      headers: { 'content-type': 'application/json', ...(cookie === undefined ? {} : { cookie }) },
+      body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: `${namespace}/${method}`, payload: { args } }),
+    })
+    return { status: response.status, body: await response.text() }
+  }
+
+  if (origin === undefined || cookie === undefined || !answered) {
+    checks.push({ name: 'session-api', ok: false, detail: 'no authenticated session cookie, so the API cannot be called' })
+    checks.push({ name: 'thread-load', ok: false, detail: 'the API was never reached' })
+  } else {
+    let listed
+    try {
+      const response = await rpc('session', 'list', { _request: {} })
+      const parsed = response.status === 200 ? JSON.parse(response.body) : undefined
+      // The RPC envelope is `{ result: { ok, value } }`.
+      const value = parsed?.result?.value ?? parsed?.result ?? parsed
+      const items = Array.isArray(value?.items) ? value.items : undefined
+      listed = items
+      checks.push({
+        name: 'session-api',
+        ok: items !== undefined,
+        detail: items === undefined ? `HTTP ${response.status}: ${response.body.slice(0, 200)}` : `HTTP 200, ${String(items.length)} thread(s)`,
+      })
+    } catch (error) {
+      checks.push({ name: 'session-api', ok: false, detail: String(error).slice(0, 200) })
+    }
+
+    // Load a real thread when the snapshot has one. A fresh recovery state has
+    // none, so a thread is created in this throwaway state instead — that is
+    // what proves the load path rather than only the list endpoint.
+    let threadId = listed?.[0]?.id ?? listed?.[0]?.sessionId
+    let created = false
+    if (threadId === undefined) {
+      try {
+        const response = await rpc('session', 'create', { request: {} })
+        const parsed = response.status === 200 ? JSON.parse(response.body) : undefined
+        const result = parsed?.result?.value ?? parsed?.result ?? parsed
+        threadId = result?.session?.id ?? result?.id ?? result?.sessionId
+        created = threadId !== undefined
+      } catch {
+        threadId = undefined
+      }
+    }
+    if (threadId === undefined) {
+      checks.push({ name: 'thread-load', ok: true, detail: 'no thread to load and this Host would not create one; the list endpoint answered instead' })
+    } else {
+      try {
+        const response = await rpc('session', 'page', { _request: { sessionId: threadId } })
+        checks.push({
+          name: 'thread-load',
+          ok: response.status === 200,
+          detail: `${created ? 'created then loaded' : 'loaded'} ${threadId}: HTTP ${response.status}${response.status === 200 ? '' : ` ${response.body.slice(0, 160)}`}`,
+        })
+      } catch (error) {
+        checks.push({ name: 'thread-load', ok: false, detail: String(error).slice(0, 200) })
+      }
+    }
   }
 
   child.kill('SIGTERM')

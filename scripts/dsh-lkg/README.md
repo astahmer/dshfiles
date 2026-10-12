@@ -50,6 +50,12 @@ moves:
 | `activation`          | any entry fails to activate, **or any profile bundle is skipped** |
 | `authenticated-index` | the tokenized URL never appears, or does not answer 200/303       |
 
+`session-api` and `thread-load` exist because a launch URL that answers proves
+the shell boots, not that the Host works: they call the same authenticated RPC
+the client does, and `thread-load` creates a thread in the throwaway verify
+state and loads it back, so a snapshot that serves a page but cannot answer its
+own sessions API is refused rather than promoted.
+
 A failed candidate is deleted and the previous known-good snapshot stays
 current. `reap` keeps the newest three plus whatever `current` points at.
 
@@ -90,6 +96,9 @@ Session environment is detected, unless `DSH_LKG_ADMIN=1` is set.
 - The tool gate matches text in tool arguments. A DSH agent cannot reach the
   store through its tools, but a process outside DSH — or a determined agent
   that sets `DSH_LKG_ADMIN=1` — is only stopped by the immutable flags.
+- The verify and recovery states are thawed after cloning: the snapshot payload
+  is immutable, but a state the Host runs from must not be, or the Host cannot
+  maintain its own profile and the state cannot be removed.
 - A snapshot captures the runtime, not your data. Sessions and OptMem memory are
   deliberately excluded.
 - `clonefile` is APFS-only. On another filesystem the copy is real, and a

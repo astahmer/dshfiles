@@ -50,6 +50,9 @@ mkdir -p "$HOME_DIR/profiles"
 if [ ! -d "$HOME_DIR/profiles/web" ]; then
   echo "dsh-recover: preparing writable state in $HOME_DIR (this never touches ~/.dsh)"
   cp -R "$VERSION/profile" "$HOME_DIR/profiles/web"
+  # The snapshot is frozen on purpose; the state this instance runs from must be
+  # writable, or the Host cannot maintain its own profile.
+  chflags -R nouchg "$HOME_DIR/profiles/web" 2>/dev/null || true
 fi
 
 echo "dsh-recover: last known good $(basename "$VERSION")"
