@@ -45,6 +45,46 @@ const absolutePathsIn = (value: unknown, out: string[] = [], depth = 0): string[
   return out
 }
 
+const stringsIn = (value: unknown, out: string[] = [], depth = 0): string[] => {
+  if (depth > 4 || out.length > 256) return out
+  if (typeof value === 'string') {
+    out.push(value)
+    return out
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) stringsIn(item, out, depth + 1)
+    return out
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) stringsIn(item, out, depth + 1)
+    return out
+  }
+  return out
+}
+
+/**
+ * The last known good recovery store must outlive the failure it exists for, so
+ * no tool call may name it — not a shell string, not a write target, and not the
+ * launcher either: `dsh-recover` reaches the store without ever spelling its
+ * path. Matching text is deliberately blunt: a false positive costs one refused
+ * call and names the path, while a false negative costs the recovery copy.
+ */
+export const PROTECTED_TOOL_NAMES = ['dsh-recover', 'dsh-lkg'] as const
+
+export const protectedHit = (value: unknown, protectedPaths: readonly string[]): string | undefined => {
+  if (protectedPaths.length === 0) return undefined
+  const texts = stringsIn(value)
+  for (const path of protectedPaths) {
+    const needles = [path, path.replace(/^\/(?:Users|home)\/[^/]+/, '~')]
+    for (const needle of needles) {
+      if (needle.length === 0) continue
+      if (texts.some(text => text.includes(needle))) return path
+    }
+  }
+  const named = PROTECTED_TOOL_NAMES.find(name => texts.some(text => text.includes(name)))
+  return named === undefined ? undefined : protectedPaths[0]
+}
+
 export interface GateDeny {
   readonly kind: 'deny'
   readonly reason: string
@@ -58,6 +98,8 @@ export interface ToolGateDependencies {
   readonly heartbeatWriter: (input: { readonly workspaceId: string; readonly sessionId: string }) => Promise<unknown>
   readonly staleAfterMs: number
   readonly readOnlyTools: readonly string[]
+  /** Absolute paths no tool call may name, whatever the tool and whatever workspace it runs in. */
+  readonly protectedPaths?: readonly string[] | undefined
   readonly hostname: () => string
   readonly now?: (() => number) | undefined
   readonly cacheMs?: number | undefined
@@ -114,6 +156,14 @@ export const createToolGate = (deps: ToolGateDependencies) => {
   }
 
   return async <Decision extends { readonly kind: string }>(execution: GateExecution, next: () => Promise<Decision>): Promise<Decision | GateDeny> => {
+    // Checked before any workspace lookup: the recovery store is protected in
+    // every Session, isolated or not.
+    const hit = protectedHit(execution.arguments, deps.protectedPaths ?? [])
+    if (hit !== undefined) {
+      const reason = `"${hit}" is the last known good recovery store. It is deliberately not writable from a DSH Session: ask the operator to run dsh-recover, or to promote a new snapshot with the dsh-lkg tool.`
+      deps.onDeny?.({ sessionId: execution.agent?.id ?? 'unknown', workspaceId: 'protected', toolName: execution.name, code: 'protected-path', reason })
+      return { kind: 'deny', reason }
+    }
     const agent = execution.agent
     const cwd = agent?.session.header.cwd
     if (agent === undefined || cwd === undefined || cwd.length === 0) return next()

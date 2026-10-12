@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { WorkspaceOwnershipView } from './ownership.js'
-import { createToolGate, type GateExecution } from './tool-gate.js'
+import { createToolGate, protectedHit, type GateExecution } from './tool-gate.js'
 
 const view = (overrides: Partial<WorkspaceOwnershipView> = {}): WorkspaceOwnershipView => ({
   workspaceName: 'thread-a',
@@ -17,7 +17,14 @@ const execution = (name: string, sessionId: string, cwd = '/threads/thread-a'): 
   agent: { id: sessionId, session: { header: { cwd } } },
 })
 
-const build = (options: { readonly view?: WorkspaceOwnershipView | undefined; readonly now?: number; readonly acquireFails?: boolean } = {}) => {
+const build = (
+  options: {
+    readonly view?: WorkspaceOwnershipView | undefined
+    readonly now?: number
+    readonly acquireFails?: boolean
+    readonly protectedPaths?: readonly string[]
+  } = {},
+) => {
   const next = vi.fn(() => Promise.resolve({ kind: 'allow' }))
   const acquireWriter = vi.fn(() =>
     options.acquireFails === true
@@ -32,6 +39,7 @@ const build = (options: { readonly view?: WorkspaceOwnershipView | undefined; re
     heartbeatWriter,
     staleAfterMs: 60_000,
     readOnlyTools: ['read', 'grep'],
+    protectedPaths: options.protectedPaths ?? [],
     hostname: () => 'test-host',
     now: () => options.now ?? 0,
     cacheMs: 0,
@@ -179,5 +187,51 @@ describe('structured writes into another workspace', () => {
   it('leaves a shell command untouched, because its writes are not a structured path', async () => {
     const { gate, next } = buildForeign()
     await expect(gate(call('bash', { command: 'echo x > /threads/thread-b/a.ts' }), next)).resolves.toEqual({ kind: 'allow' })
+  })
+})
+
+/**
+ * The recovery store is the one thing that has to survive an agent breaking
+ * everything else, so it is refused in every Session — including one whose cwd
+ * is not a registered workspace at all.
+ */
+describe('protected recovery store', () => {
+  const store = '/Users/someone/.dsh-lkg'
+  const call = (name: string, args: unknown, cwd = '/threads/thread-a') => ({
+    name,
+    arguments: args,
+    agent: { id: 'session-owner', session: { header: { cwd } } },
+  })
+
+  it('matches the absolute path, the tilde form and the launcher name, at any depth', () => {
+    expect(protectedHit({ command: `rm -rf ${store}/versions` }, [store])).toBe(store)
+    expect(protectedHit({ command: 'rm -rf ~/.dsh-lkg/versions' }, [store])).toBe(store)
+    expect(protectedHit({ nested: { list: ['ok', `${store}/current`] } }, [store])).toBe(store)
+    expect(protectedHit({ command: 'dsh-recover --port 3099' }, [store])).toBe(store)
+    expect(protectedHit({ command: 'dsh-lkg snapshot' }, [store])).toBe(store)
+    expect(protectedHit({ command: 'rm -rf /tmp/other' }, [store])).toBeUndefined()
+    expect(protectedHit({ command: `rm -rf ${store}` }, [])).toBeUndefined()
+    expect(protectedHit({ command: 'dsh-recover' }, [])).toBeUndefined()
+  })
+
+  it('refuses a shell command that names the store, before the tool body runs', async () => {
+    const { gate, next, denials } = build({ view: view(), protectedPaths: [store] })
+    const decision = await gate(call('bash', { command: `rm -rf ${store}/versions` }), next)
+    expect(decision).toMatchObject({ kind: 'deny' })
+    expect(decision).toHaveProperty('reason', expect.stringContaining('last known good'))
+    expect(next).not.toHaveBeenCalled()
+    expect(denials).toEqual(['protected-path'])
+  })
+
+  it('refuses it even when the Session is not in a registered workspace', async () => {
+    const { gate, next } = build({ view: undefined, protectedPaths: [store] })
+    await expect(gate(call('bash', { command: `dsh-recover --port 3099` }, '/not/a/workspace'), next)).resolves.toMatchObject({ kind: 'deny' })
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('leaves everything else alone', async () => {
+    const { gate, next } = build({ view: view(), protectedPaths: [store] })
+    await expect(gate(call('bash', { command: 'ls /tmp' }), next)).resolves.toEqual({ kind: 'allow' })
+    expect(next).toHaveBeenCalledOnce()
   })
 })

@@ -1,4 +1,5 @@
-import { hostname } from 'node:os'
+import { homedir, hostname } from 'node:os'
+import { join } from 'node:path'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -50,7 +51,7 @@ export interface JjIntegrationConfig {
   readonly autoDiscoverWorkspaces: boolean
   readonly workspaceIsolation: { readonly mode: WorkspaceIsolationMode; readonly directory?: string | undefined }
   readonly integration: { readonly mode: 'auto' | 'manual' | 'off' }
-  readonly ownership: { readonly staleAfterSeconds: number; readonly readOnlyTools: readonly string[] }
+  readonly ownership: { readonly staleAfterSeconds: number; readonly readOnlyTools: readonly string[]; readonly protectedPaths: readonly string[] }
 }
 
 const readConfig = (): JjIntegrationConfig => {
@@ -66,48 +67,56 @@ const readConfig = (): JjIntegrationConfig => {
       ...(settings.workspaceIsolationDirectory === '' ? {} : { directory: settings.workspaceIsolationDirectory }),
     },
     integration: { mode: settings.integrationMode },
-    ownership: { staleAfterSeconds: settings.staleAfterSeconds, readOnlyTools: [...settings.readOnlyTools] },
+    ownership: {
+      staleAfterSeconds: settings.staleAfterSeconds,
+      readOnlyTools: [...settings.readOnlyTools],
+      protectedPaths: settings.protectedPaths.map(path => (path.startsWith('~/') ? join(homedir(), path.slice(2)) : path)),
+    },
   }
 }
 
-const createExecutor = (ctx: Context): JjExecutor => async input => {
-  const executable = await ctx.subprocess.resolveExecutable('jj', undefined, input.signal)
-  const handle = ctx.subprocess.spawn({
-    argv: [executable, '--color=never', '--no-pager', ...input.args],
-    cwd: input.cwd,
-    stdio: {
-      stdin: 'ignore',
-      stdout: { maxBytes: MAX_OUTPUT },
-      stderr: { maxBytes: MAX_STDERR },
-    },
-    graceMs: 1_500,
-    ...(input.signal === undefined ? {} : { signal: input.signal }),
-  })
-  const outcome = await handle.done
-  const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
-  const stderr = handle.collected.stderr?.readFrom(0)?.text ?? ''
-  return { exitCode: outcome.exitCode ?? 1, stdout, stderr }
-}
+const createExecutor =
+  (ctx: Context): JjExecutor =>
+  async input => {
+    const executable = await ctx.subprocess.resolveExecutable('jj', undefined, input.signal)
+    const handle = ctx.subprocess.spawn({
+      argv: [executable, '--color=never', '--no-pager', ...input.args],
+      cwd: input.cwd,
+      stdio: {
+        stdin: 'ignore',
+        stdout: { maxBytes: MAX_OUTPUT },
+        stderr: { maxBytes: MAX_STDERR },
+      },
+      graceMs: 1_500,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    })
+    const outcome = await handle.done
+    const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
+    const stderr = handle.collected.stderr?.readFrom(0)?.text ?? ''
+    return { exitCode: outcome.exitCode ?? 1, stdout, stderr }
+  }
 
-const createCommandExecutor = (ctx: Context): CommandExecutor => async input => {
-  const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
-  const argv = process.platform === 'win32' ? [shell, '/c', input.command] : [shell, '-c', input.command]
-  const handle = ctx.subprocess.spawn({
-    argv,
-    cwd: input.cwd,
-    stdio: {
-      stdin: 'ignore',
-      stdout: { maxBytes: MAX_OUTPUT },
-      stderr: { maxBytes: MAX_STDERR },
-    },
-    graceMs: 5_000,
-    ...(input.signal === undefined ? {} : { signal: input.signal }),
-  })
-  const outcome = await handle.done
-  const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
-  const stderr = handle.collected.stderr?.readFrom(0)?.text ?? ''
-  return { exitCode: outcome.exitCode ?? 1, stdout, stderr }
-}
+const createCommandExecutor =
+  (ctx: Context): CommandExecutor =>
+  async input => {
+    const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
+    const argv = process.platform === 'win32' ? [shell, '/c', input.command] : [shell, '-c', input.command]
+    const handle = ctx.subprocess.spawn({
+      argv,
+      cwd: input.cwd,
+      stdio: {
+        stdin: 'ignore',
+        stdout: { maxBytes: MAX_OUTPUT },
+        stderr: { maxBytes: MAX_STDERR },
+      },
+      graceMs: 5_000,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    })
+    const outcome = await handle.done
+    const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
+    const stderr = handle.collected.stderr?.readFrom(0)?.text ?? ''
+    return { exitCode: outcome.exitCode ?? 1, stdout, stderr }
+  }
 
 let service: JjIntegrationService | undefined
 let hostContext: Context | undefined
@@ -210,8 +219,14 @@ const workspaceRegisterTool = defineTool({
     const sessionId = agentIdOf(execution)
     if (sessionId === null) throw new IntegrationError('caller-unavailable', 'Registering a workspace requires a live DSH Agent identity.')
     const path = args.path ?? agentCwdOf(execution)
-    if (path === undefined || path.length === 0) throw new IntegrationError('path-required', 'Provide a workspace path; the calling Session has no working directory.')
-    const workspace = await requireService().registerWorkspace({ path, sessionId, source: 'agent-tool', ...(execution.signal === undefined ? {} : { signal: execution.signal }) })
+    if (path === undefined || path.length === 0)
+      throw new IntegrationError('path-required', 'Provide a workspace path; the calling Session has no working directory.')
+    const workspace = await requireService().registerWorkspace({
+      path,
+      sessionId,
+      source: 'agent-tool',
+      ...(execution.signal === undefined ? {} : { signal: execution.signal }),
+    })
     const ready = args.ready === 'true' ? await requireService().markReady(workspace.id, sessionId) : workspace
     return jsonSummary({ workspace: ready })
   },
@@ -272,7 +287,14 @@ const integrationRunTool = defineTool({
     'Run one queued integration candidate: duplicate the source revision onto the refreshed canonical spine, detect conflicts, run configured validation, and advance the spine bookmark only on success. The source workspace is never modified. Requires the candidate owner or a configured coordinator session.',
   parameters: { candidateId: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => jsonSummary(await requireIntegrationEnabled().runCandidate({ candidateId: args.candidateId, sessionId: agentIdOf(execution), ...(execution.signal === undefined ? {} : { signal: execution.signal }) })),
+  execute: async (args, execution) =>
+    jsonSummary(
+      await requireIntegrationEnabled().runCandidate({
+        candidateId: args.candidateId,
+        sessionId: agentIdOf(execution),
+        ...(execution.signal === undefined ? {} : { signal: execution.signal }),
+      }),
+    ),
 })
 
 const integrationRetryTool = defineTool({
@@ -280,7 +302,8 @@ const integrationRetryTool = defineTool({
   description: 'Re-queue a blocked, failed, stale, or cancelled candidate, re-resolving the source workspace current revision.',
   parameters: { candidateId: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => jsonSummary({ candidate: await requireService().retryCandidate(args.candidateId, agentIdOf(execution), execution.signal) }),
+  execute: async (args, execution) =>
+    jsonSummary({ candidate: await requireService().retryCandidate(args.candidateId, agentIdOf(execution), execution.signal) }),
 })
 
 const integrationCancelTool = defineTool({
@@ -311,7 +334,12 @@ const integrationEventsTool = defineTool({
   execute: async args => jsonSummary({ events: await requireService().listEvents(args.limit ?? 100) }),
 })
 
-const writerSummary = (record: { readonly name: string; readonly writerEpoch: number; readonly writerLease: unknown; readonly observers: readonly unknown[] }): { summary: string } =>
+const writerSummary = (record: {
+  readonly name: string
+  readonly writerEpoch: number
+  readonly writerLease: unknown
+  readonly observers: readonly unknown[]
+}): { summary: string } =>
   jsonSummary({ workspace: record.name, writerEpoch: record.writerEpoch, writerLease: record.writerLease, observers: record.observers.length })
 
 const workspaceClaimTool = defineTool({
@@ -320,7 +348,8 @@ const workspaceClaimTool = defineTool({
     'Take the exclusive writer lease for one registered workspace. A live lease held by another session is refused; a quiet lease is reclaimed and its holder fenced. Only the holder may write in that workspace.',
   parameters: { workspaceId: { type: 'string', required: true, description: 'Coordinator workspace id from jj_workspace_list.' } },
   output: summaryOutput,
-  execute: async (args, execution) => writerSummary(await requireService().acquireWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown', host: null })),
+  execute: async (args, execution) =>
+    writerSummary(await requireService().acquireWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown', host: null })),
 })
 
 const workspaceReleaseTool = defineTool({
@@ -328,7 +357,8 @@ const workspaceReleaseTool = defineTool({
   description: 'Release your exclusive writer lease on one workspace so another session may claim it. Only the current holder may release it.',
   parameters: { workspaceId: { type: 'string', required: true } },
   output: summaryOutput,
-  execute: async (args, execution) => writerSummary(await requireService().releaseWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown' })),
+  execute: async (args, execution) =>
+    writerSummary(await requireService().releaseWriter({ workspaceId: args.workspaceId, sessionId: agentIdOf(execution) ?? 'unknown' })),
 })
 
 const workspaceTransferTool = defineTool({
@@ -356,7 +386,8 @@ const workspaceObserveTool = defineTool({
   description: 'Register a read-only observer on one workspace. Observers may run read-only tools there and never gain write access.',
   parameters: { workspaceId: { type: 'string', required: true }, sessionId: { type: 'string', description: 'Defaults to the calling session.' } },
   output: summaryOutput,
-  execute: async (args, execution) => writerSummary(await requireService().addObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
+  execute: async (args, execution) =>
+    writerSummary(await requireService().addObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
 })
 
 const workspaceUnobserveTool = defineTool({
@@ -364,7 +395,8 @@ const workspaceUnobserveTool = defineTool({
   description: 'Remove a read-only observer from one workspace.',
   parameters: { workspaceId: { type: 'string', required: true }, sessionId: { type: 'string', description: 'Defaults to the calling session.' } },
   output: summaryOutput,
-  execute: async (args, execution) => writerSummary(await requireService().removeObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
+  execute: async (args, execution) =>
+    writerSummary(await requireService().removeObserver({ workspaceId: args.workspaceId, sessionId: args.sessionId ?? agentIdOf(execution) ?? 'unknown' })),
 })
 
 const api = jjIntegrationApi.host({
@@ -463,7 +495,8 @@ const setupHost = (context: Context): Effect<void> => {
         // queues integration, and only when the mode is automatic.
         if (integrationMode === 'auto' && event.type === 'workspace.ready') {
           setTimeout(() => void driveAutoIntegration(), 0)
-        }      },
+        }
+      },
     },
   })
   context.on('dshfiles/activity/backfill', () => {
@@ -515,7 +548,7 @@ const setupHost = (context: Context): Effect<void> => {
           detail: outcome.kind === 'refused' ? outcome.reason : `requested ${request.requestedCwd}`,
           sessionId: request.sessionId,
           workspaceId: outcome.kind === 'resolved' ? outcome.cwd : null,
-          workspaceName: outcome.kind === 'resolved' ? outcome.cwd.split('/').filter(Boolean).slice(-1)[0] ?? null : null,
+          workspaceName: outcome.kind === 'resolved' ? (outcome.cwd.split('/').filter(Boolean).slice(-1)[0] ?? null) : null,
         },
       })
       if (outcome.kind === 'refused') {
@@ -531,6 +564,7 @@ const setupHost = (context: Context): Effect<void> => {
     heartbeatWriter: input => active.heartbeatWriter(input),
     staleAfterMs: config.ownership.staleAfterSeconds * 1000,
     readOnlyTools: config.ownership.readOnlyTools,
+    protectedPaths: config.ownership.protectedPaths,
     hostname,
     heldEpochs,
     onDeny: input => {

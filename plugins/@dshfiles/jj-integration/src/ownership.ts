@@ -6,7 +6,7 @@
  * durable write.
  */
 
-export type OwnershipCode = 'writer-held' | 'writer-fenced' | 'unsafe-workspace' | 'foreign-workspace'
+export type OwnershipCode = 'writer-held' | 'writer-fenced' | 'unsafe-workspace' | 'foreign-workspace' | 'protected-path'
 
 export type OwnershipDecision =
   | { readonly kind: 'allow' }

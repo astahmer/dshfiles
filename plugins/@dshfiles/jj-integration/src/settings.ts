@@ -26,9 +26,7 @@ export const jjIntegrationSettings = defineSettings({
   namespace: 'jj-integration',
   schema: Schema.object({
     spineBookmark: Schema.string().default('integration-spine').description('Bookmark or commit every integration advances.'),
-    validationCommand: Schema.string()
-      .default('')
-      .description('Command run in the staging workspace before the spine advances. Empty disables validation.'),
+    validationCommand: Schema.string().default('').description('Command run in the staging workspace before the spine advances. Empty disables validation.'),
     allowAnyAgentIntegration: Schema.boolean()
       .default(false)
       .description('Let any Session run a coordinator integration, not only the coordinator sessions below.'),
@@ -61,6 +59,11 @@ export const jjIntegrationSettings = defineSettings({
     readOnlyTools: Schema.array(Schema.string())
       .default([...DEFAULT_READ_ONLY_TOOLS])
       .description('Tools a read-only observer may run in a workspace it does not own.'),
+    protectedPaths: Schema.array(Schema.string())
+      .default(['~/.dsh-lkg'])
+      .description(
+        'Paths no tool call may name, whatever the tool and whichever workspace it runs in. This is the last known good recovery store: it must outlive the failure it exists for, so a DSH Session cannot rewrite, launch, promote or delete it. Empty disables the guard.',
+      ),
   }),
 })
 
