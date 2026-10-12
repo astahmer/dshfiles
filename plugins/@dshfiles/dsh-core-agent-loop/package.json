@@ -28,6 +28,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent": "link:../../../tooling/dsh-core/agent",
     "@deepseek-ai/dsh-agent-loop": "workspace:*",
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@types/node": "^22.19.0",

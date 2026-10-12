@@ -30,22 +30,28 @@ const corePackages = [
   'session-format-v4-to-v5',
 ]
 const plugin = name => `link:${resolve(repoRoot, 'plugins/@dshfiles', name)}`
+// CORE=narrow swaps the five-row core bridge for the two-row agent-runtime bundle, which
+// replaces only the agent registry and the agent loop and leaves the session controller native.
+const narrowCore = process.env.CORE === 'narrow'
+const coreBundleId = narrowCore ? '@dshfiles/dsh-core-agent-loop' : '@dshfiles/dsh-core-runtime'
 const scratch = await createScratchProfile({
   profileName: 'optmem-full',
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
   bundleIds: [
     '@deepseek-ai/dsh-base',
     '@deepseek-ai/dsh-web-app',
-    ...(process.env.STOCK === '1' ? [] : ['@dshfiles/dsh-core-runtime']),
+    ...(process.env.STOCK === '1' ? [] : [coreBundleId]),
     '@dshfiles/ai-accounts',
     '@dshfiles/optmem',
   ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies: {
-    '@dshfiles/dsh-core-runtime': plugin('dsh-core-runtime'),
+    [coreBundleId]: plugin(coreBundleId.slice('@dshfiles/'.length)),
     '@dshfiles/ai-accounts': plugin('ai-accounts'),
     '@dshfiles/optmem': plugin('optmem'),
-    ...Object.fromEntries((process.env.STOCK === '1' ? [] : corePackages).map(name => [`@deepseek-ai/dsh-${name}`, `link:${resolve(coreRoot, name)}`])),
+    ...Object.fromEntries(
+      (process.env.STOCK === '1' || narrowCore ? [] : corePackages).map(name => [`@deepseek-ai/dsh-${name}`, `link:${resolve(coreRoot, name)}`]),
+    ),
   },
 })
 const log = (...parts) => process.stdout.write(`${parts.join(' ')}\n`)
@@ -60,7 +66,7 @@ await writeFile(
     - webRuntime
     - webServer
 ${
-  process.env.STOCK === '1'
+  process.env.STOCK === '1' || narrowCore
     ? ''
     : `- id: dshfiles-core-runtime
   config:
@@ -112,7 +118,7 @@ const evidence = { home: scratch.home, mode: compatMode ? 'compat' : 'full', tur
 const finish = async code => {
   evidence.hostLog = redactHostOutput(output)
     .split('\n')
-    .filter(line => /optmem|did not activate|failed to import|dshfiles-core-runtime|error/i.test(line))
+    .filter(line => /optmem|did not activate|failed to import|dshfiles-core|error/i.test(line))
     .slice(-200)
   await writeFile(out, JSON.stringify(evidence, null, 2))
   await writeFile(`${out}.host.log`, redactHostOutput(output))

@@ -13,8 +13,8 @@ const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf
 const disabledIds = [...patch.matchAll(/^- id: (\S+)\n(?:.*\n)*?\s+disabled: true$/gm)].map(match => match[1])
 const insertedNames = [...patch.matchAll(/^\s+- id: \S+\n\s+name: '([^']+)'/gm)].map(match => match[1])
 
-test('disables the agent loop and nothing else', () => {
-  assert.deepEqual(disabledIds, ['agent-loop'])
+test('disables the agent registry and the agent loop, and nothing else', () => {
+  assert.deepEqual(disabledIds, ['agent', 'agent-loop'])
 })
 
 test('inserts the local bundle as the replacement row', () => {
@@ -22,7 +22,7 @@ test('inserts the local bundle as the replacement row', () => {
 })
 
 test('never touches the session controller, the session store or persistence', () => {
-  for (const protectedRow of ['session', 'session-controller', 'session-persistence-jsonl', 'agent']) {
+  for (const protectedRow of ['session', 'session-controller', 'session-persistence-jsonl']) {
     assert.ok(!disabledIds.includes(protectedRow), `${protectedRow} must stay native`)
   }
 })

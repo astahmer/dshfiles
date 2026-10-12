@@ -10,6 +10,7 @@ export default defineConfig({
      * activation. Same set the core bridge inlines, for the same reason.
      */
     bundleDependencies: [
+      '@deepseek-ai/dsh-agent',
       '@deepseek-ai/dsh-agent-loop',
       '@deepseek-ai/dsh-brand',
       '@deepseek-ai/dsh-scope',
