@@ -17,7 +17,9 @@ export const openEngine = async (request: { readonly path: string; readonly summ
     store: memory.store,
     search: memory.search,
     summarizer: request.summarizer,
-    config: request.config,
+    // Tests drive recovery explicitly; the periodic sweep and the call-rate gate are opt-in so neither a timer nor a
+    // frozen clock can stall a test.
+    config: { catchUpIntervalMs: 0, summaryCallsPerMinute: 0, ...request.config },
     clock: { now: () => 1_700_000_000_000 },
   })
   await engine.start()

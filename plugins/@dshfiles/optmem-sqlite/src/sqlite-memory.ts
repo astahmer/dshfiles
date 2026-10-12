@@ -133,6 +133,13 @@ export type SqlitePipelineOverview = {
   readonly oldestPendingAt: number | null
   readonly completedSummaryNodes: number
   readonly summariesLastTenMinutes: number
+  /** How far the persisted main view has advanced, and the stream length it is measured against. */
+  readonly viewThroughPos: number
+  readonly streamLength: number
+  /** Newest model-produced node for this scope; null when none exists yet. */
+  readonly lastSummaryAt: number | null
+  /** Nodes materialized from clipped text because a model summary kept failing. */
+  readonly unsummarizedNodes: number
 }
 
 export type SqliteMemory = {
@@ -295,14 +302,17 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
       return row ? nodeFromRow(row) : undefined
     },
 
-    listMissingLeaves: async (streamId, fromPos) =>
-      prepare(
+    listMissingLeaves: async (streamId, fromPos, limit) => {
+      const take = limit !== undefined && Number.isSafeInteger(limit) && limit > 0 ? limit : -1
+      return prepare(
         `SELECT s.pos FROM stream_entries s
          LEFT JOIN nodes n ON n.stream = s.stream AND n.level = 0 AND n.idx = s.pos
-         WHERE s.stream = ? AND s.pos >= ? AND n.idx IS NULL ORDER BY s.pos`,
+         WHERE s.stream = ? AND s.pos >= ? AND n.idx IS NULL ORDER BY s.pos
+         LIMIT ?`,
       )
-        .all(streamId, fromPos)
-        .map(row => integer(row, 'pos')),
+        .all(streamId, fromPos, take)
+        .map(row => integer(row, 'pos'))
+    },
 
     listBuildableParents: async streamId =>
       prepare(
@@ -386,9 +396,13 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
     ).get(maxNodeBytes, streamId ?? null, streamId ?? null) ?? { jobs: 0 }
     const completion = prepare(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) AS recent
+              COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) AS recent,
+              COALESCE(SUM(CASE WHEN model = 'unsummarized' THEN 1 ELSE 0 END), 0) AS unsummarized,
+              MAX(CASE WHEN model NOT IN ('verbatim', 'concat') THEN created_at END) AS last_at
        FROM nodes WHERE model NOT IN ('verbatim', 'concat') AND (? IS NULL OR stream = ?)`,
     ).get(Date.now() - 10 * 60_000, streamId ?? null, streamId ?? null) ?? { total: 0, recent: 0 }
+    const view = streamId === undefined ? undefined : getView(streamId, 'main')
+    const length = streamId === undefined ? 0 : streamLength(streamId)
     return {
       pendingLeafJobs: integer(pending, 'jobs'),
       pendingEvents: integer(pending, 'events'),
@@ -397,6 +411,10 @@ export const openSqliteMemory = (options: SqliteMemoryOptions): SqliteMemory => 
       oldestPendingAt: pending['oldest_at'] === null ? null : integer(pending, 'oldest_at'),
       completedSummaryNodes: integer(completion, 'total'),
       summariesLastTenMinutes: integer(completion, 'recent'),
+      viewThroughPos: view?.throughPos ?? 0,
+      streamLength: length,
+      lastSummaryAt: completion['last_at'] === null || completion['last_at'] === undefined ? null : integer(completion, 'last_at'),
+      unsummarizedNodes: integer(completion, 'unsummarized'),
     }
   }
 

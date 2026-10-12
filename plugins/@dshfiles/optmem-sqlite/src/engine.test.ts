@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { StreamIds, TreeMath, Utf8, ViewMath, type MemoryAccess } from '@dshfiles/optmem-core'
+import { StreamIds, TreeMath, Utf8, ViewMath, type MemoryAccess, type NormalizedEvent } from '@dshfiles/optmem-core'
 
 import { openSqliteMemory } from './sqlite-memory.ts'
 import { createFakeSummarizer } from './testing/fake-summarizer.ts'
@@ -292,37 +292,94 @@ describe('recovery', () => {
     fixed.memory.close()
   })
 
-  it('bounds automatic retry attempts for a repeatedly failing job', async () => {
+  it('caps model calls per rolling minute and resumes when the window rolls', async () => {
+    const summarizer = createFakeSummarizer()
+    let now = 1_700_000_000_000
+    const memory = openSqliteMemory({ path: dbPath('rate-limit') })
+    const { createMemoryEngine } = await import('@dshfiles/optmem-core')
+    const engine = createMemoryEngine({
+      store: memory.store,
+      summarizer,
+      clock: { now: () => now },
+      config: { maxNodeBytes: 128, concurrency: 1, catchUpIntervalMs: 0, summaryCallsPerMinute: 2, retryBaseMs: 1, retryMaxMs: 2 },
+    })
+    await engine.start()
+    await engine.append(
+      Array.from({ length: 3 }, (_unused, index) => event({ conversationId: 'c1', projectId: 'p1', text: `oversized ${index} ${'x'.repeat(400)}` })),
+    )
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(summarizer.requests).toHaveLength(2)
+    expect((await engine.status()).summarizer.rateLimitPerMinute).toBe(2)
+    now += 60_000
+    await new Promise(resolve => setTimeout(resolve, 2_200))
+    expect(summarizer.requests.length).toBeGreaterThan(2)
+    await Promise.race([engine.close(), new Promise(resolve => setTimeout(resolve, 2_000))])
+    memory.close()
+  })
+
+  it('falls back to clipped text once a repeatedly failing leaf exhausts its attempts', async () => {
     const summarizer = createFakeSummarizer({ failing: true })
     const { engine, memory } = await openEngine({ path: dbPath('bounded-retries'), summarizer, config: { retryBaseMs: 1, retryMaxMs: 8 } })
     await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
-    await new Promise(resolve => setTimeout(resolve, 80))
+    await new Promise(resolve => setTimeout(resolve, 120))
     const status = await engine.status()
-    expect(summarizer.requests).toHaveLength(5)
-    expect(status.failures).toMatchObject({ count: 1, retryInMs: null, lastError: 'summarizer unavailable' })
+    expect(summarizer.requests).toHaveLength(3)
+    expect(status.summarizer.fallbacks).toBe(1)
+    expect(status.failures.count).toBe(0)
+    const [leaf] = await memory.store.listNodes(conversation, 0, 0, 1)
+    expect(leaf?.model).toBe('unsummarized')
+    expect(Utf8.byteLength(leaf?.text ?? '')).toBeLessThanOrEqual(512)
+    // The view advanced over the poisoned position instead of freezing at it.
+    expect((await engine.status()).streams.find(item => item.stream === conversation)?.viewThroughPos).toBe(1)
     await engine.close()
     memory.close()
   })
 
-  it('only retries non-retryable summary failures after explicit operator recovery', async () => {
+  it('falls back immediately when a leaf failure is explicitly non-retryable', async () => {
     let calls = 0
-    const flaky = createFakeSummarizer()
     const summarizer = {
-      summarize: async (request: Parameters<typeof flaky.summarize>[0]) => {
+      summarize: async () => {
         calls++
-        if (calls === 1) throw Object.assign(new Error('output budget exhausted'), { retryable: false })
-        return flaky.summarize(request)
+        throw Object.assign(new Error('output budget exhausted'), { retryable: false })
       },
     }
     const { engine, memory } = await openEngine({ path: dbPath('manual-retry'), summarizer, config: { retryBaseMs: 1, retryMaxMs: 5 } })
     await engine.append([event({ conversationId: 'c1', text: 'large '.repeat(200) })])
     await engine.drain()
     expect(calls).toBe(1)
-    expect((await engine.status()).failures).toMatchObject({ count: 1, retryInMs: null })
-    expect(engine.retryFailures()).toBe(1)
-    await engine.drain()
-    expect(calls).toBe(2)
     expect((await engine.status()).failures.count).toBe(0)
+    const [leaf] = await memory.store.listNodes(conversation, 0, 0, 1)
+    expect(leaf?.model).toBe('unsummarized')
+    await engine.close()
+    memory.close()
+  })
+
+  it('picks up backlog that appeared after start without another append', async () => {
+    const summarizer = createFakeSummarizer()
+    const { engine, memory } = await openEngine({ path: dbPath('catch-up'), summarizer, config: { catchUpIntervalMs: 20, catchUpBatchPerStream: 10 } })
+    // A second writer on the same database inserts entries the running engine never saw appended.
+    const other = openSqliteMemory({ path: dbPath('catch-up') })
+    const normalized = (text: string): NormalizedEvent => ({
+      eventKey: `other:${text}`,
+      harness: 'test',
+      conversationId: 'c1',
+      projectId: 'p1',
+      parentConversationId: null,
+      role: 'user',
+      createdAt: 1_700_000_000_000,
+      text,
+      bytes: Utf8.byteLength(text),
+      truncated: false,
+      meta: {},
+      streams: [conversation, StreamIds.project('p1')],
+    })
+    await other.store.appendEvents([normalized('appended by another process'), normalized('and another one')])
+    other.close()
+    await new Promise(resolve => setTimeout(resolve, 80))
+    const stream = await engine.status()
+    expect(stream.catchUp.rounds).toBeGreaterThan(0)
+    const leaves = await memory.store.listNodes(conversation, 0, 0, 4)
+    expect(leaves.map(node => node.model)).toEqual(['verbatim', 'verbatim'])
     await engine.close()
     memory.close()
   })
@@ -371,7 +428,7 @@ describe('compact view', () => {
     const engine = createMemoryEngine({
       store: memory.store,
       summarizer: createFakeSummarizer(),
-      config: { ...smallView, compactUpperBytes: 900, compactLowerBytes: 450 },
+      config: { ...smallView, compactUpperBytes: 900, compactLowerBytes: 450, catchUpIntervalMs: 0, summaryCallsPerMinute: 0 },
       onViewCommitted: event => committed.push(event.kind),
     })
     await engine.start()
