@@ -49,6 +49,9 @@ export const Config = z.object({
   /** Coordinator-driven integration. Default is explicit; `off` disables coordinator runs. */
   integration: z.object({ mode: z.enum(['auto', 'manual', 'off']).default('manual') }).default({ mode: 'manual' }),
 })
+// The Loader hands a row without stored config `undefined`, and a bare object
+// schema rejects that. `prefault({})` applies every inner default instead.
+export const ConfigSchema = Config.prefault({})
 export type JjIntegrationConfig = z.infer<typeof Config>
 
 const createExecutor = (ctx: Context): JjExecutor => async input => {
@@ -384,7 +387,7 @@ const setupHost = (context: Context, config: JjIntegrationConfig): Effect<void> 
 const host = defineHost({
   name: 'jj-integration',
   inject: ['subprocess', 'agents'],
-  Config,
+  Config: ConfigSchema,
   apis: [api],
   tools: [
     workspaceListTool,

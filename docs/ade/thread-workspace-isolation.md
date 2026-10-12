@@ -11,6 +11,8 @@ not design.
 |---|---|
 | `68e4d85d` | `@dshfiles/jj-integration`: provisioning core, isolation resolver, `workspaceIsolation` / `integration` config, activity events |
 | `28203960` | web profile seed loads `@dshfiles/jj-integration` |
+| `d5a33e7a` | this page |
+| fix revision | `Config.prefault({})` — see "Loader config" below |
 
 Canonical DSH checkout (`~/dev/dsh-core-ade-hook`, store `~/dev/dsh-core-activity-rc2`,
 origin `deepseek-ai/deepseek-harness`), local revision `5d2c5a5c` on the
@@ -43,6 +45,16 @@ requireWorkspaceResolver: false   # session-controller: true refuses a Session w
 `off` never provisions and never calls jj. `auto` provisions or refuses — a
 provisioning failure never behaves like `off`.
 
+## Loader config
+
+The Loader hands a row with no stored config `undefined`, and a bare
+`z.object` rejects that: the first scratch-profile boot failed with
+`ValidationError: invalid config: Invalid input: expected object, received
+undefined`. A row only receives a `config:` block once settings exist. The
+plugin therefore exports `ConfigSchema = Config.prefault({})`, which applies
+every inner default to `undefined`. Any owned plugin with native zod `Config`
+and no seeded config needs the same treatment.
+
 ## Verified
 
 - `@dshfiles/jj-integration`: **30/30** vitest (9 new: 20 concurrent threads,
@@ -58,6 +70,8 @@ provisioning failure never behaves like `off`.
   allow reads.
 - Installed web profile composes offline: `dsh --profile web --dump-config`
   exits 0 and lists `- id: jj-integration`.
+- **Second instance, scratch home (`~/.dsh-ade-verify`, port 3199)**, published
+  core + this plugin: boots with **zero** entries that failed to activate.
 
 ## Not verified / blocked
 
@@ -66,12 +80,18 @@ provisioning failure never behaves like `off`.
    live host (pid 1955) was started as `node .../dsh/lib/bin.js web` directly
    from a shell, so its `PATH` has no shim. Starting the host through
    `dsh-web` is the whole activation step.
-2. **The core hook is not installed.** The global `@deepseek-ai/dsh` is the
-   published registry build. A drop-in `@deepseek-ai/dsh-api-session-controller`
-   needs the repo's full host build (Typert artifacts `lib/typert.host.js` and
-   `lib/typert.remote-client.js` are produced by the root `tsdown` workspace
-   pass, not by the package-local build), then the package in the global
-   `.pnpm` store is replaced — or the hook is released upstream.
+2. **The core hook is not installed, and a package-level build is not a
+   drop-in.** The global `@deepseek-ai/dsh` is the published registry build.
+   A full host build of the canonical checkout was produced
+   (`tsc -b tsconfig.host.json` then the root `tsdown --env.DSH_BUILD_FACE host`,
+   both exit 0) and its `@deepseek-ai/dsh-api-session-controller` overlaid onto
+   the published package. The overlay imports cleanly and exposes the same
+   symbols, but the scratch instance then booted with
+   `ui-deliverables` and `ai-accounts` pending on `sessionController`, where the
+   published core boots with zero such entries. The built package also lacks the
+   `lib/types/client` tree the published artifact ships. **Do not deploy the
+   overlay.** A drop-in replacement needs the repo's full release build, or the
+   hook has to be released upstream and the global `@deepseek-ai/dsh` upgraded.
 3. **No live end-to-end run.** No thread has yet been created against the
    running host with the resolver active. That needs items 1 and 2 plus a
    restart.
