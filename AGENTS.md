@@ -122,7 +122,11 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
 - **`@` is not always a head.** Run `jj log -r @` before editing files here: when
   the checkout's working copy sits mid-history, writing any file amends that
   revision and rebases its whole subtree under every other agent. Move `@` to the
-  tip first, or do the file work in a scratch `jj workspace add`.
+  tip first, or do the file work in a scratch `jj workspace add`. The `default`
+  checkout is folded exactly this way: its `@` sits on a duplicate side line
+  whose uncommitted work is already durable in the commit, so consolidate from a
+  fresh named workspace based on a frozen spine commit — never by rewriting
+  `default`'s `@` or rebasing it onto `main`.
 - **Never rewrite a revision another workspace holds as its `@`.** Describing,
   squashing or abandoning it races that workspace's snapshot and leaves a
   divergent copy of the same change (same change-id, second commit-id); that is
@@ -282,6 +286,17 @@ recovery operation in a focused, current closeout document. Preserve active
 writers and unrelated refs. Do not create permanent bookmarks for every attempted
 rewrite. Validation failures remain explicit; history cleanup does not imply
 release or live-profile acceptance.
+
+Classify the source working copies before transplanting: a file that is
+byte-identical to the target is already represented, not unique work, and a
+duplicate side line with the same descriptions and different change ids is a
+rebased equivalent. Transplant only verified-unique changes into the staging
+workspace, in separately described revisions. If combining a unique change
+regresses another package, do not force it onto the line: preserve its source
+workspace and leave it off the spine. A green test suite is never permission for
+an unsafe production history operation — it is not authorization to rewrite a
+live ancestor, advance a bookmark over an unreviewed leaf, or restart a Host
+that holds live sessions.
 
 ## Environment
 
