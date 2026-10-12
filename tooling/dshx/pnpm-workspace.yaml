@@ -1,9 +1,10 @@
 packages:
   - packages/*
 
-# A global virtual store (the user-level `enableGlobalVirtualStore`) leaves every package
-# unable to resolve its own peers, so the `declare module` augmentations this toolchain types
-# plugins against never merge. Pin the classic per-workspace virtual store in both workspaces.
+# Same guard as plugins/pnpm-workspace.yaml: a global virtual store puts every package under
+# ~/.local/share/pnpm/store/v11/links, where a package's own peer imports resolve to nothing. The E2E boot check
+# then refuses the profile because the plugin and this SDK no longer share one cordis identity, and
+# `declare module '@deepseek-ai/cordis'` augmentations stop merging. Keep the per-workspace virtual store.
 enableGlobalVirtualStore: false
 
 catalog:
