@@ -32,7 +32,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
+    "@dshfiles/plugin-ui": "workspace:*",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {

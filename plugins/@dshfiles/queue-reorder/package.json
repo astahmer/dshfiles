@@ -24,8 +24,8 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
-    "@dshfiles/shared-runtime": "link:../shared-runtime",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

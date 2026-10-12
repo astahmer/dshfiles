@@ -24,9 +24,9 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
-    "@dshfiles/shared-runtime": "link:../shared-runtime",
-    "@dshfiles/workbench": "link:../workbench",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/workbench": "workspace:*",
     "monaco-editor": "0.57.0",
     "zod": "^4.4.3"
   },

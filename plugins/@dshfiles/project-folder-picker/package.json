@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui"
+    "@dshfiles/plugin-ui": "workspace:*"
   },
   "devDependencies": {
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",

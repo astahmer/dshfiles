@@ -25,9 +25,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
-    "@dshfiles/project-folder-picker": "link:../project-folder-picker",
-    "@dshfiles/shared-runtime": "link:../shared-runtime",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/project-folder-picker": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

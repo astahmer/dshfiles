@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Jujutsu workspace lifecycle and serialized integration coordination for DSH Agents.",
-  "files": ["dist", "cordis.patch.yml"],
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -18,8 +21,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
-    "@dshfiles/shared-runtime": "link:../shared-runtime",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "write-file-atomic": "7.0.0",
     "zod": "^4.4.3"
   },
@@ -60,7 +63,9 @@
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -72,9 +77,15 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale"
       ],
-      "locales": ["dshfiles.jjIntegration"],
-      "external": ["@dshfiles/shared-runtime"]
+      "locales": [
+        "dshfiles.jjIntegration"
+      ],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ]
     }
   },
-  "dshx": { "features": "./dshx.features.json" }
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
 }

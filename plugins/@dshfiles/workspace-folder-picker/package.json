@@ -32,8 +32,8 @@
     "dev": "dshx dev --open"
   },
   "dependencies": {
-    "@dshfiles/plugin-ui": "link:../plugin-ui",
-    "@dshfiles/project-folder-picker": "link:../project-folder-picker"
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/project-folder-picker": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

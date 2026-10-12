@@ -557,10 +557,10 @@ importers:
         specifier: link:../../../tooling/dsh-core/agent
         version: link:../../../tooling/dsh-core/agent
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       write-file-atomic:
         specifier: 7.0.0
@@ -627,10 +627,10 @@ importers:
         specifier: link:../../../tooling/dsh-core/agent
         version: link:../../../tooling/dsh-core/agent
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       write-file-atomic:
         specifier: 7.0.0
@@ -770,13 +770,13 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/project-folder-picker':
-        specifier: link:../project-folder-picker
+        specifier: workspace:*
         version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       '@earendil-works/pi-ai':
         specifier: ~0.87.1
@@ -870,7 +870,7 @@ importers:
         specifier: link:../../../tooling/dshx/packages/dshx
         version: link:../../../tooling/dshx/packages/dshx
       '@dshfiles/secret-catalog':
-        specifier: link:../secret-catalog
+        specifier: workspace:*
         version: link:../secret-catalog
       '@types/node':
         specifier: ^22.19.0
@@ -897,10 +897,10 @@ importers:
         specifier: link:../../../tooling/dsh-core/api-session-controller
         version: link:../../../tooling/dsh-core/api-session-controller
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -1037,10 +1037,10 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -1123,7 +1123,7 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(0fd82cc2bd900d5984f57e81487e9016)
       '@deepseek-ai/dsh-agent-loop':
-        specifier: link:../../../tooling/dsh-core/agent-loop
+        specifier: workspace:*
         version: link:../../../tooling/dsh-core/agent-loop
       '@dshfiles/dshx':
         specifier: link:../../../tooling/dshx/packages/dshx
@@ -1295,7 +1295,7 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(3faf5016706604c0a80c142d8c770c2a)
       '@deepseek-ai/dsh-agent-loop':
-        specifier: link:../../../tooling/dsh-core/agent-loop
+        specifier: workspace:*
         version: link:../../../tooling/dsh-core/agent-loop
       '@deepseek-ai/dsh-api-session-controller':
         specifier: link:../../../tooling/dsh-core/api-session-controller
@@ -1304,10 +1304,10 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-session-persistence':
-        specifier: link:../../../tooling/dsh-core/session-persistence
+        specifier: workspace:*
         version: link:../../../tooling/dsh-core/session-persistence
       '@deepseek-ai/dsh-session-persistence-jsonl':
-        specifier: link:../../../tooling/dsh-core/session-persistence-jsonl
+        specifier: workspace:*
         version: link:../../../tooling/dsh-core/session-persistence-jsonl
       '@deepseek-ai/dsh-util-crypto':
         specifier: 0.2.0-rc.2
@@ -1340,13 +1340,13 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       '@dshfiles/workbench':
-        specifier: link:../workbench
+        specifier: workspace:*
         version: link:../workbench
       monaco-editor:
         specifier: 0.57.0
@@ -1447,10 +1447,10 @@ importers:
         specifier: link:../../../tooling/dsh-core/agent
         version: link:../../../tooling/dsh-core/agent
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       write-file-atomic:
         specifier: 7.0.0
@@ -1532,13 +1532,13 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/project-folder-picker':
-        specifier: link:../project-folder-picker
+        specifier: workspace:*
         version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -1614,10 +1614,10 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       oauth4webapi:
         specifier: 3.8.8
@@ -1702,7 +1702,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       react-dom:
         specifier: ^18.3.1
@@ -1781,10 +1781,10 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       ws:
         specifier: ^8.18.0
@@ -1860,16 +1860,16 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/optmem-core':
-        specifier: link:../optmem-core
+        specifier: workspace:*
         version: link:../optmem-core
       '@dshfiles/optmem-sqlite':
-        specifier: link:../optmem-sqlite
+        specifier: workspace:*
         version: link:../optmem-sqlite
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -1960,7 +1960,7 @@ importers:
   '@dshfiles/optmem-sqlite':
     dependencies:
       '@dshfiles/optmem-core':
-        specifier: link:../optmem-core
+        specifier: workspace:*
         version: link:../optmem-core
     devDependencies:
       '@types/node':
@@ -1979,10 +1979,10 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       execa:
         specifier: 10.0.1
@@ -2176,10 +2176,10 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(cf1017927973d8a03092b3cd4e8e18ea)
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2243,7 +2243,7 @@ importers:
   '@dshfiles/project-folder-picker':
     dependencies:
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       react:
         specifier: '>=18.2.0 <19'
@@ -2271,10 +2271,10 @@ importers:
         specifier: link:../../../tooling/dshx/packages/dshx
         version: link:../../../tooling/dshx/packages/dshx
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2335,10 +2335,10 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2408,13 +2408,13 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/project-folder-picker':
-        specifier: link:../project-folder-picker
+        specifier: workspace:*
         version: link:../project-folder-picker
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2487,10 +2487,10 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2542,7 +2542,7 @@ importers:
         specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@radix-ui/primitive':
         specifier: 1.1.7
@@ -2830,13 +2830,13 @@ importers:
         specifier: ^3.18.4
         version: 3.18.4
       '@dshfiles/command-palette':
-        specifier: link:../command-palette
+        specifier: workspace:*
         version: link:../command-palette
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       zod:
         specifier: ^4.4.3
@@ -2930,10 +2930,10 @@ importers:
         specifier: link:../../../tooling/dshx/packages/dshx
         version: link:../../../tooling/dshx/packages/dshx
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/shared-runtime':
-        specifier: link:../shared-runtime
+        specifier: workspace:*
         version: link:../shared-runtime
       dockview-react:
         specifier: 8.4.1
@@ -3006,10 +3006,10 @@ importers:
   '@dshfiles/workspace-folder-picker':
     dependencies:
       '@dshfiles/plugin-ui':
-        specifier: link:../plugin-ui
+        specifier: workspace:*
         version: link:../plugin-ui
       '@dshfiles/project-folder-picker':
-        specifier: link:../project-folder-picker
+        specifier: workspace:*
         version: link:../project-folder-picker
     devDependencies:
       '@deepseek-ai/cordis':

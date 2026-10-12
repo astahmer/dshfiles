@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dshfiles/optmem-core": "link:../optmem-core"
+    "@dshfiles/optmem-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
