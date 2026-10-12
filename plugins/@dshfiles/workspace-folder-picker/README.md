@@ -23,6 +23,9 @@ unchanged.
   remains the workspace owner's responsibility.
 - The shared picker defaults to project mode for its other consumers. This
   bundle opts into directory-only mode without duplicating the explorer UI.
+- Host browsing follows the DSH process user's filesystem access; it is not
+  confined to the current workspace or home directory, and symlinked directories
+  remain navigable. This broader capability is enabled here only for Add Workspace.
 
 ## Checks
 
