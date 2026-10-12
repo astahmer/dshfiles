@@ -124,3 +124,60 @@ describe('tool-boundary ownership gate', () => {
     expect(next).toHaveBeenCalledTimes(2)
   })
 })
+
+/**
+ * The residual hole is a shell string: deciding what `bash` writes is not a
+ * tool-level cwd guard's job. A structured write tool does name its target, so
+ * that case is refused rather than merely documented.
+ */
+describe('structured writes into another workspace', () => {
+  const buildForeign = () => {
+    const next = vi.fn(() => Promise.resolve({ kind: 'allow' }))
+    const denials: string[] = []
+    const gate = createToolGate({
+      ownershipForPath: path =>
+        path.startsWith('/threads/thread-b')
+          ? Promise.resolve({ workspaceId: 'workspace-2', view: view({ workspaceName: 'thread-b' }) })
+          : path.startsWith('/shared')
+            ? Promise.resolve({ workspaceId: 'workspace-3', view: view({ workspaceName: 'shared', isolated: false }) })
+            : Promise.resolve({ workspaceId: 'workspace-1', view: view() }),
+      acquireWriter: () => Promise.resolve({ writerLease: { epoch: 7 } }),
+      heartbeatWriter: () => Promise.resolve({}),
+      staleAfterMs: 60_000,
+      readOnlyTools: ['read'],
+      hostname: () => 'test-host',
+      now: () => 0,
+      cacheMs: 0,
+      onDeny: input => denials.push(input.code),
+    })
+    return { gate, next, denials }
+  }
+
+  const call = (name: string, args: unknown) => ({ name, arguments: args, agent: { id: 'session-owner', session: { header: { cwd: '/threads/thread-a' } } } })
+
+  it('refuses a write whose absolute target is inside another isolated workspace', async () => {
+    const { gate, next, denials } = buildForeign()
+    const decision = await gate(call('write', { path: '/threads/thread-b/src/a.ts', content: 'x' }), next)
+    expect(decision).toMatchObject({ kind: 'deny' })
+    expect(decision).toHaveProperty('reason', expect.stringContaining('thread-b'))
+    expect(next).not.toHaveBeenCalled()
+    expect(denials).toEqual(['foreign-workspace'])
+  })
+
+  it('admits a write inside the caller own workspace and one outside every workspace', async () => {
+    const { gate, next } = buildForeign()
+    await expect(gate(call('edit', { path: '/threads/thread-a/src/a.ts' }), next)).resolves.toEqual({ kind: 'allow' })
+    await expect(gate(call('write', { path: '/tmp/scratch.txt' }), next)).resolves.toEqual({ kind: 'allow' })
+    expect(next).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not fence a shared checkout that was only discovered', async () => {
+    const { gate, next } = buildForeign()
+    await expect(gate(call('write', { path: '/shared/notes.md' }), next)).resolves.toEqual({ kind: 'allow' })
+  })
+
+  it('leaves a shell command untouched, because its writes are not a structured path', async () => {
+    const { gate, next } = buildForeign()
+    await expect(gate(call('bash', { command: 'echo x > /threads/thread-b/a.ts' }), next)).resolves.toEqual({ kind: 'allow' })
+  })
+})

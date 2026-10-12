@@ -10,12 +10,39 @@ import { decideToolCall, type OwnershipCode, type WorkspaceOwnershipView } from 
 
 export interface GateExecution {
   readonly name: string
+  /** Parsed tool arguments, when the registry exposes them (it does for every dispatch). */
+  readonly arguments?: unknown
   readonly agent?:
     | {
         readonly id: string
         readonly session: { readonly header: { readonly cwd?: string | undefined } }
       }
     | undefined
+}
+
+/**
+ * Structured write tools whose target path is a real argument, unlike a shell
+ * command string. Guarding these is precise; a `bash` command remains the
+ * documented hole below, because deciding what a shell string writes is not
+ * something a tool-level cwd guard can do.
+ */
+const STRUCTURED_WRITE_TOOLS = new Set(['write', 'edit'])
+
+const absolutePathsIn = (value: unknown, out: string[] = [], depth = 0): string[] => {
+  if (depth > 4 || out.length > 32) return out
+  if (typeof value === 'string') {
+    if (value.startsWith('/')) out.push(value)
+    return out
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) absolutePathsIn(item, out, depth + 1)
+    return out
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) absolutePathsIn(item, out, depth + 1)
+    return out
+  }
+  return out
 }
 
 export interface GateDeny {
@@ -36,7 +63,13 @@ export interface ToolGateDependencies {
   readonly cacheMs?: number | undefined
   readonly heldEpochs?: Map<string, number> | undefined
   readonly onDeny?:
-    | ((input: { readonly sessionId: string; readonly workspaceId: string; readonly toolName: string; readonly code: OwnershipCode; readonly reason: string }) => void)
+    | ((input: {
+        readonly sessionId: string
+        readonly workspaceId: string
+        readonly toolName: string
+        readonly code: OwnershipCode
+        readonly reason: string
+      }) => void)
     | undefined
   readonly onError?: ((input: { readonly sessionId: string; readonly error: unknown }) => void) | undefined
 }
@@ -66,6 +99,20 @@ export const createToolGate = (deps: ToolGateDependencies) => {
     return entry
   }
 
+  /**
+   * A structured write whose target resolves inside another isolated workspace.
+   * Only workspaces this plugin provisioned are checked, so a checkout merely
+   * discovered from a cwd is never fenced by this rule.
+   */
+  const foreignTarget = async (args: unknown, ownWorkspaceId: string): Promise<string | undefined> => {
+    for (const candidate of absolutePathsIn(args)) {
+      const found = await deps.ownershipForPath(candidate)
+      if (found === undefined || found.workspaceId === ownWorkspaceId || !found.view.isolated) continue
+      return `"${candidate}" is inside workspace "${found.view.workspaceName}", which this thread does not own; write inside your own workspace or take that lease explicitly`
+    }
+    return undefined
+  }
+
   return async <Decision extends { readonly kind: string }>(execution: GateExecution, next: () => Promise<Decision>): Promise<Decision | GateDeny> => {
     const agent = execution.agent
     const cwd = agent?.session.header.cwd
@@ -93,6 +140,13 @@ export const createToolGate = (deps: ToolGateDependencies) => {
         cache.delete(sessionId)
       } else {
         void deps.heartbeatWriter({ workspaceId: entry.workspaceId, sessionId }).catch(() => undefined)
+      }
+      if (STRUCTURED_WRITE_TOOLS.has(execution.name)) {
+        const reason = await foreignTarget(execution.arguments, entry.workspaceId)
+        if (reason !== undefined) {
+          deps.onDeny?.({ sessionId, workspaceId: entry.workspaceId, toolName: execution.name, code: 'foreign-workspace', reason })
+          return { kind: 'deny', reason }
+        }
       }
       return next()
     } catch (error) {

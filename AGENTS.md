@@ -27,7 +27,7 @@ Reference material we have ported from lives in `../bb-plugins`. It is a
 different boundaries, and a different plugin model. Do not assume that project's
 architecture carries over, and do not carry its product names into ours: our
 plugins are named for what they do here. Read its `README.md` for the
-*behavior* worth keeping, then reimplement against the DSH API.
+_behavior_ worth keeping, then reimplement against the DSH API.
 
 ### When no plugin covers the need
 
@@ -166,9 +166,9 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
 
 - **The canonical spine is one line; the workspaces around it are a fan.** `main`
   and `integration-spine` point at the same tip, and every active workspace `@`
-  sits *off* that tip as its own leaf. Branch off the tip; never stack one
+  sits _off_ that tip as its own leaf. Branch off the tip; never stack one
   workspace's `@` on another's. A second head is only a problem when it is a
-  *duplicate* — the same change id twice — which is folded with
+  _duplicate_ — the same change id twice — which is folded with
   `jj rebase -r <stray-head> -d <tip>` plus abandoning the copy. Independent
   leaves are the design, not a defect to unify.
 
@@ -176,7 +176,7 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
   one change at once makes jj record a divergent change, and the next command in
   the owning workspace merges it and checks out the sibling copy — deleting the
   files that only the losing copy snapshotted (`Updated working copy to fresh
-  commit`). Measured 20/20. The rules that remove the race:
+commit`). Measured 20/20. The rules that remove the race:
   - Base every workspace on a full commit id or on `integration-spine`, never on
     `@`, `@-`, a change id, or another workspace's `@`. Never `jj workspace add`
     without `-r`.
@@ -206,6 +206,17 @@ This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
     complete denies. A discovered workspace is never migrated into this.
   - Other sessions may be **observers**: they may run the read-only tools in
     `ownership.readOnlyTools` and nothing else.
+  - A **structured write** (`write`, `edit`) whose absolute target resolves
+    inside another isolated workspace is refused at the same boundary with the
+    foreign workspace named. This is a cwd and tool-argument guard, **not** an OS
+    sandbox: a `bash` command can still write anywhere the process can, because
+    what a shell string writes is not a structured path. Never describe a thread
+    as filesystem-isolated.
+  - Workspace isolation and integration are configurable in the Host settings UI
+    under the `jj-integration` namespace (`workspaceIsolationMode`,
+    `integrationMode`), with every other option beside them. Integration mode
+    applies to the running service; isolation mode is read per Session, so a
+    change affects the next thread and never a running one.
   - A lease quiet for `ownership.staleAfterSeconds` (default 900) is reclaimed by
     the next caller and its holder is **fenced**: the epoch moved, so its writes
     are denied (`writer-fenced`) while its reads continue. Transferring a live

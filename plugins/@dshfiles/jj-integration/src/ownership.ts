@@ -6,7 +6,7 @@
  * durable write.
  */
 
-export type OwnershipCode = 'writer-held' | 'writer-fenced' | 'unsafe-workspace'
+export type OwnershipCode = 'writer-held' | 'writer-fenced' | 'unsafe-workspace' | 'foreign-workspace'
 
 export type OwnershipDecision =
   | { readonly kind: 'allow' }
@@ -54,7 +54,10 @@ export const decideToolCall = (query: OwnershipQuery): OwnershipDecision => {
   if (workspace.unsafe) {
     return readOnly
       ? { kind: 'allow' }
-      : deny('unsafe-workspace', `workspace "${workspace.workspaceName}" is quarantined: a folded or stale checkout would rebase the canonical line, so only read-only tools are allowed there`)
+      : deny(
+          'unsafe-workspace',
+          `workspace "${workspace.workspaceName}" is quarantined: a folded or stale checkout would rebase the canonical line, so only read-only tools are allowed there`,
+        )
   }
   if (!workspace.isolated) return { kind: 'allow' }
 
@@ -69,7 +72,13 @@ export const decideToolCall = (query: OwnershipQuery): OwnershipDecision => {
   if (readOnly && workspace.observers.includes(query.sessionId)) return { kind: 'allow' }
   const fenced = query.heldEpoch !== null && workspace.writerEpoch > query.heldEpoch
   if (fenced) {
-    return deny('writer-fenced', `this thread lost ownership of "${workspace.workspaceName}" (epoch ${String(query.heldEpoch)} -> ${String(workspace.writerEpoch)}); stop writing there and move to the workspace you now own`)
+    return deny(
+      'writer-fenced',
+      `this thread lost ownership of "${workspace.workspaceName}" (epoch ${String(query.heldEpoch)} -> ${String(workspace.writerEpoch)}); stop writing there and move to the workspace you now own`,
+    )
   }
-  return deny('writer-held', `workspace "${workspace.workspaceName}" is owned by another live writer; wait for it to release, take a read-only observer slot, or transfer ownership explicitly`)
+  return deny(
+    'writer-held',
+    `workspace "${workspace.workspaceName}" is owned by another live writer; wait for it to release, take a read-only observer slot, or transfer ownership explicitly`,
+  )
 }
