@@ -201,3 +201,74 @@ In the isolated workspace, on the tree carrying `27f7238e` and `b9621310`:
 - `editor` build and typecheck stay blocked on the settings-target contract above.
 - The fix revisions are on this line only: `main` and `integration-spine` still point below them, and the
   shared checkout's vendored `lib` and `dist` need the same regeneration once the line is advanced.
+
+## 2026-10-12 — linearize the completed ADE and OptMem work
+
+Consolidation of the finished ADE (jj workspace isolation) and OptMem (backlog
+recovery) threads onto one validated line, without rewriting any live workspace.
+
+### What moved
+
+`main` and `integration-spine` advanced from `7f346a9e` (ADE composer status) to
+the tip that carries this record. The line adds, in order: OptMem engine
+recovery, OptMem SQLite persistence, OptMem Workbench diagnostics, OptMem
+findings, the dshx virtual-store note, the Activity Timeline ingest-test bound,
+the AGENTS.md consolidation rules, and this record. No other workspace `@` was
+rewritten.
+
+### Sources and classification
+
+- Sources: the `default` working copy `bd68b307` (+3441/−152 across 47 files) and
+  the `history-repair` working copy `f35022ed` (5 files).
+- Already represented, so not re-integrated (byte-identical trees): `AGENTS.md`,
+  `profiles/web/package.json`, every `jj-integration` and `activity-timeline`
+  source in the `default` WIP, and the shadow line
+  `c789e89c → 1daf60f9 → b26d09c7 → e3e81350`, which duplicates `1a8f73ac`,
+  `3ef5eecb`, `8bcd90ac` and `789d0dbb`.
+- Unique and integrated: OptMem engine/sqlite/UI/docs, `plans/*` formatting, the
+  dshx virtual-store note, the Activity Timeline test bound, and this record.
+- Unique and **not** integrated: `history-repair`'s client-session separation
+  (`27f7238e`). It was transplanted, measured, and abandoned from the line
+  because it regressed `queue-reorder` and `optmem` client typechecks; its
+  workspace keeps it.
+- Preserved untouched: `store-editor-fix` (empty leaf on `789d0dbb`),
+  `agent-comm-audit`, the parked `thread-archive-toast-final` and
+  `workspace-folder-picker-browser-latest`, and the separate
+  `~/dev/dshfiles-jj-isolation` store.
+
+### Staging and recovery
+
+- Fresh workspace `integration-spine-20261012`
+  (`/Users/astahmer/dev/dshfiles-integration-spine`), created from the frozen
+  commit `7f346a9e`. Only verified-unique files were copied in and each group was
+  committed as its own described revision; `default`'s `@` was never rewritten.
+- `default`'s WIP was saved as `/private/tmp/dsh-integr-backup/default-wip.patch`
+  before the first transplant. The pre-surgery operation was `01920baad9dd`.
+- Tree check: `jj diff --from bd68b307 --to <tip>` reports 0 changes on every
+  transplanted OptMem, `plans` and toolchain path.
+
+### Validation
+
+- Consolidated tree, fresh workspace: `optmem-core` 30, `optmem-sqlite` 38,
+  `optmem` 49, `jj-integration` 56, `activity-timeline` 14 — all pass, with the
+  bounded Activity Timeline test exercised on the new file.
+- Canonical checkout, same plugin bytes: every focused gate passes, including the
+  `optmem`, `optmem-core`, `optmem-sqlite`, `queue-reorder` and `jj-integration`
+  typechecks, the `optmem` build, and the `jj-integration` 56-test suite.
+- Fresh-workspace typecheck caveat: in the newly created workspace,
+  `queue-reorder` reports `'"inbox"' is not assignable to keyof
+  SessionProjectionMap` although its source, `tsconfig.json`, dependency tree and
+  `tsc` version are byte-identical to the canonical checkout, where the same
+  project exits 0. Recorded as an unresolved workspace-environment difference,
+  not a code finding.
+
+### Remaining gates
+
+- The running Host (pid 1955, started 14:00) still executes the pre-deployment
+  session controller and the previous plugin bundles; a user-controlled restart
+  through `~/.local/bin/dsh-web` activates the deployed core hook. The restart is
+  deliberately deferred while this session is live.
+- `@dshfiles/activity-timeline` is not in `profiles/web/package.json`, so the
+  workspace lifecycle events it adapts are not composed into the live web
+  profile.
+- `editor` build and typecheck stay blocked on the settings-target contract.
