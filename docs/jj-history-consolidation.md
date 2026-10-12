@@ -268,7 +268,7 @@ rewritten.
   session controller and the previous plugin bundles; a user-controlled restart
   through `~/.local/bin/dsh-web` activates the deployed core hook. The restart is
   deliberately deferred while this session is live.
-- `@dshfiles/activity-timeline` is not in `profiles/web/package.json`, so the
-  workspace lifecycle events it adapts are not composed into the live web
-  profile.
+- `@dshfiles/activity-timeline` is now composed: the spine seed carries it and
+  the running web profile was synced with the bundle after a clean scratch boot.
+  The live Host picks it up on the same restart as the core hook.
 - `editor` build and typecheck stay blocked on the settings-target contract.

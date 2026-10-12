@@ -2,6 +2,7 @@
   "name": "dsh-profile-web",
   "private": true,
   "dependencies": {
+    "@dshfiles/activity-timeline": "link:../../../dev/dshfiles/plugins/@dshfiles/activity-timeline",
     "@dshfiles/agent-communication": "link:../../../dev/dshfiles/plugins/@dshfiles/agent-communication",
     "@dshfiles/agent-questions": "link:../../../dev/dshfiles/plugins/@dshfiles/agent-questions",
     "@dshfiles/ai-accounts": "link:../../../dev/dshfiles/plugins/@dshfiles/ai-accounts",
@@ -41,6 +42,7 @@
         "@dshfiles/queue-reorder",
         "@dshfiles/shortcuts",
         "@dshfiles/jj-integration",
+        "@dshfiles/activity-timeline",
         "@dshfiles/jujutsu",
         "@dshfiles/mcp-servers",
         "@dshfiles/secret-catalog",
