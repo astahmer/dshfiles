@@ -4,6 +4,13 @@ packages:
   # This package retains upstream workspace peers whose sources are not in this checkout.
   - '!../tooling/dsh-core/api-session-controller'
 
+# A global virtual store puts every package under ~/.local/share/pnpm/store/v11/links,
+# where a package's own peer imports resolve to nothing: the packages it augments
+# (`declare module '@deepseek-ai/cordis'`, the SlotMap in dsh-client-ui-slots) then never
+# merge, and every plugin fails to typecheck against the DSH contract it actually calls.
+# The classic per-workspace virtual store links each package's peer set beside it.
+enableGlobalVirtualStore: false
+
 peerDependencyRules:
   allowedVersions:
     '@deepseek-ai/cordis': 4.0.4
