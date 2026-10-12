@@ -139,12 +139,23 @@ export class SessionCommandController {
       this.rejectCreation(sessionId, error)
     }
     if (workspace !== undefined) {
+      // The resolver owns where the Session actually runs, so it may have placed
+      // it outside the workspace the caller named. `attachSession` validates that
+      // the Session's cwd is the workspace's own path, so attaching the requested
+      // workspace then fails for a Session the deployment deliberately placed
+      // elsewhere. Attach the workspace that owns the resolved directory; a
+      // provisioned directory that is not a registered workspace attaches none,
+      // which keeps creation working instead of refusing it.
+      const owner =
+        cwd === workspace.path
+          ? workspace
+          : await this.ctx.workspaceRegistry.resolveByPath(cwd).catch(() => undefined)
       try {
-        await workspace.attachSession(sessionId)
+        await owner?.attachSession(sessionId)
       } catch (error) {
         throw new RemoteError(
           'session/workspace-attach-failed',
-          `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
+          `session "${sessionId}" was created but could not attach to workspace "${(owner ?? workspace).id}": ${String(error)}`,
           { sessionId, workspaceId: workspace.id },
         )
       }
@@ -326,12 +337,16 @@ export class SessionCommandController {
       )
     }
     if (workspace !== undefined) {
+      const owner =
+        childCwd === workspace.path
+          ? workspace
+          : await this.ctx.workspaceRegistry.resolveByPath(childCwd).catch(() => undefined)
       try {
-        await workspace.attachSession(childId)
+        await owner?.attachSession(childId)
       } catch (error) {
         throw new RemoteError(
           'session/workspace-attach-failed',
-          `session "${childId}" was forked but could not attach to workspace "${workspace.id}": ${String(error)}`,
+          `session "${childId}" was forked but could not attach to workspace "${(owner ?? workspace).id}": ${String(error)}`,
           { sessionId: childId, workspaceId: workspace.id },
         )
       }

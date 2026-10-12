@@ -78,8 +78,38 @@ try {
   const launchUrl = output.match(urlPattern)[0]
   const platform = await connectDshPlatformClient({ url: launchUrl })
 
+  // The typed client exposes no generic RPC, so plugin and workspace APIs go
+  // over the same authenticated HTTP envelope the client itself uses.
+  const parsedUrl = new URL(launchUrl)
+  const index = await fetch(launchUrl, { redirect: 'manual' })
+  const cookie = index.headers.getSetCookie?.()[0] ?? index.headers.get('set-cookie')
+  const rpc = async (namespace, method, args) => {
+    const response = await fetch(`${parsedUrl.origin}/api/${namespace}/${method}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(cookie === undefined ? {} : { cookie }) },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: `${namespace}/${method}`, payload: { args } }),
+    })
+    const body = await response.text()
+    if (response.status !== 200) return { error: `HTTP ${response.status}: ${body.slice(0, 200)}` }
+    const envelope = JSON.parse(body)
+    return envelope?.result?.value ?? envelope?.result ?? envelope
+  }
+
+  // The failing path: a thread created from a project passes that project's
+  // workspaceId, so session.create attaches the Session to a workspace. The
+  // resolver then places it in its own directory, and the attach must follow the
+  // resolved directory rather than reject the placement.
+  const workspaceId = await rpc('workspace', 'list', {}).then(value => value?.workspaces?.[0]?.id ?? value?.items?.[0]?.id)
+  evidence.workspaceId = workspaceId
   const sessions = ['session-ade-alpha', 'session-ade-beta']
-  for (const sessionId of sessions) await platform.sessions.create({ sessionId })
+  for (const sessionId of sessions) {
+    const created = await rpc('session', 'create', { request: { sessionId, ...(workspaceId === undefined ? {} : { workspaceId }) } })
+    evidence.checks.push({
+      name: `create-${sessionId}`,
+      ok: created?.error === undefined && created?.sessionId === sessionId,
+      detail: JSON.stringify(created).slice(0, 200),
+    })
+  }
   await new Promise(done => setTimeout(done, 5000))
 
   const provisioned = jjWorkspaces()

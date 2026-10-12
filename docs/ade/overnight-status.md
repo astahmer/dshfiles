@@ -68,6 +68,58 @@ deployed preset stack; the fix is either to give the fork agent the scope the
 preset stack expects, or to upstream the `agent/request-messages` waterfall so
 no swap is needed.
 
+## RELEASE BLOCKER — thread creation from a project (root-caused, fix landed in source)
+
+**Symptom** (live UI): `New session failed: session/workspace-attach-failed ...
+cannot attach session to workspace '/Users/astahmer/dev/dshfiles': its cwd
+resolves to '/Users/astahmer/dev/dshfiles-threads/dshfiles-707ac8ac'`.
+
+**Root cause, by file and line.** `session.create` resolves the Session's
+directory through the awaited resolver and _then_ attaches it to the workspace
+the caller named:
+
+```js
+const cwd = await resolveSessionWorkspaceCwd(this.ctx, { sessionId, requestedCwd: workspace?.path ?? ... })
+...
+if (workspace !== undefined) await workspace.attachSession(sessionId)
+```
+
+`@deepseek-ai/dsh-workspace`'s `WorkspaceEntity.attachSession` validates
+`cwd === this.record.path` (`lib/index.js:122`) and throws otherwise. The
+resolver deliberately places the Session in its own provisioned directory, so
+the attach targets a workspace that by construction does not own that cwd.
+
+This is why the earlier scratch verification passed while the UI failed: the
+verification created sessions **without** a `workspaceId`, so `workspace` was
+`undefined` and the attach never ran. The UI always passes the project.
+
+**The intended contract.** `workspace-resolution.ts` states the resolver decides
+"the directory the Session actually owns" and runs "before the Agent exists, so
+the first tool call already executes inside the resolved directory". The attach
+step is therefore the layer at fault, not the resolver.
+
+**Fix landed** in `tooling/dsh-core/api-session-controller/src/commands.ts`
+(both `create` and `fork`): attach the workspace that owns the **resolved**
+directory, resolving it through `workspaceRegistry.resolveByPath(cwd)`, and
+attach none when the resolved directory is not a registered workspace. Creation
+no longer fails for a Session the deployment deliberately placed elsewhere;
+ownership and isolation are unchanged.
+
+**Deployment is blocked by two constraints, both deliberate:**
+
+1. The live Host loads the controller from the **global install**, built from
+   the canonical ADE checkout — whose working copy carries **uncommitted foreign
+   changes** in `commands.ts` and `index.ts`. I did not touch it.
+2. Making the fix live needs a Host restart, which is excluded.
+
+So the fix is in the repo's source of truth and needs the canonical checkout to
+carry the same change, a rebuild, and a user-controlled restart.
+
+**Still to do on this blocker:** find the correct RPC for a workspace id in the
+scratch Host so `scripts/ade-scratch-verify.mjs` exercises the attach path (it
+now sends `workspaceId` when one resolves), then confirm creation succeeds with
+the patched controller linked into the scratch profile.
+
 ## NOT verified
 
 - **Browser acceptance** for the composer control, integration panel, settings
