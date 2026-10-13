@@ -11,6 +11,8 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `plugin-ui` — any plugin UI or styling; adding shadcn components to the kit.
 - `plugin-state` — Query / Form / xstate / localStorage in plugin clients.
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
+- `verify-dsh` — launch, drive and screenshot a scratch DSH (`dshx dev up|doctor|open|shot|down`).
+- `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
 
 ## Adopt, port, or build
