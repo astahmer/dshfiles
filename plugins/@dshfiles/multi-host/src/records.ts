@@ -56,12 +56,14 @@ export const runtimeLocatorSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('ssh'),
+      /** Ignored since discovery reads the launch file; kept so directories written before that still decode. */
       unit: z
         .string()
         .trim()
         .min(1)
         .max(128)
-        .regex(/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/),
+        .regex(/^[A-Za-z0-9][A-Za-z0-9_.@-]*$/)
+        .optional(),
       remoteHome: z
         .string()
         .trim()

@@ -1,9 +1,9 @@
 import { Buffer } from 'node:buffer'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { runtimeLocatorSchema, hostConnectorSchema } from '../records.js'
+import { hostConnectorSchema } from '../records.js'
 import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
 import { reserveLoopbackEndpoint } from './loopback.js'
-import { readRuntimeLaunch } from './ssh-journal.js'
+import { launchFilePaths, parseRuntimeLaunch, type RuntimeLaunch } from '../launch-file.js'
 
 const outputLimit = 128 * 1024
 
@@ -129,25 +129,25 @@ const runSshCommand = async ({
 
 const remoteLaunch = async ({
   sshTarget,
-  unit,
+  remoteHome,
   signal,
 }: {
   readonly sshTarget: string
-  readonly unit: string
+  readonly remoteHome: string
   readonly signal?: AbortSignal
-}): Promise<{ readonly port: number; readonly token: string }> => {
-  const parsed = runtimeLocatorSchema.parse({ kind: 'ssh', unit, remoteHome: '/runtime' })
-  if (parsed.kind !== 'ssh') throw new GatewayUnavailableError('invalid-runtime-locator', 'The SSH runtime locator is invalid.')
-  const launch = await readRuntimeLaunch({
-    readJournal: source =>
-      runSshCommand({
-        sshTarget,
-        command: `${source === 'user' ? 'journalctl --user --unit' : 'journalctl --user-unit'} ${shellQuote(parsed.unit)} --lines=80 --no-pager --output=cat`,
-        signal,
-      }),
+}): Promise<RuntimeLaunch> => {
+  const [launchFile, webUrlFile] = launchFilePaths(remoteHome)
+  const content = await runSshCommand({
+    sshTarget,
+    command: `cat -- ${shellQuote(launchFile)} 2>/dev/null || cat -- ${shellQuote(webUrlFile)} 2>/dev/null || true`,
+    signal,
   })
+  const launch = parseRuntimeLaunch(content)
   if (launch === undefined) {
-    throw new GatewayUnavailableError('runtime-not-found', 'Could not read an active tokenized launch URL from the remote runtime journal.')
+    throw new GatewayUnavailableError(
+      'runtime-not-running',
+      'No launch file was found in the remote DSH home. Start DSH there with the multi-host plugin, or through dsh-web, and try again.',
+    )
   }
   return launch
 }
@@ -228,32 +228,27 @@ const openTunnel = async ({
 
 export const connectSsh = async ({
   sshTarget,
-  unit,
   remoteHome,
   originPort,
   signal,
 }: {
   readonly sshTarget: string
-  readonly unit: string
   readonly remoteHome: string
   readonly originPort?: number
   readonly signal?: AbortSignal
 }): Promise<Gateway> => {
-  const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget })
-  const locator = runtimeLocatorSchema.parse({ kind: 'ssh', unit, remoteHome })
-  if (connector.kind !== 'ssh' || locator.kind !== 'ssh') {
-    throw new GatewayUnavailableError('invalid-runtime-locator', 'The SSH runtime locator is invalid.')
-  }
-  const launch = await remoteLaunch({ sshTarget: connector.sshTarget, unit: locator.unit, signal })
+  const target = sshTargetOf(sshTarget)
+  const launch = await remoteLaunch({ sshTarget: target, remoteHome, signal })
   const endpoint = await reserveLoopbackEndpoint(originPort)
   let child: ChildProcess
   try {
-    child = await openTunnel({ sshTarget: connector.sshTarget, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port, signal })
+    child = await openTunnel({ sshTarget: target, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port, signal })
   } catch (error) {
     endpoint.release()
     throw error
   }
   const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
+  const closed = new Promise<void>(resolve => child.once('close', () => resolve()))
   let disposed = false
   return connectGateway({
     launchUrl: localLaunchUrl,
@@ -261,6 +256,7 @@ export const connectSsh = async ({
     createTransport: async origin => ({
       origin: origin.origin,
       launchUrl: localLaunchUrl,
+      closed,
       dispose: async () => {
         if (disposed) return
         disposed = true
@@ -269,4 +265,34 @@ export const connectSsh = async ({
       },
     }),
   })
+}
+
+/** Cheapest proof that SSH reaches the machine with BatchMode keys: run `true`. */
+export const probeSsh = async ({ sshTarget, signal }: { readonly sshTarget: string; readonly signal?: AbortSignal }): Promise<void> => {
+  await runSshCommand({ sshTarget: sshTargetOf(sshTarget), command: 'true', signal })
+}
+
+/** DSH homes under the remote user's home that publish a launch file, newest first. Paths only, never contents. */
+export const discoverRemoteHomes = async ({
+  sshTarget,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly signal?: AbortSignal
+}): Promise<{ path: string; source: 'multi-host' | 'web-url' }[]> => {
+  const output = await runSshCommand({
+    sshTarget: sshTargetOf(sshTarget),
+    command:
+      "find \"$HOME\" -maxdepth 7 -type f \\( -path '*/plugins/multi-host/launch.json' -o -path '*/runtime/web-url' \\) -not -path '*/node_modules/*' -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -20",
+    signal,
+  })
+  const homes = new Map<string, 'multi-host' | 'web-url'>()
+  for (const line of output.split('\n')) {
+    const path = line.trim()
+    const multiHost = /^(\/.+)\/plugins\/multi-host\/launch\.json$/.exec(path)
+    const webUrl = /^(\/.+)\/runtime\/web-url$/.exec(path)
+    const home = multiHost?.[1] ?? webUrl?.[1]
+    if (home !== undefined && !homes.has(home)) homes.set(home, multiHost === null ? 'web-url' : 'multi-host')
+  }
+  return [...homes.entries()].map(([path, source]) => ({ path, source }))
 }

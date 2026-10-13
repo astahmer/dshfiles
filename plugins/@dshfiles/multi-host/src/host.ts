@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { basename } from 'node:path'
+import { homedir } from 'node:os'
+import { basename, join } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
-import { multiHostApi, type RuntimeStatus } from './api.js'
+import { multiHostApi, type ConnectionTestStep, type RuntimeStatus } from './api.js'
 import { connectLocal } from './connectors/local.js'
-import { connectSsh } from './connectors/ssh.js'
+import { connectSsh, discoverRemoteHomes, probeSsh } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
+import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
+import { removeLaunchFile, writeLaunchFile } from './launch-file.js'
 import { callNativeRpc, mayHaveReachedRuntime } from './native-rpc.js'
 import {
   hostConnectorSchema,
@@ -17,6 +20,8 @@ import {
   type RuntimeIdentity,
   type RuntimeRecord,
 } from './records.js'
+import { createChildDirectory, listDirectory } from './directory-listing.js'
+import { listSshConfigHosts } from './ssh-config.js'
 import {
   DirectoryStoreError,
   findHost,
@@ -29,6 +34,8 @@ import {
   upsertHost,
   upsertRuntime,
 } from './store.js'
+import { reduceTranscript } from './transcript.js'
+import { forgetRemoteThreads, listRemoteThreads, recordRemoteThread } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
 
 const profileSchema = z
@@ -46,20 +53,26 @@ const sessionRowSchema = z
     running: z.boolean(),
     blank: z.boolean(),
     updatedAt: z.number().finite(),
+    title: z.string().max(512).optional(),
   })
   .passthrough()
 const sessionListSchema = z.object({ items: z.array(sessionRowSchema).max(10_000) }).passthrough()
+const sessionCreatedSchema = z.object({ sessionId: z.string().min(1).max(256) }).passthrough()
+const directoryListingSchema = z
+  .object({
+    path: z.string(),
+    home: z.string(),
+    crumbs: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })),
+    entries: z.array(z.object({ name: z.string(), path: z.string(), hidden: z.boolean() })).max(5_000),
+    truncated: z.boolean(),
+  })
+  .passthrough()
 const workspaceRowSchema = z
   .object({
     workspaceId: z.string().min(1).max(256),
     path: z.string().min(1).max(4096),
     title: z.string().max(512).optional(),
     sessionIds: z.array(z.string().max(256)).max(10_000).optional(),
-  })
-  .passthrough()
-const workspaceCreatedSchema = z
-  .object({
-    workspace: z.object({ workspaceId: z.string(), path: z.string(), title: z.string().optional() }).passthrough(),
   })
   .passthrough()
 const workspaceContainerSchema = z
@@ -72,18 +85,34 @@ const workspaceContainerSchema = z
     snapshot: z.unknown().optional(),
   })
   .passthrough()
-const sessionCursorFrameSchema = z
+const modelCatalogSchema = z
   .object({
-    type: z.literal('snapshot'),
-    cursor: z.number().int().safe().min(-1),
+    default: z.object({ provider: z.string(), model: z.string() }).passthrough().optional(),
+    groups: z.array(
+      z.object({ id: z.string(), name: z.string(), models: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()) }).passthrough(),
+    ),
   })
   .passthrough()
+const sessionSnapshotSchema = z
+  .object({
+    type: z.literal('snapshot'),
+    cursor: z.number().int(),
+    header: z.object({ cwd: z.string().optional() }).passthrough().optional(),
+    records: z.array(z.unknown()).max(10_000),
+  })
+  .passthrough()
+const sessionCursorFrameSchema = z.object({ type: z.literal('snapshot'), cursor: z.number().int().safe().min(-1) }).passthrough()
+const webServerSchema = z.object({ port: z.number().int().min(1).max(65_535) }).passthrough()
 
-interface ViewLease {
-  readonly runtimeId: string
-  readonly gateway: Gateway
-  readonly timer: ReturnType<typeof setTimeout>
-}
+/** Failures that mean the pooled connection itself is gone, so the next call should open a fresh one. */
+const transportFailures = new Set([
+  'gateway-unreachable',
+  'authentication-expired',
+  'stream-unreachable',
+  'stream-closed',
+  'api-unreachable',
+  'gateway-request-failed',
+])
 
 class IdentityMismatchError extends Error {
   readonly code = 'identity-mismatch'
@@ -94,10 +123,17 @@ class IdentityMismatchError extends Error {
   }
 }
 
+interface ViewLease {
+  readonly runtimeId: string
+  readonly pooled: PooledGateway
+  readonly timer: ReturnType<typeof setTimeout>
+}
+
 let configuredProfile: string | undefined
 const viewLeases = new Map<string, ViewLease>()
 const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
+const connectionErrors = new Map<string, { readonly code: string; readonly message: string; readonly at: string }>()
 
 const connectRuntime = async ({
   host,
@@ -110,14 +146,11 @@ const connectRuntime = async ({
   readonly signal?: AbortSignal
   readonly originPort?: number
 }): Promise<Gateway> => {
-  if (host.connector.kind !== runtime.locator.kind)
-    throw new GatewayUnavailableError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
   if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
     return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort === undefined ? {} : { originPort }), signal })
   if (runtime.locator.kind === 'ssh' && host.connector.kind === 'ssh')
     return connectSsh({
       sshTarget: host.connector.sshTarget,
-      unit: runtime.locator.unit,
       remoteHome: runtime.locator.remoteHome,
       ...(originPort === undefined ? {} : { originPort }),
       signal,
@@ -146,7 +179,10 @@ const readIdentity = async (gateway: Gateway): Promise<RuntimeIdentity> => {
   try {
     raw = await gateway.api('identity')
   } catch {
-    throw new GatewayUnavailableError('identity-unavailable', 'The connected runtime did not provide the multi-host identity API.')
+    throw new GatewayUnavailableError(
+      'identity-unavailable',
+      'The connected runtime did not provide the multi-host identity API. Install @dshfiles/multi-host there.',
+    )
   }
   const parsed = runtimeIdentitySchema.safeParse(raw)
   if (!parsed.success) throw new GatewayUnavailableError('identity-invalid', 'The connected runtime returned an identity outside the supported contract.')
@@ -191,24 +227,80 @@ const safeFailure = (error: unknown): { readonly code: string; readonly message:
     return { code: error.code, message: error.message }
   }
   if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
-    return { code: error.code, message: 'The runtime request failed. Check the runtime status and reconnect if needed.' }
+    return { code: error.code, message: 'The runtime request failed. Check the host status and reconnect if needed.' }
   }
-  return { code: 'runtime-unavailable', message: 'The runtime request failed. Check the runtime status and reconnect if needed.' }
+  return { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
 }
 
-const hostSummary = async (record: HostRecord) => ({
-  id: record.id,
-  name: record.name,
-  connector: record.connector,
-  runtimeCount: (await listRuntimes(record.id)).length,
+const failureCode = (error: unknown): string => safeFailure(error).code
+
+const pool = createGatewayPool({
+  connect: async runtimeId => {
+    const runtime = await findRuntime(runtimeId)
+    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'No recorded runtime has this id.')
+    const host = await findHost(runtime.hostId)
+    if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime has no recorded host.')
+    // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
+    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort === undefined ? {} : { originPort: runtime.originPort }) })
+    try {
+      const identity = await verifyPinnedIdentity(gateway, runtime)
+      await upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
+      connectionErrors.delete(runtimeId)
+      return gateway
+    } catch (error) {
+      await gateway.dispose()
+      throw error
+    }
+  },
 })
+
+/**
+ * Run one request on the runtime's pooled connection. A read that fails because the connection dropped retries once on
+ * a fresh one; a mutation never does, so an admitted mutation is not replayed.
+ */
+const withRuntime = async <Result>(
+  runtimeId: string,
+  request: (gateway: Gateway) => Promise<Result>,
+  options: { readonly mutation: boolean },
+): Promise<Result> => {
+  for (let attempt = 0; ; attempt += 1) {
+    let pooled: PooledGateway
+    try {
+      pooled = await pool.acquire(runtimeId)
+    } catch (error) {
+      const failure = safeFailure(error)
+      connectionErrors.set(runtimeId, { ...failure, at: new Date().toISOString() })
+      throw error
+    }
+    try {
+      return await request(pooled.gateway)
+    } catch (error) {
+      const code = failureCode(error)
+      if (!transportFailures.has(code)) throw error
+      pool.invalidate(runtimeId, pooled.generation)
+      if (options.mutation || attempt > 0) throw error
+    } finally {
+      pooled.release()
+    }
+  }
+}
 
 const runtimeSummary = (record: RuntimeRecord) => ({
   id: record.id,
   hostId: record.hostId,
   name: record.name,
   identity: record.identity,
+  ...(record.locator.kind === 'ssh' ? { remoteHome: record.locator.remoteHome } : {}),
   ...(record.lastSeenAt === undefined ? {} : { lastSeenAt: record.lastSeenAt }),
+  connected: pool.status(record.id) !== undefined,
+  ...(connectionErrors.has(record.id) ? { lastError: connectionErrors.get(record.id) } : {}),
+})
+
+const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => ({
+  id: record.id,
+  name: record.name,
+  connector: record.connector,
+  runtimeCount: runtimes.filter(runtime => runtime.hostId === record.id).length,
 })
 
 const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof workspaceRowSchema.parse>[] => {
@@ -237,12 +329,8 @@ const closeLease = async (leaseId: string): Promise<boolean> => {
   if (lease === undefined) return false
   viewLeases.delete(leaseId)
   clearTimeout(lease.timer)
-  await lease.gateway.dispose()
+  lease.pooled.release()
   return true
-}
-
-const closeAllLeases = async (): Promise<void> => {
-  await Promise.all([...viewLeases.keys()].map(closeLease))
 }
 
 const closeRuntimeLeases = async (runtimeId: string): Promise<void> => {
@@ -250,18 +338,135 @@ const closeRuntimeLeases = async (runtimeId: string): Promise<void> => {
   await Promise.all(leases.map(closeLease))
 }
 
+/** Probe one SSH target + DSH home and pin its identity; shared by the add-host test and the save. */
+const qualifyRuntime = async ({
+  host,
+  locator,
+  name,
+  signal,
+}: {
+  readonly host: HostRecord
+  readonly locator: RuntimeRecord['locator']
+  readonly name: string
+  readonly signal?: AbortSignal
+}): Promise<{ readonly identity: RuntimeIdentity; readonly steps: ConnectionTestStep[] }> => {
+  const steps: ConnectionTestStep[] = []
+  const timed = async <T>(step: ConnectionTestStep['step'], run: () => Promise<T>): Promise<T> => {
+    const startedAt = Date.now()
+    try {
+      const value = await run()
+      steps.push({ step, ok: true, ms: Date.now() - startedAt })
+      return value
+    } catch (error) {
+      steps.push({ step, ok: false, ms: Date.now() - startedAt, ...safeFailure(error) })
+      throw error
+    }
+  }
+  if (host.connector.kind === 'ssh') {
+    const sshTarget = host.connector.sshTarget
+    await timed('ssh', () => probeSsh({ sshTarget, signal }))
+  }
+  const provisional: RuntimeRecord = {
+    schemaVersion: 2,
+    id: randomUUID(),
+    hostId: host.id,
+    name,
+    locator,
+    identity: null,
+    createdAt: new Date().toISOString(),
+  }
+  const gateway = await timed('runtime', () => connectRuntime({ host, runtime: provisional, signal }))
+  try {
+    const identity = await timed('identity', () => readIdentity(gateway))
+    if (locator.kind === 'ssh' && identity.homeLeaf !== basename(locator.remoteHome)) {
+      throw new IdentityMismatchError('The connected runtime home does not match the SSH home you selected.')
+    }
+    return { identity, steps }
+  } finally {
+    await gateway.dispose()
+  }
+}
+
+const register = async ({ host, locator, name, signal }: Parameters<typeof qualifyRuntime>[0]): Promise<RuntimeRecord> => {
+  const { identity } = await qualifyRuntime({ host, locator, name, signal })
+  const directory = await readDirectory()
+  const existing = directory.runtimes.find(runtime => runtime.id === identity.runtimeId)
+  if (existing !== undefined && existing.hostId !== host.id) {
+    throw new IdentityMismatchError('This runtime identity is already registered under a different host.')
+  }
+  const originPort =
+    existing?.originPort ??
+    (await allocateRuntimeOriginPort(identity.runtimeId, [
+      ...directory.retiredPorts,
+      ...directory.runtimes.flatMap(runtime => (runtime.originPort === undefined ? [] : [runtime.originPort])),
+    ]))
+  await pool.close(identity.runtimeId)
+  return upsertRuntime({
+    schemaVersion: 2,
+    id: identity.runtimeId,
+    hostId: host.id,
+    name,
+    locator,
+    identity,
+    originPort,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+  })
+}
+
+const sshHostId = (sshTarget: string): string =>
+  sshTarget
+    .replace(/^[^@]*@/, '')
+    .replace(/[^A-Za-z0-9._-]/g, '-')
+    .slice(0, 64) || 'host'
+
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([listHosts(), listRuntimes()])
-    return {
-      hosts: hosts.map(record => ({
-        id: record.id,
-        name: record.name,
-        connector: record.connector,
-        runtimeCount: runtimes.filter(runtime => runtime.hostId === record.id).length,
-      })),
-      runtimes: runtimes.map(runtimeSummary),
+    return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
+  },
+  sshConfigHosts: async () => ({ hosts: await listSshConfigHosts(join(homedir(), '.ssh')) }),
+  discoverHomes: async ({ input, signal }) => {
+    try {
+      return { ok: true as const, homes: await discoverRemoteHomes({ sshTarget: input.sshTarget, signal }) }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  testConnection: async ({ input, signal }) => {
+    const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+    const host: HostRecord = { schemaVersion: 2, id: sshHostId(input.sshTarget), name: input.name, connector, createdAt: new Date().toISOString() }
+    const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+    try {
+      const { identity, steps } = await qualifyRuntime({ host, locator, name: input.name, signal })
+      return { ok: true as const, steps, identity }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  saveSshHost: async ({ input, signal }) => {
+    try {
+      const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
+      const previous = input.hostId === undefined ? undefined : await findHost(input.hostId)
+      const host: HostRecord = {
+        schemaVersion: 2,
+        id: previous?.id ?? sshHostId(input.sshTarget),
+        name: input.name.trim(),
+        connector,
+        createdAt: previous?.createdAt ?? new Date().toISOString(),
+      }
+      const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
+      await upsertHost(host)
+      const runtime = await register({ host, locator, name: input.name.trim(), signal })
+      // An edit that moved the host to another DSH home leaves the old runtime record behind.
+      for (const stale of (await listRuntimes(host.id)).filter(item => item.id !== runtime.id)) {
+        await removeRuntime(stale.id)
+        await pool.close(stale.id)
+      }
+      return { ok: true as const, runtime: runtimeSummary(runtime) }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
     }
   },
   hostUpsert: async ({ input }) => {
@@ -275,248 +480,295 @@ const multiHostHandlers = multiHostApi.host({
       createdAt: previous?.createdAt ?? new Date().toISOString(),
     }
     await upsertHost(record)
-    return hostSummary(record)
+    return hostSummary(record, await listRuntimes())
   },
   hostRemove: async ({ input }) => {
     const runtimes = input.removeDirectory ? await listRuntimes(input.id) : []
     const removed = await removeHost(input.id, input.removeDirectory)
-    if (removed) await Promise.all(runtimes.map(runtime => closeRuntimeLeases(runtime.id)))
+    if (removed) {
+      for (const runtime of runtimes) {
+        await closeRuntimeLeases(runtime.id)
+        await pool.close(runtime.id)
+        await forgetRemoteThreads({ runtimeId: runtime.id })
+      }
+    }
     return { removed }
   },
-  runtimeList: async ({ input }) => ({ runtimes: (await listRuntimes(input.hostId)).map(runtimeSummary) }),
   runtimeUpsert: async ({ input, signal }) => {
-    let gateway: Gateway | undefined
     try {
       const host = await findHost(input.hostId)
       if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
       const locator = runtimeLocatorSchema.parse(input.locator)
       if (locator.kind !== host.connector.kind)
         throw new DirectoryStoreError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
-      const provisional: RuntimeRecord = {
-        schemaVersion: 2,
-        id: randomUUID(),
-        hostId: host.id,
-        name: input.name.trim(),
-        locator,
-        identity: null,
-        createdAt: new Date().toISOString(),
-      }
-      gateway = await connectRuntime({ host, runtime: provisional, signal })
-      const identity = await readIdentity(gateway)
-      if (locator.kind === 'ssh' && identity.homeLeaf !== basename(locator.remoteHome)) {
-        throw new IdentityMismatchError('The connected runtime home does not match the SSH home you selected.')
-      }
-      const directory = await readDirectory()
-      const existing = directory.runtimes.find(runtime => runtime.id === identity.runtimeId)
-      if (existing !== undefined && existing.hostId !== host.id) {
-        throw new IdentityMismatchError('This runtime identity is already registered under a different host.')
-      }
-      const originPort =
-        existing?.originPort ??
-        (await allocateRuntimeOriginPort(identity.runtimeId, [
-          ...directory.retiredPorts,
-          ...directory.runtimes.flatMap(runtime => (runtime.originPort === undefined ? [] : [runtime.originPort])),
-        ]))
-      const record = await upsertRuntime({
-        schemaVersion: 2,
-        id: identity.runtimeId,
-        hostId: host.id,
-        name: input.name.trim(),
-        locator,
-        identity,
-        originPort,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-        lastSeenAt: new Date().toISOString(),
-      })
-      return { ok: true as const, runtime: runtimeSummary(record) }
+      return { ok: true as const, runtime: runtimeSummary(await register({ host, locator, name: input.name.trim(), signal })) }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
-    } finally {
-      await gateway?.dispose()
     }
   },
-  runtimeStatus: async ({ input, signal }): Promise<RuntimeStatus> => {
+  runtimeStatus: async ({ input }): Promise<RuntimeStatus> => {
     const runtime = await findRuntime(input.runtimeId)
     if (runtime === undefined)
       return { ok: false, hostId: 'unknown', runtimeId: input.runtimeId, code: 'runtime-not-found', message: 'No recorded runtime has this id.', stale: true }
-    const host = await findHost(runtime.hostId)
-    if (host === undefined)
+    try {
+      return await withRuntime(
+        runtime.id,
+        async gateway => {
+          const [frames, sessionValue] = await Promise.all([gateway.follow('workspace/follow', {}, 10_000), gateway.run('session', 'list', { _request: {} })])
+          const sessions = sessionListSchema
+            .parse(sessionValue)
+            .items.slice(0, 500)
+            .map(item => ({
+              runtimeId: runtime.id,
+              sessionId: item.sessionId,
+              ...(item.cwd === undefined ? {} : { cwd: item.cwd }),
+              running: item.running,
+              blank: item.blank,
+              updatedAt: item.updatedAt,
+            }))
+          const workspaces = collectWorkspaces(frames).map(item => ({
+            runtimeId: runtime.id,
+            workspaceId: item.workspaceId,
+            path: item.path,
+            title: item.title ?? item.path,
+            sessionIds: item.sessionIds ?? [],
+          }))
+          const refreshed = (await findRuntime(runtime.id)) ?? runtime
+          return { ok: true as const, runtime: runtimeSummary(refreshed), workspaces, sessions }
+        },
+        { mutation: false },
+      )
+    } catch (error) {
+      const failure = safeFailure(error)
       return {
         ok: false,
         hostId: runtime.hostId,
         runtimeId: runtime.id,
-        code: 'host-not-found',
-        message: 'The runtime has no recorded host.',
-        stale: true,
-        ...(runtime.lastSeenAt === undefined ? {} : { lastSeenAt: runtime.lastSeenAt }),
-      }
-    let gateway: Gateway | undefined
-    try {
-      gateway = await connectRuntime({ host, runtime, signal })
-      const identity = await verifyPinnedIdentity(gateway, runtime)
-      const [frames, sessionValue] = await Promise.all([gateway.follow('workspace/follow', {}, 10_000), gateway.run('session', 'list', { _request: {} })])
-      const sessions = sessionListSchema
-        .parse(sessionValue)
-        .items.slice(0, 500)
-        .map(item => ({
-          runtimeId: runtime.id,
-          sessionId: item.sessionId,
-          ...(item.cwd === undefined ? {} : { cwd: item.cwd }),
-          running: item.running,
-          blank: item.blank,
-          updatedAt: item.updatedAt,
-        }))
-      const workspaces = collectWorkspaces(frames).map(item => ({
-        runtimeId: runtime.id,
-        workspaceId: item.workspaceId,
-        path: item.path,
-        title: item.title ?? item.path,
-        sessionIds: item.sessionIds ?? [],
-      }))
-      const lastSeenAt = new Date().toISOString()
-      const refreshed = await upsertRuntime({ ...runtime, identity, lastSeenAt })
-      return {
-        ok: true,
-        host: await hostSummary(host),
-        runtime: runtimeSummary(refreshed),
-        identity,
-        workspaces,
-        sessions,
-      }
-    } catch (error) {
-      const failure = safeFailure(error)
-      return {
-        ok: false,
-        hostId: host.id,
-        runtimeId: runtime.id,
         code: failure.code,
         message: failure.message,
         stale: true,
         ...(runtime.lastSeenAt === undefined ? {} : { lastSeenAt: runtime.lastSeenAt }),
       }
-    } finally {
-      await gateway?.dispose()
     }
   },
-  workspaceOpen: async ({ input, signal }) => {
-    const runtime = await findRuntime(input.runtimeId)
-    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'Choose a recorded runtime before opening a workspace.')
-    const host = await findHost(runtime.hostId)
-    if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime host is no longer recorded.')
-    const gateway = await connectRuntime({ host, runtime, signal })
+  runtimeReconnect: async ({ input }) => {
+    await pool.close(input.runtimeId)
+    connectionErrors.delete(input.runtimeId)
     try {
-      await verifyPinnedIdentity(gateway, runtime)
-      let raw: unknown
-      try {
-        raw = await gateway.run('workspace', 'create', { request: { path: input.path } })
-      } catch (error) {
-        if (error instanceof GatewayUnavailableError && mayHaveReachedRuntime(error.code)) {
-          throw new GatewayUnavailableError(
-            'unknown-mutation-outcome',
-            'The connection failed after workspace creation was sent. Inspect runtime workspaces before retrying.',
-          )
-        }
-        throw error
-      }
-      const result = workspaceCreatedSchema.safeParse(raw)
-      if (!result.success)
-        throw new GatewayUnavailableError(
-          'unknown-mutation-outcome',
-          'The runtime reply was unusable after workspace creation. Inspect runtime workspaces before retrying.',
-        )
-      return {
-        runtimeId: runtime.id,
-        workspaceId: result.data.workspace.workspaceId,
-        path: result.data.workspace.path,
-        title: result.data.workspace.title ?? result.data.workspace.path,
-        sessionIds: [],
-      }
-    } finally {
-      await gateway.dispose()
-    }
-  },
-  runtimeCall: async ({ input, signal }) => {
-    const runtime = await findRuntime(input.runtimeId)
-    if (runtime === undefined) return { ok: false, code: 'runtime-not-found', message: 'Choose a recorded runtime before sending a request.' }
-    const host = await findHost(runtime.hostId)
-    if (host === undefined) return { ok: false, code: 'host-not-found', message: 'The runtime host is no longer recorded.' }
-    let gateway: Gateway | undefined
-    try {
-      gateway = await connectRuntime({ host, runtime, signal })
-      await verifyPinnedIdentity(gateway, runtime)
-      return await callNativeRpc(gateway, input.request)
+      await withRuntime(input.runtimeId, async () => undefined, { mutation: false })
+      return { ok: true as const }
     } catch (error) {
-      const failure = safeFailure(error)
-      return {
-        ok: false,
-        code: failure.code,
-        message: failure.message,
-      }
-    } finally {
-      await gateway?.dispose()
+      return { ok: false as const, ...safeFailure(error) }
     }
   },
-  sessionCursor: async ({ input, signal }) => {
-    const runtime = await findRuntime(input.runtimeId)
-    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'Choose a recorded runtime before reading its session cursor.')
-    const host = await findHost(runtime.hostId)
-    if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime host is no longer recorded.')
-    const gateway = await connectRuntime({ host, runtime, signal })
+  listDirectory: async ({ input }) => listDirectory(input.path),
+  createDirectory: async ({ input }) => ({ path: await createChildDirectory(input) }),
+  runtimeBrowse: async ({ input, signal }) => {
     try {
-      await verifyPinnedIdentity(gateway, runtime)
-      const frames = await gateway.follow(
-        'session/follow',
-        {
-          request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: 1 },
-        },
-        10_000,
+      const listing = await withRuntime(
+        input.runtimeId,
+        async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', input.path === undefined ? {} : { path: input.path }, signal)),
+        { mutation: false },
       )
-      const snapshot = frames.map(frame => sessionCursorFrameSchema.safeParse(frame)).find(result => result.success)
-      if (snapshot === undefined) throw new GatewayUnavailableError('session-cursor-unavailable', 'The runtime did not return a session history cursor.')
-      return { cursor: snapshot.data.cursor }
-    } finally {
-      await gateway.dispose()
+      return {
+        ok: true as const,
+        path: listing.path,
+        home: listing.home,
+        crumbs: listing.crumbs,
+        entries: listing.entries.slice(0, 2_000),
+        truncated: listing.truncated || listing.entries.length > 2_000,
+      }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
     }
   },
-  runtimeOpenView: async ({ input, signal }) => {
+  runtimeCreateDirectory: async ({ input }) => {
+    try {
+      const created = await withRuntime(input.runtimeId, async gateway => gateway.api('createDirectory', { path: input.path, name: input.name }), {
+        mutation: true,
+      })
+      return { ok: true as const, path: z.object({ path: z.string() }).parse(created).path }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimePluginCall: async ({ input, signal }) => {
+    const mutation = input.method === 'provision' || input.method === 'noFolder'
+    try {
+      const value = await withRuntime(
+        input.runtimeId,
+        async gateway => gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(input.method, input.input, signal),
+        { mutation },
+      )
+      return { ok: true as const, value }
+    } catch (error) {
+      const failure = safeFailure(error)
+      if (mutation && mayHaveReachedRuntime(failure.code)) {
+        return {
+          ok: false as const,
+          code: 'unknown-mutation-outcome',
+          message: 'The connection dropped after the request was sent; check the host before retrying.',
+        }
+      }
+      return { ok: false as const, ...failure }
+    }
+  },
+  threadStart: async ({ input }) => {
+    const runtime = await findRuntime(input.runtimeId)
+    if (runtime === undefined) return { ok: false as const, code: 'runtime-not-found', message: 'This host is no longer recorded.' }
+    let sessionId: string | undefined
+    try {
+      return await withRuntime(
+        runtime.id,
+        async gateway => {
+          const created = await callNativeRpc(gateway, {
+            namespace: 'session',
+            method: 'create',
+            args: { request: { cwd: input.cwd, ...(input.agentPreset === undefined ? {} : { agentPreset: input.agentPreset }) } },
+          })
+          if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
+          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          if (input.model !== undefined) {
+            const selected = await gateway.runSafe('session', 'selectModel', {
+              request: { sessionId, provider: input.model.provider, model: input.model.model },
+            })
+            if (!selected.ok)
+              return { ok: false as const, code: selected.code, message: `The thread was created but its model was refused: ${selected.message}`, sessionId }
+          }
+          await recordRemoteThread({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
+          const prompted = await callNativeRpc(gateway, {
+            namespace: 'session',
+            method: 'prompt',
+            args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
+          })
+          if (!prompted.ok) return { ok: false as const, code: prompted.code, message: prompted.message, sessionId }
+          return { ok: true as const, sessionId }
+        },
+        { mutation: true },
+      )
+    } catch (error) {
+      const failure = safeFailure(error)
+      return { ok: false as const, ...failure, ...(sessionId === undefined ? {} : { sessionId }) }
+    }
+  },
+  runtimeModels: async ({ input, signal }) => {
+    try {
+      const catalog = await withRuntime(input.runtimeId, async gateway => modelCatalogSchema.parse(await gateway.run('session', 'modelCatalog', {}, signal)), {
+        mutation: false,
+      })
+      return {
+        ok: true as const,
+        default: catalog.default ?? null,
+        groups: catalog.groups.map(group => ({ id: group.id, name: group.name, models: group.models.map(model => ({ id: model.id, name: model.name })) })),
+      }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  threadTranscript: async ({ input, signal }) => {
+    try {
+      return await withRuntime(
+        input.runtimeId,
+        async gateway => {
+          const frames = await gateway.follow(
+            'session/follow',
+            { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: input.maxMessages ?? 60 } },
+            15_000,
+            signal,
+          )
+          const snapshot = frames.map(frame => sessionSnapshotSchema.safeParse(frame)).find(result => result.success)?.data
+          if (snapshot === undefined)
+            throw new GatewayUnavailableError('session-unavailable', 'The host did not return this thread. It may have been deleted there.')
+          const reduced = reduceTranscript(snapshot.records)
+          return {
+            ok: true as const,
+            cursor: snapshot.cursor,
+            ...(snapshot.header?.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
+            ...(reduced.title === undefined ? {} : { title: reduced.title }),
+            ...(reduced.model === undefined ? {} : { model: reduced.model }),
+            running: reduced.running,
+            entries: reduced.entries,
+          }
+        },
+        { mutation: false },
+      )
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  threadList: async () => {
+    const [threads, runtimes, hosts] = await Promise.all([listRemoteThreads(), listRuntimes(), listHosts()])
+    return {
+      threads: threads.flatMap(thread => {
+        const runtime = runtimes.find(item => item.id === thread.runtimeId)
+        const host = hosts.find(item => item.id === runtime?.hostId)
+        return runtime === undefined ? [] : [{ ...thread, hostName: host?.name ?? runtime.name, connected: pool.status(runtime.id) !== undefined }]
+      }),
+    }
+  },
+  threadForget: async ({ input }) => ({ removed: await forgetRemoteThreads(input) }),
+  runtimeCall: async ({ input, signal }) => {
+    const mutation = input.request.namespace !== 'session' || ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(input.request.method)
+    try {
+      return await withRuntime(input.runtimeId, gateway => callNativeRpc(gateway, input.request, signal), { mutation })
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  sessionCursor: async ({ input, signal }) =>
+    withRuntime(
+      input.runtimeId,
+      async gateway => {
+        const frames = await gateway.follow(
+          'session/follow',
+          { request: { address: { kind: 'session', sessionId: input.sessionId }, maxMessages: 1 } },
+          10_000,
+          signal,
+        )
+        const snapshot = frames.map(frame => sessionCursorFrameSchema.safeParse(frame)).find(result => result.success)
+        if (snapshot === undefined) throw new GatewayUnavailableError('session-cursor-unavailable', 'The runtime did not return a session history cursor.')
+        return { cursor: snapshot.data.cursor }
+      },
+      { mutation: false },
+    ),
+  runtimeOpenView: async ({ input }) => {
     const runtime = await findRuntime(input.runtimeId)
     if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'Choose a recorded runtime before opening its native view.')
-    const host = await findHost(runtime.hostId)
-    if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime host is no longer recorded.')
-    if ([...viewLeases.values()].some(lease => lease.runtimeId === runtime.id)) {
-      throw new GatewayUnavailableError('runtime-view-open', 'This runtime already has an open native view. Close it before opening another.')
-    }
     if (runtime.originPort === undefined)
-      throw new GatewayUnavailableError(
-        'runtime-origin-unavailable',
-        'This runtime has no stable browser origin. Re-register it before opening the native view.',
-      )
-    const gateway = await connectRuntime({ host, runtime, signal, originPort: runtime.originPort })
-    try {
-      await verifyPinnedIdentity(gateway, runtime)
-    } catch (error) {
-      await gateway.dispose()
-      throw error
+      throw new GatewayUnavailableError('runtime-origin-unavailable', 'This runtime has no stable browser origin. Re-register it before opening its view.')
+    const existing = [...viewLeases.entries()].find(([, lease]) => lease.runtimeId === runtime.id)
+    if (existing !== undefined && pool.status(runtime.id)?.generation === existing[1].pooled.generation) {
+      return { leaseId: existing[0], launchUrl: existing[1].pooled.gateway.launchUrl }
     }
+    if (existing !== undefined) await closeLease(existing[0])
+    const pooled = await pool.acquire(runtime.id)
     while (viewLeases.size >= maxViewLeases) {
       const oldest = viewLeases.keys().next().value
       if (oldest === undefined) break
       await closeLease(oldest)
     }
     const leaseId = randomUUID()
-    const timer = setTimeout(() => {
-      void closeLease(leaseId)
-    }, viewLeaseTtlMs)
-    viewLeases.set(leaseId, { runtimeId: runtime.id, gateway, timer })
-    return { leaseId, launchUrl: gateway.launchUrl }
+    const timer = setTimeout(() => void closeLease(leaseId), viewLeaseTtlMs)
+    viewLeases.set(leaseId, { runtimeId: runtime.id, pooled, timer })
+    return { leaseId, launchUrl: pooled.gateway.launchUrl }
   },
   runtimeCloseView: async ({ input }) => ({ closed: await closeLease(input.leaseId) }),
   runtimeRemove: async ({ input }) => {
     const removed = await removeRuntime(input.runtimeId)
-    if (removed) await closeRuntimeLeases(input.runtimeId)
+    if (removed) {
+      await closeRuntimeLeases(input.runtimeId)
+      await pool.close(input.runtimeId)
+      await forgetRemoteThreads({ runtimeId: input.runtimeId })
+    }
     return { removed }
   },
 })
+
+const callable = (target: unknown, name: string): ((...args: unknown[]) => unknown) | undefined => {
+  if (typeof target !== 'object' || target === null) return undefined
+  const member: unknown = Reflect.get(target, name)
+  return typeof member === 'function' ? (...args: unknown[]): unknown => Reflect.apply(member, target, args) : undefined
+}
 
 export default defineHost({
   name: '@dshfiles/multi-host',
@@ -524,8 +776,27 @@ export default defineHost({
   apis: [multiHostHandlers],
   setup(ctx, config) {
     configuredProfile = configSchema.parse(config ?? {}).profile
+    // Publish this runtime's launch URL so a manager on another machine can find it over SSH.
+    ctx.inject(['connection', 'webServer'], scoped => {
+      let launchPath: string | undefined
+      let disposed = false
+      scoped.effect(() => {
+        void (async () => {
+          await callable(scoped.get('loader'), 'await')?.()
+          const webServer = webServerSchema.safeParse(scoped.get('webServer'))
+          const launchUrl = callable(scoped.get('connection'), 'authenticatedUrl')?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
+          if (disposed || !webServer.success || typeof launchUrl !== 'string') return
+          launchPath = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+        })().catch(() => undefined)
+        return () => {
+          disposed = true
+          if (launchPath !== undefined) void removeLaunchFile(launchPath)
+        }
+      }, 'multi-host: launch file')
+    })
     ctx.effect(() => async () => {
-      await closeAllLeases()
+      for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)
+      await pool.close()
     })
   },
 })

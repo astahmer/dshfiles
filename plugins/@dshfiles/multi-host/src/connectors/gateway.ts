@@ -35,10 +35,18 @@ const streamFrameSchema = z
 export type Gateway = {
   readonly origin: string
   readonly launchUrl: string
-  run(namespace: string, method: string, args: Record<string, unknown>): Promise<unknown>
-  runSafe(namespace: string, method: string, args: Record<string, unknown>): Promise<GatewayOutcome>
+  /** Settles when the transport underneath (an SSH tunnel) went away on its own. */
+  readonly closed: Promise<void>
+  run(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
+  runSafe(namespace: string, method: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<GatewayOutcome>
   api(method: string, input?: import('@dshfiles/dshx/platform').JsonValue, signal?: AbortSignal): Promise<unknown>
-  follow(endpoint: string, args: unknown, timeoutMs: number): Promise<readonly unknown[]>
+  /** Call another plugin's dshx API on the connected runtime. */
+  pluginApi(target: {
+    readonly packageId: string
+    readonly apiId: string
+    readonly version: number
+  }): (method: string, input?: import('@dshfiles/dshx/platform').JsonValue, signal?: AbortSignal) => Promise<unknown>
+  follow(endpoint: string, args: unknown, timeoutMs: number, signal?: AbortSignal): Promise<readonly unknown[]>
   dispose(): Promise<void>
 }
 
@@ -57,6 +65,7 @@ export class GatewayUnavailableError extends Error {
 interface GatewayTransport {
   readonly origin: string
   readonly launchUrl?: string
+  readonly closed?: Promise<void>
   dispose(): Promise<void>
 }
 
@@ -115,24 +124,24 @@ export const connectGateway = async ({
     await dispose()
     throw new GatewayUnavailableError('cancelled', 'The runtime connection was cancelled.')
   }
-  const callApi = createDshxApiCaller({
-    origin: transport.origin,
-    cookie,
-    packageId: '@dshfiles/multi-host',
-    apiId: 'multi-host',
-    version: 1,
+  const pluginApi: Gateway['pluginApi'] = target => createDshxApiCaller({ origin: transport.origin, cookie, ...target })
+  const closed = new Promise<void>(resolve => {
+    void transport.closed?.then(resolve)
   })
   return {
     origin: transport.origin,
     launchUrl: runtimeLaunchUrl,
-    run: async (namespace, method, args) => {
-      const result = await attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal })
+    closed,
+    run: async (namespace, method, args, callSignal) => {
+      const result = await attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal })
       if (!result.ok) throw new GatewayUnavailableError(result.code, result.message)
       return result.value
     },
-    runSafe: (namespace, method, args) => attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal }),
-    api: callApi,
-    follow: (endpoint, args, timeoutMs) => followOnce({ origin: transport.origin, cookie, endpoint, args, timeoutMs, signal }),
+    runSafe: (namespace, method, args, callSignal) => attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal }),
+    api: pluginApi({ packageId: '@dshfiles/multi-host', apiId: 'multi-host', version: 1 }),
+    pluginApi,
+    follow: (endpoint, args, timeoutMs, callSignal) =>
+      followOnce({ origin: transport.origin, cookie, endpoint, args, timeoutMs, signal: callSignal ?? signal }),
     dispose,
   }
 }

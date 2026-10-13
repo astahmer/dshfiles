@@ -36,7 +36,8 @@ describe('multi-host record schemas', () => {
     expect(runtimeLocatorSchema.safeParse({ kind: 'local', launchUrl: 'https://127.0.0.1:3199/?token=token_value-123456' }).success).toBe(false)
   })
 
-  test('rejects shell-shaped SSH targets, unit names, and remote paths', () => {
+  test('rejects shell-shaped SSH targets and remote paths; the legacy unit field is optional', () => {
+    expect(runtimeLocatorSchema.safeParse({ kind: 'ssh', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
     expect(hostConnectorSchema.safeParse({ kind: 'ssh', sshTarget: 'deploy@machine.example' }).success).toBe(true)
     expect(hostConnectorSchema.safeParse({ kind: 'ssh', sshTarget: 'deploy@machine; touch /tmp/pwned' }).success).toBe(false)
     expect(runtimeLocatorSchema.safeParse({ kind: 'ssh', unit: 'dsh-runtime@blue.service', remoteHome: '/home/deploy/.dsh/blue' }).success).toBe(true)
