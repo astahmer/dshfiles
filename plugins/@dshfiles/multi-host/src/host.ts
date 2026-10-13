@@ -9,7 +9,7 @@ import { connectSsh, discoverRemoteHomes, probeSsh } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
-import { removeLaunchFile, writeLaunchFile } from './launch-file.js'
+import { removeLaunchFile, removeLaunchFileSync, writeLaunchFile } from './launch-file.js'
 import { callNativeRpc, mayHaveReachedRuntime } from './native-rpc.js'
 import {
   hostConnectorSchema,
@@ -75,6 +75,7 @@ const workspaceRowSchema = z
     sessionIds: z.array(z.string().max(256)).max(10_000).optional(),
   })
   .passthrough()
+const workspaceCreatedSchema = z.object({ workspace: z.object({ workspaceId: z.string().min(1), path: z.string().min(1) }).passthrough() }).passthrough()
 const workspaceContainerSchema = z
   .object({
     items: z.unknown().optional(),
@@ -476,7 +477,6 @@ const multiHostHandlers = multiHostApi.host({
       for (const runtime of runtimes) {
         await closeRuntimeLeases(runtime.id)
         await pool.close(runtime.id)
-        await forgetRemoteThreads({ runtimeId: runtime.id })
       }
     }
     return { removed }
@@ -538,6 +538,15 @@ const multiHostHandlers = multiHostApi.host({
       }
     }
   },
+  runtimePing: async ({ input, signal }) => {
+    const startedAt = Date.now()
+    try {
+      await withRuntime(input.runtimeId, gateway => gateway.api('identity', undefined, signal), { mutation: false })
+      return { ok: true as const, ms: Date.now() - startedAt }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
   runtimeReconnect: async ({ input }) => {
     await pool.close(input.runtimeId)
     connectionErrors.delete(input.runtimeId)
@@ -565,6 +574,20 @@ const multiHostHandlers = multiHostApi.host({
         entries: listing.entries.slice(0, 2_000),
         truncated: listing.truncated || listing.entries.length > 2_000,
       }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimeOpenFolder: async ({ input }) => {
+    try {
+      const created = await withRuntime(
+        input.runtimeId,
+        async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: input.path } })),
+        {
+          mutation: true,
+        },
+      )
+      return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -745,7 +768,6 @@ const multiHostHandlers = multiHostApi.host({
     if (removed) {
       await closeRuntimeLeases(input.runtimeId)
       await pool.close(input.runtimeId)
-      await forgetRemoteThreads({ runtimeId: input.runtimeId })
     }
     return { removed }
   },
@@ -774,6 +796,9 @@ export default defineHost({
           const launchUrl = callable(scoped.get('connection'), 'authenticatedUrl')?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
           if (disposed || !webServer.success || typeof launchUrl !== 'string') return
           launchPath = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+          // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
+          const written = launchPath
+          process.once('exit', () => removeLaunchFileSync(written))
         })().catch(() => undefined)
         return () => {
           disposed = true

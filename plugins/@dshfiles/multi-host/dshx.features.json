@@ -4,7 +4,7 @@
     {
       "id": "runtime-directory",
       "title": "Register and identify local DSH runtimes",
-      "summary": "Maintain a bounded host/runtime directory with stable runtime identity, tokenized local URLs, discovered workspaces, and sessions.",
+      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add, edit, test, reconnect and remove SSH hosts from the host chip.",
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -36,16 +36,19 @@
     {
       "id": "ssh-runtime-connection",
       "title": "Connect to an SSH-managed runtime",
-      "summary": "Attach through a systemd-managed remote DSH unit, verify pinned identity/capabilities, and avoid implicit agent forwarding or untrusted host-key acceptance.",
+      "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["disconnected", "connecting", "authenticated", "stale", "refused"],
-      "failureModes": ["Host-key or identity mismatch rejects attachment.", "SSH journal/user service failure does not create a connected runtime."],
+      "failureModes": [
+        "Host-key or identity mismatch rejects attachment.",
+        "A missing or stale launch file reports runtime-not-running instead of connecting."
+      ],
       "externalDependencies": [
         {
-          "id": "ssh-and-systemd",
-          "boundary": "SSH subprocess, remote systemd user service, journal, and host key.",
-          "deterministicFake": "Inject fake SSH argv results and journal output; never connect to a real host or user SSH agent."
+          "id": "ssh-and-launch-file",
+          "boundary": "System OpenSSH client and the remote runtime's plugins/multi-host/launch.json.",
+          "deterministicFake": "tests/ssh.integration.test.ts runs the real ssh binary; the live suite needs MULTI_HOST_SSH_TARGET and MULTI_HOST_SSH_HOME."
         }
       ],
       "verification": [
@@ -63,11 +66,11 @@
     },
     {
       "id": "session-routing",
-      "title": "Open workspaces and sessions on the selected runtime",
-      "summary": "List workspaces and sessions per runtime, create sessions, and route workspace opening only to the explicitly selected compatible runtime.",
+      "title": "Start and follow threads on a remote host",
+      "summary": "Browse the host's folders, start a thread there from the New thread composer, follow its transcript and reply from the remote thread view.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["workspace-listed", "session-listed", "creating", "opened", "stale"],
+      "states": ["folder-chosen", "starting", "running", "finished", "offline"],
       "failureModes": [
         "A capability or version mismatch disables incompatible actions.",
         "An unknown mutation result after a lost reply is inspected and never automatically replayed."
@@ -94,14 +97,19 @@
     },
     {
       "id": "isolated-runtime-views",
-      "title": "Open and close runtime views safely",
-      "summary": "Open native runtime views in isolated browser origins, enforce bounded expiring leases, and close one or all views without affecting remote runtime data.",
+      "title": "Open the host's own DSH UI",
+      "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["leased", "opened", "popup-blocked", "expired", "released"],
+      "states": [
+        "leased",
+        "opened",
+        "expired",
+        "released"
+      ],
       "failureModes": [
-        "Popup blocking remains visible and does not claim a view opened.",
-        "Lease release failure does not erase or mutate the remote runtime."
+        "A dropped tunnel retires the lease; the next open reconnects.",
+        "Lease release never mutates the remote runtime."
       ],
       "externalDependencies": [],
       "verification": [

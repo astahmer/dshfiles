@@ -250,21 +250,32 @@ export const connectSsh = async ({
   const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
   const closed = new Promise<void>(resolve => child.once('close', () => resolve()))
   let disposed = false
-  return connectGateway({
-    launchUrl: localLaunchUrl,
-    signal,
-    createTransport: async origin => ({
-      origin: origin.origin,
+  try {
+    return await connectGateway({
       launchUrl: localLaunchUrl,
-      closed,
-      dispose: async () => {
-        if (disposed) return
-        disposed = true
-        await stopChild(child)
-        endpoint.release()
-      },
-    }),
-  })
+      signal,
+      createTransport: async origin => ({
+        origin: origin.origin,
+        launchUrl: localLaunchUrl,
+        closed,
+        dispose: async () => {
+          if (disposed) return
+          disposed = true
+          await stopChild(child)
+          endpoint.release()
+        },
+      }),
+    })
+  } catch (error) {
+    // SSH and the forward worked, so nothing listens behind the launch file: DSH there stopped without removing it.
+    if (error instanceof GatewayUnavailableError && error.code === 'gateway-unreachable') {
+      throw new GatewayUnavailableError(
+        'runtime-not-running',
+        'DSH is not running on this host: its launch file points at a closed port. Start DSH there and reconnect.',
+      )
+    }
+    throw error
+  }
 }
 
 /** Cheapest proof that SSH reaches the machine with BatchMode keys: run `true`. */

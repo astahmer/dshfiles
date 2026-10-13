@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync, rmSync } from 'node:fs'
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
@@ -61,6 +62,15 @@ export const removeLaunchFile = async (path: string): Promise<void> => {
   try {
     const record = launchRecordSchema.safeParse(JSON.parse(content))
     if (record.success && record.data.pid === process.pid) await rm(path, { force: true })
+  } catch {
+    // Not ours to remove.
+  }
+}
+
+export const removeLaunchFileSync = (path: string): void => {
+  try {
+    const record = launchRecordSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')))
+    if (record.success && record.data.pid === process.pid) rmSync(path, { force: true })
   } catch {
     // Not ours to remove.
   }

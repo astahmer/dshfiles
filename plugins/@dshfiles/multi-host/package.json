@@ -6,7 +6,8 @@
   "files": [
     "dist",
     "cordis.patch.yml",
-    "locale"
+    "locale",
+    "src"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -14,7 +15,11 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./dist/client.js"
+    "./client": "./dist/client.js",
+    "./destination": {
+      "types": "./src/destination/index.ts",
+      "default": "./src/destination/index.ts"
+    }
   },
   "scripts": {
     "build": "dshx build",

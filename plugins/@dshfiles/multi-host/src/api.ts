@@ -202,6 +202,11 @@ export const multiHostApi = defineApi({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: runtimeStatusSchema,
     }),
+    /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
+    runtimePing: method({
+      input: z.object({ runtimeId: idSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }), failedSchema]),
+    }),
     runtimeReconnect: method({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
@@ -218,6 +223,11 @@ export const multiHostApi = defineApi({
     runtimeCreateDirectory: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096), name: z.string().min(1).max(255) }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), path: z.string() }), failedSchema]),
+    }),
+    /** Register a folder as a workspace on the runtime, so its jj-integration can describe and isolate it. */
+    runtimeOpenFolder: method({
+      input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096) }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), workspaceId: z.string(), path: z.string() }), failedSchema]),
     }),
     runtimeBrowse: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),
