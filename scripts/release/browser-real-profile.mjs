@@ -35,8 +35,26 @@ for (const [name, spec] of Object.entries(manifest.dependencies)) {
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 console.log('rewrote', rewritten, 'profile links to absolute paths')
 
+// queue-reorder reads the `inbox` Session projection, which only the FORK agent
+// loop declares (tooling/dsh-core/agent-loop/src/inbox.ts). The deployed loop is
+// the published one, so the plugin cannot build or run here: disable it in the
+// staged profile rather than shipping a bundle that cannot activate.
+const bundles = manifest.dsh?.profile?.bundles ?? []
+const disabled = '@dshfiles/queue-reorder'
+if (bundles.includes(disabled)) {
+  manifest.dsh.profile.bundles = bundles.filter(bundle => bundle !== disabled)
+  delete manifest.dependencies[disabled]
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+  console.log('disabled', disabled, '(fork-only inbox projection)')
+}
 execFileSync('pnpm', ['install', '--no-frozen-lockfile'], { cwd: resolve(HOME, 'profiles/web'), stdio: 'pipe' })
 console.log('profile installed')
+
+// Real provider credentials, copied so the scratch home can answer an LLM call.
+const accountsSource = resolve(homedir(), '.dsh/plugins/ai-accounts/accounts.json')
+await mkdir(resolve(HOME, 'plugins/ai-accounts'), { recursive: true })
+await cp(accountsSource, resolve(HOME, 'plugins/ai-accounts/accounts.json'))
+console.log('provider accounts copied into the scratch home')
 
 const project = resolve(HOME, 'project')
 await mkdir(project, { recursive: true })
@@ -141,6 +159,23 @@ const after = await page.evaluate(() => document.body.innerText)
 console.log('sidebar before:', (before.match(/All threads[^|]*/) ?? [''])[0].replace(/\s+/g, ' ').slice(0, 120))
 console.log('sidebar after :', (after.match(/All threads[^|]*/) ?? [''])[0].replace(/\s+/g, ' ').slice(0, 120))
 console.log('thread appeared in sidebar:', /Working \(1\)|Active \(1\)|pong/i.test(after) ? 'YES' : 'no')
+// A real LLM response, not just a created thread.
+const deadline = Date.now() + 120_000
+let reply = ''
+while (Date.now() < deadline) {
+  const text = await page.evaluate(() => document.body.innerText)
+  if (/pong/i.test(text) && !/no adapter registered/i.test(text)) {
+    reply = 'pong'
+    break
+  }
+  if (/no adapter registered|NO_ADAPTER/i.test(text)) {
+    reply = 'NO_ADAPTER'
+    break
+  }
+  await new Promise(done => setTimeout(done, 3000))
+}
+console.log('agent reply:', reply === '' ? 'TIMEOUT (no response within 120s)' : reply)
+await page.screenshot({ path: `${SHOTS}/12-agent-reply.png` })
 console.log('after-send UI:', after.replace(/\s+/g, ' ').slice(0, 400))
 const cwdCheck = execFileSync('jj', ['--color=never', '--no-pager', 'workspace', 'list', '--ignore-working-copy', '-T', 'name ++ "\n"'], {
   cwd: project,
