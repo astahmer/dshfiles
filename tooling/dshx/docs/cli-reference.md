@@ -116,7 +116,9 @@ dshx sessions rename <session-id> <title...>
 dshx sessions archive <session-id>
 dshx sessions unarchive <session-id>
 dshx sessions prompt <session-id> <message...> [--mode queue|steer]
-dshx sessions export <session-id> [--output <path>]
+dshx sessions export <session-id> [--output <path>] [--since-seq <seq>] [--tail <count>] [--types <type,...>]
+dshx sessions digest <session-id> [--limit <actions>]
+dshx sessions tail <session-id> [--since-seq <seq>] [--tail <count>] [--types <type,...>] [--follow]
 
 dshx plugins list
 dshx plugins info <entry-id>
@@ -201,6 +203,58 @@ without a model turn; Ctrl-C aborts the command request through DSH's native
 active Agent work. The CLI currently sends no command attachments. Session
 export reads the bounded paging API and writes a versioned JSON file when
 `--output` is supplied.
+
+### Supervising a Session
+
+Use `sessions digest` to answer "what is this agent doing, is it stuck, and what
+did it change?" in one call. It reads the Session's events and its summary
+projections and prints about 50 lines:
+
+- state: running or idle, time since the last event, model, turns, steps, tool
+  calls, compactions, token totals, and context use (DSH reports no prices);
+- `Attention`: a tool call pending for over two minutes, a running Session
+  with no events for ten minutes, a failed last turn (usage limits included),
+  three or more trailing tool failures, an identical tool call repeated three
+  times in the last twelve, three or more turns without a tool call (a goal
+  loop), and an idle Session that left todos open;
+- the working directory, plus the directories its shell calls really ran in
+  (`workdir` arguments and leading `cd`), which often differ from the Session
+  cwd;
+- the goal, the latest todo list, and the latest reasoning headlines (reasoning
+  bodies are usually encrypted; the headlines are not);
+- the last user prompt, the last message from another agent, and the last
+  assistant text;
+- the last actions as one line each (`--limit`, default 15), with `ok`, `ERR`,
+  or `...` for a call still running;
+- the files edited, grouped by directory with edit counts; the `jj` commands
+  that describe, commit, create, squash, push, or move revisions with their
+  message title; and edits made since the last describe;
+- tool errors and failed commands with their error line, and LLM retry counts.
+
+`--json` returns the same digest under `data`: `sessionId`, `title`, `running`,
+`cwd`, `model`, `lastSeq`, `lastEventAt`, `idleMs`, `eventCount`, `turns`,
+`steps`, `compactions`, `lastTurnEnd`, `attention[]`, `goal`, `todos[]`,
+`intents[]`, `lastUserPrompt`, `lastAgentMessage`, `lastAssistantText`,
+`actions[]` (`seq`, `time`, `tool`, `summary`, `status`, `error`),
+`toolCallCount`, `workDirectories[]`, `filesChanged[]`, `revisions[]`,
+`undescribedEdits`, `failures`, `tokens`, and `subagents[]`. Absent facts are
+omitted rather than null.
+
+`sessions tail` prints one line per event: sequence, local time, type, and a
+summary (`bash: pnpm test`, `↳ bash ERR exit 1 2.1s: Error: …`, `thinks: …`,
+`2/5 done; now: …`). It shows the newest 40 events unless `--since-seq` or
+`--tail` says otherwise. Without `--types` it hides per-step bookkeeping
+(`step/*`, `request/*`, system prompts, inbox splices, prune markers) and the
+runtime context DSH injects as user messages. `--follow` polls every two seconds
+and prints new events until Ctrl-C; with `--json` it prints one JSON object per
+line. A tool result names its tool when the call is in the same window.
+
+Filters on `sessions export` and `sessions tail`: `--since-seq N` keeps events after
+sequence N, `--types` keeps exact types or every type under a prefix (`tool`
+matches `tool/call` and `tool/result`), and `--tail N` keeps the newest N
+matching events. Paging walks backwards from the newest event and stops once
+the filter is satisfied, so a tail of a large Session does not read its whole
+history.
 
 `sessions prompt` sends text to DSH and does not echo it in output. It defaults
 to queue mode; `--mode steer` asks DSH to steer the active turn. Ctrl-C asks
