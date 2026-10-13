@@ -35,14 +35,14 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.scope-filter",
-          "reason": "No browser journey exists yet for the scope-filter scenario of \"Browse aliases by scope and environment\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.project-picker",
-          "reason": "No browser journey exists yet for the project-picker scenario of \"Browse aliases by scope and environment\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
           "kind": "unit-test",
@@ -110,9 +110,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.reveal-expiry",
-          "reason": "No browser journey exists yet for the reveal-expiry scenario of \"Reveal and copy an exact secret value\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
           "kind": "unit-test",
@@ -160,14 +160,14 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.add-edit",
-          "reason": "No browser journey exists yet for the add-edit scenario of \"Create, edit, rename, and remove aliases safely\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.rename-remove",
-          "reason": "No browser journey exists yet for the rename-remove scenario of \"Create, edit, rename, and remove aliases safely\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
           "kind": "unit-test",
@@ -224,9 +224,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "secret-catalog.agent-tools",
-          "reason": "No browser journey exists yet for the agent-tools scenario of \"Expose safe secret catalog tools to agents\"; nothing automated verifies it yet."
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         }
       ]
     }
