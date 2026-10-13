@@ -86,7 +86,8 @@ describe('Host boot check ownership', () => {
       profile: 'fixture',
       port: 3199,
       executable: file,
-      timeoutMs: 500,
+      // The same budget first covers the --dump-config launch, which a loaded machine can take well over 500 ms to answer.
+      timeoutMs: 3_000,
       ...profile,
       expectedBundles: ['@test/plugin'],
     })
