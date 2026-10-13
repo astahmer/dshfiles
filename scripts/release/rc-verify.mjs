@@ -99,6 +99,18 @@ for (const name of provisioned) {
     again.value?.workspace?.existing === true || again.value?.existing === true ? 'yes' : 'unknown',
   )
 }
+// Isolation is asserted from persisted state, not from an HTTP status: the
+// registry must own exactly one record per provisioned directory with the
+// Session attached, and no Session may run in the shared project checkout.
+const { readFileSync, readdirSync } = await import('node:fs')
+const registry = JSON.parse(readFileSync(`${scratch.home}/storages/workspace.json`, 'utf8')).tables.workspaces
+const rows = Object.values(registry)
+const isolated = rows.filter(row => (row.path ?? '').includes('-threads/'))
+console.log('registry records:', rows.length, '| isolated:', isolated.length, '| distinct paths:', new Set(isolated.map(row => row.path)).size)
+console.log('isolated with a session attached:', isolated.filter(row => row.sessionIds.length > 0).length)
+const sessionDirs = readdirSync(`${scratch.home}/sessions`)
+console.log('session persistence dirs:', sessionDirs.length)
+console.log('sessions in the shared checkout:', sessionDirs.filter(name => !name.includes('-threads-')).length)
 console.log('activation failures:', /did not activate|failed to import/.test(output) ? 'YES' : 'none')
 try {
   process.kill(-child.pid, 'SIGTERM')
