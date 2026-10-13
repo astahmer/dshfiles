@@ -5,15 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import { boundedSummary } from '../../optmem-core/src/bounded-summary.ts'
 import { optmemSettings } from './settings.ts'
-import {
-  classifyProviderFailure,
-  createLlmSummarizer,
-  createRouteResolver,
-  selectSummaryRoute,
-  type RouteCatalog,
-  type SummarizerPolicy,
-  type SummaryRoute,
-} from './summarizer.ts'
+import { createRouteResolver, selectSummaryRoute, type RouteCatalog, type SummarizerPolicy, type SummaryRoute } from '@dshfiles/optmem-core/summary-routes'
+import { classifyProviderFailure, createLlmSummarizer } from './summarizer.ts'
 
 const answer = (text: string): StreamChunk[] => [
   { type: 'block-start', index: 0, blockType: 'text' },

@@ -24,7 +24,7 @@ import { openSqliteMemory, type SqliteMemory } from '@dshfiles/optmem-sqlite'
 import { createCapture, type CaptureHeader, type CapturePolicy, type CaptureSession } from './capture.ts'
 import { createInjectionCache } from './injection.ts'
 import type { OptmemSettings } from './settings.ts'
-import type { SummarizerRouteState } from './summarizer.ts'
+import type { SummarizerRouteState } from '@dshfiles/optmem-core/summary-routes'
 
 export type RuntimeState = 'off' | 'starting' | 'ready' | 'failed'
 

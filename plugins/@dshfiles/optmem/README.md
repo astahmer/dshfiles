@@ -36,7 +36,7 @@ Settings live in the `dshfiles-optmem` entry (Loader row inserted by this packag
 
 - Row editors for `cheapModels` (kind, ordered models, effort) and `summarizerFallbacks` (provider, model, effort), with
   add, reorder and remove. Routes are checked against the models each DSH provider offers, using the same matching as
-  the Host (`src/routing.ts`). Warnings never block saving.
+  the Host (`@dshfiles/optmem-core/summary-routes`). Warnings never block saving.
 - An override route (one provider, model and effort for every summary), every byte budget, and the exclusions.
 - Effort `off` asks the route not to reason. OpenCode Go summaries default to it: with DeepSeek V4.1 Flash, hidden
   reasoning had filled the output budget of most long summaries

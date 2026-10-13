@@ -20,7 +20,8 @@ import { deferPressureCompaction } from './compaction-deferral.ts'
 import { optmemApi, type OptmemExplorerZoom, type OptmemOverview, type OptmemProject, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
-import { createLlmSummarizer, createRouteResolver, routeCooldownMs, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
+import { createRouteResolver, routeCooldownMs, type SummarizerPolicy, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
+import { createLlmSummarizer } from './summarizer.ts'
 import { createMemoryTools } from './tools.ts'
 
 let runtime: OptmemRuntime | undefined

@@ -1,5 +1,5 @@
 import type { OptmemProvider } from './api.ts'
-import { SummaryRouting } from './routing.ts'
+import { SummaryRouting } from '@dshfiles/optmem-core/summary-routes'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
 
 export type SettingsKey = keyof OptmemSettings & string

@@ -10,6 +10,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./summary-routes": {
+      "types": "./src/summary-routes.ts",
+      "default": "./src/summary-routes.ts"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
