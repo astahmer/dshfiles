@@ -33,10 +33,6 @@ overrides:
   '@deepseek-ai/cordis': 4.0.4
   '@deepseek-ai/cordis-plugin-include': 1.0.9
   '@deepseek-ai/cordis-plugin-loader': 1.0.5
-  # One copy of the session-controller types across this workspace and the
-  # plugins that type their client surfaces from it. The published package lags
-  # the checkout's client contract (updateAttention, workspace restore, …).
-  '@deepseek-ai/dsh-api-session-controller': link:../dsh-core/api-session-controller
 
 packageExtensions:
   '@deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2':

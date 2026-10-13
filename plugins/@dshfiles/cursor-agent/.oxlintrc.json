@@ -1,7 +1,0 @@
-{
-  "plugins": ["typescript", "oxc"],
-  "categories": {
-    "correctness": "error"
-  },
-  "ignorePatterns": ["dist/**", "node_modules/**"]
-}

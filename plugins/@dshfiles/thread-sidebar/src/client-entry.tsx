@@ -379,13 +379,6 @@ export default defineClient({
               const result = await ctx.remote.workspace.unpinSession({ sessionId })
               if (!result.ok) throw new Error(result.error.code)
             },
-            markRead: async (sessionId: SessionSummary['id']) =>
-              (
-                await ctx.sessions.updateAttention({
-                  sessionId,
-                  action: { type: 'mark-read' },
-                })
-              ).ok,
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
           }),
         },

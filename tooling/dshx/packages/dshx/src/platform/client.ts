@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { isIPv4 } from 'node:net'
-import type { SessionRuntimeSelection } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import WebSocket, { type RawData } from 'ws'
 
@@ -9,24 +8,6 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 )
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
-
-const sessionAttentionSummarySchema = z.object({
-  lastPromptSeq: z.number().int().nullable(),
-  readThroughSeq: z.number().int(),
-  snoozed: z.boolean(),
-  unread: z.boolean(),
-})
-export type SessionAttentionSummary = z.infer<typeof sessionAttentionSummarySchema>
-const sessionAttentionActionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('mark-read') }),
-  z.object({ type: z.literal('set-snoozed'), snoozed: z.boolean() }),
-])
-export type SessionAttentionAction = z.infer<typeof sessionAttentionActionSchema>
-
-export interface SessionAttentionUpdateRequest {
-  readonly sessionId: string
-  readonly action: SessionAttentionAction
-}
 
 const sessionSummarySchema = z.object({
   agentAvailable: z.boolean(),
@@ -38,7 +19,6 @@ const sessionSummarySchema = z.object({
   origin: z.enum(['subagent']).optional(),
   cwd: z.string().optional(),
   projections: jsonValueSchema.optional(),
-  attention: sessionAttentionSummarySchema.nullable().optional(),
 })
 
 const sessionSearchItemSchema = z.object({
@@ -231,7 +211,6 @@ export interface SessionSummary {
   readonly origin?: 'subagent'
   readonly cwd?: string
   readonly projections?: JsonValue
-  readonly attention?: SessionAttentionSummary | null
 }
 
 export interface SessionSearchItem {
@@ -387,8 +366,6 @@ export interface DshPlatformTransport {
 export interface DshPlatformClient {
   readonly sessions: {
     list(): Promise<readonly SessionSummary[]>
-    updateAttention(sessionId: string, action: SessionAttentionAction, signal?: AbortSignal): Promise<SessionAttentionSummary>
-    updateAttention(request: SessionAttentionUpdateRequest): Promise<SessionAttentionSummary>
     search(query: string): Promise<{
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
@@ -396,7 +373,6 @@ export interface DshPlatformClient {
     create(input: {
       readonly cwd?: string
       readonly agentPreset?: string
-      readonly runtimeBinding?: SessionRuntimeSelection
     }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
     fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
@@ -504,7 +480,6 @@ function mapSession(value: unknown): SessionSummary {
     ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
     ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
     ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
-    ...(parsed.attention === undefined ? {} : { attention: parsed.attention }),
   }
 }
 
@@ -713,15 +688,6 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   return {
     sessions: {
       list: listSessions,
-      updateAttention: async (sessionId: string | SessionAttentionUpdateRequest, action?: SessionAttentionAction, signal?: AbortSignal) => {
-        const request = z
-          .object({
-            sessionId: z.string().min(1),
-            action: sessionAttentionActionSchema,
-          })
-          .parse(typeof sessionId === 'string' ? { sessionId, action } : sessionId)
-        return sessionAttentionSummarySchema.parse(await transport.rpc('session', 'updateAttention', { request }, signal))
-      },
       search: async query => {
         const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', { request: { query } }))
         return { items: result.items, hasMore: result.hasMore }

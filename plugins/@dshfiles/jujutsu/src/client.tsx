@@ -105,7 +105,6 @@ import { SessionForkPanel } from './session-fork-panel.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisioner } from './workspace-provisioner.js'
-import { WorkspaceRestorePanel } from './workspace-restore-panel.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 
 type View = 'graph' | 'source'
@@ -1290,14 +1289,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                     onPreview={askForConfirmation}
                     pickDirectory={props.pickDirectory}
                     launchSession={props.launchSession}
-                  />
-                )}
-                {state !== undefined && (
-                  <WorkspaceRestorePanel
-                    sessions={props.sessions}
-                    workspacePath={state.root}
-                    targetCommitId={selectedRevision?.commitId ?? null}
-                    onRestored={refreshRepository}
                   />
                 )}
               </aside>

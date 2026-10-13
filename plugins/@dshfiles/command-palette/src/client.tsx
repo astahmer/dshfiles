@@ -88,7 +88,6 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
               workspaceId: selectedWorkspaceId,
               pinned: pinned.has(selectedSession.id),
               archived: archived.has(selectedSession.id),
-              unread: selectedSession.attention?.unread === true,
             },
       workspace,
       workspaces,

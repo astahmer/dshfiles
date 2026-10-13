@@ -1,8 +1,5 @@
 packages:
   - '@dshfiles/*'
-  - '../tooling/dsh-core/*'
-  # This package retains upstream workspace peers whose sources are not in this checkout.
-  - '!../tooling/dsh-core/api-session-controller'
 
 # A global virtual store puts every package under ~/.local/share/pnpm/store/v11/links,
 # where a package's own peer imports resolve to nothing: the packages it augments
@@ -17,7 +14,7 @@ peerDependencyRules:
     cordis-plugin-include: 1.0.9
     cordis-plugin-loader: 1.0.5
 
-# One cordis module identity across the plugin and the fork that types it.
+# One cordis module identity across the plugins.
 # Two copies silently split the Events interface, which makes every `ctx.on`
 # event name fail to typecheck.
 dedupePeerDependents: true
@@ -31,19 +28,15 @@ allowBuilds:
   protobufjs: false
 
 # Keep one copy of the DSH type packages in this workspace so a cordis module
-# augmentation is visible from both the plugin and the fork that types it.
+# augmentation is visible from every plugin.
 publicHoistPattern:
   - '@deepseek-ai/*'
   - '@dshfiles/*'
 
-# One copy of the DSH type packages across this workspace and the fork it links
-# to. Two copies silently split cordis's Events interface, which makes every
+# One cordis copy across this workspace. Two copies silently split cordis's Events interface, which makes every
 # `ctx.on` event name fail to typecheck in the plugin.
 overrides:
   '@deepseek-ai/cordis': 4.0.4
   '@deepseek-ai/cordis-plugin-include': 1.0.9
   '@deepseek-ai/cordis-plugin-loader': 1.0.5
 
-  '@deepseek-ai/dsh-agent': link:../tooling/dsh-core/agent
-  '@deepseek-ai/dsh-api-session-controller': link:../tooling/dsh-core/api-session-controller
-  '@deepseek-ai/dsh-session': link:../tooling/dsh-core/session

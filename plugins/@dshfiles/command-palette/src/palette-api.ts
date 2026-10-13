@@ -13,7 +13,6 @@ export interface PaletteThread {
   readonly workspaceId: string | undefined
   readonly pinned: boolean
   readonly archived: boolean
-  readonly unread: boolean
 }
 
 export type PaletteMode = 'all' | 'threads' | 'files'

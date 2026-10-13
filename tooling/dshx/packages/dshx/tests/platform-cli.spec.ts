@@ -33,51 +33,6 @@ function clientWith(rpc: DshPlatformTransport['rpc']): DshPlatformClient {
 }
 
 describe('DSH platform CLI', () => {
-  it('forwards a selected runtime binding through Host Session creation', async () => {
-    let createArgs: Parameters<DshPlatformTransport['rpc']>[2] | undefined
-    const client = clientWith(async (namespace, method, args) => {
-      expect(namespace).toBe('session')
-      expect(method).toBe('create')
-      createArgs = args
-      return { sessionId: 'cursor-session' }
-    })
-
-    await expect(
-      client.sessions.create({
-        cwd: '/tmp/runtime-workspace',
-        runtimeBinding: { driverKind: 'cursor-acp', instanceId: 'work-account' },
-      }),
-    ).resolves.toEqual({ sessionId: 'cursor-session' })
-    expect(createArgs).toEqual({
-      request: {
-        cwd: '/tmp/runtime-workspace',
-        runtimeBinding: { driverKind: 'cursor-acp', instanceId: 'work-account' },
-      },
-    })
-  })
-
-  it('updates Host-owned Session attention through the Session Remote contract', async () => {
-    let updateArgs: Parameters<DshPlatformTransport['rpc']>[2] | undefined
-    const client = clientWith(async (namespace, method, args) => {
-      expect(namespace).toBe('session')
-      expect(method).toBe('updateAttention')
-      updateArgs = args
-      return { lastPromptSeq: 8, readThroughSeq: 8, snoozed: true, unread: false }
-    })
-    const request: Parameters<DshPlatformClient['sessions']['updateAttention']>[0] = {
-      sessionId: 'session-1',
-      action: { type: 'set-snoozed', snoozed: true },
-    }
-
-    await expect(client.sessions.updateAttention(request)).resolves.toEqual({
-      lastPromptSeq: 8,
-      readThroughSeq: 8,
-      snoozed: true,
-      unread: false,
-    })
-    expect(updateArgs).toEqual({ request })
-  })
-
   it('parses platform command groups and scoped options', () => {
     expect(parseCliArgs(['sessions', 'history', 'session-1', '--max', '50', '--json'])).toMatchObject({
       command: 'sessions',
@@ -292,7 +247,7 @@ describe('DSH platform CLI', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it('preserves Host Session attention, projections, and command input descriptors', async () => {
+  it('preserves Host Session projections and command input descriptors', async () => {
     const client = createDshPlatformClientFromTransport({
       sessionCursor: async () => 0,
       rpc: async (namespace, method) => {
@@ -306,12 +261,6 @@ describe('DSH platform CLI', () => {
                 blank: false,
                 agentAvailable: true,
                 projections: { summary: 'Ready', state: 'idle' },
-                attention: {
-                  lastPromptSeq: 7,
-                  readThroughSeq: 2,
-                  snoozed: false,
-                  unread: true,
-                },
               },
             ],
           }
@@ -334,12 +283,6 @@ describe('DSH platform CLI', () => {
       {
         sessionId: 'session-1',
         projections: { summary: 'Ready', state: 'idle' },
-        attention: {
-          lastPromptSeq: 7,
-          readThroughSeq: 2,
-          snoozed: false,
-          unread: true,
-        },
       },
     ])
     expect(await client.commands.list('session-1')).toEqual([
@@ -350,52 +293,6 @@ describe('DSH platform CLI', () => {
         input: { hint: 'Optional scope', attachments: true },
       },
     ])
-  })
-
-  it('updates Host-owned Session attention through the Session Remote', async () => {
-    const calls: {
-      readonly namespace: string
-      readonly method: string
-      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
-    }[] = []
-    const responses = [
-      { lastPromptSeq: 4, readThroughSeq: 4, snoozed: false, unread: false },
-      { lastPromptSeq: 4, readThroughSeq: 4, snoozed: true, unread: false },
-    ]
-    const client = createDshPlatformClientFromTransport({
-      sessionCursor: async () => 0,
-      rpc: async (namespace, method, args) => {
-        calls.push({ namespace, method, args })
-        return responses[calls.length - 1]
-      },
-    })
-
-    await expect(client.sessions.updateAttention('session-1', { type: 'mark-read' })).resolves.toEqual({
-      lastPromptSeq: 4,
-      readThroughSeq: 4,
-      snoozed: false,
-      unread: false,
-    })
-    await expect(client.sessions.updateAttention('session-1', { type: 'set-snoozed', snoozed: true })).resolves.toEqual({
-      lastPromptSeq: 4,
-      readThroughSeq: 4,
-      snoozed: true,
-      unread: false,
-    })
-    expect(calls).toEqual([
-      {
-        namespace: 'session',
-        method: 'updateAttention',
-        args: { request: { sessionId: 'session-1', action: { type: 'mark-read' } } },
-      },
-      {
-        namespace: 'session',
-        method: 'updateAttention',
-        args: { request: { sessionId: 'session-1', action: { type: 'set-snoozed', snoozed: true } } },
-      },
-    ])
-    await expect(client.sessions.updateAttention('', { type: 'mark-read' })).rejects.toThrow()
-    expect(calls).toHaveLength(2)
   })
 
   it('uses revisioned settings mutations and rejects non slash-prefixed Session commands', async () => {

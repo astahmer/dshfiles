@@ -38,10 +38,20 @@ import { createFailureRecovery, offloadResentImages, type RecoveryAction } from 
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
 import type { LlmRetryEventData, LlmRetryStartedEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     'llm/retry': LlmRetryEventData
     'llm/retry-started': LlmRetryStartedEventData
+  }
+}
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'agent/request-messages'(
+      payload: { agent: Agent; turn: number; step: number; isFirstStepOfTurn: boolean; messages: readonly Message[]; toolHistory: ToolHistory; signal: AbortSignal },
+      next: () => Promise<readonly Message[]>,
+    ): Promise<readonly Message[]>
   }
 }
 import { randomUUID } from 'node:crypto'

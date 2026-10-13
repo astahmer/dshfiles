@@ -87,8 +87,8 @@ export const clearThreadMute = (preferences: ThreadNotificationPreferences, sess
   return { ...preferences, mutedUntil }
 }
 
-export const isThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string, hostUnread: boolean): boolean =>
-  hostUnread || preferences.manuallyUnreadSessionIds.includes(sessionId)
+export const isThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string): boolean =>
+  preferences.manuallyUnreadSessionIds.includes(sessionId)
 
 export const markThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string): ThreadNotificationPreferences => ({
   ...preferences,

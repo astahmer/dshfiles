@@ -1,5 +1,0 @@
-autoInstallPeers: false
-dedupePeerDependents: true
-overrides:
-  '@deepseek-ai/dsh-agent': 'link:.'
-  '@deepseek-ai/dsh-session': 'link:../session'

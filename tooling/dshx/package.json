@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --dir ../../plugins --filter @deepseek-ai/dsh-agent run build && pnpm --dir ../dsh-core/session run build && pnpm --dir ../../plugins --filter @deepseek-ai/dsh-agent-loop run build && pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx build",
+    "build": "pnpm --filter create-dshx build && pnpm --filter @dshfiles/dshx build",
     "lint": "pnpm --dir ../.. run lint",
     "format:check": "pnpm --dir ../.. run fmt:check",
     "deps:check": "knip",

@@ -39,7 +39,6 @@ const sessionSummary = ({ id, parentId, ...overrides }: SessionFixture): Session
   blank: false,
   updatedAt: 0,
   ...overrides,
-  attention: overrides.attention ?? null,
   id: SessionId(id),
   parentId: parentId === undefined ? undefined : SessionId(parentId),
 })

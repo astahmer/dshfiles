@@ -20,7 +20,6 @@ const context: PaletteActionContext = {
     workspaceId: 'workspace-1',
     pinned: false,
     archived: false,
-    unread: false,
   },
   workspace: { id: 'workspace-1', title: 'Repo' },
   workspaces: [{ id: 'workspace-1', title: 'Repo' }],

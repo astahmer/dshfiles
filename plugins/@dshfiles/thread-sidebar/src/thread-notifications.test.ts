@@ -73,11 +73,10 @@ test('timed snooze expires, while permanent mute lasts until cleared', () => {
   assert.deepEqual(clearExpiredThreadMutes(muted, 100).mutedUntil, { forever: null })
   assert.deepEqual(clearThreadMute(muted, 'forever').mutedUntil, { timed: 100 })
 })
-test('manual unread is separate from Host unread and clears when thread is opened', () => {
+test('manual unread clears when the thread is opened', () => {
   const markedUnread = markThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread')
-  assert.equal(isThreadUnread(markedUnread, 'thread', false), true)
-  assert.equal(isThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread', true), true)
-  assert.equal(isThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread', false), false)
+  assert.equal(isThreadUnread(markedUnread, 'thread'), true)
+  assert.equal(isThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread'), false)
   assert.deepEqual(markThreadSeen(markedUnread, 'thread').manuallyUnreadSessionIds, [])
   assert.deepEqual(markThreadUnread(markedUnread, 'thread').manuallyUnreadSessionIds, ['thread'])
 })
@@ -97,8 +96,8 @@ test('opening one thread preserves another thread unread marker', () => {
   const bothUnread = markThreadUnread(firstUnread, 'second')
   const secondSeen = markThreadSeen(bothUnread, 'second')
 
-  assert.equal(isThreadUnread(bothUnread, 'first', false), true)
-  assert.equal(isThreadUnread(bothUnread, 'second', false), true)
-  assert.equal(isThreadUnread(secondSeen, 'first', false), true)
-  assert.equal(isThreadUnread(secondSeen, 'second', false), false)
+  assert.equal(isThreadUnread(bothUnread, 'first'), true)
+  assert.equal(isThreadUnread(bothUnread, 'second'), true)
+  assert.equal(isThreadUnread(secondSeen, 'first'), true)
+  assert.equal(isThreadUnread(secondSeen, 'second'), false)
 })

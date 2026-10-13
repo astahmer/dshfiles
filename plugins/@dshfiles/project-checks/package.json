@@ -19,8 +19,7 @@
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify:scratch": "node --experimental-strip-types scripts/verify-scratch.mjs"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",

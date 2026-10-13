@@ -18,16 +18,6 @@ playwright-report/
 # Cached plugin gate results keyed by tree content (.jj-gates/<fingerprint>.json).
 .jj-gates/
 
-# Generated narrow core fork output.
-tooling/dsh-core/agent/lib/
-tooling/dsh-core/agent-loop/lib/
-tooling/dsh-core/api-session-controller/lib/
-tooling/dsh-core/session/lib/
-tooling/dsh-core/session-format-catalog/lib/
-tooling/dsh-core/session-format-v4-to-v5/lib/
-
-/tooling/dsh-core/api-session-controller/node_modules
-
 # Local reference checkouts and benchmark scratch.
 .references/
 .bench/
