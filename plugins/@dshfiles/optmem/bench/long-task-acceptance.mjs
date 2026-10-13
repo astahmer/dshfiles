@@ -13,8 +13,7 @@ export const taskAcceptanceChecks = [
   },
   {
     id: 'retains effective decisions, types, and scope',
-    assert: ({ actual, expected }) =>
-      assert.deepEqual(actual.state, expected.state, 'handoff must retain effective decisions, types, and scope'),
+    assert: ({ actual, expected }) => assert.deepEqual(actual.state, expected.state, 'handoff must retain effective decisions, types, and scope'),
   },
   {
     id: 'obeys operational action dependencies',

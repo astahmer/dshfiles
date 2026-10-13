@@ -1,8 +1,4 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { completedRun, loadScenario, runtimeFingerprint } from './scenario-loader.mjs'
