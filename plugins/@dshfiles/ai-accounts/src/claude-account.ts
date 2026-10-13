@@ -36,7 +36,11 @@ export const claudeKeychainService = (configDir: string): string =>
   configDir === DEFAULT_CONFIG_DIR ? 'Claude Code-credentials' : `Claude Code-credentials-${createHash('sha256').update(configDir).digest('hex').slice(0, 8)}`
 
 export const claudeLoginHint = (configDir: string): string =>
-  configDir === DEFAULT_CONFIG_DIR ? 'claude /login' : `CLAUDE_CONFIG_DIR="${configDir}" claude /login`
+  configDir === DEFAULT_CONFIG_DIR ? 'claude auth login' : `CLAUDE_CONFIG_DIR="${configDir}" claude auth login`
+
+/** Claude Code keeps an emptied login record after `/logout`; the Claude desktop app's login is separate and unusable here. */
+const signedOutMessage = (configDir: string): string =>
+  `Claude Code is signed out on this machine (the Claude desktop app keeps its own login, which Claude Code cannot use). Run: ${claudeLoginHint(configDir)}, or store a \`claude setup-token\` token as this account's setup token.`
 
 const oauthSchema = z.object({
   claudeAiOauth: z.object({
@@ -68,11 +72,14 @@ const parseCredential = (raw: string): ClaudeCredential | undefined => {
   }
 }
 
-const readClaudeCredential = async (configDir: string): Promise<ClaudeCredential | undefined> => {
-  const fromFile = await readFile(join(configDir, '.credentials.json'), 'utf8').then(parseCredential, () => undefined)
-  if (fromFile !== undefined) return fromFile
-  const fromKeychain = await readKeychainSecret({ service: claudeKeychainService(configDir) })
-  return fromKeychain === undefined ? undefined : parseCredential(fromKeychain)
+type StoredLogin = { readonly kind: 'signed-in'; readonly credential: ClaudeCredential } | { readonly kind: 'signed-out' } | { readonly kind: 'missing' }
+
+const readClaudeLogin = async (configDir: string): Promise<StoredLogin> => {
+  const raw =
+    (await readFile(join(configDir, '.credentials.json'), 'utf8').catch(() => undefined)) ?? (await readKeychainSecret({ service: claudeKeychainService(configDir) }))
+  if (raw === undefined) return { kind: 'missing' }
+  const credential = parseCredential(raw)
+  return credential === undefined ? { kind: 'signed-out' } : { kind: 'signed-in', credential }
 }
 
 const profileSchema = z.object({
@@ -103,19 +110,22 @@ export const describeClaudeAuth = async (input: {
   readonly now: number
   readonly resolveCredential?: CredentialValueResolver
 }): Promise<ClaudeAuthView> => {
-  const [credential, identity, named] = await Promise.all([
-    readClaudeCredential(input.configDir),
+  const [login, identity, named] = await Promise.all([
+    readClaudeLogin(input.configDir),
     readClaudeIdentity(input.configDir),
     input.resolveCredential === undefined ? Promise.resolve(readKeyFromEnv(input.keyEnv)) : input.resolveCredential(input.keyEnv),
   ])
   const hasKey = named.length > 0
+  const credential = login.kind === 'signed-in' ? login.credential : undefined
   const expired = credential?.expiresAt !== undefined && credential.expiresAt <= input.now
-  return {
-    signedIn: hasKey || (credential !== undefined && !expired),
-    identity,
-    plan: credential?.plan,
-    detail: expired && !hasKey ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.' : undefined,
-  }
+  const detail = hasKey
+    ? undefined
+    : expired
+      ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.'
+      : login.kind === 'signed-out'
+        ? signedOutMessage(input.configDir)
+        : undefined
+  return { signedIn: hasKey || (credential !== undefined && !expired), identity, plan: credential?.plan, detail }
 }
 
 /** The token a request authenticates with: the named setup-token first, then the live login. */
@@ -127,8 +137,10 @@ export const resolveClaudeInferenceToken = async (input: {
 }): Promise<string> => {
   const named = input.resolveCredential === undefined ? readKeyFromEnv(input.keyEnv) : await input.resolveCredential(input.keyEnv)
   if (named.length > 0) return named
-  const credential = await readClaudeCredential(input.configDir)
-  if (credential === undefined) throw new Error(`No Claude login found. Run: ${claudeLoginHint(input.configDir)}`)
+  const login = await readClaudeLogin(input.configDir)
+  if (login.kind === 'signed-out') throw new Error(signedOutMessage(input.configDir))
+  if (login.kind === 'missing') throw new Error(`No Claude login found. Run: ${claudeLoginHint(input.configDir)}`)
+  const credential = login.credential
   if (credential.expiresAt !== undefined && credential.expiresAt <= input.now) {
     throw new Error('The Claude Code login has expired. Run Claude Code once on this account to refresh it.')
   }
@@ -172,8 +184,10 @@ export const parseClaudeUsage = (raw: unknown, plan: string | undefined): UsageC
 
 export const readClaudeUsage = async (configDir: string, signal?: AbortSignal): Promise<UsageCard> => {
   if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
-  const credential = await readClaudeCredential(configDir)
-  if (credential === undefined) return emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.')
+  const login = await readClaudeLogin(configDir)
+  if (login.kind === 'signed-out') return emptyUsage('unauthenticated', signedOutMessage(configDir))
+  if (login.kind === 'missing') return emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.')
+  const credential = login.credential
   if (credential.expiresAt !== undefined && credential.expiresAt <= Date.now()) {
     return emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.')
   }
