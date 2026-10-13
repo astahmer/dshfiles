@@ -69,6 +69,35 @@ become host-aware. Must run on **stock DSH 0.2.0-rc.2** (no core patches).
   hostId + path (+ worktree); server dispatches by hostId. App.asar not inspected further.
 - Lesson: both own a multi-connection client. DSH stock does not → we stay per-runtime and route.
 
+## Reference comparison (bb desktop build, t3code nightly v0.0.46-nightly.20261013, ours)
+
+Studied read-only: `/Applications/bb.app` app.asar (sourcemapped TS) and t3code nightly (same commit as
+its default branch). "Ours" is the target for this plan on stock DSH 0.2.0-rc.2.
+
+| Feature | bb | t3code nightly | Ours |
+| --- | --- | --- | --- |
+| Transport | Enrolled daemon, reconnecting WS to server; no SSH | System `ssh -N -L` tunnel to `t3 serve` on remote loopback | System `ssh -N -L` tunnel to remote `dsh web` on loopback (BatchMode) |
+| Host record | id, name, type, status, lifecycle, lastSeen, protocol | catalog entry: target `{alias,host,user,port}`, routes, profile | host `{id,name,sshTarget}` + runtime `{remoteHome, pinned identity, originPort, lastSeen}` |
+| Add host | Dialog → one-time enroll key → copy `curl … \| sh` → poll until connected | Settings → Connections → Add (SSH or pairing URL); SSH config/known_hosts suggestions | Host chip → **Add host…** sheet: suggestions from `~/.ssh/config` + `known_hosts`, **Find DSH** discovers remote homes, **Test** (ssh / runtime / identity steps with ms), Save |
+| Edit / remove | Rename, permission limit, suspend, delete | Row menu: routes, remove, retry update | Manage hosts: edit name/target/home (re-qualifies), reconnect, remove (forgets its threads) |
+| Remote provisioning | `install.sh` over enroll key | Downloads release archive, sha256, mkdir lock, `nohup serve` | **Gap**: DSH runtime provisioned by nixfiles / by hand; we only discover a running one |
+| Discovery of running server | Daemon dials in | `~/.t3/ssh-launch/<key>/port` + `server-runtime.json` | `$DSH_HOME/plugins/multi-host/launch.json` (0600, written by remote multi-host) or `$DSH_HOME/runtime/web-url` |
+| Auth to server | hostKey in `auth.json` 0600 | pairing token → bearer → WS ticket; catalog encrypted with safeStorage | launch token read over SSH at connect, exchanged for an HttpOnly cookie held in memory; nothing stored |
+| Persistent connection | WS with 5 s heartbeat, 30 s lease | one tunnel per target, supervisor | one pooled tunnel + gateway per runtime, 5 min idle TTL, generation ids, evicted when ssh exits |
+| Reconnect / backoff | 1→30 s jittered, reset after 10 s stable | 2 s→5 min jittered, reset after 30 s, wake/online skip | lazy reconnect on next call, reads retried once on a fresh tunnel, mutations never replayed; client polls status, manual **Reconnect** |
+| Status UI | Online/Offline/Paused, "Machines offline" | Off/Connecting/Reconnecting/Failed/Offline | status dot per host in chip menu (connected / idle / error with message + last seen) |
+| Folder browsing | `host.browse_directory` | env `filesystem.browse` | native `directoryPicker.list` on the remote runtime |
+| Branches / worktrees | `host.list_branch_options`, managed worktrees | `vcs.listRefs`, `createWorktree`, local\|worktree mode | remote `@dshfiles/jj-integration` (`projects`/`destination`/`provision`); hidden when the remote lacks it |
+| New-thread selector | machine picker, offline labels | "Run on" select, locked once thread has messages | Host chip leads the destination bar: Local ✓ / hosts with status / Add host… / Manage hosts…; blank threads only |
+| Run thread remotely | `thread.start` / `turn.submit` RPC | per-env WS orchestration | `session.create` + `session.prompt` on the remote runtime; unknown outcome reported, never replayed |
+| Streaming output | events POSTed + terminal WS | `subscribeThread` per env | remote thread view in the local `main` area: transcript polled from `session.page`, reply box, cancel, open remote UI |
+| Sidebar badge | "By machine" grouping, no per-thread badge | machine icon when thread env ≠ current | thread sidebar lists remote threads with a host badge |
+| Send while offline | queued until host reconnects | blocked, toast "Not connected" | blocked with the host's error and a Reconnect action |
+| Credentials | daemon hostKey 0600; GH_TOKEN for git | system ssh + askpass prompt; secrets in safeStorage | system ssh, agent/keys only (BatchMode, StrictHostKeyChecking=yes); **gap**: no password/askpass prompt |
+
+Stock-DSH gaps that stay: the browser client holds one runtime connection, so a remote thread is not a native
+local Session (no native transcript renderer, tools, approvals UI); remote provisioning; password SSH.
+
 ## Design
 
 ### What a host is
