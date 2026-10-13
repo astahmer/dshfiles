@@ -42,14 +42,14 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "plugin-marketplace.search-page",
-          "reason": "No browser journey exists yet for the search-page scenario of \"Browse and filter the plugin catalog\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/plugin-marketplace.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "plugin-marketplace.hub-boundary",
-          "reason": "No browser journey exists yet for the hub-boundary scenario of \"Browse and filter the plugin catalog\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/plugin-marketplace.feature"
         },
         {
           "kind": "unit-test",
@@ -97,14 +97,14 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "plugin-marketplace.install-consent",
-          "reason": "No browser journey exists yet for the install-consent scenario of \"Install a selected plugin with explicit consent\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/plugin-marketplace.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "plugin-marketplace.install-retry",
-          "reason": "No browser journey exists yet for the install-retry scenario of \"Install a selected plugin with explicit consent\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/plugin-marketplace.feature"
         },
         {
           "kind": "unit-test",
