@@ -1,6 +1,7 @@
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 
+import { boundedSummary } from '../../optmem-core/src/bounded-summary.ts'
 import { optmemSettings } from './settings.ts'
 import {
   classifyProviderFailure,
@@ -225,6 +226,84 @@ describe('llm summarizer', () => {
     })
     await expect(summarizer.summarize(request)).rejects.toThrow('summary output budget exhausted at 4096 tokens without answer text')
     expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('discards partial answer text on max-tokens and retries for a complete note', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        if (calls.length === 1) {
+          yield* answer('Deploy uses region eu-west-1; rollback requires').slice(0, -1)
+          yield { type: 'finish', reason: { kind: 'max-tokens' } }
+          return
+        }
+        yield* answer('Deploy uses eu-west-1; rollback requires release tag v3.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(summarizer.summarize(request)).resolves.toMatchObject({ text: 'Deploy uses eu-west-1; rollback requires release tag v3.' })
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('rejects repeated partial exhaustion as non-retryable without quarantining the route', async () => {
+    const calls: GenerateOptions[] = []
+    const quarantined: string[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('Rollback requires').slice(0, -1)
+        yield { type: 'finish', reason: { kind: 'max-tokens' } }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+      onRouteUnusable: route => quarantined.push(route),
+    })
+    await expect(summarizer.summarize(request)).rejects.toMatchObject({ name: 'OutputBudgetError', retryable: false })
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+    expect(quarantined).toEqual([])
+  })
+
+  it('propagates partial exhaustion through boundedSummary instead of returning an apparently unclipped node', async () => {
+    let calls = 0
+    const warnings: string[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* () {
+        calls++
+        yield* answer('Rollback requires').slice(0, -1)
+        yield { type: 'finish', reason: { kind: 'max-tokens' } }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(boundedSummary({ ...request, summarizer, logger: { warn: message => void warnings.push(message) }, retries: 3 })).rejects.toMatchObject({
+      name: 'OutputBudgetError',
+      retryable: false,
+    })
+    expect(calls).toBe(2)
+    expect(warnings).toEqual([])
+  })
+
+  it.each(['max-tokens', 'error'] as const)('does not repeat an exhausted %s request when the initial budget is already at the cap', async finish => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield {
+          type: 'finish',
+          reason: finish === 'max-tokens' ? { kind: finish } : { kind: finish, failure: { code: 'output_limit', message: 'finish_reason=length' } },
+        }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    await expect(summarizer.summarize({ ...request, maxBytes: 4_096 })).rejects.toMatchObject({ name: 'OutputBudgetError', retryable: false })
+    expect(calls.map(call => call.maxTokens)).toEqual([16_384])
   })
 
   it('fails clearly on an errored stream without retrying unrelated errors', async () => {

@@ -204,7 +204,8 @@ export const createLlmSummarizer = (options: {
     if (state.kind !== 'ready') throw new Error(`summarizer unavailable: ${state.kind === 'unavailable' ? state.reason : 'route not resolved'}`)
     const route = `${state.route.provider}/${state.route.model}`
     const initialBudget = Math.min(16_384, Math.max(2_048, request.maxBytes * 4))
-    const budgets = [initialBudget, Math.min(16_384, initialBudget * 2)]
+    const retryBudget = Math.min(16_384, initialBudget * 2)
+    const budgets = retryBudget > initialBudget ? [initialBudget, retryBudget] : [initialBudget]
     for (const maxTokens of budgets) {
       const commonCall: Omit<GenerateOptions, 'reasoningEffort'> = {
         provider: state.route.provider,
@@ -229,7 +230,7 @@ export const createLlmSummarizer = (options: {
         .trim()
       const failure = finish.kind === 'error' || finish.kind === 'aborted' ? finish.failure.message : ''
       if (failure.length > 0) {
-        if (maxTokens === initialBudget && isOutputBudgetFailure(failure)) continue
+        if (maxTokens < retryBudget && isOutputBudgetFailure(failure)) continue
         if (isOutputBudgetFailure(failure)) throw new OutputBudgetError(`summary output budget exhausted at ${maxTokens} tokens: ${failure}`)
         if (classifyProviderFailure(failure) === 'permanent') {
           options.onRouteUnusable?.(route, failure)
@@ -239,9 +240,11 @@ export const createLlmSummarizer = (options: {
         throw new Error(`summary call ended with ${finish.kind}: ${failure}`)
       }
       if (finish.kind === 'tool-calls') throw new Error('summary model requested a tool')
-      if (text.length === 0 && finish.kind === 'max-tokens') {
-        if (maxTokens === initialBudget) continue
-        throw new OutputBudgetError(`summary output budget exhausted at ${maxTokens} tokens without answer text`)
+      if (finish.kind === 'max-tokens') {
+        if (maxTokens < retryBudget) continue
+        throw new OutputBudgetError(
+          `summary output budget exhausted at ${maxTokens} tokens ${text.length === 0 ? 'without answer text' : 'with incomplete answer text'}`,
+        )
       }
       if (text.length === 0) throw new Error(`summary model returned no text (finish: ${finish.kind})`)
       const usage = assembler.usage
@@ -259,6 +262,6 @@ export const createLlmSummarizer = (options: {
             }),
       }
     }
-    throw new Error('summary call exhausted the output token budget twice without answer text')
+    throw new OutputBudgetError('summary call exhausted the output token budget')
   },
 })
