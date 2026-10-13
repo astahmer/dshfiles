@@ -135,7 +135,9 @@ for (const plugin of packages) {
     if (featureIds.has(feature.id)) featureIssues.push(`duplicate feature id ${feature.id}`)
     featureIds.add(feature.id)
     const kinds = new Set(feature.verification.map(item => item.kind))
-    if (parsed.data.kind === 'bundle' && !kinds.has('gherkin')) featureIssues.push(`bundle feature ${feature.id} needs a Gherkin browser scenario`)
+    if (parsed.data.kind === 'bundle' && !kinds.has('gherkin') && !kinds.has('not-applicable')) {
+      featureIssues.push(`bundle feature ${feature.id} needs a Gherkin browser scenario or an explicit not-applicable rationale`)
+    }
     if (parsed.data.kind === 'library' && !kinds.has('unit-test')) featureIssues.push(`library feature ${feature.id} needs a package unit-test reference`)
     if (parsed.data.kind === 'infrastructure' && !kinds.has('not-applicable')) {
       featureIssues.push(`infrastructure feature ${feature.id} needs an explicit not-applicable rationale`)

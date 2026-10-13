@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,7 +42,7 @@ const withFixture = async callback => {
   )
   const featureFile = resolve(featureRoot, 'demo.feature')
   await writeFile(featureFile, 'Feature: Demo boot\n  @scenario:demo.boot-profile\n  Scenario: Boot the disposable profile\n')
-  return callback({ root, featureFile })
+  return callback({ root, featureFile, catalogFile: resolve(pluginRoot, 'dshx.features.json') })
 }
 
 const runCheck = (root, mode = '--check') => spawnSync(process.execPath, ['--experimental-strip-types', scriptPath, mode, '--root', root], { encoding: 'utf8' })
@@ -104,5 +104,23 @@ test('reports a missing Gherkin file separately from a missing scenario tag', as
     const result = runCheck(root)
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Declared Gherkin feature file tooling\/dshx\/e2e\/features\/demo\.feature is missing from E2E feature discovery/)
+  })
+})
+
+test('lets a bundle feature declare its missing browser journey only with an explicit rationale', async () => {
+  await withFixture(async ({ root, featureFile, catalogFile }) => {
+    await rm(featureFile)
+    const catalog = JSON.parse(await readFile(catalogFile, 'utf8'))
+    catalog.features[0].verification = [{ kind: 'unit-test', id: 'demo.boot-unit', file: 'plugins/@dshfiles/demo/package.json', testName: '@dshfiles/demo' }]
+    catalog.features[0].configuration[0].coveredBy = ['demo.boot-unit']
+    await writeFile(catalogFile, JSON.stringify(catalog))
+    const withoutRationale = runCheck(root)
+    assert.equal(withoutRationale.status, 1)
+    assert.match(withoutRationale.stderr, /bundle feature boot-profile needs a Gherkin browser scenario or an explicit not-applicable rationale/)
+
+    catalog.features[0].verification.push({ kind: 'not-applicable', id: 'demo.boot-browser', reason: 'No browser journey exists yet for booting the profile.' })
+    await writeFile(catalogFile, JSON.stringify(catalog))
+    const withRationale = runCheck(root)
+    assert.equal(withRationale.status, 0, withRationale.stderr)
   })
 })
