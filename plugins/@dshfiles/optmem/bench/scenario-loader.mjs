@@ -12,11 +12,12 @@ const probeSchema = z.object({
   expect: z.array(expectation),
   forbid: z.array(expectation).optional(),
 })
+// The three original long scenarios name their stage and never require tools; the coding lane numbers its stages.
 const packetSchema = z.object({
   topic: z.string().min(1),
-  stage: z.number().int().min(1).max(3),
+  stage: z.union([z.number().int().min(1).max(3), z.string().min(1)]),
   rows: z.number().int().positive(),
-  requiresTools: z.boolean(),
+  requiresTools: z.boolean().default(false),
 })
 const scenarioSchema = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/),
@@ -24,7 +25,10 @@ const scenarioSchema = z.object({
   fixture: z.string().optional(),
   truth: z.record(z.string(), z.unknown()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  acceptance: z.string().regex(/^acceptance\/[a-z0-9-]+\.test\.mjs$/).optional(),
+  acceptance: z
+    .string()
+    .regex(/^acceptance\/[a-z0-9-]+\.test\.mjs$/)
+    .optional(),
   permissionMode: z.enum(['workspace-write', 'danger-full-access', 'read-only']).optional(),
   turnTimeoutMs: z.number().int().positive().optional(),
   compaction: z.object({ thresholdRatio: z.number().positive().max(1), retainTokens: z.number().int().nonnegative() }).optional(),

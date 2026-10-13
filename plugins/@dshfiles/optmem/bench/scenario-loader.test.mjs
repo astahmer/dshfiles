@@ -63,3 +63,10 @@ test('calibration runtime fingerprint includes calibration implementation', asyn
   const calibrationHash = await runtimeFingerprint({ arm: 'A', calibration: true })
   assert.notEqual(calibrationHash, benchmarkHash)
 })
+
+test('loads the original long scenarios with their named packet stages', async () => {
+  const { scenario } = await loadScenario({ path: new URL('./scenarios/infra-rollout.mjs', import.meta.url).pathname, rep: 1, variant: 'pilot' })
+  const packets = scenario.conversations.flatMap(conversation => conversation.turns.flatMap(turn => (turn.packet === undefined ? [] : [turn.packet])))
+  assert.ok(packets.length > 0)
+  assert.ok(packets.every(packet => typeof packet.stage === 'string' && packet.requiresTools === false))
+})
