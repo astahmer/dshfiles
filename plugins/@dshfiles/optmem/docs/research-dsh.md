@@ -4,6 +4,11 @@ Paths: **F** = `tooling/dsh-core` (fork, copied from tag dsh-v0.2.0-rc.2 + runti
 **G/I** = installed rc.2 packages under `~/.local/share/pnpm/global/v11/…/node_modules/@deepseek-ai/<pkg>/lib/`.
 [C] confirmed in code, [I] inferred. Full helper reports were not saved; re-derive details from the citations.
 
+> 2026-10-13: the fork (**F**) was deleted. Full mode now runs on stock DSH: `@dshfiles/request-messages` dispatches
+> `agent/request-messages` by wrapping `LlmRuntime.adapterStream`, the innermost callback of the `llm/stream`
+> waterfall, which receives the same options object and runs before file/image projection and adapter dispatch. See
+> [design.md](design.md) §1. Fork-path statements below are historical.
+
 ## Versions / install
 
 - Installed DSH 0.2.0-rc.2 (global pnpm). Fork session format v5 vs installed v4 (only adds `runtimeBinding`). [C]

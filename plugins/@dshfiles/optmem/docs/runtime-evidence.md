@@ -156,3 +156,24 @@ cap), every node ≤ 512 bytes; level-0 LLM nodes cover events too long to keep 
 500 bytes stay `verbatim`, small merges stay `concat`. All cursors are caught up (fts 66 = events 66; leaf = last position per
 stream). The project compact view the model saw was 5.6 KB at the end of 26 turns. For comparison the S1 compat run
 wrote 18 LLM nodes (max 498 bytes, levels 0–4) over 56 events.
+
+# Full mode on stock DSH through `@dshfiles/request-messages` (2026-10-13)
+
+No core fork: DSH 0.2.0-rc.2 as installed, Node 22.23.3. Scratch homes under `/private/tmp/dsh-optmem-verify`
+(`DSH_HOME` per mode), profile `optmem-verify` = `dsh-base` + `dsh-web-app` + `@dshfiles/shared-runtime`,
+`@dshfiles/request-messages`, `@dshfiles/optmem` (linked with `pnpm profile:sync --home … --bundle …`) + a throwaway
+`echo-llm` bundle registering provider `echo` (model `echo-1`, `contextWindow` 80000, so compaction-basic's default
+policy gives a 14,464-token threshold). The echo adapter answers one short text block and appends every request it
+receives (purpose, session, message count, bytes) to a JSONL file. No real provider was called. Each run booted
+`dsh optmem-verify --port 3199`, created one session through the dshx platform client, sent ten ~8 KB prompts, read
+OptMem's `overview` API, then stopped the Host. Port 3080 was not touched.
+
+| Mode   | OptMem overview                                        | Messages per agent-loop request (turns 1–10) | Last request | DSH compaction summaries     |
+| ------ | ------------------------------------------------------ | -------------------------------------------- | ------------ | ---------------------------- |
+| full   | `fullModeAvailable: true`, `activeMode: full`          | 5 ×10                                        | 34,032 B     | 0                            |
+| compat | `fullModeAvailable: true`, `activeMode: compatibility` | 4, 6, 8, 10, 12, 14, 16, 17, 19, 17          | 84,161 B     | 6 (18 `compaction/*` events) |
+
+Both runs also made 12 one-message OptMem leaf summaries (`purpose: compaction`, echo route). Before pressure
+compaction was skipped in full mode, the same full-mode run sent 5 messages for turns 1–7, then DSH compacted the
+stored history (6 summaries), OptMem's current-turn cut no longer matched the replaced surface, and turns 8–10 fell
+back to 17–19 messages. That is why `src/compaction-deferral.ts` exists.

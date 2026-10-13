@@ -16,6 +16,16 @@ A dedicated **OptMem** Workbench page (separate from Settings) offers three read
 
 Workspace identity remains the current OptMem project identity (`workspace:<id>` or historical `path:<hash>`). Multiple Jujutsu workspaces in one repository are not silently joined; a repository-level identity migration would need an explicit compatibility and data-preservation design. Pending unsummarized tails are accounted in the Pipeline tab, not in the committed Explorer tree.
 
+## Full mode
+
+Full mode sends each request as system and instruction messages, one memory view message, then the current turn only.
+It runs on stock DSH through `@dshfiles/request-messages`, which wraps the llm runtime's innermost adapter call; that
+bundle must be in the profile. Each override is recorded in OptMem's status (`lastFullRequest`: original vs sent
+message counts and bytes) and the Host log (`optmem: full-mode request`), never in the session log. While full mode
+holds a conversation, DSH's pressure compaction of its stored history is skipped (`src/compaction-deferral.ts`): the
+token meter prices that history, not what is sent, so compaction would otherwise keep summarizing context full mode
+never sends. Overflow recovery still runs. The Context bar keeps showing the stored history's size.
+
 ## Settings in DSH
 
 Settings live in the `dshfiles-optmem` entry (Loader row inserted by this package's `cordis.patch.yml`). A small client
@@ -26,8 +36,8 @@ Settings live in the `dshfiles-optmem` entry (Loader row inserted by this packag
   add, reorder and remove. Routes are checked against the models each DSH provider offers, using the same matching as
   the Host (`src/routing.ts`). Warnings never block saving.
 - An override route (one provider, model and effort for every summary), every byte budget, and the exclusions.
-- `mode` can be switched to `full` only when the Host reports the fork core marker (`agent/request-messages`).
-  Otherwise it is read-only.
+- `mode` can be switched to `full` only when [`@dshfiles/request-messages`](../request-messages/README.md) is loaded
+  and reports that it dispatches `agent/request-messages`. Otherwise it is read-only.
 - Live status from the Host API (`src/api.ts`): database size, stored events vs stream entries, in-memory jobs vs persisted missing-leaf entries, estimated unique model calls, ready merges, oldest pending work, completed summaries, recent throughput, last route and error. The legacy `pendingSummaries` value is explicitly labeled as an in-memory job count, not calls or persisted backlog. **Pause summaries** is live; failed summaries retry after resume. **Backfill sessions** imports a bounded batch.
 - Backlog accounting, the output-budget failure mode, safe retry behavior, production-snapshot caveats and data-safety boundaries are recorded in [`docs/backlog-diagnosis.md`](docs/backlog-diagnosis.md).
 

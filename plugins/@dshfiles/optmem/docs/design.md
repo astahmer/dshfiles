@@ -9,19 +9,21 @@ Clean-room: the gist has no licence — no prompts, templates or code are copied
   `ctx.sessionQuery`. Session id, cwd, parentSession from the session header; project via cwd realpath.
 - Tools: `defineTool` in `defineHost({ tools })`; `exec.agent.id` = session id, `exec.signal` for cancellation.
 - Injection: `definePromptContext` (durable user-role snapshot, re-emitted only when its text changes).
-- Full replacement: **no stock hook replaces request messages**. Options: (A) fork waterfall
-  `agent/request-messages` after `buildRequest` (≈10 lines in `tooling/dsh-core/agent-loop`, active only under
-  `dsh-core-runtime`, i.e. scratch profiles); (B) durable `surfaceOp:'replace'` from `agent/pre-step` (stock, but
+- Full replacement: **no stock event replaces request messages**. Options: (A) an `agent/request-messages`
+  waterfall dispatched per agent-loop request; (B) durable `surfaceOp:'replace'` from `agent/pre-step` (stock, but
   rewrites the session surface, i.e. the user's history view of the model context); (C) `llm/stream`
-  short-circuit (stock, but the session log no longer matches what was sent). **Chosen: A**, B as documented
-  fallback; C rejected.
+  short-circuit (stock, but drops every later `llm/stream` listener and the prepared call). **Chosen: A**, first as a
+  core fork, now dispatched on stock DSH by `@dshfiles/request-messages`, which wraps `LlmRuntime.adapterStream`
+  (the innermost callback of `llm/stream`) and keeps config, tools and tool history unchanged.
 - Storage: `node:sqlite` `DatabaseSync` + FTS5, verified on Node v22.23.3 (DSH runtime). DB at
   `dshHomePath('plugins', 'optmem', 'optmem.db')`. WAL mode, one writer per process, `busy_timeout`.
 
 ## 2. Limitations to accept up front
 
-- Full mode works only where the fork agent-loop is active (probe/scratch profile via dsh-core-runtime) until the
-  waterfall is upstreamed. Stock `web` runs compatibility mode only; startup validation reports this.
+- Full mode needs `@dshfiles/request-messages`, which relies on the private `LlmRuntime.adapterStream`; a DSH
+  release that drops it makes the bundle report itself inactive and OptMem falls back to compatibility mode.
+  DSH's token meter and compaction still price the stored history, so OptMem skips pressure compaction while full
+  mode is active.
 - Runtime drivers (cursor-acp) get no system prompt/tools from DSH → OptMem can capture their events but cannot
   inject or replace context there.
 - deepseek caches server-side by prefix; pi-ai routes need `cacheRetention` ≠ none. Cache-read % is observable
@@ -152,7 +154,7 @@ Producers (capture) and consumers (tools/injection) are separate adapter parts.
   settings (mode, budgets, model, exclusions). Depends on core + sqlite.
 - Benchmarks/evals: `optmem-sqlite/bench` (10k/100k synthetic) + retrieval eval fixtures; promote to an
   `optmem-evals` package only if it grows.
-- Fork change for full mode: `tooling/dsh-core/agent/src/runtime-types.ts` + `agent-loop/src/agent.ts`.
+- Full-mode dispatch: `plugins/@dshfiles/request-messages` (no core change).
 
 ## 9. Security
 
@@ -166,7 +168,7 @@ DB file mode 600, no network listener.
 - Summaries cost model calls ≈ one per event + one per internal node; mitigated by the 512 B verbatim rule and a
   cheap model; budget visible in `memory_status`.
 - Project-stream interleaving of concurrent conversations is chronological but mixes topics; acceptable by spec.
-- Full mode depends on the fork; upstreaming the waterfall is the long-term fix.
+- Full mode depends on a private `LlmRuntime` method; an upstream `agent/request-messages` waterfall is the long-term fix.
 
 ## 11. Stage plan
 

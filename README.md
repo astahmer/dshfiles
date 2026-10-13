@@ -17,9 +17,7 @@ Every owned bundle links to its package guide. This table is the package index; 
 | [`agent-questions`](plugins/@dshfiles/agent-questions/README.md) | Parent-scoped questions, deferred answers, and revisioned Markdown feedback. |
 | [`ai-accounts`](plugins/@dshfiles/ai-accounts/README.md) | Account-aware provider setup and model routing. |
 | [`command-palette`](plugins/@dshfiles/command-palette/README.md) | App-wide searchable command palette and action registry. |
-| [`cursor-agent`](plugins/@dshfiles/cursor-agent/README.md) | Cursor ACP sessions and recovery for uncertain prompts. |
 | [`diff-viewed`](plugins/@dshfiles/diff-viewed/README.md) | Track changed files reviewed per turn. |
-| [`dsh-core-runtime`](plugins/@dshfiles/dsh-core-runtime/README.md) | Load local core runtime forks in scratch profiles. |
 | [`editor`](plugins/@dshfiles/editor/README.md) | Monaco file tree, tabs, open-from-anywhere, and confined saves. |
 | [`goal-stall-guard`](plugins/@dshfiles/goal-stall-guard/README.md) | Pause goals whose rounds stop making progress. |
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
@@ -30,6 +28,7 @@ Every owned bundle links to its package guide. This table is the package index; 
 | [`project-checks`](plugins/@dshfiles/project-checks/README.md) | Run trusted project actions and inspect completion receipts. |
 | [`prompt-stash`](plugins/@dshfiles/prompt-stash/README.md) | Save reusable prompts and bounded composer drafts locally. |
 | [`queue-reorder`](plugins/@dshfiles/queue-reorder/README.md) | Reorder queued messages through DSH's durable inbox splice. |
+| [`request-messages`](plugins/@dshfiles/request-messages/README.md) | Dispatch `agent/request-messages` on stock DSH so plugins can replace a request's messages. |
 | [`secret-catalog`](plugins/@dshfiles/secret-catalog/README.md) | Browse project-scoped secret aliases without exposing values to Client. |
 | [`settings-search`](plugins/@dshfiles/settings-search/README.md) | Search Settings fields and edit matches in place. |
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md) | Claim keyboard shortcuts before browser defaults. |
