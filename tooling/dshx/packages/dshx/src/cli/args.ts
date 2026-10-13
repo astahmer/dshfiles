@@ -289,7 +289,7 @@ export const cliCommandMetadata = {
   package: 'Build, validate, and pack a native plugin bundle.',
   build: 'Build Host and Client plugin artifacts.',
   check: 'Validate compatibility and project wiring.',
-  dev: 'Run a compatibility-aware DSH development session.',
+  dev: 'Run a compatibility-aware DSH development session; dev up|doctor|open|shot|down drive a scratch DSH (dshx dev up --help).',
   inspect: 'Inspect Slots, Tools, Services, or Events.',
   add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
   status: 'Check the authenticated local DSH Host connection.',

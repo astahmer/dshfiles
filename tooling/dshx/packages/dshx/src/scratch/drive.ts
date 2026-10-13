@@ -1,0 +1,223 @@
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { Browser, Page } from 'playwright'
+import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
+import { DSHFILES_ROOT } from '../project/local-bundles.js'
+import { dismissPreviewNotice, dismissProviderSetupDuringStartup } from '../project/startup-dialogs.js'
+import { ScratchError, ownedProcessStatus, redactUrls, type ScratchState } from './state.js'
+
+export interface CatalogFeature {
+  readonly packageId: string
+  readonly catalogFile: string
+  readonly id: string
+  readonly title: string
+  readonly reach?: readonly string[]
+}
+
+const catalogFeatures = async (): Promise<CatalogFeature[]> => {
+  const pluginsRoot = join(DSHFILES_ROOT, 'plugins/@dshfiles')
+  const features: CatalogFeature[] = []
+  for (const entry of await readdir(pluginsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const catalogFile = join(pluginsRoot, entry.name, 'dshx.features.json')
+    const source = await readFile(catalogFile, 'utf8').catch(() => undefined)
+    if (source === undefined) continue
+    const catalog = DshxFeatureCatalogSchema.safeParse(JSON.parse(source))
+    if (!catalog.success) continue
+    for (const feature of catalog.data.features) {
+      features.push({
+        packageId: `@dshfiles/${entry.name}`,
+        catalogFile,
+        id: feature.id,
+        title: feature.title,
+        ...(feature.reach === undefined ? {} : { reach: feature.reach }),
+      })
+    }
+  }
+  return features
+}
+
+/** `<feature-id>`, `<plugin>/<feature-id>` or `@dshfiles/<plugin>#<feature-id>`. */
+export const findCatalogFeature = async (reference: string): Promise<CatalogFeature> => {
+  const features = await catalogFeatures()
+  const match = /^(?:@dshfiles\/)?(?:([a-z0-9-]+)[/#])?([a-z0-9][a-z0-9-]*)$/.exec(reference)
+  const plugin = match?.[1]
+  const featureId = match?.[2]
+  const candidates = features.filter(feature => feature.id === featureId && (plugin === undefined || feature.packageId === `@dshfiles/${plugin}`))
+  if (candidates.length === 1 && candidates[0] !== undefined) return candidates[0]
+  if (candidates.length > 1) {
+    throw new ScratchError(
+      'ambiguous-feature',
+      `"${reference}" names ${candidates.length} features.`,
+      `Qualify it: ${candidates.map(feature => `${feature.packageId.slice('@dshfiles/'.length)}/${feature.id}`).join(', ')}.`,
+    )
+  }
+  const reachable = features.filter(feature => feature.reach !== undefined).map(feature => `${feature.packageId.slice('@dshfiles/'.length)}/${feature.id}`)
+  throw new ScratchError('unknown-feature', `No catalog feature matches "${reference}".`, `Features with reach steps: ${reachable.join(', ')}.`)
+}
+
+const connect = async (state: ScratchState): Promise<{ readonly browser: Browser; readonly page: Page }> => {
+  if (ownedProcessStatus(state.browser) !== 'running') {
+    throw new ScratchError('browser-down', 'The scratch Chromium is not running.', 'Run "dshx dev down" then "dshx dev up".')
+  }
+  const { chromium } = await import('playwright')
+  const browser = await chromium.connectOverCDP(`http://127.0.0.1:${state.browser.cdpPort}`)
+  const context = browser.contexts()[0]
+  if (context === undefined)
+    throw new ScratchError('browser-context', 'The scratch Chromium has no browser context.', 'Run "dshx dev down" then "dshx dev up".')
+  const page = context.pages()[0] ?? (await context.newPage())
+  return { browser, page }
+}
+
+/** Names match exactly; a trailing `*` matches a case-insensitive substring (for names that carry a path or count). */
+const locate = (page: Page, by: string, rawName: string) => {
+  const exact = !rawName.endsWith('*')
+  const name = exact ? rawName : rawName.slice(0, -1)
+  if (by === 'text') return page.getByText(name, { exact }).first()
+  if (by === 'label') return page.getByLabel(name, { exact }).first()
+  // SAFETY: the catalog grammar admits any lowercase word; Playwright rejects an unknown ARIA role at run time.
+  return page.getByRole(by as Parameters<Page['getByRole']>[0], { name, exact }).first()
+}
+
+export interface OpenStepResult {
+  readonly step: string
+  readonly ok: boolean
+  readonly ms: number
+  readonly error?: string
+}
+
+export interface OpenResult {
+  readonly feature: string
+  readonly packageId: string
+  readonly catalogFile: string
+  readonly steps: readonly OpenStepResult[]
+  readonly ok: boolean
+  readonly path: string
+  readonly failureShot?: string
+}
+
+export const scratchOpen = async (state: ScratchState, reference: string, timeoutMs: number): Promise<OpenResult> => {
+  const feature = await findCatalogFeature(reference)
+  if (feature.reach === undefined) {
+    throw new ScratchError(
+      'no-reach',
+      `${feature.packageId}#${feature.id} has no reach steps.`,
+      `Add "reach" to ${feature.catalogFile} (skill maintain-verify-dsh).`,
+    )
+  }
+  if (!state.bundles.includes(feature.packageId)) {
+    throw new ScratchError(
+      'plugin-not-loaded',
+      `${feature.packageId} is not in this scratch DSH.`,
+      `Run "dshx dev down" then "dshx dev up --plugin ${feature.packageId}".`,
+    )
+  }
+  const { browser, page } = await connect(state)
+  const steps: OpenStepResult[] = []
+  try {
+    await page.goto(state.launchUrl, { waitUntil: 'domcontentloaded' })
+    await page.locator('[data-slot="root"]').first().waitFor({ state: 'attached', timeout: timeoutMs })
+    await dismissPreviewNotice(page, 3_000)
+    await dismissProviderSetupDuringStartup(page, 3_000)
+    for (const step of feature.reach) {
+      const parsed = parseReachStep(step)
+      const startedAt = Date.now()
+      try {
+        if (parsed === undefined) throw new Error('step does not match the reach grammar')
+        if (parsed.action === 'press') await page.keyboard.press(parsed.key)
+        else if (parsed.action === 'click') await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })
+        else if (parsed.action === 'fill') await locate(page, parsed.by, parsed.name).fill(parsed.value ?? '', { timeout: timeoutMs })
+        else await locate(page, parsed.by, parsed.name).waitFor({ state: 'visible', timeout: timeoutMs })
+        steps.push({ step, ok: true, ms: Date.now() - startedAt })
+      } catch (error) {
+        steps.push({
+          step,
+          ok: false,
+          ms: Date.now() - startedAt,
+          error: redactUrls(error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error)),
+        })
+        break
+      }
+    }
+    const ok = steps.length === feature.reach.length && steps.every(step => step.ok)
+    let failureShot: string | undefined
+    if (!ok) {
+      await mkdir(state.evidenceDir, { recursive: true })
+      failureShot = join(state.evidenceDir, `${new Date().toISOString().replaceAll(':', '-')}-open-failed-${feature.id}.png`)
+      await page.screenshot({ path: failureShot })
+    }
+    return {
+      feature: feature.id,
+      packageId: feature.packageId,
+      catalogFile: feature.catalogFile,
+      steps,
+      ok,
+      path: new URL(page.url()).pathname,
+      ...(failureShot === undefined ? {} : { failureShot }),
+    }
+  } finally {
+    await browser.close()
+  }
+}
+
+interface BrowserEvent {
+  readonly at: string
+  readonly kind: string
+  readonly detail: string
+}
+
+export interface ShotResult {
+  readonly screenshot: string
+  readonly summary: string
+  readonly path: string
+  readonly title: string
+  readonly errors: { readonly console: number; readonly page: number; readonly requests: number; readonly http: number }
+  readonly warnings: number
+  /** Distinct error events, most frequent first, at most 10. */
+  readonly topErrors: readonly { readonly kind: string; readonly detail: string; readonly count: number }[]
+}
+
+export const scratchShot = async (state: ScratchState, label: string, outDir: string | undefined): Promise<ShotResult> => {
+  const directory = outDir ?? state.evidenceDir
+  await mkdir(directory, { recursive: true })
+  const stamp = new Date().toISOString().replaceAll(':', '-')
+  const screenshot = join(directory, `${stamp}-${label}.png`)
+  const summaryFile = join(directory, `${stamp}-${label}.json`)
+  const { browser, page } = await connect(state)
+  let path: string
+  let title: string
+  try {
+    await page.screenshot({ path: screenshot })
+    path = new URL(page.url()).pathname
+    title = await page.title()
+  } finally {
+    await browser.close()
+  }
+  const events = (await readFile(state.browserEvents, 'utf8').catch(() => ''))
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .map((line): BrowserEvent => JSON.parse(line))
+  const count = (kind: string): number => events.filter(event => event.kind === kind).length
+  const errorEvents = events.filter(event => event.kind !== 'console.warning')
+  const result: ShotResult = {
+    screenshot,
+    summary: summaryFile,
+    path,
+    title,
+    errors: { console: count('console.error'), page: count('pageerror'), requests: count('requestfailed'), http: count('http') },
+    warnings: count('console.warning'),
+    topErrors: [
+      ...errorEvents
+        .reduce((groups, event) => {
+          const key = `${event.kind}\u0000${event.detail.slice(0, 300)}`
+          groups.set(key, { kind: event.kind, detail: event.detail.slice(0, 300), count: (groups.get(key)?.count ?? 0) + 1 })
+          return groups
+        }, new Map<string, { kind: string; detail: string; count: number }>())
+        .values(),
+    ]
+      .sort((left, right) => right.count - left.count)
+      .slice(0, 10),
+  }
+  await writeFile(summaryFile, `${JSON.stringify({ ...result, events: errorEvents }, null, 2)}\n`)
+  return result
+}

@@ -50,6 +50,18 @@ Successful Host rebuilds restart the Host automatically by default. Set `dev.hos
 
 `--port 0` asks DSH to allocate an available Web port. Use a concrete port when browser state or an external test must keep the same address across automatic Host restarts. If omitted, DSHX follows the configured/default DSH Web port.
 
+### Scratch DSH for verification: `dshx dev up|doctor|open|shot|down`
+
+```bash
+dshx dev up [--plugin @dshfiles/<name>]... [--project <dir>] [--port <n>] [--skip-build] [--json]
+dshx dev doctor [--json]
+dshx dev open <feature> [--timeout <ms>] [--json]
+dshx dev shot [--label <label>] [--out <dir>] [--json]
+dshx dev down [--dry-run] [--json]
+```
+
+These drive a disposable DSH from this checkout (they need the dshfiles repository and Node from `.node-version`). `up` builds the owned bundles under test, installs a scratch profile in a temp `DSH_HOME`, seeds a jj project with a `main` bookmark (or registers `--project`) in the scratch workspace storage, starts `dsh` on a free port and a headless Chromium, and records pids and paths in `$TMPDIR/dshx-dev/<name>/state.json` (mode 600; it is the only place the tokenized launch URL is written). `open` walks a feature's `reach` steps from its `dshx.features.json` catalog in that browser; `shot` saves a screenshot and a grouped console/network error summary; `down` stops the recorded process groups only while their command lines still match, deletes the scratch home and state, and keeps the evidence directory. `--name` runs several side by side; every action has `--help`, and failures print a `fix` (`error.hint` with `--json`).
+
 ## `dshx inspect`
 
 ```bash

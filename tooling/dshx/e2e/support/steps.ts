@@ -5,6 +5,7 @@ import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
+import { dismissProviderSetupDuringStartup, registerProviderSetupDismissal } from '../../packages/dshx/src/project/startup-dialogs.js'
 import {
   capturePageEvidenceFrame,
   completeEvidenceStep,
@@ -44,29 +45,6 @@ const evidenceRunFor = (page: Page): EvidenceRun => {
 }
 
 export const browserDiagnosticsFor = (page: Page): readonly string[] => browserDiagnostics.get(page) ?? []
-
-const registerProviderSetupDismissal = (page: Page): Promise<void> => {
-  const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
-  return page.addLocatorHandler(providerSetup, async dialog => {
-    await dialog.getByRole('button', { name: 'Configure later', exact: true }).click()
-  })
-}
-
-const dismissProviderSetupDuringStartup = async (page: Page): Promise<void> => {
-  const providerSetup = page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
-  const providerSetupAppeared = await providerSetup.waitFor({ state: 'visible', timeout: 5_000 }).then(
-    () => true,
-    error => {
-      if (error instanceof Error && error.name === 'TimeoutError') return false
-      throw error
-    },
-  )
-  if (providerSetupAppeared) {
-    await providerSetup.getByRole('button', { name: 'Configure later', exact: true }).click()
-    await expect(providerSetup).toBeHidden()
-  }
-  await registerProviderSetupDismissal(page)
-}
 
 const hostApiDiagnosticsFor = async (homeRoot: string): Promise<{ readonly files: readonly string[]; readonly lines: readonly string[] }> => {
   const logDirectories = ['logs', '.dsh/logs']

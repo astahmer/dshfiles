@@ -1,0 +1,160 @@
+import { readFile, rm } from 'node:fs/promises'
+import { basename, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { connectDshPlatformClient } from '../platform/client.js'
+import { LIVE_DSH_HOME, LIVE_DSH_PORT, isWithin, ownedProcessStatus, redactUrls, removeScratchStateFile, type ScratchState } from './state.js'
+
+export interface DoctorCheck {
+  readonly id: string
+  readonly ok: boolean
+  readonly detail: string
+  readonly fix?: string
+}
+
+const HOST_ERROR_LINE = /did not activate|\berror\b|\bfailed\b|EADDRINUSE|unhandled/i
+
+/** Read-only: never restarts, navigates or writes anything. */
+export const scratchDoctor = async (state: ScratchState): Promise<readonly DoctorCheck[]> => {
+  const checks: DoctorCheck[] = []
+  const isolated = state.port !== LIVE_DSH_PORT && !isWithin(LIVE_DSH_HOME, state.home)
+  checks.push({
+    id: 'isolated',
+    ok: isolated,
+    detail: isolated ? `port ${state.port}, home ${state.home}` : 'state points at the live DSH port or home',
+    ...(isolated ? {} : { fix: 'Do not use this state; run "dshx dev down --dry-run" and inspect it by hand.' }),
+  })
+  const host = ownedProcessStatus(state.host)
+  checks.push({
+    id: 'host-process',
+    ok: host === 'running',
+    detail: `pid ${state.host.pid} ${host}`,
+    ...(host === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
+  })
+  const browser = ownedProcessStatus(state.browser)
+  checks.push({
+    id: 'browser-process',
+    ok: browser === 'running',
+    detail: `pid ${state.browser.pid} ${browser}`,
+    ...(browser === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
+  })
+
+  let plugins: Awaited<ReturnType<Awaited<ReturnType<typeof connectDshPlatformClient>>['plugins']['list']>> | undefined
+  try {
+    const client = await connectDshPlatformClient({ url: state.launchUrl })
+    checks.push({ id: 'url', ok: true, detail: `${state.origin} answers and authenticates` })
+    plugins = await client.plugins.list()
+  } catch (error) {
+    checks.push({
+      id: 'url',
+      ok: false,
+      detail: redactUrls(error instanceof Error ? error.message : String(error)),
+      fix: 'Read the host log; if dsh exited, run "dshx dev down" then "dshx dev up".',
+    })
+  }
+  if (plugins !== undefined) {
+    const broken = plugins.filter(plugin => plugin.enabled && (plugin.phase === 'failed' || plugin.phase === 'pending'))
+    const loadedModules = plugins.filter(plugin => plugin.phase === 'active').map(plugin => plugin.moduleName)
+    const missing = state.bundles.filter(bundle => !loadedModules.some(moduleName => moduleName === bundle || moduleName.startsWith(`${bundle}/`)))
+    const ok = broken.length === 0 && missing.length === 0
+    checks.push({
+      id: 'plugins',
+      ok,
+      detail: ok
+        ? `${loadedModules.length} active entries; all ${state.bundles.length} bundles under test loaded`
+        : [
+            broken.length > 0 ? `not active: ${broken.map(plugin => `${plugin.id} (${plugin.phase})`).join(', ')}` : '',
+            missing.length > 0 ? `no active entry: ${missing.join(', ')}` : '',
+          ]
+            .filter(Boolean)
+            .join('; '),
+      ...(ok ? {} : { fix: 'The first entry named is often a dependent; read the host log and run "dshx check --boot" in the plugin.' }),
+    })
+  }
+  const hostErrors = (await readFile(state.hostLog, 'utf8').catch(() => ''))
+    .split('\n')
+    .filter(line => HOST_ERROR_LINE.test(line))
+    .map(line => redactUrls(line).slice(0, 300))
+  checks.push({
+    id: 'host-log',
+    ok: hostErrors.length === 0,
+    detail: hostErrors.length === 0 ? 'no error lines' : hostErrors.slice(-10).join('\n'),
+    ...(hostErrors.length === 0 ? {} : { fix: `Read ${state.hostLog} (it holds the launch token; do not paste it).` }),
+  })
+  return checks
+}
+
+export interface DownAction {
+  readonly action: 'stop' | 'skip' | 'remove' | 'keep'
+  readonly target: string
+  readonly reason: string
+}
+
+const scratchHomeIsOurs = (home: string): boolean =>
+  isWithin(tmpdir(), home) && basename(home).startsWith('dshx-boot-profile-') && !isWithin(LIVE_DSH_HOME, home)
+
+const stopGroup = async (pid: number): Promise<boolean> => {
+  const alive = (): boolean => {
+    try {
+      process.kill(-pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch {
+    return !alive()
+  }
+  for (let attempt = 0; attempt < 50 && alive(); attempt += 1) await new Promise(resolve => setTimeout(resolve, 100))
+  if (alive()) {
+    try {
+      process.kill(-pid, 'SIGKILL')
+    } catch {
+      /* exited in between */
+    }
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  return !alive()
+}
+
+/** Stop exactly the processes `up` recorded (if they still are ours) and remove the scratch home; evidence stays. */
+export const scratchDown = async (
+  state: ScratchState,
+  dryRun: boolean,
+): Promise<{ readonly actions: readonly DownAction[]; readonly leftRunning: readonly number[] }> => {
+  const actions: DownAction[] = []
+  const leftRunning: number[] = []
+  for (const [label, owned] of [
+    ['browser', state.browser],
+    ['dsh', state.host],
+  ] as const) {
+    const status = ownedProcessStatus(owned)
+    if (status === 'gone') {
+      actions.push({ action: 'skip', target: `${label} pid ${owned.pid}`, reason: 'already exited' })
+      continue
+    }
+    if (status === 'foreign') {
+      actions.push({ action: 'skip', target: `${label} pid ${owned.pid}`, reason: 'the pid now runs another command; not ours to kill' })
+      continue
+    }
+    actions.push({ action: 'stop', target: `${label} pid ${owned.pid} (process group)`, reason: 'started by dshx dev up' })
+    if (!dryRun && !(await stopGroup(owned.pid))) leftRunning.push(owned.pid)
+  }
+  if (scratchHomeIsOurs(state.home)) {
+    actions.push({ action: 'remove', target: state.home, reason: 'scratch home (profile, storages, browser profile, sample project)' })
+    if (!dryRun) await rm(state.home, { recursive: true, force: true })
+  } else {
+    actions.push({ action: 'skip', target: state.home, reason: 'not a dshx scratch home under the temp directory; left alone' })
+  }
+  for (const file of [state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready'), join(state.stateDir, 'state.json')]) {
+    actions.push({ action: 'remove', target: file, reason: 'scratch state (the host log and state hold the launch token)' })
+  }
+  if (!dryRun) {
+    await Promise.all([state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready')].map(file => rm(file, { force: true })))
+    await removeScratchStateFile(state.stateDir)
+  }
+  if (!state.project.ownedByScratch) actions.push({ action: 'keep', target: state.project.path, reason: 'project passed with --project' })
+  actions.push({ action: 'keep', target: state.evidenceDir, reason: 'evidence' })
+  return { actions, leftRunning }
+}
