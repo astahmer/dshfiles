@@ -8,7 +8,7 @@ import { z } from 'zod'
  *
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
- * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool, `[[read PATH]]` calls the read tool and
+ * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[read PATH]]` calls the read tool and
  * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, and `[[hold]]`
  * keeps the turn running until `releaseHeldTurns`; the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
@@ -55,10 +55,11 @@ const streamAnswer = (response: ServerResponse, delta: object): void => {
   response.end('data: [DONE]\n\n')
 }
 
-const toolCall = (name: string, args: object): object => ({
+const toolCalls = (calls: readonly { readonly name: string; readonly args: object }[]): object => ({
   content: null,
-  tool_calls: [{ index: 0, id: `call_${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
+  tool_calls: calls.map((call, index) => ({ index, id: `call_${String(index)}_${call.name}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } })),
 })
+const toolCall = (name: string, args: object): object => toolCalls([{ name, args }])
 
 export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode> => {
   const requests: FakeChatRequest[] = []
@@ -113,8 +114,8 @@ export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode>
         held.add(response)
         return
       }
-      const call = /\[\[call (\w+) (\{.*?\})\]\]/.exec(last?.text ?? '')
-      if (call?.[1] !== undefined && call[2] !== undefined) return streamAnswer(response, toolCall(call[1], JSON.parse(call[2])))
+      const calls = [...(last?.text ?? '').matchAll(/\[\[call (\w+) (\{.*?\})\]\]/g)].map(match => ({ name: match[1] ?? '', args: JSON.parse(match[2] ?? '{}') }))
+      if (calls.length > 0) return streamAnswer(response, toolCalls(calls))
       const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
       if (read?.[1] !== undefined) return streamAnswer(response, toolCall('read', { file_path: read[1] }))
       const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
