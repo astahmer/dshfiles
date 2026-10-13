@@ -7,11 +7,12 @@ import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
-import { createRestartController } from './restart.js'
+import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
 
 const restartApi = threadSidebarRestartApi.host({
   availability: ({ ctx }) => ({ available: createRestartController(ctx).available }),
+  launchUrl: async () => ({ url: await readLaunchUrl() }),
   requestRestart: async ({ ctx }) => {
     try {
       return await createRestartController(ctx).request()

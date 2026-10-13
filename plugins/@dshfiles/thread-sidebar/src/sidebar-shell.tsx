@@ -36,6 +36,8 @@ import {
   MessageSquareIcon,
   PanelLeftIcon,
   RefreshCwIcon,
+  LinkIcon,
+  CheckIcon,
   SlidersHorizontalIcon,
   TextCursorInputIcon,
 } from '@dshfiles/plugin-ui/icons'
@@ -460,12 +462,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const restartApi = useApi(threadSidebarRestartApi)
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
+  const launchUrl = useApiQuery(threadSidebarRestartApi, 'launchUrl').data?.url ?? null
   const pluginUpdates = useApiQuery(threadSidebarPluginUpdatesApi, 'pending')
   const pendingPlugins = pluginUpdates.data?.plugins ?? []
   const pluginUpdatesSupported = pluginUpdates.status !== 'error'
   const refetchPluginUpdates = pluginUpdates.refetch
   const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
+  const [launchUrlCopied, setLaunchUrlCopied] = useState(false)
   const [restartRequestPending, setRestartRequestPending] = useState(false)
   const [restartRequestFailed, setRestartRequestFailed] = useState(false)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
@@ -930,6 +934,18 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             },
           ]
         : []),
+      ...(launchUrl === null
+        ? []
+        : [
+            {
+              id: '@dshfiles/thread-sidebar/action/copy-dsh-url',
+              group: 'destination' as const,
+              label: text(props.t, 'threadSidebarCopyLaunchUrl'),
+              aliases: ['token', 'url', 'dshx', 'agent access'],
+              icon: <LinkIcon className="dshx:size-4" />,
+              run: () => void navigator.clipboard.writeText(launchUrl),
+            },
+          ]),
       ...(runCommand === null
         ? []
         : hostShortcuts
@@ -951,6 +967,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       props.t,
       props.toggleSidebar,
       restartAvailable,
+      launchUrl,
       pendingUpdatesLabel,
       hostShortcuts,
       runCommand,
@@ -1532,6 +1549,35 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               </PopoverContent>
             </Popover>
           ) : null}
+          {restartAvailable && pendingUpdatesLabel === null ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="dshx:shrink-0 dshx:text-muted-foreground"
+              aria-label={text(props.t, 'threadSidebarRestart')}
+              title={text(props.t, 'threadSidebarRestart')}
+              onClick={openRestartDialog}
+            >
+              <RefreshCwIcon className="dshx:size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+          {launchUrl === null ? null : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="dshx:shrink-0 dshx:text-muted-foreground"
+              aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
+              title={text(props.t, 'threadSidebarCopyLaunchUrl')}
+              onClick={() =>
+                void navigator.clipboard.writeText(launchUrl).then(() => {
+                  setLaunchUrlCopied(true)
+                  window.setTimeout(() => setLaunchUrlCopied(false), 1500)
+                })
+              }
+            >
+              {launchUrlCopied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
+            </Button>
+          )}
           {visibleFooterEntries.map((entry, index) => {
             const overflowed = !footerEntryFits(index)
             const item = (

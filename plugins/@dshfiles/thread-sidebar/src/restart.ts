@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-cmdline'
-import { open, mkdir, unlink } from 'node:fs/promises'
+import { open, mkdir, readFile, unlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
@@ -11,6 +11,13 @@ const RESTART_EXIT_CODE = 75
 export interface RestartControllerOptions {
   readonly env?: NodeJS.ProcessEnv
   readonly scheduleExit?: (exit: () => void) => void
+}
+
+/** Written by the dsh-web supervisor next to its restart requests, mode 600. */
+export const readLaunchUrl = async (env: NodeJS.ProcessEnv = process.env): Promise<string | null> => {
+  const dshHome = resolve(env.DSH_HOME?.trim() || join(homedir(), '.dsh'))
+  const recorded = await readFile(join(dshHome, 'runtime', 'web-url'), 'utf8').catch(() => '')
+  return /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+\/\?token=\S+$/u.test(recorded.trim()) ? recorded.trim() : null
 }
 
 export const createRestartController = (ctx: Pick<Context, 'appExit'>, options: RestartControllerOptions = {}) => {

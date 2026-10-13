@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'vitest'
-import { createRestartController } from './restart.js'
+import { createRestartController, readLaunchUrl } from './restart.js'
 
 const RUN_ID = 'a53b44df-e873-4abb-2c6e-a92223ae2db9'
 
@@ -75,4 +75,18 @@ test('sidebar restart availability uses the DSHX API hook without a React Query 
   const sidebarShell = await readFile(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
   assert.match(sidebarShell, /useApiQuery\(threadSidebarRestartApi, 'availability'\)/u)
   assert.doesNotMatch(sidebarShell, /@dshfiles\/plugin-ui\/query/u)
+})
+
+test('hands out only a loopback launch URL the supervisor recorded', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-launch-url-'))
+  try {
+    assert.equal(await readLaunchUrl({ DSH_HOME: home }), null)
+    await mkdir(join(home, 'runtime'))
+    await writeFile(join(home, 'runtime', 'web-url'), 'http://127.0.0.1:3080/?token=abc\n')
+    assert.equal(await readLaunchUrl({ DSH_HOME: home }), 'http://127.0.0.1:3080/?token=abc')
+    await writeFile(join(home, 'runtime', 'web-url'), 'http://evil.example/?token=abc\n')
+    assert.equal(await readLaunchUrl({ DSH_HOME: home }), null)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
 })
