@@ -216,7 +216,8 @@ describe('host compiler', () => {
         "import { defineHost } from '@dshfiles/dshx/host'",
         "import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'",
         "import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'",
-        'export default defineHost({ setup() { return { createDshxApiCaller, loopbackLaunchUrl, nativeRpcRequestSchema } } })',
+        "import { digestSession } from '@dshfiles/dshx/platform/session-digest'",
+        'export default defineHost({ setup() { return { createDshxApiCaller, loopbackLaunchUrl, nativeRpcRequestSchema, digestSession } } })',
         '',
       ].join('\n'),
     )
@@ -230,6 +231,7 @@ describe('host compiler', () => {
     expect(code).toContain('createDshxApiCaller')
     expect(code).toContain('loopbackLaunchUrl')
     expect(code).toContain('nativeRpcRequestSchema')
+    expect(code).toContain('digestSession')
     expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
   })
 

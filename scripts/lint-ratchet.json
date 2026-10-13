@@ -16,7 +16,7 @@
     "react(purity)": 15
   },
   "ast-grep": {
-    "no-deeply-nested-ternary": 12,
+    "no-deeply-nested-ternary": 7,
     "no-deeply-nested-ternary-tsx": 2,
     "no-direct-json-parse": 185,
     "no-direct-json-parse-tsx": 1,

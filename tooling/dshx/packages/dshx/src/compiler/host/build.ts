@@ -14,6 +14,7 @@ const VIRTUAL_HOST_COMMUNICATION_PUBLIC = '\0virtual:dshx-host-communication-pub
 const VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC = '\0virtual:dshx-host-communication-types-public'
 const VIRTUAL_HOST_PLATFORM_API_PUBLIC = '\0virtual:dshx-host-platform-api-public'
 const VIRTUAL_HOST_NATIVE_RPC_PUBLIC = '\0virtual:dshx-host-native-rpc-public'
+const VIRTUAL_HOST_SESSION_DIGEST_PUBLIC = '\0virtual:dshx-host-session-digest-public'
 const DSHX_HOST_PUBLIC = '@dshfiles/dshx/host'
 const DSHX_API_PUBLIC = '@dshfiles/dshx/api'
 const DSHX_SETTINGS_PUBLIC = '@dshfiles/dshx/settings'
@@ -21,6 +22,7 @@ const DSHX_COMMUNICATION_PUBLIC = '@dshfiles/dshx/communication'
 const DSHX_COMMUNICATION_TYPES_PUBLIC = '@dshfiles/dshx/communication/types'
 const DSHX_PLATFORM_HOST_API_PUBLIC = '@dshfiles/dshx/platform/host-api'
 const DSHX_PLATFORM_NATIVE_RPC_PUBLIC = '@dshfiles/dshx/platform/native-rpc'
+const DSHX_PLATFORM_SESSION_DIGEST_PUBLIC = '@dshfiles/dshx/platform/session-digest'
 const HOST_RUNTIME_PATH = fileURLToPath(new URL('../../host/runtime.js', import.meta.url))
 const HOST_DEFINE_PATH = fileURLToPath(new URL('../../host/define.js', import.meta.url))
 const HOST_PROCESS_PATH = fileURLToPath(new URL('../../host/process.js', import.meta.url))
@@ -33,6 +35,7 @@ const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/in
 const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/types.js', import.meta.url))
 const PLATFORM_HOST_API_PATH = fileURLToPath(new URL('../../platform/host-api.js', import.meta.url))
 const NATIVE_RPC_SCHEMA_PATH = fileURLToPath(new URL('../../platform/native-rpc.js', import.meta.url))
+const SESSION_DIGEST_PATH = fileURLToPath(new URL('../../platform/session-digest.js', import.meta.url))
 
 /** Options for producing one Node ESM Host bundle. */
 export interface BuildHostOptions {
@@ -49,6 +52,18 @@ export interface BuildHostOptions {
 }
 
 export type HostBuildResult = BuildReport
+
+/** Public dshx entry points a Host bundle may import, each inlined through its own virtual module. */
+const VIRTUAL_DSHX_PUBLIC_MODULES: ReadonlyMap<string, string> = new Map([
+  [DSHX_HOST_PUBLIC, VIRTUAL_HOST_PUBLIC],
+  [DSHX_API_PUBLIC, `${VIRTUAL_HOST_PUBLIC}-api`],
+  [DSHX_SETTINGS_PUBLIC, `${VIRTUAL_HOST_PUBLIC}-settings`],
+  [DSHX_COMMUNICATION_PUBLIC, VIRTUAL_HOST_COMMUNICATION_PUBLIC],
+  [DSHX_COMMUNICATION_TYPES_PUBLIC, VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC],
+  [DSHX_PLATFORM_HOST_API_PUBLIC, VIRTUAL_HOST_PLATFORM_API_PUBLIC],
+  [DSHX_PLATFORM_NATIVE_RPC_PUBLIC, VIRTUAL_HOST_NATIVE_RPC_PUBLIC],
+  [DSHX_PLATFORM_SESSION_DIGEST_PUBLIC, VIRTUAL_HOST_SESSION_DIGEST_PUBLIC],
+])
 
 function isInside(parent: string, child: string): boolean {
   const path = relative(parent, child)
@@ -68,33 +83,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
     name: 'dshx-host-entry',
     enforce: 'pre',
     resolveId(source) {
-      if (
-        source === VIRTUAL_HOST_ENTRY ||
-        source === DSHX_HOST_PUBLIC ||
-        source === DSHX_API_PUBLIC ||
-        source === DSHX_SETTINGS_PUBLIC ||
-        source === DSHX_COMMUNICATION_PUBLIC ||
-        source === DSHX_COMMUNICATION_TYPES_PUBLIC ||
-        source === DSHX_PLATFORM_HOST_API_PUBLIC ||
-        source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
-      ) {
-        return source === DSHX_HOST_PUBLIC
-          ? VIRTUAL_HOST_PUBLIC
-          : source === DSHX_API_PUBLIC
-            ? `${VIRTUAL_HOST_PUBLIC}-api`
-            : source === DSHX_SETTINGS_PUBLIC
-              ? `${VIRTUAL_HOST_PUBLIC}-settings`
-              : source === DSHX_COMMUNICATION_PUBLIC
-                ? VIRTUAL_HOST_COMMUNICATION_PUBLIC
-                : source === DSHX_COMMUNICATION_TYPES_PUBLIC
-                  ? VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC
-                  : source === DSHX_PLATFORM_HOST_API_PUBLIC
-                    ? VIRTUAL_HOST_PLATFORM_API_PUBLIC
-                    : source === DSHX_PLATFORM_NATIVE_RPC_PUBLIC
-                      ? VIRTUAL_HOST_NATIVE_RPC_PUBLIC
-                      : VIRTUAL_HOST_ENTRY
-      }
-      return null
+      if (source === VIRTUAL_HOST_ENTRY) return VIRTUAL_HOST_ENTRY
+      return VIRTUAL_DSHX_PUBLIC_MODULES.get(source) ?? null
     },
     load(id) {
       if (id === VIRTUAL_HOST_PUBLIC) {
@@ -131,6 +121,9 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       if (id === VIRTUAL_HOST_NATIVE_RPC_PUBLIC) {
         return `export * from ${JSON.stringify(NATIVE_RPC_SCHEMA_PATH)}\n`
+      }
+      if (id === VIRTUAL_HOST_SESSION_DIGEST_PUBLIC) {
+        return `export * from ${JSON.stringify(SESSION_DIGEST_PATH)}\n`
       }
       if (id !== VIRTUAL_HOST_ENTRY) return null
       if (paths.entry === undefined) {
@@ -189,17 +182,8 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       hint: 'Keep the Host Cordis identity external.',
     })
   }
-  const dshxPublicModules = [
-    DSHX_HOST_PUBLIC,
-    DSHX_API_PUBLIC,
-    DSHX_SETTINGS_PUBLIC,
-    DSHX_COMMUNICATION_PUBLIC,
-    DSHX_COMMUNICATION_TYPES_PUBLIC,
-    DSHX_PLATFORM_HOST_API_PUBLIC,
-    DSHX_PLATFORM_NATIVE_RPC_PUBLIC,
-  ]
   const external = (source: string): boolean => {
-    if (dshxPublicModules.includes(source)) return false
+    if (VIRTUAL_DSHX_PUBLIC_MODULES.has(source)) return false
     const bundled = bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
     return !bundled && isHostExternal(source)
   }

@@ -74,6 +74,10 @@
       "types": "./dist/platform/host-api.d.ts",
       "default": "./dist/platform/host-api.js"
     },
+    "./platform/session-digest": {
+      "types": "./dist/platform/session-digest.d.ts",
+      "default": "./dist/platform/session-digest.js"
+    },
     "./communication": {
       "types": "./dist/communication/index.d.ts",
       "default": "./dist/communication/index.js"

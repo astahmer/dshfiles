@@ -127,7 +127,15 @@ export interface SessionDigest {
   readonly subagents: readonly { readonly id: string; readonly label?: string }[]
 }
 
-const decodeEvent = (record: JsonValue): SessionEvent | undefined => {
+/**
+ * One digest input: an exported record as the platform API returns it, or an event a Host plugin read through DSH's
+ * session query service. Both are decoded by the same schema.
+ */
+export type SessionDigestRecord =
+  | JsonValue
+  | { readonly type: 'event'; readonly event: { readonly type: string; readonly seq: number; readonly time?: number | undefined; readonly data?: unknown } }
+
+const decodeEvent = (record: SessionDigestRecord): SessionEvent | undefined => {
   const parsed = eventRecordSchema.safeParse(record)
   return parsed.success ? parsed.data.event : undefined
 }
@@ -332,7 +340,7 @@ const mostFrequent = (counts: ReadonlyMap<string, number>): string | undefined =
 /** Folds a Session's event history into what a supervisor needs: state, plan, recent actions, changes, and failures. */
 export const digestSession = (input: {
   readonly summary: SessionSummary
-  readonly records: readonly JsonValue[]
+  readonly records: readonly SessionDigestRecord[]
   readonly now: number
   readonly actionLimit?: number
 }): SessionDigest => {
