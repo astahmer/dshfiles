@@ -45,7 +45,7 @@ hashes diverge, several sheets load, and same-specificity rules resolve by sheet
 beats an earlier `sm:max-w-2xl`). So after any class change anywhere:
 
 ```sh
-cd /Users/astahmer/dev/dshfiles
+# from the repository root
 for dir in $(grep -l '"@dshfiles/plugin-ui"' plugins/@dshfiles/*/package.json | xargs -n1 dirname | grep -v '/plugin-ui$'); do
   pnpm --dir "$dir" build || { echo "FAILED: $dir"; break; }
 done
