@@ -499,6 +499,9 @@ importers:
       '@dshfiles/dshx':
         specifier: link:../../../tooling/dshx/packages/dshx
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/request-messages':
+        specifier: workspace:*
+        version: link:../request-messages
       '@dshfiles/secret-catalog':
         specifier: workspace:*
         version: link:../secret-catalog
