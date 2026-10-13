@@ -5,6 +5,7 @@
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
       "summary": "Group active, pinned, parked, inactive, and archived threads by project; park with sidebar preferences and pin/archive through Host APIs.",
+      "reach": ["expect region \"Threads\"", "expect button \"Group: Status\""],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -194,6 +195,7 @@
       "id": "thread-list-views",
       "title": "Configure saved thread views",
       "summary": "Group and filter thread rows, create named tabs with saved presets, reorder or disable views, and hide quick controls.",
+      "reach": ["expect group \"Thread list view\"", "click button \"All threads\"", "expect button \"All threads\""],
       "surfaces": ["client", "storage"],
       "configuration": [
         {
@@ -488,6 +490,7 @@
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",
+      "reach": ["click button \"Customize sidebar\"", "expect heading \"Customize sidebar\""],
       "surfaces": ["client", "settings", "storage"],
       "configuration": [
         {

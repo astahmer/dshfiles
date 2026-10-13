@@ -6,6 +6,14 @@
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
       "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository.",
+      "reach": [
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"main\"",
+        "expect checkbox \"workspace\""
+      ],
       "surfaces": ["host", "client", "integration"],
       "configuration": [
         {

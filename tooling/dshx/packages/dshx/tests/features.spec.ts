@@ -49,4 +49,14 @@ describe('plugin feature metadata', () => {
       }),
     ).toEqual(expect.arrayContaining([expect.stringContaining('coveredBy'), expect.stringContaining('choices must include defaultValue')]))
   })
+
+  it('accepts reach steps a scratch DSH can run and rejects ones it cannot', () => {
+    const withReach = (reach: unknown) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
+    expect(
+      withReach(['click button "Choose workspace"', 'fill textbox "Search" "sample"', 'expect option "sample*"', 'press Enter', 'expect checkbox "workspace"']),
+    ).toEqual([])
+    expect(withReach(['open the queue panel'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
+    expect(withReach(['fill text "Queue" "x"', 'expect text "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
+    expect(withReach(['click button "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('must end with an expect step')]))
+  })
 })

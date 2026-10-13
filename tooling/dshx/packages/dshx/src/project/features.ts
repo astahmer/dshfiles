@@ -30,6 +30,43 @@ const externalDependencySchema = z
   })
   .strict()
 
+/**
+ * One user step toward a feature, run by `dshx dev open` from the app root:
+ * `click <role|text|label> "<name>"`, `fill <role|label> "<name>" "<value>"`,
+ * `expect <role|text|label> "<name>"` or `press <key>` (Playwright key names, e.g. `Meta+K`). Names match exactly;
+ * a trailing `*` (`"sample*"`) matches a case-insensitive substring.
+ */
+const reachStepPattern = /^(?:(?:click|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+)$/
+
+export const parseReachStep = (
+  step: string,
+):
+  | { readonly action: 'click' | 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
+  | { readonly action: 'press'; readonly key: string }
+  | undefined => {
+  if (!reachStepPattern.test(step)) return undefined
+  const press = /^press (\S+)$/.exec(step)
+  if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
+  const match = /^(click|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?$/.exec(step)
+  const action = match?.[1]
+  if (match === null || match[2] === undefined || match[3] === undefined) return undefined
+  if (action !== 'click' && action !== 'expect' && action !== 'fill') return undefined
+  if (action === 'fill' && match[2] === 'text') return undefined
+  return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4] }) }
+}
+
+const reachSchema = z
+  .array(
+    z
+      .string()
+      .refine(
+        step => parseReachStep(step) !== undefined,
+        'reach steps are click/expect <role|text|label> "<name>", fill <role|label> "<name>" "<value>", or press <key>',
+      ),
+  )
+  .min(1)
+  .refine(steps => steps.at(-1)?.startsWith('expect ') === true, 'reach must end with an expect step that proves the feature is on screen')
+
 export const DshxFeatureSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
@@ -41,6 +78,7 @@ export const DshxFeatureSchema = z
     failureModes: z.array(z.string().min(1)).min(1),
     externalDependencies: z.array(externalDependencySchema),
     verification: z.array(verificationSchema).min(1),
+    reach: reachSchema.optional(),
   })
   .strict()
 

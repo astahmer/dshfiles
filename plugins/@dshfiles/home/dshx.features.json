@@ -6,6 +6,17 @@
       "id": "home-screen",
       "title": "New thread screen branding and shortcuts",
       "summary": "Replaces the DeepSeek mark and headline on the New thread screen and lists the project's recent threads and thread workspaces with work to land.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a recent thread\"",
+        "press Enter",
+        "click button \"New thread\"",
+        "expect text \"Resume\""
+      ],
       "surfaces": ["client"],
       "configuration": [
         {
