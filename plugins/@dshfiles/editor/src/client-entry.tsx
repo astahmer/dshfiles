@@ -4,7 +4,8 @@ import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { defineClient } from '@dshfiles/dshx/client'
+import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
@@ -27,6 +28,7 @@ import {
   parseSessionFileAddress,
 } from './open-file.js'
 import { openFileLinksPreference } from './open-file-links-preference.js'
+import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
 import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestSchema } from './workspace-files.js'
 
@@ -38,7 +40,7 @@ const FILE_LINK_ID = '@dshfiles/editor/file-link'
 const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
 
-// Open requests arrive while no editor surface is mounted, so the setting is mirrored where the event handler reads it.
+// Open requests arrive while no editor surface is mounted, so the settings are mirrored where the event handler reads them.
 const placement = createStoredValue({ key: 'dshfiles-editor:placement', schema: z.enum(['workbench', 'right-panel']), fallback: 'workbench' })
 // Monaco stays in this one chunk (dshx forbids others); the dynamic import only defers evaluating it until a file opens.
 const loadEngine = () => import('./monaco-engine.js').then(module => module.monacoEngine)
@@ -62,8 +64,22 @@ const clientSessionsSchema = z.object({
 export default defineClient({
   name: '@dshfiles/editor',
   locales: [editorSettingsLocale],
-  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles'],
+  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'remote', 'remote.workspaceFiles', 'configForms'],
   setup(ctx, decorate) {
+    // The form's value is the Host's schema-resolved section, so its fields arrive with their defaults applied.
+    const settingsForm = ctx.configForms.get<SettingsValue<typeof editorSettings.schema>>(EDITOR_SETTINGS_NAMESPACE)
+    const mirrorSettings = (): void => {
+      const settings = settingsForm.getSnapshot().value
+      if (settings === undefined) return
+      placement.set(settings.editorPlacement)
+      openFileLinksPreference.set(settings.openFileLinks)
+    }
+    ctx.effect(() => {
+      mirrorSettings()
+      void ctx.configForms.describe().ensure()
+      return settingsForm.subscribe(mirrorSettings)
+    }, 'dshfiles-editor: mirror placement and file-link settings')
+
     ctx.slots.inject('settings.general.item', () =>
       ctx.slots.register(
         {
@@ -116,15 +132,6 @@ export default defineClient({
 
     const SessionEditorPanel = (): JSX.Element => {
       const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
-      const settings = useSettings(editorSettings).value
-      const configured = settings?.editorPlacement
-      const claimLinks = settings?.openFileLinks
-      useEffect(() => {
-        if (configured !== undefined) placement.set(configured)
-      }, [configured])
-      useEffect(() => {
-        if (claimLinks !== undefined) openFileLinksPreference.set(claimLinks)
-      }, [claimLinks])
       return <EditorPanel loadEngine={loadEngine} remote={ctx.remote} sessionId={sessionId} store={store} />
     }
     const Panel = decorate(() => (
