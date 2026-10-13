@@ -10,6 +10,7 @@
     "@dshfiles/diff-viewed": "link:../../../dev/dshfiles/plugins/@dshfiles/diff-viewed",
     "@dshfiles/editor": "link:../../../dev/dshfiles/plugins/@dshfiles/editor",
     "@dshfiles/goal-stall-guard": "link:../../../dev/dshfiles/plugins/@dshfiles/goal-stall-guard",
+    "@dshfiles/home": "link:../../../dev/dshfiles/plugins/@dshfiles/home",
     "@dshfiles/jj-integration": "link:../../../dev/dshfiles/plugins/@dshfiles/jj-integration",
     "@dshfiles/jujutsu": "link:../../../dev/dshfiles/plugins/@dshfiles/jujutsu",
     "@dshfiles/mcp-servers": "link:../../../dev/dshfiles/plugins/@dshfiles/mcp-servers",
@@ -61,7 +62,8 @@
         "@dshfiles/editor",
         "@dshfiles/workbench",
         "@dshfiles/workspace-folder-picker",
-        "@dshfiles/optmem"
+        "@dshfiles/optmem",
+        "@dshfiles/home"
       ]
     }
   }
