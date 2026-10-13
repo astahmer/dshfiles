@@ -2,7 +2,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
-import { multiHostApi, multiHostKeys, openRemoteThread, openRemoteThreadRef } from '@dshfiles/multi-host/destination'
+import { isMultiHostMissing, multiHostApi, multiHostKeys, openRemoteThread, openRemoteThreadRef } from '@dshfiles/multi-host/destination'
 
 /**
  * Threads started on other hosts, with their host as a badge. They are Sessions of another runtime, so they live in
@@ -19,7 +19,7 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
   const threads = useQuery({
     queryKey: multiHostKeys.threads,
     queryFn: ({ signal }) => api.threadList(undefined, { signal }),
-    refetchInterval: 15_000,
+    refetchInterval: query => (isMultiHostMissing(query.state.error) ? false : 15_000),
     retry: false,
   })
   const open = openRemoteThreadRef.useValue()

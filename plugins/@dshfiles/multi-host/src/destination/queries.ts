@@ -1,6 +1,6 @@
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { queryOptions } from '@dshfiles/plugin-ui/query'
-import type { ApiClient } from '@dshfiles/dshx/api'
+import { isApiError, type ApiClient } from '@dshfiles/dshx/api'
 import { multiHostApi } from '../api.js'
 
 export type MultiHostClient = ApiClient<(typeof multiHostApi)['methods']>
@@ -16,12 +16,15 @@ export const multiHostKeys = {
   sshHosts: ['multi-host', 'ssh-hosts'] as const,
 }
 
+/** Without the multi-host plugin its routes do not exist, and the Connection reports that as an HTTP 404 transport failure. */
+export const isMultiHostMissing = (error: unknown): boolean => isApiError(error) && error.kind === 'transport' && error.message.endsWith('HTTP 404')
+
 export const multiHostQueries = {
   directory: (api: MultiHostClient, refetchInterval: number | false = false) =>
     queryOptions({
       queryKey: multiHostKeys.directory,
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list(undefined, { signal: hostSignal }) }),
-      refetchInterval,
+      refetchInterval: query => (isMultiHostMissing(query.state.error) ? false : refetchInterval),
       retry: false,
     }),
   /** Connects the host if needed, so it doubles as the status probe of the chip menu. */
