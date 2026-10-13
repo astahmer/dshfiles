@@ -1,0 +1,5 @@
+# Top-level Loader ids share one namespace across every bundle in a profile, so
+# the scope stays in the id.
+- insert:
+    - id: dshfiles-request-messages
+      name: '@dshfiles/request-messages'

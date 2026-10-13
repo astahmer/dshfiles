@@ -1,0 +1,63 @@
+{
+  "name": "@dshfiles/request-messages",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dispatch the agent/request-messages waterfall on stock DSH so plugins can replace the messages one agent-loop request sends",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src/contract.ts",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/contract.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "scripts": {
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
+    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@types/node": "^22.19.0",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-scope": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "host": {
+      "inject": [
+        "@deepseek-ai/dsh-agent",
+        "@deepseek-ai/dsh-llm"
+      ]
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

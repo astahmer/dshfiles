@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "dispatch-request-messages",
+      "title": "Dispatch agent/request-messages on stock DSH",
+      "summary": "Wrap the llm runtime's innermost adapter call so every agent-loop request runs the agent/request-messages waterfall and sends the messages its listeners return, with config, tools and tool history unchanged.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["active", "unsupported-runtime"],
+      "failureModes": [
+        "A DSH llm runtime without adapterStream reports active=false through request-messages/status and dispatches nothing.",
+        "A listener that throws is logged and the derived messages are sent, unless the request was cancelled."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "request-messages.replaces-agent-loop-messages",
+          "file": "plugins/@dshfiles/request-messages/src/polyfill.test.ts",
+          "testName": "sends the messages a listener returns for an agent-loop request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "request-messages.leaves-other-requests",
+          "file": "plugins/@dshfiles/request-messages/src/polyfill.test.ts",
+          "testName": "leaves requests the agent loop did not build untouched"
+        },
+        {
+          "kind": "unit-test",
+          "id": "request-messages.restores-on-dispose",
+          "file": "plugins/@dshfiles/request-messages/src/polyfill.test.ts",
+          "testName": "restores the runtime when the last copy unloads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "request-messages.idempotent",
+          "file": "plugins/@dshfiles/request-messages/src/polyfill.test.ts",
+          "testName": "dispatches once when two copies are loaded"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}
