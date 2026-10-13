@@ -21,6 +21,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`diff-viewed`](plugins/@dshfiles/diff-viewed/README.md) | Track changed files reviewed per turn. |
 | [`editor`](plugins/@dshfiles/editor/README.md) | Monaco file tree, tabs, open-from-anywhere, and confined saves. |
 | [`goal-stall-guard`](plugins/@dshfiles/goal-stall-guard/README.md) | Pause goals whose rounds stop making progress. |
+| [`home`](plugins/@dshfiles/home/README.md) | New thread screen: own mark and headline, resume and land shortcuts, and a Settings › New thread page. |
 | [`jj-integration`](plugins/@dshfiles/jj-integration/README.md) | One jj workspace per thread, chosen before the first message, and a Land button that rebases its work onto `main`. |
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
 | [`mcp-servers`](plugins/@dshfiles/mcp-servers/README.md) | Configure profile-wide MCP servers through native DSH clients. |
@@ -35,6 +36,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`secret-catalog`](plugins/@dshfiles/secret-catalog/README.md) | Browse project-scoped secret aliases without exposing values to Client. |
 | [`settings-search`](plugins/@dshfiles/settings-search/README.md) | Search Settings fields and edit matches in place. |
 | [`shared-runtime`](plugins/@dshfiles/shared-runtime/package.json) | One shared copy of third-party Client modules and the plugin stylesheet for `@dshfiles` UI plugins. |
+| [`shared-streams`](plugins/@dshfiles/shared-streams/README.md) | One EventSource per URL across tabs, so several DSH tabs never exhaust the browser's per-origin connections. |
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md) | Claim keyboard shortcuts before browser defaults. |
 | [`sidebar-commands`](plugins/@dshfiles/sidebar-commands/README.md) | Use `/goto` to open a sidebar panel or recent session. |
 | [`thread-sidebar`](plugins/@dshfiles/thread-sidebar/README.md) | Group project threads and customize DSH navigation. |

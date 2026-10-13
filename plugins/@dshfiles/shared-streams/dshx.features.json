@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "kind": "infrastructure",
+  "features": [
+    {
+      "id": "shared-event-sources",
+      "title": "One EventSource per URL across tabs",
+      "summary": "A shim injected before the app entry routes every tab's EventSource through one SharedWorker per URL, so the browser's six-socket-per-origin limit cannot starve new tabs.",
+      "surfaces": ["host", "client"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "false serves the page unchanged.",
+          "coveredBy": ["shared-streams.injects-before-entry"]
+        }
+      ],
+      "states": ["shared", "native-fallback"],
+      "failureModes": ["A worker that fails to start falls back to the native EventSource."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "shared-streams.browser-journey",
+          "reason": "Needs several real browser tabs against one Host; measured manually on a scratch host (see README)."
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.inline-safe",
+          "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
+          "testName": "stays safe to inline inside one script element"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.stable-worker",
+          "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
+          "testName": "points every tab at one stable worker path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.fallback",
+          "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
+          "testName": "keeps a native fallback so a failed worker cannot silence streams"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.closes-last",
+          "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
+          "testName": "closes a stream once its last subscriber leaves"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.injects-before-entry",
+          "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
+          "testName": "places the shim before the app entry module"
+        }
+      ]
+    }
+  ]
+}

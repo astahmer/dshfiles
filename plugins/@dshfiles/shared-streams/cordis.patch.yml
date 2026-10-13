@@ -1,0 +1,7 @@
+# Top-level Loader ids share one namespace across every bundle in a profile, so
+# the scope stays in the id.
+- insert:
+    - id: dshfiles-shared-streams
+      name: '@dshfiles/shared-streams'
+      config:
+        enabled: true
