@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -10,7 +10,8 @@ import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh
 import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useEffect, useRef } from 'react'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
@@ -269,8 +270,23 @@ export default defineClient({
     ctx.effect(() => ctx.locale.subscribe(syncPanels), 'thread-sidebar: panel labels')
     syncPanels()
 
+    const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    const currentWorkspaceId = (): WorkspaceView['workspaceId'] | undefined => {
+      const sessions = ctx.sessions.list.getSnapshot()
+      const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+      return current === undefined ? undefined : ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(current))?.workspaceId
+    }
     const rootProps = (): SidebarRootInjected => ({
-      startSession: workspaceId => ctx.uiWorkspace.startSession(workspaceId),
+      startSession: workspaceId => {
+        const target = workspaceId ?? currentWorkspaceId()
+        if (target === undefined) return ctx.uiWorkspace.startSession()
+        // jj-integration decides whether the new thread gets its own jj workspace; without it, start where asked.
+        void jjThreads
+          .provision({ workspaceId: target })
+          // SAFETY: the Host returned this id from its workspace registry.
+          .then(result => ctx.uiWorkspace.startSession(result.workspaceId as WorkspaceView['workspaceId']))
+          .catch(() => ctx.uiWorkspace.startSession(target))
+      },
       toggleSidebar: () => ctx.layout.toggleSidebar(),
       selectPanel: id => ctx.layout.selectPanel(id),
       hooks: {

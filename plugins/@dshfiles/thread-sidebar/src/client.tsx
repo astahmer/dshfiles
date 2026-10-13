@@ -225,12 +225,27 @@ const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Read
     return session === undefined ? [] : [session]
   })
 
+const THREADS_DIRECTORY_SUFFIX = '-threads'
+
+/** jj-integration puts a thread's own workspace at `<project>-threads/<name>`; its sessions belong to `<project>`. */
+const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<string, WorkspaceView>): WorkspaceView | undefined => {
+  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
+  return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) : undefined
+}
+
 const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
+  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   const map = new Map<string, string>()
   for (const workspace of workspaces) {
-    for (const sessionId of workspace.sessionIds) map.set(sessionId, workspace.workspaceId)
+    const owner = projectOfThreadWorkspace(workspace, byPath) ?? workspace
+    for (const sessionId of workspace.sessionIds) map.set(sessionId, owner.workspaceId)
   }
   return map
+}
+
+const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
+  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
+  return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
 }
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
@@ -765,7 +780,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const displayWorkspaces = useMemo(
     () =>
-      workspaceState.items.map(workspace => ({
+      projectWorkspaces(workspaceState.items).map(workspace => ({
         id: workspace.workspaceId,
         title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
       })),
