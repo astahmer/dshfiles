@@ -1,19 +1,29 @@
-# Agent session observability
+# Agent session observability: remaining work
 
-Practical, read-only visibility across authorized DSH sessions and their JJ/workspace context, reusing the DSHX and DSH services this profile already owns. Observation must never wake, message, or otherwise modify inspected sessions. Do not alter unrelated JJ workspaces, live-profile state, or shared history.
+Read-only visibility across authorized DSH Sessions and their workspace
+context. Observation must never wake, message, or modify an inspected Session.
 
-## Progress
+Shipped in `@dshfiles/agent-communication` (see its
+[README](../../plugins/@dshfiles/agent-communication/README.md)):
+`dshx_comm_agents` lists the caller's runtime-owned descendants,
+`dshx_comm_workspace` resolves one of them to its DSH Workspace id and title,
+and `dshx_comm_history` searches one live descendant's visible messages. All
+three check ownership through `AgentRegistry.isOwnedBy` and return the same
+generic answer for unowned ids.
 
-| Phase            | State       | Evidence / next gate                                                                                                                                                                                                                                                                                                                  |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A. Discovery     | complete    | Host Inspect exposes Session Query, Session Controller, Workspace Registry, Workspace Changes, and Agent Teams services. `WorkspaceRegistry.resolveByPath` is read-only; the current Agent tool catalog has no scoped Session Query adapter. Avoid direct Session Controller calls that bypass transport authorization.               |
-| B. Observability | partial     | `dshx_comm_agents` preserves the live peer directory and adds metadata only for direct/transitive runtime-owned descendants, checked with `AgentRegistry.isOwnedBy`. New `dshx_comm_workspace` resolves one requested live descendant through the same ownership graph. Neither tool reads task text or transcripts.                  |
-| C. Context       | partial     | The workspace lookup returns only an existing DSH Workspace id/title from the Host-derived cwd; no raw path. The opaque `workspace_topic` remains a separate same-cwd hash, not a DSH Workspace or JJ id. Task/history access and JJ change associations remain unverified.                                                           |
-| D. Orchestration | pending     | No prompt, queue, cancellation, resume, or acknowledgment controls added. Keep all Session writes separately authorized.                                                                                                                                                                                                              |
-| E. Validation    | in progress | Prior live-directory slice passed plugin contract, typecheck, 13 tests, build/import, changed-file Oxlint/Oxfmt, and one disposable Host-report E2E. Workspace tool, activity-schema regression, lockfile, and scratch validation are pending. Global feature checker baseline: 81 unrelated issues. No live profile sync or restart. |
+## Remaining
 
-## Resume here
-
-Next slice: authorized Session history/search, then verified JJ change associations. Live Host Inspect exposes `sessionQuery` and `sessionController`, but current Agent tools provide no scoped Session Query adapter. Before adding one, verify that target ownership is enforced by the service or an authorization-aware API; do not call Remote Session Controller methods directly from plugin code. Session event reads can expose transcript content, so require an explicit, bounded authorization path. `workspaceChanges` is a recorder summary, not proof of JJ identity or a revision association.
-
-This workspace lookup is deliberately limited to one live runtime-owned descendant and returns only an existing DSH Workspace id/title. Run its focused tests, plugin gates, and isolated Host verification before marking this slice complete. Source workspace `session-observability-resume` is based on clean revision `d539a6eca0a7`; the original task workspace and `integration-spine` currently contain conflicts, so do not rebase or resolve them blindly. Preserve source history and report integration handoff if the spine remains conflicted. No live profile sync or restart; user controls promotion.
+- [ ] **History beyond live descendants.** Today only live, runtime-owned
+      descendants are searchable. Anything wider follows the decision in
+      [agent-session-history](../agent-session-history.md). Do not call Remote
+      Session Controller methods from plugin code: they bypass transport
+      authorization, and Session event reads expose transcript content, so a
+      wider read needs an explicit, bounded authorization path.
+- [ ] **JJ change associations.** `workspaceChanges` is a recorder summary, not
+      proof of a jj workspace or revision; the opaque `workspace_topic` hash is
+      neither. Find a verifiable source before associating a Session with a
+      change.
+- [ ] **Orchestration writes** (prompt, queue, cancel, resume, acknowledge) need
+      their own authorization design; none exist.
+- [ ] **Scratch verification of `dshx_comm_workspace`** on an isolated Host;
+      it has unit tests only.

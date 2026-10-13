@@ -13,8 +13,6 @@ and current workarounds are documented in each owning plugin's README.
 | Collapse viewed files, "only unviewed" filter, auto-mark on scroll | diff-viewed | Review tab shows one file; plugins only add toolbar buttons | File-list slot / filter hook in the review tab |
 | Live MCP connection health ("Connected") | mcp-servers | DSH MCP client reports no connection status | Status events from `dsh-mcp-client` |
 | Legacy SSE MCP servers | mcp-servers | DSH MCP client supports stdio + Streamable HTTP only | Add SSE transport to `dsh-mcp-client` |
-| MCP preferences in DSH Settings (connect on startup, tool timeout, Registry search, OAuth client name) | mcp-servers | dshx refuses a Host with both native `Config` (server list) and a Settings namespace | Split the Host into two loader entries, or move the server list into the Settings namespace |
 | "Unify branches" prefilled thread | jujutsu | No API to start a session with a prefilled prompt | Session create option `initialPrompt` |
-| Global "All models" composer picker | ai-accounts | No composer action slot for model choice | Composer model-picker slot |
 | Edit a queued message that has attachments | queue-reorder | `QueueAction.edit` is text-only and `updateQueue` replaces the whole content | Host edit that keeps existing attachment refs and replaces only text blocks |
 | ⌘, / ⌘N shortcuts | shortcuts | No service to open Settings / start a session from a plugin | Expose those actions as commands |
