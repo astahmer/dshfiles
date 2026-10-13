@@ -215,16 +215,10 @@ Given('the isolated plugin composition {string} and {string} is booted', async (
   await visitIsolatedPluginProfile(page, profile)
 })
 
-Given('the isolated plugin composition {string} and {string} and {string} is booted', async (
-  { page }: { page: Page },
-  packageId: string,
-  secondPackageId: string,
-  thirdPackageId: string,
-) => {
-  const profile = await bootComposedPluginProfile({
-    packageIds: [packageId, secondPackageId, thirdPackageId],
-    profileLabel: `${packageId}+${secondPackageId}+${thirdPackageId}`,
-  })
+Given('the isolated plugin composition of {string} is booted', async ({ page }: { page: Page }, packageList: string) => {
+  const [packageId, ...companionPackageIds] = packageList.split(',').map(packageId => packageId.trim())
+  if (packageId === undefined || packageId === '') throw new Error('The plugin composition names no package.')
+  const profile = await bootComposedPluginProfile({ packageIds: [packageId, ...companionPackageIds], profileLabel: packageList })
   await visitIsolatedPluginProfile(page, profile)
 })
 

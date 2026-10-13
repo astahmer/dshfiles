@@ -6,7 +6,7 @@ Feature: New thread home screen
 
   @scenario:home.browser-journey
   Scenario: Brand the New thread screen and resume project work from it
-    Given the isolated plugin composition "@dshfiles/home" and "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/home, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted
     When a disposable jj repository is chosen as the New thread project
     Then the New thread headline names the project "repo" instead of the DeepSeek headline
     When the New thread headline is set to "Ship {project}" with the mark "🚀"
