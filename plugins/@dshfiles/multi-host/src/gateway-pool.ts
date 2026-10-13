@@ -12,10 +12,13 @@ export type PooledGateway = { readonly gateway: Gateway; readonly generation: nu
 
 export const createGatewayPool = ({
   connect,
+  isTransportFailure,
   idleMs = 5 * 60_000,
 }: {
   /** Opens and verifies a new gateway; never given a caller's signal, because the connection outlives the caller. */
   readonly connect: (runtimeId: string) => Promise<Gateway>
+  /** Whether a request failure means the connection itself is gone, so it should be replaced. */
+  readonly isTransportFailure: (error: unknown) => boolean
   readonly idleMs?: number
 }) => {
   const entries = new Map<string, PoolEntry>()
@@ -68,13 +71,45 @@ export const createGatewayPool = ({
     }
   }
 
+  /**
+   * Run one request on the pooled connection. A read that fails because the connection dropped retries once on a fresh
+   * one; a mutation never does, so an admitted mutation is not replayed. `broken` lets a request that reports failures
+   * as values (native RPC results) still retire a dead connection.
+   */
+  const run = async <Result>(
+    runtimeId: string,
+    request: (gateway: Gateway) => Promise<Result>,
+    options: { readonly mutation: boolean; readonly broken?: (result: Result) => boolean },
+  ): Promise<Result> => {
+    for (let attempt = 0; ; attempt += 1) {
+      const pooled = await acquire(runtimeId)
+      try {
+        const result = await request(pooled.gateway)
+        if (options.broken?.(result) === true) {
+          invalidate(runtimeId, pooled.generation)
+          if (!options.mutation && attempt === 0) continue
+        }
+        return result
+      } catch (error) {
+        if (!isTransportFailure(error)) throw error
+        invalidate(runtimeId, pooled.generation)
+        if (options.mutation || attempt > 0) throw error
+      } finally {
+        pooled.release()
+      }
+    }
+  }
+
+  const invalidate = (runtimeId: string, generation: number): void => {
+    const entry = entries.get(runtimeId)
+    if (entry?.generation === generation) evict(runtimeId, entry)
+  }
+
   return {
     acquire,
+    run,
     /** Drop a connection a caller found broken, unless a newer generation already replaced it. */
-    invalidate: (runtimeId: string, generation: number): void => {
-      const entry = entries.get(runtimeId)
-      if (entry?.generation === generation) evict(runtimeId, entry)
-    },
+    invalidate,
     status: (runtimeId: string): { readonly connected: boolean; readonly generation: number } | undefined => {
       const entry = entries.get(runtimeId)
       return entry === undefined ? undefined : { connected: true, generation: entry.generation }

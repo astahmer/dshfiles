@@ -235,6 +235,7 @@ const safeFailure = (error: unknown): { readonly code: string; readonly message:
 const failureCode = (error: unknown): string => safeFailure(error).code
 
 const pool = createGatewayPool({
+  isTransportFailure: error => transportFailures.has(failureCode(error)),
   connect: async runtimeId => {
     const runtime = await findRuntime(runtimeId)
     if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'No recorded runtime has this id.')
@@ -254,36 +255,22 @@ const pool = createGatewayPool({
   },
 })
 
-/**
- * Run one request on the runtime's pooled connection. A read that fails because the connection dropped retries once on
- * a fresh one; a mutation never does, so an admitted mutation is not replayed.
- */
 const withRuntime = async <Result>(
   runtimeId: string,
   request: (gateway: Gateway) => Promise<Result>,
-  options: { readonly mutation: boolean },
+  options: { readonly mutation: boolean; readonly broken?: (result: Result) => boolean },
 ): Promise<Result> => {
-  for (let attempt = 0; ; attempt += 1) {
-    let pooled: PooledGateway
-    try {
-      pooled = await pool.acquire(runtimeId)
-    } catch (error) {
-      const failure = safeFailure(error)
-      connectionErrors.set(runtimeId, { ...failure, at: new Date().toISOString() })
-      throw error
-    }
-    try {
-      return await request(pooled.gateway)
-    } catch (error) {
-      const code = failureCode(error)
-      if (!transportFailures.has(code)) throw error
-      pool.invalidate(runtimeId, pooled.generation)
-      if (options.mutation || attempt > 0) throw error
-    } finally {
-      pooled.release()
-    }
+  try {
+    return await pool.run(runtimeId, request, options)
+  } catch (error) {
+    connectionErrors.set(runtimeId, { ...safeFailure(error), at: new Date().toISOString() })
+    throw error
   }
 }
+
+/** A native RPC result that says the connection, not the request, failed. */
+const brokenRpc = (result: { readonly ok: boolean; readonly code?: string }): boolean =>
+  !result.ok && (result.code === 'unknown-mutation-outcome' || (result.code !== undefined && transportFailures.has(result.code)))
 
 const runtimeSummary = (record: RuntimeRecord) => ({
   id: record.id,
@@ -644,7 +631,7 @@ const multiHostHandlers = multiHostApi.host({
           if (!prompted.ok) return { ok: false as const, code: prompted.code, message: prompted.message, sessionId }
           return { ok: true as const, sessionId }
         },
-        { mutation: true },
+        { mutation: true, broken: brokenRpc },
       )
     } catch (error) {
       const failure = safeFailure(error)
@@ -710,7 +697,7 @@ const multiHostHandlers = multiHostApi.host({
   runtimeCall: async ({ input, signal }) => {
     const mutation = input.request.namespace !== 'session' || ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(input.request.method)
     try {
-      return await withRuntime(input.runtimeId, gateway => callNativeRpc(gateway, input.request, signal), { mutation })
+      return await withRuntime(input.runtimeId, gateway => callNativeRpc(gateway, input.request, signal), { mutation, broken: brokenRpc })
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
