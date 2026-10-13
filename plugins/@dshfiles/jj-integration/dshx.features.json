@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "kind": "infrastructure",
+  "kind": "bundle",
   "features": [
     {
       "id": "thread-destination",
@@ -55,9 +55,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "jj-integration.destination-browser-journey",
-          "reason": "The destination bar needs a running Host with a jj project; covered by real-jj host tests until a Playwright journey composes it."
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
           "kind": "unit-test",
@@ -103,9 +103,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "jj-integration.land-browser-journey",
-          "reason": "The Land button needs a running Host with a jj project; covered by real-jj host tests until a Playwright journey composes it."
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
           "kind": "unit-test",
