@@ -379,7 +379,18 @@ ${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'ful
               })),
             answer: answer.slice(0, 100000),
             answerTruncated: answer.length > 100000,
-            ...(item.probe === undefined ? {} : { probe: scoreProbe({ answer, probe: item.probe, truth }) }),
+            ...(item.probe === undefined
+              ? {}
+              : {
+                  probe: scoreProbe({
+                    answer,
+                    probe: item.probe,
+                    truth,
+                    tools: assistant.flatMap(event =>
+                      (event.data.message?.content ?? []).filter(block => block.type === 'tool-call').map(block => block.name ?? block.toolName),
+                    ),
+                  }),
+                }),
           }
           evidence.turns.push(record)
           log(

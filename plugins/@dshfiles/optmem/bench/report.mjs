@@ -73,7 +73,7 @@ const rescore = async (scenario, turn) => {
   const { probes, truth } = await scenarioProbes(scenario)
   const probe = probes.get(turn.probe.id)
   if (probe === undefined) return turn.probe
-  const scored = scoreProbe({ answer: turn.answer, probe, truth })
+  const scored = scoreProbe({ answer: turn.answer, probe, truth, tools: turn.steps.flatMap(step => step.tools) })
   return turn.answerTruncated ? turn.probe : scored
 }
 
@@ -85,14 +85,16 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   const ended = new Set(calls.map(call => call.seq))
   for (const start of journal.filter(call => call.kind === 'call-start' && !ended.has(call.seq)))
     calls.push({ ...start, kind: undefined, error: 'unfinished call; cost unknown', incomplete: true })
+  if (calls.some(call => call.model !== 'deepseek-v4.1-flash' || !call.provider?.startsWith('opencode-go')))
+    throw new Error('list-price estimates require OpenCode Go DeepSeek V4.1 Flash; supply route-specific pricing before reporting another model')
   const byKind = Object.groupBy(calls, callKind)
   const agentCalls = byKind.agent ?? []
   const probes = await Promise.all(run.turns.filter(turn => turn.probe !== undefined).map(turn => rescore(run, turn)))
   const tally = kind => {
-    const matching = probes.filter(probe => probe.kind === kind)
+    const matching = probes.filter(probe => probe.kind === kind || (kind === 'recall' && probe.kind === 'delayed-recall'))
     return { pass: matching.filter(probe => probe.pass).length, total: matching.length }
   }
-  const mainTurns = run.turns.filter(turn => turn.conversation === 'main')
+  const mainTurns = run.turns.filter(turn => turn.conversation === run.turns[0]?.conversation)
   const lastSteps = mainTurns.map(turn => turn.steps.at(-1)?.usage).filter(Boolean)
   const promptOf = usage => (usage.inputTokens ?? 0) + (usage.cacheReadTokens ?? 0)
   const sentBytes = agentCalls.map(call => call.sentBytes ?? call.messageBytes)
@@ -140,12 +142,20 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
       const sorted = run.turns.map(turn => turn.wallMs).sort((a, b) => a - b)
       return sorted.length === 0 ? 0 : Number((sorted[Math.floor(sorted.length / 2)] / 1000).toFixed(1))
     })(),
+    meanFirstTextTokenMs: (() => {
+      const measured = agentCalls.map(call => call.firstTextTokenMs).filter(Number.isFinite)
+      return measured.length === 0 ? undefined : Math.round(measured.reduce((sum, value) => sum + value, 0) / measured.length)
+    })(),
+    firstTextTokenCoverage: agentCalls.filter(call => call.firstTextTokenMs !== undefined).length,
+    modelMetadata: journal.filter(call => call.kind === 'model-info'),
     meanFirstChunkMs: agentCalls.length === 0 ? 0 : Math.round(agentCalls.reduce((total, call) => total + (call.firstChunkMs ?? 0), 0) / agentCalls.length),
     nativeCompactionCalls: (byKind['native-compaction'] ?? []).length,
     nativeCompactionEvents,
     recall: tally('recall'),
     analysis: tally('analysis'),
     cross: tally('cross-session'),
+    negativeRecall: tally('negative-recall'),
+    taskReasoning: tally('task-reasoning'),
     failedProbes: probes.filter(probe => !probe.pass).map(probe => probe.id),
     acceptance:
       run.acceptance === undefined ? undefined : { pass: run.acceptance.pass, total: run.acceptance.pass + run.acceptance.fail, failed: run.acceptance.failed },
@@ -159,7 +169,8 @@ const successfulRuns = runs.filter(
     run.finishedAt !== undefined &&
     run.turnEnds.every(end => end === 'completed') &&
     (run.expectedTurns === undefined || run.turns === run.expectedTurns) &&
-    run.drain?.complete !== false,
+    run.drain?.complete !== false &&
+    run.all.unfinishedCalls === 0,
 )
 const groups = Object.groupBy(successfulRuns, run => `${run.scenario}|${run.arm}`)
 for (const [key, items] of Object.entries(groups)) {
@@ -241,14 +252,16 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
       `| ${ARM_NAMES[arm]} | ${curveTurns.map(turn => stat(items, run => run.promptCurve[turn - 1])).join(' | ')} | ${stat(items, run => run.promptCurve.at(-1))} |`,
     )
   }
-  lines.push('\n| arm | recall probes | analysis probes | cross-session probes | acceptance tests | failed probes (per run) |')
-  lines.push('|---|---|---|---|---|---|')
+  lines.push(
+    '\n| arm | recall probes | analysis probes | cross-session probes | negative recall | task reasoning | acceptance tests | failed probes (per run) |',
+  )
+  lines.push('|---|---|---|---|---|---|---|---|')
   for (const arm of ['A', 'B', 'C']) {
     const items = groups[`${scenario}|${arm}`] ?? []
     if (items.length === 0) continue
     const acceptance = items.some(run => run.acceptance !== undefined) ? ratio(items, run => run.acceptance ?? { pass: 0, total: 0 }) : '–'
     lines.push(
-      `| ${ARM_NAMES[arm]} | ${ratio(items, run => run.recall)} | ${ratio(items, run => run.analysis)} | ${ratio(items, run => run.cross)} | ${acceptance} | ${items.map(run => `r${run.rep}: ${run.failedProbes.join(', ') || '—'}`).join('; ')} |`,
+      `| ${ARM_NAMES[arm]} | ${ratio(items, run => run.recall)} | ${ratio(items, run => run.analysis)} | ${ratio(items, run => run.cross)} | ${ratio(items, run => run.negativeRecall)} | ${ratio(items, run => run.taskReasoning)} | ${acceptance} | ${items.map(run => `r${run.rep}: ${run.failedProbes.join(', ') || '—'}`).join('; ')} |`,
     )
   }
 }
