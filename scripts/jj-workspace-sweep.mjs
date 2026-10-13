@@ -79,6 +79,25 @@ const headCommits = new Set(
     .split('\n')
     .filter(Boolean),
 )
+// A workspace's `@` can be empty while its ANCESTORS hold real work. Reading
+// only the slot commit classified optmem-reliability and pnpm-root as sweepable
+// even though each carried two commits that exist nowhere on the spine.
+//
+// A query that fails yields `undefined`, which the decision treats as
+// "unique work": an unreadable ancestry is retained, never swept.
+const uniqueWorkByName = new Map(
+  workspaceRows.map(row => {
+    try {
+      const unique = jj(['log', '-r', `::${row.name}@ & ~::${spine} & ~empty()`, '--no-graph', '-T', String.raw`commit_id ++ "\n"`])
+        .split('\n')
+        .filter(Boolean).length
+      return [row.name, unique]
+    } catch {
+      return [row.name, undefined]
+    }
+  }),
+)
+
 const bookmarkedCommits = new Set(
   jj(['log', '-r', 'bookmarks()', '--no-graph', '-T', String.raw`commit_id ++ "\n"`])
     .split('\n')
@@ -121,7 +140,20 @@ const candidates = detectedWorkspaces
   .filter(entry => entry.repository === repoRoot && entry.name !== 'default')
   .map(entry => {
     const row = stateByName.get(entry.name)
-    const landing = row === undefined ? 'unknown' : row.empty ? 'empty' : spineCommits.has(row.commit) ? 'on-spine' : 'unique-work'
+    const uniqueWork = uniqueWorkByName.get(entry.name)
+    // A workspace's `@` can be empty while its ANCESTORS hold real work, so the
+    // slot commit alone is not a landing test. An unreadable ancestry is
+    // 'unknown', which is retained rather than swept.
+    const landing =
+      row === undefined || uniqueWork === undefined
+        ? 'unknown'
+        : uniqueWork > 0
+          ? 'unique-work'
+          : row.empty
+            ? 'empty'
+            : spineCommits.has(row.commit)
+              ? 'on-spine'
+              : 'unique-work'
     const stale = entry.age_days >= olderThanDays || entry.action === 'review'
     // `target.empty()` describes the recorded working-copy commit, never the files
     // on disk, so it is not a safety proof. A workspace is sweepable only once
