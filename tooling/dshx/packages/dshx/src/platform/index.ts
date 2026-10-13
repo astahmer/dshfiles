@@ -10,6 +10,7 @@ export type {
   DshPlatformTransport,
   JsonValue,
   PluginSummary,
+  SessionEventRange,
   SessionPage,
   SessionSummary,
   SettingsDescription,

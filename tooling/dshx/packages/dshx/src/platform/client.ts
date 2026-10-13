@@ -347,6 +347,14 @@ export interface SessionPage {
   readonly hasMore: boolean
 }
 
+/** Bounds a Session export: events after `afterSeq`, at most `newest` records that pass `keep`, newest last. */
+export interface SessionEventRange {
+  readonly afterSeq?: number
+  readonly throughSeq?: number
+  readonly newest?: number
+  readonly keep?: (record: JsonValue) => boolean
+}
+
 export interface ChangeResult {
   readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
   readonly changed: boolean
@@ -382,7 +390,8 @@ export interface DshPlatformClient {
     prompt(sessionId: string, text: string, mode: 'queue' | 'steer', signal?: AbortSignal): Promise<{ readonly accepted: true }>
     page(sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages?: number): Promise<SessionPage>
     history(sessionId: string, maxMessages?: number): Promise<SessionPage>
-    export(sessionId: string): Promise<readonly JsonValue[]>
+    cursor(sessionId: string): Promise<number>
+    export(sessionId: string, range?: SessionEventRange): Promise<readonly JsonValue[]>
   }
   readonly plugins: {
     list(): Promise<readonly PluginSummary[]>
@@ -733,30 +742,42 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         const throughSeq = await transport.sessionCursor(sessionId)
         return page(sessionId, throughSeq, undefined, maxMessages)
       },
-      export: async sessionId => {
-        const throughSeq = await transport.sessionCursor(sessionId)
+      cursor: sessionId => transport.sessionCursor(sessionId),
+      export: async (sessionId, range = {}) => {
+        const throughSeq = range.throughSeq ?? (await transport.sessionCursor(sessionId))
+        const recordSeq = (record: JsonValue): number | undefined => {
+          const parsed = historyRecordSchema.safeParse(record)
+          return parsed.success ? parsed.data.event.seq : undefined
+        }
+        const isWanted = (record: JsonValue): boolean => {
+          const seq = recordSeq(record)
+          if (range.afterSeq !== undefined && seq !== undefined && seq <= range.afterSeq) return false
+          return range.keep?.(record) ?? true
+        }
         const pages: JsonValue[][] = []
+        let collected = 0
         let beforeSeq: number | undefined
         let hasMore = true
         while (hasMore) {
           const current = await page(sessionId, throughSeq, beforeSeq, 250)
-          pages.push([...current.records])
-          hasMore = current.hasMore
+          const wanted = current.records.filter(isWanted)
+          pages.push(wanted)
+          collected += wanted.length
+          const oldestSeq = current.records
+            .map(recordSeq)
+            .reduce<number | undefined>((minimum, value) => (value === undefined || (minimum !== undefined && minimum <= value) ? minimum : value), undefined)
+          const reachedAfterSeq = range.afterSeq !== undefined && oldestSeq !== undefined && oldestSeq <= range.afterSeq + 1
+          const reachedNewest = range.newest !== undefined && collected >= range.newest
+          hasMore = current.hasMore && !reachedAfterSeq && !reachedNewest
           if (hasMore) {
-            const sequenceValues = current.records
-              .map(record => historyRecordSchema.safeParse(record))
-              .flatMap(result => (result.success ? [result.data.event.seq] : []))
-            const nextBeforeSeq = sequenceValues.reduce<number | undefined>(
-              (minimum, value) => (minimum === undefined || value < minimum ? value : minimum),
-              undefined,
-            )
-            if (nextBeforeSeq === undefined || nextBeforeSeq === beforeSeq) {
+            if (oldestSeq === undefined || oldestSeq === beforeSeq) {
               throw new DshPlatformError('invalid-history-page', 'DSH reported more session history without an earlier event cursor.')
             }
-            beforeSeq = nextBeforeSeq
+            beforeSeq = oldestSeq
           }
         }
-        return pages.reverse().flatMap(items => items)
+        const records = pages.reverse().flatMap(items => items)
+        return range.newest === undefined ? records : records.slice(-range.newest)
       },
     },
     plugins: {
