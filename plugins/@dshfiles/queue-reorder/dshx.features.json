@@ -20,19 +20,19 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "queue-reorder.move-message",
-          "reason": "No browser journey exists yet for the move-message scenario of \"Reorder pending messages\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "queue-reorder.drag-target",
-          "reason": "No browser journey exists yet for the drag-target scenario of \"Reorder pending messages\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "queue-reorder.dock-preferences",
-          "reason": "No browser journey exists yet for the dock-preferences scenario of \"Reorder pending messages\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
           "kind": "unit-test",
@@ -77,9 +77,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "queue-reorder.busy-locks",
-          "reason": "No browser journey exists yet for the busy-locks scenario of \"Edit queued messages in the composer\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
           "kind": "unit-test",
@@ -161,9 +161,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "queue-reorder.message-preview",
-          "reason": "No browser journey exists yet for the message-preview scenario of \"Preview queued message text\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
         },
         {
           "kind": "unit-test",

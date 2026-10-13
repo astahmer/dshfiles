@@ -9,7 +9,8 @@ import { z } from 'zod'
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
  * suffix>` unless its latest message carries a directive: `[[read PATH]]` calls the read tool and
- * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool; the turn after a tool
+ * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, and `[[hold]]`
+ * keeps the turn running until `releaseHeldTurns`; the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
  */
 
@@ -32,6 +33,8 @@ export interface FakeCommandCode {
   readonly baseUrl: string
   readonly requests: FakeChatRequest[]
   summaries: 'answer' | 'fail' | 'hang'
+  /** Answers every turn held by a `[[hold]]` directive. */
+  releaseHeldTurns(): void
   close(): Promise<void>
 }
 
@@ -60,6 +63,7 @@ const toolCall = (name: string, args: object): object => ({
 export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode> => {
   const requests: FakeChatRequest[] = []
   const hanging = new Set<ServerResponse>()
+  const held = new Set<ServerResponse>()
   const server = createServer((request, response) => {
     let body = ''
     request.setEncoding('utf8')
@@ -105,6 +109,10 @@ export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode>
       // DSH appends its runtime-context snapshot after the user's message.
       const last = messages.filter(message => !message.text.startsWith(RUNTIME_CONTEXT)).at(-1)
       if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })
+      if (last?.text.includes('[[hold]]') === true) {
+        held.add(response)
+        return
+      }
       const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
       if (read?.[1] !== undefined) return streamAnswer(response, toolCall('read', { file_path: read[1] }))
       const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
@@ -121,7 +129,12 @@ export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode>
     baseUrl: `http://127.0.0.1:${String(address.port)}`,
     requests,
     summaries: 'answer',
+    releaseHeldTurns: () => {
+      for (const response of held) streamAnswer(response, { content: 'Held turn released.' })
+      held.clear()
+    },
     close: async () => {
+      for (const response of held) response.destroy()
       for (const response of hanging) response.destroy()
       server.closeAllConnections()
       await new Promise<void>(resolve => server.close(() => resolve()))
