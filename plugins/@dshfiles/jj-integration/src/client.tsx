@@ -1,11 +1,17 @@
-import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { JjIntegrationPanel } from './panel.js'
+import { DestinationBar, type DestinationBarServices } from './destination-bar.js'
+import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
+import { ThreadWorkspacesPanel } from './panel.js'
+import { jjIntegrationSettings } from './settings.js'
 import './client.css'
 
 const PANEL_ID = 'jj-integration'
@@ -18,22 +24,50 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   </svg>
 )
 
+const useBookmark = (): string => useSettings(jjIntegrationSettings).value?.bookmark ?? 'main'
+
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
-  inject: ['slots', 'layout'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
-    const label = (): string => translate('title')
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label, locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
         { name: 'main', key: PANEL_ID, locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <JjIntegrationPanel t={props.t} />
+            <ThreadWorkspacesPanel t={props.t} bookmark={useBookmark()} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    const destinationServices: DestinationBarServices = {
+      sessions: ctx.sessions,
+      workspaces: ctx.workspaces,
+      // SAFETY: every id passed here came back from the Host's workspace registry.
+      openWorkspace: workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId as WorkspaceView['workspaceId']),
+      pickDirectory: () => ctx.uiWorkspace.pickDirectory(),
+    }
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'dshfiles-jj-integration-destination', order: 10, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: Parameters<typeof DestinationBar>[0]['sessionId'] }) => (
+          <PluginQueryProvider>
+            <DestinationBar sessionId={props.sessionId} services={destinationServices} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-land', order: 39, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: Parameters<typeof LandButton>[0]['sessionId'] }) => (
+          <PluginQueryProvider>
+            <LandButton sessionId={props.sessionId} sessions={ctx.sessions} t={translate} bookmark={useBookmark()} />
           </PluginQueryProvider>
         )),
       ),

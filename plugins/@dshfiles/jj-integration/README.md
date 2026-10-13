@@ -1,113 +1,84 @@
-# DSH Jujutsu integration coordinator
+# Thread workspaces (jj-integration)
 
-Owned DSH bundle that turns many independent jj workspaces into one coordinated
-development environment. Each Agent keeps its own workspace; the coordinator
-serializes completed work into one canonical bookmark.
+Lets many agents work on one jj repository at once: a thread can run in its own
+jj workspace beside the repository, and **Land** puts its finished work on
+`main`. Works on stock DSH 0.2.0-rc.2; no core patch.
 
-## Architecture
+## Starting a thread
 
-```
-independent agent workspaces ──► durable integration queue ──► canonical bookmark
-        (jj workspace add)          (this plugin, single writer)     (integration-spine)
-```
+A blank thread shows a destination bar above its composer:
 
-- **Workspace identity** is coordinator-owned and distinct from the Session id,
-  Agent id, filesystem path, communication `workspace/<hash>` topic, and jj
-  change/commit ids. One workspace can have several owning Sessions over time.
-- **Canonical target** is an existing jj bookmark (default `integration-spine`).
-  It is read explicitly and never inferred from recent activity.
-- **Integration** uses `jj duplicate <source> --onto <target>`: the source
-  revision is never rewritten, so the agent's workspace is untouched.
-- **Single writer**: an in-process mutation queue plus a token-checked lock file
-  in the Jujutsu **store** (`<store>/.dshfiles-jj-integration.lock`, where the
-  store is what `<workspace>/.jj/repo` names). Two coordinators sharing one store
-  are mutually exclusive whatever `DSH_HOME` each was started with; a lock left by
-  a dead pid or older than ten minutes is reclaimed, and a process only releases a
-  lock whose on-disk token is still its own. A second coordinator is refused with
-  `integration-busy`.
-- **Crash-safe staging, no leaked duplicates**: the staging workspace is
-  journalled in the store before `jj workspace add`, so a crash between create and
-  cleanup is reaped on the next run (`integration.staging_reaped`). The canonical
-  bookmark is re-read before it advances and the run is refused with
-  `spine-moved` if another writer moved it, and a duplicate created for a run that
-  then fails is abandoned, with `duplicateAbandoned` / `leakedRevision` recorded
-  on the attempt.
+- **Host**: `Local`, or a machine registered with
+  [`@dshfiles/multi-host`](../multi-host/README.md) (status dot, **Add host…**,
+  **Manage hosts…**). With a remote host chosen, the folder, bookmark and
+  workspace chips describe that host (through its own jj-integration), and the
+  composer starts the thread there; see the multi-host README.
+- **Folder**: a registered project, **No folder** (a scratch directory,
+  `~/.dsh/no-folder`), or **Open folder…**.
+- **Bookmark** (jj repositories): the bookmark the thread starts from. Picking
+  one starts the thread in its own workspace at that bookmark.
+- **workspace** toggle: run the thread in its own jj workspace,
+  `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
 
-## State model
+A Session's directory is fixed once created, so each change opens a blank
+thread at the new destination; the blank thread left behind is discarded with
+its empty workspace. The thread sidebar's **New thread** asks this plugin first,
+so `isolateByDefault` decides whether a new thread starts isolated. The thread
+sidebar shows a thread workspace's sessions under its project.
 
-Workspace lifecycle (`created`, `active`, `idle`, `ready`, `integrating`,
-`integrated`, `blocked`, `abandoned`, `archived`, `missing`) is a separate
-dimension from candidate integration state (`queued`, `running`, `blocked`,
-`failed`, `integrated`, `already-integrated`, `stale`, `cancelled`). Readiness
-is explicit; an idle or absent Session never implies completion or readiness.
+## Landing
 
-A candidate records the source workspace, source Session, immutable source
-change/commit ids, the spine at submit time, explicit dependencies, a
-correlation id, attempts, validation, conflict files, and the result revision.
+**Land** (thread header, the panel, or the `jj_thread_land` tool) runs in the
+thread's own workspace, serialized per repository:
 
-## Integration algorithm
+1. Abandon empty leftovers between `main` and `@`.
+2. Refuse revisions described as nothing or `wip`.
+3. `jj rebase -b @ -d main`; on conflict, report the files and leave `main`
+   where it was.
+4. `jj bookmark set main -r <tip>` (forward only; retried after a rebase if
+   another writer moved `main`), then `jj new main` when `@` held work.
 
-1. Resolve the candidate's source revision and refresh the canonical bookmark.
-2. Reject stale candidates (source commit changed) and already-integrated work
-   (source is an ancestor of the bookmark, or a recorded integration matches).
-3. Refuse to run while an explicit dependency is not integrated.
-4. `jj duplicate <source> --onto <target>` with `--ignore-working-copy`.
-5. If jj reports a conflict, record `jj resolve --list` files and block; the
-   bookmark does not move.
-6. If a validation command is configured, run it in an ephemeral staging
-   workspace at the duplicated revision, then forget and remove the staging
-   workspace.
-7. Only on success, `jj bookmark set <spine> -r <duplicate>` and record the
-   resulting revision. Nothing is pushed, and no source workspace is modified.
+When Land stops on conflicts or descriptions, it queues a message asking the
+thread's agent to fix them and call `jj_thread_land` again
+(`askAgentToFixLanding`). Nothing is pushed.
+
+## Cleanup
+
+Every 10 minutes, a thread workspace whose threads are all archived and that
+holds no unlanded work is removed: `jj workspace forget`, its own empty
+revisions abandoned (no stray heads), its directory deleted, its registry entry
+dropped. A workspace with unlanded work is never removed automatically; the
+panel's **Discard with work** deletes it on request.
 
 ## Agent tools
 
-Read-only: `jj_workspace_list`, `jj_workspace_inspect`, `jj_integration_list`,
-`jj_integration_inspect`, `jj_integration_events`.
+- `jj_thread_status`: this thread's unlanded revisions and whether `main` moved.
+- `jj_thread_land`: land this thread's work.
 
-Mutating: `jj_workspace_register`, `jj_workspace_ready`, `jj_integration_submit`,
-`jj_integration_run`, `jj_integration_retry`, `jj_integration_cancel`,
-`jj_integration_move`.
+## Settings (`jj-integration`)
 
-`jj_integration_run`, `retry`, and `cancel` require the candidate owner Session,
-a configured coordinator Session, or `allowAnyAgentIntegration`. The browser API
-acts as the human operator. No tool exposes arbitrary shell execution; jj runs
-with fixed argv through the DSH subprocess service, and the optional validation
-command is operator configuration only.
+| Key | Default | Meaning |
+|---|---|---|
+| `isolateByDefault` | `false` | Initial state of the workspace toggle for new threads. |
+| `bookmark` | `main` | Bookmark threads start from and Land advances. |
+| `threadsDirectory` | empty | Parent for thread workspaces; empty uses `<repository>-threads`. |
+| `setupCommand` | empty | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`. |
+| `askAgentToFixLanding` | `true` | Hand Land problems back to the thread's agent. |
+| `removeFinishedThreads` | `true` | Remove finished thread workspaces without unlanded work. |
 
-## Structured events
+## Limits
 
-`workspace.created`, `workspace.attached`, `workspace.detached`,
-`workspace.refreshed`, `workspace.ready`, `workspace.missing`,
-`integration.queued`, `integration.started`, `integration.blocked`,
-`integration.validation_failed`, `integration.completed`,
-`integration.already_integrated`, `integration.stale`, `integration.cancelled`,
-`integration.failed` — each with event id, timestamp, workspace/Session/candidate
-ids, correlation id, and immutable revisions. Events never contain conversation
-content and are bounded to 2,000 entries.
+- jj repositories only; git worktrees are not handled yet.
+- A thread workspace starts without `node_modules`; use `setupCommand`.
+- Isolation is a working directory, not a sandbox: a shell command can still
+  write anywhere.
+- With a custom `threadsDirectory`, the thread sidebar cannot group thread
+  sessions under their project.
 
-## UI
+## Verify
 
-A `main` panel with **Integration queue** (primary), **Workspaces**, and
-**History** tabs. The queue shows source workspace, revision, state, conflict
-and validation indicators, and serialized actions; the workspaces tab shows
-lifecycle, current revision, and owners.
+```sh
+pnpm --dir plugins --filter @dshfiles/jj-integration test
+```
 
-## Configuration
-
-`spineBookmark` (default `integration-spine`), optional `validationCommand`,
-`allowAnyAgentIntegration` (default false), `coordinatorSessions`, and
-`autoDiscoverWorkspaces` (default true, best-effort registration of an Agent's
-working directory on `agent/created`).
-
-## Known limitations
-
-- One source revision per candidate; a stack of commits is not yet duplicated as
-  a unit.
-- The overlap preview is a file-level heuristic; only jj's duplicate result is
-  authoritative.
-- Conflict resolution is manual: fix the source workspace and retry. Delegation
-  to a new Session is not implemented here and should use the opt-in session
-  tools when they are composed.
-- The panel has no Playwright journey yet; behavior is verified by the real-jj
-  host tests in `src/jj.integration.test.ts`.
+The tests drive real `jj` in temporary repositories.

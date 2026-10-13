@@ -2,7 +2,7 @@
   "name": "@dshfiles/jj-integration",
   "version": "0.1.0",
   "private": true,
-  "description": "Jujutsu workspace lifecycle and serialized integration coordination for DSH Agents.",
+  "description": "One jj workspace per thread, chosen above a new thread\u2019s composer, and a Land button that rebases a thread\u2019s work onto main.",
   "files": [
     "dist",
     "cordis.patch.yml"
@@ -13,7 +13,11 @@
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./src/api.ts"
+    }
   },
   "scripts": {
     "build": "dshx build",
@@ -23,22 +27,25 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "write-file-atomic": "7.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-subprocess": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-workspace": "0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
     "@types/node": "^22.19.0",
@@ -50,16 +57,20 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-api-gateway": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-api-remotes": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-session": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {
@@ -73,8 +84,11 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-api-gateway",
-        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-locale"
       ],
       "locales": [
