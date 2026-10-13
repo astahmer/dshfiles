@@ -58,6 +58,18 @@
           "kind": "not-applicable",
           "id": "home.browser-journey",
           "reason": "Verified manually against a scratch DSH instance; no Playwright journey composes it yet."
+        },
+        {
+          "kind": "unit-test",
+          "id": "home.thread-project",
+          "file": "plugins/@dshfiles/home/src/home-model.test.ts",
+          "testName": "files a thread workspace under its project and leaves other workspaces alone"
+        },
+        {
+          "kind": "unit-test",
+          "id": "home.brand-style",
+          "file": "plugins/@dshfiles/home/src/home-model.test.ts",
+          "testName": "hides only the native pieces the settings replace"
         }
       ]
     }

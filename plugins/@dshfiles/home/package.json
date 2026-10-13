@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "dshx build",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

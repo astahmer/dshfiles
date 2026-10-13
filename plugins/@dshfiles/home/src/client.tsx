@@ -11,11 +11,11 @@ import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useSyncExternalStore } from 'react'
 import { HOME_LOCALE_NAMESPACE, homeLocale, type HomeTranslate } from './locales.js'
 import { NewThreadSettings } from './settings-section.js'
+import { brandStyle, projectOf } from './home-model.js'
 import { homeSettings, type HomeSettings } from './settings.js'
 import './client.css'
 
 const RECENT_THREADS = 3
-const THREADS_DIRECTORY_SUFFIX = '-threads'
 const defaults: HomeSettings = homeSettings.schema({})
 
 interface Stores {
@@ -38,13 +38,6 @@ const useStores = <Value,>(stores: Stores, read: () => Value): Value => {
   return useSyncExternalStore(subscribe, read)
 }
 
-/** A jj-integration thread workspace lives at `<project>-threads/<name>`; it belongs to `<project>`. */
-const projectOf = (workspace: WorkspaceView, items: readonly WorkspaceView[]): WorkspaceView => {
-  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
-  if (!parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return workspace
-  return items.find(item => item.path === parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) ?? workspace
-}
-
 const workspaceOfSession = (stores: Stores, sessionId: string | undefined): WorkspaceView | undefined => {
   if (sessionId === undefined) return undefined
   const items = stores.workspaces.list.getSnapshot().items
@@ -56,14 +49,6 @@ const mainSessionId = (stores: Stores): string | undefined => {
   const sessions = stores.sessions.list.getSnapshot()
   return sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
 }
-
-const brandStyle = (settings: HomeSettings): string =>
-  [
-    '[class$="_fishHitbox"]{width:auto}',
-    settings.headline.trim() === '' ? '' : '[class$="_titleGroup"]>span:first-child{display:none}',
-    settings.showPreviewBadge ? '' : '[class$="_previewBadge"]{display:none}',
-    settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none!important}',
-  ].join('')
 
 const BrandMark = (props: HeroBrandMarkOwnerProps & { readonly stores: Stores; readonly t: HomeTranslate }) => {
   const settings = useSettings(homeSettings).value ?? defaults
