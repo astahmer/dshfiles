@@ -370,6 +370,24 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state, graphOrder, mineOnly, hideImmutable, authorFilter, textFilter, fromDate, toDate])
 
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
+  const dropDestination = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.destinationId)
+  /** The drop preview renders in its destination row, or above the list while a filter hides that row. */
+  const dropPreviewAt = (destination: Revision): JSX.Element | null => {
+    if (dropPresentation === null) return null
+    const source = revisionsByCommitId.get(dropPresentation.sourceId)
+    return (
+      <InlineDropPreview
+        branch={dropPresentation.kind === 'rebase' ? previewBranch : []}
+        busy={actionBusy}
+        destinationLabel={`${destination.shortestChangeId} · ${firstLine(destination.description)}`}
+        onCancel={() => sendAction({ type: 'cancel' })}
+        onConfirm={confirmPreview}
+        presentation={dropPresentation}
+        preview={preview}
+        sourceLabel={source === undefined ? dropPresentation.sourceId.slice(0, 12) : `${source.shortestChangeId} · ${firstLine(source.description)}`}
+      />
+    )
+  }
   const graphRows = useMemo(() => {
     if (state === undefined) return []
     const graphRevisions = graphOrder.filter(revision => (!hideImmutable || !revision.immutable) && (!mineOnly || revision.mine || revision.workingCopy))
@@ -959,13 +977,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               </Button>
             </div>
           )}
+          {dropDestination !== undefined && !visibleRevisions.some(revision => revision.commitId === dropDestination.commitId) && (
+            // A filter can hide the destination row the preview lives in; the preview stays reachable above the list.
+            <div className="dshx:border-b dshx:p-2">{dropPreviewAt(dropDestination)}</div>
+          )}
           <div className="dshx:relative dshx:w-full" style={{ height: listVirtualizer.getTotalSize() }}>
             {listVirtualizer.getVirtualItems().map(virtualRow => {
               const item = listItems[virtualRow.index]
               if (item === undefined) return null
               const sticky = virtualRow.index === stickyDayIndex
               const rowDropPresentation = item.kind === 'revision' && dropPresentation?.destinationId === item.revision.commitId ? dropPresentation : null
-              const dropSourceRevision = rowDropPresentation === null ? undefined : revisionsByCommitId.get(rowDropPresentation.sourceId)
               return (
                 <div
                   className={sticky ? 'dshx:sticky dshx:top-0 dshx:z-10' : 'dshx:absolute dshx:top-0 dshx:left-0 dshx:w-full'}
@@ -1019,22 +1040,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
-                      {rowDropPresentation !== null && (
-                        <InlineDropPreview
-                          branch={rowDropPresentation.kind === 'rebase' ? previewBranch : []}
-                          busy={actionBusy}
-                          destinationLabel={`${item.revision.shortestChangeId} · ${firstLine(item.revision.description)}`}
-                          onCancel={() => sendAction({ type: 'cancel' })}
-                          onConfirm={confirmPreview}
-                          presentation={rowDropPresentation}
-                          preview={preview}
-                          sourceLabel={
-                            dropSourceRevision === undefined
-                              ? rowDropPresentation.sourceId.slice(0, 12)
-                              : `${dropSourceRevision.shortestChangeId} · ${firstLine(dropSourceRevision.description)}`
-                          }
-                        />
-                      )}
+                      {rowDropPresentation !== null && dropPreviewAt(item.revision)}
                     </RevisionRow>
                   )}
                 </div>
