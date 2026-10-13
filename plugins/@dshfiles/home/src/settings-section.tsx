@@ -25,8 +25,8 @@ export const NewThreadSettings = () => {
     return (
       <div className="dshx-root dshx:p-1 dshx:text-sm dshx:text-muted-foreground">{home.status === 'loading' ? '…' : (home.error?.message ?? home.status)}</div>
     )
-  const toggle = (field: 'showAgentPresetPicker' | 'showRecentThreads' | 'showUnlandedWork' | 'showPreviewBadge') => (
-    <Switch checked={value[field]} disabled={!home.writable} onCheckedChange={checked => void home.set(field, checked)} />
+  const toggle = (field: 'showAgentPresetPicker' | 'showRecentThreads' | 'showUnlandedWork' | 'showPreviewBadge', label: string) => (
+    <Switch aria-label={label} checked={value[field]} disabled={!home.writable} onCheckedChange={checked => void home.set(field, checked)} />
   )
   return (
     <div className="dshx-root dshx:flex dshx:flex-col">
@@ -36,6 +36,7 @@ export const NewThreadSettings = () => {
           description="New threads in a jj repository start isolated in their own workspace; the toggle on the New thread row overrides it."
         >
           <Switch
+            aria-label="Own jj workspace by default"
             checked={threads.value.isolateByDefault}
             disabled={!threads.writable}
             onCheckedChange={checked => void threads.set('isolateByDefault', checked)}
@@ -46,20 +47,25 @@ export const NewThreadSettings = () => {
         title="Agent preset picker"
         description="Show “Standard mode…” on the New thread row. Hidden, new threads use the Agent presets page’s New task default."
       >
-        {toggle('showAgentPresetPicker')}
+        {toggle('showAgentPresetPicker', 'Agent preset picker')}
       </Row>
       <Row title="Recent threads" description="Offer the project’s three most recent threads above the composer.">
-        {toggle('showRecentThreads')}
+        {toggle('showRecentThreads', 'Recent threads')}
       </Row>
       <Row title="Work to land" description="Show how many of the project’s thread workspaces hold work not landed yet.">
-        {toggle('showUnlandedWork')}
+        {toggle('showUnlandedWork', 'Work to land')}
       </Row>
       <Row title="Headline" description="`{project}` is the selected project; empty keeps the DeepSeek headline.">
-        <Input className="dshx:w-56" defaultValue={value.headline} onBlur={event => void home.set('headline', event.currentTarget.value)} />
+        <Input
+          aria-label="Headline"
+          className="dshx:w-56"
+          defaultValue={value.headline}
+          onBlur={event => void home.set('headline', event.currentTarget.value)}
+        />
       </Row>
       <Row title="Mark" description="What replaces the DeepSeek fish.">
         <Select value={value.mark} onValueChange={mark => void home.set('mark', mark === 'text' || mark === 'image' ? mark : 'none')}>
-          <SelectTrigger className="dshx:w-56">
+          <SelectTrigger aria-label="Mark" className="dshx:w-56">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -71,16 +77,26 @@ export const NewThreadSettings = () => {
       </Row>
       {value.mark === 'text' ? (
         <Row title="Mark text" description="Shown before the headline.">
-          <Input className="dshx:w-56" defaultValue={value.markText} onBlur={event => void home.set('markText', event.currentTarget.value)} />
+          <Input
+            aria-label="Mark text"
+            className="dshx:w-56"
+            defaultValue={value.markText}
+            onBlur={event => void home.set('markText', event.currentTarget.value)}
+          />
         </Row>
       ) : null}
       {value.mark === 'image' ? (
         <Row title="Mark image" description="An https: or data:image URL.">
-          <Input className="dshx:w-56" defaultValue={value.markImageUrl} onBlur={event => void home.set('markImageUrl', event.currentTarget.value)} />
+          <Input
+            aria-label="Mark image"
+            className="dshx:w-56"
+            defaultValue={value.markImageUrl}
+            onBlur={event => void home.set('markImageUrl', event.currentTarget.value)}
+          />
         </Row>
       ) : null}
       <Row title="Preview badge" description="Keep DeepSeek’s “Preview” badge next to the headline.">
-        {toggle('showPreviewBadge')}
+        {toggle('showPreviewBadge', 'Preview badge')}
       </Row>
     </div>
   )
