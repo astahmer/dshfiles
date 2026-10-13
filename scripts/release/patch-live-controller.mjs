@@ -43,7 +43,10 @@ const controllerOf = install => {
   return join(store, entry, 'node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js')
 }
 
-const install = runningInstall() ?? shimInstall()
+// --install exists so the launch step can be exercised against a simulated
+// rehash without touching the real installation.
+const overrideIndex = process.argv.indexOf('--install')
+const install = overrideIndex === -1 ? (runningInstall() ?? shimInstall()) : process.argv[overrideIndex + 1]
 if (install === undefined) throw new Error('could not resolve the dsh installation from the running Host or the shim')
 const controller = controllerOf(install)
 const patched = readFileSync(PATCHED, 'utf8')
@@ -77,5 +80,11 @@ if (mode === '--verify') {
     console.log('applied      :', PATCHED)
   }
   const after = readFileSync(controller, 'utf8')
+  const applied = after.includes('resolveByPath(cwd)') && after.includes('resolveByPath(childCwd)')
   console.log('now          : create:', after.includes('resolveByPath(cwd)'), '| fork:', after.includes('resolveByPath(childCwd)'))
+  // Fail closed: a launcher must not start a Host that will fail thread creation.
+  if (!applied) {
+    console.error('FAIL: the attach fix is not present after patching; refusing to report success.')
+    process.exitCode = 1
+  }
 }
