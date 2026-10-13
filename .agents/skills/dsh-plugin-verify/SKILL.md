@@ -66,6 +66,12 @@ fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe   # re
 In the browser (tokenized URL from boot output): check the console for `slot entry crashed` and `Failed to load
 plugins`; the first entry named is often a dependent, not the cause.
 
+A scratch instance (`DSH_HOME=/private/tmp/… dsh web --port <free> --no-open`) shows a DeepSeek "Add an API key"
+dialog when it has no provider; dismiss it with **Configure later**. Never use the native "Open folder" / directory
+picker there: on macOS it opens an `osascript` folder dialog on the user's screen. Register a test project instead by
+creating a Session from that folder (`cd <folder> && DSHX_URL=<scratch url> dshx sessions create`) or, with the
+instance stopped, by adding it to `$DSH_HOME/storages/workspace.json`.
+
 ## 5. Perf budget
 
 UI work must not regress the palette budgets (palette open, keystroke frame, style recalc, one shared `@dshfiles`

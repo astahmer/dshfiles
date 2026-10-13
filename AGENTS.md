@@ -70,7 +70,14 @@ Work lands on `main`; never `jj git push` without asking.
   `jj new` before the next change.
 - Never rewrite a revision another workspace holds as its `@` (describe,
   squash, rebase, abandon): it leaves a divergent copy of the change. Touch
-  only revisions you created.
+  only revisions you created, and not ones another workspace is built on:
+  amending an ancestor rebases that workspace and leaves it stale. Add a new
+  revision instead.
+- `jj workspace add` without `--ignore-working-copy`: with it, jj registers
+  the workspace but never checks its files out.
+- To move a checkout that may hold someone's uncommitted edits (e.g.
+  `~/dev/dshfiles`) onto `main`, use `jj rebase -r @ -d main`; `jj new main`
+  leaves those edits behind in the old revision.
 - Always pass `-m` to `jj describe` and `jj squash` (or
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.
