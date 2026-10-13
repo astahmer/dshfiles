@@ -25,9 +25,23 @@ const sourceVariant = (source: ActivitySource): 'default' | 'secondary' | 'outli
   return 'outline'
 }
 
-const formatTime = (at: number): string => new Date(at).toLocaleTimeString()
+/**
+ * A clock alone is ambiguous the moment a timeline spans more than one day:
+ * `00:41:29` reads as today even when it is last week. Today keeps the clock;
+ * anything older carries its date, so ordering stays legible at a glance.
+ */
+const formatTime = (at: number, now: number = Date.now()): string => {
+  const date = new Date(at)
+  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  if (date.toDateString() === new Date(now).toDateString()) return time
+  return `${date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })} ${time}`
+}
 
-const levelMarker = (level: CondensedItem['level']): string => (level === 'attention' ? 'dshx:bg-destructive' : level === 'notable' ? 'dshx:bg-primary' : 'dshx:bg-muted-foreground/40')
+/** The unambiguous spelling, for a hover or an event detail. */
+const formatExact = (at: number): string => new Date(at).toLocaleString()
+
+const levelMarker = (level: CondensedItem['level']): string =>
+  level === 'attention' ? 'dshx:bg-destructive' : level === 'notable' ? 'dshx:bg-primary' : 'dshx:bg-muted-foreground/40'
 
 const ActivityRow = (props: {
   readonly item: CondensedItem
@@ -48,7 +62,7 @@ const ActivityRow = (props: {
         {props.item.count > 1 ? <Badge variant="outline">{props.item.count}×</Badge> : null}
       </span>
       <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
-        <span>{formatTime(props.item.at)}</span>
+        <span title={formatExact(props.item.at)}>{formatTime(props.item.at)}</span>
         {props.item.sessionId === null ? null : <span>session {props.item.sessionId.slice(0, 8)}</span>}
         {props.item.correlationId === null ? null : <span>correlation {props.item.correlationId}</span>}
       </span>
@@ -71,7 +85,10 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
   const nearBottomRef = useRef(true)
   const debouncedSearch = useDebouncedValue({ value: search.trim(), delayMs: 200 })
   const attentionLevels: readonly ActivityLevel[] = ['attention']
-  const filterKey = useMemo(() => [debouncedSearch, [...sources].sort().join(','), attentionOnly, detailed] as const, [debouncedSearch, sources, attentionOnly, detailed])
+  const filterKey = useMemo(
+    () => [debouncedSearch, [...sources].sort().join(','), attentionOnly, detailed] as const,
+    [debouncedSearch, sources, attentionOnly, detailed],
+  )
   const feedQuery = useQuery({
     queryKey: [...feedKey, ...filterKey],
     queryFn: ({ signal }) =>
@@ -189,7 +206,9 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
           <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <Badge variant="secondary">{statsQuery.data?.retained ?? 0} {t('retained')}</Badge>
+          <Badge variant="secondary">
+            {statsQuery.data?.retained ?? 0} {t('retained')}
+          </Badge>
           <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
             {statsQuery.data?.attention ?? 0} {t('attention')}
           </Badge>
@@ -201,10 +220,22 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <div className="dshx:relative dshx:min-w-56 dshx:flex-1">
           <SearchIcon aria-hidden />
-          <Input aria-label={t('search')} placeholder={t('searchPlaceholder')} value={search} onChange={event => setSearch(event.currentTarget.value)} className="dshx:pl-8" />
+          <Input
+            aria-label={t('search')}
+            placeholder={t('searchPlaceholder')}
+            value={search}
+            onChange={event => setSearch(event.currentTarget.value)}
+            className="dshx:pl-8"
+          />
         </div>
         {(['session', 'communication', 'integration'] as const).map(source => (
-          <Button key={source} size="sm" variant={sources.includes(source) ? 'secondary' : 'outline'} aria-pressed={sources.includes(source)} onClick={() => toggleSource(source)}>
+          <Button
+            key={source}
+            size="sm"
+            variant={sources.includes(source) ? 'secondary' : 'outline'}
+            aria-pressed={sources.includes(source)}
+            onClick={() => toggleSource(source)}
+          >
             {t(source)}
           </Button>
         ))}
@@ -216,14 +247,20 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
         </Button>
       </div>
       {feedQuery.error === null ? null : (
-        <Alert variant="destructive"><AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription></Alert>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
+        </Alert>
       )}
       <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card className="dshx:min-w-0">
           <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
             <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
             <div className="dshx:flex dshx:items-center dshx:gap-2">
-              {pendingNew > 0 ? <Button size="sm" variant="secondary" onClick={jumpToLatest}>{t('newEvents')} ({pendingNew})</Button> : null}
+              {pendingNew > 0 ? (
+                <Button size="sm" variant="secondary" onClick={jumpToLatest}>
+                  {t('newEvents')} ({pendingNew})
+                </Button>
+              ) : null}
               {cursor === null ? null : (
                 <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate()}>
                   {olderMutation.isPending ? t('loadingOlder') : t('loadOlder')}
@@ -242,7 +279,9 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
               className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
             >
               {items.length === 0 && !feedQuery.isPending ? (
-                <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">{debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}</p>
+                <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">
+                  {debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}
+                </p>
               ) : null}
               {items.map(item => (
                 <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} onSelect={setSelected} />
@@ -251,40 +290,58 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
           </CardContent>
         </Card>
         <Card className="dshx:min-w-0">
-          <CardHeader className="dshx:pb-2"><CardTitle className="dshx:text-sm">{t('detail')}</CardTitle></CardHeader>
+          <CardHeader className="dshx:pb-2">
+            <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
+          </CardHeader>
           <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
             {selected === null ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('emptyDetail')}</p> : null}
             {selected !== null && selected.kind === 'group' ? (
               <>
                 <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground">{t('groupMembers')}: {selected.eventIds.length} {t('events')}</p>
-                <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>{t('detailed')}</Button>
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  {t('groupMembers')}: {selected.eventIds.length} {t('events')}
+                </p>
+                <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
+                  {t('detailed')}
+                </Button>
               </>
             ) : null}
             {selectedEvent === undefined ? null : (
               <>
                 <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground">{selectedEvent.type} · {formatTime(selectedEvent.at)}</p>
+                <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
+                  {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
+                </p>
                 {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
                 <Separator />
                 <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
-                <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">{JSON.stringify(selectedEvent.metadata, null, 2)}</pre>
+                <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">
+                  {JSON.stringify(selectedEvent.metadata, null, 2)}
+                </pre>
                 <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
                 <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
                   {selectedEvent.references.map(reference => (
-                    <Badge key={`${reference.kind}:${reference.id}`} variant="outline">{reference.kind}: {reference.id.slice(0, 12)}</Badge>
+                    <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
+                      {reference.kind}: {reference.id.slice(0, 12)}
+                    </Badge>
                   ))}
                   {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
                 </div>
                 <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
-                {(relatedQuery.data?.events ?? []).length < 2 ? <p className="dshx:text-xs dshx:text-muted-foreground">—</p> : (
+                {(relatedQuery.data?.events ?? []).length < 2 ? (
+                  <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
+                ) : (
                   <div className="dshx:flex dshx:flex-col dshx:gap-1">
                     {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
-                      <span key={event.id} className="dshx:text-xs">{formatTime(event.at)} · {event.summary}</span>
+                      <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
+                        {formatTime(event.at)} · {event.summary}
+                      </span>
                     ))}
                   </div>
                 )}
-                <p className="dshx:text-xs dshx:text-muted-foreground">{t('provenance')}: {t(selectedEvent.provenance)}</p>
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  {t('provenance')}: {t(selectedEvent.provenance)}
+                </p>
               </>
             )}
             <p className="dshx:mt-auto dshx:text-[11px] dshx:text-muted-foreground">{t('routineHidden')}</p>
