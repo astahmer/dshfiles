@@ -60,9 +60,9 @@ A layered E2E strategy, with the layer boundary drawn by _where the defect can
 live_ rather than by tooling preference.
 
 1. **Static contract checks** — the cheap layer, extended so whole classes of
-   cross-plugin defects never reach a browser. Implemented in
-   `plans/plugin-boot-integrity.md`; referenced here because it changes what E2E
-   must cover.
+   cross-plugin defects never reach a browser. dshx now refuses reserved or
+   colliding locale namespaces and undeclared Client services at build time, and
+   `dshx check --boot` fails on a `failed` Client entry.
 2. **Boot smoke** — one real browser, one real profile, assert every client entry
    reaches `active`. This is the net for anything static analysis misses.
 3. **Behavior E2E** — Gherkin journeys for the surfaces plugins actually

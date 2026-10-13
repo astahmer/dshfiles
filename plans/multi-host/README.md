@@ -483,7 +483,7 @@ Run from repository root:
 
 ```sh
 fnm exec --using 22.23.3 node --experimental-strip-types tooling/dshx/scripts/smoke-multi-host.mjs
-fnm exec --using 22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx exec vitest run /Users/astahmer/dev/dshfiles/tooling/dshx/packages/dshx/tests/platform-cli.spec.ts --maxWorkers=1
+fnm exec --using 22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx exec vitest run tests/platform-cli.spec.ts --maxWorkers=1
 ```
 
 The smoke script isolates DSH_HOME twice, chooses OS-assigned loopback ports,

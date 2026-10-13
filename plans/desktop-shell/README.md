@@ -196,9 +196,3 @@ mismatch, which is worth remembering.
 - Use the token handshake rather than a `--trusted-host` workaround. The fence
   already accepts a cookie from the root exchange, so loosening trust buys nothing.
 - No auto-update until a release channel exists.
-
-## Relationship to the customization brief
-
-This is packaging, not a customization feature, so it is tracked here rather than
-in `plans/dsh-customization/README.md`'s status table. It does not change any Host
-capability, which is the brief's threshold for belonging there.

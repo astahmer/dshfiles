@@ -1,7 +1,7 @@
 # DSH Host gaps — features waiting on a DSH patch or upstream
 
 BB behaviours our DSH plugins cannot reproduce because the Host (or dshx) lacks a capability. Each is a
-candidate for a local DSH patch (`tooling/dsh-core`, dshx fork) or an upstream request. The product behavior
+candidate for an upstream DSH request (this repo runs stock DSH and carries no core patches) or a dshx change. The product behavior
 and current workarounds are documented in each owning plugin's README.
 
 | Feature | Plugin | Missing capability | Possible route |
@@ -17,4 +17,5 @@ and current workarounds are documented in each owning plugin's README.
 | Machine selector for secrets / per-machine paths | secret-catalog, ai-accounts | One Host per DSH; no remote machine registry | multi-host could provide one later |
 | "Unify branches" prefilled thread | jujutsu | No API to start a session with a prefilled prompt | Session create option `initialPrompt` |
 | Global "All models" composer picker | ai-accounts | No composer action slot for model choice | Composer model-picker slot |
+| Edit a queued message that has attachments | queue-reorder | `QueueAction.edit` is text-only and `updateQueue` replaces the whole content | Host edit that keeps existing attachment refs and replaces only text blocks |
 | ⌘, / ⌘N shortcuts | shortcuts | No service to open Settings / start a session from a plugin | Expose those actions as commands |
