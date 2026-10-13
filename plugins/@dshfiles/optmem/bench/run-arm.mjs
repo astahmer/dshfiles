@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { z } from 'zod'
 import { generateFixture } from './fixtures.mjs'
 import { fillTruth, scoreProbe } from './probes.mjs'
 import { loadScenario, runtimeFingerprint } from './scenario-loader.mjs'
@@ -26,10 +27,35 @@ const { values: args } = parseArgs({
     rep: { type: 'string', default: '1' },
     variant: { type: 'string', default: 'long' },
     'drain-ms': { type: 'string', default: '120000' },
+    calibration: { type: 'boolean', default: false },
+    'calibration-variants': { type: 'string', default: 'baseline-default,low-effort' },
+    'calibration-limit': { type: 'string', default: '2' },
+    'calibration-reps': { type: 'string', default: '1' },
   },
 })
 if (!['A', 'B', 'C'].includes(args.arm ?? '') || args.scenario === undefined || args.port === undefined || args.out === undefined)
   throw new Error('usage: run-arm.mjs --arm A|B|C --scenario <file> --port <port> --out <dir> [--rep n]')
+if (args.calibration && args.arm !== 'A') throw new Error('direct calibration uses arm A without a live memory engine')
+const calibrationSettings = z
+  .object({
+    variants: z
+      .string()
+      .transform(value => value.split(',').map(id => id.trim()))
+      .pipe(
+        z
+          .array(z.string().min(1))
+          .min(1)
+          .max(10)
+          .refine(values => new Set(values).size === values.length),
+      ),
+    limit: z.coerce.number().int().min(1).max(50),
+    repetitions: z.coerce.number().int().min(1).max(10),
+  })
+  .parse({
+    variants: args['calibration-variants'],
+    limit: args['calibration-limit'],
+    repetitions: args['calibration-reps'],
+  })
 const arm = args.arm
 const { scenario, scenarioHash, sourceHash, scenarioPath } = await loadScenario({ path: args.scenario, rep: Number(args.rep), variant: args.variant })
 const provider = process.env.BENCH_PROVIDER ?? 'opencode-go-alex'
@@ -53,6 +79,13 @@ const { connectDshPlatformClient } = await import(pathToFileURL(resolve(repoRoot
 const plugin = name => `link:${resolve(repoRoot, 'plugins/@dshfiles', name)}`
 const withOptmem = arm !== 'A'
 const withRequestMessages = arm === 'C'
+const extraDependencies = {
+  '@dshfiles/shared-runtime': plugin('shared-runtime'),
+  '@dshfiles/ai-accounts': plugin('ai-accounts'),
+  '@dshfiles/optmem-bench-probe': `link:${resolve(benchRoot, 'probe')}`,
+}
+if (withRequestMessages) extraDependencies['@dshfiles/request-messages'] = plugin('request-messages')
+if (withOptmem) extraDependencies['@dshfiles/optmem'] = plugin('optmem')
 const scratch = await createScratchProfile({
   profileName: 'optmem-bench',
   // Only the shape is read; every @dshfiles / third-party dependency is excluded below.
@@ -67,13 +100,7 @@ const scratch = await createScratchProfile({
     ...(withOptmem ? ['@dshfiles/optmem'] : []),
   ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
-  extraDependencies: {
-    '@dshfiles/shared-runtime': plugin('shared-runtime'),
-    '@dshfiles/ai-accounts': plugin('ai-accounts'),
-    '@dshfiles/optmem-bench-probe': `link:${resolve(benchRoot, 'probe')}`,
-    ...(withRequestMessages ? { '@dshfiles/request-messages': plugin('request-messages') } : {}),
-    ...(withOptmem ? { '@dshfiles/optmem': plugin('optmem') } : {}),
-  },
+  extraDependencies,
 })
 const home = scratch.home
 const credentialsFile = resolve(home, '.credentials.yaml')
@@ -86,7 +113,7 @@ try {
   if (previousEvidence !== undefined) {
     const archive = resolve(outDir, 'attempts', `${runId}-${Date.now()}`)
     await mkdir(archive, { recursive: true, mode: 0o700 })
-    for (const suffix of ['.json', '.calls.jsonl', '.host.log', '.scenario.json', '.optmem']) {
+    for (const suffix of ['.json', '.calls.jsonl', '.calibration.jsonl', '.host.log', '.scenario.json', '.optmem']) {
       await cp(resolve(outDir, `${runId}${suffix}`), resolve(archive, `${runId}${suffix}`), { recursive: true }).catch(error => {
         if (error.code !== 'ENOENT') throw error
       })
@@ -94,6 +121,7 @@ try {
   }
   if (probeFile !== resolve(outDir, `${runId}.calls.jsonl`)) throw new Error('unexpected benchmark probe path')
   await rm(probeFile, { force: true })
+  if (args.calibration) await rm(resolve(outDir, `${runId}.calibration.jsonl`), { force: true })
   const overlay = resolve(home, 'bench.patch.yml')
   await writeFile(
     overlay,
@@ -109,7 +137,7 @@ try {
 ${effort === '' ? '' : `    reasoningEffort: ${effort}\n`}- id: dshfiles-optmem-bench-probe
   config:
     file: ${JSON.stringify(probeFile)}
-${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'full' : 'compat'}\n${summaryEffort === '' ? '' : `    summarizerProvider: ${provider}\n    summarizerModel: ${model}\n    summarizerEffort: ${summaryEffort}\n`}` : ''}`,
+${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.stringify(calibrationSettings.variants)}\n    calibrationLimit: ${calibrationSettings.limit}\n    calibrationReps: ${calibrationSettings.repetitions}\n` : ''}${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'full' : 'compat'}\n${summaryEffort === '' ? '' : `    summarizerProvider: ${provider}\n    summarizerModel: ${model}\n    summarizerEffort: ${summaryEffort}\n`}` : ''}`,
   )
 
   const project = resolve(home, 'project')
@@ -134,8 +162,9 @@ ${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'ful
     )
     const sourceCredentials = parseYaml(await readFile(process.env.BENCH_CREDENTIALS ?? resolve(homedir(), '.dsh/.credentials.yaml'), 'utf8'))
     const keyName = account.apiKeyEnv
-    if (typeof sourceCredentials?.refs?.[keyName] !== 'string') throw new Error(`credential ${keyName} is not stored in DSH credentials`)
-    await writeFile(credentialsFile, stringifyYaml({ version: 1, records: {}, refs: { [keyName]: sourceCredentials.refs[keyName] } }), { mode: 0o600 })
+    const credentialReference = z.string().safeParse(sourceCredentials?.refs?.[keyName])
+    if (!credentialReference.success) throw new Error(`credential ${keyName} is not stored in DSH credentials`)
+    await writeFile(credentialsFile, stringifyYaml({ version: 1, records: {}, refs: { [keyName]: credentialReference.data } }), { mode: 0o600 })
     await chmod(credentialsFile, 0o600)
 
     await mkdir(project, { recursive: true })
@@ -210,7 +239,10 @@ ${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'ful
     sourceHash,
     scenarioPath,
     metadata: scenario.metadata,
-    runtimeHash: await runtimeFingerprint({ arm }),
+    runtimeHash: await runtimeFingerprint({ arm, calibration: args.calibration }),
+    calibration: args.calibration
+      ? { variants: calibrationSettings.variants, limit: calibrationSettings.limit, repetitions: calibrationSettings.repetitions }
+      : undefined,
     compaction: scenario.compaction ?? 'stock',
     expectedTurns: scenario.conversations.reduce((total, conversation) => total + conversation.turns.length, 0),
     startedAt: new Date().toISOString(),
@@ -379,18 +411,16 @@ ${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'ful
               })),
             answer: answer.slice(0, 100000),
             answerTruncated: answer.length > 100000,
-            ...(item.probe === undefined
-              ? {}
-              : {
-                  probe: scoreProbe({
-                    answer,
-                    probe: item.probe,
-                    truth,
-                    tools: assistant.flatMap(event =>
-                      (event.data.message?.content ?? []).filter(block => block.type === 'tool-call').map(block => block.name ?? block.toolName),
-                    ),
-                  }),
-                }),
+          }
+          if (item.probe !== undefined) {
+            record.probe = scoreProbe({
+              answer,
+              probe: item.probe,
+              truth,
+              tools: assistant.flatMap(event =>
+                (event.data.message?.content ?? []).filter(block => block.type === 'tool-call').map(block => block.name ?? block.toolName),
+              ),
+            })
           }
           evidence.turns.push(record)
           log(

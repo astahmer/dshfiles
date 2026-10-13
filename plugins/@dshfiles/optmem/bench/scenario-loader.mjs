@@ -47,7 +47,7 @@ export const loadScenario = async ({ path, rep = 1, variant = 'long' }) => {
   }
 }
 
-export const runtimeFingerprint = async ({ arm }) => {
+export const runtimeFingerprint = async ({ arm, calibration = false }) => {
   const benchRoot = dirname(fileURLToPath(import.meta.url))
   const packages = [
     'shared-runtime',
@@ -55,7 +55,13 @@ export const runtimeFingerprint = async ({ arm }) => {
     ...(arm === 'A' ? [] : ['optmem', 'optmem-core', 'optmem-sqlite']),
     ...(arm === 'C' ? ['request-messages'] : []),
   ]
-  const files = [...packages.map(name => resolve(benchRoot, '..', '..', name, 'dist/index.js')), resolve(benchRoot, 'probe/index.js')]
+  const files = [
+    ...packages.map(name => resolve(benchRoot, '..', '..', name, 'dist/index.js')),
+    resolve(benchRoot, 'probe/index.js'),
+    ...(calibration
+      ? [resolve(benchRoot, 'calibration-runtime.mjs'), resolve(benchRoot, 'calibration-cases.mjs'), resolve(benchRoot, '..', 'src', 'summarizer.ts')]
+      : []),
+  ]
   const hash = createHash('sha256')
   for (const path of files) hash.update(await readFile(path))
   return hash.digest('hex')

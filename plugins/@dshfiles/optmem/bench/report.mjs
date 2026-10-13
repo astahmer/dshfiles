@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { z } from 'zod'
+import { calibrationCases } from './calibration-cases.mjs'
 import { generateFixture } from './fixtures.mjs'
 import { scoreProbe } from './probes.mjs'
 
@@ -22,6 +24,7 @@ const readJsonl = async file =>
 
 const callKind = call => {
   if (call.kind === 'model-info') return 'model-info'
+  if (call.calibration === true) return 'calibration'
   if (call.purpose === 'agent') return 'agent'
   if (call.purpose === 'session-title') return 'title'
   if (call.purpose === 'compaction') return (call.systemHead ?? '').startsWith('You maintain the long-term memory') ? 'optmem' : 'native-compaction'
@@ -38,7 +41,7 @@ const usageOf = calls => {
     callsWithUsage: calls.filter(call => call.usage !== undefined).length,
     maxTokenFinishes: calls.filter(call => call.finish === 'max-tokens').length,
     unfinishedCalls: calls.filter(call => call.incomplete).length,
-    errors: calls.filter(call => call.error !== undefined || call.finish === 'error' || call.finish === 'aborted').length,
+    errors: calls.filter(call => !call.incomplete && (call.error !== undefined || call.finish === 'error' || call.finish === 'aborted')).length,
     reasoning: sum('reasoningTokens'),
     reasoningReportedCalls: calls.filter(call => call.usage?.reasoningTokens !== undefined).length,
     input,
@@ -53,6 +56,14 @@ const usageOf = calls => {
 // every run. Stored answers are capped; a live pass on a capped answer is kept.
 const benchRoot = dirname(fileURLToPath(import.meta.url))
 const scenarios = new Map()
+const calibrationCasesById = new Map(calibrationCases.map(item => [item.id, item]))
+const rescoreCalibration = outcome => {
+  const item = calibrationCasesById.get(outcome.caseId)
+  if (item === undefined) return outcome.quality
+  const answer = z.string().safeParse(outcome.text)
+  if (!answer.success) return outcome.quality
+  return scoreProbe({ answer: answer.data, probe: { id: item.id, expect: item.expect, forbid: item.forbid }, truth: {} })
+}
 const scenarioProbes = async run => {
   const key = run.scenarioHash ?? run.scenario
   if (scenarios.has(key)) return scenarios.get(key)
@@ -81,6 +92,31 @@ const runs = []
 for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test(name)).sort()) {
   const run = JSON.parse(await readFile(join(dir, file), 'utf8'))
   const journal = await readJsonl(join(dir, file.replace(/\.json$/, '.calls.jsonl')))
+  const calibrationJournal = await readJsonl(join(dir, file.replace(/\.json$/, '.calibration.jsonl')))
+  const calibrationOutcomes = calibrationJournal.filter(record => record.kind === 'calibration-end')
+  const calibration = Object.entries(Object.groupBy(calibrationOutcomes, outcome => outcome.variant)).map(([variant, outcomes]) => {
+    const callRecords = calibrationJournal.filter(record => record.kind === 'calibration-call-end' && record.variant === variant)
+    const usage = usageOf(callRecords)
+    return {
+      variant,
+      cases: outcomes.length,
+      completed: outcomes.filter(outcome => outcome.complete).length,
+      qualityPasses: outcomes.filter(outcome => rescoreCalibration(outcome)?.pass === true).length,
+      clipped: outcomes.filter(outcome => outcome.clipped === true).length,
+      calls: usage.calls,
+      callsWithUsage: usage.callsWithUsage,
+      maxTokenFinishes: usage.maxTokenFinishes,
+      errors: usage.errors,
+      inputTokens: usage.input,
+      cacheReadTokens: usage.cacheRead,
+      outputTokens: usage.output,
+      reasoningTokens: usage.reasoning,
+      reasoningTextBytes: callRecords.reduce((total, record) => total + (record.reasoningTextBytes ?? 0), 0),
+      answerTextBytes: callRecords.reduce((total, record) => total + (record.answerTextBytes ?? 0), 0),
+      cost: usage.cost,
+    }
+  })
+  const calibrationErrors = calibrationJournal.filter(record => record.kind === 'calibration-error').length
   const calls = journal.filter(call => call.kind !== 'model-info' && call.kind !== 'call-start')
   const ended = new Set(calls.map(call => call.seq))
   for (const start of journal.filter(call => call.kind === 'call-start' && !ended.has(call.seq)))
@@ -118,6 +154,9 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
     variant: run.variant,
     effort: run.effort,
     summaryEffort: run.summaryEffort,
+    calibrationConfig: run.calibration,
+    calibration,
+    calibrationErrors,
     compactionPolicy: run.compaction,
     drain: run.drain,
     expectedTurns: run.expectedTurns,
@@ -158,7 +197,16 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
     taskReasoning: tally('task-reasoning'),
     failedProbes: probes.filter(probe => !probe.pass).map(probe => probe.id),
     acceptance:
-      run.acceptance === undefined ? undefined : { pass: run.acceptance.pass, total: run.acceptance.pass + run.acceptance.fail, failed: run.acceptance.failed },
+      run.acceptance === undefined
+        ? undefined
+        : {
+            pass: run.acceptance.valid === false ? 0 : run.acceptance.pass,
+            total: Math.max(1, run.acceptance.pass + run.acceptance.fail),
+            failed: run.acceptance.failed,
+            valid: run.acceptance.valid,
+            exitCode: run.acceptance.exitCode,
+            error: run.acceptance.error,
+          },
     optmemNodes: run.optmemDb?.nodesByModel,
   })
 }
@@ -267,12 +315,27 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
 }
 lines.push(
   '\n### Summary health and accounting\n',
-  '| run | summary calls | capped | error finishes | usage coverage | summary output tokens | estimated summary cost | drained |',
-  '|---|---:|---:|---:|---|---:|---:|---|',
+  '| run | summary calls | capped | provider errors | unfinished | usage coverage | summary output tokens | estimated summary cost | drained |',
+  '|---|---:|---:|---:|---:|---|---:|---:|---|',
 )
 for (const run of runs)
   lines.push(
-    `| ${run.runId} | ${run.optmem.calls} | ${run.optmem.maxTokenFinishes} | ${run.optmem.errors} | ${run.all.callsWithUsage}/${run.all.calls} | ${run.optmem.output} | ${run.optmem.cost.toFixed(4)} | ${run.drain?.complete ?? 'n/a'} |`,
+    `| ${run.runId} | ${run.optmem.calls} | ${run.optmem.maxTokenFinishes} | ${run.optmem.errors} | ${run.optmem.unfinishedCalls} | ${run.all.callsWithUsage}/${run.all.calls} | ${run.optmem.output} | ${run.optmem.cost.toFixed(4)} | ${run.drain?.complete ?? 'n/a'} |`,
   )
+const calibrationRuns = runs.filter(run => run.calibration.length > 0 || run.calibrationErrors > 0)
+if (calibrationRuns.length > 0) {
+  lines.push(
+    '\n### Direct summary calibration (not mode comparison)\n',
+    '| run | variant | complete/cases | quality pass/cases | clipped | calls | usage | max-token/errors | reasoning bytes | input tokens | cache-read tokens | output tokens | reasoning tokens | list-price $ |',
+    '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+  )
+  for (const run of calibrationRuns) {
+    for (const item of run.calibration)
+      lines.push(
+        `| ${run.runId} | ${item.variant} | ${item.completed}/${item.cases} | ${item.qualityPasses}/${item.cases} | ${item.clipped} | ${item.calls} | ${item.callsWithUsage}/${item.calls} | ${item.maxTokenFinishes}/${item.errors} | ${item.reasoningTextBytes} | ${item.inputTokens} | ${item.cacheReadTokens} | ${item.outputTokens} | ${item.reasoningTokens} | ${item.cost.toFixed(4)} |`,
+      )
+    if (run.calibrationErrors > 0) lines.push(`- ${run.runId}: ${run.calibrationErrors} calibration execution errors; details omitted from compact summary.`)
+  }
+}
 console.log(lines.join('\n'))
 if (values.json !== undefined) await writeFile(values.json, `${JSON.stringify(runs, null, 2)}\n`)

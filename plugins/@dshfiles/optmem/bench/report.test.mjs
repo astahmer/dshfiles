@@ -89,6 +89,7 @@ test('unfinished provider calls remain unknown-cost accounting units', async () 
     const [summary] = JSON.parse(await readFile(join(directory, 'summary.json'), 'utf8'))
     assert.equal(summary.optmem.calls, 1)
     assert.equal(summary.optmem.unfinishedCalls, 1)
+    assert.equal(summary.optmem.errors, 0)
     assert.equal(summary.optmem.callsWithUsage, 0)
   }))
 
@@ -108,4 +109,26 @@ test('report refuses unpaired scenario data between modes', async () =>
     const result = runReport(directory)
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /unpaired benchmark comparison/)
+  }))
+
+test('report separates direct calibration costs without copying summary text', async () =>
+  withEvidence(async directory => {
+    const runId = await writeRun({ directory, arm: 'A', calibration: { variants: ['baseline-default'], limit: 1, repetitions: 1 } })
+    await writeFile(
+      join(directory, `${runId}.calls.jsonl`),
+      `${JSON.stringify({ kind: 'call-start', seq: 1, purpose: 'compaction', calibration: true, provider: 'opencode-go-alex', model: 'deepseek-v4.1-flash' })}\n${JSON.stringify({ seq: 1, purpose: 'compaction', calibration: true, provider: 'opencode-go-alex', model: 'deepseek-v4.1-flash', finish: 'stop', usage: { inputTokens: 10, cacheReadTokens: 2, outputTokens: 5, reasoningTokens: 3 } })}\n`,
+    )
+    await writeFile(
+      join(directory, `${runId}.calibration.jsonl`),
+      `${JSON.stringify({ kind: 'calibration-call-end', variant: 'baseline-default', finish: 'stop', usage: { inputTokens: 10, cacheReadTokens: 2, outputTokens: 5, reasoningTokens: 3 } })}\n${JSON.stringify({ kind: 'calibration-end', caseId: 'support-open-work', variant: 'baseline-default', complete: true, quality: { pass: false }, clipped: false, text: 'private synthetic summary: Elin Moss, export retention 45d, human review; permissions preflight not run; verify active org-lumen membership and reviewer permission.' })}\n`,
+    )
+
+    const result = runReport(directory)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Direct summary calibration \(not mode comparison\)/)
+    const [summary] = JSON.parse(await readFile(join(directory, 'summary.json'), 'utf8'))
+    assert.equal(summary.optmem.calls, 0)
+    assert.equal(summary.calibration[0].calls, 1)
+    assert.equal(summary.calibration[0].qualityPasses, 1)
+    assert.doesNotMatch(JSON.stringify(summary), /private synthetic summary text/)
   }))

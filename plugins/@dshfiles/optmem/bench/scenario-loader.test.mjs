@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { completedRun, loadScenario } from './scenario-loader.mjs'
+import { completedRun, loadScenario, runtimeFingerprint } from './scenario-loader.mjs'
 
 const identity = { scenarioHash: 'scenario', runtimeHash: 'runtime', provider: 'opencode-go-alex', model: 'deepseek-v4.1-flash', effort: '', summaryEffort: '' }
 const evidence = { ...identity, arm: 'B', expectedTurns: 1, finishedAt: '2026-10-13T00:00:00Z', turns: [{ end: 'completed' }], drain: { complete: true } }
@@ -41,4 +41,10 @@ test('summary ablation uses stock context and includes recall', async () => {
   assert.equal(loaded.scenario.compaction, undefined)
   assert.ok(loaded.scenario.conversations.length > 1)
   assert.ok(loaded.scenario.conversations.flatMap(conversation => conversation.turns).some(turn => turn.probe))
+})
+
+test('calibration runtime fingerprint includes calibration implementation', async () => {
+  const benchmarkHash = await runtimeFingerprint({ arm: 'A' })
+  const calibrationHash = await runtimeFingerprint({ arm: 'A', calibration: true })
+  assert.notEqual(calibrationHash, benchmarkHash)
 })
