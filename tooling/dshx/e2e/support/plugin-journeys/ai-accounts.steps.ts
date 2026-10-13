@@ -1,66 +1,7 @@
 import { expect, type Page } from '@playwright/test'
-import { createServer, type Server } from 'node:http'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-
-/**
- * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address. The key
- * decides the answer: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and every other
- * key reports a 75%-left session window and a 10%-left weekly window and answers chat with its own suffix.
- */
-interface FakeCommandCode {
-  readonly server: Server
-  readonly baseUrl: string
-  readonly chatKeys: string[]
-}
-
-const fakeProviders = new WeakMap<Page, FakeCommandCode>()
-const HOUR_MS = 3_600_000
-
-const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode> => {
-  const chatKeys: string[] = []
-  const server = createServer((request, response) => {
-    request.resume()
-    request.on('end', () => {
-      const key = (request.headers.authorization ?? '').replace(/^Bearer /, '')
-      const json = (status: number, value: unknown): void => {
-        response.writeHead(status, { 'content-type': 'application/json' })
-        response.end(JSON.stringify(value))
-      }
-      if (request.url === '/alpha/billing/credits') {
-        if (key.endsWith('-BROKEN')) return json(503, { error: 'billing unavailable' })
-        return json(200, {
-          windowLimits: { fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS }, weekly: { used: 90, cap: 100, resetAt: Date.now() + 72 * HOUR_MS } },
-          credits: { planId: 'individual-pro' },
-        })
-      }
-      if (request.url === '/alpha/whoami') return json(200, { user: { userName: `fake-${key.slice(-6)}` } })
-      if (request.url === '/alpha/billing/subscriptions') return json(200, { data: { planId: 'individual-pro', status: 'active' } })
-      if (request.url === '/provider/v1/models') return json(200, { data: [] })
-      if (request.url !== '/provider/v1/chat/completions') return json(404, { error: 'not found' })
-      chatKeys.push(key)
-      if (key.endsWith('-LIMITED')) return json(429, { error: { message: 'Rate limit reached', type: 'rate_limit_error' } })
-      const chunk = (delta: object, finishReason: string | null): string =>
-        `data: ${JSON.stringify({ id: 'fake', object: 'chat.completion.chunk', created: 1, model: 'gpt-6-luna', choices: [{ index: 0, delta, finish_reason: finishReason }] })}\n\n`
-      response.writeHead(200, { 'content-type': 'text/event-stream' })
-      response.write(chunk({ role: 'assistant', content: `Answered by ${key.slice(-6)}` }, null))
-      response.write(chunk({}, 'stop'))
-      response.end('data: [DONE]\n\n')
-    })
-  })
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  if (address === null || typeof address === 'string') throw new Error('The fake Command Code server has no port.')
-  const fake = { server, baseUrl: `http://127.0.0.1:${String(address.port)}`, chatKeys }
-  fakeProviders.set(page, fake)
-  return fake
-}
-
-const fakeProviderFor = (page: Page): FakeCommandCode => {
-  const fake = fakeProviders.get(page)
-  if (fake === undefined) throw new Error('The fake Command Code server was not started for this scenario.')
-  return fake
-}
+import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
 
@@ -69,7 +10,7 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
   await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
   await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
-  await baseUrl.fill(fakeProviderFor(page).baseUrl)
+  await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
   await baseUrl.blur()
   await expect(page.getByRole('status').filter({ hasText: /^Saved/ })).toBeVisible()
   await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
@@ -330,7 +271,9 @@ When('a new thread asks the first account\'s model a question', async ({ page }:
 Then('the healthy account answers and the rate-limited one cools down', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-pool-fails-over-to-the-healthy-account', async () => {
     await expect(page.getByText('Answered by BRAVO2', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
-    const chatKeys = fakeProviderFor(page).chatKeys
+    const chatKeys = fakeCommandCodeFor(page)
+      .requests.filter(request => request.kind === 'turn')
+      .map(request => request.key)
     expect(chatKeys[0]).toBe('e2e-fake-key-LIMITED')
     expect(chatKeys.at(-1)).toBe('e2e-fake-key-BRAVO2')
     expect(new Set(chatKeys)).toEqual(new Set(['e2e-fake-key-LIMITED', 'e2e-fake-key-BRAVO2']))
@@ -346,9 +289,5 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
 })
 
 After(async ({ page }: { page: Page }) => {
-  const fake = fakeProviders.get(page)
-  if (fake === undefined) return
-  fakeProviders.delete(page)
-  fake.server.closeAllConnections()
-  await new Promise<void>(resolve => fake.server.close(() => resolve()))
+  await stopFakeCommandCode(page)
 })

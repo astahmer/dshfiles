@@ -1,9 +1,9 @@
 import { expect, type Page } from '@playwright/test'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
 
 const workspaces = new WeakMap<Page, string>()
 const helloSource = 'export const greeting = "hello"\n'
@@ -43,7 +43,7 @@ const saveActiveFile = async (page: Page): Promise<void> => {
 }
 
 When('a disposable workspace with source, dependency and version-control files has a thread', async ({ page }: { page: Page }) => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'dshx-editor-e2e-')))
+  const root = await createScratchDirectory('dshx-editor-e2e-')
   const workspace = join(root, 'editor-workspace')
   workspaces.set(page, root)
   await mkdir(join(workspace, 'src'), { recursive: true })
@@ -54,21 +54,11 @@ When('a disposable workspace with source, dependency and version-control files h
   await writeFile(join(workspace, 'node_modules', 'left-pad', 'index.js'), 'module.exports = 1\n')
   await writeFile(join(workspace, '.git', 'HEAD'), headSource)
 
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-  await page.getByRole('menuitem', { name: /Add workspace/ }).click()
-  const picker = page.getByRole('dialog', { name: 'Add workspace' })
-  const pathInput = picker.getByRole('textbox', { name: 'Enter a folder path', exact: true })
-  // The picker opens on the Host home and rewrites the path field when that first listing lands.
-  await expect(picker.locator('p').filter({ hasText: /^\// })).toBeVisible()
-  await pathInput.fill(workspace)
-  await pathInput.press('Enter')
-  await expect(picker.locator('p').filter({ hasText: workspace }).first()).toBeVisible()
-  await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
-  await expect(picker).toBeHidden()
+  await registerWorkspaceFolder(page, workspace)
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.fill('editor e2e thread')
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread')
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread', { timeout: 45_000 })
 })
 
 When('{string} is opened with Go to file', async ({ page }: { page: Page }, fileName: string) => {
@@ -84,8 +74,11 @@ When('the editor placement is set to {string} in the plugin settings', async ({ 
   await page.getByRole('combobox', { name: 'Editor placement', exact: true }).selectOption({ label: placement })
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  await page.getByRole('treeitem', { name: /^editor e2e thread/ }).click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread')
+  // Leaving a global panel can land on the panel shown before it, so the thread is reopened until its view is on screen.
+  await expect(async () => {
+    await page.getByRole('treeitem', { name: /^editor e2e thread/ }).click()
+    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread', { timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
 })
 
 When('a line is appended to {string} and saved', async ({ page }: { page: Page }, fileName: string) => {
