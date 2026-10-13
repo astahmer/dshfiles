@@ -10,6 +10,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useSyncExternalStore } from 'react'
 import { HOME_LOCALE_NAMESPACE, homeLocale, type HomeTranslate } from './locales.js'
+import { NewThreadSettings } from './settings-section.js'
 import { homeSettings, type HomeSettings } from './settings.js'
 import './client.css'
 
@@ -61,6 +62,7 @@ const brandStyle = (settings: HomeSettings): string =>
     '[class$="_fishHitbox"]{width:auto}',
     settings.headline.trim() === '' ? '' : '[class$="_titleGroup"]>span:first-child{display:none}',
     settings.showPreviewBadge ? '' : '[class$="_previewBadge"]{display:none}',
+    settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none}',
   ].join('')
 
 const BrandMark = (props: HeroBrandMarkOwnerProps & { readonly stores: Stores; readonly t: HomeTranslate }) => {
@@ -148,6 +150,9 @@ export default defineClient({
         { name: 'conversation.hero.brand.mark', priority: -1000 },
         decorate((props: HeroBrandMarkOwnerProps) => <BrandMark {...props} stores={stores} t={t} />),
       ),
+    )
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register({ name: 'settings.section', id: 'dshfiles-new-thread', order: 21, label: () => 'New thread' }, decorate(NewThreadSettings)),
     )
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
