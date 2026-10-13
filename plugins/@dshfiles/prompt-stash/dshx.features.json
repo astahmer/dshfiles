@@ -5,18 +5,9 @@
       "id": "prompt-library",
       "title": "Manage reusable prompt snippets",
       "summary": "Save, edit, delete, search, and insert bounded prompt snippets with revision checks across browser tabs.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "empty",
-        "saved",
-        "editing",
-        "conflicted",
-        "save-as-copy"
-      ],
+      "states": ["empty", "saved", "editing", "conflicted", "save-as-copy"],
       "failureModes": [
         "Quota or storage failure leaves the prior library intact.",
         "A cross-tab revision conflict preserves the local edit and offers save-as-copy."
@@ -57,17 +48,9 @@
       "id": "guarded-composer-insertion",
       "title": "Insert prompt text without submitting",
       "summary": "Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "captured",
-        "inserted",
-        "stale",
-        "already-inserted"
-      ],
+      "states": ["captured", "inserted", "stale", "already-inserted"],
       "failureModes": [
         "A changed composer revision rejects insertion and asks the user to reopen the action.",
         "Repeated insertion from one opening is ignored."
@@ -85,16 +68,9 @@
       "id": "recent-user-prompts",
       "title": "Browse recent text-only user messages",
       "summary": "Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "available",
-        "evicted",
-        "unavailable"
-      ],
+      "states": ["available", "evicted", "unavailable"],
       "failureModes": [
         "A message no longer present in loaded chat cannot be inserted.",
         "Attachment and non-user content are never represented as plain prompt text."
@@ -130,17 +106,9 @@
       "id": "draft-and-sent-history",
       "title": "Save and restore composer drafts",
       "summary": "Save bounded plain-text drafts and restore sent text without submitting or converting attachments and references.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "draft",
-        "saved",
-        "restored",
-        "sent-history"
-      ],
+      "states": ["draft", "saved", "restored", "sent-history"],
       "failureModes": [
         "Busy, empty, oversized, or reference-bearing input disables draft save.",
         "Invalid storage falls back without overwriting the stored bytes."

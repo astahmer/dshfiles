@@ -1,1 +1,6 @@
-{ "meta": { "title": "AI Accounts", "description": "Run several Codex, Claude, OpenCode Go, Command Code and Cursor accounts side by side, each with its own login and quota." } }
+{
+  "meta": {
+    "title": "AI Accounts",
+    "description": "Run several Codex, Claude, OpenCode Go, Command Code and Cursor accounts side by side, each with its own login and quota."
+  }
+}

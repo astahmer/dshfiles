@@ -60,7 +60,11 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
                     scope="col"
                   >
                     {sortable && isSortable(column) ? (
-                      <button className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:uppercase dshx:hover:text-foreground" onClick={column.getToggleSortingHandler()} type="button">
+                      <button
+                        className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:uppercase dshx:hover:text-foreground"
+                        onClick={column.getToggleSortingHandler()}
+                        type="button"
+                      >
                         {content}
                         <SortIcon aria-hidden className="dshx:size-3" />
                       </button>

@@ -1,44 +1,33 @@
-import * as React from "react"
-import { cn } from "../../lib/utils.js"
-import { XIcon } from "lucide-react"
-import { Dialog as DialogPrimitive } from "radix-ui"
+import * as React from 'react'
+import { cn } from '../../lib/utils.js'
+import { XIcon } from 'lucide-react'
+import { Dialog as DialogPrimitive } from 'radix-ui'
 
-import { Button } from "./button.js"
+import { Button } from './button.js'
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 
-function DialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
+function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
 }
 
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
 }
 
-function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
+function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0",
-        className
+        'dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0',
+        className,
       )}
       {...props}
     />
@@ -49,7 +38,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  closeLabel = "Close",
+  closeLabel = 'Close',
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -62,8 +51,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "dshx:fixed dshx:top-[50%] dshx:left-[50%] dshx:z-[1050] dshx:grid dshx:w-full dshx:max-w-[calc(100%-2rem)] dshx:translate-x-[-50%] dshx:translate-y-[-50%] dshx:gap-4 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-6 dshx:shadow-lg dshx:duration-200 dshx:outline-none dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95 dshx:sm:max-w-lg",
-          className
+          'dshx:fixed dshx:top-[50%] dshx:left-[50%] dshx:z-[1050] dshx:grid dshx:w-full dshx:max-w-[calc(100%-2rem)] dshx:translate-x-[-50%] dshx:translate-y-[-50%] dshx:gap-4 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-6 dshx:shadow-lg dshx:duration-200 dshx:outline-none dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95 dshx:sm:max-w-lg',
+          className,
         )}
         {...props}
       >
@@ -82,14 +71,8 @@ function DialogContent({
   )
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-header"
-      className={cn("dshx:flex dshx:flex-col dshx:gap-2 dshx:text-center dshx:sm:text-left", className)}
-      {...props}
-    />
-  )
+function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
+  return <div data-slot="dialog-header" className={cn('dshx:flex dshx:flex-col dshx:gap-2 dshx:text-center dshx:sm:text-left', className)} {...props} />
 }
 
 function DialogFooter({
@@ -97,18 +80,11 @@ function DialogFooter({
   showCloseButton = false,
   children,
   ...props
-}: React.ComponentProps<"div"> & {
+}: React.ComponentProps<'div'> & {
   showCloseButton?: boolean
 }) {
   return (
-    <div
-      data-slot="dialog-footer"
-      className={cn(
-        "dshx:flex dshx:flex-col-reverse dshx:gap-2 dshx:sm:flex-row dshx:sm:justify-end",
-        className
-      )}
-      {...props}
-    >
+    <div data-slot="dialog-footer" className={cn('dshx:flex dshx:flex-col-reverse dshx:gap-2 dshx:sm:flex-row dshx:sm:justify-end', className)} {...props}>
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
@@ -119,41 +95,12 @@ function DialogFooter({
   )
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("dshx:text-lg dshx:leading-none dshx:font-semibold", className)}
-      {...props}
-    />
-  )
+function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('dshx:text-lg dshx:leading-none dshx:font-semibold', className)} {...props} />
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("dshx:text-sm dshx:text-muted-foreground", className)}
-      {...props}
-    />
-  )
+function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return <DialogPrimitive.Description data-slot="dialog-description" className={cn('dshx:text-sm dshx:text-muted-foreground', className)} {...props} />
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-}
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger }

@@ -5,53 +5,30 @@
       "id": "catalog-browse",
       "title": "Browse and filter the plugin catalog",
       "summary": "Search, filter by category and compatibility, sort, paginate, refresh, and open catalog entries without claiming unavailable detail or uninstall capabilities.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [
         {
           "key": "hubBaseUrl",
           "defaultValue": "https://dshx.io",
           "constraints": "HTTPS only except loopback HTTP; no credentials, query, or fragment; normalize trailing slash.",
-          "coveredBy": [
-            "plugin-marketplace.hub-boundary"
-          ]
+          "coveredBy": ["plugin-marketplace.hub-boundary"]
         },
         {
           "key": "defaultSort",
           "defaultValue": "latest",
           "constraints": "One of latest or stars.",
-          "choices": [
-            "latest",
-            "stars"
-          ],
-          "coveredBy": [
-            "plugin-marketplace.search-page"
-          ]
+          "choices": ["latest", "stars"],
+          "coveredBy": ["plugin-marketplace.search-page"]
         },
         {
           "key": "hideIncompatible",
           "defaultValue": "false",
           "constraints": "Boolean; hide entries that fail compatibility checks.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "plugin-marketplace.search-page"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["plugin-marketplace.search-page"]
         }
       ],
-      "states": [
-        "loading",
-        "populated",
-        "empty",
-        "filtered",
-        "page-loaded",
-        "catalog-error"
-      ],
+      "states": ["loading", "populated", "empty", "filtered", "page-loaded", "catalog-error"],
       "failureModes": [
         "Catalog failures show a retry path without fabricating results.",
         "Incompatible entries remain visible unless the user enables the filter."
@@ -104,20 +81,9 @@
       "id": "guarded-plugin-install",
       "title": "Install a selected plugin with explicit consent",
       "summary": "Require two explicit confirmations, re-fetch exact package detail, execute fixed argv, show install status, and explain restart guidance without hot-loading or restarting DSH.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "confirmation-required",
-        "installing",
-        "installed",
-        "failed",
-        "cancelled",
-        "restart-required"
-      ],
+      "states": ["confirmation-required", "installing", "installed", "failed", "cancelled", "restart-required"],
       "failureModes": [
         "Package detail changes or ambiguity blocks installation.",
         "CLI timeout, cancellation, profile activation failure, or package error remains visible and retryable."

@@ -20,7 +20,12 @@ const feature = {
   externalDependencies: [],
   verification: [
     { kind: 'gherkin', id: 'queue-reorder.move-message', featureFile: 'tooling/dshx/e2e/features/queue-reorder.feature' },
-    { kind: 'unit-test', id: 'queue-reorder.message-preview', file: 'plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts', testName: 'edits pending text messages' },
+    {
+      kind: 'unit-test',
+      id: 'queue-reorder.message-preview',
+      file: 'plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts',
+      testName: 'edits pending text messages',
+    },
   ],
 }
 

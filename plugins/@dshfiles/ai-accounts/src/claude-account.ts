@@ -76,7 +76,8 @@ type StoredLogin = { readonly kind: 'signed-in'; readonly credential: ClaudeCred
 
 const readClaudeLogin = async (configDir: string): Promise<StoredLogin> => {
   const raw =
-    (await readFile(join(configDir, '.credentials.json'), 'utf8').catch(() => undefined)) ?? (await readKeychainSecret({ service: claudeKeychainService(configDir) }))
+    (await readFile(join(configDir, '.credentials.json'), 'utf8').catch(() => undefined)) ??
+    (await readKeychainSecret({ service: claudeKeychainService(configDir) }))
   if (raw === undefined) return { kind: 'missing' }
   const credential = parseCredential(raw)
   return credential === undefined ? { kind: 'signed-out' } : { kind: 'signed-in', credential }

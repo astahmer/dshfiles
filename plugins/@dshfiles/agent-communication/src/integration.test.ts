@@ -167,9 +167,7 @@ describe('Agent communication integration', () => {
       runtimeOwnerSessionId: SessionId(orchestrator.id),
     })
 
-    expect(requests).toEqual([
-      { sessionId: worker.id, query: 'visible', filters: [{ kind: 'type', values: ['user/message', 'assistant/message'] }], limit: 8 },
-    ])
+    expect(requests).toEqual([{ sessionId: worker.id, query: 'visible', filters: [{ kind: 'type', values: ['user/message', 'assistant/message'] }], limit: 8 }])
     expect(projected).toMatchObject({ status: 'results', session_id: worker.id, runtime_owner_session_id: orchestrator.id, more_available: true })
     expect(JSON.stringify(projected)).not.toContain(cwd)
     expect(Object.keys(sessionQuery)).toEqual(['searchEvents'])
@@ -245,9 +243,13 @@ describe('Agent communication integration', () => {
     expect(await service.browseMessages({ agentId: staleId })).toMatchObject({ totalMatching: 1 })
 
     const reopened = createCommunicationService({ statePath, now: () => now })
-    expect(await reopened.inbox({ principal: { kind: 'agent', id: staleId }, topic: 'inbox' })).toMatchObject([{ id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] }])
+    expect(await reopened.inbox({ principal: { kind: 'agent', id: staleId }, topic: 'inbox' })).toMatchObject([
+      { id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] },
+    ])
 
-    await expect(reopened.acknowledge({ kind: 'agent', id: staleId }, '00000000-0000-4000-8000-000000000000')).rejects.toMatchObject({ code: 'message-not-found' })
+    await expect(reopened.acknowledge({ kind: 'agent', id: staleId }, '00000000-0000-4000-8000-000000000000')).rejects.toMatchObject({
+      code: 'message-not-found',
+    })
     expect(await reopened.browseMessages({ agentId: staleId })).toMatchObject({ totalMatching: 1 })
 
     const persisted: unknown = JSON.parse(await readFile(statePath, 'utf8'))

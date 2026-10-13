@@ -142,7 +142,9 @@ const MessageRow = (props: {
       <p className="dshx:whitespace-pre-wrap dshx:break-words dshx:text-sm">{props.message.text}</p>
     </div>
     <div className="dshx:mt-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-      <span className="dshx:text-xs dshx:text-muted-foreground">{props.t('notReadCount', { count: props.message.recipients.filter(recipient => recipient.readAt === null).length })}</span>
+      <span className="dshx:text-xs dshx:text-muted-foreground">
+        {props.t('notReadCount', { count: props.message.recipients.filter(recipient => recipient.readAt === null).length })}
+      </span>
       <div className="dshx:flex dshx:gap-2">
         {props.message.sender.kind === 'agent' ? (
           <Button variant="ghost" size="sm" disabled={props.disabled} onClick={() => props.onOpenDirect(props.message.sender.id)}>
@@ -158,9 +160,7 @@ const MessageRow = (props: {
 )
 
 const AgentStatus = (props: { readonly agent: CommunicationDiagnosticAgent; readonly t: AgentCommunicationTranslate }): JSX.Element => (
-  <Badge variant={props.agent.status === 'running' ? 'default' : 'secondary'}>
-    {props.agent.status === 'running' ? props.t('running') : props.t('idle')}
-  </Badge>
+  <Badge variant={props.agent.status === 'running' ? 'default' : 'secondary'}>{props.agent.status === 'running' ? props.t('running') : props.t('idle')}</Badge>
 )
 
 const DiagnosticPanel = (props: {
@@ -204,7 +204,10 @@ const DiagnosticPanel = (props: {
           <CardContent className="dshx:p-0">
             {diagnostics.topics.length === 0 ? <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{t('noTopics')}</p> : null}
             {diagnostics.topics.map(topic => (
-              <div key={topic.topic} className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3">
+              <div
+                key={topic.topic}
+                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3"
+              >
                 <code className="dshx:break-all dshx:text-sm">{topic.topic}</code>
                 <Badge variant="secondary">{topicMap.get(topic.topic) ?? 0}</Badge>
               </div>
@@ -219,7 +222,10 @@ const DiagnosticPanel = (props: {
           <CardContent className="dshx:p-0">
             {diagnostics.agents.length === 0 ? <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{t('noLiveAgents')}</p> : null}
             {diagnostics.agents.map(agent => (
-              <div key={agent.id} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:p-4">
+              <div
+                key={agent.id}
+                className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:p-4"
+              >
                 <div className="dshx:min-w-0">
                   <p className="dshx:break-all dshx:font-medium">{agentLabel(agent.id)}</p>
                   <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -227,7 +233,9 @@ const DiagnosticPanel = (props: {
                     {agent.workspaceTopic === null ? null : <code className="dshx:text-xs dshx:text-muted-foreground">{agent.workspaceTopic}</code>}
                     {agent.workspaceOptedOut ? <Badge variant="outline">{t('optedOut')}</Badge> : null}
                     {agent.workspaceSubscribed === true ? <Badge variant="secondary">{t('subscribed')}</Badge> : null}
-                    {agent.workspaceTopic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? <Badge variant="outline">{t('unknownSubscription')}</Badge> : null}
+                    {agent.workspaceTopic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? (
+                      <Badge variant="outline">{t('unknownSubscription')}</Badge>
+                    ) : null}
                   </div>
                 </div>
                 {agent.workspaceTopic === null ? null : agent.workspaceOptedOut || agent.workspaceSubscribed === false ? (
@@ -259,7 +267,9 @@ const DiagnosticPanel = (props: {
           <CardTitle>{t('recentActivity')}</CardTitle>
           <CardDescription>
             {t('activityHistory', { count: diagnostics.activity.retainedCount })}{' '}
-            {diagnostics.activity.trackingStartedAt === null ? t('notTrackedYet') : t('trackingStarted', { time: formatTime(diagnostics.activity.trackingStartedAt) })}
+            {diagnostics.activity.trackingStartedAt === null
+              ? t('notTrackedYet')
+              : t('trackingStarted', { time: formatTime(diagnostics.activity.trackingStartedAt) })}
           </CardDescription>
         </CardHeader>
         <CardContent className="dshx:p-0">
@@ -301,9 +311,17 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   for (const agent of diagnostics?.agents ?? []) threadAgents.set(agent.id, agent)
   for (const message of navigationQuery.data?.items ?? []) {
     if (message.topic !== null) continue
-    if (message.sender.kind === 'agent') threadAgents.set(message.sender.id, diagnostics?.agents.find(agent => agent.id === message.sender.id))
+    if (message.sender.kind === 'agent')
+      threadAgents.set(
+        message.sender.id,
+        diagnostics?.agents.find(agent => agent.id === message.sender.id),
+      )
     for (const recipient of message.recipients) {
-      if (recipient.principal.kind === 'agent') threadAgents.set(recipient.principal.id, diagnostics?.agents.find(agent => agent.id === recipient.principal.id))
+      if (recipient.principal.kind === 'agent')
+        threadAgents.set(
+          recipient.principal.id,
+          diagnostics?.agents.find(agent => agent.id === recipient.principal.id),
+        )
     }
   }
   const directThreads = [...threadAgents.entries()].sort(([left], [right]) => left.localeCompare(right))
@@ -335,7 +353,11 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     refetchInterval: 30_000,
     retry: false,
   })
-  const messages = messagesQuery.data?.pages.slice().reverse().flatMap(page => page.items) ?? []
+  const messages =
+    messagesQuery.data?.pages
+      .slice()
+      .reverse()
+      .flatMap(page => page.items) ?? []
   const selectedMessage = messages.find(message => message.id === selectedMessageId) ?? null
   const recipientQuery = useQuery({
     queryKey: [...messageRecipientsKey, selectedMessageId],
@@ -378,11 +400,16 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const t = props.t
   const currentTopic = selection.kind === 'topic' ? selection.topic : null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
-  const currentTitle = currentTopic === null ? (currentDirectAgent === null ? t('allConversations') : t('directThread', { agent: currentDirectAgent })) : topicLabel(currentTopic, t)
+  const currentTitle =
+    currentTopic === null
+      ? currentDirectAgent === null
+        ? t('allConversations')
+        : t('directThread', { agent: currentDirectAgent })
+      : topicLabel(currentTopic, t)
   const legacyHost =
-    diagnostics?.unnotifiedRecipientCount !== undefined ||
-    diagnostics?.subscriptions.some(subscription => subscription.delivery !== 'passive') === true
-  const missingWorkspaceCount = diagnostics?.agents.filter(agent => agent.workspaceTopic !== null && agent.workspaceSubscribed === false && !agent.workspaceOptedOut).length ?? 0
+    diagnostics?.unnotifiedRecipientCount !== undefined || diagnostics?.subscriptions.some(subscription => subscription.delivery !== 'passive') === true
+  const missingWorkspaceCount =
+    diagnostics?.agents.filter(agent => agent.workspaceTopic !== null && agent.workspaceSubscribed === false && !agent.workspaceOptedOut).length ?? 0
   const actionDescription =
     action === null
       ? ''
@@ -452,7 +479,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
               <div className="dshx:grid dshx:gap-3 dshx:xl:grid-cols-[15rem_minmax(0,1fr)_18rem]">
                 <Card className="dshx:min-w-0">
                   <CardHeader className="dshx:pb-3">
-                    <CardTitle className="dshx:flex dshx:items-center dshx:gap-2"><HashIcon aria-hidden /> {t('channels')}</CardTitle>
+                    <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
+                      <HashIcon aria-hidden /> {t('channels')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:pt-0">
                     <Button
@@ -482,7 +511,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     </div>
                     <Separator />
                     <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                      <p className="dshx:px-2 dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">{t('directMessages')}</p>
+                      <p className="dshx:px-2 dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
+                        {t('directMessages')}
+                      </p>
                       <form
                         className="dshx:flex dshx:flex-col dshx:gap-2 dshx:px-1"
                         onSubmit={event => {
@@ -504,7 +535,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           {t('openThread')}
                         </Button>
                       </form>
-                      {directThreads.length === 0 ? <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{t('noDirectThreads')}</p> : null}
+                      {directThreads.length === 0 ? (
+                        <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{t('noDirectThreads')}</p>
+                      ) : null}
                       {directThreads.map(([agentId, agent]) => (
                         <Button
                           key={agentId}
@@ -639,9 +672,15 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         </Button>
                       </div>
                       {sendMutation.error !== null ? (
-                        <Alert variant="destructive"><AlertDescription>{errorMessage(sendMutation.error, t('sendFailed'))}</AlertDescription></Alert>
+                        <Alert variant="destructive">
+                          <AlertDescription>{errorMessage(sendMutation.error, t('sendFailed'))}</AlertDescription>
+                        </Alert>
                       ) : null}
-                      {receiptCount === null ? null : <p role="status" className="dshx:text-xs dshx:text-muted-foreground">{t('sendReceipt', { count: receiptCount })}</p>}
+                      {receiptCount === null ? null : (
+                        <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+                          {t('sendReceipt', { count: receiptCount })}
+                        </p>
+                      )}
                     </form>
                   </CardContent>
                 </Card>
@@ -649,10 +688,14 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                 <Card className="dshx:min-w-0">
                   <CardHeader>
                     <CardTitle>{t('messageContext')}</CardTitle>
-                    <CardDescription>{selectedMessage === null ? currentTitle : `${selectedMessage.id.slice(0, 8)} · ${formatTime(selectedMessage.createdAt)}`}</CardDescription>
+                    <CardDescription>
+                      {selectedMessage === null ? currentTitle : `${selectedMessage.id.slice(0, 8)} · ${formatTime(selectedMessage.createdAt)}`}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="dshx:flex dshx:flex-col dshx:gap-3">
-                    {selectedMessage === null ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('selectConversation')}</p> : (
+                    {selectedMessage === null ? (
+                      <p className="dshx:text-sm dshx:text-muted-foreground">{t('selectConversation')}</p>
+                    ) : (
                       <>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
@@ -678,11 +721,18 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <p className="dshx:text-sm dshx:font-medium">{t('recipientDetails')}</p>
                         {recipientQuery.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('loading')}</p> : null}
                         {recipientQuery.error !== null ? (
-                          <Alert variant="destructive"><AlertDescription>{errorMessage(recipientQuery.error, t('loadFailed'))}</AlertDescription></Alert>
+                          <Alert variant="destructive">
+                            <AlertDescription>{errorMessage(recipientQuery.error, t('loadFailed'))}</AlertDescription>
+                          </Alert>
                         ) : null}
                         {recipientQuery.data?.recipients.map(recipient => (
-                          <div key={`${recipient.principal.kind}:${recipient.principal.id}`} className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2">
-                            <span className="dshx:break-all dshx:text-sm">{recipient.principal.kind === 'agent' ? agentLabel(recipient.principal.id) : recipient.principal.id}</span>
+                          <div
+                            key={`${recipient.principal.kind}:${recipient.principal.id}`}
+                            className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2"
+                          >
+                            <span className="dshx:break-all dshx:text-sm">
+                              {recipient.principal.kind === 'agent' ? agentLabel(recipient.principal.id) : recipient.principal.id}
+                            </span>
                             <span className="dshx:text-xs dshx:text-muted-foreground">
                               {recipient.readAt === null ? t('notRead') : t('readAt', { time: formatTime(recipient.readAt) })}
                             </span>
@@ -691,9 +741,16 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                             </Badge>
                           </div>
                         ))}
-                        {recipientQuery.data?.recipients.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('noRecipientDetails')}</p> : null}
+                        {recipientQuery.data?.recipients.length === 0 ? (
+                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('noRecipientDetails')}</p>
+                        ) : null}
                         {selectedMessage.sender.kind === 'agent' ? (
-                          <Button variant="outline" size="sm" disabled={sendMutation.isPending} onClick={() => changeSelection({ kind: 'direct', agentId: selectedMessage.sender.id })}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={sendMutation.isPending}
+                            onClick={() => changeSelection({ kind: 'direct', agentId: selectedMessage.sender.id })}
+                          >
                             <MessageSquareIcon aria-hidden /> {t('directMessages')}
                           </Button>
                         ) : null}
@@ -708,7 +765,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
               <div className="dshx:flex dshx:flex-col dshx:gap-3">
                 <p className="dshx:text-sm dshx:text-muted-foreground">{t('noTurnGuarantee')}</p>
                 {missingWorkspaceCount > 0 ? (
-                  <Alert variant="destructive"><AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription></Alert>
+                  <Alert variant="destructive">
+                    <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
+                  </Alert>
                 ) : null}
                 <DiagnosticPanel
                   data={diagnostics}
@@ -720,7 +779,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                   }}
                 />
                 {managementMutation.error !== null ? (
-                  <Alert variant="destructive"><AlertDescription>{errorMessage(managementMutation.error, t('loadFailed'))}</AlertDescription></Alert>
+                  <Alert variant="destructive">
+                    <AlertDescription>{errorMessage(managementMutation.error, t('loadFailed'))}</AlertDescription>
+                  </Alert>
                 ) : null}
               </div>
             </TabsContent>
@@ -741,7 +802,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
           </AlertDialogHeader>
           <Separator />
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={managementMutation.isPending} onClick={() => setAction(null)}>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel disabled={managementMutation.isPending} onClick={() => setAction(null)}>
+              {t('cancel')}
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={managementMutation.isPending}
               variant={action?.kind === 'unsubscribe' ? 'destructive' : 'default'}

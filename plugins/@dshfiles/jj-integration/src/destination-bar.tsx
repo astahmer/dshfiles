@@ -24,7 +24,11 @@ type Target = { readonly workspaceId: string; readonly isolate: boolean; readonl
  * own jj workspace, rendered in the native New thread row beside its project chip (the host chip leads the row). A
  * Session's directory is fixed once created, so each change opens a blank thread at the new destination.
  */
-export const DestinationBar = (props: { readonly workspaceId: string | undefined; readonly services: DestinationBarServices; readonly t: JjIntegrationTranslate }) => {
+export const DestinationBar = (props: {
+  readonly workspaceId: string | undefined
+  readonly services: DestinationBarServices
+  readonly t: JjIntegrationTranslate
+}) => {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
@@ -34,13 +38,15 @@ export const DestinationBar = (props: { readonly workspaceId: string | undefined
   const destination = useQuery({
     queryKey: ['jj-integration', 'destination', workspaceId ?? ''],
     enabled: workspaceId !== null,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
+    queryFn: ({ signal }) =>
+      runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
   })
   const move = useMutation({
     mutationFn: async (target: Target): Promise<void> => {
       const leaving = destination.data?.isolated === true ? workspaceId : null
-      const next = (await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) }))
-        .workspaceId
+      const next = (
+        await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) })
+      ).workspaceId
       if (next === workspaceId) return
       await services.openWorkspace(next)
       // The blank thread left behind had no message, so its fresh workspace holds nothing worth keeping.

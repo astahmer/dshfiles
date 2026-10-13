@@ -62,7 +62,8 @@ const pageTool = defineTool({
 
 const attentionTool = defineTool({
   name: 'activity_timeline_attention',
-  description: 'List retained events that need human attention (agent errors, blocked or failed integrations, missing workspaces, failed communication tool calls). Read-only.',
+  description:
+    'List retained events that need human attention (agent errors, blocked or failed integrations, missing workspaces, failed communication tool calls). Read-only.',
   parameters: { limit: { type: 'integer', description: 'Maximum events, 1 to 100; defaults to 20.' } },
   output: summaryOutput,
   execute: async args => ({ summary: JSON.stringify({ events: await requireService().attention(args.limit ?? 20) }) }),
@@ -129,7 +130,8 @@ const setupHost = (context: Context): Effect<void> => {
       .strict()
       .safeParse(payload)
     if (!parsed.success) return undefined
-    if (parsed.data.kind === 'communication-activity') void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
+    if (parsed.data.kind === 'communication-activity')
+      void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
     if (parsed.data.kind === 'communication-message') void active.ingest(communicationMessageSafe(parsed.data.value))
     if (parsed.data.kind === 'integration') void active.ingest(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
     if (parsed.data.kind === 'workspace') void active.ingest(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0]))

@@ -5,43 +5,23 @@
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
       "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, and save through Host file APIs.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "editorPlacement",
           "defaultValue": "workbench",
           "constraints": "One of workbench or right-panel; applies live.",
-          "choices": [
-            "workbench",
-            "right-panel"
-          ],
-          "coveredBy": [
-            "editor.placement"
-          ]
+          "choices": ["workbench", "right-panel"],
+          "coveredBy": ["editor.placement"]
         },
         {
           "key": "openFileLinks",
           "defaultValue": "true",
           "constraints": "Boolean; applies live.",
-          "coveredBy": [
-            "editor.open-file-links-native-row"
-          ]
+          "coveredBy": ["editor.open-file-links-native-row"]
         }
       ],
-      "states": [
-        "loading",
-        "clean",
-        "dirty",
-        "saving",
-        "conflict",
-        "external-change",
-        "saved"
-      ],
+      "states": ["loading", "clean", "dirty", "saving", "conflict", "external-change", "saved"],
       "failureModes": [
         "A stale file hash raises a conflict and requires reload or explicit overwrite.",
         "Traversal, symlink, protected metadata, missing parent, and oversized writes are rejected."
@@ -133,21 +113,10 @@
       "id": "workspace-file-index",
       "title": "Index workspace files with bounded traversal",
       "summary": "Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.",
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "surfaces": ["host", "integration"],
       "configuration": [],
-      "states": [
-        "complete",
-        "truncated",
-        "directory-skipped",
-        "stale-index"
-      ],
-      "failureModes": [
-        "Unreadable directories are skipped with partial results.",
-        "A stale index is refreshed before searching."
-      ],
+      "states": ["complete", "truncated", "directory-skipped", "stale-index"],
+      "failureModes": ["Unreadable directories are skipped with partial results.", "A stale index is refreshed before searching."],
       "externalDependencies": [],
       "verification": [
         {

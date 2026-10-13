@@ -270,7 +270,10 @@ export default definePlugin({
     }
 
     const modelForRoute = (provider: string, modelId: string) =>
-      profiles.get(provider)?.piProvider?.getModels().find(candidate => candidate.id === modelId)
+      profiles
+        .get(provider)
+        ?.piProvider?.getModels()
+        .find(candidate => candidate.id === modelId)
     const modelsCompatible = (sourceProvider: string, candidateProvider: string, modelId: string): boolean => {
       const source = modelForRoute(sourceProvider, modelId)
       const candidate = modelForRoute(candidateProvider, modelId)
@@ -606,8 +609,7 @@ export default definePlugin({
               async ({ turn, step, provider, failure, signal }, next) => {
                 const surface = agent.session.deriveMessages()
                 const active = activeAccountRoutes.get(id)
-                const routedAccountId =
-                  active?.turn === turn && active.step === step && active.provider === provider ? active.accountId : undefined
+                const routedAccountId = active?.turn === turn && active.step === step && active.provider === provider ? active.accountId : undefined
                 const action = recovery.recover({
                   conversationKey: id,
                   turn,
@@ -618,12 +620,7 @@ export default definePlugin({
                   failure,
                   canShrink: offloadResentImages(surface) !== surface,
                 })
-                if (
-                  action.kind === 'retry' &&
-                  action.step.kind === 'failover' &&
-                  routedAccountId !== undefined &&
-                  active !== undefined
-                ) {
+                if (action.kind === 'retry' && action.step.kind === 'failover' && routedAccountId !== undefined && active !== undefined) {
                   active.accountId = action.step.to
                 }
                 if (action.kind === 'pass') return next()

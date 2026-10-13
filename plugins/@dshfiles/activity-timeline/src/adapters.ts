@@ -12,10 +12,44 @@ export const sessionActivity = (input: {
 }): ActivityIngest => {
   const base = { at: input.at, source: 'session' as const, sessionId: input.sessionId, provenance: 'observed' as const }
   const reference: ActivityReference = { kind: 'session', id: input.sessionId, label: null }
-  if (input.kind === 'created') return { ...base, id: `session:created:${input.sessionId}:${String(input.at)}`, type: 'session.started', level: 'notable', summary: 'Agent started work', references: [reference] }
-  if (input.kind === 'disposed') return { ...base, id: `session:disposed:${input.sessionId}:${String(input.at)}`, type: 'session.disposed', level: 'notable', summary: 'Agent session disposed', references: [reference] }
-  if (input.kind === 'status') return { ...base, id: `session:status:${input.sessionId}:${String(input.at)}`, type: 'session.status', level: 'routine', summary: `Agent became ${input.status ?? 'unknown'}`, metadata: { status: input.status ?? null }, references: [reference] }
-  if (input.kind === 'input') return { ...base, id: `session:input:${input.sessionId}:${String(input.at)}`, type: 'session.input', level: 'notable', summary: 'Input delivered to an agent', detail: input.detail === undefined ? null : clamp(input.detail, 2000), references: [reference] }
+  if (input.kind === 'created')
+    return {
+      ...base,
+      id: `session:created:${input.sessionId}:${String(input.at)}`,
+      type: 'session.started',
+      level: 'notable',
+      summary: 'Agent started work',
+      references: [reference],
+    }
+  if (input.kind === 'disposed')
+    return {
+      ...base,
+      id: `session:disposed:${input.sessionId}:${String(input.at)}`,
+      type: 'session.disposed',
+      level: 'notable',
+      summary: 'Agent session disposed',
+      references: [reference],
+    }
+  if (input.kind === 'status')
+    return {
+      ...base,
+      id: `session:status:${input.sessionId}:${String(input.at)}`,
+      type: 'session.status',
+      level: 'routine',
+      summary: `Agent became ${input.status ?? 'unknown'}`,
+      metadata: { status: input.status ?? null },
+      references: [reference],
+    }
+  if (input.kind === 'input')
+    return {
+      ...base,
+      id: `session:input:${input.sessionId}:${String(input.at)}`,
+      type: 'session.input',
+      level: 'notable',
+      summary: 'Input delivered to an agent',
+      detail: input.detail === undefined ? null : clamp(input.detail, 2000),
+      references: [reference],
+    }
   return {
     ...base,
     id: `session:error:${input.sessionId}:${String(input.at)}`,
@@ -69,7 +103,10 @@ export const communicationMessage = (input: {
   level: input.intent === 'request' ? 'notable' : 'routine',
   sessionId: input.sessionId ?? null,
   correlationId: input.correlationId ?? null,
-  summary: input.topic === null ? `Direct message from ${input.senderId} to ${String(input.recipientCount)} agent(s)` : `Message from ${input.senderId} on ${input.topic}`,
+  summary:
+    input.topic === null
+      ? `Direct message from ${input.senderId} to ${String(input.recipientCount)} agent(s)`
+      : `Message from ${input.senderId} on ${input.topic}`,
   metadata: { intent: input.intent, topic: input.topic, recipientCount: input.recipientCount, senderId: input.senderId },
   references: [{ kind: 'message', id: input.messageId, label: input.topic }],
   provenance: 'observed',
@@ -86,7 +123,15 @@ export const integrationActivity = (input: {
   readonly detail: string | null
   readonly outcome: string | null
 }): ActivityIngest => {
-  const level: ActivityLevel = input.type === 'integration.blocked' || input.type === 'integration.validation_failed' || input.type === 'integration.failed' || input.type === 'workspace.missing' ? 'attention' : input.type === 'integration.queued' || input.type === 'integration.started' ? 'notable' : 'routine'
+  const level: ActivityLevel =
+    input.type === 'integration.blocked' ||
+    input.type === 'integration.validation_failed' ||
+    input.type === 'integration.failed' ||
+    input.type === 'workspace.missing'
+      ? 'attention'
+      : input.type === 'integration.queued' || input.type === 'integration.started'
+        ? 'notable'
+        : 'routine'
   const references: ActivityReference[] = []
   if (input.candidateId !== null) references.push({ kind: 'integration-candidate', id: input.candidateId, label: null })
   if (input.workspaceId !== null) references.push({ kind: 'workspace', id: input.workspaceId, label: null })

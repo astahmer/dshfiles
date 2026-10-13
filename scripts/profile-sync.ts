@@ -22,7 +22,14 @@ const profileManifestSchema = z.looseObject({
   dsh: z.looseObject({ profile: z.looseObject({ bundles: z.array(z.string()) }) }),
 })
 
-const { values } = parseArgs({ options: { profile: { type: 'string', default: 'probe' }, home: { type: 'string' }, bundle: { type: 'string', multiple: true }, 'dry-run': { type: 'boolean', default: false } } })
+const { values } = parseArgs({
+  options: {
+    profile: { type: 'string', default: 'probe' },
+    home: { type: 'string' },
+    bundle: { type: 'string', multiple: true },
+    'dry-run': { type: 'boolean', default: false },
+  },
+})
 const profileDirectory = join(values.home ?? join(homedir(), '.dsh'), 'profiles', values.profile)
 const manifestPath = join(profileDirectory, 'package.json')
 if (!existsSync(manifestPath)) throw new Error(`Profile ${values.profile} has no package.json at ${manifestPath}.`)
@@ -43,10 +50,13 @@ const manifest = profileManifestSchema.parse(JSON.parse(readFileSync(manifestPat
 const isOwned = (name: string): boolean => name.startsWith('@dshfiles/')
 
 const dependencies = Object.fromEntries([
-  ...Object.entries(manifest.dependencies).filter(([name]) => selectedNames === null ? !isOwned(name) : !selectedNames.has(name)),
+  ...Object.entries(manifest.dependencies).filter(([name]) => (selectedNames === null ? !isOwned(name) : !selectedNames.has(name))),
   ...selectedBundles.map(bundle => [bundle.name, `link:${bundle.directory}`]),
 ])
-const bundles = [...manifest.dsh.profile.bundles.filter(name => selectedNames === null ? !isOwned(name) : !selectedNames.has(name)), ...selectedBundles.map(bundle => bundle.name)]
+const bundles = [
+  ...manifest.dsh.profile.bundles.filter(name => (selectedNames === null ? !isOwned(name) : !selectedNames.has(name))),
+  ...selectedBundles.map(bundle => bundle.name),
+]
 const next = { ...manifest, dependencies, dsh: { ...manifest.dsh, profile: { ...manifest.dsh.profile, bundles } } }
 
 const removed = manifest.dsh.profile.bundles.filter(name => isOwned(name) && !bundles.includes(name))

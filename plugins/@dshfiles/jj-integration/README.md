@@ -57,14 +57,14 @@ panel's **Discard with work** deletes it on request.
 
 ## Settings (`jj-integration`)
 
-| Key | Default | Meaning |
-|---|---|---|
-| `isolateByDefault` | `false` | Initial state of the workspace toggle for new threads. |
-| `bookmark` | `main` | Bookmark threads start from and Land advances. |
-| `threadsDirectory` | empty | Parent for thread workspaces; empty uses `<repository>-threads`. |
-| `setupCommand` | empty | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`. |
-| `askAgentToFixLanding` | `true` | Hand Land problems back to the thread's agent. |
-| `removeFinishedThreads` | `true` | Remove finished thread workspaces without unlanded work. |
+| Key                     | Default | Meaning                                                                             |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------- |
+| `isolateByDefault`      | `false` | Initial state of the workspace toggle for new threads.                              |
+| `bookmark`              | `main`  | Bookmark threads start from and Land advances.                                      |
+| `threadsDirectory`      | empty   | Parent for thread workspaces; empty uses `<repository>-threads`.                    |
+| `setupCommand`          | empty   | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`. |
+| `askAgentToFixLanding`  | `true`  | Hand Land problems back to the thread's agent.                                      |
+| `removeFinishedThreads` | `true`  | Remove finished thread workspaces without unlanded work.                            |
 
 ## Limits
 

@@ -123,10 +123,7 @@ const BasePicker = (props: { readonly repository: ComposerRepository; readonly b
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx:max-h-80 dshx:w-64 dshx:overflow-y-auto">
         <DropdownMenuLabel className="dshx:text-xs">Compare the working copy against</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          onValueChange={value => props.onChoose(composerBaseFromSetting(value))}
-          value={composerBaseSetting(props.base)}
-        >
+        <DropdownMenuRadioGroup onValueChange={value => props.onChoose(composerBaseFromSetting(value))} value={composerBaseSetting(props.base)}>
           <DropdownMenuRadioItem value="parent">Parent (@-)</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="trunk">Trunk (trunk())</DropdownMenuRadioItem>
           {props.repository.localBookmarks.length > 0 && <DropdownMenuSeparator />}
@@ -236,7 +233,14 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
                     <span className="dshx:text-success">+{counts.additions}</span> <span className="dshx:text-destructive">−{counts.deletions}</span>
                   </span>
                 )}
-                <Button aria-label={'Open diff of ' + file.path} onClick={() => setFullDiffPath(file.path)} size="icon-xs" title="Open diff" type="button" variant="ghost">
+                <Button
+                  aria-label={'Open diff of ' + file.path}
+                  onClick={() => setFullDiffPath(file.path)}
+                  size="icon-xs"
+                  title="Open diff"
+                  type="button"
+                  variant="ghost"
+                >
                   <FileDiffIcon />
                 </Button>
                 <Button

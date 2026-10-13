@@ -33,12 +33,20 @@ function materializer(packageId: string, css: string, suppliedHash: string | und
   if (css === '') return ''
   const styleId = `${packageId}/client.css`
   const hash = sharedCssHash(css)
-  const sheet = hash === suppliedHash ? '' : `if(document.querySelector(select("data-dshx-shared-css",hash))===null){const sheet=document.createElement("style");sheet.dataset.plugin=${JSON.stringify(SHARED_SHEET_OWNER)};sheet.dataset.dshxSharedCss=hash;sheet.textContent=${JSON.stringify(css)};document.head.appendChild(sheet)}`
+  const sheet =
+    hash === suppliedHash
+      ? ''
+      : `if(document.querySelector(select("data-dshx-shared-css",hash))===null){const sheet=document.createElement("style");sheet.dataset.plugin=${JSON.stringify(SHARED_SHEET_OWNER)};sheet.dataset.dshxSharedCss=hash;sheet.textContent=${JSON.stringify(css)};document.head.appendChild(sheet)}`
   return `if(typeof document!=="undefined"){const select=(name,value)=>"style["+name+"="+JSON.stringify(value)+"]";const hash=${JSON.stringify(hash)};if(document.querySelector(select("data-plugin-css",${JSON.stringify(styleId)}))===null){const marker=document.createElement("style");marker.dataset.plugin=${JSON.stringify(packageId)};marker.dataset.pluginCss=${JSON.stringify(styleId)};marker.dataset.dshxCss=hash;document.head.appendChild(marker)}${sheet}const key=Symbol.for("dshx.sharedCss.v1");if(globalThis[key]===undefined&&typeof MutationObserver!=="undefined"){globalThis[key]=new MutationObserver(records=>{for(const record of records)for(const node of record.removedNodes){const removed=node.dataset?.dshxCss;if(removed!==undefined&&document.querySelector(select("data-dshx-css",removed))===null)document.querySelector(select("data-dshx-shared-css",removed))?.remove()}});globalThis[key].observe(document.head,{childList:true})}}`
 }
 
 /** Fold Vite's one native CSS asset into the lazy Client factory. */
-export function clientCssPlugin(options: { readonly packageId: string; readonly outDir: string; readonly suppliedHash?: string; readonly onSheet?: (hash: string | undefined) => void }): Plugin {
+export function clientCssPlugin(options: {
+  readonly packageId: string
+  readonly outDir: string
+  readonly suppliedHash?: string
+  readonly onSheet?: (hash: string | undefined) => void
+}): Plugin {
   const { packageId, outDir } = options
   let pendingMaterializer = ''
   return {

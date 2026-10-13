@@ -277,7 +277,6 @@ const InstallDialog = ({
   )
 }
 
-
 const PluginCard = ({
   plugin,
   installing,
@@ -318,7 +317,10 @@ const PluginCard = ({
               v{plugin.version}
             </span>
             {plugin.stars !== null ? (
-              <span aria-label={interpolate(t('starsLabel'), { count: String(plugin.stars) })} className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5">
+              <span
+                aria-label={interpolate(t('starsLabel'), { count: String(plugin.stars) })}
+                className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5"
+              >
                 <StarIcon aria-hidden="true" className="dshx:size-3" />
                 {starFormat.format(plugin.stars)}
               </span>

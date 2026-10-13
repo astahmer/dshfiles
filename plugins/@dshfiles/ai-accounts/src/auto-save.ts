@@ -81,7 +81,10 @@ const autoSaveMachine = <Value>(options: AutoSaveOptions<Value>) => {
           },
           onDone: [
             { guard: 'hasPending', target: 'saving', reenter: true, actions: assign(({ context }) => ({ lastSaved: context.inFlight })) },
-            { target: 'idle', actions: assign(({ context }) => ({ lastSaved: context.inFlight, inFlight: null, status: { kind: 'saved', at: now() } as const })) },
+            {
+              target: 'idle',
+              actions: assign(({ context }) => ({ lastSaved: context.inFlight, inFlight: null, status: { kind: 'saved', at: now() } as const })),
+            },
           ],
           onError: {
             target: 'idle',

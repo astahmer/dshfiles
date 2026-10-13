@@ -222,7 +222,10 @@ describe('checkProjectManifest', () => {
     const resolved = await resolveDshxConfig({ cwd: root })
     const missing = await checkProjectManifest({ ...resolved, clientShared: '@test/runtime' })
     expect(missing.filter(item => item.code === 'DSHX4233')).toHaveLength(1)
-    ;(manifest.dsh as { client: Record<string, unknown> }).client = { ...(manifest.dsh as { client: Record<string, unknown> }).client, external: ['@test/runtime'] }
+    ;(manifest.dsh as { client: Record<string, unknown> }).client = {
+      ...(manifest.dsh as { client: Record<string, unknown> }).client,
+      external: ['@test/runtime'],
+    }
     await writeManifest(root, manifest)
     const declared = await checkProjectManifest({ ...(await resolveDshxConfig({ cwd: root })), clientShared: '@test/runtime' })
     expect(declared.filter(item => item.code === 'DSHX4233')).toHaveLength(0)

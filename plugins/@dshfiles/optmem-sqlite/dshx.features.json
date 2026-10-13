@@ -6,19 +6,9 @@
       "id": "durable-event-streams",
       "title": "Persist and replay ordered memory events",
       "summary": "Append events to isolated streams, replay in order, deduplicate re-ingested events, and serialize concurrent writers without gaps.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "empty",
-        "appended",
-        "replayed",
-        "duplicate-ignored",
-        "concurrent-write"
-      ],
+      "states": ["empty", "appended", "replayed", "duplicate-ignored", "concurrent-write"],
       "failureModes": [
         "Positions remain contiguous under interleaved concurrent writers.",
         "Database files are private to the user and migrations are idempotent."
@@ -49,24 +39,10 @@
       "id": "scoped-keyword-search",
       "title": "Search and zoom within authorized memory scope",
       "summary": "Search exact terms and snippets across conversations in the same project, keep other projects hidden, and return bounded zoomable context.",
-      "surfaces": [
-        "host",
-        "tool",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "tool", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "same-project",
-        "other-project-hidden",
-        "global-only",
-        "cross-project-enabled",
-        "truncated"
-      ],
-      "failureModes": [
-        "Cross-project results remain denied unless explicitly enabled.",
-        "Secrets are redacted before event, tree, or index persistence."
-      ],
+      "states": ["same-project", "other-project-hidden", "global-only", "cross-project-enabled", "truncated"],
+      "failureModes": ["Cross-project results remain denied unless explicitly enabled.", "Secrets are redacted before event, tree, or index persistence."],
       "externalDependencies": [],
       "verification": [
         {
@@ -93,23 +69,10 @@
       "id": "incremental-summary-engine",
       "title": "Build and persist incremental memory summaries",
       "summary": "Create complete hierarchy nodes, preserve summaries byte-for-byte across reload, extend at the tail, and report raw pending items explicitly.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "raw-tail",
-        "summary-pending",
-        "summarized",
-        "persisted-view",
-        "reload"
-      ],
-      "failureModes": [
-        "A pending leaf is rendered as raw and tagged rather than omitted.",
-        "New histories produce deterministic summaries and view bytes."
-      ],
+      "states": ["raw-tail", "summary-pending", "summarized", "persisted-view", "reload"],
+      "failureModes": ["A pending leaf is rendered as raw and tagged rather than omitted.", "New histories produce deterministic summaries and view bytes."],
       "externalDependencies": [
         {
           "id": "memory-summarizer",
@@ -148,23 +111,10 @@
       "id": "crash-recovery-and-versioned-views",
       "title": "Recover interrupted indexing and migrate persisted views",
       "summary": "Complete interrupted pipelines when reopened, retain main and secondary views across schema migration, and explicitly bound pending tails.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "interrupted",
-        "recovered",
-        "migrated",
-        "secondary-view",
-        "tail-capped"
-      ],
-      "failureModes": [
-        "A summarizer failure retains source history for later retry.",
-        "Version-1 views migrate without rebuilding away stored content."
-      ],
+      "states": ["interrupted", "recovered", "migrated", "secondary-view", "tail-capped"],
+      "failureModes": ["A summarizer failure retains source history for later retry.", "Version-1 views migrate without rebuilding away stored content."],
       "externalDependencies": [],
       "verification": [
         {

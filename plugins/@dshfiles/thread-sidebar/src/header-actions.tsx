@@ -4,12 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArchiveIcon, BellIcon, PauseIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { useState, type ReactNode } from 'react'
@@ -35,9 +30,9 @@ interface HeaderThreadActionsInjected {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'>
-  & PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
-  & HeaderThreadActionsInjected
+type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'> &
+  PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> &
+  HeaderThreadActionsInjected
 
 export const HeaderThreadActions = ({
   action,
@@ -98,14 +93,7 @@ export const HeaderThreadActions = ({
     threadNotificationPreferences.set(setThreadMute(notificationPreferences, sessionId, until))
   }
   const actionButton = (label: string, icon: ReactNode, onClick?: () => void, disabled = false) => (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <Button type="button" variant="ghost" size="sm" aria-label={label} disabled={disabled} onClick={onClick}>
       {icon}
       {label}
     </Button>
@@ -129,11 +117,7 @@ export const HeaderThreadActions = ({
 
   if (action === 'park') {
     const label = t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')
-    return (
-      <span className="dshx-root">
-        {actionButton(label, <PauseIcon className="dshx:size-4" aria-hidden="true" />, updateParked, session.running)}
-      </span>
-    )
+    return <span className="dshx-root">{actionButton(label, <PauseIcon className="dshx:size-4" aria-hidden="true" />, updateParked, session.running)}</span>
   }
 
   if (action === 'notifications') {
@@ -141,21 +125,14 @@ export const HeaderThreadActions = ({
     return (
       <span className="dshx-root">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            {actionButton(label, <BellIcon className="dshx:size-4" aria-hidden="true" />)}
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild>{actionButton(label, <BellIcon className="dshx:size-4" aria-hidden="true" />)}</DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarNotifications')}>
             {snoozeDurations.map(duration => (
-              <DropdownMenuItem
-                key={duration.milliseconds}
-                onSelect={() => updateMute(Date.now() + duration.milliseconds)}
-              >
+              <DropdownMenuItem key={duration.milliseconds} onSelect={() => updateMute(Date.now() + duration.milliseconds)}>
                 {t('threadSidebarSnoozeFor')} {t(duration.label)}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuItem onSelect={() => updateMute(null)}>
-              {t('threadSidebarMuteUntilEnabled')}
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => updateMute(null)}>{t('threadSidebarMuteUntilEnabled')}</DropdownMenuItem>
             <DropdownMenuItem
               disabled={!muted}
               onSelect={() => {
@@ -174,7 +151,12 @@ export const HeaderThreadActions = ({
   const disabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
   return (
     <span className="dshx-root">
-      {actionButton(label, <ArchiveIcon className="dshx:size-4" aria-hidden="true" />, () => void updateThreadOperation(archived ? 'unarchive' : 'archive'), disabled)}
+      {actionButton(
+        label,
+        <ArchiveIcon className="dshx:size-4" aria-hidden="true" />,
+        () => void updateThreadOperation(archived ? 'unarchive' : 'archive'),
+        disabled,
+      )}
       {error}
     </span>
   )

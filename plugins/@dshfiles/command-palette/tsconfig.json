@@ -7,17 +7,9 @@
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "types": [
-      "node",
-      "@dshfiles/dshx/client/env"
-    ],
+    "types": ["node", "@dshfiles/dshx/client/env"],
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": [
-    "dshx.config.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "tests/**/*.ts"
-  ]
+  "include": ["dshx.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
 }

@@ -27,7 +27,15 @@ type Row = ReturnType<typeof session>
 const sessionsOf = (rows: readonly Row[]) => ({ ids: rows.map(row => row.id), byId: Object.fromEntries(rows.map(row => [row.id, row])) })
 
 const build = (overrides: Partial<Parameters<typeof buildGoToEntries<string>>[0]> = {}) =>
-  buildGoToEntries<string>({ panels: [], mainPanelKeys: new Set(), sessions: undefined, archivedSessionIds: new Set(), paletteAvailable: false, copy, ...overrides })
+  buildGoToEntries<string>({
+    panels: [],
+    mainPanelKeys: new Set(),
+    sessions: undefined,
+    archivedSessionIds: new Set(),
+    paletteAvailable: false,
+    copy,
+    ...overrides,
+  })
 
 describe('buildGoToEntries', () => {
   it('leads with palette actions only when the thread sidebar acknowledged the palette', () => {

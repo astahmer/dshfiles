@@ -37,8 +37,25 @@ export const activityEventSchema = z
 export type ActivityEvent = z.infer<typeof activityEventSchema>
 
 export const activityIngestSchema = activityEventSchema
-  .partial({ level: true, sessionId: true, workspaceId: true, taskId: true, correlationId: true, causationId: true, detail: true, metadata: true, references: true, provenance: true })
-  .extend({ id: z.string().min(1).max(256), at: z.number().int().nonnegative(), source: activitySourceSchema, type: z.string().min(1).max(80), summary: z.string().min(1).max(500) })
+  .partial({
+    level: true,
+    sessionId: true,
+    workspaceId: true,
+    taskId: true,
+    correlationId: true,
+    causationId: true,
+    detail: true,
+    metadata: true,
+    references: true,
+    provenance: true,
+  })
+  .extend({
+    id: z.string().min(1).max(256),
+    at: z.number().int().nonnegative(),
+    source: activitySourceSchema,
+    type: z.string().min(1).max(80),
+    summary: z.string().min(1).max(500),
+  })
 export type ActivityIngest = z.infer<typeof activityIngestSchema>
 
 export const condensedItemSchema = z

@@ -51,10 +51,28 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   expect(head).toMatchObject({ bookmarks: [], empty: false, conflict: false, description: '' })
   expect(runJj(repo, home, ['--ignore-working-copy', 'workspace', 'list', '-T', COMPOSER_WORKSPACE_TEMPLATE]).trim()).toBe('"default"')
 
-  const nearest = runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'heads(::@- & bookmarks())', '--limit', '2', '-T', COMPOSER_BOOKMARKS_TEMPLATE])
+  const nearest = runJj(repo, home, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '-r',
+    'heads(::@- & bookmarks())',
+    '--limit',
+    '2',
+    '-T',
+    COMPOSER_BOOKMARKS_TEMPLATE,
+  ])
   expect(nearest.trim()).toBe('["main"]')
   expect(runJj(repo, home, ['--ignore-working-copy', 'bookmark', 'list', '-T', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE]).trim()).toBe('"main"')
-  const missing = runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', composerBaseTarget({ kind: 'bookmark', name: 'absent' }), '-T', 'commit_id'])
+  const missing = runJj(repo, home, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '-r',
+    composerBaseTarget({ kind: 'bookmark', name: 'absent' }),
+    '-T',
+    'commit_id',
+  ])
   expect(missing).toBe('')
 
   const parentRange = composerDiffRange({ kind: 'parent' })

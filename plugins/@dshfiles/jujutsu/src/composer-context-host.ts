@@ -89,10 +89,7 @@ export const composerContextHost = (run: RunJj) =>
       const nearestBookmarks = parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
       const targetBookmarks = baseTarget === null ? [] : parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
       const fileRows = files === null ? [] : parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
-      const bookmarkNames =
-        localBookmarks === null
-          ? []
-          : parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
+      const bookmarkNames = localBookmarks === null ? [] : parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
       const workspaceNames = workspaces === null ? [] : parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
       return {
         repository: {

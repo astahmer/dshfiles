@@ -37,11 +37,7 @@ afterEach(async () => {
 describe('activity timeline service', () => {
   it('interleaves events from multiple agents in chronological order', async () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    await service.ingestMany([
-      routine(1, now + 300, 'session-b'),
-      routine(2, now + 100, 'session-a'),
-      routine(3, now + 200, 'session-c'),
-    ])
+    await service.ingestMany([routine(1, now + 300, 'session-b'), routine(2, now + 100, 'session-a'), routine(3, now + 200, 'session-c')])
     const page = await service.page({ detailed: true })
     expect(page.items.map(item => item.sessionId)).toEqual(['session-a', 'session-c', 'session-b'])
     expect(page.items.map(item => item.at)).toEqual([now + 100, now + 200, now + 300])
@@ -60,17 +56,19 @@ describe('activity timeline service', () => {
 
   it('orders out-of-order timestamps and preserves references', async () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
-    await service.ingest(integrationActivity({
-      id: 'evt-2',
-      at: now + 500,
-      type: 'integration.completed',
-      workspaceId: 'workspace-1',
-      sessionId: 'session-a',
-      candidateId: 'candidate-1',
-      correlationId: 'corr-1',
-      detail: 'Integrated as abc123',
-      outcome: 'integrated',
-    }))
+    await service.ingest(
+      integrationActivity({
+        id: 'evt-2',
+        at: now + 500,
+        type: 'integration.completed',
+        workspaceId: 'workspace-1',
+        sessionId: 'session-a',
+        candidateId: 'candidate-1',
+        correlationId: 'corr-1',
+        detail: 'Integrated as abc123',
+        outcome: 'integrated',
+      }),
+    )
     await service.ingest(sessionActivity({ kind: 'created', at: now + 100, sessionId: 'session-a' }))
     const page = await service.page({ detailed: true })
     expect(page.items.map(item => item.type)).toEqual(['session.started', 'integration.completed'])
@@ -135,7 +133,17 @@ describe('activity timeline service', () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     await service.ingestMany([
       routine(1, now, 'session-a'),
-      integrationActivity({ id: 'evt-block', at: now + 1, type: 'integration.blocked', workspaceId: 'ws-1', sessionId: 'session-a', candidateId: 'cand-1', correlationId: null, detail: 'conflict in shared.txt', outcome: 'blocked' }),
+      integrationActivity({
+        id: 'evt-block',
+        at: now + 1,
+        type: 'integration.blocked',
+        workspaceId: 'ws-1',
+        sessionId: 'session-a',
+        candidateId: 'cand-1',
+        correlationId: null,
+        detail: 'conflict in shared.txt',
+        outcome: 'blocked',
+      }),
       routine(2, now + 2, 'session-a'),
     ])
     const page = await service.page({})
@@ -148,8 +156,26 @@ describe('activity timeline service', () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     await service.ingestMany([
       sessionActivity({ kind: 'created', at: now, sessionId: 'session-a' }),
-      communicationMessage({ at: now + 1, messageId: 'message-1', senderId: 'session-a', recipientCount: 1, intent: 'request', topic: null, sessionId: 'session-a' }),
-      integrationActivity({ id: 'evt-1', at: now + 2, type: 'integration.completed', workspaceId: 'ws-1', sessionId: 'session-b', candidateId: 'cand-1', correlationId: null, detail: 'Integrated as abc123', outcome: 'integrated' }),
+      communicationMessage({
+        at: now + 1,
+        messageId: 'message-1',
+        senderId: 'session-a',
+        recipientCount: 1,
+        intent: 'request',
+        topic: null,
+        sessionId: 'session-a',
+      }),
+      integrationActivity({
+        id: 'evt-1',
+        at: now + 2,
+        type: 'integration.completed',
+        workspaceId: 'ws-1',
+        sessionId: 'session-b',
+        candidateId: 'cand-1',
+        correlationId: null,
+        detail: 'Integrated as abc123',
+        outcome: 'integrated',
+      }),
     ])
     const bySource = await service.page({ sources: ['communication'], detailed: true })
     expect(bySource.items.map(item => item.type)).toEqual(['communication.message'])
@@ -224,8 +250,22 @@ describe('activity condensation primitives', () => {
 
   it('maps adapters with authoritative levels', () => {
     expect(sessionActivity({ kind: 'error', at: now, sessionId: 's' }).level).toBe('attention')
-    expect(communicationActivity({ at: now, sessionId: 's', operation: 'dshx_comm_inbox', outcome: 'failure', callId: 'c1', rootCallId: null }).level).toBe('attention')
+    expect(communicationActivity({ at: now, sessionId: 's', operation: 'dshx_comm_inbox', outcome: 'failure', callId: 'c1', rootCallId: null }).level).toBe(
+      'attention',
+    )
     expect(communicationMessage({ at: now, messageId: 'm1', senderId: 's', recipientCount: 2, intent: 'request', topic: null }).level).toBe('notable')
-    expect(integrationActivity({ id: 'e', at: now, type: 'integration.completed', workspaceId: null, sessionId: null, candidateId: null, correlationId: null, detail: null, outcome: 'integrated' }).level).toBe('routine')
+    expect(
+      integrationActivity({
+        id: 'e',
+        at: now,
+        type: 'integration.completed',
+        workspaceId: null,
+        sessionId: null,
+        candidateId: null,
+        correlationId: null,
+        detail: null,
+        outcome: 'integrated',
+      }).level,
+    ).toBe('routine')
   })
 })

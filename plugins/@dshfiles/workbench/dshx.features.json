@@ -5,32 +5,17 @@
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
       "summary": "Add panels and arrange tab, split, float, move, close, and reset operations independently in the main workbench and right-side pane.",
-      "surfaces": [
-        "client",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "integration", "storage"],
       "configuration": [
         {
           "key": "headerToggle",
           "defaultValue": "true",
           "constraints": "Boolean; show the workbench header toggle.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "workbench.surface-layouts"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["workbench.surface-layouts"]
         }
       ],
-      "states": [
-        "tabbed",
-        "split",
-        "floating",
-        "closed",
-        "reset"
-      ],
+      "states": ["tabbed", "split", "floating", "closed", "reset"],
       "failureModes": [
         "Malformed persisted layout falls back to defaults.",
         "An unavailable registered plugin remains a closable placeholder and recovers when it registers."
@@ -93,20 +78,10 @@
       "id": "early-panel-registration",
       "title": "Queue panel-open requests before mount",
       "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "registered",
-        "queued-open",
-        "mounted",
-        "placeholder"
-      ],
-      "failureModes": [
-        "A duplicate or missing panel identity cannot silently replace another registration."
-      ],
+      "states": ["registered", "queued-open", "mounted", "placeholder"],
+      "failureModes": ["A duplicate or missing panel identity cannot silently replace another registration."],
       "externalDependencies": [],
       "verification": [
         {

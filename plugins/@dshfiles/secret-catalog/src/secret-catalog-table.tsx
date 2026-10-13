@@ -59,11 +59,7 @@ const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   if (revealed?.id === props.row.id) {
     const preview = revealed.stage === 'preview' ? previewSecretValue(revealed.value) : null
     const value =
-      preview === null
-        ? revealed.value
-        : preview.kind === 'excerpt'
-          ? preview.text
-          : actions.t('previewMasked', { mask: preview.mask, count: preview.length })
+      preview === null ? revealed.value : preview.kind === 'excerpt' ? preview.text : actions.t('previewMasked', { mask: preview.mask, count: preview.length })
     return <output className="dshx:font-mono dshx:text-xs dshx:break-all dshx:select-all">{value}</output>
   }
   return (
@@ -168,7 +164,12 @@ export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element 
   const columns = useMemo(
     () =>
       column.columns([
-        column.accessor('variableName', { id: 'variable', header: t('columnVariable'), sortFn: 'alphanumeric', cell: context => <VariableCell row={context.row.original} /> }),
+        column.accessor('variableName', {
+          id: 'variable',
+          header: t('columnVariable'),
+          sortFn: 'alphanumeric',
+          cell: context => <VariableCell row={context.row.original} />,
+        }),
         column.display({ id: 'description', header: t('columnDescription'), cell: context => <DescriptionCell row={context.row.original} /> }),
         column.display({ id: 'value', header: t('columnValue'), cell: context => <ValueCell row={context.row.original} /> }),
         column.display({ id: 'reveal', header: '', cell: context => <RevealCopyCell row={context.row.original} /> }),

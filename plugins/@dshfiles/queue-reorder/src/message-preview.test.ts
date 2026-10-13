@@ -5,13 +5,7 @@ import { messagePreview } from './message-preview.js'
 test('flattens text and named blocks while excluding attachments', () => {
   assert.equal(
     messagePreview(
-      [
-        { type: 'text', text: '  First\nline ' },
-        { type: 'image' },
-        { type: 'tool-call' },
-        { type: 'file' },
-        { type: 'text', text: 'second' },
-      ],
+      [{ type: 'text', text: '  First\nline ' }, { type: 'image' }, { type: 'tool-call' }, { type: 'file' }, { type: 'text', text: 'second' }],
       80,
     ),
     'First line [tool-call] second',

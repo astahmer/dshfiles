@@ -15,7 +15,14 @@ import { z } from 'zod'
  * forward signals to the node process it starts.
  */
 
-const failureMarkers = ['did not activate', 'failed to import', 'Failed to load plugins', 'fatal uncaught exception', 'Cannot find module', 'ERR_MODULE_NOT_FOUND']
+const failureMarkers = [
+  'did not activate',
+  'failed to import',
+  'Failed to load plugins',
+  'fatal uncaught exception',
+  'Cannot find module',
+  'ERR_MODULE_NOT_FOUND',
+]
 
 const { values } = parseArgs({
   options: {
@@ -28,7 +35,9 @@ const { values } = parseArgs({
 
 const expectedNode = `v${readFileSync(join(import.meta.dirname, '../.node-version'), 'utf8').trim()}`
 if (process.version !== expectedNode) {
-  console.error(`dsh must run on the official Node build ${expectedNode}, not ${process.version}. Run: fnm exec --using=${expectedNode.slice(1)} node scripts/profile-boot.ts`)
+  console.error(
+    `dsh must run on the official Node build ${expectedNode}, not ${process.version}. Run: fnm exec --using=${expectedNode.slice(1)} node scripts/profile-boot.ts`,
+  )
   process.exit(2)
 }
 

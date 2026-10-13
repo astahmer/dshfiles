@@ -65,7 +65,13 @@ const registryOf = () => {
   return registry
 }
 
-const emitActivity = (input: { readonly type: string; readonly summary: string; readonly detail?: string; readonly path: string; readonly level?: string }): void => {
+const emitActivity = (input: {
+  readonly type: string
+  readonly summary: string
+  readonly detail?: string
+  readonly path: string
+  readonly level?: string
+}): void => {
   const at = Date.now()
   hostContext?.emit('dshfiles/activity/event', {
     kind: 'workspace',
@@ -215,11 +221,16 @@ const landThread = async (input: { readonly path: string; readonly sessionId: st
   }
   const message = landingMessage(result)
   const agentAsked =
-    message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding ? await askAgent(input.path, input.sessionId, message).catch(() => false) : false
+    message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
+      ? await askAgent(input.path, input.sessionId, message).catch(() => false)
+      : false
   emitActivity({
     type: `workspace.land_${outcome.status.replaceAll('-', '_')}`,
     level: outcome.status === 'landed' || outcome.status === 'nothing-to-land' ? 'notable' : 'attention',
-    summary: outcome.status === 'landed' ? `Landed ${String(outcome.revisions.length)} revision(s) from ${basename(input.path)} onto ${bookmark}` : `Land ${outcome.status} in ${basename(input.path)}`,
+    summary:
+      outcome.status === 'landed'
+        ? `Landed ${String(outcome.revisions.length)} revision(s) from ${basename(input.path)} onto ${bookmark}`
+        : `Land ${outcome.status} in ${basename(input.path)}`,
     path: input.path,
   })
   return { ...result, agentAsked }
@@ -257,7 +268,11 @@ const threadOfAgent = (execution: ToolRunContext): string => {
   return cwd
 }
 
-const summaryOutputSchema = { type: 'object', additionalProperties: false, properties: { summary: { type: 'string', required: true } } } satisfies ValueSchemaSpec
+const summaryOutputSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: { summary: { type: 'string', required: true } },
+} satisfies ValueSchemaSpec
 
 const summaryOutput = {
   schema: summaryOutputSchema,
@@ -319,7 +334,12 @@ const api = jjIntegrationApi.host({
     const registry = registryOf()
     const isolateByDefault = readSettings().isolateByDefault
     const source = registry.get(WorkspaceId(input.workspaceId))
-    const location = source === undefined ? undefined : await requireThreads().locate(source.path).catch(() => undefined)
+    const location =
+      source === undefined
+        ? undefined
+        : await requireThreads()
+            .locate(source.path)
+            .catch(() => undefined)
     if (location === undefined) return { vcs: 'none', isolated: false, projectWorkspaceId: null, bookmark: null, bookmarks: [], isolateByDefault }
     const bookmarks = await requireThreads().bookmarks(location.workspaceRoot)
     return {
@@ -335,7 +355,11 @@ const api = jjIntegrationApi.host({
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     const projects = []
     for (const workspace of workspaces) {
-      const location = existsSync(workspace.path) ? await requireThreads().locate(workspace.path).catch(() => undefined) : undefined
+      const location = existsSync(workspace.path)
+        ? await requireThreads()
+            .locate(workspace.path)
+            .catch(() => undefined)
+        : undefined
       if (location?.threadName === undefined) projects.push({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })
     }
     return { projects }

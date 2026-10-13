@@ -67,7 +67,10 @@ describe('MCP OAuth discovery', () => {
 
   it('rejects metadata whose issuer differs from the advertised authorization server', async () => {
     const fetcher = routes({
-      'https://mcp.example.test/.well-known/oauth-protected-resource': { resource: 'https://mcp.example.test/', authorization_servers: ['https://auth.example.test'] },
+      'https://mcp.example.test/.well-known/oauth-protected-resource': {
+        resource: 'https://mcp.example.test/',
+        authorization_servers: ['https://auth.example.test'],
+      },
       'https://auth.example.test/.well-known/oauth-authorization-server': { ...authorizationServer, issuer: 'https://evil.example.test' },
     })
     await expect(discoverOAuth('https://mcp.example.test/', fetcher)).rejects.toThrow('authorization metadata')

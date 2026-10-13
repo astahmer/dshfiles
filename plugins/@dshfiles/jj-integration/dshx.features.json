@@ -6,51 +6,34 @@
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
       "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository.",
-      "surfaces": [
-        "host",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "client", "integration"],
       "configuration": [
         {
           "key": "isolateByDefault",
           "defaultValue": "false",
           "constraints": "Initial workspace toggle for new threads in a jj repository.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "bookmark",
           "defaultValue": "main",
           "constraints": "Existing local bookmark new threads start from.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "threadsDirectory",
           "defaultValue": "unset",
           "constraints": "Empty uses <repository>-threads beside the repository.",
-          "coveredBy": [
-            "jj-integration.provision"
-          ]
+          "coveredBy": ["jj-integration.provision"]
         },
         {
           "key": "removeFinishedThreads",
           "defaultValue": "true",
           "constraints": "Removes a thread workspace only when every thread in it is archived and it has no unlanded work.",
-          "coveredBy": [
-            "jj-integration.discard"
-          ]
+          "coveredBy": ["jj-integration.discard"]
         }
       ],
-      "states": [
-        "shared-checkout",
-        "isolated",
-        "finished",
-        "missing"
-      ],
+      "states": ["shared-checkout", "isolated", "finished", "missing"],
       "failureModes": [
         "A folder outside a jj repository offers no bookmark or isolation.",
         "A thread workspace with unlanded work is never removed by the sweep."
@@ -92,32 +75,17 @@
       "id": "land",
       "title": "Land a thread onto the bookmark",
       "summary": "Rebase a thread's described work onto the landing bookmark and move the bookmark forward; conflicts and undescribed revisions are handed back to the thread's agent.",
-      "surfaces": [
-        "host",
-        "tool",
-        "client",
-        "integration"
-      ],
+      "surfaces": ["host", "tool", "client", "integration"],
       "configuration": [
         {
           "key": "askAgentToFixLanding",
           "defaultValue": "true",
           "constraints": "Queues a message to the thread's latest unarchived Session when Land stops.",
-          "coveredBy": [
-            "jj-integration.land-conflict"
-          ]
+          "coveredBy": ["jj-integration.land-conflict"]
         }
       ],
-      "states": [
-        "landed",
-        "nothing-to-land",
-        "needs-description",
-        "conflicted"
-      ],
-      "failureModes": [
-        "A conflict leaves the bookmark where it was.",
-        "Placeholder descriptions (empty or wip) are refused."
-      ],
+      "states": ["landed", "nothing-to-land", "needs-description", "conflicted"],
+      "failureModes": ["A conflict leaves the bookmark where it was.", "Placeholder descriptions (empty or wip) are refused."],
       "externalDependencies": [
         {
           "id": "jj",

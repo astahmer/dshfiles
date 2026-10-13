@@ -19,7 +19,11 @@ describe('createViewedMarks', () => {
     const marks = createViewedMarks({ storage: () => storage })
     marks.toggle(file)
     expect(marks.getSnapshot().has(viewedKey(file))).toBe(true)
-    expect(createViewedMarks({ storage: () => storage }).getSnapshot().has(viewedKey(file))).toBe(true)
+    expect(
+      createViewedMarks({ storage: () => storage })
+        .getSnapshot()
+        .has(viewedKey(file)),
+    ).toBe(true)
     marks.toggle(file)
     expect(marks.getSnapshot().has(viewedKey(file))).toBe(false)
   })

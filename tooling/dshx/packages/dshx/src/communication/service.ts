@@ -212,7 +212,11 @@ const migrateLegacyState = (state: CommunicationStateV1 | CommunicationStateV2 |
       intent: 'notice',
       correlationId: null,
       dedupeKey: null,
-      recipients: message.recipients.map(recipient => ({ principal: recipient.principal, delivery: 'passive', readAt: 'readAt' in recipient ? recipient.readAt : null })),
+      recipients: message.recipients.map(recipient => ({
+        principal: recipient.principal,
+        delivery: 'passive',
+        readAt: 'readAt' in recipient ? recipient.readAt : null,
+      })),
     })),
     subscriptions: state.subscriptions.map(subscription => ({
       principal: subscription.principal,
@@ -381,7 +385,9 @@ export class CommunicationService {
           workspaceSubscribed:
             agent.workspaceTopic !== undefined &&
             agent.workspaceTopic !== null &&
-            state.subscriptions.some(subscription => subscription.topic === agent.workspaceTopic && principalKey(subscription.principal) === `agent:${agent.id}`),
+            state.subscriptions.some(
+              subscription => subscription.topic === agent.workspaceTopic && principalKey(subscription.principal) === `agent:${agent.id}`,
+            ),
         }),
       ),
       topicCount: topics.length,
@@ -601,7 +607,9 @@ export class CommunicationService {
         .filter(message => !acknowledgedMessageIds.has(message.id))
         .filter(message => topic === undefined || (topic === 'inbox' ? message.topic === null : message.topic === topic))
         .slice(-limit)
-      if (!matchingMessages.some(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId && recipient.readAt === null))) {
+      if (
+        !matchingMessages.some(message => message.recipients.some(recipient => principalKey(recipient.principal) === principalId && recipient.readAt === null))
+      ) {
         return { state, value: matchingMessages }
       }
       const matchingMessageIds = new Set(matchingMessages.map(message => message.id))

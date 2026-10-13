@@ -43,11 +43,7 @@ const ThreadRow = (props: {
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <span className="dshx:font-mono dshx:text-sm">{thread.name}</span>
         <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
-        {thread.unlanded.length === 0 ? (
-          <Badge variant="outline">{t('upToDate')}</Badge>
-        ) : (
-          <Badge>{t('unlanded', { count: thread.unlanded.length })}</Badge>
-        )}
+        {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('unlanded', { count: thread.unlanded.length })}</Badge>}
         {thread.behind ? <Badge variant="outline">{t('behind', { bookmark: props.bookmark })}</Badge> : null}
         {conflicted ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
         {thread.finished ? <Badge variant="outline">{t('finished')}</Badge> : null}
@@ -122,9 +118,7 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
       )}
       {repositories.isError ? (
         <Alert variant="destructive">
-          <AlertDescription>
-            {errorMessage(repositories.error, t('loadFailed'))}
-          </AlertDescription>
+          <AlertDescription>{errorMessage(repositories.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       ) : null}
       {repositories.data?.repositories.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p> : null}

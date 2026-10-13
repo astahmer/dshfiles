@@ -1,26 +1,11 @@
-"use client"
+'use client'
 
-import * as React from "react"
-import { cn } from "../../lib/utils.js"
-import { Slider as SliderPrimitive } from "radix-ui"
+import * as React from 'react'
+import { cn } from '../../lib/utils.js'
+import { Slider as SliderPrimitive } from 'radix-ui'
 
-function Slider({
-  className,
-  defaultValue,
-  value,
-  min = 0,
-  max = 100,
-  ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+function Slider({ className, defaultValue, value, min = 0, max = 100, ...props }: React.ComponentProps<typeof SliderPrimitive.Root>) {
+  const _values = React.useMemo(() => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]), [value, defaultValue, min, max])
 
   return (
     <SliderPrimitive.Root
@@ -30,22 +15,20 @@ function Slider({
       min={min}
       max={max}
       className={cn(
-        "dshx:relative dshx:flex dshx:w-full dshx:touch-none dshx:items-center dshx:select-none dshx:data-[disabled]:opacity-50 dshx:data-[orientation=vertical]:h-full dshx:data-[orientation=vertical]:min-h-44 dshx:data-[orientation=vertical]:w-auto dshx:data-[orientation=vertical]:flex-col",
-        className
+        'dshx:relative dshx:flex dshx:w-full dshx:touch-none dshx:items-center dshx:select-none dshx:data-[disabled]:opacity-50 dshx:data-[orientation=vertical]:h-full dshx:data-[orientation=vertical]:min-h-44 dshx:data-[orientation=vertical]:w-auto dshx:data-[orientation=vertical]:flex-col',
+        className,
       )}
       {...props}
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          "dshx:relative dshx:grow dshx:overflow-hidden dshx:rounded-full dshx:bg-muted dshx:data-[orientation=horizontal]:h-1.5 dshx:data-[orientation=horizontal]:w-full dshx:data-[orientation=vertical]:h-full dshx:data-[orientation=vertical]:w-1.5"
+          'dshx:relative dshx:grow dshx:overflow-hidden dshx:rounded-full dshx:bg-muted dshx:data-[orientation=horizontal]:h-1.5 dshx:data-[orientation=horizontal]:w-full dshx:data-[orientation=vertical]:h-full dshx:data-[orientation=vertical]:w-1.5',
         )}
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className={cn(
-            "dshx:absolute dshx:bg-primary dshx:data-[orientation=horizontal]:h-full dshx:data-[orientation=vertical]:w-full"
-          )}
+          className={cn('dshx:absolute dshx:bg-primary dshx:data-[orientation=horizontal]:h-full dshx:data-[orientation=vertical]:w-full')}
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (

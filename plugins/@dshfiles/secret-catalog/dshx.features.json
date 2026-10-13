@@ -5,43 +5,23 @@
       "id": "scoped-alias-catalog",
       "title": "Browse aliases by scope and environment",
       "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker and identify the current host-local scope.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "defaultScope",
           "defaultValue": "all",
           "constraints": "One of all, project, global, or local.",
-          "choices": [
-            "all",
-            "project",
-            "global",
-            "local"
-          ],
-          "coveredBy": [
-            "secret-catalog.scope-filter"
-          ]
+          "choices": ["all", "project", "global", "local"],
+          "coveredBy": ["secret-catalog.scope-filter"]
         },
         {
           "key": "defaultEnvironment",
           "defaultValue": "prod",
           "constraints": "Must match ^[A-Za-z0-9_-]+$.",
-          "coveredBy": [
-            "secret-catalog.scope-filter"
-          ]
+          "coveredBy": ["secret-catalog.scope-filter"]
         }
       ],
-      "states": [
-        "all-scopes",
-        "project-scope",
-        "global-scope",
-        "local-scope",
-        "ambiguous-alias"
-      ],
+      "states": ["all-scopes", "project-scope", "global-scope", "local-scope", "ambiguous-alias"],
       "failureModes": [
         "Duplicate alias and environment across scopes makes value operations unavailable.",
         "A scope without a selected folder cannot claim project-specific results."
@@ -94,48 +74,29 @@
       "id": "bounded-secret-reveal",
       "title": "Reveal and copy an exact secret value",
       "summary": "Reveal one exact alias and environment only on demand, permit a bounded preview/full/hidden cycle, and clear plaintext on timeout, blur, scope change, refresh, or unmount.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
           "key": "revealSeconds",
           "defaultValue": "15",
           "constraints": "Integer from 3 to 300 seconds.",
-          "coveredBy": [
-            "secret-catalog.reveal-expiry"
-          ]
+          "coveredBy": ["secret-catalog.reveal-expiry"]
         },
         {
           "key": "noticeSeconds",
           "defaultValue": "4",
           "constraints": "Integer from 0 to 60 seconds; zero keeps the notice persistent.",
-          "coveredBy": [
-            "secret-catalog.reveal-expiry"
-          ]
+          "coveredBy": ["secret-catalog.reveal-expiry"]
         },
         {
           "key": "hideOnBlur",
           "defaultValue": "true",
           "constraints": "Boolean; clear revealed values when focus leaves the view.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "secret-catalog.reveal-expiry"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["secret-catalog.reveal-expiry"]
         }
       ],
-      "states": [
-        "hidden",
-        "preview",
-        "full",
-        "expired",
-        "cleared"
-      ],
+      "states": ["hidden", "preview", "full", "expired", "cleared"],
       "failureModes": [
         "Secret values are never included in catalog metadata, argv, or notices.",
         "Blur or navigation clears client plaintext before another reveal."
@@ -183,20 +144,9 @@
       "id": "alias-mutations",
       "title": "Create, edit, rename, and remove aliases safely",
       "summary": "Create generated or manual values, edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [],
-      "states": [
-        "editing",
-        "creating",
-        "renaming",
-        "removing-alias",
-        "deleting-vault-item",
-        "collision"
-      ],
+      "states": ["editing", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
       "failureModes": [
         "Duplicate alias/environment collisions are blocked before writes.",
         "Manual values travel through stdin and are not echoed in process output."
@@ -267,21 +217,10 @@
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
       "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment.",
-      "surfaces": [
-        "tool",
-        "host"
-      ],
+      "surfaces": ["tool", "host"],
       "configuration": [],
-      "states": [
-        "metadata-listed",
-        "exact-value-requested",
-        "not-found",
-        "ambiguous"
-      ],
-      "failureModes": [
-        "List never contains secret values.",
-        "Ambiguous aliases and missing scopes fail closed."
-      ],
+      "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous"],
+      "failureModes": ["List never contains secret values.", "Ambiguous aliases and missing scopes fail closed."],
       "externalDependencies": [],
       "verification": [
         {

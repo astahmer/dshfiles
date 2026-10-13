@@ -5,23 +5,10 @@
       "id": "parent-child-question",
       "title": "Ask and answer a child-agent question",
       "summary": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
-      "surfaces": [
-        "tool",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["tool", "host", "storage"],
       "configuration": [],
-      "states": [
-        "pending",
-        "answered",
-        "cancelled",
-        "expired",
-        "interrupted"
-      ],
-      "failureModes": [
-        "A non-parent attempts to answer.",
-        "A duplicate operation carries conflicting answer data."
-      ],
+      "states": ["pending", "answered", "cancelled", "expired", "interrupted"],
+      "failureModes": ["A non-parent attempts to answer.", "A duplicate operation carries conflicting answer data."],
       "externalDependencies": [],
       "verification": [
         {
@@ -64,22 +51,10 @@
       "id": "question-expiry",
       "title": "Resolve question expiry safely",
       "summary": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
-      "surfaces": [
-        "tool",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["tool", "host", "storage"],
       "configuration": [],
-      "states": [
-        "recommended-expiry",
-        "deferred",
-        "cancelled",
-        "expired"
-      ],
-      "failureModes": [
-        "Unsafe path, symlink, or overwrite is rejected.",
-        "Repeated defer does not create duplicate records."
-      ],
+      "states": ["recommended-expiry", "deferred", "cancelled", "expired"],
+      "failureModes": ["Unsafe path, symlink, or overwrite is rejected.", "Repeated defer does not create duplicate records."],
       "externalDependencies": [],
       "verification": [
         {
@@ -117,19 +92,9 @@
       "id": "revision-pinned-feedback",
       "title": "Submit and resolve anchored Markdown feedback",
       "summary": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
-      "surfaces": [
-        "tool",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["tool", "host", "storage"],
       "configuration": [],
-      "states": [
-        "submitted",
-        "accepted",
-        "rejected",
-        "deferred",
-        "stale"
-      ],
+      "states": ["submitted", "accepted", "rejected", "deferred", "stale"],
       "failureModes": [
         "A changed, unreadable, or unsafe Markdown target makes the receipt stale.",
         "Feedback delivery failure is reported without applying stale content."
@@ -182,21 +147,10 @@
       "id": "bounded-batch-resolution",
       "title": "Resolve feedback in bounded batches",
       "summary": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
-      "surfaces": [
-        "tool",
-        "host",
-        "storage"
-      ],
+      "surfaces": ["tool", "host", "storage"],
       "configuration": [],
-      "states": [
-        "batch-accepted",
-        "batch-rejected",
-        "partially-stale"
-      ],
-      "failureModes": [
-        "A batch above the maximum is rejected before mutation.",
-        "A stale target cannot be automatically re-anchored."
-      ],
+      "states": ["batch-accepted", "batch-rejected", "partially-stale"],
+      "failureModes": ["A batch above the maximum is rejected before mutation.", "A stale target cannot be automatically re-anchored."],
       "externalDependencies": [],
       "verification": [
         {

@@ -98,7 +98,11 @@ export const connectDshxApi = async ({
   readonly fetch?: typeof fetch
 }): Promise<DshxApiCall> => {
   const launchUrl = resolveLaunchUrl(url)
-  if (launchUrl === undefined) throw new DshPlatformError('missing-url', 'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.')
+  if (launchUrl === undefined)
+    throw new DshPlatformError(
+      'missing-url',
+      'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.',
+    )
   const parsed = loopbackLaunchUrl(launchUrl)
   let exchange: Response
   try {

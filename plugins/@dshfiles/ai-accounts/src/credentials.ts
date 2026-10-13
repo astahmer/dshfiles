@@ -11,10 +11,7 @@ export const readKeyFromEnv = (name: string): string => {
   return isKeyEnvName(trimmed) ? (process.env[trimmed] ?? '').trim() : ''
 }
 
-export const resolveKeyFromProvider = async (
-  credentials: Pick<CredentialProvider, 'resolve'> | undefined,
-  name: string,
-): Promise<string> => {
+export const resolveKeyFromProvider = async (credentials: Pick<CredentialProvider, 'resolve'> | undefined, name: string): Promise<string> => {
   const trimmed = name.trim()
   if (!isKeyEnvName(trimmed)) return ''
   if (credentials === undefined) return readKeyFromEnv(trimmed)
@@ -22,8 +19,10 @@ export const resolveKeyFromProvider = async (
 }
 
 /** Resolve a key per operation; provider-managed changes need no plugin restart. */
-export const resolveKeyFromContext = (ctx: Context): CredentialValueResolver => name =>
-  resolveKeyFromProvider(ctx.get('credentials'), name)
+export const resolveKeyFromContext =
+  (ctx: Context): CredentialValueResolver =>
+  name =>
+    resolveKeyFromProvider(ctx.get('credentials'), name)
 
 interface DiscoveryRequest {
   readonly baseURL?: string

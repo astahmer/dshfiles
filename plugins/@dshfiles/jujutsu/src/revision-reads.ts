@@ -25,7 +25,8 @@ const fileStatsRowSchema = z.object({
     .max(20_000),
 })
 
-const SAFE_FAILURE_MESSAGE = /^(Choose |Invalid |Registered |Selected |Split |Jujutsu |Repository |Revision |Changed |Remote |Bookmark |Preview |Workspace |Descriptions )/
+const SAFE_FAILURE_MESSAGE =
+  /^(Choose |Invalid |Registered |Selected |Split |Jujutsu |Repository |Revision |Changed |Remote |Bookmark |Preview |Workspace |Descriptions )/
 
 /**
  * Reads that never snapshot the working copy. A commit id names immutable content, so reading it with

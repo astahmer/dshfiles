@@ -84,11 +84,7 @@ export const parseCursorUsage = (raw: unknown): UsageCard => {
   }
 }
 
-export const readCursorUsage = async (
-  keyEnv: string,
-  signal?: AbortSignal,
-  resolveCredential?: CredentialValueResolver,
-): Promise<UsageCard> => {
+export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal, resolveCredential?: CredentialValueResolver): Promise<UsageCard> => {
   if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
   const token = await readCursorToken(keyEnv, resolveCredential)
   if (token === undefined) return emptyUsage('unauthenticated', `Sign in with ${CURSOR_LOGIN_HINT}.`)

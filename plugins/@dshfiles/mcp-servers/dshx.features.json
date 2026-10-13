@@ -5,111 +5,72 @@
       "id": "server-configuration",
       "title": "Manage local and remote MCP server definitions",
       "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "tool",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "tool", "integration"],
       "configuration": [
         {
           "key": "servers",
           "defaultValue": "[]",
           "constraints": "Native Loader Config list with at most 64 server definitions.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "servers[].transport",
           "defaultValue": "required",
           "constraints": "One of stdio or streamable-http.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "servers[].serverName",
           "defaultValue": "required",
           "constraints": "Must match ^[A-Za-z0-9_-]{1,32}$.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "servers[].envRefs",
           "defaultValue": "{}",
           "constraints": "At most 32 environment-variable-to-credential-reference pairs; inline credentials in argv are rejected.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "servers[].url",
           "defaultValue": "required for streamable-http",
           "constraints": "HTTPS URL without embedded username/password, query, or fragment.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "servers[].headerRefs",
           "defaultValue": "{}",
           "constraints": "At most 32 header-to-credential-reference pairs.",
-          "coveredBy": [
-            "mcp-servers.server-validation"
-          ]
+          "coveredBy": ["mcp-servers.server-validation"]
         },
         {
           "key": "connectOnStartup",
           "defaultValue": "true",
           "constraints": "Declared preference is currently not user-writable; Host uses the hard-coded parsed default.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "mcp-servers.settings-boundary"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["mcp-servers.settings-boundary"]
         },
         {
           "key": "toolCallTimeoutSeconds",
           "defaultValue": "30",
           "constraints": "Declared integer preference 5 to 600 seconds; currently not user-writable.",
-          "coveredBy": [
-            "mcp-servers.settings-boundary"
-          ]
+          "coveredBy": ["mcp-servers.settings-boundary"]
         },
         {
           "key": "registrySearch",
           "defaultValue": "true",
           "constraints": "Declared boolean preference currently not user-writable.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "mcp-servers.settings-boundary"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["mcp-servers.settings-boundary"]
         },
         {
           "key": "oauthClientName",
           "defaultValue": "DSH MCP servers",
           "constraints": "Declared trimmed text from 1 to 120 characters; currently not user-writable.",
-          "coveredBy": [
-            "mcp-servers.settings-boundary"
-          ]
+          "coveredBy": ["mcp-servers.settings-boundary"]
         }
       ],
-      "states": [
-        "configured",
-        "enabled",
-        "connected",
-        "disconnected",
-        "failed",
-        "health-unreported"
-      ],
+      "states": ["configured", "enabled", "connected", "disconnected", "failed", "health-unreported"],
       "failureModes": [
         "Malformed URL, inline credential, duplicate tool namespace, or invalid server identifier is rejected.",
         "Client-loaded status never claims a native server health ping was performed."
@@ -143,24 +104,10 @@
       "id": "registry-catalog",
       "title": "Search curated providers and the MCP Registry",
       "summary": "Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "curated",
-        "searching",
-        "results",
-        "empty",
-        "offline",
-        "malformed"
-      ],
-      "failureModes": [
-        "Registry failure or oversized response is shown without adding a server.",
-        "Only safe HTTPS catalog endpoints are requested."
-      ],
+      "states": ["curated", "searching", "results", "empty", "offline", "malformed"],
+      "failureModes": ["Registry failure or oversized response is shown without adding a server.", "Only safe HTTPS catalog endpoints are requested."],
       "externalDependencies": [
         {
           "id": "mcp-registry",
@@ -180,21 +127,9 @@
       "id": "oauth-authorization",
       "title": "Authorize remote OAuth servers",
       "summary": "Discover OAuth metadata, register a client, run PKCE/state validation, exchange and refresh grants, and clear grant state on sign-out.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration",
-        "storage"
-      ],
+      "surfaces": ["client", "host", "integration", "storage"],
       "configuration": [],
-      "states": [
-        "not-used",
-        "needs-sign-in",
-        "pending",
-        "signed-in",
-        "refreshing",
-        "expired"
-      ],
+      "states": ["not-used", "needs-sign-in", "pending", "signed-in", "refreshing", "expired"],
       "failureModes": [
         "Issuer mismatch, invalid state, expired callback, or token refresh failure never yields a signed-in state.",
         "Sign-out clears stored grant data."

@@ -112,7 +112,6 @@ describe('settlement classification', () => {
   it('does not call a tool-use turn empty', () => {
     expect(isEmptyCompletion({ content: [{ type: 'toolCall' }], stopReason: 'toolUse' })).toBe(false)
   })
-
 })
 
 describe('Command Code provider: empty response settles as a classified failure', () => {
@@ -149,7 +148,10 @@ describe('Command Code provider: empty response settles as a classified failure'
   })
 
   it('the control: a CLI answer keeps its content', async () => {
-    const result = await run(ndjson({ type: 'reasoning-delta', text: 'thinking' }, { type: 'text-delta', text: 'done' }, { type: 'finish', finishReason: 'stop' }), GO)
+    const result = await run(
+      ndjson({ type: 'reasoning-delta', text: 'thinking' }, { type: 'text-delta', text: 'done' }, { type: 'finish', finishReason: 'stop' }),
+      GO,
+    )
     expect(result.settled.content.map(block => block.type)).toEqual(['thinking', 'text'])
   })
 })

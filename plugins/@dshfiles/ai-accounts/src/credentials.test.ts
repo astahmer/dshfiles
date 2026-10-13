@@ -35,7 +35,12 @@ describe('resolveKeyFromProvider', () => {
 
   it('refuses invalid reference names before asking the provider', async () => {
     let reads = 0
-    const provider = { resolve: async () => { reads += 1; return undefined } }
+    const provider = {
+      resolve: async () => {
+        reads += 1
+        return undefined
+      },
+    }
 
     expect(await resolveKeyFromProvider(provider, 'PATH')).toBe('')
     expect(reads).toBe(0)

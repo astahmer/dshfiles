@@ -87,7 +87,14 @@ describe('Command Code CLI request', () => {
         stopReason: 'toolUse',
         timestamp: 0,
       },
-      { role: 'toolResult', toolCallId: longId, toolName: 'read_image', content: [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }], isError: false, timestamp: 0 },
+      {
+        role: 'toolResult',
+        toolCallId: longId,
+        toolName: 'read_image',
+        content: [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }],
+        isError: false,
+        timestamp: 0,
+      },
     ] as Message[]
     const { requests } = await run({ respond: answer, messages })
     const params = requests[0]?.body.params as { messages: unknown; system: unknown }
@@ -103,7 +110,9 @@ describe('Command Code CLI request', () => {
       },
       {
         role: 'tool',
-        content: [{ type: 'tool-result', toolCallId: 'cc-1', toolName: 'read_image', output: { type: 'text', value: '(image returned; see the attached image)' } }],
+        content: [
+          { type: 'tool-result', toolCallId: 'cc-1', toolName: 'read_image', output: { type: 'text', value: '(image returned; see the attached image)' } },
+        ],
       },
       {
         role: 'user',
@@ -179,7 +188,12 @@ describe('Command Code CLI stream', () => {
   })
 
   it('reports an in-stream error event', async () => {
-    const { settled } = await run({ respond: () => new Response(ndjson({ type: 'text-delta', text: 'pa' }, { type: 'error', error: { message: 'upstream overloaded', statusCode: 503 } }), { status: 200 }) })
+    const { settled } = await run({
+      respond: () =>
+        new Response(ndjson({ type: 'text-delta', text: 'pa' }, { type: 'error', error: { message: 'upstream overloaded', statusCode: 503 } }), {
+          status: 200,
+        }),
+    })
     expect(settled.errorMessage).toBe('503 upstream overloaded')
   })
 

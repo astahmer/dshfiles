@@ -8,14 +8,14 @@ Cursor sessions run outside DSH.
 
 ## Providers
 
-| Kind           | Login                                                                                                                                                | Model route | Quota                                                                  |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| Codex          | `CODEX_HOME=… codex login`, one shadow home per account                                                                                              | yes         | 5-hour and weekly windows, banked resets                               |
+| Kind           | Login                                                                                                                                                    | Model route | Quota                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
+| Codex          | `CODEX_HOME=… codex login`, one shadow home per account                                                                                                  | yes         | 5-hour and weekly windows, banked resets                               |
 | Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`)                |
-| OpenCode Go    | key in DSH credentials or the Host environment                                                                                                       | yes         | rolling, weekly and monthly windows                                    |
-| Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                       | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)             |
-| GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                            | yes         | unsupported; GitHub exposes no supported subscription quota endpoint   |
-| Cursor         | `cursor-agent login`, or a token in DSH credentials or the Host environment                                                                          | no          | included usage for the billing cycle (undocumented dashboard endpoint) |
+| OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                    |
+| Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)             |
+| GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                                | yes         | unsupported; GitHub exposes no supported subscription quota endpoint   |
+| Cursor         | `cursor-agent login`, or a token in DSH credentials or the Host environment                                                                              | no          | included usage for the billing cycle (undocumented dashboard endpoint) |
 
 GitHub Copilot sign-in opens GitHub's device authorization page and shows a
 short code in AI Accounts. Each account's OAuth grant is stored as a DSH

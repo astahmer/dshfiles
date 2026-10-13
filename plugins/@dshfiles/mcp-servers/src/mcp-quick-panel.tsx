@@ -136,7 +136,12 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
           <InputGroupAddon>
             <SearchIcon className="dshx:size-3.5" />
           </InputGroupAddon>
-          <InputGroupInput aria-label={t('quickPanelSearch')} onChange={event => setSearch(event.currentTarget.value)} placeholder={t('quickPanelSearch')} value={search} />
+          <InputGroupInput
+            aria-label={t('quickPanelSearch')}
+            onChange={event => setSearch(event.currentTarget.value)}
+            placeholder={t('quickPanelSearch')}
+            value={search}
+          />
         </InputGroup>
       </div>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
@@ -166,12 +171,20 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                     <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
                       <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', lifecycleDotClassName(server))} />
                       <span className="dshx:truncate">
-                        {server.oauth === 'needs-sign-in' ? t('signInRequired') : `${lifecycleText(server, t)} · ${server.registeredToolCount} ${t('registeredTools')}`}
+                        {server.oauth === 'needs-sign-in'
+                          ? t('signInRequired')
+                          : `${lifecycleText(server, t)} · ${server.registeredToolCount} ${t('registeredTools')}`}
                       </span>
                     </p>
                     {processText ? <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{processText}</p> : null}
                   </div>
-                  <Button aria-label={`${t('edit')} ${server.name}`} disabled={actions.isPending} onClick={() => props.onEdit(server)} size="icon-sm" variant="ghost">
+                  <Button
+                    aria-label={`${t('edit')} ${server.name}`}
+                    disabled={actions.isPending}
+                    onClick={() => props.onEdit(server)}
+                    size="icon-sm"
+                    variant="ghost"
+                  >
                     <PencilIcon className="dshx:size-4" />
                   </Button>
                   {server.oauth === 'needs-sign-in' ? (

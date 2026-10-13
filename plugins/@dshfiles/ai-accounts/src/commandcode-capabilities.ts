@@ -39,7 +39,17 @@ const EFFORT_GROUPS: readonly (readonly [readonly CliEffort[], readonly string[]
   ],
   [
     ['low', 'medium', 'high', 'xhigh'],
-    ['gpt-5.3-codex', 'gpt-5.4', 'gpt-5.5', 'xai/grok-4.6', 'xai/grok-4.7', 'meta/muse-spark-1.1', 'meta/muse-spark-1.2', 'meta/muse-spark-1.2-contributor', 'meta/muse-spark-1.3-contributor'],
+    [
+      'gpt-5.3-codex',
+      'gpt-5.4',
+      'gpt-5.5',
+      'xai/grok-4.6',
+      'xai/grok-4.7',
+      'meta/muse-spark-1.1',
+      'meta/muse-spark-1.2',
+      'meta/muse-spark-1.2-contributor',
+      'meta/muse-spark-1.3-contributor',
+    ],
   ],
   [
     ['low', 'medium', 'high'],
@@ -59,10 +69,22 @@ const EFFORT_GROUPS: readonly (readonly [readonly CliEffort[], readonly string[]
     ],
   ],
   [['low', 'medium', 'high', 'max'], ['stealth/space-bunny-alpha']],
-  [['low', 'medium', 'xhigh'], ['Qwen/Qwen3.8-Max', 'Qwen/Qwen3.8-Max-0902', 'Qwen/Qwen3.8-27B', 'Qwen/Qwen3.8-Flash', 'Qwen/Qwen3.8-Omni-Flash']],
-  [['low', 'high', 'max'], ['deepseek/deepseek-v4-flash-fast', 'moonshotai/Kimi-K3', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3-flashx', 'zai-org/GLM-5.3']],
-  [['off', 'low', 'high', 'max'], ['deepseek/deepseek-v4.1-flash', 'deepseek/deepseek-v4.1-flash-fast']],
-  [['off', 'high', 'max'], ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-flash-vision-exp', 'deepseek/deepseek-v4-pro']],
+  [
+    ['low', 'medium', 'xhigh'],
+    ['Qwen/Qwen3.8-Max', 'Qwen/Qwen3.8-Max-0902', 'Qwen/Qwen3.8-27B', 'Qwen/Qwen3.8-Flash', 'Qwen/Qwen3.8-Omni-Flash'],
+  ],
+  [
+    ['low', 'high', 'max'],
+    ['deepseek/deepseek-v4-flash-fast', 'moonshotai/Kimi-K3', 'z-ai/glm-5.3-flash', 'z-ai/glm-5.3-flashx', 'zai-org/GLM-5.3'],
+  ],
+  [
+    ['off', 'low', 'high', 'max'],
+    ['deepseek/deepseek-v4.1-flash', 'deepseek/deepseek-v4.1-flash-fast'],
+  ],
+  [
+    ['off', 'high', 'max'],
+    ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-flash-vision-exp', 'deepseek/deepseek-v4-pro'],
+  ],
   [['high', 'xhigh'], ['sakana/fugu-ultra']],
   [['high', 'max'], ['zai-org/GLM-5.2']],
 ]

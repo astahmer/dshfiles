@@ -2,7 +2,15 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { activityIngestSchema, activityStateSchema, type ActivityEvent, type ActivityFilter, type ActivityIngest, type ActivityPage, type ActivityState } from './types.js'
+import {
+  activityIngestSchema,
+  activityStateSchema,
+  type ActivityEvent,
+  type ActivityFilter,
+  type ActivityIngest,
+  type ActivityPage,
+  type ActivityState,
+} from './types.js'
 import { condenseEvents } from './condensation.js'
 
 const MAX_EVENTS = 5000
@@ -162,7 +170,10 @@ export class ActivityTimelineService {
 
   async attention(limit = 20): Promise<readonly ActivityEvent[]> {
     const state = await this.#readState()
-    return state.events.filter(event => event.level === 'attention').slice(-Math.max(1, Math.min(100, limit))).reverse()
+    return state.events
+      .filter(event => event.level === 'attention')
+      .slice(-Math.max(1, Math.min(100, limit)))
+      .reverse()
   }
 
   async event(id: string): Promise<ActivityEvent> {
@@ -180,7 +191,13 @@ export class ActivityTimelineService {
     return state.events.filter(candidate => candidate.correlationId === event.correlationId).slice(-Math.max(1, Math.min(100, limit)))
   }
 
-  async stats(): Promise<{ readonly retained: number; readonly ingested: number; readonly duplicates: number; readonly attention: number; readonly sources: Readonly<Record<string, number>> }> {
+  async stats(): Promise<{
+    readonly retained: number
+    readonly ingested: number
+    readonly duplicates: number
+    readonly attention: number
+    readonly sources: Readonly<Record<string, number>>
+  }> {
     const state = await this.#readState()
     const sources: Record<string, number> = {}
     for (const event of state.events) sources[event.source] = (sources[event.source] ?? 0) + 1

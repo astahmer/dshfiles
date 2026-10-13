@@ -22,7 +22,14 @@ import { ServerEditor, ServerEditorDialog } from './server-editor.js'
 import { blankServerForm, serverFormFromView, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { credentialReferenceSummary, isClientActive, isConnectionToggleBlocked, lifecycleDotClassName, lifecycleText, localProcessText } from './server-status.js'
+import {
+  credentialReferenceSummary,
+  isClientActive,
+  isConnectionToggleBlocked,
+  lifecycleDotClassName,
+  lifecycleText,
+  localProcessText,
+} from './server-status.js'
 
 interface EditorState {
   readonly key: number
@@ -207,7 +214,9 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
           {server.oauth === 'signed-in' ? <Badge variant="muted">{t('signedIn')}</Badge> : null}
           {server.configuration === 'ready' || server.oauth === 'needs-sign-in' ? null : <Badge variant="warning">{t('needsCredentials')}</Badge>}
         </ItemTitle>
-        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{server.transport === 'stdio' ? server.commandLine : server.url}</ItemDescription>
+        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">
+          {server.transport === 'stdio' ? server.commandLine : server.url}
+        </ItemDescription>
         <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
           <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', lifecycleDotClassName(server))} />
           {lifecycleText(server, t)} · {server.registeredToolCount} {t('registeredTools')}
@@ -241,7 +250,14 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
         <Button disabled={props.busy} onClick={props.onToggleEnabled} size="sm" variant={server.enabled ? 'default' : 'outline'}>
           {server.enabled ? t('disable') : t('enable')}
         </Button>
-        <Button aria-label={t('remove')} className="dshx:text-muted-foreground dshx:hover:text-destructive" disabled={props.busy} onClick={props.onRemove} size="icon-sm" variant="ghost">
+        <Button
+          aria-label={t('remove')}
+          className="dshx:text-muted-foreground dshx:hover:text-destructive"
+          disabled={props.busy}
+          onClick={props.onRemove}
+          size="icon-sm"
+          variant="ghost"
+        >
           <Trash2Icon className="dshx:size-4" />
         </Button>
       </ItemActions>

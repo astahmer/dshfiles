@@ -234,7 +234,15 @@ describe('Secret Catalog metadata and exact alias actions', () => {
   it('renames an alias in its own config before editing it under the new name', async () => {
     const run = vi.fn(async (request: SecretCliRequest) => (request.args[0] === 'print' ? JSON.stringify([{ alias: 'SYNTHETIC_OLD' }]) : ''))
     const operations = createSecretCatalogOperations(run)
-    await operations.update({ alias: 'SYNTHETIC_OLD', newAlias: 'SYNTHETIC_NEW', scope: 'global', cwd: null, environment: 'prod', value: null, source: 'https://example.test' })
+    await operations.update({
+      alias: 'SYNTHETIC_OLD',
+      newAlias: 'SYNTHETIC_NEW',
+      scope: 'global',
+      cwd: null,
+      environment: 'prod',
+      value: null,
+      source: 'https://example.test',
+    })
     expect(run.mock.calls.map(([request]) => request.args)).toEqual([
       ['print', 'global', '--json'],
       ['mv', 'SYNTHETIC_OLD', 'SYNTHETIC_NEW', '--global'],

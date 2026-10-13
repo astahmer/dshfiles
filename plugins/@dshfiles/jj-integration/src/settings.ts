@@ -6,7 +6,9 @@ export const jjIntegrationSettings = defineSettings({
   schema: Schema.object({
     isolateByDefault: Schema.boolean()
       .default(false)
-      .description('Start new threads in a jj repository in their own jj workspace. The workspace toggle above a new thread’s composer overrides it per thread.'),
+      .description(
+        'Start new threads in a jj repository in their own jj workspace. The workspace toggle above a new thread’s composer overrides it per thread.',
+      ),
     bookmark: Schema.string().default('main').description('Bookmark new threads start from and Land advances.'),
     threadsDirectory: Schema.string()
       .default('')

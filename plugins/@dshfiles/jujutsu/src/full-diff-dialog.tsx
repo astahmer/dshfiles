@@ -64,7 +64,14 @@ export const FullDiffDialog = (props: FullDiffDialogProps): JSX.Element => {
             layout={props.layout}
             renderHeaderMetadata={file =>
               file.type === 'deleted' ? null : (
-                <Button aria-label={'Open ' + file.name + ' in editor'} onClick={() => props.onOpenInEditor(file.name)} size="xs" title="Open in editor" type="button" variant="ghost">
+                <Button
+                  aria-label={'Open ' + file.name + ' in editor'}
+                  onClick={() => props.onOpenInEditor(file.name)}
+                  size="xs"
+                  title="Open in editor"
+                  type="button"
+                  variant="ghost"
+                >
                   <FilePenLineIcon />
                   Open
                 </Button>

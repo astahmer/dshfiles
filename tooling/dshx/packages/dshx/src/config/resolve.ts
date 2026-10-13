@@ -198,7 +198,10 @@ function validateConfig(value: unknown, file: string): DshxConfig {
   }
   if (value.build !== undefined) {
     if (!isObject(value.build)) {
-      throw new DshxError('DSHX4004', 'build must be an object.', { file, hint: 'Use build: { sourcemap: true | false, declarations: true | false, minify: true | false }.' })
+      throw new DshxError('DSHX4004', 'build must be an object.', {
+        file,
+        hint: 'Use build: { sourcemap: true | false, declarations: true | false, minify: true | false }.',
+      })
     }
     rejectUnknownKeys(value.build, new Set(['sourcemap', 'declarations', 'minify']), 'build', file)
     if (value.build.sourcemap !== undefined && typeof value.build.sourcemap !== 'boolean') {

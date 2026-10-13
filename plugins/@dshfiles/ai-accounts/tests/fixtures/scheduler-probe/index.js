@@ -25,10 +25,8 @@ const verifyScheduledDelivery = async ctx => {
     const receipt = history.records.find(record => record.prompt === prompt)
     if (receipt !== undefined) {
       const inspection = await ctx.sessionController.inspect(session.sessionId)
-      const event = inspection.events.find(candidate =>
-        candidate.type === 'user/message'
-        && candidate.data?.source?.kind === 'schedule'
-        && JSON.stringify(candidate.data).includes(prompt),
+      const event = inspection.events.find(
+        candidate => candidate.type === 'user/message' && candidate.data?.source?.kind === 'schedule' && JSON.stringify(candidate.data).includes(prompt),
       )
       if (event !== undefined) {
         await writeResult({
@@ -51,8 +49,6 @@ export default {
   name: 'ai-accounts-scheduler-probe',
   inject: ['schedule', 'sessionController'],
   apply: ctx => {
-    void verifyScheduledDelivery(ctx).catch(error =>
-      writeResult({ status: 'failed', errorName: error instanceof Error ? error.name : 'UnknownError' }),
-    )
+    void verifyScheduledDelivery(ctx).catch(error => writeResult({ status: 'failed', errorName: error instanceof Error ? error.name : 'UnknownError' }))
   },
 }

@@ -60,8 +60,11 @@ export default defineHost({
         getCredentials: () => ctx.get('credentials'),
       }),
     )
-    ctx.effect(() => () => {
-      if (hostContext === ctx) hostContext = undefined
-    }, 'secret-catalog tools context')
+    ctx.effect(
+      () => () => {
+        if (hostContext === ctx) hostContext = undefined
+      },
+      'secret-catalog tools context',
+    )
   },
 })

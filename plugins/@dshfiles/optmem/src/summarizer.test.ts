@@ -2,7 +2,14 @@ import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 
 import { optmemSettings } from './settings.ts'
-import { classifyProviderFailure, createLlmSummarizer, createRouteResolver, selectSummaryRoute, type RouteCatalog, type SummarizerPolicy } from './summarizer.ts'
+import {
+  classifyProviderFailure,
+  createLlmSummarizer,
+  createRouteResolver,
+  selectSummaryRoute,
+  type RouteCatalog,
+  type SummarizerPolicy,
+} from './summarizer.ts'
 
 const answer = (text: string): StreamChunk[] => [
   { type: 'block-start', index: 0, blockType: 'text' },

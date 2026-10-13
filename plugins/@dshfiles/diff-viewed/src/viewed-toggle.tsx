@@ -57,7 +57,10 @@ export const ViewedToggle = (props: ViewedToggleProps): JSX.Element | null => {
   const label = props.t(isViewed ? 'markUnviewed' : 'markViewed', { name: file.display })
   return (
     <span className="dshx-root dshx:ms-1 dshx:inline-flex dshx:items-center dshx:gap-2">
-      <span className="dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums" data-diff-viewed="progress">
+      <span
+        className="dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums"
+        data-diff-viewed="progress"
+      >
         <ProgressRing total={files.length} viewed={viewedCount} />
         {props.t('progress', { viewed: viewedCount, total: files.length })}
       </span>

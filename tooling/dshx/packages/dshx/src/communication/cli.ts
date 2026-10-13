@@ -79,10 +79,7 @@ const reportRows = (report: CommunicationDiagnostics): string => {
     report.subscriptions.length === 0
       ? 'No subscriptions.'
       : report.subscriptions
-          .map(
-            subscription =>
-              `${subscription.topic}\t${subscription.principal.kind}:${JSON.stringify(subscription.principal.id)}\t${subscription.delivery}`, 
-          )
+          .map(subscription => `${subscription.topic}\t${subscription.principal.kind}:${JSON.stringify(subscription.principal.id)}\t${subscription.delivery}`)
           .join('\n')
 
   return [
@@ -135,7 +132,8 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       return 0
     }
     if (action === 'subscribe') {
-      if (args.delivery !== undefined) throw new CommunicationError('delivery-retired', 'Communication subscriptions are passive; remove the --delivery option.')
+      if (args.delivery !== undefined)
+        throw new CommunicationError('delivery-retired', 'Communication subscriptions are passive; remove the --delivery option.')
       const subscription = await client.subscribe({ topic: first ?? '' })
       emitResult(args, runtime.io, subscription, `Subscribed ${subscription.principal.id} to ${subscription.topic}; messages stay passive.`)
       return 0

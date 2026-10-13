@@ -464,7 +464,10 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
   }
   const isBundled = (source: string): boolean => bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
   const external = (source: string): boolean => externals.has(source) && !isBundled(source)
-  const supplier = options.shared === undefined ? undefined : await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
+  const supplier =
+    options.shared === undefined
+      ? undefined
+      : await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
   let sheetHash: string | undefined
   const assetsInlineLimit = (): boolean => true
   const output = {
@@ -496,7 +499,15 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         : [SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies })]),
       ...(options.sharedRuntime === undefined
         ? []
-        : [SharedRuntime.supplierPlugin({ packageId: options.packageId, root: paths.root, provide: options.sharedRuntime, outDir: paths.outDir, cssHash: () => sheetHash })]),
+        : [
+            SharedRuntime.supplierPlugin({
+              packageId: options.packageId,
+              root: paths.root,
+              provide: options.sharedRuntime,
+              outDir: paths.outDir,
+              cssHash: () => sheetHash,
+            }),
+          ]),
       clientCssPlugin({
         packageId: options.packageId,
         outDir: paths.outDir,

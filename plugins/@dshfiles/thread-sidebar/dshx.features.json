@@ -5,154 +5,91 @@
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
       "summary": "Group active, pinned, parked, inactive, and archived threads by project; park with sidebar preferences and pin/archive through Host APIs.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
           "key": "threadRowDensity",
           "defaultValue": "compact",
           "constraints": "One of compact or comfortable.",
-          "choices": [
-            "compact",
-            "comfortable"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["compact", "comfortable"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowProject",
           "defaultValue": "true",
           "constraints": "Boolean; show project labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowProjectColor",
           "defaultValue": "true",
           "constraints": "Boolean; color project labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowTitle",
           "defaultValue": "true",
           "constraints": "Boolean; show thread titles.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowMachine",
           "defaultValue": "true",
           "constraints": "Boolean; show machine labels.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowPath",
           "defaultValue": "false",
           "constraints": "Boolean; show workspace paths.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowTime",
           "defaultValue": "true",
           "constraints": "Boolean; show thread activity time.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "threadRowStatusDot",
           "defaultValue": "true",
           "constraints": "Boolean; show thread status indicator.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "attentionColors",
           "defaultValue": "{\"approvalNeeded\":\"warning\",\"inputNeeded\":\"info\",\"turnFinished\":\"success\"}",
           "constraints": "Each status independently chooses one of muted, primary, info, success, warning, or danger semantic colors.",
-          "coveredBy": [
-            "thread-sidebar.attention-colors"
-          ]
+          "coveredBy": ["thread-sidebar.attention-colors"]
         },
         {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
           "constraints": "Parked session IDs in sidebar preferences; not updated through Host session attention.",
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "applyActionsToChildThreads",
           "defaultValue": "true",
           "constraints": "Boolean; apply manual actions to every descendant when acting on a parent thread.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.classification"]
         },
         {
           "key": "collapsedSections",
           "defaultValue": "[archived]",
           "constraints": "Section ID list; archived is collapsed by default.",
-          "coveredBy": [
-            "thread-sidebar.classification"
-          ]
+          "coveredBy": ["thread-sidebar.classification"]
         }
       ],
-      "states": [
-        "active",
-        "pinned",
-        "parked",
-        "inactive",
-        "archived"
-      ],
+      "states": ["active", "pinned", "parked", "inactive", "archived"],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
         "Activity uses session metadata timestamps and may reflect metadata updates."
@@ -216,41 +153,23 @@
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
       "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread without restoring it.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "archiveUndoEnabled",
           "defaultValue": "true",
           "constraints": "Boolean; show or hide manual archive undo notices.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.archive-undo-preferences"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         },
         {
           "key": "archiveUndoDurationSeconds",
           "defaultValue": "5",
           "constraints": "Integer from 1 through 30 seconds.",
-          "coveredBy": [
-            "thread-sidebar.archive-undo-preferences"
-          ]
+          "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         }
       ],
-      "states": [
-        "archived",
-        "undo-available",
-        "archived-open",
-        "restored",
-        "restore-failed"
-      ],
+      "states": ["archived", "undo-available", "archived-open", "restored", "restore-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
         "A partial restore reports failure without hiding the remaining archive state.",
@@ -275,99 +194,60 @@
       "id": "thread-list-views",
       "title": "Configure saved thread views",
       "summary": "Group and filter thread rows, create named tabs with saved presets, reorder or disable views, and hide quick controls.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [
         {
           "key": "groupBy",
           "defaultValue": "status",
           "constraints": "Browser-local view preference: project, date, status, or none.",
-          "choices": [
-            "project",
-            "date",
-            "status",
-            "none"
-          ],
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "choices": ["project", "date", "status", "none"],
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "statusFilter",
           "defaultValue": "all",
           "constraints": "Browser-local view preference: all, working, attention, or archived.",
-          "choices": [
-            "all",
-            "working",
-            "attention",
-            "archived"
-          ],
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "choices": ["all", "working", "attention", "archived"],
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "sourceFilter",
           "defaultValue": "all",
           "constraints": "Browser-local view preference: all, main threads, or subagent threads.",
-          "choices": [
-            "all",
-            "main",
-            "subagents"
-          ],
-          "coveredBy": [
-            "thread-sidebar.view-controls"
-          ]
+          "choices": ["all", "main", "subagents"],
+          "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"all\",\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"working\",\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "activeViewId",
           "defaultValue": "all-threads",
           "constraints": "Browser-local ID of the enabled preset currently selected.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "showGroupControl",
           "defaultValue": "true",
           "constraints": "Boolean; show the quick group control in the sidebar header.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "showFilterControl",
           "defaultValue": "true",
           "constraints": "Boolean; show the quick filter control in the sidebar header.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"all\",\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"working\",\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
-          "coveredBy": [
-            "thread-sidebar.custom-views"
-          ]
+          "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],
       "states": [
@@ -481,92 +361,59 @@
       "id": "idle-archive-policy",
       "title": "Automatically archive eligible idle threads",
       "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "autoArchiveEnabled",
           "defaultValue": "false",
           "constraints": "Boolean; automatic archive is opt-in.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "idleMinutes",
           "defaultValue": "120",
           "constraints": "Integer from 15 to 10080 minutes.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "scanIntervalMinutes",
           "defaultValue": "10",
           "constraints": "Integer from 1 to 120 minutes.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "excludedWorkspaceIds",
           "defaultValue": "[]",
           "constraints": "Workspace ID exclusion list.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         },
         {
           "key": "excludedSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID exclusion list; safety exclusions cannot be bypassed by thread overrides.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive",
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive", "thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "autoArchiveSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID allow-list; enables per-thread auto-archive even when global policy is off.",
-          "coveredBy": [
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "autoArchiveDisabledSessionIds",
           "defaultValue": "[]",
           "constraints": "Session ID deny-list; disables auto-archive for one thread without changing global exclusions.",
-          "coveredBy": [
-            "thread-sidebar.auto-archive-overrides"
-          ]
+          "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
           "key": "workspaceFilter",
           "defaultValue": "null",
           "constraints": "Optional workspace ID used to scope the visible thread list.",
-          "coveredBy": [
-            "thread-sidebar.idle-archive"
-          ]
+          "coveredBy": ["thread-sidebar.idle-archive"]
         }
       ],
-      "states": [
-        "disabled",
-        "eligible",
-        "per-thread-enabled",
-        "per-thread-disabled",
-        "excluded",
-        "archived",
-        "archive-failed"
-      ],
+      "states": ["disabled", "eligible", "per-thread-enabled", "per-thread-disabled", "excluded", "archived", "archive-failed"],
       "failureModes": [
         "Running, blank, pinned, parked, or excluded sessions are never automatically archived.",
         "Per-thread enable still respects session and workspace safety exclusions.",
@@ -615,15 +462,9 @@
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
       "summary": "Mark a thread unread from the sidebar and clear that marker when the thread is opened.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "read",
-        "manual-unread"
-      ],
+      "states": ["read", "manual-unread"],
       "failureModes": [
         "Manual unread is a per-thread sidebar preference; it does not read or change Host attention state.",
         "Opening a thread clears its manual unread marker without clearing another thread's marker."
@@ -647,113 +488,69 @@
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",
-      "surfaces": [
-        "client",
-        "settings",
-        "storage"
-      ],
+      "surfaces": ["client", "settings", "storage"],
       "configuration": [
         {
           "key": "headerMode",
           "defaultValue": "compact",
           "constraints": "One of compact or expanded.",
-          "choices": [
-            "compact",
-            "expanded"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["compact", "expanded"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hideBrandLogo",
           "defaultValue": "false",
           "constraints": "Boolean; hide the brand logo.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "navigationDensity",
           "defaultValue": "compact",
           "constraints": "One of compact or comfortable.",
-          "choices": [
-            "compact",
-            "comfortable"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["compact", "comfortable"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "navigationOverflow",
           "defaultValue": "scroll-menu",
           "constraints": "One of scroll, menu, or scroll-menu.",
-          "choices": [
-            "scroll",
-            "menu",
-            "scroll-menu"
-          ],
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "choices": ["scroll", "menu", "scroll-menu"],
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "headerRegionHeight",
           "defaultValue": "null",
           "constraints": "Optional persisted pixel height.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "headerOrder",
           "defaultValue": "[]",
           "constraints": "Ordered header item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hiddenHeaderIds",
           "defaultValue": "[]",
           "constraints": "Hidden header item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "footerOrder",
           "defaultValue": "[]",
           "constraints": "Ordered footer item ID list.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         },
         {
           "key": "hiddenFooterIds",
           "defaultValue": "[]",
           "constraints": "Hidden footer item ID list; default includes More.",
-          "coveredBy": [
-            "thread-sidebar.navigation-layout"
-          ]
+          "coveredBy": ["thread-sidebar.navigation-layout"]
         }
       ],
-      "states": [
-        "compact",
-        "expanded",
-        "scroll-overflow",
-        "menu-overflow",
-        "custom-order"
-      ],
-      "failureModes": [
-        "Unknown item IDs do not create phantom navigation entries.",
-        "Persisted layout values fall back to safe defaults when invalid."
-      ],
+      "states": ["compact", "expanded", "scroll-overflow", "menu-overflow", "custom-order"],
+      "failureModes": ["Unknown item IDs do not create phantom navigation entries.", "Persisted layout values fall back to safe defaults when invalid."],
       "externalDependencies": [],
       "verification": [
         {
@@ -797,70 +594,46 @@
       "id": "palette-search-history",
       "title": "Search threads, files, and recent navigation",
       "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
           "key": "paletteRecentLimit",
           "defaultValue": "20",
           "constraints": "Integer from 5 to 100 recent entries.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "paletteChord",
           "defaultValue": "primary+KeyK",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "fileSearchChord",
           "defaultValue": "primary+KeyP",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "threadSearchChord",
           "defaultValue": "null",
           "constraints": "Optional persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "backChord",
           "defaultValue": "primary+BracketLeft",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         },
         {
           "key": "forwardChord",
           "defaultValue": "primary+BracketRight",
           "constraints": "Persisted keyboard chord string.",
-          "coveredBy": [
-            "thread-sidebar.palette-search"
-          ]
+          "coveredBy": ["thread-sidebar.palette-search"]
         }
       ],
-      "states": [
-        "closed",
-        "searching-threads",
-        "searching-files",
-        "history-back",
-        "history-forward"
-      ],
+      "states": ["closed", "searching-threads", "searching-files", "history-back", "history-forward"],
       "failureModes": [
         "Conflicting key chords are reported rather than silently stealing another shortcut.",
         "Unsupported URL routes are not treated as navigable thread state."
@@ -907,32 +680,17 @@
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
       "summary": "Expand recursive child sessions with inherited workspace context and copy credential-free thread URLs.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
           "key": "maxChildren",
           "defaultValue": "3",
           "constraints": "Integer from 1 to 50 children per level.",
-          "coveredBy": [
-            "thread-sidebar.children-links"
-          ]
+          "coveredBy": ["thread-sidebar.children-links"]
         }
       ],
-      "states": [
-        "collapsed",
-        "expanded",
-        "nested",
-        "copied"
-      ],
-      "failureModes": [
-        "Child chains preserve inherited workspace identity.",
-        "Copied links omit credentials and unsupported path-based routes."
-      ],
+      "states": ["collapsed", "expanded", "nested", "copied"],
+      "failureModes": ["Child chains preserve inherited workspace identity.", "Copied links omit credentials and unsupported path-based routes."],
       "externalDependencies": [],
       "verification": [
         {
@@ -994,20 +752,9 @@
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
       "summary": "Expose pin, park, snooze, archive, and restore actions beside the conversation header and honor child-thread action preferences.",
-      "surfaces": [
-        "client",
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "active",
-        "pinned",
-        "parked",
-        "snoozed",
-        "archived"
-      ],
+      "states": ["active", "pinned", "parked", "snoozed", "archived"],
       "failureModes": [
         "Blank sessions have no header actions.",
         "Running sessions cannot be parked or archived.",
@@ -1056,19 +803,9 @@
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
       "summary": "Detect pending host-side plugin updates and ask for explicit confirmation before handing off a restart when the supervisor supports it.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "unchanged",
-        "client-only-update",
-        "host-update-pending",
-        "confirmation-required",
-        "restarting"
-      ],
+      "states": ["unchanged", "client-only-update", "host-update-pending", "confirmation-required", "restarting"],
       "failureModes": [
         "No restart is requested for unchanged or client-only bundles.",
         "Missing supervisor handoff is reported without restarting the user instance."
@@ -1104,23 +841,10 @@
       "id": "thread-reference-mention",
       "title": "Insert cross-session references into the composer",
       "summary": "Resolve a target Host session and insert its native reference chip at the active composer’s captured selection.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "captured",
-        "resolving",
-        "inserted",
-        "unavailable",
-        "failed"
-      ],
-      "failureModes": [
-        "Unresolvable targets and canceled requests never change the draft.",
-        "Error diagnostics expose only bounded, non-sensitive fields."
-      ],
+      "states": ["captured", "resolving", "inserted", "unavailable", "failed"],
+      "failureModes": ["Unresolvable targets and canceled requests never change the draft.", "Error diagnostics expose only bounded, non-sensitive fields."],
       "externalDependencies": [],
       "verification": [
         {

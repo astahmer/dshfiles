@@ -10,7 +10,12 @@ import {
   type CommunicationPrincipal,
   type CommunicationService,
 } from '@dshfiles/dshx/communication'
-import { postMessageReceiptSchema, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput, type AgentCommunicationSubscriptionInput } from './api.js'
+import {
+  postMessageReceiptSchema,
+  type AgentCommunicationBrowseInput,
+  type AgentCommunicationPostInput,
+  type AgentCommunicationSubscriptionInput,
+} from './api.js'
 
 export const createAgentCommunicationOperations = (input: {
   readonly service: () => CommunicationService

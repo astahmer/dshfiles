@@ -2,7 +2,7 @@
   "name": "@dshfiles/jj-integration",
   "version": "0.1.0",
   "private": true,
-  "description": "One jj workspace per thread, chosen above a new thread\u2019s composer, and a Land button that rebases a thread\u2019s work onto main.",
+  "description": "One jj workspace per thread, chosen above a new thread’s composer, and a Land button that rebases a thread’s work onto main.",
   "files": [
     "dist",
     "cordis.patch.yml"

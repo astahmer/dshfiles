@@ -151,7 +151,12 @@ const hostServices = (ctx: Context): HostServices => {
         timeoutMs: () => currentSettings().summarizerTimeoutMs,
         onRouteUnusable: (route, reason) => {
           unusableRoutes.set(route, { until: Date.now() + routeCooldownMs, reason })
-          ctx.logger.warn('optmem: summary route %s was rejected for configuration reasons; skipping it for %d minutes: %s', route, routeCooldownMs / 60_000, reason)
+          ctx.logger.warn(
+            'optmem: summary route %s was rejected for configuration reasons; skipping it for %d minutes: %s',
+            route,
+            routeCooldownMs / 60_000,
+            reason,
+          )
         },
         invalidateRoute: routes.invalidate,
       }),

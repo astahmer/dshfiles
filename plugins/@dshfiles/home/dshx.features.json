@@ -6,48 +6,34 @@
       "id": "home-screen",
       "title": "New thread screen branding and shortcuts",
       "summary": "Replaces the DeepSeek mark and headline on the New thread screen and lists the project's recent threads and thread workspaces with work to land.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [
         {
           "key": "mark",
           "defaultValue": "none",
           "constraints": "none, text or image.",
-          "coveredBy": [
-            "home.browser-journey"
-          ]
+          "coveredBy": ["home.browser-journey"]
         },
         {
           "key": "headline",
           "defaultValue": "{project}",
           "constraints": "Empty keeps the DeepSeek headline.",
-          "coveredBy": [
-            "home.browser-journey"
-          ]
+          "coveredBy": ["home.browser-journey"]
         },
         {
           "key": "showRecentThreads",
           "defaultValue": "true",
           "constraints": "Up to three unarchived threads of the selected project.",
-          "coveredBy": [
-            "home.browser-journey"
-          ]
+          "coveredBy": ["home.browser-journey"]
         },
         {
           "key": "showUnlandedWork",
           "defaultValue": "true",
           "constraints": "Needs jj-integration.",
-          "coveredBy": [
-            "home.browser-journey"
-          ]
+          "coveredBy": ["home.browser-journey"]
         }
       ],
-      "states": [
-        "blank-thread",
-        "project-selected",
-        "no-folder"
-      ],
+      "states": ["blank-thread", "project-selected", "no-folder"],
       "failureModes": [
         "Without jj-integration the unlanded count stays hidden.",
         "The headline hides native elements by CSS class suffix, which a DSH update can rename."

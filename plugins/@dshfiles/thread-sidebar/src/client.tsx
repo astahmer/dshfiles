@@ -794,8 +794,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     [preferences.includeSubagentAttention, sessions],
   )
   const unreadSessionIds = useMemo(
-    () =>
-      new Set(sessions.filter(session => isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
+    () => new Set(sessions.filter(session => isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
     [notificationPreferences, sessions],
   )
 

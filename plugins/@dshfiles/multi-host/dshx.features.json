@@ -5,30 +5,16 @@
       "id": "runtime-directory",
       "title": "Register and identify local DSH runtimes",
       "summary": "Maintain a bounded host/runtime directory with stable runtime identity, tokenized local URLs, discovered workspaces, and sessions.",
-      "surfaces": [
-        "client",
-        "host",
-        "settings",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
           "key": "profile",
           "defaultValue": "inferred",
           "constraints": "Optional trimmed identifier of 1 to 64 characters; if supplied it must match the profile name discovered from the environment/argv.",
-          "coveredBy": [
-            "multi-host.identity-profile"
-          ]
+          "coveredBy": ["multi-host.identity-profile"]
         }
       ],
-      "states": [
-        "unregistered",
-        "registered",
-        "online",
-        "stale",
-        "incompatible"
-      ],
+      "states": ["unregistered", "registered", "online", "stale", "incompatible"],
       "failureModes": [
         "Profile mismatch or runtime identity change rejects registration.",
         "Corrupt or unsupported directory data is left intact and writes are refused."
@@ -51,23 +37,10 @@
       "id": "ssh-runtime-connection",
       "title": "Connect to an SSH-managed runtime",
       "summary": "Attach through a systemd-managed remote DSH unit, verify pinned identity/capabilities, and avoid implicit agent forwarding or untrusted host-key acceptance.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "disconnected",
-        "connecting",
-        "authenticated",
-        "stale",
-        "refused"
-      ],
-      "failureModes": [
-        "Host-key or identity mismatch rejects attachment.",
-        "SSH journal/user service failure does not create a connected runtime."
-      ],
+      "states": ["disconnected", "connecting", "authenticated", "stale", "refused"],
+      "failureModes": ["Host-key or identity mismatch rejects attachment.", "SSH journal/user service failure does not create a connected runtime."],
       "externalDependencies": [
         {
           "id": "ssh-and-systemd",
@@ -92,19 +65,9 @@
       "id": "session-routing",
       "title": "Open workspaces and sessions on the selected runtime",
       "summary": "List workspaces and sessions per runtime, create sessions, and route workspace opening only to the explicitly selected compatible runtime.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "workspace-listed",
-        "session-listed",
-        "creating",
-        "opened",
-        "stale"
-      ],
+      "states": ["workspace-listed", "session-listed", "creating", "opened", "stale"],
       "failureModes": [
         "A capability or version mismatch disables incompatible actions.",
         "An unknown mutation result after a lost reply is inspected and never automatically replayed."
@@ -133,19 +96,9 @@
       "id": "isolated-runtime-views",
       "title": "Open and close runtime views safely",
       "summary": "Open native runtime views in isolated browser origins, enforce bounded expiring leases, and close one or all views without affecting remote runtime data.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "leased",
-        "opened",
-        "popup-blocked",
-        "expired",
-        "released"
-      ],
+      "states": ["leased", "opened", "popup-blocked", "expired", "released"],
       "failureModes": [
         "Popup blocking remains visible and does not claim a view opened.",
         "Lease release failure does not erase or mutate the remote runtime."

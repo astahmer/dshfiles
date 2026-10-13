@@ -112,7 +112,12 @@ export default defineClient({
     )
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(
-        { name: 'conversation.session.header.utilities', id: 'dshfiles-jujutsu-toggle', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        {
+          name: 'conversation.session.header.utilities',
+          id: 'dshfiles-jujutsu-toggle',
+          order: 40,
+          inject: sessionId => ({ sessionId, jujutsu: composerServices }),
+        },
         composerSlot(props => <ConversationHeaderToggle {...props} icon={<PanelGlyph size={16} />} />),
       ),
     )

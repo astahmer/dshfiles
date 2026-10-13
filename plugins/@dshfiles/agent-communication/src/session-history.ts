@@ -6,16 +6,16 @@ const maxHistoryCursorLength = 4096
 const maxHistoryPageSize = 10
 const maxHistorySnippetLength = 280
 
-export const sessionHistorySearchInputSchema = z.object({
-  sessionId: z.string().min(1).max(256),
-  query: z.string().trim().min(1).max(256),
-  limit: z.number().int().min(1).max(10).optional(),
-  cursor: z.string().min(1).max(maxHistoryCursorLength).optional(),
-}).strict()
+export const sessionHistorySearchInputSchema = z
+  .object({
+    sessionId: z.string().min(1).max(256),
+    query: z.string().trim().min(1).max(256),
+    limit: z.number().int().min(1).max(10).optional(),
+    cursor: z.string().min(1).max(maxHistoryCursorLength).optional(),
+  })
+  .strict()
 
-const sessionHistoryEventFilters: NonNullable<SessionEventSearchRequest['filters']> = [
-  { kind: 'type', values: ['user/message', 'assistant/message'] },
-]
+const sessionHistoryEventFilters: NonNullable<SessionEventSearchRequest['filters']> = [{ kind: 'type', values: ['user/message', 'assistant/message'] }]
 
 export const createSessionHistorySearchRequest = (input: {
   readonly sessionId: SessionId

@@ -47,7 +47,10 @@ const hubCardSchema = z.object({
   author: z.string().max(120).nullable().optional(),
   stars: z.number().int().nonnegative().nullable().optional(),
   updated: z.string().max(40).nullable().optional(),
-  publisher: z.object({ avatarUrl: z.string().max(2_048).nullable().optional() }).nullable().optional(),
+  publisher: z
+    .object({ avatarUrl: z.string().max(2_048).nullable().optional() })
+    .nullable()
+    .optional(),
 })
 
 export const hubListResponseSchema = z.object({

@@ -30,7 +30,10 @@ export const activityTimelineApi = defineApi({
   version: 1,
   methods: {
     page: method({ input: pageInputSchema, output: activityPageSchema }),
-    attention: method({ input: z.object({ limit: z.number().int().min(1).max(100).optional() }).strict(), output: z.object({ events: z.array(activityEventSchema).max(100) }).strict() }),
+    attention: method({
+      input: z.object({ limit: z.number().int().min(1).max(100).optional() }).strict(),
+      output: z.object({ events: z.array(activityEventSchema).max(100) }).strict(),
+    }),
     stats: method({ input: z.object({}).strict(), output: statsSchema }),
     event: method({ input: z.object({ eventId: z.string().min(1).max(256) }).strict(), output: activityEventSchema }),
     related: method({

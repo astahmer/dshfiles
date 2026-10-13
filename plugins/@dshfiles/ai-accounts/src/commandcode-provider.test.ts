@@ -82,7 +82,12 @@ describe('Command Code transport selection', () => {
     readonly body: Record<string, unknown> | undefined
   }
 
-  const CLI_ANSWER = ['{"type":"start"}', '{"type":"text-delta","text":"ok"}', '{"type":"finish","finishReason":"stop","totalUsage":{"inputTokens":3,"outputTokens":1}}', ''].join('\n')
+  const CLI_ANSWER = [
+    '{"type":"start"}',
+    '{"type":"text-delta","text":"ok"}',
+    '{"type":"finish","finishReason":"stop","totalUsage":{"inputTokens":3,"outputTokens":1}}',
+    '',
+  ].join('\n')
   const SSE_ANSWER = [
     'data: {"id":"c1","object":"chat.completion.chunk","created":0,"model":"gpt-6-luna","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"},"finish_reason":null}]}',
     'data: {"id":"c1","object":"chat.completion.chunk","created":0,"model":"gpt-6-luna","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}',
@@ -157,7 +162,10 @@ describe('Command Code transport selection', () => {
       respond: url =>
         url.pathname === '/alpha/generate'
           ? new Response(CLI_ANSWER, { status: 200 })
-          : Response.json({ error: { message: "Your Go plan doesn't include API access.", type: 'permission_error', code: 'upgrade_required' } }, { status: 403 }),
+          : Response.json(
+              { error: { message: "Your Go plan doesn't include API access.", type: 'permission_error', code: 'upgrade_required' } },
+              { status: 403 },
+            ),
     })
     expect(captured.map(call => new URL(call.url).pathname)).toEqual(['/provider/v1/chat/completions', '/alpha/generate'])
     expect(settled.stopReason).toBe('stop')
@@ -197,7 +205,12 @@ describe('Command Code key resolution', () => {
 
 describe('Command Code catalog endpoints', () => {
   it('routes a model whose catalog row serves only /messages to the Messages shape', async () => {
-    catalogPayload = { data: [{ id: 'claude-sonnet-5-5', supported_endpoints: ['/messages'] }, { id: 'gpt-6-luna', supported_endpoints: ['/chat/completions', '/responses'] }] } as never
+    catalogPayload = {
+      data: [
+        { id: 'claude-sonnet-5-5', supported_endpoints: ['/messages'] },
+        { id: 'gpt-6-luna', supported_endpoints: ['/chat/completions', '/responses'] },
+      ],
+    } as never
     try {
       const entries = await fetchCommandCodeCatalog({ baseUrl, apiKey: 'typed-key' })
       expect(entries).toEqual([
@@ -228,7 +241,8 @@ describe('Command Code CLI login fallback', () => {
 })
 
 describe('Command Code image request pricing', () => {
-  const image = (width: number, height: number) => ({ type: 'image' as const, attachment: { attachmentId: 'a', mediaType: 'image/png', width, height, bytes: 1 } }) as never
+  const image = (width: number, height: number) =>
+    ({ type: 'image' as const, attachment: { attachmentId: 'a', mediaType: 'image/png', width, height, bytes: 1 } }) as never
 
   it('prices a Claude image at the CLI request size', () => {
     // 3136x1568 is sent at 1568x784: ceil(1568 * 784 / 750) visual tokens.

@@ -83,7 +83,10 @@ test('an unknown revision reports a readable failure instead of the generic Host
 })
 
 test('unexpected errors fall back to a generic message so raw parser or process text never reaches the client', () => {
-  assert.equal(RevisionReads.failure(new Error('ZodError: [{"path":["files"]}]'), 'Could not load revision details.').failure.message, 'Could not load revision details.')
+  assert.equal(
+    RevisionReads.failure(new Error('ZodError: [{"path":["files"]}]'), 'Could not load revision details.').failure.message,
+    'Could not load revision details.',
+  )
   assert.equal(RevisionReads.failure('boom', 'Could not load this repository.').failure.message, 'Could not load this repository.')
   assert.equal(RevisionReads.failure(new Error('Jujutsu command timed out.'), 'fallback').failure.message, 'Jujutsu command timed out.')
 })

@@ -6,21 +6,10 @@
       "id": "credential-redaction",
       "title": "Redact credentials before data reaches persistence",
       "summary": "Remove common credential shapes and caller-supplied secret literals while leaving ordinary code intact.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "unchanged",
-        "redacted",
-        "caller-literal-redacted"
-      ],
-      "failureModes": [
-        "Short literals are ignored to avoid over-redaction.",
-        "Credential-shaped text is removed before storage and indexing."
-      ],
+      "states": ["unchanged", "redacted", "caller-literal-redacted"],
+      "failureModes": ["Short literals are ignored to avoid over-redaction.", "Credential-shaped text is removed before storage and indexing."],
       "externalDependencies": [],
       "verification": [
         {
@@ -41,20 +30,10 @@
       "id": "bounded-utf8-text",
       "title": "Count, clip, and paginate UTF-8 text by bytes",
       "summary": "Measure and bound UTF-8 payloads without splitting a code point and with an explicit truncation marker.",
-      "surfaces": [
-        "host",
-        "integration"
-      ],
+      "surfaces": ["host", "integration"],
       "configuration": [],
-      "states": [
-        "within-limit",
-        "clipped",
-        "paginated"
-      ],
-      "failureModes": [
-        "A multi-byte character is never split by byte clipping.",
-        "Pagination preserves the complete text without gaps."
-      ],
+      "states": ["within-limit", "clipped", "paginated"],
+      "failureModes": ["A multi-byte character is never split by byte clipping.", "Pagination preserves the complete text without gaps."],
       "externalDependencies": [],
       "verification": [
         {
@@ -81,22 +60,10 @@
       "id": "memory-tree-addressing",
       "title": "Address complete nodes in a hierarchical memory tree",
       "summary": "Map level/index addresses to ranges, navigate relatives, identify complete nodes, and find the covering view node deterministically.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "leaf",
-        "complete-node",
-        "partial-node",
-        "covering-view"
-      ],
-      "failureModes": [
-        "Invalid addresses are rejected instead of mapped to a different node.",
-        "Incomplete nodes are never presented as complete summaries."
-      ],
+      "states": ["leaf", "complete-node", "partial-node", "covering-view"],
+      "failureModes": ["Invalid addresses are rejected instead of mapped to a different node.", "Incomplete nodes are never presented as complete summaries."],
       "externalDependencies": [],
       "verification": [
         {
@@ -123,19 +90,9 @@
       "id": "deterministic-view-and-summary",
       "title": "Build deterministic bounded summaries and views",
       "summary": "Merge the most due node pairs first, preserve recent detail, retry summaries under a tighter byte budget, and report compatibility capabilities accurately.",
-      "surfaces": [
-        "host",
-        "storage",
-        "integration"
-      ],
+      "surfaces": ["host", "storage", "integration"],
       "configuration": [],
-      "states": [
-        "fine-grained",
-        "coarsened",
-        "summary-retry",
-        "compatibility",
-        "full-unavailable"
-      ],
+      "states": ["fine-grained", "coarsened", "summary-retry", "compatibility", "full-unavailable"],
       "failureModes": [
         "A summarizer answer that cannot fit is clipped deterministically or rejected if empty.",
         "Full mode reports exactly which runtime hooks are missing."

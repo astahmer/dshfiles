@@ -84,17 +84,14 @@ const openWindow = async (): Promise<void> => {
 }
 
 void app.whenReady().then(async () => {
-  const executable = await resolveDshExecutable(isExecutable, process.env['PATH'] ?? '').catch(
-    (error: unknown) =>
-      fail(
-        `${String(error instanceof Error ? error.message : error)}\n\nThe directory containing dsh is usually added by your shell profile, which a Finder-launched app does not read.`,
-      ),
+  const executable = await resolveDshExecutable(isExecutable, process.env['PATH'] ?? '').catch((error: unknown) =>
+    fail(
+      `${String(error instanceof Error ? error.message : error)}\n\nThe directory containing dsh is usually added by your shell profile, which a Finder-launched app does not read.`,
+    ),
   )
 
   session = await startHost({ profile: PROFILE, executable }).catch((error: unknown) =>
-    fail(
-      `The DSH Host for profile "${PROFILE}" did not start.\n\n${String(error instanceof Error ? error.message : error)}`,
-    ),
+    fail(`The DSH Host for profile "${PROFILE}" did not start.\n\n${String(error instanceof Error ? error.message : error)}`),
   )
 
   await openWindow()

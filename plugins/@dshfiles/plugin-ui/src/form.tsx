@@ -35,7 +35,9 @@ interface LabelledFieldProps {
 }
 
 /** Label, description and error wired to one control by id (`aria-describedby`, `aria-invalid`). */
-const LabelledField = (props: LabelledFieldProps & { readonly children: (control: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: true }) => ReactNode }): JSX.Element => {
+const LabelledField = (
+  props: LabelledFieldProps & { readonly children: (control: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: true }) => ReactNode },
+): JSX.Element => {
   const id = useId()
   const errors = useVisibleErrors()
   const descriptionId = `${id}-description`
@@ -118,7 +120,9 @@ export interface SelectOption<Value extends string> {
   readonly disabled?: boolean
 }
 
-const SelectField = <Value extends string>(props: LabelledFieldProps & { readonly options: readonly SelectOption<Value>[]; readonly placeholder?: string }): JSX.Element => {
+const SelectField = <Value extends string>(
+  props: LabelledFieldProps & { readonly options: readonly SelectOption<Value>[]; readonly placeholder?: string },
+): JSX.Element => {
   const field = useFieldContext<Value>()
   return (
     <LabelledField {...props}>
@@ -153,7 +157,13 @@ const ToggleField = (props: { readonly label: ReactNode; readonly description?: 
   const Control = props.kind === 'checkbox' ? Checkbox : Switch
   return (
     <Field orientation="horizontal">
-      <Control checked={field.state.value} id={id} name={field.name} onBlur={field.handleBlur} onCheckedChange={checked => field.handleChange(checked === true)} />
+      <Control
+        checked={field.state.value}
+        id={id}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onCheckedChange={checked => field.handleChange(checked === true)}
+      />
       <FieldContent>
         <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
         {props.description !== undefined && <FieldDescription>{props.description}</FieldDescription>}

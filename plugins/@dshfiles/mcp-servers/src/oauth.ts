@@ -80,7 +80,12 @@ const protectedResource = async (fetcher: Fetch, server: URL): Promise<oauth.Res
   const options = requestOptions(fetcher, server.href)
   const hint = await resourceMetadataHint(fetcher, server)
   const attempts: (() => Promise<Response>)[] = [
-    ...(hint === undefined ? [] : [() => fetcher(hint.href, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })]),
+    ...(hint === undefined
+      ? []
+      : [
+          () =>
+            fetcher(hint.href, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
+        ]),
     () => oauth.resourceDiscoveryRequest(server, options),
     ...(server.pathname === '/' ? [] : [() => oauth.resourceDiscoveryRequest(new URL(server.origin), options)]),
   ]
@@ -202,7 +207,12 @@ const grantFromToken = (
 }
 
 /** Validates the callback (state, RFC 9207 `iss`) and exchanges its code with the PKCE verifier. */
-export const exchangeCode = async (pending: PendingAuthorization, callbackParameters: URLSearchParams, fetcher: Fetch = fetch, now = Date.now()): Promise<OAuthGrant> => {
+export const exchangeCode = async (
+  pending: PendingAuthorization,
+  callbackParameters: URLSearchParams,
+  fetcher: Fetch = fetch,
+  now = Date.now(),
+): Promise<OAuthGrant> => {
   const as = pending.authorizationServer
   const tokenEndpoint = as.token_endpoint
   if (tokenEndpoint === undefined) throw new Error('The authorization server has no token endpoint.')
@@ -213,7 +223,11 @@ export const exchangeCode = async (pending: PendingAuthorization, callbackParame
     additionalParameters: { resource: pending.resource },
   })
   const token = await oauth.processAuthorizationCodeResponse(as, client, response)
-  return grantFromToken(token, { clientId: pending.clientId, clientSecret: pending.clientSecret, issuer: as.issuer, tokenEndpoint, resource: pending.resource }, now)
+  return grantFromToken(
+    token,
+    { clientId: pending.clientId, clientSecret: pending.clientSecret, issuer: as.issuer, tokenEndpoint, resource: pending.resource },
+    now,
+  )
 }
 
 export const needsRefresh = (grant: OAuthGrant, now = Date.now()): boolean => grant.expiresAt !== undefined && grant.expiresAt - now < REFRESH_MARGIN_MS

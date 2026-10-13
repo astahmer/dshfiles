@@ -5,16 +5,9 @@
       "id": "review-file-markers",
       "title": "Mark review files as viewed",
       "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "unviewed",
-        "viewed",
-        "progress-updated"
-      ],
+      "states": ["unviewed", "viewed", "progress-updated"],
       "failureModes": [
         "An invalid review action URL hides the control.",
         "A malformed or unavailable summary hides progress instead of displaying invented state."
@@ -73,21 +66,10 @@
       "id": "cross-tab-view-state",
       "title": "Retain viewed marks across tabs",
       "summary": "Persist bounded browser-local marks, adopt cross-tab changes, and fall back safely when stored data is corrupt.",
-      "surfaces": [
-        "storage",
-        "client"
-      ],
+      "surfaces": ["storage", "client"],
       "configuration": [],
-      "states": [
-        "stored",
-        "cross-tab-updated",
-        "corrupt-fallback",
-        "retention-evicted"
-      ],
-      "failureModes": [
-        "A full retention cap evicts the oldest mark.",
-        "Corrupt storage initializes the feature empty without crashing the panel."
-      ],
+      "states": ["stored", "cross-tab-updated", "corrupt-fallback", "retention-evicted"],
+      "failureModes": ["A full retention cap evicts the oldest mark.", "Corrupt storage initializes the feature empty without crashing the panel."],
       "externalDependencies": [],
       "verification": [
         {

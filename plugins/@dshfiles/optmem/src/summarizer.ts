@@ -140,8 +140,7 @@ const PERMANENT_PROVIDER_FAILURE =
   /missing ?session|session ?id|x-opencode-session|bad[_ ]request|invalid[_ ](?:request|argument|parameter|model)|unsupported|model not found|no such model|does not exist|unauthorized|forbidden|invalid api key|permission denied/i
 
 /** Permanent configuration failures are separated from transient ones before any retry decision. */
-export const classifyProviderFailure = (message: string): 'permanent' | 'transient' =>
-  PERMANENT_PROVIDER_FAILURE.test(message) ? 'permanent' : 'transient'
+export const classifyProviderFailure = (message: string): 'permanent' | 'transient' => (PERMANENT_PROVIDER_FAILURE.test(message) ? 'permanent' : 'transient')
 
 /** Remembers each thread's route for a minute, so a burst of summaries does not re-list provider models every call. */
 export const createRouteResolver = (options: {
@@ -251,7 +250,13 @@ export const createLlmSummarizer = (options: {
         model: route,
         ...(usage === undefined
           ? {}
-          : { usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, ...(usage.totalTokens === undefined ? {} : { totalTokens: usage.totalTokens }) } }),
+          : {
+              usage: {
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                ...(usage.totalTokens === undefined ? {} : { totalTokens: usage.totalTokens }),
+              },
+            }),
       }
     }
     throw new Error('summary call exhausted the output token budget twice without answer text')

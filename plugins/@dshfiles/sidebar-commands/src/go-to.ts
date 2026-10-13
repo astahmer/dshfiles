@@ -43,7 +43,10 @@ const paletteEntries = <SessionKey extends string>(input: GoToInput<SessionKey>)
   const group = { name: 'actions', label: input.copy.actionsGroup }
   return [
     { option: { id: 'palette:all', label: input.copy.paletteLabel, detail: input.copy.actionDetail, group }, target: { kind: 'palette', mode: 'all' } },
-    { option: { id: 'palette:threads', label: input.copy.threadSearchLabel, detail: input.copy.actionDetail, group }, target: { kind: 'palette', mode: 'threads' } },
+    {
+      option: { id: 'palette:threads', label: input.copy.threadSearchLabel, detail: input.copy.actionDetail, group },
+      target: { kind: 'palette', mode: 'threads' },
+    },
   ]
 }
 

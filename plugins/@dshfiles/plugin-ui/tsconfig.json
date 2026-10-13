@@ -8,23 +8,10 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": [
-      "node",
-      "react",
-      "@dshfiles/dshx/client/env"
-    ],
+    "types": ["node", "react", "@dshfiles/dshx/client/env"],
     "paths": {
-      "@dshfiles/plugin-ui/*": [
-        "./src/*"
-      ]
+      "@dshfiles/plugin-ui/*": ["./src/*"]
     }
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "testing/**/*.tsx",
-    "tests/**/*.ts",
-    "tests/**/*.tsx",
-    "vitest.config.ts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "testing/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts"]
 }

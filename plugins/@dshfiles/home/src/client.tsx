@@ -96,13 +96,16 @@ const HomeStrip = (props: {
     enabled: blank && settings.showUnlandedWork && project !== undefined,
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 30_000, request: () => props.repositories() }).then(
-        result => result.repositories.find(repository => repository.repoRoot === project?.path)?.threads.filter(thread => thread.unlanded.length > 0).length ?? 0,
+        result =>
+          result.repositories.find(repository => repository.repoRoot === project?.path)?.threads.filter(thread => thread.unlanded.length > 0).length ?? 0,
       ),
   })
   if (!blank) return null
   const recentIds = new Set(settings.showRecentThreads && recentKey !== '' ? recentKey.split(',') : [])
   const sessions = props.stores.sessions.list.getSnapshot()
-  const recent = sessions.ids.filter(id => recentIds.has(id)).sort((left, right) => (sessions.byId[right]?.updatedAt ?? 0) - (sessions.byId[left]?.updatedAt ?? 0))
+  const recent = sessions.ids
+    .filter(id => recentIds.has(id))
+    .sort((left, right) => (sessions.byId[right]?.updatedAt ?? 0) - (sessions.byId[left]?.updatedAt ?? 0))
   const toLand = unlanded.data ?? 0
   if (recent.length === 0 && toLand === 0) return null
   return (
@@ -114,7 +117,13 @@ const HomeStrip = (props: {
         </Button>
       ))}
       {toLand > 0 ? (
-        <Button size="sm" variant="outline" className="dshx:ml-auto dshx:h-7 dshx:px-2 dshx:text-xs" title={props.t('openThreadWorkspaces')} onClick={props.openThreadWorkspaces}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="dshx:ml-auto dshx:h-7 dshx:px-2 dshx:text-xs"
+          title={props.t('openThreadWorkspaces')}
+          onClick={props.openThreadWorkspaces}
+        >
           {props.t('unlanded', { count: toLand })}
         </Button>
       ) : null}

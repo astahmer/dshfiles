@@ -163,10 +163,16 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         </CardTitle>
         <CardDescription className="dshx:text-xs">Profile-trusted commands run with argv in this session’s project directory.</CardDescription>
         <CardAction className="dshx:flex dshx:items-center dshx:gap-1">
-          <Button type="button" variant="ghost" size="xs" onClick={() => {
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => {
               runMutation.reset()
               void queryClient.invalidateQueries({ queryKey: sessionKey })
-            }} aria-label="Refresh project checks">
+            }}
+            aria-label="Refresh project checks"
+          >
             <RefreshCwIcon />
             Refresh
           </Button>
@@ -187,7 +193,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         <h3 id="project-action-title" className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">
           Actions
         </h3>
-        {actions.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No trusted actions are configured for this session directory.</p> : null}
+        {actions.length === 0 ? (
+          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No trusted actions are configured for this session directory.</p>
+        ) : null}
         <ItemGroup className="dshx:gap-1">
           {actions.map(action => (
             <Item role="listitem" variant="outline" size="sm" className="dshx:gap-3 dshx:px-3 dshx:py-2" key={action.id}>
@@ -224,8 +232,12 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
                 <ItemDescription className="dshx:line-clamp-none dshx:font-mono dshx:text-xs">
                   {formatTime(receipt.finishedAt)} · {receipt.durationMs} ms{receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}
                 </ItemDescription>
-                <ItemDescription className={receipt.freshness === 'stale' ? 'dshx:text-xs dshx:text-warning' : 'dshx:text-xs'}>{freshnessLabel(receipt)}</ItemDescription>
-                {receipt.failure !== null ? <ItemDescription className="dshx:text-xs dshx:text-destructive">Runner state: {receipt.failure}</ItemDescription> : null}
+                <ItemDescription className={receipt.freshness === 'stale' ? 'dshx:text-xs dshx:text-warning' : 'dshx:text-xs'}>
+                  {freshnessLabel(receipt)}
+                </ItemDescription>
+                {receipt.failure !== null ? (
+                  <ItemDescription className="dshx:text-xs dshx:text-destructive">Runner state: {receipt.failure}</ItemDescription>
+                ) : null}
               </ItemContent>
               <ItemActions className="dshx:self-start">
                 <Badge variant={receiptBadgeVariant(receipt.status)} data-status={receipt.status}>
@@ -244,7 +256,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
         <p className="dshx:text-xs dshx:text-muted-foreground">
           The Host records hooks that ran. It has no durable skipped-hook event, so skipped and unsupported hooks cannot be attributed here.
         </p>
-        {hooks.length === 0 ? <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this session.</p> : null}
+        {hooks.length === 0 ? (
+          <p className="dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No native hook records are available for this session.</p>
+        ) : null}
         <ItemGroup className="dshx:divide-y dshx:rounded-md dshx:border dshx:empty:hidden">
           {hooks.map(event => (
             <Item role="listitem" size="sm" className="dshx:gap-3 dshx:rounded-none dshx:px-3 dshx:py-2" key={`${event.seq}-${event.kind}`}>

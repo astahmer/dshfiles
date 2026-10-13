@@ -123,10 +123,7 @@ const stopHost = async (child: HostChild): Promise<void> => {
  * A GUI launch inherits a much smaller `PATH` than a shell, so "not found" is the
  * expected failure here rather than an edge case, and it needs its own message.
  */
-export const resolveDshExecutable = async (
-  probe: (directory: string) => Promise<boolean>,
-  pathValue: string,
-): Promise<string> => {
+export const resolveDshExecutable = async (probe: (directory: string) => Promise<boolean>, pathValue: string): Promise<string> => {
   for (const directory of pathValue.split(':')) {
     if (directory === '') continue
     if (await probe(directory)) return `${directory}/dsh`

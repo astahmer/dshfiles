@@ -157,7 +157,12 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           Drafts
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" side="top" className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-96 dshx:flex-col dshx:gap-0 dshx:overflow-y-auto dshx:p-0" aria-label="Saved prompt drafts">
+      <PopoverContent
+        align="start"
+        side="top"
+        className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-96 dshx:flex-col dshx:gap-0 dshx:overflow-y-auto dshx:p-0"
+        aria-label="Saved prompt drafts"
+      >
         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3 dshx:pb-2">
           <h2 className="dshx:text-sm dshx:font-semibold">Saved drafts</h2>
           <p className="dshx:text-xs dshx:text-muted-foreground">Stored in this browser only. Text drafts only; references and files stay in the composer.</p>
@@ -215,7 +220,12 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                 <p className="dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">No sent text prompts are loaded for this session.</p>
               ) : null}
               {sentPrompts.map(prompt => (
-                <CommandItem key={prompt.id} value={`sent-${prompt.id} ${prompt.text}`} disabled={input.phase !== 'plain'} onSelect={() => insertSentPrompt(prompt)}>
+                <CommandItem
+                  key={prompt.id}
+                  value={`sent-${prompt.id} ${prompt.text}`}
+                  disabled={input.phase !== 'plain'}
+                  onSelect={() => insertSentPrompt(prompt)}
+                >
                   <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{previewText(prompt.text)}</span>
                 </CommandItem>
               ))}

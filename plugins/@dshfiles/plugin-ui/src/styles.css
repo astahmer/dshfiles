@@ -80,16 +80,68 @@
  * Not bare `[data-slot]`: the DSH renderer also tags its own outlets (`root`, `sidebar`, `main.conversation`, …).
  */
 @layer base {
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]),
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"])::before,
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"])::after {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ),
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  )::before,
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  )::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
     border: 0 solid var(--dsw-alias-border-l2);
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(button, input, select, textarea, optgroup) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(button, input, select, textarea, optgroup) {
     font: inherit;
     font-feature-settings: inherit;
     letter-spacing: inherit;
@@ -98,40 +150,157 @@
     border-radius: 0;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(button, [role='button'], select, summary) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(button, [role='button'], select, summary) {
     cursor: pointer;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(button, input, select, textarea):disabled {
+  :where(
+      .dshx-root,
+      .dshx-root *,
+      [data-slot$='-content'],
+      [data-slot$='-content'] *,
+      [data-slot$='-overlay'],
+      [data-slot='button'],
+      [data-slot='input'],
+      [data-slot='textarea'],
+      [data-slot='checkbox'],
+      [data-slot='switch'],
+      [data-slot='toggle'],
+      [data-slot$='-trigger']
+    ):is(button, input, select, textarea):disabled {
     cursor: not-allowed;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(h1, h2, h3, h4, h5, h6) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(h1, h2, h3, h4, h5, h6) {
     font-size: inherit;
     font-weight: inherit;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(ol, ul, menu) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(ol, ul, menu) {
     list-style: none;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(a) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(a) {
     color: inherit;
     text-decoration: inherit;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"]):is(table) {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  ):is(table) {
     border-collapse: collapse;
     text-indent: 0;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"])::placeholder {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  )::placeholder {
     color: var(--dsw-alias-label-tertiary);
     opacity: 1;
   }
 
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"])::-webkit-search-cancel-button,
-  :where(.dshx-root, .dshx-root *, [data-slot$="-content"], [data-slot$="-content"] *, [data-slot$="-overlay"], [data-slot="button"], [data-slot="input"], [data-slot="textarea"], [data-slot="checkbox"], [data-slot="switch"], [data-slot="toggle"], [data-slot$="-trigger"])::-webkit-search-decoration {
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  )::-webkit-search-cancel-button,
+  :where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot$='-overlay'],
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot$='-trigger']
+  )::-webkit-search-decoration {
     -webkit-appearance: none;
   }
 

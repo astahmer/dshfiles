@@ -5,17 +5,9 @@
       "id": "palette-search",
       "title": "Search threads and workspace files",
       "summary": "Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "closed",
-        "open-empty",
-        "thread-results",
-        "file-results",
-        "content-results"
-      ],
+      "states": ["closed", "open-empty", "thread-results", "file-results", "content-results"],
       "failureModes": [
         "A thread title or project match is omitted from results.",
         "A file basename match is buried below unrelated path matches.",
@@ -68,21 +60,10 @@
       "id": "action-registry",
       "title": "Register and invoke typed palette actions",
       "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
-      "surfaces": [
-        "client",
-        "api"
-      ],
+      "surfaces": ["client", "api"],
       "configuration": [],
-      "states": [
-        "registered",
-        "available",
-        "selected",
-        "disposed"
-      ],
-      "failureModes": [
-        "A duplicate or unnamespaced action id enters the registry.",
-        "A disposed action remains visible or callable."
-      ],
+      "states": ["registered", "available", "selected", "disposed"],
+      "failureModes": ["A duplicate or unnamespaced action id enters the registry.", "A disposed action remains visible or callable."],
       "externalDependencies": [],
       "verification": [
         {
@@ -130,21 +111,10 @@
       "id": "frecency-ranking",
       "title": "Rank recently used actions and files",
       "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "unused",
-        "recently-used",
-        "frecent",
-        "evicted"
-      ],
-      "failureModes": [
-        "Recent use fails to affect result ordering.",
-        "Usage storage grows beyond its configured bound."
-      ],
+      "states": ["unused", "recently-used", "frecent", "evicted"],
+      "failureModes": ["Recent use fails to affect result ordering.", "Usage storage grows beyond its configured bound."],
       "externalDependencies": [],
       "verification": [
         {
@@ -182,19 +152,10 @@
       "id": "palette-prefix-routing",
       "title": "Route prefixed searches to the right content",
       "summary": "Use distinct palette prefixes to switch between commands, indexed content, and line-numbered file views.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "command-prefix",
-        "content-prefix",
-        "line-prefix"
-      ],
-      "failureModes": [
-        "A recognized prefix searches the wrong content type.",
-        "A line prefix is parsed as ordinary search text."
-      ],
+      "states": ["command-prefix", "content-prefix", "line-prefix"],
+      "failureModes": ["A recognized prefix searches the wrong content type.", "A line prefix is parsed as ordinary search text."],
       "externalDependencies": [],
       "verification": [
         {
@@ -224,18 +185,10 @@
       "id": "performance-budget",
       "title": "Keep palette ranking within the interaction budget",
       "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "open",
-        "query-change",
-        "ranked-results"
-      ],
-      "failureModes": [
-        "Opening or typing exceeds the documented palette interaction budget."
-      ],
+      "states": ["open", "query-change", "ranked-results"],
+      "failureModes": ["Opening or typing exceeds the documented palette interaction budget."],
       "externalDependencies": [],
       "verification": [
         {

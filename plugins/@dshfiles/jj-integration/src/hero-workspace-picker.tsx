@@ -47,14 +47,14 @@ export const HeroWorkspacePicker = (
     <>
       {bar}
       <ProjectFolderPicker
-      projects={registered}
-      directoryPicker={props.ports.directoryPicker}
-      onRegisterWorkspace={props.ports.registerWorkspace}
-      onSelect={selection => void choose(selection).catch(() => props.onClose())}
-      onClose={props.onClose}
-      showNativePicker={false}
-      disabled={projects.isLoading}
-      title={props.t('chooseProject')}
+        projects={registered}
+        directoryPicker={props.ports.directoryPicker}
+        onRegisterWorkspace={props.ports.registerWorkspace}
+        onSelect={selection => void choose(selection).catch(() => props.onClose())}
+        onClose={props.onClose}
+        showNativePicker={false}
+        disabled={projects.isLoading}
+        title={props.t('chooseProject')}
       />
     </>
   )

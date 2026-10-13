@@ -176,7 +176,12 @@ export const serverFormSchema = serverFormValuesSchema.superRefine((values, cont
 })
 
 /** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
-export const catalogServerDraft = (input: { readonly name: string; readonly url: string; readonly oauth: boolean; readonly taken: readonly string[] }): ServerDraft => ({
+export const catalogServerDraft = (input: {
+  readonly name: string
+  readonly url: string
+  readonly oauth: boolean
+  readonly taken: readonly string[]
+}): ServerDraft => ({
   id: '',
   name: input.name,
   serverName: uniqueServerName(input.name, input.taken),

@@ -36,7 +36,10 @@ export default defineClient({
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
+        PanelGlyph,
+      ),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(

@@ -133,7 +133,11 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
   const entries: CatalogEntry[] = parsed.data.data.map(row => {
     const endpoints = row.supported_endpoints
     const messagesOnly = endpoints === undefined ? messagesOnlyById(row.id) : endpoints.includes('/messages') && !endpoints.includes('/chat/completions')
-    return { id: row.id, api: messagesOnly ? 'anthropic-messages' : 'openai-completions', ...(row.context_length === undefined ? {} : { contextWindow: row.context_length }) }
+    return {
+      id: row.id,
+      api: messagesOnly ? 'anthropic-messages' : 'openai-completions',
+      ...(row.context_length === undefined ? {} : { contextWindow: row.context_length }),
+    }
   })
   return entries.length === 0 ? FALLBACK : entries
 }
@@ -180,7 +184,9 @@ export const explainCommandCodeFailure = (message: string): string =>
   /^404\b/.test(message) ? `${message} — Command Code has no such route; check the account's API base URL (expected ${DEFAULT_COMMANDCODE_BASE_URL}).` : message
 
 const explainEvent = (event: AssistantMessageEvent): AssistantMessageEvent =>
-  event.type === 'error' && event.error.errorMessage !== undefined ? { ...event, error: { ...event.error, errorMessage: explainCommandCodeFailure(event.error.errorMessage) } } : event
+  event.type === 'error' && event.error.errorMessage !== undefined
+    ? { ...event, error: { ...event.error, errorMessage: explainCommandCodeFailure(event.error.errorMessage) } }
+    : event
 
 type Transport = 'cli' | 'provider'
 
@@ -229,7 +235,10 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
 
   const viaProviderApi = (model: Model<string>, context: TranscriptContext, streamOptions: SimpleStreamOptions | undefined): AssistantMessageEventStream => {
     const shape = shapes.get(model.id) ?? (messagesOnlyById(model.id) ? 'anthropic-messages' : 'openai-completions')
-    const shaped = shape === 'openai-completions' ? { ...model, api: shape, baseUrl: baseFor(root, shape), compat: { supportsReasoningEffort: true } } : { ...model, api: shape, baseUrl: baseFor(root, shape) }
+    const shaped =
+      shape === 'openai-completions'
+        ? { ...model, api: shape, baseUrl: baseFor(root, shape), compat: { supportsReasoningEffort: true } }
+        : { ...model, api: shape, baseUrl: baseFor(root, shape) }
     return providerApis[shape].streamSimple(shaped, context, streamOptions)
   }
 
@@ -240,7 +249,8 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
    */
   const route = (model: Model<string>, context: TranscriptContext, streamOptions: SimpleStreamOptions | undefined): AssistantMessageEventStream => {
     const target = createAssistantMessageEventStream()
-    const cli = (): AssistantMessageEventStream => streamCommandCodeCli({ root, model, context, ...(streamOptions === undefined ? {} : { options: streamOptions }) })
+    const cli = (): AssistantMessageEventStream =>
+      streamCommandCodeCli({ root, model, context, ...(streamOptions === undefined ? {} : { options: streamOptions }) })
     const forward = async (source: AssistantMessageEventStream, onEarlyRefusal?: () => AssistantMessageEventStream): Promise<void> => {
       const held: AssistantMessageEvent[] = []
       let committed = onEarlyRefusal === undefined

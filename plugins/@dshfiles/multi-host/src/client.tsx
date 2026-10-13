@@ -370,7 +370,6 @@ export const MultiHostPanel = (): JSX.Element => {
     await refresh()
   }
 
-
   const runtimeHostKind = directory.hosts.find(host => host.id === runtimeHostId)?.connector.kind
   const statusLabel = status === null ? (runtimeStatusQuery.isFetching ? 'Checking' : 'Unavailable') : status.ok ? 'Online' : 'Stale'
 
@@ -421,7 +420,15 @@ export const MultiHostPanel = (): JSX.Element => {
               >
                 <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2">
                   <hostForm.AppField name="id">
-                    {field => <field.TextField description="Letters, numbers, dots, underscores, and hyphens." label="Host id" monospace placeholder="workstation" required />}
+                    {field => (
+                      <field.TextField
+                        description="Letters, numbers, dots, underscores, and hyphens."
+                        label="Host id"
+                        monospace
+                        placeholder="workstation"
+                        required
+                      />
+                    )}
                   </hostForm.AppField>
                   <hostForm.AppField name="name">{field => <field.TextField label="Display name" placeholder="Workstation" required />}</hostForm.AppField>
                 </div>
@@ -480,11 +487,15 @@ export const MultiHostPanel = (): JSX.Element => {
                       />
                     )}
                   </runtimeForm.AppField>
-                  <runtimeForm.AppField name="name">{field => <field.TextField label="Runtime name" placeholder="Web profile" required />}</runtimeForm.AppField>
+                  <runtimeForm.AppField name="name">
+                    {field => <field.TextField label="Runtime name" placeholder="Web profile" required />}
+                  </runtimeForm.AppField>
                 </div>
                 {runtimeHostKind === 'local' && (
                   <runtimeForm.AppField name="launchUrl">
-                    {field => <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />}
+                    {field => (
+                      <field.TextField autoComplete="off" label="Tokenized launch URL" placeholder="Paste from DSH startup output" required type="password" />
+                    )}
                   </runtimeForm.AppField>
                 )}
                 {runtimeHostKind === 'ssh' && (
@@ -598,9 +609,7 @@ export const MultiHostPanel = (): JSX.Element => {
                     <span className="dshx:text-xs dshx:text-muted-foreground">{selectedHost?.name ?? selectedRuntime.hostId}</span>
                     <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
                       <h3 className="dshx:text-base dshx:font-semibold">{selectedRuntime.name}</h3>
-                      <Badge variant={status === null ? 'muted' : status.ok ? 'success' : 'warning'}>
-                        {statusLabel}
-                      </Badge>
+                      <Badge variant={status === null ? 'muted' : status.ok ? 'success' : 'warning'}>{statusLabel}</Badge>
                     </div>
                     <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{selectedRuntime.id}</span>
                   </CardHeader>
@@ -637,7 +646,9 @@ export const MultiHostPanel = (): JSX.Element => {
                           }}
                         >
                           <workspaceForm.AppField name="path">
-                            {field => <field.TextField className="dshx:flex-1" label="Open workspace path" monospace placeholder="/absolute/path/on/runtime" required />}
+                            {field => (
+                              <field.TextField className="dshx:flex-1" label="Open workspace path" monospace placeholder="/absolute/path/on/runtime" required />
+                            )}
                           </workspaceForm.AppField>
                           <workspaceForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
                             {([canSubmit, isSubmitting]) => (
@@ -657,7 +668,14 @@ export const MultiHostPanel = (): JSX.Element => {
                           }}
                         >
                           <sessionForm.AppField name="cwd">
-                            {field => <field.TextField className="dshx:flex-1" label="New Session working directory" monospace placeholder="Optional runtime-local path" />}
+                            {field => (
+                              <field.TextField
+                                className="dshx:flex-1"
+                                label="New Session working directory"
+                                monospace
+                                placeholder="Optional runtime-local path"
+                              />
+                            )}
                           </sessionForm.AppField>
                           <sessionForm.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
                             {([canSubmit, isSubmitting]) => (
@@ -678,7 +696,11 @@ export const MultiHostPanel = (): JSX.Element => {
                                   <Fragment key={workspace.workspaceId}>
                                     {index > 0 && <ItemSeparator />}
                                     <Item asChild className="dshx:cursor-pointer dshx:text-left dshx:hover:bg-accent/50" role="listitem" size="sm">
-                                      <button onClick={() => sessionForm.setFieldValue('cwd', workspace.path)} title="Use as Session working directory" type="button">
+                                      <button
+                                        onClick={() => sessionForm.setFieldValue('cwd', workspace.path)}
+                                        title="Use as Session working directory"
+                                        type="button"
+                                      >
                                         <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
                                           <ItemTitle className="dshx:w-full dshx:truncate">{workspace.title}</ItemTitle>
                                           <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{workspace.path}</ItemDescription>
@@ -702,7 +724,9 @@ export const MultiHostPanel = (): JSX.Element => {
                                     <Item role="listitem" size="sm">
                                       <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
                                         <ItemTitle className="dshx:w-full dshx:truncate dshx:font-mono dshx:text-xs">{session.sessionId}</ItemTitle>
-                                        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">{session.cwd ?? 'No working directory'}</ItemDescription>
+                                        <ItemDescription className="dshx:truncate dshx:font-mono dshx:text-xs">
+                                          {session.cwd ?? 'No working directory'}
+                                        </ItemDescription>
                                       </ItemContent>
                                       <ItemActions>
                                         <Badge variant={session.running ? 'info' : 'outline'}>
@@ -722,7 +746,9 @@ export const MultiHostPanel = (): JSX.Element => {
                         {status === null ? <Spinner /> : <TriangleAlertIcon />}
                         <AlertTitle>{status === null ? 'Checking runtime identity…' : status.message}</AlertTitle>
                         <AlertDescription>
-                          {status?.lastSeenAt === undefined ? 'No successful connection yet.' : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
+                          {status?.lastSeenAt === undefined
+                            ? 'No successful connection yet.'
+                            : `Last verified ${new Date(status.lastSeenAt).toLocaleString()}.`}
                         </AlertDescription>
                       </Alert>
                     )}

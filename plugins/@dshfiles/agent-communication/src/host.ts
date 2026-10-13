@@ -298,7 +298,10 @@ const publishTool = defineTool({
     },
     priority: { type: 'string', enum: ['normal', 'urgent'], description: 'Priority is descriptive metadata only; it never changes delivery or execution.' },
     correlationId: { type: 'string', description: 'Optional opaque id shared by related messages so later readers and timelines can group them.' },
-    dedupeKey: { type: 'string', description: 'Optional sender-scoped idempotency key; a retry with the same key returns the stored message instead of storing a duplicate.' },
+    dedupeKey: {
+      type: 'string',
+      description: 'Optional sender-scoped idempotency key; a retry with the same key returns the stored message instead of storing a duplicate.',
+    },
   },
   output: summaryOutput,
   execute: async (args, execution) =>
@@ -316,7 +319,19 @@ const publishTool = defineTool({
           ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
           ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
         })
-        hostContext?.emit('dshfiles/activity/event', { kind: 'communication-message', value: { at: message.createdAt, messageId: message.id, senderId: sender.id, recipientCount: message.recipients.length, intent: message.intent, topic: message.topic, ...(message.correlationId === null ? {} : { correlationId: message.correlationId }), sessionId: sender.id } })
+        hostContext?.emit('dshfiles/activity/event', {
+          kind: 'communication-message',
+          value: {
+            at: message.createdAt,
+            messageId: message.id,
+            senderId: sender.id,
+            recipientCount: message.recipients.length,
+            intent: message.intent,
+            topic: message.topic,
+            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            sessionId: sender.id,
+          },
+        })
         return { summary: `Published ${message.id} to ${message.topic} as ${message.intent}; ${message.recipients.length} subscriber(s) matched.` }
       },
     }),
@@ -336,7 +351,10 @@ const sendTool = defineTool({
     },
     priority: { type: 'string', enum: ['normal', 'urgent'] },
     correlationId: { type: 'string', description: 'Optional opaque id shared by related messages so later readers and timelines can group them.' },
-    dedupeKey: { type: 'string', description: 'Optional sender-scoped idempotency key; a retry with the same key returns the stored message instead of storing a duplicate.' },
+    dedupeKey: {
+      type: 'string',
+      description: 'Optional sender-scoped idempotency key; a retry with the same key returns the stored message instead of storing a duplicate.',
+    },
   },
   output: summaryOutput,
   execute: async (args, execution) =>
@@ -354,7 +372,19 @@ const sendTool = defineTool({
           ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
           ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
         })
-        hostContext?.emit('dshfiles/activity/event', { kind: 'communication-message', value: { at: message.createdAt, messageId: message.id, senderId: sender.id, recipientCount: message.recipients.length, intent: message.intent, topic: message.topic, ...(message.correlationId === null ? {} : { correlationId: message.correlationId }), sessionId: sender.id } })
+        hostContext?.emit('dshfiles/activity/event', {
+          kind: 'communication-message',
+          value: {
+            at: message.createdAt,
+            messageId: message.id,
+            senderId: sender.id,
+            recipientCount: message.recipients.length,
+            intent: message.intent,
+            topic: message.topic,
+            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            sessionId: sender.id,
+          },
+        })
         const recipientLive = hostContext?.agents.list().some(agent => agent.id === args.toAgentId) === true
         return {
           summary: `Sent ${message.id} to ${args.toAgentId} as ${message.intent}; durably stored in the recipient inbox (recipient ${recipientLive ? 'currently live' : 'not currently live; the message stays pending until that Session runs again'}).`,
@@ -564,7 +594,18 @@ const host = defineHost({
   name: 'agent-communication',
   inject: ['agents'],
   apis: [api],
-  tools: [agentListTool, workspaceLookupTool, historySearchTool, topicListTool, subscribeTool, unsubscribeTool, publishTool, sendTool, inboxTool, acknowledgeTool],
+  tools: [
+    agentListTool,
+    workspaceLookupTool,
+    historySearchTool,
+    topicListTool,
+    subscribeTool,
+    unsubscribeTool,
+    publishTool,
+    sendTool,
+    inboxTool,
+    acknowledgeTool,
+  ],
   setup: setupHost,
 })
 

@@ -3,8 +3,7 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 
 export const DEFAULT_HUB_BASE_URL = 'https://dshx.io'
 
-const isLoopbackHost = (hostname: string): boolean =>
-  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
+const isLoopbackHost = (hostname: string): boolean => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
 
 export const validateHubBaseUrl = (value: string): URL => {
   const url = new URL(value)

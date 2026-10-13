@@ -169,9 +169,7 @@ const prepareBootProfiles = async (
       }
     }
     const bundles =
-      options.includeSourceProfileBundles === true
-        ? [...new Set(sourceManifest.dsh.profile.bundles)]
-        : [...new Set([...BASE_BUNDLES, ...expectedBundles])]
+      options.includeSourceProfileBundles === true ? [...new Set(sourceManifest.dsh.profile.bundles)] : [...new Set([...BASE_BUNDLES, ...expectedBundles])]
     for (const bundle of localBundles) dependencies[bundle.packageId] = `link:${resolve(bundle.projectRoot)}`
     const manifest = {
       name: 'dshx-boot-profile',
@@ -189,8 +187,7 @@ const prepareBootProfiles = async (
       homeRoot,
       profileRoot,
       profile: PROFILE_NAME,
-      expectedBundles:
-        options.includeSourceProfileBundles === true ? [bundles[0] ?? BASE_BUNDLES[0], ...bundles.slice(1)] : expectedBundles,
+      expectedBundles: options.includeSourceProfileBundles === true ? [bundles[0] ?? BASE_BUNDLES[0], ...bundles.slice(1)] : expectedBundles,
       async dispose() {
         if (disposed) return
         disposed = true

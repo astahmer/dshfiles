@@ -373,10 +373,7 @@ export interface DshPlatformClient {
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
     }>
-    create(input: {
-      readonly cwd?: string
-      readonly agentPreset?: string
-    }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
+    create(input: { readonly cwd?: string; readonly agentPreset?: string }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
     fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
     rename(sessionId: string, title: string): Promise<{ readonly title: string; readonly seq: number }>
@@ -865,7 +862,11 @@ export interface ConnectDshPlatformClientOptions {
 
 export async function connectDshPlatformClient(options: ConnectDshPlatformClientOptions = {}): Promise<DshPlatformClient> {
   const launchUrl = resolveLaunchUrl(options.url)
-  if (launchUrl === undefined) throw new DshPlatformError('missing-url', 'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.')
+  if (launchUrl === undefined)
+    throw new DshPlatformError(
+      'missing-url',
+      'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.',
+    )
   const parsed = loopbackLaunchUrl(launchUrl)
   const request = options.fetch ?? fetch
   let exchange: Response

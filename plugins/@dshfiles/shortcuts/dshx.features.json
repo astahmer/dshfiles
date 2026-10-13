@@ -5,18 +5,9 @@
       "id": "sidebar-toggle-chord",
       "title": "Toggle the sidebar with the platform primary chord",
       "summary": "Capture primary+B in the browser capture phase, prevent competing shell handling, and choose Meta on Mac or Control elsewhere.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "matched",
-        "unmatched",
-        "already-handled",
-        "composing",
-        "repeated"
-      ],
+      "states": ["matched", "unmatched", "already-handled", "composing", "repeated"],
       "failureModes": [
         "Modifier mismatch leaves the browser and Host behavior untouched.",
         "A missing layout service is surfaced rather than silently swallowed."
@@ -68,21 +59,10 @@
       "id": "panel-selection-chords",
       "title": "Select native panels with keyboard shortcuts",
       "summary": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, and prior event claims.",
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "panel-selected",
-        "editable-target",
-        "unclaimed",
-        "disposed"
-      ],
-      "failureModes": [
-        "Extra Alt or Shift modifiers do not trigger a shortcut.",
-        "Disposal unregisters the capture handler."
-      ],
+      "states": ["panel-selected", "editable-target", "unclaimed", "disposed"],
+      "failureModes": ["Extra Alt or Shift modifiers do not trigger a shortcut.", "Disposal unregisters the capture handler."],
       "externalDependencies": [],
       "verification": [
         {

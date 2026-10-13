@@ -5,14 +5,9 @@
       "id": "dispatch-request-messages",
       "title": "Dispatch agent/request-messages on stock DSH",
       "summary": "Wrap the llm runtime's innermost adapter call so every agent-loop request runs the agent/request-messages waterfall and sends the messages its listeners return, with config, tools and tool history unchanged.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "configuration": [],
-      "states": [
-        "active",
-        "unsupported-runtime"
-      ],
+      "states": ["active", "unsupported-runtime"],
       "failureModes": [
         "A DSH llm runtime without adapterStream reports active=false through request-messages/status and dispatches nothing.",
         "A listener that throws is logged and the derived messages are sent, unless the request was cancelled."

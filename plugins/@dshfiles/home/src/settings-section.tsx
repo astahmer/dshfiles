@@ -22,18 +22,30 @@ export const NewThreadSettings = () => {
   const threads = useSettings(jjIntegrationSettings)
   const value: HomeSettings | undefined = home.value
   if (value === undefined)
-    return <div className="dshx-root dshx:p-1 dshx:text-sm dshx:text-muted-foreground">{home.status === 'loading' ? '…' : (home.error?.message ?? home.status)}</div>
+    return (
+      <div className="dshx-root dshx:p-1 dshx:text-sm dshx:text-muted-foreground">{home.status === 'loading' ? '…' : (home.error?.message ?? home.status)}</div>
+    )
   const toggle = (field: 'showAgentPresetPicker' | 'showRecentThreads' | 'showUnlandedWork' | 'showPreviewBadge') => (
     <Switch checked={value[field]} disabled={!home.writable} onCheckedChange={checked => void home.set(field, checked)} />
   )
   return (
     <div className="dshx-root dshx:flex dshx:flex-col">
       {threads.value === undefined ? null : (
-        <Row title="Own jj workspace by default" description="New threads in a jj repository start isolated in their own workspace; the toggle on the New thread row overrides it.">
-          <Switch checked={threads.value.isolateByDefault} disabled={!threads.writable} onCheckedChange={checked => void threads.set('isolateByDefault', checked)} />
+        <Row
+          title="Own jj workspace by default"
+          description="New threads in a jj repository start isolated in their own workspace; the toggle on the New thread row overrides it."
+        >
+          <Switch
+            checked={threads.value.isolateByDefault}
+            disabled={!threads.writable}
+            onCheckedChange={checked => void threads.set('isolateByDefault', checked)}
+          />
         </Row>
       )}
-      <Row title="Agent preset picker" description="Show “Standard mode…” on the New thread row. Hidden, new threads use the Agent presets page’s New task default.">
+      <Row
+        title="Agent preset picker"
+        description="Show “Standard mode…” on the New thread row. Hidden, new threads use the Agent presets page’s New task default."
+      >
         {toggle('showAgentPresetPicker')}
       </Row>
       <Row title="Recent threads" description="Offer the project’s three most recent threads above the composer.">

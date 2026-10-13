@@ -1,27 +1,18 @@
-"use client"
+'use client'
 
-import * as React from "react"
-import { cn } from "../../lib/utils.js"
-import { Popover as PopoverPrimitive } from "radix-ui"
+import * as React from 'react'
+import { cn } from '../../lib/utils.js'
+import { Popover as PopoverPrimitive } from 'radix-ui'
 
-function Popover({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
-function PopoverTrigger({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
+function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
-function PopoverContent({
-  className,
-  align = "center",
-  sideOffset = 4,
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+function PopoverContent({ className, align = 'center', sideOffset = 4, ...props }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -29,8 +20,8 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "dshx:z-[1100] dshx:max-h-(--radix-popover-content-available-height) dshx:w-72 dshx:origin-(--radix-popover-content-transform-origin) dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:bg-popover dshx:p-4 dshx:text-popover-foreground dshx:shadow-md dshx:outline-hidden dshx:data-[side=bottom]:slide-in-from-top-2 dshx:data-[side=left]:slide-in-from-right-2 dshx:data-[side=right]:slide-in-from-left-2 dshx:data-[side=top]:slide-in-from-bottom-2 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95",
-          className
+          'dshx:z-[1100] dshx:max-h-(--radix-popover-content-available-height) dshx:w-72 dshx:origin-(--radix-popover-content-transform-origin) dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:bg-popover dshx:p-4 dshx:text-popover-foreground dshx:shadow-md dshx:outline-hidden dshx:data-[side=bottom]:slide-in-from-top-2 dshx:data-[side=left]:slide-in-from-right-2 dshx:data-[side=right]:slide-in-from-left-2 dshx:data-[side=top]:slide-in-from-bottom-2 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95',
+          className,
         )}
         {...props}
       />
@@ -38,51 +29,20 @@ function PopoverContent({
   )
 }
 
-function PopoverAnchor({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
+function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
 }
 
-function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="popover-header"
-      className={cn("dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm", className)}
-      {...props}
-    />
-  )
+function PopoverHeader({ className, ...props }: React.ComponentProps<'div'>) {
+  return <div data-slot="popover-header" className={cn('dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm', className)} {...props} />
 }
 
-function PopoverTitle({ className, ...props }: React.ComponentProps<"h2">) {
-  return (
-    <div
-      data-slot="popover-title"
-      className={cn("dshx:font-medium", className)}
-      {...props}
-    />
-  )
+function PopoverTitle({ className, ...props }: React.ComponentProps<'h2'>) {
+  return <div data-slot="popover-title" className={cn('dshx:font-medium', className)} {...props} />
 }
 
-function PopoverDescription({
-  className,
-  ...props
-}: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="popover-description"
-      className={cn("dshx:text-muted-foreground", className)}
-      {...props}
-    />
-  )
+function PopoverDescription({ className, ...props }: React.ComponentProps<'p'>) {
+  return <p data-slot="popover-description" className={cn('dshx:text-muted-foreground', className)} {...props} />
 }
 
-export {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverAnchor,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverDescription,
-}
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor, PopoverHeader, PopoverTitle, PopoverDescription }

@@ -101,7 +101,9 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                 <form.AppField listeners={nameListeners} name="name">
                   {field => <field.TextField label={t('name')} placeholder={t('namePlaceholder')} required />}
                 </form.AppField>
-                <form.AppField name="url">{field => <field.TextField label={t('endpoint')} placeholder="https://example.com/mcp" required type="url" />}</form.AppField>
+                <form.AppField name="url">
+                  {field => <field.TextField label={t('endpoint')} placeholder="https://example.com/mcp" required type="url" />}
+                </form.AppField>
               </div>
               <form.AppField name="oauth">{field => <field.CheckboxField label={t('useOAuth')} />}</form.AppField>
               <Disclosure defaultOpen={values.headerRefs !== '{}'} label={t('advancedHeaders')}>
@@ -235,7 +237,14 @@ export const ServerEditorDialog = (props: {
         <DialogTitle>{props.title ?? props.t('customTitle')}</DialogTitle>
         <DialogDescription>{props.description ?? props.t('customSubtitle')}</DialogDescription>
       </DialogHeader>
-      <ServerEditor bare defaultValues={props.values} onCancel={props.onClose} onSave={props.onSave} t={props.t} {...(props.hint === undefined ? {} : { hint: props.hint })} />
+      <ServerEditor
+        bare
+        defaultValues={props.values}
+        onCancel={props.onClose}
+        onSave={props.onSave}
+        t={props.t}
+        {...(props.hint === undefined ? {} : { hint: props.hint })}
+      />
     </DialogContent>
   </Dialog>
 )

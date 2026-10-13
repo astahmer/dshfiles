@@ -81,7 +81,9 @@ const streamPartSchema = z.discriminatedUnion('type', [
         inputTokens: z.number().optional(),
         outputTokens: z.number().optional(),
         reasoningTokens: z.number().optional(),
-        inputTokenDetails: z.object({ noCacheTokens: z.number().optional(), cacheReadTokens: z.number().optional(), cacheWriteTokens: z.number().optional() }).optional(),
+        inputTokenDetails: z
+          .object({ noCacheTokens: z.number().optional(), cacheReadTokens: z.number().optional(), cacheWriteTokens: z.number().optional() })
+          .optional(),
       })
       .optional(),
   }),
@@ -155,7 +157,9 @@ const toWireMessages = (messages: readonly Message[]): WireMessage[] => {
         typeof message.content === 'string'
           ? [{ type: 'text', text: message.content }]
           : message.content.map(block =>
-              block.type === 'text' ? { type: 'text', text: block.text } : { type: 'image', image: `data:${block.mimeType};base64,${block.data}`, mimeType: block.mimeType },
+              block.type === 'text'
+                ? { type: 'text', text: block.text }
+                : { type: 'image', image: `data:${block.mimeType};base64,${block.data}`, mimeType: block.mimeType },
             )
       if (parts.length > 0) out.push({ role: 'user', content: parts })
       continue
@@ -223,7 +227,12 @@ const requestBody = (model: Model<string>, context: TranscriptContext, options: 
     params: {
       model: model.id,
       messages: toWireMessages(context.messages),
-      tools: getCurrentTools(context.messages).map(tool => ({ type: 'function', name: tool.name, description: tool.description, input_schema: tool.parameters })),
+      tools: getCurrentTools(context.messages).map(tool => ({
+        type: 'function',
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.parameters,
+      })),
       system: system === '' ? '' : [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       max_tokens: options?.maxTokens ?? model.maxTokens,
       stream: true,
@@ -245,7 +254,8 @@ const httpFailure = (status: number, body: string): string => {
   let detail = body.slice(0, 500)
   try {
     const parsed = errorBodySchema.safeParse(JSON.parse(body))
-    if (parsed.success) detail = typeof parsed.data.error === 'string' ? parsed.data.error : [parsed.data.error.code, parsed.data.error.message].filter(Boolean).join(': ')
+    if (parsed.success)
+      detail = typeof parsed.data.error === 'string' ? parsed.data.error : [parsed.data.error.code, parsed.data.error.message].filter(Boolean).join(': ')
   } catch {
     // A non-JSON body is reported as text.
   }

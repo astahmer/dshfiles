@@ -30,7 +30,12 @@ export const SignInNotice = (props: { readonly t: McpServersTranslate; readonly 
   props.actions.authorizationUrl === null ? null : (
     <Alert className={cn('dshx:flex dshx:items-center dshx:gap-3', props.className)} role="status">
       <AlertDescription className="dshx:flex-1">{props.t('signInHint')}</AlertDescription>
-      <a className="dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:underline dshx:underline-offset-4" href={props.actions.authorizationUrl} rel="noopener noreferrer" target="_blank">
+      <a
+        className="dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:underline dshx:underline-offset-4"
+        href={props.actions.authorizationUrl}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
         {props.t('continueSignIn')}
       </a>
       <Button aria-label={props.t('dismiss')} onClick={props.actions.dismissAuthorization} size="icon-xs" variant="ghost">
@@ -49,7 +54,11 @@ const ProviderMark = (props: { readonly id: string }): JSX.Element => {
         icon?.tile === 'light' ? 'dshx:bg-white' : 'dshx:bg-muted dshx:text-muted-foreground',
       )}
     >
-      {icon === undefined ? <GlobeIcon className="dshx:size-5" /> : <img alt="" className="dshx:size-6 dshx:object-contain" src={`data:image/svg+xml,${encodeURIComponent(icon.svg)}`} />}
+      {icon === undefined ? (
+        <GlobeIcon className="dshx:size-5" />
+      ) : (
+        <img alt="" className="dshx:size-6 dshx:object-contain" src={`data:image/svg+xml,${encodeURIComponent(icon.svg)}`} />
+      )}
     </span>
   )
 }
@@ -102,7 +111,9 @@ export const CatalogBrowser = (props: {
   const providerKeys = new Set(providers.map(provider => endpointKey(provider.url)))
   const registryRows =
     registryQuery === trimmed && registry.isSuccess
-      ? registry.data.flatMap(entry => (entry.endpoint === null || providerKeys.has(endpointKey(entry.endpoint)) ? [] : [{ ...entry, endpoint: entry.endpoint }]))
+      ? registry.data.flatMap(entry =>
+          entry.endpoint === null || providerKeys.has(endpointKey(entry.endpoint)) ? [] : [{ ...entry, endpoint: entry.endpoint }],
+        )
       : []
   const showCustom = trimmed === '' || 'custom mcp add your own'.includes(trimmed.toLocaleLowerCase())
 
@@ -116,7 +127,11 @@ export const CatalogBrowser = (props: {
   const addProvider = (provider: Provider): void => {
     if (provider.auth === 'token') {
       props.onCustom({
-        values: blankServerForm({ name: provider.name, endpoint: provider.url, headerRefs: { Authorization: `${provider.id.toUpperCase().replace(/-/g, '_')}_MCP_AUTHORIZATION` } }),
+        values: blankServerForm({
+          name: provider.name,
+          endpoint: provider.url,
+          headerRefs: { Authorization: `${provider.id.toUpperCase().replace(/-/g, '_')}_MCP_AUTHORIZATION` },
+        }),
         hint: t('tokenHint'),
       })
       return
@@ -140,7 +155,10 @@ export const CatalogBrowser = (props: {
       }}
       open={props.open}
     >
-      <DialogContent className="dshx-root dshx:flex dshx:max-h-[min(80vh,40rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-5xl" showCloseButton={false}>
+      <DialogContent
+        className="dshx-root dshx:flex dshx:max-h-[min(80vh,40rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-5xl"
+        showCloseButton={false}
+      >
         <header className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:border-b dshx:px-4 dshx:py-3">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-[1_1_20rem] dshx:items-baseline dshx:gap-3">
             <DialogTitle className="dshx:shrink-0 dshx:text-base">{t('browseTitle')}</DialogTitle>
@@ -150,7 +168,14 @@ export const CatalogBrowser = (props: {
             <InputGroupAddon>
               <SearchIcon />
             </InputGroupAddon>
-            <InputGroupInput aria-label={t('search')} autoFocus maxLength={80} onChange={event => setSearch(event.currentTarget.value)} placeholder={t('search')} value={search} />
+            <InputGroupInput
+              aria-label={t('search')}
+              autoFocus
+              maxLength={80}
+              onChange={event => setSearch(event.currentTarget.value)}
+              placeholder={t('search')}
+              value={search}
+            />
           </InputGroup>
           <Button aria-label={t('close')} onClick={props.onClose} size="icon-sm" variant="ghost">
             <XIcon />
@@ -185,7 +210,12 @@ export const CatalogBrowser = (props: {
                 badge={provider.category}
                 description={provider.description}
                 footer={
-                  <a className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground dshx:underline dshx:underline-offset-4 dshx:hover:text-foreground" href={provider.docsUrl} rel="noopener noreferrer" target="_blank">
+                  <a
+                    className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground dshx:underline dshx:underline-offset-4 dshx:hover:text-foreground"
+                    href={provider.docsUrl}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
                     {t('docs')}
                   </a>
                 }
@@ -210,15 +240,25 @@ export const CatalogBrowser = (props: {
               />
             ))}
             {registry.isFetching ? (
-              <p className="dshx:col-span-full dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-4 dshx:text-xs dshx:text-muted-foreground" role="status">
+              <p
+                className="dshx:col-span-full dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-4 dshx:text-xs dshx:text-muted-foreground"
+                role="status"
+              >
                 <Spinner /> {t('registrySearching')}
               </p>
             ) : null}
-            {!registryEnabled && trimmed.length >= 2 ? <p className="dshx:col-span-full dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{t('registryOff')}</p> : null}
+            {!registryEnabled && trimmed.length >= 2 ? (
+              <p className="dshx:col-span-full dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{t('registryOff')}</p>
+            ) : null}
             {registryEnabled && trimmed.length === 1 && providers.length === 0 ? (
               <p className="dshx:col-span-full dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{t('registryTypeMore')}</p>
             ) : null}
-            {registryEnabled && trimmed.length >= 2 && providers.length === 0 && registryRows.length === 0 && !registry.isFetching && registryQuery === trimmed ? (
+            {registryEnabled &&
+            trimmed.length >= 2 &&
+            providers.length === 0 &&
+            registryRows.length === 0 &&
+            !registry.isFetching &&
+            registryQuery === trimmed ? (
               <p className="dshx:col-span-full dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{t('registryNoMatch')}</p>
             ) : null}
           </div>

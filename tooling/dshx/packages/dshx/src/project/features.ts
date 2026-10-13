@@ -71,7 +71,9 @@ export const featureCatalogIssues = (value: unknown): readonly string[] => {
     for (const option of feature.configuration) {
       const uncovered = option.coveredBy.filter(verificationId => !feature.verification.some(verification => verification.id === verificationId))
       if (uncovered.length > 0) {
-        issues.push(`features.${feature.id}.configuration.${option.key}: coveredBy must refer to verification declared by this feature (${uncovered.join(', ')})`)
+        issues.push(
+          `features.${feature.id}.configuration.${option.key}: coveredBy must refer to verification declared by this feature (${uncovered.join(', ')})`,
+        )
       }
       if (option.choices !== undefined && option.choices.length > 0 && !option.choices.includes(option.defaultValue)) {
         issues.push(`features.${feature.id}.configuration.${option.key}: choices must include defaultValue`)

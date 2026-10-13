@@ -63,7 +63,8 @@ export default defineClient({
 
     const select = createDeferredNavigation({
       isAvailable: isStillAvailable,
-      unavailableMessage: target => translate(target.kind === 'palette' ? 'paletteUnavailable' : target.kind === 'panel' ? 'panelUnavailable' : 'sessionUnavailable'),
+      unavailableMessage: target =>
+        translate(target.kind === 'palette' ? 'paletteUnavailable' : target.kind === 'panel' ? 'panelUnavailable' : 'sessionUnavailable'),
       navigate: open,
       schedule: run => void setTimeout(run, 0),
     })

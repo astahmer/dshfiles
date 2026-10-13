@@ -13,7 +13,12 @@ const executor: JjExecutor = async ({ args, cwd }) => {
 }
 
 const jj = (cwd: string, ...args: string[]): string =>
-  execFileSync('jj', ['--color=never', '--no-pager', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, JJ_CONFIG: '' } })
+  execFileSync('jj', ['--color=never', '--no-pager', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, JJ_CONFIG: '' },
+  })
 
 const bookmarkTarget = (cwd: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'description.first_line()')
 

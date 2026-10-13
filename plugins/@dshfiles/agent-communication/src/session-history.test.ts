@@ -1,11 +1,7 @@
 import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { SessionSearchCursor, type SessionEventSearchPage } from '@deepseek-ai/dsh-session-query'
 import { describe, expect, it } from 'vitest'
-import {
-  createSessionHistorySearchRequest,
-  projectSessionHistoryPage,
-  sessionHistorySearchInputSchema,
-} from './session-history.js'
+import { createSessionHistorySearchRequest, projectSessionHistoryPage, sessionHistorySearchInputSchema } from './session-history.js'
 
 describe('Agent session history search', () => {
   it('validates bounded inputs and normalizes literal queries', () => {
@@ -113,14 +109,18 @@ describe('Agent session history search', () => {
         cwd: '/private/child-workspace',
         isSeeded: false,
       },
-      items: Array.from({ length: 11 }, (_, index) => ({
-        sessionId,
-        seq: SessionSeq(index),
-        type: 'user/message',
-        time: index,
-        surface: 'current',
-        snippet: `message ${index}`,
-      } satisfies SessionEventSearchPage['items'][number])),
+      items: Array.from(
+        { length: 11 },
+        (_, index) =>
+          ({
+            sessionId,
+            seq: SessionSeq(index),
+            type: 'user/message',
+            time: index,
+            surface: 'current',
+            snippet: `message ${index}`,
+          }) satisfies SessionEventSearchPage['items'][number],
+      ),
       nextCursor: SessionSearchCursor('next-page'),
     }
 

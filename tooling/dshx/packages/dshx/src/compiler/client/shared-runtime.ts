@@ -38,13 +38,7 @@ export class SharedRuntime {
         if (id !== SharedRuntime.supplierModule) return null
         const imports = options.provide.map((specifier, index) => `import * as module${index} from ${JSON.stringify(specifier)}`)
         const entries = options.provide.map((specifier, index) => `  ${JSON.stringify(specifier)}: module${index},`)
-        return [
-          ...imports,
-          `export const ${SharedRuntime.exportName} = Object.freeze({`,
-          ...entries,
-          '})',
-          '',
-        ].join('\n')
+        return [...imports, `export const ${SharedRuntime.exportName} = Object.freeze({`, ...entries, '})', ''].join('\n')
       },
       async writeBundle() {
         const manifest = { supplier: options.packageId, modules, cssHash: options.cssHash() ?? null }
@@ -76,7 +70,11 @@ export class SharedRuntime {
   }
 
   /** Consumer side: read the supplier's built manifest from the consumer's dependency graph. */
-  static async readSupplier(options: { readonly root: string; readonly supplier: string; readonly external: readonly string[] }): Promise<{ readonly modules: ReadonlyMap<string, readonly string[]>; readonly cssHash: string | undefined }> {
+  static async readSupplier(options: {
+    readonly root: string
+    readonly supplier: string
+    readonly external: readonly string[]
+  }): Promise<{ readonly modules: ReadonlyMap<string, readonly string[]>; readonly cssHash: string | undefined }> {
     if (!options.external.includes(options.supplier)) {
       throw new DshxError('DSHX1208', `client.shared names ${JSON.stringify(options.supplier)}, but dsh.client.external does not request it.`, {
         hint: `Add ${JSON.stringify(options.supplier)} to dsh.client.external so the Host loads the supplier before this package.`,
@@ -84,7 +82,11 @@ export class SharedRuntime {
     }
     let manifestFile: string
     try {
-      manifestFile = resolve(dirname(createRequire(resolve(options.root, 'package.json')).resolve(`${options.supplier}/package.json`)), 'dist', SharedRuntime.manifestFile)
+      manifestFile = resolve(
+        dirname(createRequire(resolve(options.root, 'package.json')).resolve(`${options.supplier}/package.json`)),
+        'dist',
+        SharedRuntime.manifestFile,
+      )
     } catch (cause) {
       throw new DshxError('DSHX1208', `Shared-runtime supplier ${JSON.stringify(options.supplier)} is not resolvable from this package.`, {
         cause,
@@ -118,7 +120,11 @@ export class SharedRuntime {
   }
 
   /** Consumer side: resolve every provided module to a side-effect-free facade over the supplier's table. */
-  static consumerPlugin(options: { readonly supplier: string; readonly modules: ReadonlyMap<string, readonly string[]>; readonly bundleDependencies: readonly string[] }): Plugin {
+  static consumerPlugin(options: {
+    readonly supplier: string
+    readonly modules: ReadonlyMap<string, readonly string[]>
+    readonly bundleDependencies: readonly string[]
+  }): Plugin {
     const bundled = (source: string): boolean => options.bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
     return {
       name: 'dshx-shared-runtime-consumer',

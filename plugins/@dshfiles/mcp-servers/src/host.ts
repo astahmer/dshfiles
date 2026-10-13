@@ -106,8 +106,7 @@ const grantKey = (server: StoredServer): CredentialKey =>
 
 type HttpServer = Extract<StoredServer, { transport: 'streamable-http' }>
 
-const usesOAuth = (server: StoredServer): server is HttpServer =>
-  server.transport === 'streamable-http' && server.auth === 'oauth'
+const usesOAuth = (server: StoredServer): server is HttpServer => server.transport === 'streamable-http' && server.auth === 'oauth'
 
 const readGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant | undefined> => {
   try {
@@ -221,7 +220,12 @@ const nativeTarget = async (ctx: Context, server: StoredServer, suspended: boole
     const referencedHeaders = await resolveReferences(ctx, server.headerRefs)
     const grant = usesOAuth(server) ? await liveGrant(ctx, server) : undefined
     const oauthReady = !usesOAuth(server) || grant !== undefined
-    const headers = referencedHeaders === undefined || !oauthReady ? undefined : grant === undefined ? referencedHeaders : { ...referencedHeaders, Authorization: `Bearer ${grant.accessToken}` }
+    const headers =
+      referencedHeaders === undefined || !oauthReady
+        ? undefined
+        : grant === undefined
+          ? referencedHeaders
+          : { ...referencedHeaders, Authorization: `Bearer ${grant.accessToken}` }
     grantVersion = grant?.issuedAt
     const localEnv = server.startCommand === undefined ? undefined : await resolveReferences(ctx, server.startCommand.envRefs)
     config = {
@@ -464,7 +468,11 @@ const reconnect = async (ctx: Context, id: string): Promise<void> => {
 }
 
 const callbackPage = (response: ServerResponse, status: number, message: string): void => {
-  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" })
+  response.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+  })
   response.end(
     `<!doctype html><meta charset="utf-8"><title>MCP sign-in</title><body style="font:14px system-ui;padding:32px;color:#ddd;background:#1b1b1b"><p>${message}</p><p>You can close this tab and return to DSH.</p>${status === 200 ? '<script>setTimeout(()=>window.close(),800)</script>' : ''}</body>`,
   )

@@ -6,14 +6,14 @@ recent threads or jump to thread workspaces that still hold work to land.
 
 ## Settings (`dshfiles-home`)
 
-| Key | Default | Meaning |
-|---|---|---|
-| `mark` | `none` | `none`, `text` (`markText`, e.g. an emoji) or `image` (`markImageUrl`, https or data URL). |
-| `headline` | `{project}` | Headline text; `{project}` is the selected project. Empty keeps the DeepSeek headline. |
-| `showPreviewBadge` | `false` | Keep the DeepSeek "Preview" badge. |
-| `showAgentPresetPicker` | `true` | Show the agent preset picker; hidden, new threads use the native "New task default" preset. |
-| `showRecentThreads` | `true` | Up to three unarchived threads of the selected project. |
-| `showUnlandedWork` | `true` | Count of the project's thread workspaces with work to land (needs jj-integration). |
+| Key                     | Default     | Meaning                                                                                     |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `mark`                  | `none`      | `none`, `text` (`markText`, e.g. an emoji) or `image` (`markImageUrl`, https or data URL).  |
+| `headline`              | `{project}` | Headline text; `{project}` is the selected project. Empty keeps the DeepSeek headline.      |
+| `showPreviewBadge`      | `false`     | Keep the DeepSeek "Preview" badge.                                                          |
+| `showAgentPresetPicker` | `true`      | Show the agent preset picker; hidden, new threads use the native "New task default" preset. |
+| `showRecentThreads`     | `true`      | Up to three unarchived threads of the selected project.                                     |
+| `showUnlandedWork`      | `true`      | Count of the project's thread workspaces with work to land (needs jj-integration).          |
 
 ## Limits
 

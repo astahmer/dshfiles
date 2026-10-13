@@ -5,7 +5,8 @@ type RefreshPreferences = Pick<JujutsuPreferences, 'refreshMode' | 'refreshInter
 
 /** TanStack Query options for repository data; `paused` holds refreshes while a confirm or mutation is in flight. */
 export const refreshQueryOptions = (input: { readonly preferences: RefreshPreferences; readonly visible: boolean; readonly paused: boolean }) => ({
-  refetchInterval: input.preferences.refreshMode === 'interval' && input.visible && !input.paused ? input.preferences.refreshIntervalSeconds * 1000 : (false as const),
+  refetchInterval:
+    input.preferences.refreshMode === 'interval' && input.visible && !input.paused ? input.preferences.refreshIntervalSeconds * 1000 : (false as const),
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: input.preferences.refreshOnVisible && input.visible && !input.paused,
 })

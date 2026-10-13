@@ -17,4 +17,3 @@ export const brandStyle = (settings: HomeSettings): string =>
     settings.showPreviewBadge ? '' : '[class$="_previewBadge"]{display:none}',
     settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none!important}',
   ].join('')
-

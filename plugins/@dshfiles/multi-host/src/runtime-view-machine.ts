@@ -1,7 +1,10 @@
 import { assign, emit, enqueueActions, fromPromise, sendParent, setup, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 
 interface ViewPort {
-  readonly openView: (input: { readonly runtimeId: string }, options: { readonly signal: AbortSignal }) => Promise<{ readonly leaseId: string; readonly launchUrl: string }>
+  readonly openView: (
+    input: { readonly runtimeId: string },
+    options: { readonly signal: AbortSignal },
+  ) => Promise<{ readonly leaseId: string; readonly launchUrl: string }>
   readonly closeView: (input: { readonly leaseId: string }) => Promise<unknown>
 }
 
@@ -54,7 +57,10 @@ const runtimeViewLease = setup({
         },
         onError: {
           target: 'done',
-          actions: ['closePopup', sendParent(({ context, event }): ParentEvent => ({ type: 'view.failed', viewId: context.viewId, message: failureMessage(event.error) }))],
+          actions: [
+            'closePopup',
+            sendParent(({ context, event }): ParentEvent => ({ type: 'view.failed', viewId: context.viewId, message: failureMessage(event.error) })),
+          ],
         },
       },
       on: {
@@ -66,7 +72,10 @@ const runtimeViewLease = setup({
     },
     watching: {
       after: {
-        poll: [{ guard: ({ context }) => context.popup.closed, target: 'releasing' }, { target: 'watching', reenter: true }],
+        poll: [
+          { guard: ({ context }) => context.popup.closed, target: 'releasing' },
+          { target: 'watching', reenter: true },
+        ],
       },
       on: { release: { target: 'releasing', actions: 'closePopup' } },
     },
@@ -125,7 +134,10 @@ export const runtimeViewsMachine = setup({
       },
     ],
     'view.opened': {
-      actions: emit(({ event }) => ({ type: 'notice', message: `Opened an isolated browser origin for ${event.runtimeId}. Close its tab to release the connection.` }) as const),
+      actions: emit(
+        ({ event }) =>
+          ({ type: 'notice', message: `Opened an isolated browser origin for ${event.runtimeId}. Close its tab to release the connection.` }) as const,
+      ),
     },
     'view.failed': {
       actions: assign(({ context, event }) => ({
@@ -137,7 +149,10 @@ export const runtimeViewsMachine = setup({
       actions: enqueueActions(({ context, event, enqueue }) => {
         const views = Object.fromEntries(Object.entries(context.views).filter(([viewId]) => viewId !== event.viewId))
         if (context.closingAll === null) {
-          enqueue.assign({ views, ...(event.failure === null ? {} : { error: 'Runtime view closed. Its tunnel will expire automatically if the host is unreachable.' }) })
+          enqueue.assign({
+            views,
+            ...(event.failure === null ? {} : { error: 'Runtime view closed. Its tunnel will expire automatically if the host is unreachable.' }),
+          })
           return
         }
         const failure = context.closingAll.failure ?? event.failure
