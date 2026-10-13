@@ -22,7 +22,16 @@ const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = awai
 const scratch = await createScratchProfile({
   profileName: 'browser-verify',
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
-  bundleIds: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@dshfiles/shared-runtime', '@dshfiles/plugin-ui', '@dshfiles/command-palette', '@dshfiles/jj-integration', '@dshfiles/thread-sidebar', '@dshfiles/activity-timeline'],
+  bundleIds: [
+    '@deepseek-ai/dsh-base',
+    '@deepseek-ai/dsh-web-app',
+    '@dshfiles/shared-runtime',
+    '@dshfiles/plugin-ui',
+    '@dshfiles/command-palette',
+    '@dshfiles/jj-integration',
+    '@dshfiles/thread-sidebar',
+    '@dshfiles/activity-timeline',
+  ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies: {
     '@dshfiles/shared-runtime': `link:${repoRoot}/plugins/@dshfiles/shared-runtime`,
