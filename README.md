@@ -26,7 +26,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
 | [`mcp-servers`](plugins/@dshfiles/mcp-servers/README.md) | Configure profile-wide MCP servers through native DSH clients. |
 | [`model-effort-picker`](plugins/@dshfiles/model-effort-picker/README.md) | Search provider-grouped model catalogs and tune reasoning effort in the composer. |
-| [`multi-host`](plugins/@dshfiles/multi-host/README.md) | Manage execution machines and runtimes through shared Host APIs. |
+| [`multi-host`](plugins/@dshfiles/multi-host/README.md) | Run new threads on other machines over SSH: host chip, hosts dialog, remote thread view. |
 | [`optmem`](plugins/@dshfiles/optmem/README.md) | Persistent project memory, tools, and compact context views. |
 | [`plugin-marketplace`](plugins/@dshfiles/plugin-marketplace/README.md) | Find and install plugins from the Framework Hub catalog. |
 | [`project-checks`](plugins/@dshfiles/project-checks/README.md) | Run trusted project actions and inspect completion receipts. |

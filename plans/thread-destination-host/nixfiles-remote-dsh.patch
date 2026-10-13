@@ -1,0 +1,51 @@
+Proposed nixfiles change (not applied; apply from ~/.config/nixfiles with `patch -p1`).
+Base: nixfiles revision omnqwvoz "fix(dsh): start DSH without patching it, and record its launch URL".
+
+Lets a Linux machine managed by this Home Manager profile serve as a remote host for
+@dshfiles/multi-host: the existing supervisor runs `dsh web` on loopback as a user
+service and writes ~/.dsh/runtime/web-url (0600), which multi-host reads over SSH when
+the remote profile does not include multi-host itself. The Mac-only pieces (app bundle,
+caffeinate launcher) are guarded by isDarwin. Untested: neither the Pi nor the VPS is
+managed by nixfiles today, and the flag order `dsh web --profile web --host ...` passed
+through supervise-web.mjs should be checked on the first Linux apply.
+
+--- a/modules/dsh.nix
++++ b/modules/dsh.nix
+@@ -54,7 +54,7 @@
+       '';
+       home.file.".dsh/AGENTS.md".source =
+         config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/AGENTS.md";
+-      home.file.".local/bin/dsh-web".source = ../assets/dsh/start-dsh;
++      home.file.".local/bin/dsh-web" = lib.mkIf pkgs.stdenv.isDarwin { source = ../assets/dsh/start-dsh; };
+       home.file.".local/bin/dsh-web-supervisor.mjs".source = ../assets/dsh/supervise-web.mjs;
+       home.file.".local/bin/dsh-start".source = dshStartAlias;
+       home.shellAliases.dshstart = "dsh-start";
+@@ -87,6 +87,27 @@
+       # activation only emits regular files and symlinks, and its comparison
+       # helpers abort with "Is a directory". Registering it with macos-apps
+       # rsync-copies it into ~/Applications like every other GUI app here.
+-      macosAppSources."DeepSeek Harness.app" = "${dshApp}";
++      macosAppSources = lib.mkIf pkgs.stdenv.isDarwin { "DeepSeek Harness.app" = "${dshApp}"; };
++
++      # A Linux machine used as a remote host for threads (Raspberry Pi, VPS):
++      # the same supervisor runs `dsh web` on loopback only, as a user service,
++      # and records the tokenized launch URL in ~/.dsh/runtime/web-url (0600).
++      # @dshfiles/multi-host on the manager reads that file (or the plugin's own
++      # plugins/multi-host/launch.json) over SSH and tunnels to it; nothing
++      # listens beyond 127.0.0.1. Needs `loginctl enable-linger` once so the
++      # service outlives SSH sessions.
++      systemd.user.services.dsh-web = lib.mkIf pkgs.stdenv.isLinux {
++        Unit.Description = "DeepSeek Harness runtime (loopback, reached over SSH)";
++        Service = {
++          ExecStart = "${pkgs.writeShellScript "dsh-web-remote" ''
++            exec "$HOME/.local/share/fnm/fnm" exec --using=v22.23.3 -- node "$HOME/.local/bin/dsh-web-supervisor.mjs" --profile web --host 127.0.0.1 --port 0 --no-open
++          ''}";
++          Restart = "on-failure";
++          RestartSec = 5;
++          UMask = "0077";
++          NoNewPrivileges = true;
++        };
++        Install.WantedBy = [ "default.target" ];
++      };
+     };
+ }

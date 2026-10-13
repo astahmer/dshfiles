@@ -14,7 +14,7 @@ behavior belongs in the owning package's README (see the
 | [Async Agent questions](async-agent-questions.md) | Native timed-question acceptance; the child-question flow waits on a Host reply lifecycle. |
 | [Multi-host](multi-host/README.md) | Runtime federation architecture; [phase tracker](multi-host/implementation.md). UI and rollout phases are partial. |
 | [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. |
-| [Thread destination Host chip](thread-destination-host/README.md) | Make the jj-integration destination bar host-aware through multi-host, on stock DSH. |
+| [Thread destination Host chip](thread-destination-host/README.md) | Shipped; only the proposed nixfiles change for Linux remote hosts awaits the owner. |
 | [Desktop shell](desktop-shell/README.md) | Desktop app lifecycle, signing and distribution gates. |
 
 ## Testing and research

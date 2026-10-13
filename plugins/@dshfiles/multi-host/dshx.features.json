@@ -101,16 +101,8 @@
       "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": [
-        "leased",
-        "opened",
-        "expired",
-        "released"
-      ],
-      "failureModes": [
-        "A dropped tunnel retires the lease; the next open reconnects.",
-        "Lease release never mutates the remote runtime."
-      ],
+      "states": ["leased", "opened", "expired", "released"],
+      "failureModes": ["A dropped tunnel retires the lease; the next open reconnects.", "Lease release never mutates the remote runtime."],
       "externalDependencies": [],
       "verification": [
         {

@@ -14,7 +14,6 @@ and current workarounds are documented in each owning plugin's README.
 | Live MCP connection health ("Connected") | mcp-servers | DSH MCP client reports no connection status | Status events from `dsh-mcp-client` |
 | Legacy SSE MCP servers | mcp-servers | DSH MCP client supports stdio + Streamable HTTP only | Add SSE transport to `dsh-mcp-client` |
 | MCP preferences in DSH Settings (connect on startup, tool timeout, Registry search, OAuth client name) | mcp-servers | dshx refuses a Host with both native `Config` (server list) and a Settings namespace | Split the Host into two loader entries, or move the server list into the Settings namespace |
-| Machine selector for secrets / per-machine paths | secret-catalog, ai-accounts | One Host per DSH; no remote machine registry | multi-host could provide one later |
 | "Unify branches" prefilled thread | jujutsu | No API to start a session with a prefilled prompt | Session create option `initialPrompt` |
 | Global "All models" composer picker | ai-accounts | No composer action slot for model choice | Composer model-picker slot |
 | Edit a queued message that has attachments | queue-reorder | `QueueAction.edit` is text-only and `updateQueue` replaces the whole content | Host edit that keeps existing attachment refs and replaces only text blocks |

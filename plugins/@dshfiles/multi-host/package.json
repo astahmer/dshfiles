@@ -2,7 +2,7 @@
   "name": "@dshfiles/multi-host",
   "version": "0.1.0",
   "private": true,
-  "description": "Directory of execution machines and runtimes with qualified native connectors; CLI and UI call the same API.",
+  "description": "Run new threads on other machines over SSH: host directory, pooled tunnels, host chip and remote thread view.",
   "files": [
     "dist",
     "cordis.patch.yml",
