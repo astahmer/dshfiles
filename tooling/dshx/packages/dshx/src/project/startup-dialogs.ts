@@ -18,9 +18,28 @@ const appears = (page: Page, dialogName: string, timeoutMs: number): Promise<boo
 /** Dismiss the "Add an API key" dialog whenever it covers an element this page acts on. */
 export const registerProviderSetupDismissal = (page: Page): Promise<void> => {
   const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
+  // A dialog opened over it (a palette) blocks the click; the blocked action then fails on its own instead of the
+  // handler rejecting after the page has closed and crashing the process.
   return page.addLocatorHandler(providerSetup, async dialog => {
-    await dialog.getByRole('button', { name: 'Configure later', exact: true }).click()
+    await dialog
+      .getByRole('button', { name: 'Configure later', exact: true })
+      .click({ timeout: 5_000 })
+      .catch(() => undefined)
   })
+}
+
+/**
+ * The dialog returns on the first New thread screen of a fresh page, possibly after a key press is already on its way;
+ * a step that types or presses keys checks for it first, since only locator actions trigger the registered handler.
+ */
+export const dismissProviderSetupIfShown = async (page: Page): Promise<void> => {
+  const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
+  if (!(await providerSetup.isVisible())) return
+  // While it animates in or out the button may refuse a click; the locator handler covers what remains.
+  await providerSetup
+    .getByRole('button', { name: 'Configure later', exact: true })
+    .click({ timeout: 2_000 })
+    .catch(() => undefined)
 }
 
 /**

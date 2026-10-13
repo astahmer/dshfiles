@@ -18,7 +18,7 @@ pnpm --dir tooling/dshx --filter @dshfiles/dshx build   # once per checkout, and
 ## Launch
 
 ```sh
-dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
+dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/thread-sidebar --plugin @dshfiles/home --json
 ```
 
 Builds the named bundles (plus the client bundles they load), installs a scratch
@@ -45,7 +45,10 @@ dshx dev open home-screen
 ```
 
 Goes to the app root, dismisses Preview Notice and "Add an API key", then runs
-the feature's `reach` steps. The browser keeps its page between commands, so
+the feature's `reach` steps. A `seed` step first sets up state no short UI path
+creates, once per instance: `landable-thread` (a jj workspace thread with a
+described revision, for Land) and `pending-restart` (changes thread-sidebar's
+`dist/index.js`; `down` restores it). The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
 decide drift vs regression with `maintain-verify-dsh`. To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.
@@ -72,6 +75,11 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 
 - `reach` starts from the app root of the default `up` seed: the project is
   `sample`; a `--project` run needs steps that pick its folder name.
+- The root reopens the last thread, so a reach that needs the New thread screen
+  starts with `click button "New thread"`; that button and the thread rows come
+  from `@dshfiles/thread-sidebar`, so load it for any thread reach.
+- Reaches share one browser: a reach that changes a sidebar view leaves it for
+  the next one; row-driven reaches start with `click button "All threads"`.
 - The project picker filters asynchronously: wait for the row
   (`expect option "sample*"`) before `press Enter`.
 - Register projects by their realpath. macOS temp dirs sit behind

@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
-import { dismissPreviewNotice, dismissProviderSetupDuringStartup } from '../project/startup-dialogs.js'
-import { ScratchError, ownedProcessStatus, redactUrls, type ScratchState } from './state.js'
+import { dismissPreviewNotice, dismissProviderSetupDuringStartup, dismissProviderSetupIfShown } from '../project/startup-dialogs.js'
+import { applySeed } from './seed.js'
+import { ScratchError, ownedProcessStatus, redactUrls, writeScratchState, type ScratchState } from './state.js'
 
 export interface CatalogFeature {
   readonly packageId: string
@@ -75,6 +76,7 @@ const locate = (page: Page, by: string, rawName: string) => {
   const name = exact ? rawName : rawName.slice(0, -1)
   if (by === 'text') return page.getByText(name, { exact }).first()
   if (by === 'label') return page.getByLabel(name, { exact }).first()
+  if (by === 'title') return page.getByTitle(name, { exact }).first()
   // SAFETY: the catalog grammar admits any lowercase word; Playwright rejects an unknown ARIA role at run time.
   return page.getByRole(by as Parameters<Page['getByRole']>[0], { name, exact }).first()
 }
@@ -114,20 +116,67 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
   }
   const { browser, page } = await connect(state)
   const steps: OpenStepResult[] = []
-  try {
+  const openAppRoot = async (): Promise<void> => {
     await page.goto(state.launchUrl, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-slot="root"]').first().waitFor({ state: 'attached', timeout: timeoutMs })
     await dismissPreviewNotice(page, 3_000)
     await dismissProviderSetupDuringStartup(page, 3_000)
-    for (const step of feature.reach) {
+  }
+  try {
+    await openAppRoot()
+    let seeded = state.seeds ?? []
+    // A key press right after fill goes to that field as a locator action, so a dialog that opened in between is dismissed first.
+    let filled: ReturnType<typeof locate> | undefined
+    for (const [index, step] of feature.reach.entries()) {
       const parsed = parseReachStep(step)
       const startedAt = Date.now()
       try {
         if (parsed === undefined) throw new Error('step does not match the reach grammar')
-        if (parsed.action === 'press') await page.keyboard.press(parsed.key)
-        else if (parsed.action === 'click') await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })
-        else if (parsed.action === 'fill') await locate(page, parsed.by, parsed.name).fill(parsed.value ?? '', { timeout: timeoutMs })
-        else await locate(page, parsed.by, parsed.name).waitFor({ state: 'visible', timeout: timeoutMs })
+        await dismissProviderSetupIfShown(page)
+        if (parsed.action === 'seed') {
+          if (!seeded.some(applied => applied.seed === parsed.seed)) {
+            const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
+            const changedFile = await applySeed({ state, seed: parsed.seed, page, timeoutMs })
+            if (changedFile !== undefined) applied.changedFile = changedFile
+            seeded = [...seeded, applied]
+            await writeScratchState({ ...state, seeds: seeded })
+          }
+          if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
+        } else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
+        else if (parsed.action === 'click') {
+          filled = undefined
+          await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })
+        } else if (parsed.action === 'rightclick') {
+          filled = undefined
+          // A row that re-renders under the pointer (a new thread, a status change) closes its context menu at once.
+          const target = locate(page, parsed.by, parsed.name)
+          const deadline = Date.now() + timeoutMs
+          for (;;) {
+            await target.click({ button: 'right', timeout: timeoutMs })
+            const opened = await page
+              .getByRole('menu')
+              .first()
+              .waitFor({ state: 'visible', timeout: 1_500 })
+              .then(
+                () => true,
+                () => false,
+              )
+            if (opened) break
+            if (Date.now() > deadline) throw new Error(`no context menu opened on ${parsed.by} "${parsed.name}"`)
+          }
+        } else if (parsed.action === 'fill') {
+          filled = locate(page, parsed.by, parsed.name)
+          const value = parsed.value ?? ''
+          // A screen still initialising (the New thread composer) can reset a draft typed into it a moment earlier.
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            await filled.fill(value, { timeout: timeoutMs })
+            await page.waitForTimeout(400)
+            const current = await filled.evaluate(element =>
+              element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+            )
+            if (current.includes(value)) break
+          }
+        } else await locate(page, parsed.by, parsed.name).waitFor({ state: 'visible', timeout: timeoutMs })
         steps.push({ step, ok: true, ms: Date.now() - startedAt })
       } catch (error) {
         steps.push({

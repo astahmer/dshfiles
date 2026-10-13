@@ -385,6 +385,20 @@
       "id": "idle-archive-policy",
       "title": "Automatically archive eligible idle threads",
       "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Idle policy target\"",
+        "click menuitem \"Auto-settle behavior\"",
+        "expect menuitemradio \"Auto-archive after idle threshold\"",
+        "press Escape",
+        "press Escape",
+        "click button \"Sidebar settings\"",
+        "expect checkbox \"Auto-archive inactive threads\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -486,6 +500,20 @@
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
       "summary": "Mark a thread unread from the sidebar and clear that marker when the thread is opened.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Unread target\"",
+        "click menuitem \"Mark unread\"",
+        "expect img \"Unread\""
+      ],
       "surfaces": ["client", "storage"],
       "configuration": [],
       "states": ["read", "manual-unread"],
@@ -619,6 +647,15 @@
       "id": "palette-search-history",
       "title": "Search threads, files, and recent navigation",
       "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Palette search target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "click button \"Search threads\"",
+        "fill combobox \"*\" \"Palette search target\"",
+        "expect option \"Palette search target*\""
+      ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -877,6 +914,12 @@
       "id": "pending-host-restart",
       "title": "Warn when a host restart is required",
       "summary": "Detect pending host-side plugin updates and ask for explicit confirmation before handing off a restart when the supervisor supports it.",
+      "reach": [
+        "seed pending-restart",
+        "expect button \"Restart DSH to apply updates*\"",
+        "click button \"Restart DSH to apply updates*\"",
+        "expect text \"Restart DSH yourself to load them.\""
+      ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["unchanged", "client-only-update", "host-update-pending", "confirmation-required", "restarting"],
@@ -915,6 +958,20 @@
       "id": "thread-reference-mention",
       "title": "Insert cross-session references into the composer",
       "summary": "Resolve a target Host session and insert its native reference chip at the active composer’s captured selection.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Mention target\"",
+        "click menuitem \"@Mention thread\"",
+        "expect title \"Mention target\""
+      ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["captured", "resolving", "inserted", "unavailable", "failed"],

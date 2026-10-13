@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -63,7 +63,7 @@ describe('dshx dev scratch commands', () => {
     const help = await run(['dev', 'open', '--help'])
     expect(help.code).toBe(0)
     expect(help.stdout).toContain('dshx dev open <feature>')
-    expect(help.stdout).toContain('click <role|text|label>')
+    expect(help.stdout).toContain('click <role|text|label|title>')
 
     const missingFeature = await run(['dev', 'open', '--json'])
     expect(missingFeature.code).toBe(2)
@@ -88,6 +88,47 @@ describe('dshx dev scratch commands', () => {
     const result = await run(['dev', 'up', '--port', '3080', '--state-dir', stateDir, '--json'])
     expect(result.code).toBe(1)
     expect(envelope(result.stdout).error?.code).toBe('live-port')
+  })
+
+  it('restores the Host entry a pending-restart seed changed, and only on a real down', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'dshx-dev-spec-'))
+    const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
+    cleanups.push(
+      () => rm(stateDir, { recursive: true, force: true }),
+      () => rm(home, { recursive: true, force: true }),
+    )
+    const hostEntry = join(stateDir, 'index.js')
+    await writeFile(hostEntry, 'export default 1\n\n// dshx dev seed: pending restart\n')
+    const state: ScratchState = {
+      schemaVersion: 1,
+      name: 'default',
+      createdAt: new Date().toISOString(),
+      stateDir,
+      home,
+      profile: 'dshx-boot',
+      port: 45125,
+      origin: 'http://127.0.0.1:45125',
+      launchUrl: 'http://127.0.0.1:45125/?token=secret',
+      bundles: ['@dshfiles/thread-sidebar'],
+      expectedClientEntries: ['@dshfiles/thread-sidebar'],
+      project: { path: join(home, 'projects/sample'), workspaceId: 'workspace', ownedByScratch: true },
+      host: { pid: 999_999, signature: ['--profile dshx-boot', '--port 45125'] },
+      browser: { pid: 999_998, signature: ['browser-host.js'], cdpPort: 45126 },
+      hostLog: join(stateDir, 'host.log'),
+      browserLog: join(stateDir, 'browser.log'),
+      browserEvents: join(stateDir, 'browser-events.jsonl'),
+      evidenceDir: join(stateDir, 'evidence'),
+      seeds: [{ seed: 'pending-restart', changedFile: hostEntry }, { seed: 'landable-thread' }],
+    }
+    await writeFile(join(stateDir, 'state.json'), JSON.stringify(state), { mode: 0o600 })
+
+    const dryRun = await run(['dev', 'down', '--dry-run', '--state-dir', stateDir])
+    expect(dryRun.stdout).toContain(`would restore ${hostEntry}`)
+    expect(await readFile(hostEntry, 'utf8')).toContain('dshx dev seed')
+
+    const down = await run(['dev', 'down', '--state-dir', stateDir, '--json'])
+    expect(down.code).toBe(0)
+    expect(await readFile(hostEntry, 'utf8')).toBe('export default 1\n')
   })
 
   it('stops only the processes it started and removes the scratch home, after a dry run that changes nothing', async () => {

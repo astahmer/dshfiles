@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { openSync, closeSync } from 'node:fs'
 import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
@@ -8,6 +8,7 @@ import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { isolatedHostEnvironment } from '../project/scratch-profile.js'
+import { seedSampleProject } from './seed.js'
 import {
   LIVE_DSH_HOME,
   LIVE_DSH_PORT,
@@ -35,34 +36,6 @@ const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
 const browserHostScript = fileURLToPath(new URL('./browser-host.js', import.meta.url))
 
 const sleep = (ms: number): Promise<void> => new Promise(resolveSleep => setTimeout(resolveSleep, ms))
-
-const runJj = (cwd: string, home: string, args: readonly string[]): void => {
-  const result = spawnSync('jj', ['--color=never', '--no-pager', ...args], {
-    cwd,
-    env: { PATH: process.env.PATH ?? '', HOME: home, XDG_CONFIG_HOME: join(home, 'config'), JJ_USER: 'Scratch DSH', JJ_EMAIL: 'scratch-dsh@example.invalid' },
-    encoding: 'utf8',
-    timeout: 20_000,
-  })
-  if (result.error !== undefined || result.status !== 0) {
-    throw new ScratchError(
-      'project-seed-failed',
-      `jj ${args[0] ?? ''} failed while seeding the sample project: ${result.stderr ?? result.error?.message ?? ''}`,
-      'Install jj, or pass --project <dir> to register an existing folder.',
-    )
-  }
-}
-
-/** A jj repository with a `main` bookmark, so jj-integration's destination bar has a bookmark and isolation to show. */
-const seedSampleProject = async (home: string): Promise<string> => {
-  const project = join(home, 'projects', 'sample')
-  await mkdir(project, { recursive: true })
-  await writeFile(join(project, 'README.md'), '# Sample\n\nScratch project created by dshx dev up.\n')
-  runJj(project, home, ['git', 'init', '--no-colocate'])
-  runJj(project, home, ['describe', '--message', 'Sample project'])
-  runJj(project, home, ['bookmark', 'create', 'main', '--revision', '@'])
-  runJj(project, home, ['new'])
-  return project
-}
 
 /**
  * Register the project the way DSH stores an opened folder, before the Host starts. The native "Open folder" picker

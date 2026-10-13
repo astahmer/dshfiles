@@ -31,26 +31,39 @@ const externalDependencySchema = z
   .strict()
 
 /**
- * One user step toward a feature, run by `dshx dev open` from the app root:
- * `click <role|text|label> "<name>"`, `fill <role|label> "<name>" "<value>"`,
- * `expect <role|text|label> "<name>"` or `press <key>` (Playwright key names, e.g. `Meta+K`). Names match exactly;
- * a trailing `*` (`"sample*"`) matches a case-insensitive substring.
+ * State a reach needs that one short UI path cannot create, set up once per scratch instance by `dshx dev open`:
+ * `landable-thread` is a thread in its own jj workspace whose described revision is ready to land (the agent's edit is
+ * stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would.
  */
-const reachStepPattern = /^(?:(?:click|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+)$/
+export const REACH_SEEDS = ['landable-thread', 'pending-restart'] as const
+export type ReachSeed = (typeof REACH_SEEDS)[number]
+
+/**
+ * One user step toward a feature, run by `dshx dev open` from the app root:
+ * `click|rightclick <role|text|label|title> "<name>"`, `fill <role|label> "<name>" "<value>"`,
+ * `expect <role|text|label|title> "<name>"`, `press <key>` (Playwright key names, e.g. `Meta+K`) or `seed <seed>` (before
+ * every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
+ */
+const reachStepPattern = new RegExp(
+  `^(?:(?:click|rightclick|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|seed (?:${REACH_SEEDS.join('|')}))$`,
+)
 
 export const parseReachStep = (
   step: string,
 ):
-  | { readonly action: 'click' | 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
+  | { readonly action: 'click' | 'rightclick' | 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
   | { readonly action: 'press'; readonly key: string }
+  | { readonly action: 'seed'; readonly seed: ReachSeed }
   | undefined => {
   if (!reachStepPattern.test(step)) return undefined
   const press = /^press (\S+)$/.exec(step)
   if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
-  const match = /^(click|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?$/.exec(step)
+  const seed = REACH_SEEDS.find(candidate => step === `seed ${candidate}`)
+  if (seed !== undefined) return { action: 'seed', seed }
+  const match = /^(click|rightclick|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?$/.exec(step)
   const action = match?.[1]
   if (match === null || match[2] === undefined || match[3] === undefined) return undefined
-  if (action !== 'click' && action !== 'expect' && action !== 'fill') return undefined
+  if (action !== 'click' && action !== 'rightclick' && action !== 'expect' && action !== 'fill') return undefined
   if (action === 'fill' && match[2] === 'text') return undefined
   return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4] }) }
 }
@@ -61,10 +74,14 @@ const reachSchema = z
       .string()
       .refine(
         step => parseReachStep(step) !== undefined,
-        'reach steps are click/expect <role|text|label> "<name>", fill <role|label> "<name>" "<value>", or press <key>',
+        `reach steps are click/rightclick/expect <role|text|label|title> "<name>", fill <role|label> "<name>" "<value>", press <key>, or seed <${REACH_SEEDS.join('|')}>`,
       ),
   )
   .min(1)
+  .refine(
+    steps => steps.slice(0, steps.findLastIndex(step => step.startsWith('seed ')) + 1).every(step => step.startsWith('seed ')),
+    'seed steps come first: they set up state before the walk starts from the app root',
+  )
   .refine(steps => steps.at(-1)?.startsWith('expect ') === true, 'reach must end with an expect step that proves the feature is on screen')
 
 export const DshxFeatureSchema = z

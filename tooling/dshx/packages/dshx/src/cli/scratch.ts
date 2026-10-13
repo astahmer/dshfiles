@@ -68,9 +68,13 @@ ${COMMON_HELP}`,
 qualified: "thread-destination", "jj-integration/thread-destination" or
 "@dshfiles/jj-integration#thread-destination". Navigates to the app root, dismisses the Preview
 Notice and "Add an API key" dialogs, then runs the feature's "reach" steps:
-  click <role|text|label> "<name>"   fill <role|label> "<name>" "<value>"
-  expect <role|text|label> "<name>"  press <key>
+  click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
+  rightclick <role|text|label|title> "<name>"  press <key>
+  expect <role|text|label|title> "<name>"      seed <landable-thread|pending-restart>
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
+Seed steps come first and run once per instance: landable-thread starts a thread in its own jj
+workspace through the New thread screen and describes a revision there; pending-restart changes
+thread-sidebar's Host entry on disk, as a rebuild would ("down" restores it).
 A failing step stops the walk, saves a screenshot and exits 1: fix the catalog when the UI path
 moved, report a regression when the feature broke (skill maintain-verify-dsh).
 

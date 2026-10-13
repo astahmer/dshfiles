@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { z } from 'zod'
+import { REACH_SEEDS } from '../project/features.js'
 
 /** The live DSH the user works in; a scratch instance never takes its port or its home. */
 export const LIVE_DSH_PORT = 3080
@@ -42,6 +43,8 @@ export const ScratchStateSchema = z
     browserLog: z.string(),
     browserEvents: z.string(),
     evidenceDir: z.string(),
+    /** Seeds `dshx dev open` already applied to this instance, with the checkout file one changed for `down` to restore. */
+    seeds: z.array(z.object({ seed: z.enum(REACH_SEEDS), changedFile: z.string().optional() }).strict()).optional(),
   })
   .strict()
 

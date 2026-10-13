@@ -2,6 +2,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { connectDshPlatformClient } from '../platform/client.js'
+import { restorePendingRestart } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, isWithin, ownedProcessStatus, redactUrls, removeScratchStateFile, type ScratchState } from './state.js'
 
 export interface DoctorCheck {
@@ -84,7 +85,7 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
 }
 
 export interface DownAction {
-  readonly action: 'stop' | 'skip' | 'remove' | 'keep'
+  readonly action: 'stop' | 'skip' | 'remove' | 'keep' | 'restore'
   readonly target: string
   readonly reason: string
 }
@@ -141,6 +142,8 @@ export const scratchDown = async (
     actions.push({ action: 'stop', target: `${label} pid ${owned.pid} (process group)`, reason: 'started by dshx dev up' })
     if (!dryRun && !(await stopGroup(owned.pid))) leftRunning.push(owned.pid)
   }
+  const restoredHostEntry = await restorePendingRestart(state, dryRun)
+  if (restoredHostEntry !== undefined) actions.push({ action: 'restore', target: restoredHostEntry, reason: 'undo the pending-restart seed' })
   if (scratchHomeIsOurs(state.home)) {
     actions.push({ action: 'remove', target: state.home, reason: 'scratch home (profile, storages, browser profile, sample project)' })
     if (!dryRun) await rm(state.home, { recursive: true, force: true })

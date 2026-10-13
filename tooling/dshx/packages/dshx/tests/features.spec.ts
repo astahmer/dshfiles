@@ -59,4 +59,13 @@ describe('plugin feature metadata', () => {
     expect(withReach(['fill text "Queue" "x"', 'expect text "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
     expect(withReach(['click button "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('must end with an expect step')]))
   })
+
+  it('accepts context-menu clicks and seeds that come before the walk', () => {
+    const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
+    expect(withReach(['seed landable-thread', 'seed pending-restart', 'rightclick text "Seeded*"', 'expect menuitem "Mark unread"'])).toEqual([])
+    expect(withReach(['seed a-thread', 'expect text "x"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
+    expect(withReach(['click button "New thread"', 'seed landable-thread', 'expect text "x"'])).toEqual(
+      expect.arrayContaining([expect.stringContaining('seed steps come first')]),
+    )
+  })
 })
