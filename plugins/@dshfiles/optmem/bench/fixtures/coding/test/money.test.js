@@ -24,5 +24,8 @@ test('addMoney sums integer cents', () => {
 
 test('allocate keeps the total', () => {
   assert.deepEqual(allocate(100, [1, 1, 1]), [34, 33, 33])
-  assert.equal(allocate(1001, [3, 5, 2]).reduce((a, b) => a + b, 0), 1001)
+  assert.equal(
+    allocate(1001, [3, 5, 2]).reduce((a, b) => a + b, 0),
+    1001,
+  )
 })

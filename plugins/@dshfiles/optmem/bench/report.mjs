@@ -85,8 +85,7 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   const sentBytes = agentCalls.map(call => call.sentBytes ?? call.messageBytes)
   const sentMessages = agentCalls.map(call => call.sentMessages ?? call.messages)
   const nativeCompactionEvents = Object.values(run.sessionEventCounts ?? {}).reduce(
-    (total, counts) =>
-      total + Object.entries(counts).reduce((sum, [type, count]) => sum + (/^compaction\/end$/.test(type) ? count : 0), 0),
+    (total, counts) => total + Object.entries(counts).reduce((sum, [type, count]) => sum + (/^compaction\/end$/.test(type) ? count : 0), 0),
     0,
   )
   runs.push({

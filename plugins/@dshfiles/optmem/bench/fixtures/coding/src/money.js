@@ -24,8 +24,7 @@ export const fromCents = cents => {
 }
 
 /** Format integer cents for display, e.g. formatMoney(123456, 'EUR', 'en-IE') -> "€1,234.56". */
-export const formatMoney = (cents, currency = 'EUR', locale = 'en-IE') =>
-  new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100)
+export const formatMoney = (cents, currency = 'EUR', locale = 'en-IE') => new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100)
 
 /** Sum any number of integer-cent amounts. */
 export const addMoney = (...amounts) =>
