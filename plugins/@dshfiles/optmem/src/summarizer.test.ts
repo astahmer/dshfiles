@@ -1,4 +1,6 @@
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { createMemoryEngine, StreamIds, type SummaryRequest } from '@dshfiles/optmem-core'
+import { openSqliteMemory } from '@dshfiles/optmem-sqlite'
 import { describe, expect, it } from 'vitest'
 
 import { boundedSummary } from '../../optmem-core/src/bounded-summary.ts'
@@ -10,6 +12,7 @@ import {
   selectSummaryRoute,
   type RouteCatalog,
   type SummarizerPolicy,
+  type SummaryRoute,
 } from './summarizer.ts'
 
 const answer = (text: string): StreamChunk[] => [
@@ -319,6 +322,170 @@ describe('llm summarizer', () => {
     })
     await expect(failing.summarize(request)).rejects.toThrow('summary call ended with error: slow down')
     expect(calls).toBe(1)
+  })
+})
+
+describe('exact-prompt single-flight', () => {
+  it('shares concurrent cross-stream requests and attributes usage only to the physical owner', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield { type: 'usage', usage: { inputTokens: 12, outputTokens: 6 } }
+        yield* answer('Shared facts.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const results = await Promise.all([
+      summarizer.summarize(request),
+      summarizer.summarize({ ...request, stream: 'conversation:thread-codex', address: '8+2' }),
+    ])
+    expect(calls).toHaveLength(1)
+    expect(results).toEqual([
+      { text: 'Shared facts.', model: 'codex-emialex/gpt-6-luna', usage: { inputTokens: 12, outputTokens: 6 } },
+      { text: 'Shared facts.', model: 'codex-emialex/gpt-6-luna' },
+    ])
+    await summarizer.summarize(request)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('shares the entire output-token retry operation', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        if (calls.length === 1) {
+          yield* answer('Incomplete').slice(0, -1)
+          yield { type: 'finish', reason: { kind: 'max-tokens' } }
+          return
+        }
+        yield* answer('Complete shared facts.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const results = await Promise.all([summarizer.summarize(request), summarizer.summarize(request)])
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+    expect(results.map(result => result.text)).toEqual(['Complete shared facts.', 'Complete shared facts.'])
+  })
+
+  it('shares repeated exhaustion without returning partial text to any caller', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('Incomplete shared text').slice(0, -1)
+        yield { type: 'finish', reason: { kind: 'max-tokens' } }
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const owner = summarizer.summarize(request)
+    const joined = summarizer.summarize(request)
+    await Promise.all([
+      expect(owner).rejects.toMatchObject({ name: 'OutputBudgetError', retryable: false }),
+      expect(joined).rejects.toMatchObject({ name: 'OutputBudgetError', retryable: false }),
+    ])
+    expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('fans out failures honestly and clears failed work for the next request', async () => {
+    let calls = 0
+    const resolver = createRouteResolver({ catalog: () => catalog(), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* () {
+        calls++
+        if (calls === 1) {
+          yield { type: 'finish', reason: { kind: 'error', failure: { code: 'busy', message: 'slow down' } } }
+          return
+        }
+        yield* answer('Recovered facts.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const results = await Promise.allSettled([summarizer.summarize(request), summarizer.summarize(request)])
+    expect(results.map(result => result.status)).toEqual(['rejected', 'rejected'])
+    expect(calls).toBe(1)
+    await expect(summarizer.summarize(request)).resolves.toMatchObject({ text: 'Recovered facts.' })
+    expect(calls).toBe(2)
+  })
+
+  const differentCalls: readonly { readonly name: string; readonly request?: Partial<SummaryRequest>; readonly route?: Partial<SummaryRoute> }[] = [
+    { name: 'conversation', request: { conversationId: 'session-other' } },
+    { name: 'provider', route: { provider: 'codex-other' } },
+    { name: 'model', route: { model: 'gpt-other' } },
+    { name: 'effort', route: { effort: 'high' } },
+    { name: 'kind', request: { kind: 'leaf' } },
+    { name: 'input text', request: { input: ['changed', 'assistant: ok'] } },
+    { name: 'input order', request: { input: [...request.input].reverse() } },
+    { name: 'byte budget', request: { maxBytes: 256 } },
+    { name: 'byte-retry instruction', request: { previousBytes: 900 } },
+  ]
+  it.each(differentCalls)('does not share a different $name', async change => {
+    const calls: GenerateOptions[] = []
+    let route: SummaryRoute = { provider: 'codex-emialex', model: 'gpt-6-luna', effort: 'low' }
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('Facts.')
+      },
+      resolveRoute: async conversationId => ({ kind: 'ready', conversationId, source: 'account', route }),
+      timeoutMs: () => 1_000,
+    })
+    const owner = summarizer.summarize(request)
+    route = { ...route, ...change.route }
+    const other = summarizer.summarize({ ...request, ...change.request })
+    await Promise.all([owner, other])
+    expect(calls).toHaveLength(2)
+  })
+
+  it('coalesces identical parent summaries through the real engine and SQLite store', async () => {
+    const calls: GenerateOptions[] = []
+    const resolver = createRouteResolver({ catalog: () => anyProviderCatalog('codex-emialex'), policy: () => accountPolicy })
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        yield* answer('Both preserved facts.')
+      },
+      resolveRoute: resolver.resolve,
+      timeoutMs: () => 1_000,
+    })
+    const memory = openSqliteMemory({ path: ':memory:' })
+    const engine = createMemoryEngine({
+      store: memory.store,
+      summarizer,
+      config: { catchUpIntervalMs: 0, summaryCallsPerMinute: 0 },
+    })
+    try {
+      await engine.start()
+      await engine.append(
+        ['a', 'b'].map((text, index) => ({
+          eventKey: `single-flight-${index}`,
+          harness: 'test',
+          conversationId: 'thread-codex',
+          projectId: 'p1',
+          role: 'user',
+          createdAt: index,
+          text: text.repeat(300),
+        })),
+      )
+      await engine.drain()
+      const conversation = await memory.store.getNodes(StreamIds.conversation('thread-codex'), [{ level: 1, idx: 0 }])
+      const project = await memory.store.getNodes(StreamIds.project('p1'), [{ level: 1, idx: 0 }])
+      expect(calls).toHaveLength(1)
+      expect(conversation[0]?.text).toBe('Both preserved facts.')
+      expect(project[0]?.text).toBe('Both preserved facts.')
+      expect(conversation[0]?.model).toBe('codex-emialex/gpt-6-luna')
+      expect(project[0]?.model).toBe('codex-emialex/gpt-6-luna')
+    } finally {
+      await engine.close()
+      memory.close()
+    }
   })
 })
 
