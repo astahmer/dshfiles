@@ -23,9 +23,20 @@ DSH on 127.0.0.1:3080 or ~/.dsh. The launch URL is a secret: it stays in the mod
   dshx dev shot [--label <label>]              screenshot + console/network error summary
   dshx dev down [--dry-run]                    stop what up started, delete the scratch home
 
-Run "dshx dev <action> --help" for details. Without an action, "dshx dev" is the plugin dev session.
+Run "dshx dev <action> --help" for details.
 
-${COMMON_HELP}`,
+${COMMON_HELP}
+
+Plugin dev session (no action):
+  dshx dev [--cwd <path>] [--port <port>] [--open] [--verbose] [--quiet] [--no-color]
+
+Run from a plugin project: checks compatibility, links the project into the profile its manifest
+names (in the current DSH home, not a scratch one), rebuilds on change and runs dsh on --port
+(0 lets the OS choose).
+  --cwd <path>         Run from a different project directory.
+  --open               Open the development URL.
+  --verbose            Print underlying command failures.
+  --quiet              Suppress human-readable output; retain exit status.`,
   up: `dshx dev up — start a scratch DSH.
 
 Builds the selected owned plugins (and the client bundles they load), installs a disposable profile

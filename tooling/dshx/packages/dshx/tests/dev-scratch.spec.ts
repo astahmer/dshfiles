@@ -50,6 +50,15 @@ const startProcess = async (args: readonly string[]): Promise<number> => {
 }
 
 describe('dshx dev scratch commands', () => {
+  it('lists the scratch actions and the plugin dev session when dev has no action', async () => {
+    for (const flag of ['--help', '-h']) {
+      const help = await run(['dev', flag])
+      expect(help.code).toBe(0)
+      for (const action of ['up', 'doctor', 'open', 'shot', 'down']) expect(help.stdout).toMatch(new RegExp(`dshx dev ${action}\\b`))
+      expect(help.stdout).toContain('dshx dev [--cwd <path>] [--port <port>] [--open]')
+    }
+  })
+
   it('explains each action and names the fix for misuse', async () => {
     const help = await run(['dev', 'open', '--help'])
     expect(help.code).toBe(0)
