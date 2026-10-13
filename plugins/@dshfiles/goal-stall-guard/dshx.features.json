@@ -21,17 +21,17 @@
         {
           "kind": "not-applicable",
           "id": "goal-stall-guard.streak-reset",
-          "reason": "No browser journey exists yet for the streak-reset scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
+          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
         },
         {
           "kind": "not-applicable",
           "id": "goal-stall-guard.threshold",
-          "reason": "No browser journey exists yet for the threshold scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
+          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
         },
         {
           "kind": "not-applicable",
           "id": "goal-stall-guard.unavailable-goal",
-          "reason": "No browser journey exists yet for the unavailable-goal scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
+          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
         },
         {
           "kind": "unit-test",
