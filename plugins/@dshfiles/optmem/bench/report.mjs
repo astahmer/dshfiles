@@ -57,6 +57,10 @@ const usageOf = calls => {
 const benchRoot = dirname(fileURLToPath(import.meta.url))
 const scenarios = new Map()
 const calibrationCasesById = new Map(calibrationCases.map(item => [item.id, item]))
+const packetToolTurnSchema = z.object({
+  packet: z.object({ requiresTools: z.boolean() }),
+  steps: z.array(z.object({ tools: z.array(z.string()) })),
+})
 const rescoreCalibration = outcome => {
   const item = calibrationCasesById.get(outcome.caseId)
   if (item === undefined) return outcome.quality
@@ -135,6 +139,19 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   const promptOf = usage => (usage.inputTokens ?? 0) + (usage.cacheReadTokens ?? 0)
   const sentBytes = agentCalls.map(call => call.sentBytes ?? call.messageBytes)
   const sentMessages = agentCalls.map(call => call.sentMessages ?? call.messages)
+  const requiredToolPackets = run.turns.flatMap(turn => {
+    const parsed = packetToolTurnSchema.safeParse(turn)
+    return parsed.success && parsed.data.packet.requiresTools ? [parsed.data] : []
+  })
+  const toolPackets =
+    requiredToolPackets.length === 0
+      ? undefined
+      : {
+          required: requiredToolPackets.length,
+          withCalls: requiredToolPackets.filter(packet => packet.steps.some(step => step.tools.length > 0)).length,
+          missingCalls: requiredToolPackets.filter(packet => packet.steps.every(step => step.tools.length === 0)).length,
+          calls: requiredToolPackets.reduce((total, packet) => total + packet.steps.reduce((sum, step) => sum + step.tools.length, 0), 0),
+        }
   const nativeCompactionEvents = Object.values(run.sessionEventCounts ?? {}).reduce(
     (total, counts) => total + Object.entries(counts).reduce((sum, [type, count]) => sum + (/^compaction\/end$/.test(type) ? count : 0), 0),
     0,
@@ -162,6 +179,7 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
     expectedTurns: run.expectedTurns,
     error: run.error?.split('\n')[0],
     turns: run.turns.length,
+    toolPackets,
     agent: usageOf(agentCalls),
     nativeCompaction: usageOf(byKind['native-compaction'] ?? []),
     optmem: usageOf(byKind.optmem ?? []),
@@ -312,6 +330,16 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
       `| ${ARM_NAMES[arm]} | ${ratio(items, run => run.recall)} | ${ratio(items, run => run.analysis)} | ${ratio(items, run => run.cross)} | ${ratio(items, run => run.negativeRecall)} | ${ratio(items, run => run.taskReasoning)} | ${acceptance} | ${items.map(run => `r${run.rep}: ${run.failedProbes.join(', ') || '—'}`).join('; ')} |`,
     )
   }
+}
+const toolPacketRuns = runs.filter(run => run.toolPackets !== undefined)
+if (toolPacketRuns.length > 0) {
+  lines.push(
+    '\n### Required-tool packet evidence (tool presence, not task success)\n',
+    '| run | required packets | packets with ≥1 tool call | packets with none | total tool calls |',
+    '|---|---:|---:|---:|---:|',
+  )
+  for (const run of toolPacketRuns)
+    lines.push(`| ${run.runId} | ${run.toolPackets.required} | ${run.toolPackets.withCalls} | ${run.toolPackets.missingCalls} | ${run.toolPackets.calls} |`)
 }
 lines.push(
   '\n### Summary health and accounting\n',

@@ -3,6 +3,7 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prepareFixture as prepareIngestionCodingFixture } from './fixtures/ingestion-coding/prepare.mjs'
 
 const fixturesRoot = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 
@@ -237,7 +238,9 @@ const support = async () => {
   return { releaseNotes, euWestConfig, emailThread, runbook, metricsCsv }
 }
 
-const generators = { coding, logs, support }
+const ingestionCoding = project => prepareIngestionCodingFixture({ project })
+
+const generators = { coding, logs, support, 'ingestion-coding': ingestionCoding }
 
 export const generateFixture = async (name, project) => {
   if (name === undefined) return {}

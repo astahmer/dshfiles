@@ -111,6 +111,40 @@ test('report refuses unpaired scenario data between modes', async () =>
     assert.match(result.stderr, /unpaired benchmark comparison/)
   }))
 
+test('report counts required-tool packet evidence without scoring it as task success', async () =>
+  withEvidence(async directory => {
+    await writeRun({
+      directory,
+      turns: [
+        {
+          conversation: 'main',
+          turn: 1,
+          wallMs: 1000,
+          end: 'completed',
+          steps: [{ tools: ['read', 'bash'] }],
+          answer: 'private answer one',
+          packet: { topic: 'repair', stage: 1, rows: 3, requiresTools: true },
+        },
+        {
+          conversation: 'main',
+          turn: 2,
+          wallMs: 1000,
+          end: 'completed',
+          steps: [{ tools: [] }],
+          answer: 'private answer two',
+          packet: { topic: 'repair', stage: 2, rows: 3, requiresTools: true },
+        },
+      ],
+    })
+    const result = runReport(directory)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Required-tool packet evidence \(tool presence, not task success\)/)
+    assert.match(result.stdout, /smoke-B-r1 \| 2 \| 1 \| 1 \| 2/)
+    const [summary] = JSON.parse(await readFile(join(directory, 'summary.json'), 'utf8'))
+    assert.deepEqual(summary.toolPackets, { required: 2, withCalls: 1, missingCalls: 1, calls: 2 })
+    assert.doesNotMatch(JSON.stringify(summary), /private answer/)
+  }))
+
 test('report separates direct calibration costs without copying summary text', async () =>
   withEvidence(async directory => {
     const runId = await writeRun({ directory, arm: 'A', calibration: { variants: ['baseline-default'], limit: 1, repetitions: 1 } })

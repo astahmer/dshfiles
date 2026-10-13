@@ -412,6 +412,14 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
             answer: answer.slice(0, 100000),
             answerTruncated: answer.length > 100000,
           }
+          if (item.packet !== undefined) {
+            record.packet = {
+              topic: item.packet.topic,
+              stage: item.packet.stage,
+              rows: item.packet.rows,
+              requiresTools: item.packet.requiresTools,
+            }
+          }
           if (item.probe !== undefined) {
             record.probe = scoreProbe({
               answer,

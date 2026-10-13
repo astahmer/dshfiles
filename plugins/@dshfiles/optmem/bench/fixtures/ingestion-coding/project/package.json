@@ -1,0 +1,13 @@
+{
+  "name": "sable-ingestion-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "replay": "node src/cli.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

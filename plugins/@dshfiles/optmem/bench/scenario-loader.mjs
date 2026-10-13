@@ -12,6 +12,12 @@ const probeSchema = z.object({
   expect: z.array(expectation),
   forbid: z.array(expectation).optional(),
 })
+const packetSchema = z.object({
+  topic: z.string().min(1),
+  stage: z.number().int().min(1).max(3),
+  rows: z.number().int().positive(),
+  requiresTools: z.boolean(),
+})
 const scenarioSchema = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
@@ -26,7 +32,15 @@ const scenarioSchema = z.object({
     .array(
       z.object({
         name: z.string().min(1),
-        turns: z.array(z.object({ prompt: z.string().min(1), probe: probeSchema.optional() })).min(1),
+        turns: z
+          .array(
+            z.object({
+              prompt: z.string().min(1),
+              probe: probeSchema.optional(),
+              packet: packetSchema.optional(),
+            }),
+          )
+          .min(1),
       }),
     )
     .min(1),

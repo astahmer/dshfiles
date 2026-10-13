@@ -1,6 +1,6 @@
 # OptMem realistic long-conversation evaluation
 
-Resume here: original child `session-3af7eb81-ce16-4b75-9f0b-21d9634973ad` remains idle after its Plus usage-limit interruption; its workspace is untouched. Repaired B/C pilots still fail acceptance and drain; see Pilot diagnosis. Production-prompt calibration r1 exposed 2048→4096 max-token exhaustion on a long summary; 4096→8192 completes at about 3× list cost but still loses full owner names. A corrected 2,048→8,192 retry-only pilot also exhausted; retain failures and no production recommendation. Fourth coding lane exists as interrupted WIP `29b58dc6`; integrate and validate offline. No long matrix, live-profile changes, or raw logs published.
+Resume here: original child `session-3af7eb81-ce16-4b75-9f0b-21d9634973ad` remains idle after its Plus usage-limit interruption; last five-minute check found no change. Repaired B/C pilots still fail acceptance and drain; see Pilot diagnosis. Production-prompt calibration r1 exposed 2048→4096 max-token exhaustion on a long summary; 4096→8192 completes at about 3× list cost but still loses full owner names. A corrected 2,048→8,192 retry-only pilot also exhausted; retain failures and no production recommendation. Fourth coding lane restored from WIP `29b58dc6` into this thread's integration revision; 65 turns, 54 required-tool packets, typed packet loader, scratch-only fixture, and evidence/report wiring pass focused offline tests. No provider run, long matrix, live-profile change, or raw-log publication.
 
 ## Objective
 
@@ -13,11 +13,11 @@ Reduce OptMem summary waste without sacrificing durable recall, then compare nat
 | Inspect previous benchmark and current defaults | Complete        | Prior benchmark forced 32k compaction on a 1M model; source mode already defaults to compat.                                                                                    |
 | Reproduce summary truncation                    | Complete        | Reliability fix duplicated locally as `7bd0f759`; partial max-tokens output rejected, capped duplicate retries removed; 26 focused tests passed in child.                       |
 | Remove duplicate identical merge calls          | Complete        | Integrated as `0458d55b`: exact-prompt single-flight, no persistent cache; real engine+SQLite proof 2 provider calls → 1; parent 40-test/typecheck/build/import checks pass.    |
-| Realistic seeded long datasets                  | Mostly complete | Three scenarios integrated as `2a66bcb8`; fourth coding/tool-heavy lane is authored in interrupted WIP `29b58dc6` but not yet integrated or revalidated here.            |
-| Harden runner and measurements                  | Mostly complete | Stock-policy loader, paired hashes, lifecycle cleanup, retry archives, call-start journal, strict recall provenance, explicit calibration retry budgets, and cost reporting; 30 offline tests pass. |
+| Realistic seeded long datasets                  | Integrated      | Three original scenarios plus coding lane restored from `29b58dc6`; new lane is 65 turns / 54 tool-required packets with scratch-only fixture and hidden acceptance. Offline evidence: 5 scenario tests pass; 24/25 prototype acceptance failures; reference 25/25; report-scope regression fails. No provider run. |
+| Harden runner and measurements                  | Mostly complete | Stock-policy loader, paired hashes, lifecycle cleanup, retry archives, call-start journal, strict recall provenance, explicit retry caps, typed packet metadata, and tool-call reporting; 37 benchmark tests pass. |
 | Direct summary calibration                      | Pilot incomplete | Production-aligned r1 plus retry-only follow-up: 2,048→4,096 and 2,048→8,192 exhaust the long leaf; 4,096→8,192 completes once but costs ~3× and drops full owner names. No variant passes all four quality/completion checks. |
 | Pilot and repeated real-window matrix           | Pilot incomplete | Repaired B/C 24-turn infra pilots fail the same combined handoff gate and 600s drain; capped summaries dominate cost. Do not start the long matrix until failure causes are resolved. |
-| Validation and measured recommendation          | Pending         | Preserve failures and uncertainty; no live promotion without evidence.                                                                                                          |
+| Validation and measured recommendation          | Pending         | 37 benchmark tests and changed-path checks pass; plugin contract/typecheck/build/import pass. An initial full plugin suite had one project-view failure; isolated and full rerun passed 79/79, cause unconfirmed. No live runtime or long matrix; no recommendation. |
 
 ## Evaluation requirements
 
@@ -41,9 +41,9 @@ Two compatibility support pilots per effort, on the pre-fix plugin build:
 
 ## Repaired infra pilot diagnosis
 
-- Correct report classification: B and C each have **0 provider errors and 2 unfinished summary calls** at the 600-second drain deadline. B/C both finished 24/24 user turns but failed the same aggregate task-acceptance gate; the saved evidence does not retain which individual handoff criterion failed.
+- Correct report classification: B and C each have **0 provider errors and 2 unfinished summary calls** at the 600-second drain deadline. Both finished 24/24 user turns and failed `long scenario handoff preserves corrected facts, scope, gates, dependency order, and rollback`; saved JSON retains only that aggregate test name, not the failing subassertion.
 - Of completed OptMem summaries, B had 45/77 `max-tokens` finishes and C 76/107. Those capped calls consumed 129,024/155,892 (82.8%) and 225,280/249,276 (90.4%) output tokens respectively. Provider usage reported zero reasoning tokens even though the stream recorded 448,656 and 758,494 reasoning-text bytes. Databases contain 13/7 `clipped:*` nodes, 221/135 pending leaves, 8/6 stale or merge-pending views, and 10/14 buildable parents. The pending-view query uses the `(stream,kind)` primary key; no evidence points to an expensive SQL plan. Costs remain lower bounds.
-- No long real-window matrix is justified yet. The exact acceptance subfailure is unobservable in the archived evidence; a future diagnostic run would need to preserve the candidate artifact or bounded failure details without storing raw transcripts.
+- No long real-window matrix is justified yet. Archived evidence identifies the composite test but not whether state/scope, action order, preflight gates, unsafe rejections, or rollback mismatched. A future diagnostic must preserve the candidate artifact or bounded assertion names before summarizing failure, without storing raw transcripts.
 
 ## Production-aligned direct calibration
 

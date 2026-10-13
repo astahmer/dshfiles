@@ -43,6 +43,17 @@ test('summary ablation uses stock context and includes recall', async () => {
   assert.ok(loaded.scenario.conversations.flatMap(conversation => conversation.turns).some(turn => turn.probe))
 })
 
+test('module scenarios retain validated packet metadata for tool evidence', async () => {
+  const loaded = await loadScenario({
+    path: fileURLToPath(new URL('./scenarios/ingestion-coding.mjs', import.meta.url)),
+    variant: 'pilot',
+  })
+  const packets = loaded.scenario.conversations.flatMap(conversation => conversation.turns.filter(turn => turn.packet !== undefined))
+  assert.equal(packets.length, 18)
+  assert.ok(packets.every(turn => turn.packet.requiresTools && turn.packet.rows === 3))
+  assert.ok(packets.every(turn => turn.packet.stage >= 1 && turn.packet.stage <= 3))
+})
+
 test('calibration runtime fingerprint includes calibration implementation', async () => {
   const benchmarkHash = await runtimeFingerprint({ arm: 'A' })
   const calibrationHash = await runtimeFingerprint({ arm: 'A', calibration: true })
