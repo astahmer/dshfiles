@@ -43,6 +43,14 @@ test('summary ablation uses stock context and includes recall', async () => {
   assert.ok(loaded.scenario.conversations.flatMap(conversation => conversation.turns).some(turn => turn.probe))
 })
 
+test('long scenarios retain their string-stage packet metadata', async () => {
+  const loaded = await loadScenario({ path: fileURLToPath(new URL('./scenarios/infra-rollout.mjs', import.meta.url)) })
+  const packets = loaded.scenario.conversations.flatMap(conversation => conversation.turns.filter(turn => turn.packet !== undefined))
+  assert.ok(packets.length > 0)
+  assert.ok(packets.every(turn => typeof turn.packet.stage === 'string' && turn.packet.rows > 0))
+  assert.ok(packets.every(turn => !Object.hasOwn(turn.packet, 'requiresTools')))
+})
+
 test('module scenarios retain validated packet metadata for tool evidence', async () => {
   const loaded = await loadScenario({
     path: fileURLToPath(new URL('./scenarios/ingestion-coding.mjs', import.meta.url)),
