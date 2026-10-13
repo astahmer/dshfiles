@@ -94,7 +94,7 @@ describe('server editor form', () => {
     }
     expect(issueFields(values)).toContain('commandLine')
     expect(serverFormSchema.safeParse(values).error?.issues.some(issue => issue.path[0] === 'commandLine')).toBe(true)
-    expect(issueFields({ ...values, commandLine: 'node /Users/astahmer/dev/dadabase/dist/mcp/stdio.js' })).not.toContain('commandLine')
+    expect(issueFields({ ...values, commandLine: 'node /home/user/dev/dadabase/dist/mcp/stdio.js' })).not.toContain('commandLine')
     expect(issueFields({ ...values, commandLine: 'node server.js --home ~/data' })).toContain('commandLine')
   })
 
@@ -106,7 +106,7 @@ describe('server editor form', () => {
   it('flags a local command that would inherit the Host working directory', () => {
     expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio' })).toBe(true)
     expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio', cwd: '   ' })).toBe(true)
-    expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio', cwd: '/Users/astahmer/dev/dadabase' })).toBe(false)
+    expect(inheritsHostWorkingDirectory({ ...blankServerForm(), transport: 'stdio', cwd: '/home/user/dev/dadabase' })).toBe(false)
     expect(inheritsHostWorkingDirectory(blankServerForm())).toBe(false)
   })
 })

@@ -200,7 +200,7 @@ describe('local command parsing', () => {
   it('detects tilde paths that no shell will expand', () => {
     expect(hasUnexpandedTilde(parseCommandLine('node ~/dev/dadabase/dist/mcp/stdio.js'))).toBe(true)
     expect(hasUnexpandedTilde(parseCommandLine('node ~'))).toBe(true)
-    expect(hasUnexpandedTilde(parseCommandLine('node /Users/astahmer/dev/dadabase/dist/mcp/stdio.js'))).toBe(false)
+    expect(hasUnexpandedTilde(parseCommandLine('node /home/user/dev/dadabase/dist/mcp/stdio.js'))).toBe(false)
     expect(hasUnexpandedTilde(parseCommandLine('node server.js --home /srv/~/data'))).toBe(false)
   })
 })

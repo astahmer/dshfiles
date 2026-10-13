@@ -20,7 +20,7 @@ Tools (in `plugins/@dshfiles/optmem/scripts/`):
 ## S0 — prep (once)
 
 ```bash
-cd /Users/astahmer/dev/dshfiles
+cd ~/dev/dshfiles
 fnm use 22.23.3
 pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir tooling/dshx --filter @dshfiles/dshx build
 pnpm --dir plugins/@dshfiles/request-messages run build
@@ -86,7 +86,7 @@ model `gpt-6-luna` for the 2.5 KB paste and long code answers, some level ≥1 n
 Historical: S3 targeted the since-removed core fork's `request/messages-override` session event. On stock DSH,
 `lastFullRequest` in OptMem's status and its Host log line carry `originalCount`, `sentCount` and `sentBytes`.
 
-> In /Users/astahmer/dev/dshfiles (jj, shared working copy — touch only these paths), extend the fork event
+> In ~/dev/dshfiles (jj, shared working copy — touch only these paths), extend the fork event
 > `request/messages-override` (tooling/dsh-core/session/src/types.ts + agent-loop/src/agent.ts where it is appended)
 > with `originalBytes` and `sentBytes` = UTF-8 byte length of `JSON.stringify(messages)` before/after the
 > `agent/request-messages` waterfall; keep the event `ignorable`. Update agent-loop/tests/request-messages.spec.ts,
@@ -103,7 +103,7 @@ Then re-run only the full long run from S1 to get byte numbers.
 
 ## S4 — why the codex route returns empty replies from an isolated DSH_HOME — paste to an agent
 
-> Read-only investigation first, in /Users/astahmer/dev/dshfiles. Context: plugins/@dshfiles/optmem/docs/runtime-evidence.md (Stage 4,
+> Read-only investigation first, in ~/dev/dshfiles. Context: plugins/@dshfiles/optmem/docs/runtime-evidence.md (Stage 4,
 > "Why DSH_HOME stayed the real one"). With `drive.mjs` without `REAL_HOME=1` (isolated DSH_HOME, accounts.json copied),
 > every turn on `codex-emialex/gpt-6-luna` ends `completed` with an empty assistant message and no usage within
 > ~30 ms, even on the stock core. Find the cause in plugins/@dshfiles/ai-accounts (codex shadow home resolution,

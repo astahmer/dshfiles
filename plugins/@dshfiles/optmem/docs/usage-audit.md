@@ -2,7 +2,7 @@
 
 # OptMem measured-vs-estimated LLM usage and cost audit
 
-Scope: `plugins/@dshfiles/optmem*` in `/Users/astahmer/dev/dshfiles`, measured against the read-only
+Scope: `plugins/@dshfiles/optmem*` in `~/dev/dshfiles`, measured against the read-only
 snapshot `/tmp/optmem-audit/snapshot.db` (frozen copy of `~/.dsh/plugins/optmem/optmem.db`, `quick_check = ok`).
 The live DB was opened once, read-only, for schema only. No repository file was modified; nothing was written
 to the live DB.
