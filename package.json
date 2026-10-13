@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "scripts": {
-    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile && node scripts/with-local-core-dependencies.mjs --prepare && pnpm run setup:browser",
+    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm --dir apps/desktop install --frozen-lockfile && node scripts/with-local-core-dependencies.mjs --prepare && pnpm run setup:browser",
     "setup:browser": "pnpm --dir tooling/dshx exec playwright install --only-shell chromium",
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
@@ -16,7 +16,7 @@
     "verify:dsh-customization": "node scripts/dsh-customization-verify.mjs",
     "verify:dsh-customization:a11y": "node scripts/dsh-customization-a11y.mjs",
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
-    "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch",
+    "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop && pnpm run verify:cordis-identity && pnpm run verify:core-runtime-identity && pnpm run verify:core-runtime-scratch",
     "check:diff": "node scripts/check-diff.mjs",
     "check:plugins:cached": "node scripts/check-plugins-cached.mjs",
     "jj:workspaces": "node scripts/jj-workspaces.mjs",
@@ -25,15 +25,16 @@
     "jj:isolation:recover": "node scripts/jj-isolation/cli.mjs recover",
     "jj:isolation:preflight": "node scripts/jj-isolation/cli.mjs preflight",
     "test:jj-isolation": "node --test --test-concurrency=1 scripts/jj-isolation/guard.test.mjs scripts/jj-isolation/isolation.test.mjs scripts/jj-isolation/migration.test.mjs",
-    "lint": "oxlint tooling/dshx/packages plugins --config .oxlintrc.json",
-    "fmt": "oxfmt tooling/dshx/packages plugins --config .oxfmtrc.json",
-    "fmt:check": "oxfmt --check tooling/dshx/packages plugins --config .oxfmtrc.json",
+    "lint": "oxlint tooling/dshx/packages plugins scripts apps/desktop/src --config .oxlintrc.json",
+    "fmt": "oxfmt tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
+    "fmt:check": "oxfmt --check tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "check:plugin-boot": "pnpm --dir tooling/dshx run test:boot",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "profile:sync": "node scripts/profile-sync.ts",
     "profile:boot": "node scripts/profile-boot.ts",
     "test:web-profile-contract": "node --test scripts/verify-web-profile-contract.test.mjs",
-    "verify:web-profile-contract": "node scripts/verify-web-profile-contract.mjs"
+    "verify:web-profile-contract": "node scripts/verify-web-profile-contract.mjs",
+    "check:desktop": "pnpm --dir apps/desktop run typecheck"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
