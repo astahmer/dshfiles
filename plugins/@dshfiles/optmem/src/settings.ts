@@ -3,6 +3,7 @@ import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 
 const effort = Schema.union([
   Schema.const('').description('Adapter default'),
+  Schema.const('off').description('off (no reasoning, where the route offers it)'),
   Schema.const('low').description('low'),
   Schema.const('medium').description('medium'),
   Schema.const('high').description('high'),
@@ -49,7 +50,7 @@ export const optmemSettings = defineSettings({
       .default([
         { kind: 'codex', models: ['gpt-6-luna'], effort: 'low' },
         { kind: 'claude', models: ['claude-haiku-*'], effort: 'low' },
-        { kind: 'opencode-go', models: ['deepseek-v4.1-flash', 'deepseek-v4-flash', 'glm-5.3-flash'], effort: '' },
+        { kind: 'opencode-go', models: ['deepseek-v4.1-flash', 'deepseek-v4-flash', 'glm-5.3-flash'], effort: 'off' },
         { kind: 'commandcode', models: ['deepseek-v4.1-flash', 'deepseek-v4-flash', 'gpt-6-luna'], effort: '' },
         { kind: 'deepseek', models: ['deepseek-flash'], effort: '' },
       ])

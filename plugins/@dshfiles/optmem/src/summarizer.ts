@@ -22,7 +22,7 @@ const framedInput = (request: SummaryRequest): string =>
     ? `Record (JSON string):\n${JSON.stringify(request.input[0] ?? '')}`
     : `Notes (JSON array, older first):\n${JSON.stringify(request.input)}`
 
-export type SummaryEffort = 'low' | 'medium' | 'high'
+export type SummaryEffort = 'off' | 'low' | 'medium' | 'high'
 
 /** A fixed route; an empty provider means the provider of the thread being summarized. */
 export type RouteEntry = { readonly provider: string; readonly model: string; readonly effort?: SummaryEffort | undefined }
@@ -218,7 +218,10 @@ export const createLlmSummarizer = (options: {
         const initialBudget = Math.min(16_384, Math.max(2_048, request.maxBytes * 4))
         const retryBudget = Math.min(16_384, initialBudget * 2)
         const budgets = retryBudget > initialBudget ? [initialBudget, retryBudget] : [initialBudget]
-        for (const maxTokens of budgets) {
+        // A route that does not offer the configured effort (an older adapter without `off`) still summarizes at its default.
+        let effort = state.route.effort
+        for (let index = 0; index < budgets.length; index++) {
+          const maxTokens = budgets[index] ?? initialBudget
           const commonCall: Omit<GenerateOptions, 'reasoningEffort'> = {
             provider: state.route.provider,
             model: state.route.model,
@@ -231,8 +234,7 @@ export const createLlmSummarizer = (options: {
             // Go rejects the call outright without it (`x-opencode-session`).
             ...(request.conversationId.startsWith('session-') ? { sessionId: SessionId(request.conversationId) } : {}),
           }
-          const call: GenerateOptions =
-            state.route.effort === undefined ? commonCall : { ...commonCall, reasoningEffort: ReasoningEffortId(state.route.effort) }
+          const call: GenerateOptions = effort === undefined ? commonCall : { ...commonCall, reasoningEffort: ReasoningEffortId(effort) }
           const assembler = new BlockAssembler()
           for await (const chunk of options.stream(call)) assembler.push(chunk)
           const finish = assembler.finish
@@ -242,6 +244,11 @@ export const createLlmSummarizer = (options: {
             .join('')
             .trim()
           const failure = finish.kind === 'error' || finish.kind === 'aborted' ? finish.failure.message : ''
+          if (finish.kind === 'error' && finish.failure.code === 'UNSUPPORTED_REASONING_EFFORT' && effort !== undefined) {
+            effort = undefined
+            index--
+            continue
+          }
           if (failure.length > 0) {
             if (maxTokens < retryBudget && isOutputBudgetFailure(failure)) continue
             if (isOutputBudgetFailure(failure)) throw new OutputBudgetError(`summary output budget exhausted at ${maxTokens} tokens: ${failure}`)

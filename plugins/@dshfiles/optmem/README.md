@@ -36,6 +36,10 @@ Settings live in the `dshfiles-optmem` entry (Loader row inserted by this packag
   add, reorder and remove. Routes are checked against the models each DSH provider offers, using the same matching as
   the Host (`src/routing.ts`). Warnings never block saving.
 - An override route (one provider, model and effort for every summary), every byte budget, and the exclusions.
+- Effort `off` asks the route not to reason. OpenCode Go summaries default to it: with DeepSeek V4.1 Flash, hidden
+  reasoning had filled the output budget of most long summaries
+  ([benchmark](docs/benchmark-2026-10-13-summary-reasoning.md)). A route that does not offer the configured effort
+  summarizes at its own default instead of failing.
 - `mode` can be switched to `full` only when [`@dshfiles/request-messages`](../request-messages/README.md) is loaded
   and reports that it dispatches `agent/request-messages`. Otherwise it is read-only.
 - Live status from the Host API (`src/api.ts`): database size, stored events vs stream entries, in-memory jobs vs persisted missing-leaf entries, estimated unique model calls, ready merges, oldest pending work, completed summaries, recent throughput, last route and error. The legacy `pendingSummaries` value is explicitly labeled as an in-memory job count, not calls or persisted backlog. **Pause summaries** is live; failed summaries retry after resume. **Backfill sessions** imports a bounded batch.

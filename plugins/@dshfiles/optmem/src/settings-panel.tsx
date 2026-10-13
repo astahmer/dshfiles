@@ -16,6 +16,7 @@ type Effort = OptmemSettings['summarizerEffort']
 
 const efforts: readonly { readonly value: Effort; readonly label: string }[] = [
   { value: '', label: 'Default effort' },
+  { value: 'off', label: 'Off' },
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },

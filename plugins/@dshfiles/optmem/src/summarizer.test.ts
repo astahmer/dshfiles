@@ -80,7 +80,7 @@ describe('summary route selection', () => {
       route: { provider: 'codex-emialex', model: 'gpt-6-luna', effort: 'low' },
     })
     expect(await select('thread-opencode')).toMatchObject({
-      route: { provider: 'opencode-go-alex', model: 'opencode-go/deepseek-v4.1-flash', effort: undefined },
+      route: { provider: 'opencode-go-alex', model: 'opencode-go/deepseek-v4.1-flash', effort: 'off' },
     })
     expect(await select('thread-commandcode')).toMatchObject({ route: { provider: 'commandcode', model: 'deepseek-v4-flash' } })
   })
@@ -214,6 +214,35 @@ describe('llm summarizer', () => {
     })
     await expect(summarizer.summarize(request)).resolves.toMatchObject({ text: 'Recovered concise note.' })
     expect(calls.map(call => call.maxTokens)).toEqual([2_048, 4_096])
+  })
+
+  it('summarizes at the route default when the provider does not offer the configured effort', async () => {
+    const calls: GenerateOptions[] = []
+    const summarizer = createLlmSummarizer({
+      stream: async function* (call) {
+        calls.push(call)
+        if (call.reasoningEffort !== undefined) {
+          yield {
+            type: 'finish',
+            reason: { kind: 'error', failure: { code: 'UNSUPPORTED_REASONING_EFFORT', message: 'does not support reasoning effort "off"' } },
+          }
+          return
+        }
+        yield* answer('Default-effort note.')
+      },
+      resolveRoute: async conversationId => ({
+        kind: 'ready',
+        conversationId,
+        source: 'account',
+        route: { provider: 'opencode-go-alex', model: 'glm-5.3-flash', effort: 'off' },
+      }),
+      timeoutMs: () => 1_000,
+    })
+    await expect(summarizer.summarize(request)).resolves.toMatchObject({ text: 'Default-effort note.' })
+    expect(calls.map(call => [call.reasoningEffort, call.maxTokens])).toEqual([
+      ['off', 2_048],
+      [undefined, 2_048],
+    ])
   })
 
   it('bounds repeated output-budget exhaustion to two requests', async () => {
