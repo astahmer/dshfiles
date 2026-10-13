@@ -6,7 +6,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
 import { useEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
-import { DestinationBar, HostChipSlot, type DestinationBarServices } from './destination-bar.js'
+import { DestinationBar, HostChipSlot, type DestinationBarServices, workspaceListed } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { RemoteDestinationChips } from './remote-destination.js'
 
@@ -70,6 +70,7 @@ export const HeroWorkspacePicker = (
           : selection.workspaceId
         : (await props.ports.registerWorkspace(selection.canonicalPath)).workspaceId
     const destination = selection.kind === 'workspace' && selection.workspaceId === NO_FOLDER_ID ? { workspaceId } : await api.provision({ workspaceId })
+    await workspaceListed(props.services.workspaces, destination.workspaceId)
     // SAFETY: both ids come from the Host's workspace registry.
     props.onPick(destination.workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
   }

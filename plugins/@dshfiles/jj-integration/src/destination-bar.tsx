@@ -27,6 +27,26 @@ export const HostChipSlot = () => (
   </span>
 )
 
+/**
+ * The Host answers a call that registers a workspace before its workspace-list push lands, and the client refuses to
+ * open an id it has not seen, so a freshly provisioned workspace is opened only once the list carries it.
+ */
+export const workspaceListed = (workspaces: IWorkspaces, workspaceId: string): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    const known = (): boolean => workspaces.list.getSnapshot().items.some(item => item.workspaceId === workspaceId)
+    if (known()) return resolve()
+    const timer = setTimeout(() => {
+      unsubscribe()
+      reject(new Error(`Workspace ${workspaceId} never reached the workspace list.`))
+    }, 15_000)
+    const unsubscribe = workspaces.list.subscribe(() => {
+      if (!known()) return
+      clearTimeout(timer)
+      unsubscribe()
+      resolve()
+    })
+  })
+
 type Target = { readonly workspaceId: string; readonly isolate: boolean; readonly base?: string }
 
 /**
@@ -58,6 +78,7 @@ export const DestinationBar = (props: {
         await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) })
       ).workspaceId
       if (next === workspaceId) return
+      await workspaceListed(services.workspaces, next)
       await services.openWorkspace(next)
       // The blank thread left behind had no message, so its fresh workspace holds nothing worth keeping.
       const leavingPath = leaving === null ? undefined : services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === leaving)?.path
