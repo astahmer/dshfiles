@@ -66,7 +66,9 @@ export const startScratchProfile = async (
   const port = await findFreePort()
   const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
     cwd: workspaceRoot,
-    env: isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot),
+    // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
+    // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
+    env: { ...isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot), SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
