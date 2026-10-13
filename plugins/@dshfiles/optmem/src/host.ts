@@ -14,32 +14,13 @@ import { StreamIds, TreeMath } from '@dshfiles/optmem-core'
 import { defineCommand, defineHost, definePromptContext } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { Message, ToolHistory } from '@deepseek-ai/dsh-llm'
+import type {} from '@dshfiles/request-messages'
 
 import { optmemApi, type OptmemExplorerZoom, type OptmemOverview, type OptmemProject, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
 import { createLlmSummarizer, createRouteResolver, routeCooldownMs, type SummarizerPolicy, type SummaryEffort } from './summarizer.ts'
 import { createMemoryTools } from './tools.ts'
-
-/** Dispatched only by the dshfiles fork agent loop (tooling/dsh-core/FORK.md); stock DSH never fires it. */
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    'agent/request-messages'(
-      payload: {
-        agent: Agent
-        turn: number
-        step: number
-        isFirstStepOfTurn: boolean
-        messages: readonly Message[]
-        toolHistory: ToolHistory
-        signal: AbortSignal
-      },
-      next: () => Promise<readonly Message[]>,
-    ): Promise<readonly Message[]>
-  }
-}
 
 let runtime: OptmemRuntime | undefined
 let settingsScope: SettingsScope<OptmemSettings> | undefined
@@ -151,16 +132,7 @@ const hostServices = (ctx: Context): HostServices => {
   })
   return {
     has: service => ctx.get(service) !== undefined,
-    requestMessagesHook: () => {
-      const loop: unknown = ctx.get('agentLoop')
-      return (
-        typeof loop === 'object' &&
-        loop !== null &&
-        'forkFeatures' in loop &&
-        loop.forkFeatures instanceof Set &&
-        loop.forkFeatures.has('agent/request-messages')
-      )
-    },
+    requestMessagesHook: () => ctx.bail('request-messages/status')?.active === true,
     workspaceId: async path => (await ctx.get('workspaceRegistry')?.resolveByPath(path))?.id,
     sessionLogs: () => {
       const sessionQuery = ctx.get('sessionQuery')

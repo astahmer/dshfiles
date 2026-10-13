@@ -14,11 +14,11 @@ export const optmemSettings = defineSettings({
     enabled: Schema.boolean().default(true).description('Capture sessions, register memory tools and inject the compact memory view.'),
     mode: Schema.union([
       Schema.const('compat').description('Compatibility: DSH keeps its own context'),
-      Schema.const('full').description('Full: fresh context per turn (needs a fork capability)'),
+      Schema.const('full').description('Full: fresh context per turn (needs @dshfiles/request-messages)'),
     ])
       .default('compat')
       .description(
-        'Full mode needs the dshfiles fork core (agent/request-messages); on stock DSH it is reported unsupported and the plugin runs in compatibility mode.',
+        'Full mode needs the @dshfiles/request-messages bundle (agent/request-messages); without it full mode is reported unsupported and the plugin runs in compatibility mode.',
       ),
     injectUpperBytes: Schema.natural().min(1_024).max(65_536).default(8_192).description('Compact view merge threshold, and the injected memory budget.'),
     injectLowerBytes: Schema.natural().min(512).max(65_536).default(4_096).description('Compact view size a merge batch shrinks to.'),

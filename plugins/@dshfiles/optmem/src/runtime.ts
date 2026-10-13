@@ -146,7 +146,7 @@ export type SessionLogSource = {
 /** The DSH services OptMem uses, each optional at runtime; the Host adapts them from its Cordis context. */
 export type HostServices = {
   has(service: 'sessions' | 'tools' | 'systemPrompt'): boolean
-  /** The dshfiles fork agent loop dispatches `agent/request-messages` (per-request message replacement). */
+  /** `@dshfiles/request-messages` dispatches `agent/request-messages` (per-request message replacement). */
   requestMessagesHook(): boolean
   workspaceId(path: string): Promise<string | undefined>
   sessionLogs(): SessionLogSource | undefined
@@ -447,7 +447,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
   }
 
   /**
-   * Full mode (fork `agent/request-messages`): system and instruction messages, then one memory view message, then the
+   * Full mode (`agent/request-messages`): system and instruction messages, then one memory view message, then the
    * current turn only. The view is computed once per turn behind the next-turn barrier and reused for its later steps;
    * an unchanged view keeps the same message, so the prefix stays byte-identical across turns. `undefined` sends the
    * derived messages unchanged.

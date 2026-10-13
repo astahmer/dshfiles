@@ -16,7 +16,7 @@ let databases = 0
 const freshDatabase = (): string => join(home.directory, `memory-${databases++}`, 'optmem.db')
 
 describe('full mode capabilities', () => {
-  it('stays in compatibility mode on stock DSH', async () => {
+  it('stays in compatibility mode without the request-messages bundle', async () => {
     const { runtime } = createTestRuntime({ databasePath: freshDatabase(), settings: { mode: 'full' } })
     await runtime.start()
     const status = await createMemoryToolHandlers(() => runtime).status(undefined)
@@ -25,7 +25,7 @@ describe('full mode capabilities', () => {
     await runtime.stop()
   })
 
-  it('reports full mode when the fork request-messages hook is present', async () => {
+  it('reports full mode when the request-messages bundle is active', async () => {
     const { runtime } = createTestRuntime({ databasePath: freshDatabase(), settings: { mode: 'full' }, requestMessagesHook: true })
     await runtime.start()
     const status = await createMemoryToolHandlers(() => runtime).status(undefined)
@@ -43,7 +43,7 @@ const textOf = (message: Message | undefined): string => {
   return first?.type === 'text' ? first.text : ''
 }
 
-/** One DSH conversation as the fork loop sees it: committed events plus the derived request messages. */
+/** One DSH conversation as the agent loop sees it: committed events plus the derived request messages. */
 const createConversation = (runtime: OptmemRuntime, id: string) => {
   const fixture = createSessionFixture({ id, cwd: projectA })
   const messages: Message[] = [createSystemMessage('You are a test agent.')]
@@ -190,7 +190,7 @@ describe('full mode requests', () => {
     await runtime.stop()
   })
 
-  it('leaves requests untouched without the fork hook', async () => {
+  it('leaves requests untouched without the request-messages bundle', async () => {
     const { runtime } = createTestRuntime({ databasePath: freshDatabase(), workspaces, settings: { mode: 'full' } })
     await runtime.start()
     const conversation = createConversation(runtime, 'session-stock')

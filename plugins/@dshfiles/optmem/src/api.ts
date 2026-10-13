@@ -9,7 +9,7 @@ export type OptmemOverview = {
   readonly failure: string | null
   readonly requestedMode: 'compatibility' | 'full'
   readonly activeMode: 'compatibility' | 'full'
-  /** The fork core marker: the agent loop dispatches `agent/request-messages`, so full mode can run. */
+  /** `@dshfiles/request-messages` dispatches `agent/request-messages`, so full mode can run. */
   readonly fullModeAvailable: boolean
   readonly settingsSource: 'entry' | 'defaults'
   readonly database: { readonly path: string; readonly bytes: number | null }

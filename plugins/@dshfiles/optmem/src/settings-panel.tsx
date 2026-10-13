@@ -421,7 +421,7 @@ export const OptmemSettingsPanel = (): JSX.Element => {
           >
             <option value="compat">Compatibility</option>
             <option value="full" disabled={!fullModeAvailable}>
-              Full{fullModeAvailable ? '' : ' (needs the fork core)'}
+              Full{fullModeAvailable ? '' : ' (needs @dshfiles/request-messages)'}
             </option>
           </select>
         </Row>

@@ -80,7 +80,7 @@
     {
       "id": "bounded-context-injection",
       "title": "Inject bounded same-project memory context",
-      "summary": "Inject compact, bounded summaries into eligible prompts, refresh after configured growth, and fall back to compatible mode when a fork-only hook is unavailable.",
+      "summary": "Inject compact, bounded summaries into eligible prompts, refresh after configured growth, and fall back to compatible mode when agent/request-messages is not dispatched.",
       "surfaces": ["host", "settings", "integration"],
       "configuration": [
         {
@@ -162,7 +162,7 @@
       "failureModes": [
         "Unavailable summarizer leaves pending raw summaries for retry.",
         "Cancellation preserves the durable barrier marker and does not inject stale context.",
-        "The stock Host cannot claim fork-only full mode is active."
+        "Without @dshfiles/request-messages the Host cannot claim full mode is active."
       ],
       "externalDependencies": [
         {
@@ -194,15 +194,15 @@
         },
         {
           "kind": "unit-test",
-          "id": "optmem.bounded-context-injection-unit-stock-host-fallback",
+          "id": "optmem.bounded-context-injection-unit-no-dispatcher-fallback",
           "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
-          "testName": "stays in compatibility mode on stock DSH"
+          "testName": "stays in compatibility mode without the request-messages bundle"
         },
         {
           "kind": "unit-test",
-          "id": "optmem.bounded-context-injection-unit-fork-mode",
+          "id": "optmem.bounded-context-injection-unit-full-mode",
           "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
-          "testName": "reports full mode when the fork request-messages hook is present"
+          "testName": "reports full mode when the request-messages bundle is active"
         },
         {
           "kind": "unit-test",
@@ -226,7 +226,7 @@
           "kind": "unit-test",
           "id": "optmem.bounded-context-injection-unit-stock-request-identity",
           "file": "plugins/@dshfiles/optmem/src/full-mode.test.ts",
-          "testName": "leaves requests untouched without the fork hook"
+          "testName": "leaves requests untouched without the request-messages bundle"
         },
         {
           "kind": "unit-test",
