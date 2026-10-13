@@ -276,7 +276,7 @@ export const bootComposedPluginProfile = async ({
   }
   const bundles = [...profileBundles.values()]
   for (const bundle of bundles) await buildPlugin(bundle.projectRoot, bundle.packageId)
-  const prepared = await prepareComposedBootProfile(bundles, additionalBundleIds)
+  const prepared = await prepareComposedBootProfile(bundles, { additionalBundleIds })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)

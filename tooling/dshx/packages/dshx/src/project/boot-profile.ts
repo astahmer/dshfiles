@@ -208,5 +208,5 @@ export const prepareBootProfile = async (projectRoot: string, packageId: string)
 
 export const prepareComposedBootProfile = async (
   localBundles: readonly [BootProfileBundle, ...BootProfileBundle[]],
-  additionalBundleIds: readonly string[] = [],
-): Promise<PreparedBootProfile> => prepareBootProfiles(localBundles, { additionalBundleIds })
+  options: PrepareBootProfilesOptions = {},
+): Promise<PreparedBootProfile> => prepareBootProfiles(localBundles, options)
