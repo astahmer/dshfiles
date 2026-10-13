@@ -82,6 +82,25 @@ subscription, message-lifecycle, and tool-activity data. It is read-only and
 never prints message bodies. A missing bridge or an empty event history is not
 proof that Agents never used the capability.
 
+The report keeps three kinds of evidence apart, because each proves something
+different:
+
+- **Health**: the Host bridge is reachable and the state file is readable.
+- **Tool activity**: a recorded call proves that Agent used that tool. Activity
+  is its own collection because read-only calls (`agents`, `topics`, `inbox`)
+  leave no trace in message state.
+- **Message lifecycle**: recipients, reads and acknowledgements prove that
+  communication happened, not that an Agent acted on the message.
+
+Older state (schema 1–3) is migrated in memory on read and written as version 4
+only by the next mutation, so a report never rewrites history. State that fails
+to decode is reported as `state-unreadable` and left untouched.
+
+Live Agent use has not been observed yet: the last check of the running profile
+returned `host-unavailable`, and no live Agent turn was run to produce
+activity. To check a profile, run `dshx comm report --json` against it and read
+`activity` together with the health fields, not the counts alone.
+
 The owned `@dshfiles/agent-communication` bundle adds a channel/direct-message
 browser with debounced server-side search, cursor pagination, visible untrusted
 message text, recipient read/acknowledgement context, and live Agent status. It
