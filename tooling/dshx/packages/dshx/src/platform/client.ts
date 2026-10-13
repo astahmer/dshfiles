@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { isIPv4 } from 'node:net'
 import { z } from 'zod'
 import WebSocket, { type RawData } from 'ws'
@@ -842,14 +845,27 @@ export function createDshPlatformClientFromTransport(transport: DshPlatformTrans
   return makeTypedClient(transport)
 }
 
+/** The launch URL from options, DSHX_URL, or the one the dsh-web supervisor records for this DSH home. */
+export const resolveLaunchUrl = (explicit: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined => {
+  const configured = explicit ?? env.DSHX_URL
+  if (configured !== undefined) return configured
+  const dshHome = env.DSH_HOME?.trim() || join(homedir(), '.dsh')
+  try {
+    const recorded = readFileSync(join(dshHome, 'runtime', 'web-url'), 'utf8').trim()
+    return recorded === '' ? undefined : recorded
+  } catch {
+    return undefined
+  }
+}
+
 export interface ConnectDshPlatformClientOptions {
   readonly url?: string
   readonly fetch?: typeof fetch
 }
 
 export async function connectDshPlatformClient(options: ConnectDshPlatformClientOptions = {}): Promise<DshPlatformClient> {
-  const launchUrl = options.url ?? process.env.DSHX_URL
-  if (launchUrl === undefined) throw new DshPlatformError('missing-url', 'Set DSHX_URL to the tokenized DSH launch URL printed by dsh.')
+  const launchUrl = resolveLaunchUrl(options.url)
+  if (launchUrl === undefined) throw new DshPlatformError('missing-url', 'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.')
   const parsed = loopbackLaunchUrl(launchUrl)
   const request = options.fetch ?? fetch
   let exchange: Response
