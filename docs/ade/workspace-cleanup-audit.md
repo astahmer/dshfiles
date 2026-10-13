@@ -61,8 +61,42 @@ Two checks must pass before any removal, and neither has been run:
    still referenced, and its thread history must survive the filesystem cleanup.
 2. **No writer lease or observer** in the jj-integration registry.
 
-Until both are asserted per candidate, the thread list is a **candidate list, not
-an approval list**.
+**Gate 1 has now been run** against the 25 thread workspaces, by matching each
+workspace's encoded cwd against the session persistence directory names
+(`--<path with / as ->--`):
+
+| Result                                       | Count  |
+| -------------------------------------------- | ------ |
+| referenced by a live session → **RETAIN**    | **16** |
+| no session reference → **removal candidate** | **9**  |
+
+Gate 2 (writer leases / observers in the jj-integration registry) has not been
+run, so this remains a candidate list pending your approval, not an approval
+list.
+
+### The 9 removal candidates
+
+| Workspace                       | Size                   |
+| ------------------------------- | ---------------------- |
+| `dshfiles-09ed7083`             | 28 MB                  |
+| `dshfiles-3139eb19`             | 28 MB                  |
+| `dshfiles-34f3a9ee`             | 28 MB                  |
+| `dshfiles-4d7101f5`             | 28 MB                  |
+| `dshfiles-6928173d`             | 28 MB                  |
+| `dshfiles-801bffec`             | 28 MB                  |
+| `dshfiles-8dad1a6c`             | 28 MB                  |
+| `dshfiles-core-narrow-0f366e5e` | directory already gone |
+| `dshfiles-core-narrow-30413344` | directory already gone |
+| **total**                       | **≈197 MB logical**    |
+
+All nine are empty and off-spine (nothing unique), and none is referenced by a
+session. The last two are the cheap case: their directories are already gone, so
+only the jj registration needs reconciling.
+
+The **16 referenced** workspaces stay: their thread history points at that cwd,
+and the task requires session history to survive filesystem cleanup. They are
+what the automatic post-integration lifecycle is for — retire once the thread no
+longer depends on the directory.
 
 ## Orphan from the failed thread creation
 
