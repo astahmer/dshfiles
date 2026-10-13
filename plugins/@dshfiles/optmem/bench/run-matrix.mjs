@@ -36,7 +36,7 @@ const config = z
   })
   .parse(values)
 const arms = z
-  .array(z.enum(['A', 'B', 'C']))
+  .array(z.enum(['A', 'B', 'C', 'M']))
   .min(1)
   .parse(config.arms.split(','))
 const scenarioNames = z.array(z.string().regex(/^[a-z0-9-]+$/)).parse(config.scenarios.split(','))

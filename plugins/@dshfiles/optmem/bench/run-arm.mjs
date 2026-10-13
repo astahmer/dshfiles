@@ -1,6 +1,8 @@
 // One benchmark run: one arm × one scenario × one repetition, in a fresh scratch DSH home.
 // Usage: node run-arm.mjs --arm A|B|C --scenario scenarios/<name>.json --port 3221 --out <results-dir> [--rep 1]
-// Arms: A = native compaction only (OptMem not loaded), B = OptMem compatibility, C = OptMem full (+ request-messages).
+// Arms: A = native compaction only (OptMem not loaded), B = OptMem compatibility, C = OptMem full (+ request-messages),
+//       M = @dshfiles/memory (digests of idle threads, a frozen start block, memory tools; OptMem not loaded).
+// A key exported under the account's apiKeyEnv (secret run) is used instead of the DSH credentials file.
 // Env: BENCH_PROVIDER (default opencode-go-alex), BENCH_MODEL (default deepseek-v4.1-flash), BENCH_EFFORT (default: adapter default),
 //      BENCH_ACCOUNTS (default ~/.dsh/plugins/ai-accounts/accounts.json), BENCH_CREDENTIALS (default ~/.dsh/.credentials.yaml),
 //      BENCH_HOME_ROOT (default /private/tmp/claude-501/optmem-bench-homes), BENCH_KEEP_HOME=1 keeps the home (credentials are always removed).
@@ -34,8 +36,8 @@ const { values: args } = parseArgs({
     'calibration-reps': { type: 'string', default: '1' },
   },
 })
-if (!['A', 'B', 'C'].includes(args.arm ?? '') || args.scenario === undefined || args.port === undefined || args.out === undefined)
-  throw new Error('usage: run-arm.mjs --arm A|B|C --scenario <file> --port <port> --out <dir> [--rep n]')
+if (!['A', 'B', 'C', 'M'].includes(args.arm ?? '') || args.scenario === undefined || args.port === undefined || args.out === undefined)
+  throw new Error('usage: run-arm.mjs --arm A|B|C|M --scenario <file> --port <port> --out <dir> [--rep n]')
 if (args.calibration && args.arm !== 'A') throw new Error('direct calibration uses arm A without a live memory engine')
 const calibrationSettings = z
   .object({
@@ -86,7 +88,8 @@ const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = awai
 )
 const { connectDshPlatformClient } = await import(pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/platform/index.js')).href)
 const plugin = name => `link:${resolve(repoRoot, 'plugins/@dshfiles', name)}`
-const withOptmem = arm !== 'A'
+const withOptmem = arm === 'B' || arm === 'C'
+const withMemory = arm === 'M'
 const withRequestMessages = arm === 'C'
 const extraDependencies = {
   '@dshfiles/shared-runtime': plugin('shared-runtime'),
@@ -95,10 +98,12 @@ const extraDependencies = {
 }
 if (withRequestMessages) extraDependencies['@dshfiles/request-messages'] = plugin('request-messages')
 if (withOptmem) extraDependencies['@dshfiles/optmem'] = plugin('optmem')
+if (withMemory) extraDependencies['@dshfiles/memory'] = plugin('memory')
 const scratch = await createScratchProfile({
   profileName: 'optmem-bench',
-  // Only the shape is read; every @dshfiles / third-party dependency is excluded below.
-  sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
+  // Only the shape is read; every @dshfiles / third-party dependency is excluded below. The checked-in seed keeps the
+  // run independent of the live ~/.dsh.
+  sourceProfileRoot: process.env.BENCH_SOURCE_PROFILE ?? resolve(repoRoot, 'profiles/web'),
   bundleIds: [
     '@deepseek-ai/dsh-base',
     '@deepseek-ai/dsh-web-app',
@@ -107,6 +112,7 @@ const scratch = await createScratchProfile({
     '@dshfiles/optmem-bench-probe',
     ...(withRequestMessages ? ['@dshfiles/request-messages'] : []),
     ...(withOptmem ? ['@dshfiles/optmem'] : []),
+    ...(withMemory ? ['@dshfiles/memory'] : []),
   ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies,
@@ -158,7 +164,14 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
       pathToFileURL(resolve(repoRoot, 'plugins/@dshfiles/ai-accounts/node_modules/yaml/dist/index.js')).href
     )
     const accounts = JSON.parse(await readFile(process.env.BENCH_ACCOUNTS ?? resolve(homedir(), '.dsh/plugins/ai-accounts/accounts.json'), 'utf8'))
-    const sourceCredentials = parseYaml(await readFile(process.env.BENCH_CREDENTIALS ?? resolve(homedir(), '.dsh/.credentials.yaml'), 'utf8'))
+    // A key exported under the account's apiKeyEnv (e.g. through `secret run`) wins; the DSH credentials file is read only otherwise.
+    const keysFromEnvironment = accountIds.every(id => {
+      const account = accounts.accounts.find(entry => entry.instanceId === id)
+      return account !== undefined && account.kind !== 'codex' && (process.env[account.apiKeyEnv] ?? '') !== ''
+    })
+    const sourceCredentials = keysFromEnvironment
+      ? { refs: {} }
+      : parseYaml(await readFile(process.env.BENCH_CREDENTIALS ?? resolve(homedir(), '.dsh/.credentials.yaml'), 'utf8'))
     const refs = {}
     const copied = []
     for (const id of accountIds) {
@@ -182,7 +195,10 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
         continue
       }
       const keyName = account.apiKeyEnv
-      const credentialReference = z.string().safeParse(sourceCredentials?.refs?.[keyName])
+      const credentialReference = z
+        .string()
+        .min(1)
+        .safeParse(process.env[keyName] || sourceCredentials?.refs?.[keyName])
       if (!credentialReference.success) throw new Error(`credential ${keyName} is not stored in DSH credentials`)
       refs[keyName] = credentialReference.data
       copied.push(account)
@@ -319,6 +335,10 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
       await cp(resolve(home, 'plugins/optmem'), resolve(outDir, `${runId}.optmem`), { recursive: true }).catch(() => {})
       evidence.optmemDb = await optmemStats(database).catch(error => ({ error: String(error) }))
     }
+    if (withMemory) {
+      await cp(resolve(home, 'plugins/memory'), resolve(outDir, `${runId}.memory`), { recursive: true }).catch(() => {})
+      evidence.memoryDb = await memoryStats().catch(error => ({ error: String(error) }))
+    }
     await writeFile(resolve(outDir, `${runId}.json`), JSON.stringify(evidence, null, 2))
     await writeFile(resolve(outDir, `${runId}.host.log`), redactHostOutput(output), { mode: 0o600 })
     if (process.env.BENCH_KEEP_HOME !== '1') await scratch.cleanup()
@@ -348,6 +368,48 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
     } finally {
       db.close()
     }
+  }
+
+  const memoryStats = async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const db = new DatabaseSync(resolve(home, 'plugins/memory/memory.db'), { readOnly: true })
+    const all = sql => db.prepare(sql).all()
+    try {
+      return {
+        threads: all('select id, source, length(digest) bytes, duplicate_of is not null duplicate from threads'),
+        notes: all('select count(*) n from notes where valid = 1')[0].n,
+        messages: all('select count(*) n from messages')[0].n,
+        blocks: all('select thread, length(text) bytes from thread_blocks'),
+        toolCalls: all('select tool, count(*) calls, sum(results > 0) withResults, sum(used) used from tool_calls group by tool'),
+        counters: all('select name, value from counters'),
+      }
+    } finally {
+      db.close()
+    }
+  }
+
+  /** A real user leaves time between threads; the harness waits until the previous thread's digest exists instead. */
+  const waitForDigest = async sessionId => {
+    const started = Date.now()
+    const { DatabaseSync } = await import('node:sqlite')
+    let seenAt
+    while (Date.now() - started < 240_000) {
+      const db = new DatabaseSync(resolve(home, 'plugins/memory/memory.db'), { readOnly: true })
+      try {
+        const row = db.prepare('select source from threads where id = ?').get(sessionId)
+        const seen = db.prepare('select through_seq from indexed_threads where thread = ?').get(sessionId)
+        if (row !== undefined) return { sessionId, waitedMs: Date.now() - started, digest: row.source }
+        // Indexed but no digest yet: a trivial thread, or a model digest still in flight; give the call time to land.
+        seenAt = seen === undefined ? undefined : (seenAt ?? Date.now())
+        if (seenAt !== undefined && Date.now() - seenAt > 20_000) return { sessionId, waitedMs: Date.now() - started, digest: 'none (trivial)' }
+      } catch {
+        // The database appears with the first digest.
+      } finally {
+        db.close()
+      }
+      await new Promise(done => setTimeout(done, 1000))
+    }
+    return { sessionId, waitedMs: Date.now() - started, digest: 'timeout' }
   }
 
   const drainSummaries = async () => {
@@ -484,8 +546,15 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
       throw new Error(`turn timed out: ${prompt.slice(0, 120)}`)
     }
 
+    let previousSession
     for (const conversation of scenario.conversations) {
+      if (withMemory && previousSession !== undefined) {
+        const waited = await waitForDigest(previousSession)
+        evidence.memoryWaits = [...(evidence.memoryWaits ?? []), waited]
+        log('memory digest', JSON.stringify(waited))
+      }
       const created = await platform.sessions.create({ cwd: project })
+      previousSession = created.sessionId
       for (const item of conversation.turns) await turn(conversation.name, created.sessionId, item)
       const history = await allEvents(created.sessionId)
       evidence.sessionEventCounts = {
@@ -513,6 +582,10 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
         failed: [...summary.matchAll(/^not ok \d+ - (.+)$/gm)].map(match => match[1]).slice(0, 20),
       }
       log('acceptance', JSON.stringify(evidence.acceptance))
+    }
+    if (withMemory && previousSession !== undefined) {
+      const waited = await waitForDigest(previousSession)
+      evidence.memoryWaits = [...(evidence.memoryWaits ?? []), waited]
     }
     await drainSummaries()
     await finish(evidence.drain?.complete === false ? 2 : 0)

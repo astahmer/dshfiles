@@ -8,6 +8,9 @@ export const inject = ['llm']
 
 const calibrationVariantsById = new Map(calibrationVariants.map(variant => [variant.id, variant]))
 const byteLength = value => Buffer.byteLength(JSON.stringify(value ?? null))
+const memoryBlockMarker = 'Memory: past threads have digests and notes'
+// DSH messages carry content as an array of blocks; text blocks hold the words.
+const messageText = message => (Array.isArray(message.content) ? message.content.map(block => block.text ?? '').join('\n') : String(message.content ?? ''))
 
 /**
  * Observe-only: `llm/stream` sees every model call as DSH built it (agent loop, native compaction, OptMem summaries,
@@ -81,6 +84,11 @@ export const apply = (ctx, config) => {
         systemHead: (options.system ?? '').slice(0, 48),
         tools: options.tools?.length ?? 0,
         toolBytes: byteLength(options.tools ?? []),
+        // Where @dshfiles/memory's start block sits: how often it appears in the system field and which messages hold it.
+        memoryBlock: {
+          system: (options.system ?? '').split(memoryBlockMarker).length - 1,
+          messages: options.messages.flatMap((message, index) => (messageText(message).includes(memoryBlockMarker) ? [`${message.role}#${index}`] : [])),
+        },
       }
       if (calibrationInProgress) record.calibration = true
       return (async function* () {

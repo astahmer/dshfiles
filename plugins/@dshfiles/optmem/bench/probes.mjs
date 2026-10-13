@@ -11,7 +11,7 @@ export const scoreProbe = ({ answer, probe, truth, tools = [] }) => {
   const missing = probe.expect.filter(item => !matches(item)).map(item => [item].flat().join('/'))
   const forbidden = (probe.forbid ?? []).filter(matches)
   const memoryOnly = ['delayed-recall', 'cross-session', 'negative-recall'].includes(probe.kind)
-  const forbiddenTools = memoryOnly ? tools.filter(name => !/(?:^|\.)memory_(?:search|zoom|context|status)$/.test(name)) : []
+  const forbiddenTools = memoryOnly ? tools.filter(name => !/(?:^|\.)memory_(?:search|zoom|context|status|read)$/.test(name)) : []
   const exactNegative = probe.kind !== 'negative-recall' || normalized.trim() === 'not_recorded'
   return {
     id: probe.id,

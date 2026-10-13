@@ -73,7 +73,8 @@ export const runtimeFingerprint = async ({ arm, calibration = false }) => {
   const packages = [
     'shared-runtime',
     'ai-accounts',
-    ...(arm === 'A' ? [] : ['optmem', 'optmem-core', 'optmem-sqlite']),
+    ...(arm === 'B' || arm === 'C' ? ['optmem', 'optmem-core', 'optmem-sqlite'] : []),
+    ...(arm === 'M' ? ['memory'] : []),
     ...(arm === 'C' ? ['request-messages'] : []),
   ]
   const files = [

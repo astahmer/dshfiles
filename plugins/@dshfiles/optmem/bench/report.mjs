@@ -23,7 +23,7 @@ const priceOf = call => {
   if (price === undefined) throw new Error(`no list price for ${call.provider}/${call.model}; add it before reporting`)
   return price
 }
-const ARM_NAMES = { A: 'A native compaction', B: 'B OptMem compat', C: 'C OptMem full' }
+const ARM_NAMES = { A: 'A native compaction', B: 'B OptMem compat', C: 'C OptMem full', M: 'M @dshfiles/memory' }
 
 const readJsonl = async file =>
   (await readFile(file, 'utf8').catch(() => ''))
@@ -36,7 +36,11 @@ const callKind = call => {
   if (call.calibration === true) return 'calibration'
   if (call.purpose === 'agent') return 'agent'
   if (call.purpose === 'session-title') return 'title'
-  if (call.purpose === 'compaction') return (call.systemHead ?? '').startsWith('You maintain the long-term memory') ? 'optmem' : 'native-compaction'
+  if (call.purpose === 'compaction') {
+    if ((call.systemHead ?? '').startsWith('You maintain the long-term memory')) return 'optmem'
+    if ((call.systemHead ?? '').startsWith('You write the digest of one finished')) return 'memory-digest'
+    return 'native-compaction'
+  }
   return 'other'
 }
 
@@ -107,7 +111,7 @@ const rescore = async (scenario, turn) => {
 }
 
 const runs = []
-for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test(name)).sort()) {
+for (const file of (await readdir(dir)).filter(name => /-[ABCM]-r\d+\.json$/.test(name)).sort()) {
   const run = JSON.parse(await readFile(join(dir, file), 'utf8'))
   const journal = await readJsonl(join(dir, file.replace(/\.json$/, '.calls.jsonl')))
   const calibrationJournal = await readJsonl(join(dir, file.replace(/\.json$/, '.calibration.jsonl')))
@@ -198,6 +202,18 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
     agent: usageOf(agentCalls),
     nativeCompaction: usageOf(byKind['native-compaction'] ?? []),
     optmem: usageOf(byKind.optmem ?? []),
+    memoryDigest: usageOf(byKind['memory-digest'] ?? []),
+    // Agent calls whose request carried @dshfiles/memory's start block, and where: it must sit only in the system prompt.
+    memoryBlock: {
+      agentCalls: agentCalls.length,
+      withBlock: agentCalls.filter(call => (call.memoryBlock?.system ?? 0) > 0 || (call.memoryBlock?.messages ?? []).length > 0).length,
+      outsideSystem: agentCalls.filter(call => (call.memoryBlock?.messages ?? []).some(position => !position.startsWith('system#'))).length,
+      repeated: agentCalls.filter(call => (call.memoryBlock?.system ?? 0) + (call.memoryBlock?.messages ?? []).length > 1).length,
+    },
+    agentCacheShare: (() => {
+      const usage = usageOf(agentCalls)
+      return usage.prompt === 0 ? 0 : usage.cacheRead / usage.prompt
+    })(),
     title: usageOf(byKind.title ?? []),
     all: usageOf(calls),
     agentSteps: agentCalls.length,
@@ -316,7 +332,7 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
     '| arm | runs | prompt tok, all calls | cached % | output tok | est. cost $ | agent steps | first → last turn prompt tok | max prompt tok | max msgs sent | max KB sent | native compactions | OptMem summary calls | wall s | median turn s |',
   )
   lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
-  for (const arm of ['A', 'B', 'C']) {
+  for (const arm of ['A', 'B', 'C', 'M']) {
     const items = groups[`${scenario}|${arm}`] ?? []
     if (items.length === 0) continue
     lines.push(
@@ -326,7 +342,7 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
   const curveTurns = [1, 5, 10, 15, 20, 25].filter(turn => runs.some(run => run.scenario === scenario && run.promptCurve.length >= turn))
   lines.push(`\n| arm | ${curveTurns.map(turn => `t${turn}`).join(' | ')} | last |`)
   lines.push(`|---|${curveTurns.map(() => '---|').join('')}---|`)
-  for (const arm of ['A', 'B', 'C']) {
+  for (const arm of ['A', 'B', 'C', 'M']) {
     const items = groups[`${scenario}|${arm}`] ?? []
     if (items.length === 0) continue
     lines.push(
@@ -337,7 +353,7 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
     '\n| arm | recall probes | analysis probes | cross-session probes | negative recall | task reasoning | acceptance tests | failed probes (per run) |',
   )
   lines.push('|---|---|---|---|---|---|---|---|')
-  for (const arm of ['A', 'B', 'C']) {
+  for (const arm of ['A', 'B', 'C', 'M']) {
     const items = groups[`${scenario}|${arm}`] ?? []
     if (items.length === 0) continue
     const acceptance = items.some(run => run.acceptance !== undefined) ? ratio(items, run => run.acceptance ?? { pass: 0, total: 0 }) : '–'
