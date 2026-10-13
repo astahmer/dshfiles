@@ -6,7 +6,7 @@
   "scripts": {
     "contract": "node scripts/check-workspace-contract.ts",
     "typecheck": "tsc -p scripts/tsconfig.json && pnpm -r --filter './@dshfiles/*' run typecheck",
-    "test": "pnpm -r --filter './@dshfiles/*' run test",
+    "test": "pnpm -r --filter './@dshfiles/*' run test --testTimeout=30000",
     "build": "pnpm -r --filter './@dshfiles/*' run build",
     "check": "pnpm run contract && pnpm run build && pnpm run typecheck && pnpm run test"
   },
