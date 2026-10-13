@@ -127,7 +127,6 @@ interface JujutsuPanelProps {
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
   readonly openSession: (sessionId: SessionSummary['id']) => void
-  readonly pickDirectory: () => Promise<string | null>
   readonly launchSession: (cwd: string) => Promise<void>
 }
 
@@ -1287,7 +1286,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                     selectedCommitId={selectedRevision?.commitId ?? null}
                     provisionedPath={provisionedPath}
                     onPreview={askForConfirmation}
-                    pickDirectory={props.pickDirectory}
+                    directoryPicker={props.directoryPicker}
+                    registerWorkspace={props.registerWorkspace}
                     launchSession={props.launchSession}
                   />
                 )}

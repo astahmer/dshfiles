@@ -45,10 +45,11 @@ export default defineClient({
             registerWorkspace={registerWorkspace}
             sessions={ctx.sessions}
             openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
-            pickDirectory={() => ctx.uiWorkspace.pickDirectory()}
+            // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
+            // the new JJ workspace is registered and opened the way the native folder picker opens one.
             launchSession={async cwd => {
-              const sessionId = await ctx.sessions.create({ cwd })
-              ctx.uiWorkspace.openSession(sessionId)
+              const workspace = await ctx.workspaces.create({ path: cwd })
+              await ctx.uiWorkspace.openWorkspace(workspace.workspaceId)
             }}
           />
         </PluginQueryProvider>

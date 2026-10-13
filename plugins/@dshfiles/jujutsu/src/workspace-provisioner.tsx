@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshf
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useEffect, useState } from 'react'
 import { workspaceNameSchema, type Mutation, type Revision } from './api.js'
 
@@ -12,7 +13,9 @@ interface WorkspaceProvisionerProps {
   readonly selectedCommitId: string | null
   readonly provisionedPath: string | null
   readonly onPreview: (action: Mutation) => void
-  readonly pickDirectory: () => Promise<string | null>
+  /** The same Host picker the repository chooser uses, so a browse-only Host can choose a parent too. */
+  readonly directoryPicker: DirectoryPickerPort
+  readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
   readonly launchSession: (cwd: string) => Promise<void>
 }
 
@@ -22,6 +25,7 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
   const [baseCommitId, setBaseCommitId] = useState('')
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     if (props.revisions.length === 0) {
@@ -33,16 +37,6 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
       return props.selectedCommitId ?? props.revisions.find(revision => revision.workingCopy)?.commitId ?? props.revisions[0]?.commitId ?? ''
     })
   }, [props.revisions, props.selectedCommitId])
-
-  const chooseParent = async (): Promise<void> => {
-    setError(null)
-    try {
-      const selected = await props.pickDirectory()
-      if (selected !== null) setParentPath(selected)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not choose a parent directory.')
-    }
-  }
 
   const createSession = async (): Promise<void> => {
     if (props.provisionedPath === null) return
@@ -101,7 +95,15 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
           />
         </div>
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <Button onClick={() => void chooseParent()} size="sm" type="button" variant="outline">
+          <Button
+            onClick={() => {
+              setError(null)
+              setPickerOpen(true)
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
             Choose parent directory
           </Button>
           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={parentPath || undefined}>
@@ -135,6 +137,20 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
           </Alert>
         )}
       </CardContent>
+      {pickerOpen && (
+        <ProjectFolderPicker
+          directoryPicker={props.directoryPicker}
+          mode="directories"
+          onClose={() => setPickerOpen(false)}
+          onRegisterWorkspace={props.registerWorkspace}
+          onSelect={selected => {
+            setPickerOpen(false)
+            setParentPath(selected.canonicalPath)
+          }}
+          projects={[]}
+          title="Choose the parent directory"
+        />
+      )}
     </Card>
   )
 }
