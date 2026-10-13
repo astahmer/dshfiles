@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { JjIntegrationTranslate } from './locales.js'
 import type { IntegrationCandidate, WorkspaceRecord } from './types.js'
 import { blockerOf } from './panel.js'
-import { describeStatus } from './workspace-chip.js'
 
 const t = ((key: string) => key) as unknown as JjIntegrationTranslate
 
@@ -49,32 +48,6 @@ const candidate = (overrides: Partial<IntegrationCandidate> = {}): IntegrationCa
   ...overrides,
 })
 
-describe('composer workspace status', () => {
-  it('reads a free workspace as writable', () => {
-    expect(describeStatus(workspace(), undefined, 'session-a', t)).toEqual({ label: 'chipWritable', tone: 'success' })
-  })
-
-  it('names the holder when another session owns the lease', () => {
-    const lease = { sessionId: 'session-b', epoch: 2, acquiredAt: 1, heartbeatAt: 1, host: null }
-    expect(describeStatus(workspace({ writerLease: lease }), undefined, 'session-a', t)).toEqual({ label: 'chipOwnedElsewhere', tone: 'danger' })
-    expect(describeStatus(workspace({ writerLease: lease, observers: [{ sessionId: 'session-a', since: 1 }] }), undefined, 'session-a', t)).toEqual({
-      label: 'chipReadOnly',
-      tone: 'neutral',
-    })
-  })
-
-  it('keeps the lease holder writable and surfaces integration progress', () => {
-    const lease = { sessionId: 'session-a', epoch: 1, acquiredAt: 1, heartbeatAt: 1, host: null }
-    expect(describeStatus(workspace({ writerLease: lease }), undefined, 'session-a', t)).toEqual({ label: 'chipWritable', tone: 'success' })
-    expect(describeStatus(workspace({ writerLease: lease }), candidate({ state: 'running' }), 'session-a', t)).toEqual({ label: 'chipIntegrating', tone: 'info' })
-    expect(describeStatus(workspace({ writerLease: lease }), candidate({ state: 'queued' }), 'session-a', t)).toEqual({ label: 'chipIntegrationPending', tone: 'warning' })
-    expect(describeStatus(workspace({ writerLease: lease }), candidate({ state: 'blocked' }), 'session-a', t)).toEqual({ label: 'chipNeedsResolution', tone: 'danger' })
-  })
-
-  it('reports a missing workspace ahead of any ownership state', () => {
-    expect(describeStatus(workspace({ missing: true }), candidate({ state: 'running' }), 'session-a', t)).toEqual({ label: 'missing', tone: 'danger' })
-  })
-})
 
 describe('integration blocker', () => {
   it('explains conflicts, validation, dependencies and stale sources', () => {

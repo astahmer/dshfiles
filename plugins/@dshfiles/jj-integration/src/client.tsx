@@ -5,7 +5,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { JjIntegrationPanel } from './panel.js'
-import { WorkspaceStatusChip } from './workspace-chip.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import './client.css'
 
@@ -28,28 +27,6 @@ export default defineClient({
     const label = (): string => translate('title')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label, locale: JJ_INTEGRATION_LOCALE_NAMESPACE }, PanelGlyph),
-    )
-    // The composer's existing leading control row, so the status costs no
-    // vertical space and never sits between the user and the input.
-    ctx.slots.inject('conversation.input.left', () =>
-      ctx.slots.register(
-        {
-          name: 'conversation.input.left',
-          id: 'jj-integration-status',
-          order: 4,
-          locale: JJ_INTEGRATION_LOCALE_NAMESPACE,
-          inject: (sessionId: string) => ({ sessionId }),
-        },
-        decorate(props => (
-          <PluginQueryProvider>
-            <WorkspaceStatusChip
-              sessionId={props.sessionId}
-              t={props.t}
-              onOpen={() => ctx.layout.selectPanel(PANEL_ID as MainPanelId)}
-            />
-          </PluginQueryProvider>
-        )),
-      ),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
