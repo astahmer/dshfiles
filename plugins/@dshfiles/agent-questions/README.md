@@ -47,6 +47,41 @@ applied automatically. Cold-session revision checks read the persisted Session
 header through `dsh-session-query`; feedback rows keep only the workspace-relative
 path and hash. Element anchors still require a browser/evidence provider.
 
+## Root questions use the native timed mode
+
+This bundle does not touch root questions. The `web` profile switches DSH's own
+`tool-ask-user` row to `mode: timed` with a 300 s foreground wait
+(`profiles/web/cordis.patch.yml`). After that wait the tool returns
+`{ pending: true, callId }` and the root Agent keeps working; the question stays
+answerable, and a late answer is steered in as a `user-question-reply` message.
+`timeout: -1` still blocks until answered. The browser behavior of that mode
+(card, pending result, late answer, cancel, restart) has not been accepted in a
+browser yet; see [plans/async-agent-questions.md](../../../plans/async-agent-questions.md).
+
+## Design decisions
+
+- **Reuse `ask_user_question` for root async, never a second root tool.** Two
+  rows with the same tool name throw on insertion, and the Host projection
+  (`isTimedAskUserQuestionSchema`) and the Web tool view both hard-code the
+  name, so a renamed wrapper would lose the card, countdown and late reply.
+- **Subagents get their own tool, routed to the direct parent.** A child cannot
+  open the human card (`UserQuestionService.assertLiveRoot` throws
+  `DELEGATED_CALLER`), and the card belongs to the root composer. The parent
+  answers itself or escalates by asking the human with the ordinary
+  `ask_user_question`.
+- **The durable row is the answer transport; the inbox is only a wakeup.**
+  `ctx.subagents.sendMessage` is one-way and returns a `MessageId`, not a reply
+  handle. A prose message to the parent never settles a question.
+- **Not built on `@dshfiles/agent-communication`.** That plugin serves
+  independent peers through durable topics; a parent/child question is a direct
+  runtime relationship with its own ownership checks.
+- **Every child question declares a recommendation.** Without one, expiry
+  could only block (defeating async) or defer every timeout to a file.
+- **Deferred questions are flat, workspace-relative files.** `ls questions/` is
+  the index, the files are reviewable and committable, and a later Session can
+  pick up open decisions by reading the folder. Nothing prunes the folder; the
+  repository owns it.
+
 ## Verify
 
 Run `pnpm typecheck`, `pnpm test`, and `pnpm build` from this package. `pnpm verify:scratch` composes the package with its cold-resume fixture in an isolated scratch DSH profile; it does not change the active profile.
