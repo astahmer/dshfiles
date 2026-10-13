@@ -16,6 +16,8 @@
       "entry": [
         "e2e/support/steps.ts",
         "e2e/support/plugin-journeys/**/*.ts",
+        "e2e/support/fake-mcp-server.mjs",
+        "e2e/support/fake-secret-cli.mjs",
         "scripts/smoke-client-slot.mjs",
         "scripts/smoke-multi-host.mjs",
         "scripts/smoke-multi-host-ssh.mjs"
