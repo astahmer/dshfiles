@@ -152,7 +152,7 @@
           "kind": "unit-test",
           "id": "optmem-core.summary-budget",
           "file": "plugins/@dshfiles/optmem-core/src/bounded-summary.test.ts",
-          "testName": "retries with a stricter budget until the answer fits"
+          "testName": "retries a leaf with a stricter budget until the answer fits"
         },
         {
           "kind": "unit-test",

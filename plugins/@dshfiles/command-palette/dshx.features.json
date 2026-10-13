@@ -216,7 +216,7 @@
           "kind": "unit-test",
           "id": "command-palette.prefix-routing-unit-command-content-line",
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
-          "testName": "palette prefixes route to command, content, and line views"
+          "testName": "palette prefixes route to thread, command, content, and line views"
         }
       ]
     },
