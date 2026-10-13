@@ -35,24 +35,24 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "editor.file-browse-open",
-          "reason": "No browser journey exists yet for the file-browse-open scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "editor.save-conflict",
-          "reason": "No browser journey exists yet for the save-conflict scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "editor.write-boundaries",
-          "reason": "No browser journey exists yet for the write-boundaries scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "editor.placement",
-          "reason": "No browser journey exists yet for the placement scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
         },
         {
           "kind": "gherkin",
@@ -120,9 +120,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "editor.file-index-bounds",
-          "reason": "No browser journey exists yet for the file-index-bounds scenario of \"Index workspace files with bounded traversal\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
         },
         {
           "kind": "unit-test",
