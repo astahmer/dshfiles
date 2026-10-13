@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "kind": "infrastructure",
+  "kind": "bundle",
   "features": [
     {
       "id": "home-screen",
@@ -52,9 +52,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "home.browser-journey",
-          "reason": "Verified manually against a scratch DSH instance; no Playwright journey composes it yet."
+          "featureFile": "tooling/dshx/e2e/features/home.feature"
         },
         {
           "kind": "unit-test",

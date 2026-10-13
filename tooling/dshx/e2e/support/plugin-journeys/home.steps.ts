@@ -1,0 +1,88 @@
+import { expect, type Page } from '@playwright/test'
+import { Then, When } from '../bdd.js'
+import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+
+// The native hero names its headline only by a hashed CSS-module class; the home brand style keys on the same suffix.
+const heroHeadline = (page: Page) => page.locator('[class*="_headline"]').first()
+const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true })
+
+const openNewThreadSettings = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await settingsDialog(page).getByRole('button', { name: 'New thread', exact: true }).click()
+  await expect(settingsDialog(page).getByRole('textbox', { name: 'Headline', exact: true })).toBeVisible()
+}
+
+const closeSettings = async (page: Page): Promise<void> => {
+  await settingsDialog(page).getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(settingsDialog(page)).toBeHidden()
+}
+
+When('the New thread headline is set to {string} with the mark {string}', async ({ page }: { page: Page }, headline: string, mark: string) => {
+  await openNewThreadSettings(page)
+  const dialog = settingsDialog(page)
+  const headlineInput = dialog.getByRole('textbox', { name: 'Headline', exact: true })
+  await headlineInput.fill(headline)
+  await headlineInput.blur()
+  await dialog.getByRole('combobox', { name: 'Mark', exact: true }).click()
+  await page.getByRole('option', { name: 'Text or emoji', exact: true }).click()
+  const markInput = dialog.getByRole('textbox', { name: 'Mark text', exact: true })
+  await markInput.fill(mark)
+  await markInput.blur()
+  await closeSettings(page)
+})
+
+When('recent threads are turned off in the New thread settings', async ({ page }: { page: Page }) => {
+  await openNewThreadSettings(page)
+  const recentThreads = settingsDialog(page).getByRole('switch', { name: 'Recent threads', exact: true })
+  await recentThreads.click()
+  await expect(recentThreads).not.toBeChecked()
+  await closeSettings(page)
+})
+
+When('a new thread is started from the sidebar', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
+})
+
+Then('the New thread headline names the project {string} instead of the DeepSeek headline', async ({ page }: { page: Page }, project: string) => {
+  await recordAssertion(page, 'home-headline-names-the-selected-project', async () => {
+    await expect(heroHeadline(page)).toContainText(project)
+    await expect(page.getByText('Into the Unknown', { exact: true })).toBeHidden()
+  })
+})
+
+Then('the New thread screen shows the mark {string} and the headline {string}', async ({ page }: { page: Page }, mark: string, headline: string) => {
+  await recordAssertion(page, 'home-settings-replace-the-mark-and-headline', async () => {
+    await expect(heroHeadline(page).getByText(mark, { exact: true })).toBeVisible()
+    await expect(heroHeadline(page).getByText(headline, { exact: true })).toBeVisible()
+  })
+  await page.reload()
+  await recordAssertion(page, 'home-brand-settings-survive-reload', () => expect(heroHeadline(page).getByText(headline, { exact: true })).toBeVisible())
+})
+
+Then('the New thread screen offers to resume {string} and reports one thread with work to land', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'home-strip-lists-the-project-recent-thread', async () => {
+    await expect(page.getByText('Resume', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: title, exact: true })).toBeVisible()
+  })
+  await recordAssertion(page, 'home-strip-counts-thread-workspaces-with-work-to-land', () =>
+    expect(page.getByRole('button', { name: '1 thread(s) with work to land', exact: true })).toBeVisible(),
+  )
+})
+
+Then('the work to land opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: '1 thread(s) with work to land', exact: true }).click()
+  await recordAssertion(page, 'home-work-to-land-opens-thread-workspaces', async () => {
+    await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
+    await expect(page.getByText('1 unlanded', { exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the New thread screen no longer offers to resume {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'home-recent-threads-setting-hides-the-resume-list', async () => {
+    await expect(page.getByRole('button', { name: '1 thread(s) with work to land', exact: true })).toBeVisible()
+    await expect(page.getByText('Resume', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: title, exact: true })).toHaveCount(0)
+  })
+})
