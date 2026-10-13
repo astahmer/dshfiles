@@ -62,7 +62,7 @@ const brandStyle = (settings: HomeSettings): string =>
     '[class$="_fishHitbox"]{width:auto}',
     settings.headline.trim() === '' ? '' : '[class$="_titleGroup"]>span:first-child{display:none}',
     settings.showPreviewBadge ? '' : '[class$="_previewBadge"]{display:none}',
-    settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none}',
+    settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none!important}',
   ].join('')
 
 const BrandMark = (props: HeroBrandMarkOwnerProps & { readonly stores: Stores; readonly t: HomeTranslate }) => {

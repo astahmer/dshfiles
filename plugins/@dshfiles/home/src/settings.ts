@@ -2,7 +2,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 
 export const homeSettings = defineSettings({
-  namespace: 'home',
+  namespace: 'dshfiles-home',
   schema: Schema.object({
     mark: Schema.union([
       Schema.const('none').description('No mark.'),

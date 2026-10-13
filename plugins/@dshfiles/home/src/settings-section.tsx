@@ -21,7 +21,8 @@ export const NewThreadSettings = () => {
   const home = useSettings(homeSettings)
   const threads = useSettings(jjIntegrationSettings)
   const value: HomeSettings | undefined = home.value
-  if (value === undefined) return <div className="dshx-root dshx:p-1 dshx:text-sm dshx:text-muted-foreground">…</div>
+  if (value === undefined)
+    return <div className="dshx-root dshx:p-1 dshx:text-sm dshx:text-muted-foreground">{home.status === 'loading' ? '…' : (home.error?.message ?? home.status)}</div>
   const toggle = (field: 'showAgentPresetPicker' | 'showRecentThreads' | 'showUnlandedWork' | 'showPreviewBadge') => (
     <Switch checked={value[field]} disabled={!home.writable} onCheckedChange={checked => void home.set(field, checked)} />
   )
