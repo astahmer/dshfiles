@@ -1,6 +1,90 @@
 import { expect, type Page } from '@playwright/test'
-import { Then, When } from '../bdd.js'
+import { createServer, type Server } from 'node:http'
+import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+
+/**
+ * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address. The key
+ * decides the answer: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and every other
+ * key reports a 75%-left session window and a 10%-left weekly window and answers chat with its own suffix.
+ */
+interface FakeCommandCode {
+  readonly server: Server
+  readonly baseUrl: string
+  readonly chatKeys: string[]
+}
+
+const fakeProviders = new WeakMap<Page, FakeCommandCode>()
+const HOUR_MS = 3_600_000
+
+const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode> => {
+  const chatKeys: string[] = []
+  const server = createServer((request, response) => {
+    request.resume()
+    request.on('end', () => {
+      const key = (request.headers.authorization ?? '').replace(/^Bearer /, '')
+      const json = (status: number, value: unknown): void => {
+        response.writeHead(status, { 'content-type': 'application/json' })
+        response.end(JSON.stringify(value))
+      }
+      if (request.url === '/alpha/billing/credits') {
+        if (key.endsWith('-BROKEN')) return json(503, { error: 'billing unavailable' })
+        return json(200, {
+          windowLimits: { fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS }, weekly: { used: 90, cap: 100, resetAt: Date.now() + 72 * HOUR_MS } },
+          credits: { planId: 'individual-pro' },
+        })
+      }
+      if (request.url === '/alpha/whoami') return json(200, { user: { userName: `fake-${key.slice(-6)}` } })
+      if (request.url === '/alpha/billing/subscriptions') return json(200, { data: { planId: 'individual-pro', status: 'active' } })
+      if (request.url === '/provider/v1/models') return json(200, { data: [] })
+      if (request.url !== '/provider/v1/chat/completions') return json(404, { error: 'not found' })
+      chatKeys.push(key)
+      if (key.endsWith('-LIMITED')) return json(429, { error: { message: 'Rate limit reached', type: 'rate_limit_error' } })
+      const chunk = (delta: object, finishReason: string | null): string =>
+        `data: ${JSON.stringify({ id: 'fake', object: 'chat.completion.chunk', created: 1, model: 'gpt-6-luna', choices: [{ index: 0, delta, finish_reason: finishReason }] })}\n\n`
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.write(chunk({ role: 'assistant', content: `Answered by ${key.slice(-6)}` }, null))
+      response.write(chunk({}, 'stop'))
+      response.end('data: [DONE]\n\n')
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('The fake Command Code server has no port.')
+  const fake = { server, baseUrl: `http://127.0.0.1:${String(address.port)}`, chatKeys }
+  fakeProviders.set(page, fake)
+  return fake
+}
+
+const fakeProviderFor = (page: Page): FakeCommandCode => {
+  const fake = fakeProviders.get(page)
+  if (fake === undefined) throw new Error('The fake Command Code server was not started for this scenario.')
+  return fake
+}
+
+const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
+
+const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly key: string }): Promise<void> => {
+  await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+  const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
+  await baseUrl.fill(fakeProviderFor(page).baseUrl)
+  await baseUrl.blur()
+  await expect(page.getByRole('status').filter({ hasText: /^Saved/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
+  const keyDialog = page.getByRole('dialog', { name: `Configure ${input.name} key`, exact: true })
+  await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.key)
+  await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click()
+  await expect(keyDialog).toBeHidden()
+}
+
+const openAccountsPanel = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+  await expect(providerAccounts(page)).toBeVisible()
+}
 
 When('a provider request fails because its credential is missing', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
@@ -189,4 +273,82 @@ Then('the AI Accounts list on the Models page can be hidden and restored', async
     await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
+})
+
+When('a Command Code account backed by a local fake provider is added', async ({ page }: { page: Page }) => {
+  await startFakeCommandCode(page)
+  await openAccountsPanel(page)
+  await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-ALPHA1' })
+})
+
+When('a second Command Code account whose billing read fails is added', async ({ page }: { page: Page }) => {
+  await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BROKEN' })
+})
+
+Then('the account shows the session and weekly windows the provider reports', async ({ page }: { page: Page }) => {
+  await providerAccounts(page).getByRole('button', { name: /^Command Code 1 / }).click()
+  await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
+    await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
+    await expect(page.getByText('75% left', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Resets in (59|60)m$/)).toBeVisible()
+    await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toBeVisible()
+    await expect(page.getByText('10% left', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Resets in 2d \d+h$/)).toBeVisible()
+  })
+  await recordAssertion(page, 'ai-accounts-sidebar-foot-shows-the-tightest-window', () =>
+    expect(page.getByRole('button', { name: /^Command Code 1: Weekly limit: 10% left, resets in 2d \d+h$/ })).toBeVisible(),
+  )
+})
+
+Then('the failed account reports the provider error instead of a quota', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-failed-quota-read-is-shown-as-an-error', async () => {
+    await expect(page.getByText('Command Code returned 503 for billing.', { exact: true })).toBeVisible()
+    await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Command Code 2: Weekly limit/ })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a rate-limited and a healthy Command Code account share a local fake provider', async ({ page }: { page: Page }) => {
+  await startFakeCommandCode(page)
+  await openAccountsPanel(page)
+  await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-LIMITED' })
+  await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BRAVO2' })
+})
+
+When('a new thread asks the first account\'s model a question', async ({ page }: { page: Page }) => {
+  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await page.getByRole('menuitem', { name: /^Model / }).click()
+  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('Which account answers?')
+  await composer.press('Enter')
+})
+
+Then('the healthy account answers and the rate-limited one cools down', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-pool-fails-over-to-the-healthy-account', async () => {
+    await expect(page.getByText('Answered by BRAVO2', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    const chatKeys = fakeProviderFor(page).chatKeys
+    expect(chatKeys[0]).toBe('e2e-fake-key-LIMITED')
+    expect(chatKeys.at(-1)).toBe('e2e-fake-key-BRAVO2')
+    expect(new Set(chatKeys)).toEqual(new Set(['e2e-fake-key-LIMITED', 'e2e-fake-key-BRAVO2']))
+  })
+  // The account rail reads runtime health with its usage poll; reopening the app reads it now instead of a minute later.
+  await page.reload()
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await recordAssertion(page, 'ai-accounts-rate-limited-account-is-cooling-down', async () => {
+    await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 1 Rate limited', exact: true })).toBeVisible()
+    await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 2 Authenticated', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+After(async ({ page }: { page: Page }) => {
+  const fake = fakeProviders.get(page)
+  if (fake === undefined) return
+  fakeProviders.delete(page)
+  fake.server.closeAllConnections()
+  await new Promise<void>(resolve => fake.server.close(() => resolve()))
 })

@@ -56,3 +56,18 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When the AI Accounts settings section is opened
     Then the AI Accounts list on the Models page can be hidden and restored
+
+  @scenario:ai-accounts.quota-display
+  Scenario: Read account quota windows from the provider
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    Then the account shows the session and weekly windows the provider reports
+    When a second Command Code account whose billing read fails is added
+    Then the failed account reports the provider error instead of a quota
+
+  @scenario:ai-accounts.pool-failover
+  Scenario: A rate-limited account hands the turn to a healthy one
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a rate-limited and a healthy Command Code account share a local fake provider
+    And a new thread asks the first account's model a question
+    Then the healthy account answers and the rate-limited one cools down

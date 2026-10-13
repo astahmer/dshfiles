@@ -84,9 +84,9 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "ai-accounts.pool-failover",
-          "reason": "No browser journey exists yet for the pool-failover scenario of \"Curate models and choose account routes\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
           "kind": "unit-test",
@@ -176,9 +176,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "ai-accounts.quota-display",
-          "reason": "No browser journey exists yet for the quota-display scenario of \"Read provider quota and usage status\"; nothing automated verifies it yet."
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
           "kind": "gherkin",
@@ -287,7 +287,19 @@
         {
           "kind": "not-applicable",
           "id": "ai-accounts.luna-reserve",
-          "reason": "No browser journey exists yet for the luna-reserve scenario of \"Route exhausted Luna accounts through Reserve\"; nothing automated verifies it yet."
+          "reason": "Luna Reserve exists only on Codex accounts, whose usage (chatgpt.com/backend-api/wham/usage) and chat transport are fixed ChatGPT endpoints with no base-URL override, so a browser journey would need a real ChatGPT subscription with a spent weekly window; shouldUseLunaReserve and withLunaReserve are pure and covered by codex-luna-reserve.test.ts."
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.luna-reserve-routing-unit",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-luna-reserve.test.ts",
+          "testName": "routes to the reserve only while the ordinary limit is spent, unreset, and the reserve lasts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.luna-reserve-wire-model-unit",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-luna-reserve.test.ts",
+          "testName": "sends the reserve slug while on reserve and the chosen model otherwise"
         }
       ]
     },
