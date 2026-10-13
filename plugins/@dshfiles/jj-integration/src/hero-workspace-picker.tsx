@@ -4,6 +4,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from './api.js'
+import { DestinationBar, type DestinationBarServices } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 const NO_FOLDER_ID = 'dshfiles:no-folder'
@@ -13,14 +14,17 @@ const NO_FOLDER_ID = 'dshfiles:no-folder'
  * "No folder" entry, and folder browsing to add a project. A chosen project goes through jj-integration so the
  * isolate-by-default setting applies here too.
  */
-export const HeroWorkspacePicker = (props: EmptyWorkspaceOwnerProps & { readonly ports: WorkspacePickerPorts; readonly t: JjIntegrationTranslate }) => {
+export const HeroWorkspacePicker = (
+  props: EmptyWorkspaceOwnerProps & { readonly ports: WorkspacePickerPorts; readonly services: DestinationBarServices; readonly t: JjIntegrationTranslate },
+) => {
   const api = useApi(jjIntegrationApi)
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
     enabled: props.open,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
   })
-  if (!props.open) return null
+  const bar = <DestinationBar workspaceId={props.selectedId} services={props.services} t={props.t} />
+  if (!props.open) return bar
 
   const registered: RegisteredProject[] = [
     { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder' },
@@ -40,7 +44,9 @@ export const HeroWorkspacePicker = (props: EmptyWorkspaceOwnerProps & { readonly
   }
 
   return (
-    <ProjectFolderPicker
+    <>
+      {bar}
+      <ProjectFolderPicker
       projects={registered}
       directoryPicker={props.ports.directoryPicker}
       onRegisterWorkspace={props.ports.registerWorkspace}
@@ -49,6 +55,7 @@ export const HeroWorkspacePicker = (props: EmptyWorkspaceOwnerProps & { readonly
       showNativePicker={false}
       disabled={projects.isLoading}
       title={props.t('chooseProject')}
-    />
+      />
+    </>
   )
 }

@@ -9,7 +9,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { DestinationBar, type DestinationBarServices } from './destination-bar.js'
+import type { DestinationBarServices } from './destination-bar.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
@@ -49,7 +49,6 @@ export default defineClient({
       ),
     )
     const destinationServices: DestinationBarServices = {
-      sessions: ctx.sessions,
       workspaces: ctx.workspaces,
       // SAFETY: every id passed here came back from the Host's workspace registry.
       openWorkspace: workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId as WorkspaceView['workspaceId']),
@@ -60,17 +59,7 @@ export default defineClient({
         { name: 'conversation.hero.workspace', priority: -1000 },
         decorate((props: EmptyWorkspaceOwnerProps) => (
           <PluginQueryProvider>
-            <HeroWorkspacePicker {...props} ports={pickerPorts} t={translate} />
-          </PluginQueryProvider>
-        )),
-      ),
-    )
-    ctx.slots.inject('conversation.input.dock', () =>
-      ctx.slots.register(
-        { name: 'conversation.input.dock', id: 'dshfiles-jj-integration-destination', order: 10, inject: sessionId => ({ sessionId }) },
-        decorate((props: { readonly sessionId: Parameters<typeof DestinationBar>[0]['sessionId'] }) => (
-          <PluginQueryProvider>
-            <DestinationBar sessionId={props.sessionId} services={destinationServices} t={translate} />
+            <HeroWorkspacePicker {...props} ports={pickerPorts} services={destinationServices} t={translate} />
           </PluginQueryProvider>
         )),
       ),
