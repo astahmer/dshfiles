@@ -14,3 +14,60 @@ Feature: Jujutsu revision interactions
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted
     When a disposable Jujutsu repository is selected
     Then the revision context menu copies the exact change ID and commit ID
+
+  @scenario:jujutsu.graph-filters
+  Scenario: Search, author and immutability filters narrow the revision graph
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    Then searching, filtering by author and hiding immutable revisions narrow the graph
+
+  @scenario:jujutsu.refresh-behavior
+  Scenario: Outside changes appear on refresh and when the page becomes visible
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a revision "Committed outside once" is committed outside DSH
+    Then "Committed outside once" appears only after a manual refresh
+    When a revision "Committed outside twice" is committed outside DSH
+    Then "Committed outside twice" appears when the page becomes visible again
+
+  @scenario:jujutsu.diff-review
+  Scenario: Review a revision's changed files and full diff
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And the Feature revision is opened
+    Then its changed files keep literal paths and track review progress
+
+  @scenario:jujutsu.preview-confirm
+  Scenario: A squash runs only from a fresh preview
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And the Feature revision is opened
+    And the Feature revision is previewed for squashing into its parent
+    And a revision "Moved the repository on" is committed outside DSH
+    And the squash preview is confirmed
+    Then the stale preview is refused without changing the repository
+    When the Feature revision is opened
+    And the Feature revision is previewed for squashing into its parent
+    And the squash preview is confirmed
+    Then the Feature revision is squashed into Base
+
+  @scenario:jujutsu.composer-context
+  Scenario: The composer bar shows the thread's repository context
+    Given the isolated plugin composition "@dshfiles/jujutsu" and "@dshfiles/workspace-folder-picker" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And the repository is registered and a thread is started in it
+    Then the composer bar names the repository, its workspace and its working copy
+
+  @scenario:jujutsu.workspace-session
+  Scenario: Provision a workspace at a revision and open a session there on request
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a workspace "review-ws" is provisioned at the Feature revision under the fixture root
+    Then the workspace "review-ws" exists and a session opens in it only when asked
+
+  @scenario:jujutsu.history-boundaries
+  Scenario: Fork a thread at a durable history boundary
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a thread "history boundary source thread" runs in the Default workspace
+    Then forking that thread at its first boundary opens a new thread

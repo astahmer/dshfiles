@@ -1,0 +1,269 @@
+import { expect, type Page } from '@playwright/test'
+import { spawnSync } from 'node:child_process'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { After, Then, When } from '../bdd.js'
+import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { createScratchDirectory, registerWorkspaceFolder, sendMessage } from '../threads.js'
+
+interface Repository {
+  readonly root: string
+  readonly path: string
+}
+
+const repositories = new WeakMap<Page, Repository>()
+const UNICODE_PATH = 'dir with space/ünïcode file.txt'
+
+const jj = (repository: Repository, args: readonly string[], author = { name: 'Ada Author', email: 'ada@example.invalid' }): string => {
+  const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...args], {
+    cwd: repository.path,
+    env: { PATH: process.env.PATH ?? '', HOME: repository.root, XDG_CONFIG_HOME: join(repository.root, '.config'), JJ_USER: author.name, JJ_EMAIL: author.email },
+    encoding: 'utf8',
+    shell: false,
+    timeout: 20_000,
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`Disposable JJ fixture command failed (${String(result.status)}): ${result.stderr}`)
+  return result.stdout
+}
+
+const repositoryFor = (page: Page): Repository => {
+  const repository = repositories.get(page)
+  if (repository === undefined) throw new Error('The disposable Jujutsu repository was not created for this scenario.')
+  return repository
+}
+
+const descriptions = (repository: Repository): readonly string[] =>
+  jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'all()', '-T', 'description.first_line() ++ "\\n"'])
+    .split('\n')
+    .filter(line => line.length > 0)
+
+const revisionsRegion = (page: Page) => page.getByRole('region', { name: 'Revisions', exact: true }).first()
+const revisionRow = (page: Page, description: string) => revisionsRegion(page).locator('article').filter({ hasText: description })
+
+When('a disposable Jujutsu repository with two authors is opened in the Jujutsu panel', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-jujutsu-journeys-')
+  const repository = { root, path: join(root, 'repo') }
+  repositories.set(page, repository)
+  await mkdir(repository.path)
+  jj(repository, ['git', 'init', '--no-colocate'])
+  await writeFile(join(repository.path, 'base.txt'), 'base\n')
+  jj(repository, ['describe', '-m', 'Base fixture'])
+  jj(repository, ['bookmark', 'create', 'main', '-r', '@'])
+  jj(repository, ['new'])
+  await mkdir(join(repository.path, 'dir with space'))
+  await writeFile(join(repository.path, UNICODE_PATH), 'one\n')
+  await writeFile(join(repository.path, 'feature.txt'), 'feature\n')
+  jj(repository, ['describe', '-m', 'Feature work by Ada'])
+  jj(repository, ['new', 'main', '-m', 'Bob side change'], { name: 'Bob Builder', email: 'bob@example.invalid' })
+  await writeFile(join(repository.path, 'bob.txt'), 'bob\n')
+  jj(repository, ['new'])
+  await page.evaluate(path => localStorage.setItem('dshfiles.jujutsu.selected', JSON.stringify(path)), repository.path)
+  await page.reload()
+  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
+  await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible({ timeout: 30_000 })
+})
+
+When('a revision {string} is committed outside DSH', async ({ page }: { page: Page }, description: string) => {
+  const repository = repositoryFor(page)
+  jj(repository, ['describe', '-m', description])
+  jj(repository, ['new'])
+})
+
+When('the Feature revision is opened', async ({ page }: { page: Page }) => {
+  const files = revisionRow(page, 'Feature work by Ada').getByRole('list', { name: 'Changed files', exact: true })
+  if (!(await files.isVisible())) await revisionRow(page, 'Feature work by Ada').getByRole('button', { name: 'Feature work by Ada', exact: true }).click()
+  await expect(files).toBeVisible()
+})
+
+When('the Feature revision is previewed for squashing into its parent', async ({ page }: { page: Page }) => {
+  await revisionRow(page, 'Feature work by Ada').getByRole('button', { name: 'Squash into parent', exact: true }).click()
+  await expect(page.getByRole('alertdialog', { name: 'Confirm squash changes', exact: true })).toBeVisible()
+})
+
+When('the squash preview is confirmed', async ({ page }: { page: Page }) => {
+  await page.getByRole('alertdialog', { name: 'Confirm squash changes', exact: true }).getByRole('button', { name: 'Confirm and run', exact: true }).click()
+})
+
+When('a workspace {string} is provisioned at the Feature revision under the fixture root', async ({ page }: { page: Page }, name: string) => {
+  const repository = repositoryFor(page)
+  const provision = page.getByRole('region', { name: 'Provision an isolated workspace', exact: true })
+  await provision.getByRole('combobox', { name: 'Workspace base revision', exact: true }).click()
+  await page.getByRole('option', { name: /Feature work by Ada/ }).click()
+  await provision.getByRole('textbox', { name: 'Workspace name', exact: true }).fill(name)
+  await provision.getByRole('button', { name: 'Choose parent directory', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: 'Choose the parent directory', exact: true })
+  const path = picker.getByRole('textbox').first()
+  await expect(async () => {
+    await path.fill(repository.root)
+    await path.press('Enter')
+    await expect(picker.locator('p').filter({ hasText: repository.root }).first()).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+  await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await expect(provision.getByText(repository.root, { exact: true })).toBeVisible()
+  await provision.getByRole('button', { name: 'Preview workspace setup', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm and run', exact: true }).click()
+})
+
+When('a thread {string} runs in the Default workspace', async ({ page }: { page: Page }, message: string) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await sendMessage(page, message)
+})
+
+Then('searching, filtering by author and hiding immutable revisions narrow the graph', async ({ page }: { page: Page }) => {
+  const search = page.getByRole('textbox', { name: 'Search revisions', exact: true })
+  if (!(await search.isVisible())) await page.getByRole('button', { name: 'Show search', exact: true }).click()
+  await search.fill('Bob side')
+  await recordAssertion(page, 'jujutsu-search-filters-revisions', async () => {
+    await expect(revisionRow(page, 'Bob side change')).toBeVisible()
+    await expect(revisionRow(page, 'Feature work by Ada')).toHaveCount(0)
+  })
+  await search.fill('')
+  await page.getByRole('textbox', { name: 'Filter author', exact: true }).fill('Bob')
+  await recordAssertion(page, 'jujutsu-author-filter-keeps-that-author', async () => {
+    await expect(revisionRow(page, 'Bob side change')).toBeVisible()
+    await expect(revisionRow(page, 'Feature work by Ada')).toHaveCount(0)
+    await expect(revisionRow(page, 'Base fixture')).toHaveCount(0)
+  })
+  await page.getByRole('textbox', { name: 'Filter author', exact: true }).fill('')
+  const rootRow = revisionsRegion(page).locator('article').filter({ hasText: 'zzzzzzzz' })
+  await expect(rootRow).toHaveCount(1)
+  const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
+  await hideImmutable.click()
+  await expect(hideImmutable).toBeChecked()
+  await recordAssertion(page, 'jujutsu-hide-immutable-drops-the-root', async () => {
+    await expect(rootRow).toHaveCount(0)
+    await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('{string} appears only after a manual refresh', async ({ page }: { page: Page }, description: string) => {
+  await recordAssertion(page, 'jujutsu-outside-change-waits-for-a-refresh', () => expect(revisionRow(page, description)).toHaveCount(0))
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-refresh-reads-the-new-revision', () => expect(revisionRow(page, description)).toBeVisible())
+})
+
+Then('{string} appears when the page becomes visible again', async ({ page }: { page: Page }, description: string) => {
+  await expect(revisionRow(page, description)).toHaveCount(0)
+  // A browser tab cannot be hidden from a test, so the document reports a hide and, after the panel rendered it, a return.
+  const reportVisibility = (state: DocumentVisibilityState) =>
+    page.evaluate(next => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => next })
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => next === 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+      return new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    }, state)
+  await reportVisibility('hidden')
+  await reportVisibility('visible')
+  await recordAssertion(page, 'jujutsu-refresh-on-visible', () => expect(revisionRow(page, description)).toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
+Then('its changed files keep literal paths and track review progress', async ({ page }: { page: Page }) => {
+  const row = revisionRow(page, 'Feature work by Ada')
+  await recordAssertion(page, 'jujutsu-review-progress-starts-empty', () => expect(row.getByText('0/2 reviewed')).toBeVisible())
+  await row.getByRole('radio', { name: 'Flat', exact: true }).click()
+  await expect(row.getByRole('radio', { name: 'Flat', exact: true })).toBeChecked()
+  await recordAssertion(page, 'jujutsu-flat-files-keep-literal-paths', () =>
+    expect(row.getByRole('checkbox', { name: `Mark reviewed ${UNICODE_PATH}`, exact: true })).toBeVisible(),
+  )
+  await row.getByRole('checkbox', { name: `Mark reviewed ${UNICODE_PATH}`, exact: true }).click()
+  await recordAssertion(page, 'jujutsu-review-progress-counts-reviewed-files', () => expect(row.getByText('1/2 reviewed')).toBeVisible())
+  await row.getByRole('checkbox', { name: 'Hide reviewed files', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-hide-reviewed-files', async () => {
+    await expect(row.getByRole('checkbox', { name: `Mark reviewed ${UNICODE_PATH}`, exact: true })).toHaveCount(0)
+    await expect(row.getByRole('checkbox', { name: 'Mark reviewed feature.txt', exact: true })).toBeVisible()
+  })
+  await row.getByRole('button', { name: 'Full diff', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-full-diff-shows-every-changed-file', async () => {
+    const diff = page.getByRole('dialog', { name: /^Feature work by Ada · \w+ · 2 files$/ })
+    await expect(diff.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
+    await expect(diff.getByRole('code').filter({ hasText: 'feature' })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the stale preview is refused without changing the repository', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jujutsu-stale-preview-is-refused', async () => {
+    await expect(page.getByRole('alert').filter({ hasText: 'Preview expired or repository state changed. Refresh and preview again.' })).toBeVisible()
+    expect(descriptions(repository)).toContain('Feature work by Ada')
+  })
+})
+
+Then('the Feature revision is squashed into Base', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jujutsu-confirmed-squash-runs', async () => {
+    await expect.poll(() => descriptions(repository)).not.toContain('Feature work by Ada')
+    expect(jj(repository, ['--ignore-working-copy', 'file', 'list', '-r', 'main'])).toContain('feature.txt')
+    await expect(revisionRow(page, 'Feature work by Ada')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the workspace {string} exists and a session opens in it only when asked', async ({ page }: { page: Page }, name: string) => {
+  const repository = repositoryFor(page)
+  const provision = page.getByRole('region', { name: 'Provision an isolated workspace', exact: true })
+  await recordAssertion(page, 'jujutsu-workspace-is-created-at-the-revision', async () => {
+    await expect(provision.getByText(`Created: ${join(repository.root, name)}`, { exact: true })).toBeVisible()
+    expect(jj(repository, ['--ignore-working-copy', 'workspace', 'list'])).toContain(`${name}:`)
+    expect(jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', `${name}@-`, '-T', 'description.first_line()'])).toBe('Feature work by Ada')
+    await expect(page.getByRole('treeitem', { name, exact: true })).toHaveCount(0)
+  })
+  await provision.getByRole('button', { name: 'Open a DSH Session here', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-session-opens-in-the-new-workspace', async () => {
+    await expect(page.getByRole('treeitem', { name, exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(name)
+    await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeEditable()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('forking that thread at its first boundary opens a new thread', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
+  const fork = page.getByRole('region', { name: 'Fork a Session at a history boundary', exact: true })
+  await fork.getByRole('combobox', { name: 'Session to fork', exact: true }).click()
+  await page.getByRole('option').first().click()
+  const boundary = fork.getByRole('combobox', { name: 'Fork boundary sequence', exact: true })
+  await expect(boundary).toBeEnabled()
+  await boundary.click()
+  const options = page.getByRole('option')
+  await recordAssertion(page, 'jujutsu-history-lists-durable-boundaries', () => expect(options.first()).toBeVisible())
+  // Cutting right after the user's message keeps the message and leaves out the failed answer that followed it.
+  await page.getByRole('option', { name: /· user\/message$/ }).last().click()
+  await fork.getByRole('button', { name: 'Fork and open', exact: true }).click()
+  const sessions = page.getByRole('tree', { name: 'Sessions', exact: true })
+  await recordAssertion(page, 'jujutsu-fork-opens-a-new-session-at-the-boundary', async () => {
+    await expect(sessions.getByRole('treeitem', { name: /^Untitled/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText('history boundary source thread', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('This turn failed')).toHaveCount(0)
+  })
+  await sessions.getByRole('treeitem', { name: /^history boundary source thread/ }).click()
+  await recordAssertion(page, 'jujutsu-fork-leaves-the-source-history-intact', () => expect(page.getByText('This turn failed').first()).toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
+When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await registerWorkspaceFolder(page, repository.path)
+  await sendMessage(page, 'jujutsu composer context thread')
+})
+
+Then('the composer bar names the repository, its workspace and its working copy', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jujutsu-composer-bar-shows-the-repository', async () => {
+    await expect(page.getByRole('button', { name: 'repo', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'default', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^@ \w+ · main\+$/ })).toBeVisible()
+  })
+  await page.getByRole('button', { name: 'repo', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-composer-chip-opens-the-repository', () => expect(revisionRow(page, 'Feature work by Ada')).toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
+After(async ({ page }: { page: Page }) => {
+  const repository = repositories.get(page)
+  if (repository === undefined) return
+  repositories.delete(page)
+  await rm(repository.root, { recursive: true, force: true })
+})
