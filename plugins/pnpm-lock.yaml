@@ -1332,6 +1332,9 @@ importers:
       '@deepseek-ai/dsh-compaction':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(c863f5e1563be418c7ca5996ee2ff389)
+      '@deepseek-ai/dsh-compaction-basic':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(760980f6c53b9f9729550073c2cbbc3e)
       '@deepseek-ai/dsh-home-paths':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)

@@ -16,6 +16,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 import type {} from '@dshfiles/request-messages'
 
+import { deferPressureCompaction } from './compaction-deferral.ts'
 import { optmemApi, type OptmemExplorerZoom, type OptmemOverview, type OptmemProject, type OptmemProvider } from './api.ts'
 import { createOptmemRuntime, type HostServices, type OptmemRuntime } from './runtime.ts'
 import { optmemSettings, type OptmemSettings } from './settings.ts'
@@ -464,6 +465,19 @@ const setup = (ctx: Context): void => {
     logger: ctx.logger('optmem'),
   })
   runtime = active
+  const deferredSessions = new Set<string>()
+  ctx.effect(
+    () =>
+      deferPressureCompaction({
+        fullModeActive: active.fullModeActive,
+        onDeferred: sessionId => {
+          if (deferredSessions.has(sessionId)) return
+          deferredSessions.add(sessionId)
+          ctx.logger('optmem').info('optmem: full mode holds the context of %s; skipping DSH pressure compaction of its stored history', sessionId)
+        },
+      }),
+    'optmem pressure compaction deferral',
+  )
   ctx.on('session/event', (session, event) => {
     if (event.type === 'request/header') sessionProviders.set(session.id, event.data.header.config.provider)
     active.onSessionEvent(session, event)

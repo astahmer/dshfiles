@@ -162,7 +162,8 @@
       "failureModes": [
         "Unavailable summarizer leaves pending raw summaries for retry.",
         "Cancellation preserves the durable barrier marker and does not inject stale context.",
-        "Without @dshfiles/request-messages the Host cannot claim full mode is active."
+        "Without @dshfiles/request-messages the Host cannot claim full mode is active.",
+        "While full mode holds a conversation, DSH pressure compaction of its stored history is skipped; context-overflow recovery still runs."
       ],
       "externalDependencies": [
         {
@@ -257,6 +258,30 @@
           "id": "optmem.bounded-context-injection-unit-provider-error",
           "file": "plugins/@dshfiles/optmem/src/summarizer.test.ts",
           "testName": "fails clearly on an errored stream"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-pressure-compaction-skipped",
+          "file": "plugins/@dshfiles/optmem/src/compaction-deferral.test.ts",
+          "testName": "skips pressure compaction of the stored history"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-overflow-recovery-kept",
+          "file": "plugins/@dshfiles/optmem/src/compaction-deferral.test.ts",
+          "testName": "still recovers from a provider-confirmed overflow"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-compaction-control",
+          "file": "plugins/@dshfiles/optmem/src/compaction-deferral.test.ts",
+          "testName": "the control: compatibility mode and subagents compact as before"
+        },
+        {
+          "kind": "unit-test",
+          "id": "optmem.bounded-context-injection-unit-compaction-restored",
+          "file": "plugins/@dshfiles/optmem/src/compaction-deferral.test.ts",
+          "testName": "restores the engine when OptMem unloads"
         }
       ]
     },

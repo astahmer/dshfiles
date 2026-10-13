@@ -597,6 +597,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     applySettings,
     backfill,
     requestMessages,
+    fullModeActive,
     settle,
     pipelineOverview: (projectId?: string) => {
       if (!ready) return undefined
