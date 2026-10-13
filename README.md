@@ -71,6 +71,12 @@ only vendored toolchain in the repository. It provides plugin scaffolding, build
 the CLI used by owned plugins. See [`tooling/dshx/FORK.md`](tooling/dshx/FORK.md)
 for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.md).
 
+### Desktop shell
+
+[`apps/desktop`](apps/desktop/README.md) is an unsigned Electron window that
+starts a DSH profile, shows its web UI, and stops the Host on quit
+(`nix run .#desktop`).
+
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md): project boundaries, safe profile workflow, and development rules.
