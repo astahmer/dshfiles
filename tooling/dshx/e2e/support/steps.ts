@@ -132,7 +132,8 @@ Before(async ({ page, $testInfo }) => {
   )
 })
 
-const profileFor = (page: Page): BootedProfile => {
+/** The scratch profile a scenario booted, for journeys that configure it the way an operator edits its patch file. */
+export const profileFor = (page: Page): BootedProfile => {
   const profile = profiles.get(page)
   if (profile === undefined) throw new Error('the web profile is not booted; the Background step did not run')
   return profile
@@ -325,7 +326,6 @@ After(async ({ page, $testInfo }) => {
       hostOutput: profile?.output() ?? null,
       hostApiDiagnostics: profile === undefined ? [] : await hostApiDiagnosticsFor(profile.homeRoot),
     }
-    if (process.env.DSHX_E2E_DUMP === '1') console.log('DUMP', JSON.stringify(diagnostics, null, 2))
     await $testInfo.attach('browser-diagnostics.json', {
       body: JSON.stringify(diagnostics, null, 2),
       contentType: 'application/json',

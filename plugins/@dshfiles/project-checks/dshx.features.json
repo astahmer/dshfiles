@@ -77,19 +77,19 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "project-checks.trusted-root",
-          "reason": "No browser journey exists yet for the trusted-root scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "project-checks.receipt-freshness",
-          "reason": "No browser journey exists yet for the receipt-freshness scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "project-checks.verify-retry",
-          "reason": "No browser journey exists yet for the verify-retry scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
         },
         {
           "kind": "unit-test",
@@ -136,7 +136,7 @@
         {
           "kind": "not-applicable",
           "id": "project-checks.native-hook-events",
-          "reason": "No browser journey exists yet for the native-hook-events scenario of \"Show native hook invocation records\"; only the unit tests listed for this feature verify it."
+          "reason": "Hook records come from a hook bridge such as @deepseek-ai/dsh-hooks-claude-code, which is not a dependency of the web profile the e2e scratch profile is composed from, so a patched bridge row cannot resolve there and no hook/invoked or hook/result event is ever written; the panel's reading of those events is covered by the unit test listed here."
         },
         {
           "kind": "unit-test",
