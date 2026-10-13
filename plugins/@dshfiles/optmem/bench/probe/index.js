@@ -22,7 +22,15 @@ export function apply(ctx, config) {
     if (described.has(key)) return
     described.add(key)
     const info = await ctx.llm.resolveModelInfo(provider, model).catch(error => ({ error: String(error) }))
-    write({ kind: 'model-info', provider, model, contextWindow: info.context?.contextWindow, defaultMaxTokens: info.defaultMaxTokens, error: info.error })
+    write({
+      kind: 'model-info',
+      provider,
+      model,
+      contextWindow: info.context?.contextWindow,
+      defaultMaxTokens: info.defaultMaxTokens,
+      reasoning: info.reasoning,
+      error: info.error,
+    })
   }
   const write = record => appendFileSync(file, `${JSON.stringify(record)}\n`, { mode: 0o600 })
 
@@ -49,6 +57,8 @@ export function apply(ctx, config) {
         sessionId: options.sessionId,
         provider: options.provider,
         model: options.model,
+        maxTokens: options.maxTokens,
+        reasoningEffort: options.reasoningEffort,
         messages: options.messages.length,
         messageBytes: byteLength(options.messages),
         systemBytes: Buffer.byteLength(options.system ?? ''),
@@ -58,6 +68,7 @@ export function apply(ctx, config) {
         toolBytes: byteLength(options.tools ?? []),
       }
       return (async function* () {
+        write({ ...record, kind: 'call-start' })
         if (record.purpose === 'agent') {
           openAgentCall = record
           void describe(record.provider, record.model)
@@ -65,8 +76,17 @@ export function apply(ctx, config) {
         try {
           for await (const chunk of next()) {
             if (chunk.type === 'usage') record.usage = chunk.usage
-            if (chunk.type === 'finish') record.finish = chunk.reason?.kind ?? String(chunk.reason)
+            if (chunk.type === 'finish') {
+              record.finish = chunk.reason?.kind ?? String(chunk.reason)
+              if (chunk.reason?.failure !== undefined) {
+                record.failureCode = chunk.reason.failure.code
+                record.failureStatus = chunk.reason.failure.status
+                record.providerRetryAfterMs = chunk.reason.failure.providerRetryAfterMs
+              }
+            }
             if (record.firstChunkMs === undefined) record.firstChunkMs = Date.now() - record.startedAt
+            if (record.firstTextTokenMs === undefined && chunk.type === 'text-delta' && chunk.text.length > 0)
+              record.firstTextTokenMs = Date.now() - record.startedAt
             yield chunk
           }
         } catch (error) {

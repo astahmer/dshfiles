@@ -35,6 +35,12 @@ const usageOf = calls => {
   const output = sum('outputTokens')
   return {
     calls: calls.length,
+    callsWithUsage: calls.filter(call => call.usage !== undefined).length,
+    maxTokenFinishes: calls.filter(call => call.finish === 'max-tokens').length,
+    unfinishedCalls: calls.filter(call => call.incomplete).length,
+    errors: calls.filter(call => call.error !== undefined || call.finish === 'error' || call.finish === 'aborted').length,
+    reasoning: sum('reasoningTokens'),
+    reasoningReportedCalls: calls.filter(call => call.usage?.reasoningTokens !== undefined).length,
     input,
     cacheRead,
     output,
@@ -47,17 +53,20 @@ const usageOf = calls => {
 // every run. Stored answers are capped; a live pass on a capped answer is kept.
 const benchRoot = dirname(fileURLToPath(import.meta.url))
 const scenarios = new Map()
-const scenarioProbes = async name => {
-  if (scenarios.has(name)) return scenarios.get(name)
-  const scenario = JSON.parse(await readFile(join(benchRoot, 'scenarios', `${name}.json`), 'utf8'))
+const scenarioProbes = async run => {
+  const key = run.scenarioHash ?? run.scenario
+  if (scenarios.has(key)) return scenarios.get(key)
+  const scenario = JSON.parse(
+    await readFile(join(dir, `${run.runId}.scenario.json`), 'utf8').catch(() => readFile(join(benchRoot, 'scenarios', `${run.scenario}.json`), 'utf8')),
+  )
   const scratch = await mkdtemp(join(tmpdir(), 'optmem-bench-truth-'))
-  const truth = await generateFixture(scenario.fixture, scratch)
+  const truth = { ...(await generateFixture(scenario.fixture, scratch)), ...scenario.truth }
   await rm(scratch, { recursive: true, force: true })
   const probes = new Map(
     scenario.conversations.flatMap(conversation => conversation.turns.flatMap(turn => (turn.probe === undefined ? [] : [[turn.probe.id, turn.probe]]))),
   )
   const entry = { probes, truth }
-  scenarios.set(name, entry)
+  scenarios.set(key, entry)
   return entry
 }
 const rescore = async (scenario, turn) => {
@@ -65,16 +74,20 @@ const rescore = async (scenario, turn) => {
   const probe = probes.get(turn.probe.id)
   if (probe === undefined) return turn.probe
   const scored = scoreProbe({ answer: turn.answer, probe, truth })
-  return !scored.pass && turn.probe.pass && turn.answer.length >= 1200 ? turn.probe : scored
+  return turn.answerTruncated ? turn.probe : scored
 }
 
 const runs = []
 for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test(name)).sort()) {
   const run = JSON.parse(await readFile(join(dir, file), 'utf8'))
-  const calls = (await readJsonl(join(dir, file.replace(/\.json$/, '.calls.jsonl')))).filter(call => call.kind !== 'model-info')
+  const journal = await readJsonl(join(dir, file.replace(/\.json$/, '.calls.jsonl')))
+  const calls = journal.filter(call => call.kind !== 'model-info' && call.kind !== 'call-start')
+  const ended = new Set(calls.map(call => call.seq))
+  for (const start of journal.filter(call => call.kind === 'call-start' && !ended.has(call.seq)))
+    calls.push({ ...start, kind: undefined, error: 'unfinished call; cost unknown', incomplete: true })
   const byKind = Object.groupBy(calls, callKind)
   const agentCalls = byKind.agent ?? []
-  const probes = await Promise.all(run.turns.filter(turn => turn.probe !== undefined).map(turn => rescore(run.scenario, turn)))
+  const probes = await Promise.all(run.turns.filter(turn => turn.probe !== undefined).map(turn => rescore(run, turn)))
   const tally = kind => {
     const matching = probes.filter(probe => probe.kind === kind)
     return { pass: matching.filter(probe => probe.pass).length, total: matching.length }
@@ -93,6 +106,19 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
     scenario: run.scenario,
     arm: run.arm,
     rep: run.rep,
+    provider: run.provider,
+    model: run.model,
+    runtimeHash: run.runtimeHash,
+    sourceHash: run.sourceHash,
+    finishedAt: run.finishedAt,
+    turnEnds: run.turns.map(turn => turn.end),
+    scenarioHash: run.scenarioHash,
+    variant: run.variant,
+    effort: run.effort,
+    summaryEffort: run.summaryEffort,
+    compactionPolicy: run.compaction,
+    drain: run.drain,
+    expectedTurns: run.expectedTurns,
     error: run.error?.split('\n')[0],
     turns: run.turns.length,
     agent: usageOf(agentCalls),
@@ -127,7 +153,49 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   })
 }
 
-const groups = Object.groupBy(runs, run => `${run.scenario}|${run.arm}`)
+const successfulRuns = runs.filter(
+  run =>
+    run.error === undefined &&
+    run.finishedAt !== undefined &&
+    run.turnEnds.every(end => end === 'completed') &&
+    (run.expectedTurns === undefined || run.turns === run.expectedTurns) &&
+    run.drain?.complete !== false,
+)
+const groups = Object.groupBy(successfulRuns, run => `${run.scenario}|${run.arm}`)
+for (const [key, items] of Object.entries(groups)) {
+  const policies = new Set(
+    items.map(run =>
+      JSON.stringify({
+        provider: run.provider,
+        model: run.model,
+        runtimeHash: run.runtimeHash,
+        sourceHash: run.sourceHash,
+        variant: run.variant,
+        effort: run.effort,
+        summaryEffort: run.summaryEffort,
+        compactionPolicy: run.compactionPolicy,
+      }),
+    ),
+  )
+  if (policies.size > 1) throw new Error(`refusing to average mixed benchmark policies for ${key}`)
+}
+for (const [key, items] of Object.entries(Object.groupBy(successfulRuns, run => `${run.scenario}|${run.rep}`))) {
+  const pairedIdentities = new Set(
+    items.map(run =>
+      JSON.stringify({
+        scenarioHash: run.scenarioHash,
+        sourceHash: run.sourceHash,
+        provider: run.provider,
+        model: run.model,
+        variant: run.variant,
+        effort: run.effort,
+        summaryEffort: run.summaryEffort,
+        compactionPolicy: run.compactionPolicy,
+      }),
+    ),
+  )
+  if (pairedIdentities.size > 1) throw new Error(`refusing unpaired benchmark comparison for ${key}`)
+}
 const stat = (items, pick, digits = 0) => {
   const numbers = items.map(pick).filter(value => Number.isFinite(value))
   if (numbers.length === 0) return '–'
@@ -143,7 +211,13 @@ const ratio = (items, pick) => {
   return total === 0 ? '–' : `${pass}/${total} (${Math.round((100 * pass) / total)}%)`
 }
 
-const lines = []
+const lines = ['Successful runs only in performance tables; failed/partial runs remain in JSON evidence. Costs use list prices, not subscription billing.']
+for (const run of runs.filter(run => !successfulRuns.includes(run)))
+  lines.push(`- FAILED ${run.runId}: ${run.error ?? `${run.turns}/${run.expectedTurns} turns`}`)
+for (const run of runs.filter(run => run.drain?.complete === false))
+  lines.push(
+    `- INCOMPLETE SUMMARY DRAIN ${run.runId}: cost excludes work after the deadline; ${run.drain.pendingLeaves} pending leaves, ${run.drain.pendingViews} pending views.`,
+  )
 for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
   lines.push(`\n### ${scenario}\n`)
   lines.push(
@@ -178,5 +252,14 @@ for (const scenario of [...new Set(runs.map(run => run.scenario))]) {
     )
   }
 }
+lines.push(
+  '\n### Summary health and accounting\n',
+  '| run | summary calls | capped | error finishes | usage coverage | summary output tokens | estimated summary cost | drained |',
+  '|---|---:|---:|---:|---|---:|---:|---|',
+)
+for (const run of runs)
+  lines.push(
+    `| ${run.runId} | ${run.optmem.calls} | ${run.optmem.maxTokenFinishes} | ${run.optmem.errors} | ${run.all.callsWithUsage}/${run.all.calls} | ${run.optmem.output} | ${run.optmem.cost.toFixed(4)} | ${run.drain?.complete ?? 'n/a'} |`,
+  )
 console.log(lines.join('\n'))
 if (values.json !== undefined) await writeFile(values.json, `${JSON.stringify(runs, null, 2)}\n`)
