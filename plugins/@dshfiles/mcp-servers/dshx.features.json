@@ -84,19 +84,19 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "mcp-servers.server-validation",
-          "reason": "No browser journey exists yet for the server-validation scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "mcp-servers.lifecycle",
-          "reason": "No browser journey exists yet for the lifecycle scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         },
         {
           "kind": "not-applicable",
           "id": "mcp-servers.settings-boundary",
-          "reason": "No browser journey exists yet for the settings-boundary scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
+          "reason": "connectOnStartup, toolCallTimeoutSeconds, registrySearch and oauthClientName cannot be set from any surface yet: host.ts settingsFor() returns the schema defaults because dshx refuses a Host with both a native Config and a Settings namespace, so no journey can change them until the Host entry is split."
         }
       ]
     },
@@ -119,7 +119,7 @@
         {
           "kind": "not-applicable",
           "id": "mcp-servers.registry-search",
-          "reason": "No browser journey exists yet for the registry-search scenario of \"Search curated providers and the MCP Registry\"; nothing automated verifies it yet."
+          "reason": "Registry search calls the fixed public endpoint https://registry.modelcontextprotocol.io from the Host with no override, so a browser journey would depend on the live network; the curated provider list is shown by the lifecycle journey and the parsing is unit-tested."
         }
       ]
     },
@@ -145,7 +145,7 @@
         {
           "kind": "not-applicable",
           "id": "mcp-servers.oauth-lifecycle",
-          "reason": "No browser journey exists yet for the oauth-lifecycle scenario of \"Authorize remote OAuth servers\"; only the unit tests listed for this feature verify it."
+          "reason": "A sign-in round trip needs an OAuth authorization server the browser is redirected to; the e2e network boundary admits only the scratch Host origin and no loopback authorization server fake exists yet, so discovery, PKCE, refresh and sign-out are verified by the oauth.test.ts cases listed here."
         },
         {
           "kind": "unit-test",
