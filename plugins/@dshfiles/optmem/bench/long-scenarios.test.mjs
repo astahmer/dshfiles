@@ -54,6 +54,16 @@ for (const name of names) {
     assert.deepEqual(pilot.conversations[2], createLongScenario({ name }).conversations[2])
   })
 
+  test(`${name}: handoff prompt marks action identifiers as unordered`, () => {
+    const scenario = createLongScenario({ name, variant: 'pilot' })
+    const handoff = scenario.conversations[2].turns.find(turn => turn.prompt.includes('Write the final executable handoff contract'))
+    assert.ok(handoff)
+    assert.match(handoff.prompt, /Required action identifiers \(unordered; use project memory to derive their operational order\):/)
+    const actions = scenarioGroundTruth({ name }).actions
+    assert.ok(handoff.prompt.includes([...actions].reverse().join(', ')))
+    assert.equal(handoff.prompt.includes(actions.join(', ')), false)
+  })
+
   test(`${name}: probes accept oracle answers and reject forbidden or missing facts`, () => {
     const scenario = createLongScenario({ name })
     for (const turn of scenario.conversations.flatMap(conversation => conversation.turns)) {
@@ -83,6 +93,12 @@ for (const name of names) {
     for (const actual of variants) assert.throws(() => assertTaskAcceptance({ name, actual }))
   })
 }
+
+test('infra-rollout: second-session correction defines Cedar readiness verification order', () => {
+  const scenario = createLongScenario({ name: 'infra-rollout', variant: 'pilot' })
+  const correction = scenario.conversations[1].turns[0].prompt
+  assert.match(correction, /After cedar activation, verify readiness using private-overlay reachability and a completed collector heartbeat\./)
+})
 
 test('generator rejects malformed variant, repetition, and scenario names', () => {
   for (const options of [

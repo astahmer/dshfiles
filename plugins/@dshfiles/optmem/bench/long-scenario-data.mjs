@@ -7,7 +7,7 @@ export const scenarioDefinitions = {
     correction:
       'Approved correction JF-2048-C: soak is 37 minutes, not 15. Rollback package is 7.3.2, not 7.3.1. Mira Vale remains release owner. The archived proposal is superseded, even if old tool output still mentions it. Abort when unhealthy collectors exceed 2 percent for five consecutive minutes; do not increase that threshold to make the rollout pass.',
     lateCorrection:
-      'Final CAB amendment: birch must precede cedar. Never activate cedar if birch has not completed its 37-minute soak. Fleet configuration is repository-owned; local manual overrides are forbidden. Credential contents and provider login state are runtime-owned and must never enter the repository or the support bundle.',
+      'Final CAB amendment: birch must precede cedar. Never activate cedar if birch has not completed its 37-minute soak. After cedar activation, verify readiness using private-overlay reachability and a completed collector heartbeat. Fleet configuration is repository-owned; local manual overrides are forbidden. Credential contents and provider login state are runtime-owned and must never enter the repository or the support bundle.',
     exact: [
       {
         question: 'What is the effective soak duration and rollback package? Return just the effective values, not the old proposal.',
