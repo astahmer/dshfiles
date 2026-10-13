@@ -1547,6 +1547,8 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
         'unarchive',
         'prompt',
         'export',
+        'digest',
+        'tail',
         'info',
         'check',
         'enable',

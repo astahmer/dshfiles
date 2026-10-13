@@ -11,6 +11,14 @@ import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue,
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
 import { connectMultiHost, nativeRpcRequestSchema, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
+import {
+  createSessionEventDescriber,
+  digestSession,
+  formatEventClock,
+  isNoiseSessionEvent,
+  renderSessionDigest,
+  sessionEventFilter,
+} from '../platform/session-digest.js'
 
 const runFile = promisify(execFile)
 const engineRange = '^22.19.0 || >=24.0.0'
@@ -747,7 +755,11 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           source: 'dshx',
           sessionId,
           ...(selectedPlacement === undefined ? {} : { placement: selectedPlacement }),
-          records: await client.sessions.export(sessionId),
+          records: await client.sessions.export(sessionId, {
+            ...(args.sinceSeq === undefined ? {} : { afterSeq: args.sinceSeq }),
+            ...(args.tail === undefined ? {} : { newest: args.tail }),
+            ...(args.types === undefined ? {} : { keep: sessionEventFilter(args.types) }),
+          }),
         }
         if (args.output !== undefined) {
           await writeFile(args.output, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
@@ -764,6 +776,65 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         }
         return 0
       }
+    }
+
+    if (args.command === 'sessions' && action === 'digest') {
+      const sessionId = parameters[0] ?? ''
+      const summary = (await client.sessions.list()).find(session => session.sessionId === sessionId)
+      if (!summary) throw new DshPlatformError('not-found', `No DSH Session named ${JSON.stringify(sessionId)} exists.`)
+      const records = await client.sessions.export(sessionId)
+      const now = Date.now()
+      const digest = digestSession({ summary, records, now, ...(args.limit === undefined ? {} : { actionLimit: args.limit }) })
+      emitSessionResult(digest, renderSessionDigest(digest, now))
+      return 0
+    }
+
+    if (args.command === 'sessions' && action === 'tail') {
+      const sessionId = parameters[0] ?? ''
+      const keep = args.types === undefined ? (record: JsonValue) => !isNoiseSessionEvent(record) : sessionEventFilter(args.types)
+      const describe = createSessionEventDescriber()
+      const describeAll = (records: readonly JsonValue[]) => records.flatMap(record => describe(record) ?? [])
+      const line = (item: NonNullable<ReturnType<typeof describe>>): string =>
+        `#${item.seq} ${formatEventClock(item.time)} ${item.type.padEnd(17)} ${item.summary}`
+      const throughSeq = await client.sessions.cursor(sessionId)
+      const initialRange = {
+        throughSeq,
+        keep,
+        ...(args.sinceSeq === undefined ? { newest: args.tail ?? 40 } : { afterSeq: args.sinceSeq }),
+        ...(args.sinceSeq !== undefined && args.tail !== undefined ? { newest: args.tail } : {}),
+      }
+      const initial = describeAll(await client.sessions.export(sessionId, initialRange))
+      if (!args.follow) {
+        emitSessionResult({ sessionId, throughSeq, items: initial }, initial.map(line).join('\n') || '(no matching events)')
+        return 0
+      }
+      const print = (items: readonly NonNullable<ReturnType<typeof describe>>[]): void => {
+        for (const item of items) write(runtime.io.stdout, `${args.json ? JSON.stringify(item) : line(item)}\n`)
+      }
+      print(initial)
+      const controller = new AbortController()
+      const onInterrupt = (): void => controller.abort()
+      process.once('SIGINT', onInterrupt)
+      try {
+        let lastSeq = throughSeq
+        while (!controller.signal.aborted) {
+          await new Promise(resolve => {
+            const timer = setTimeout(resolve, 2_000)
+            controller.signal.addEventListener('abort', () => {
+              clearTimeout(timer)
+              resolve(undefined)
+            })
+          })
+          if (controller.signal.aborted) break
+          const cursor = await client.sessions.cursor(sessionId)
+          if (cursor <= lastSeq) continue
+          print(describeAll(await client.sessions.export(sessionId, { afterSeq: lastSeq, throughSeq: cursor, keep })))
+          lastSeq = cursor
+        }
+      } finally {
+        process.off('SIGINT', onInterrupt)
+      }
+      return 0
     }
 
     if (args.command === 'plugins') {

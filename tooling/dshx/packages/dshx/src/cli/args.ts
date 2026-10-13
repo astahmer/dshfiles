@@ -54,6 +54,10 @@ export interface CliArgs {
   readonly priority?: 'normal' | 'urgent'
   readonly topic?: string
   readonly limit?: number
+  readonly sinceSeq?: number
+  readonly tail?: number
+  readonly types?: readonly string[]
+  readonly follow?: boolean
 }
 
 export class CliUsageError extends Error {
@@ -234,9 +238,25 @@ const sharedArgs = {
   },
   limit: {
     type: 'string',
-    description: 'Maximum communication messages or diagnostic rows to return.',
+    description: 'Maximum communication messages, diagnostic rows, or digest actions to return.',
     valueHint: 'count',
   },
+  sinceSeq: {
+    type: 'string',
+    description: 'Only Session events after this sequence number.',
+    valueHint: 'sequence',
+  },
+  tail: {
+    type: 'string',
+    description: 'Only the newest matching Session events.',
+    valueHint: 'count',
+  },
+  types: {
+    type: 'string',
+    description: 'Comma-separated Session event types; a prefix such as tool matches tool/call and tool/result.',
+    valueHint: 'type,...',
+  },
+  follow: { type: 'boolean', description: 'Keep printing new Session events until interrupted.' },
   help: { type: 'boolean', alias: 'h', description: 'Show command help.' },
   version: {
     type: 'boolean',
@@ -373,7 +393,23 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
     usage: '--session is only valid with commands, models select, or skills.',
   },
   host: {
-    allows: platformAction('sessions', 'list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export'),
+    allows: platformAction(
+      'sessions',
+      'list',
+      'search',
+      'show',
+      'history',
+      'create',
+      'fork',
+      'cancel',
+      'rename',
+      'archive',
+      'unarchive',
+      'prompt',
+      'export',
+      'digest',
+      'tail',
+    ),
     usage: '--host is only valid with sessions commands.',
   },
   local: { allows: platformAction('host', 'add'), usage: '--local is only valid with host add.' },
@@ -397,7 +433,14 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   delivery: { allows: platformAction('comm', 'subscribe'), usage: '--delivery is only valid with comm subscribe.' },
   priority: { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' },
   topic: { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' },
-  limit: { allows: platformAction('comm', 'inbox', 'report'), usage: '--limit is only valid with comm inbox or comm report.' },
+  limit: {
+    allows: context => platformAction('comm', 'inbox', 'report')(context) || platformAction('sessions', 'digest')(context),
+    usage: '--limit is only valid with comm inbox, comm report, or sessions digest.',
+  },
+  sinceSeq: { allows: platformAction('sessions', 'export', 'tail'), usage: '--since-seq is only valid with sessions export or sessions tail.' },
+  tail: { allows: platformAction('sessions', 'export', 'tail'), usage: '--tail is only valid with sessions export or sessions tail.' },
+  types: { allows: platformAction('sessions', 'export', 'tail'), usage: '--types is only valid with sessions export or sessions tail.' },
+  follow: { allows: platformAction('sessions', 'tail'), usage: '--follow is only valid with sessions tail.' },
   slot: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
   provider: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
   order: { allows: addTargets('ui'), usage: 'Slot options are only valid with add ui.' },
@@ -567,6 +610,26 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     limit = Number(parsed.limit)
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new CliUsageError('--limit requires an integer from 1 to 500.')
   }
+  let sinceSeq: number | undefined
+  let tail: number | undefined
+  if (parsed.sinceSeq !== undefined) {
+    sinceSeq = Number(parsed.sinceSeq)
+    if (!Number.isSafeInteger(sinceSeq) || sinceSeq < 0) throw new CliUsageError('--since-seq requires a non-negative safe integer.')
+  }
+  if (parsed.tail !== undefined) {
+    tail = Number(parsed.tail)
+    if (!Number.isSafeInteger(tail) || tail < 1 || tail > 100_000) throw new CliUsageError('--tail requires an integer from 1 to 100000.')
+  }
+  const rawTypes: unknown = parsed.types
+  const types =
+    typeof rawTypes === 'string'
+      ? rawTypes
+          .split(',')
+          .map(type => type.trim())
+          .filter(type => type.length > 0)
+      : undefined
+  if (types !== undefined && types.length === 0) throw new CliUsageError('--types requires at least one event type.')
+  const follow = parsed.follow ?? false
   if (parsed.order !== undefined) {
     const value = Number(parsed.order)
     if (!Number.isInteger(value)) throw new CliUsageError('--order requires an integer value.')
@@ -610,6 +673,10 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       priority,
       topic,
       limit,
+      sinceSeq,
+      tail,
+      types,
+      follow,
       slot,
       provider,
       id,
@@ -645,9 +712,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   if (command === 'sessions' && !help) {
     const [action, sessionId, ...extra] = platformArgs
-    const actions = ['list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export']
+    const actions = ['list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export', 'digest', 'tail']
     if (!actions.includes(action ?? '')) throw new CliUsageError(`sessions requires ${actions.join(', ')}.`)
-    if (['show', 'history', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export'].includes(action ?? '') && !sessionId)
+    if (['show', 'history', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export', 'digest', 'tail'].includes(action ?? '') && !sessionId)
       throw new CliUsageError(`sessions ${action} requires a Session id.`)
     if (action === 'search' && !sessionId) throw new CliUsageError('sessions search requires a query.')
     if (action === 'prompt' && extra.join(' ').trim().length === 0) throw new CliUsageError('sessions prompt requires message text.')
@@ -846,5 +913,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(priority === undefined ? {} : { priority }),
     ...(topic === undefined ? {} : { topic }),
     ...(limit === undefined ? {} : { limit }),
+    ...(sinceSeq === undefined ? {} : { sinceSeq }),
+    ...(tail === undefined ? {} : { tail }),
+    ...(types === undefined ? {} : { types }),
+    ...(follow ? { follow } : {}),
   }
 }

@@ -1,0 +1,950 @@
+{
+  "summary": {
+    "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd",
+    "updatedAt": 1791916825087,
+    "running": true,
+    "blank": false,
+    "agentAvailable": true,
+    "cwd": "/tmp/dshx-digest/work",
+    "projections": {
+      "kind": "sequenced",
+      "asOfSeq": 51,
+      "values": {
+        "title": "Scratch greeting app",
+        "goal": null,
+        "todos": [
+          { "content": "Rename greet to welcome", "status": "completed" },
+          { "content": "Run the slow integration check", "status": "in_progress" }
+        ],
+        "tokenUsage": { "uncachedInputTokens": 7200, "outputTokens": 240, "cacheReadTokens": 4800, "cacheWriteTokens": 0 },
+        "contextPressure": { "pressureTokens": 2000, "projectedTokens": 2073, "contextWindow": 1000000 },
+        "sessionStats": { "turns": 1, "steps": 5, "llmMs": 609, "toolMs": 1337, "ttftMs": 584, "ttftSteps": 6, "decodeMs": 25, "decodeTokens": 240 },
+        "modelSelection": {
+          "lastUsed": { "provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "high" },
+          "next": { "provider": "deepseek-official", "model": "deepseek-flash", "reasoningEffort": "high" }
+        }
+      }
+    }
+  },
+  "records": [
+    { "type": "event", "event": { "type": "permission/preset", "seq": 0, "time": 1791916823108, "data": { "preset": "workspace-write" } } },
+    { "type": "event", "event": { "type": "sandbox/mode", "seq": 1, "time": 1791916823110, "data": { "mode": "workspace-write" } } },
+    { "type": "event", "event": { "type": "approval/policy", "seq": 2, "time": 1791916823111, "data": { "policy": "ask" } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "agent/inbox/spliced",
+        "seq": 3,
+        "time": 1791916824556,
+        "data": {
+          "target": "next-turn",
+          "start": 0,
+          "inserted": [
+            {
+              "content": [{ "type": "text", "text": "Rename greet to welcome, describe it, then run the slow integration check." }],
+              "source": { "kind": "user", "rpcId": "9ffdd896-865b-4ee2-8475-f3fd41150de2" },
+              "role": "user",
+              "id": "e02eb054-0c31-4c68-ba85-bea078042546"
+            }
+          ]
+        }
+      }
+    },
+    { "type": "event", "event": { "type": "turn/start", "seq": 4, "time": 1791916824557, "data": { "turn": 1 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "agent/inbox/spliced",
+        "seq": 5,
+        "time": 1791916824562,
+        "data": { "target": "next-turn", "start": 0, "removedCount": 1, "inserted": [] }
+      }
+    },
+    { "type": "event", "event": { "type": "step/start", "seq": 6, "time": 1791916825081, "data": { "turn": 1, "step": 1 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "user/message",
+        "seq": 8,
+        "time": 1791916825087,
+        "data": {
+          "content": [{ "type": "text", "text": "Rename greet to welcome, describe it, then run the slow integration check." }],
+          "source": { "kind": "user", "rpcId": "9ffdd896-865b-4ee2-8475-f3fd41150de2" },
+          "role": "user",
+          "id": "e02eb054-0c31-4c68-ba85-bea078042546"
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "request/context",
+        "seq": 12,
+        "time": 1791916825090,
+        "data": { "provider": "deepseek-official", "model": "deepseek-flash", "contextWindow": 1000000, "systemPromptUpdate": "in-history" }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "session/title",
+        "seq": 13,
+        "time": 1791916825097,
+        "data": { "title": "Rename greet to welcome, describe", "messageSeqs": [8], "source": { "kind": "fallback" } }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 15,
+        "time": 1791916825198,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 14 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 16,
+        "time": 1791916825206,
+        "data": {
+          "turn": 1,
+          "step": 1,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Planning the rename**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_1_1",
+                "name": "todo_write",
+                "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"in_progress\"},{\"content\":\"Run the slow integration check\",\"status\":\"pending\"}]}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "434f8a76-e11b-4798-a307-106d6692622d"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916825202, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916825203, "index": 0, "dt": [], "texts": ["**Planning the rename**"] },
+            {
+              "type": "chunk",
+              "time": 1791916825203,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Planning the rename**" } }
+            },
+            { "type": "chunk", "time": 1791916825203, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916825203, "index": 1, "dt": [], "id": "toolu_1_1", "name": "todo_write", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916825203,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_1_1",
+              "args": [
+                "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"in_progress\"},{\"content\":\"Run the slow integration check\",\"status\":\"pending\"}]}"
+              ]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916825203,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_1_1",
+                  "name": "todo_write",
+                  "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"in_progress\"},{\"content\":\"Run the slow integration check\",\"status\":\"pending\"}]}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916825203,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916825203,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 17,
+        "time": 1791916825221,
+        "data": {
+          "turn": 1,
+          "step": 1,
+          "callId": "toolu_1_1",
+          "name": "todo_write",
+          "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"in_progress\"},{\"content\":\"Run the slow integration check\",\"status\":\"pending\"}]}"
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 18,
+        "time": 1791916825224,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 14 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "session/title",
+        "seq": 19,
+        "time": 1791916825231,
+        "data": {
+          "title": "Scratch greeting app",
+          "messageSeqs": [8],
+          "source": {
+            "kind": "provider",
+            "provider": "session-title-first-prompt-llm",
+            "model": { "provider": "deepseek-official", "model": "deepseek-flash" }
+          }
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "todo/write",
+        "seq": 20,
+        "time": 1791916825348,
+        "data": {
+          "todos": [
+            { "content": "Rename greet to welcome", "status": "in_progress" },
+            { "content": "Run the slow integration check", "status": "pending" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/result",
+        "seq": 21,
+        "time": 1791916825355,
+        "data": {
+          "turn": 1,
+          "step": 1,
+          "message": {
+            "role": "tool",
+            "source": { "kind": "tool", "callId": "toolu_1_1" },
+            "toolCallId": "toolu_1_1",
+            "content": [{ "type": "text", "text": "Updated todo list: 1 pending, 1 in progress, 0 completed." }],
+            "isError": false,
+            "id": "2e70add7-448a-47b6-8c81-a0490e28b9de"
+          }
+        },
+        "sourceEventSeqs": [17],
+        "surfaceOp": "append"
+      }
+    },
+    { "type": "event", "event": { "type": "step/end", "seq": 22, "time": 1791916825356, "data": { "turn": 1, "step": 1 } } },
+    { "type": "event", "event": { "type": "step/start", "seq": 23, "time": 1791916825985, "data": { "turn": 1, "step": 2 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 24,
+        "time": 1791916826187,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 23 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 25,
+        "time": 1791916826194,
+        "data": {
+          "turn": 1,
+          "step": 2,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Listing sources**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_2_1",
+                "name": "bash",
+                "arguments": "{\"command\":\"cd /tmp/dshx-digest/work && ls src\",\"description\":\"List sources\"}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "853aff7e-3ecc-4e73-89ee-72584854d561"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916826190, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916826190, "index": 0, "dt": [], "texts": ["**Listing sources**"] },
+            {
+              "type": "chunk",
+              "time": 1791916826190,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Listing sources**" } }
+            },
+            { "type": "chunk", "time": 1791916826190, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916826190, "index": 1, "dt": [], "id": "toolu_2_1", "name": "bash", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916826190,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_2_1",
+              "args": ["{\"command\":\"cd /tmp/dshx-digest/work && ls src\",\"description\":\"List sources\"}"]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826190,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_2_1",
+                  "name": "bash",
+                  "arguments": "{\"command\":\"cd /tmp/dshx-digest/work && ls src\",\"description\":\"List sources\"}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826190,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826190,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 26,
+        "time": 1791916826203,
+        "data": {
+          "turn": 1,
+          "step": 2,
+          "callId": "toolu_2_1",
+          "name": "bash",
+          "arguments": "{\"command\":\"cd /tmp/dshx-digest/work && ls src\",\"description\":\"List sources\"}"
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/result",
+        "seq": 27,
+        "time": 1791916826597,
+        "data": {
+          "turn": 1,
+          "step": 2,
+          "message": {
+            "role": "tool",
+            "source": { "kind": "tool", "callId": "toolu_2_1" },
+            "toolCallId": "toolu_2_1",
+            "content": [{ "type": "text", "text": "farewell.mjs\ngreeting.mjs\ngreeting.test.mjs\n" }],
+            "isError": false,
+            "id": "22494aa9-c068-4fbc-a7cf-388fb8542a40"
+          }
+        },
+        "sourceEventSeqs": [26],
+        "surfaceOp": "append"
+      }
+    },
+    { "type": "event", "event": { "type": "step/end", "seq": 28, "time": 1791916826598, "data": { "turn": 1, "step": 2 } } },
+    { "type": "event", "event": { "type": "step/start", "seq": 29, "time": 1791916826646, "data": { "turn": 1, "step": 3 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 30,
+        "time": 1791916826754,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 29 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 31,
+        "time": 1791916826755,
+        "data": {
+          "turn": 1,
+          "step": 3,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Renaming the export**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_3_1",
+                "name": "edit",
+                "arguments": "{\"file_path\":\"/tmp/dshx-digest/work/src/greeting.mjs\",\"old_string\":\"export const greet\",\"new_string\":\"export const welcome\"}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "d9f2134d-215b-4dcb-97c6-01c849f10c6c"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916826754, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916826755, "index": 0, "dt": [], "texts": ["**Renaming the export**"] },
+            {
+              "type": "chunk",
+              "time": 1791916826755,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Renaming the export**" } }
+            },
+            { "type": "chunk", "time": 1791916826755, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916826755, "index": 1, "dt": [], "id": "toolu_3_1", "name": "edit", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916826755,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_3_1",
+              "args": [
+                "{\"file_path\":\"/tmp/dshx-digest/work/src/greeting.mjs\",\"old_string\":\"export const greet\",\"new_string\":\"export const welcome\"}"
+              ]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826755,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_3_1",
+                  "name": "edit",
+                  "arguments": "{\"file_path\":\"/tmp/dshx-digest/work/src/greeting.mjs\",\"old_string\":\"export const greet\",\"new_string\":\"export const welcome\"}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826755,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826755,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 32,
+        "time": 1791916826755,
+        "data": {
+          "turn": 1,
+          "step": 3,
+          "callId": "toolu_3_1",
+          "name": "edit",
+          "arguments": "{\"file_path\":\"/tmp/dshx-digest/work/src/greeting.mjs\",\"old_string\":\"export const greet\",\"new_string\":\"export const welcome\"}"
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/result",
+        "seq": 33,
+        "time": 1791916826782,
+        "data": {
+          "turn": 1,
+          "step": 3,
+          "message": {
+            "role": "tool",
+            "source": { "kind": "tool", "callId": "toolu_3_1" },
+            "toolCallId": "toolu_3_1",
+            "content": [
+              { "type": "text", "text": "Error: cannot modify \"/tmp/dshx-digest/work/src/greeting.mjs\": file has not been read — read the file, then retry" }
+            ],
+            "isError": true,
+            "id": "70833328-1e7e-4b47-8b45-377ce08e05a2"
+          },
+          "error": { "name": "FsError", "code": "FS_NOT_OBSERVED" }
+        },
+        "sourceEventSeqs": [32],
+        "surfaceOp": "append"
+      }
+    },
+    { "type": "event", "event": { "type": "step/end", "seq": 34, "time": 1791916826782, "data": { "turn": 1, "step": 3 } } },
+    { "type": "event", "event": { "type": "step/start", "seq": 35, "time": 1791916826807, "data": { "turn": 1, "step": 4 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 36,
+        "time": 1791916826831,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 35 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 37,
+        "time": 1791916826839,
+        "data": {
+          "turn": 1,
+          "step": 4,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Describing the rename**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_4_1",
+                "name": "bash",
+                "arguments": "{\"command\":\"jj describe -m \\\"refactor(app): rename greet to welcome\\\" && jj new\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Describe the rename\"}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "36a18350-51e4-42b1-81ff-467c7b67543e"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916826832, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916826832, "index": 0, "dt": [], "texts": ["**Describing the rename**"] },
+            {
+              "type": "chunk",
+              "time": 1791916826832,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Describing the rename**" } }
+            },
+            { "type": "chunk", "time": 1791916826832, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916826832, "index": 1, "dt": [], "id": "toolu_4_1", "name": "bash", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916826832,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_4_1",
+              "args": [
+                "{\"command\":\"jj describe -m \\\"refactor(app): rename greet to welcome\\\" && jj new\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Describe the rename\"}"
+              ]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826832,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_4_1",
+                  "name": "bash",
+                  "arguments": "{\"command\":\"jj describe -m \\\"refactor(app): rename greet to welcome\\\" && jj new\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Describe the rename\"}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826837,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916826838,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 38,
+        "time": 1791916826840,
+        "data": {
+          "turn": 1,
+          "step": 4,
+          "callId": "toolu_4_1",
+          "name": "bash",
+          "arguments": "{\"command\":\"jj describe -m \\\"refactor(app): rename greet to welcome\\\" && jj new\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Describe the rename\"}"
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/result",
+        "seq": 39,
+        "time": 1791916827547,
+        "data": {
+          "turn": 1,
+          "step": 4,
+          "message": {
+            "role": "tool",
+            "source": { "kind": "tool", "callId": "toolu_4_1" },
+            "toolCallId": "toolu_4_1",
+            "content": [
+              {
+                "type": "text",
+                "text": "[stderr]\nWorking copy  (@) now at: pylplpmn 5476a164 refactor(app): rename greet to welcome\nParent commit (@-)      : tqmskrmv d4f36df9 feat(app): add a tested greeting module\nWorking copy  (@) now at: kxxkqswv e7287686 (empty) wip\nParent commit (@-)      : pylplpmn 5476a164 refactor(app): rename greet to welcome\n"
+              }
+            ],
+            "isError": false,
+            "id": "a46098cd-86bd-4d6c-beea-e824eb923115"
+          }
+        },
+        "sourceEventSeqs": [38],
+        "surfaceOp": "append"
+      }
+    },
+    { "type": "event", "event": { "type": "step/end", "seq": 40, "time": 1791916827548, "data": { "turn": 1, "step": 4 } } },
+    { "type": "event", "event": { "type": "step/start", "seq": 41, "time": 1791916827577, "data": { "turn": 1, "step": 5 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 42,
+        "time": 1791916827654,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 41 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 43,
+        "time": 1791916827661,
+        "data": {
+          "turn": 1,
+          "step": 5,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Updating the plan**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_5_1",
+                "name": "todo_write",
+                "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"completed\"},{\"content\":\"Run the slow integration check\",\"status\":\"in_progress\"}]}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "ec9ea8c9-96d3-48a3-8d43-c9c9e2292c0e"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916827657, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916827657, "index": 0, "dt": [], "texts": ["**Updating the plan**"] },
+            {
+              "type": "chunk",
+              "time": 1791916827657,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Updating the plan**" } }
+            },
+            { "type": "chunk", "time": 1791916827657, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916827657, "index": 1, "dt": [], "id": "toolu_5_1", "name": "todo_write", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916827657,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_5_1",
+              "args": [
+                "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"completed\"},{\"content\":\"Run the slow integration check\",\"status\":\"in_progress\"}]}"
+              ]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916827657,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_5_1",
+                  "name": "todo_write",
+                  "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"completed\"},{\"content\":\"Run the slow integration check\",\"status\":\"in_progress\"}]}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916827658,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916827660,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 44,
+        "time": 1791916827662,
+        "data": {
+          "turn": 1,
+          "step": 5,
+          "callId": "toolu_5_1",
+          "name": "todo_write",
+          "arguments": "{\"todos\":[{\"content\":\"Rename greet to welcome\",\"status\":\"completed\"},{\"content\":\"Run the slow integration check\",\"status\":\"in_progress\"}]}"
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "todo/write",
+        "seq": 45,
+        "time": 1791916827699,
+        "data": {
+          "todos": [
+            { "content": "Rename greet to welcome", "status": "completed" },
+            { "content": "Run the slow integration check", "status": "in_progress" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/result",
+        "seq": 46,
+        "time": 1791916827737,
+        "data": {
+          "turn": 1,
+          "step": 5,
+          "message": {
+            "role": "tool",
+            "source": { "kind": "tool", "callId": "toolu_5_1" },
+            "toolCallId": "toolu_5_1",
+            "content": [{ "type": "text", "text": "Updated todo list: 0 pending, 1 in progress, 1 completed." }],
+            "isError": false,
+            "id": "57c3ec5c-00ac-45c4-ad5a-910308c734ca"
+          }
+        },
+        "sourceEventSeqs": [44],
+        "surfaceOp": "append"
+      }
+    },
+    { "type": "event", "event": { "type": "step/end", "seq": 47, "time": 1791916827752, "data": { "turn": 1, "step": 5 } } },
+    { "type": "event", "event": { "type": "step/start", "seq": 48, "time": 1791916827964, "data": { "turn": 1, "step": 6 } } },
+    {
+      "type": "event",
+      "event": {
+        "type": "session-log-deepseek/delivery-accepted",
+        "seq": 49,
+        "time": 1791916828004,
+        "data": { "sessionId": "session-50b6cdcf-9e38-42c2-939d-50f45710bddd", "sessionFormatVersion": 4, "throughSeq": 48 }
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "assistant/message",
+        "seq": 50,
+        "time": 1791916828014,
+        "data": {
+          "turn": 1,
+          "step": 6,
+          "message": {
+            "role": "assistant",
+            "content": [
+              { "type": "reasoning", "text": "**Running the slow check**" },
+              {
+                "type": "tool-call",
+                "id": "toolu_6_1",
+                "name": "bash",
+                "arguments": "{\"command\":\"sleep 25; echo integration ok\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Run the slow integration check\"}"
+              }
+            ],
+            "source": {
+              "kind": "model",
+              "provider": "deepseek-official",
+              "model": "deepseek-flash",
+              "replayState": {
+                "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+              }
+            },
+            "id": "d67ec04e-9b06-440c-88b5-e15a2f0a9212"
+          },
+          "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 },
+          "stream": [
+            { "type": "chunk", "time": 1791916828007, "chunk": { "type": "block-start", "index": 0, "blockType": "reasoning" } },
+            { "type": "reasoning-chunks", "time0": 1791916828007, "index": 0, "dt": [], "texts": ["**Running the slow check**"] },
+            {
+              "type": "chunk",
+              "time": 1791916828007,
+              "chunk": { "type": "block-end", "index": 0, "block": { "type": "reasoning", "text": "**Running the slow check**" } }
+            },
+            { "type": "chunk", "time": 1791916828007, "chunk": { "type": "block-start", "index": 1, "blockType": "tool-call" } },
+            { "type": "tool-call-chunks", "time0": 1791916828007, "index": 1, "dt": [], "id": "toolu_6_1", "name": "bash", "args": [""] },
+            {
+              "type": "tool-call-chunks",
+              "time0": 1791916828007,
+              "index": 1,
+              "dt": [],
+              "id": "toolu_6_1",
+              "args": [
+                "{\"command\":\"sleep 25; echo integration ok\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Run the slow integration check\"}"
+              ]
+            },
+            {
+              "type": "chunk",
+              "time": 1791916828008,
+              "chunk": {
+                "type": "block-end",
+                "index": 1,
+                "block": {
+                  "type": "tool-call",
+                  "id": "toolu_6_1",
+                  "name": "bash",
+                  "arguments": "{\"command\":\"sleep 25; echo integration ok\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Run the slow integration check\"}"
+                }
+              }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916828008,
+              "chunk": { "type": "usage", "usage": { "inputTokens": 1200, "outputTokens": 40, "cacheReadTokens": 800, "totalTokens": 2040 } }
+            },
+            {
+              "type": "chunk",
+              "time": 1791916828008,
+              "chunk": {
+                "type": "finish",
+                "reason": { "kind": "tool-calls" },
+                "replayState": {
+                  "response": { "kind": "deepseek-messages", "version": 1, "model": "deepseek-flash" },
+                  "blocks": [{ "type": "reasoning", "signature": "mock-signature" }, { "type": "tool-call" }]
+                }
+              }
+            }
+          ]
+        },
+        "surfaceOp": "append"
+      }
+    },
+    {
+      "type": "event",
+      "event": {
+        "type": "tool/call",
+        "seq": 51,
+        "time": 1791916828015,
+        "data": {
+          "turn": 1,
+          "step": 6,
+          "callId": "toolu_6_1",
+          "name": "bash",
+          "arguments": "{\"command\":\"sleep 25; echo integration ok\",\"workdir\":\"/tmp/dshx-digest/work\",\"description\":\"Run the slow integration check\"}"
+        }
+      }
+    }
+  ]
+}

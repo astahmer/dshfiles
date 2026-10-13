@@ -120,7 +120,15 @@ const sessionsHelp = actionHelpGroup('sessions', {
     },
   },
   export: {
-    description: 'Export Session records as versioned DSHX JSON.',
+    description: 'Export Session records as versioned DSHX JSON, optionally filtered by sequence, type, or newest count.',
+    positionals: { 'session-id': positional('Session identifier.') },
+  },
+  digest: {
+    description: 'Summarize what a Session is doing: state, goal, todos, recent actions, edits, revisions, and failures.',
+    positionals: { 'session-id': positional('Session identifier.') },
+  },
+  tail: {
+    description: 'Print Session events as one line each; --follow keeps printing new events.',
     positionals: { 'session-id': positional('Session identifier.') },
   },
 })
