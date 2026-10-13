@@ -129,6 +129,16 @@ returns to the selected account once it recovers, while non-sticky modes choose
 again on the next request. Each step shows as a retry row in the turn. Large
 tool outputs are never trimmed.
 
+When a turn stops on an exhausted quota, the Session is listed under **Quota
+recovery** in the account's panel. **Resume now** queues a recovery prompt;
+**Snooze** (1 h, 4 h, 1 day) pushes it back. If the provider declared a reset
+time and the Schedule service is loaded, the prompt is scheduled for that time;
+an unknown reset gets no invented timer and waits for a manual resume. Any newer
+user message, other queued work, or stopping the Session invalidates the
+pending recovery, so an old continuation never runs over newer work. Records live
+in Host storage, so they survive a restart; finished ones are pruned after 30
+days, and at most 500 are kept.
+
 When a turn ends with an authentication failure (including an invalid API key
 or a missing credential), an inline **Add or fix credentials** action opens the
 AI Accounts panel. Use the account's **Set up key…** action there to store a key
