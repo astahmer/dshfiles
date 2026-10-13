@@ -109,6 +109,13 @@ test('real acceptance subprocess reads a project artifact and fails on missing o
     await writeFile(artifact, JSON.stringify(scenarioGroundTruth({ name })))
     const result = runAcceptance(separateProject)
     assert.equal(result.status, 0, result.stdout + result.stderr)
+    const expected = scenarioGroundTruth({ name })
+    const changedState = { ...expected, state: { ...expected.state, organization: 'org-driftwood' } }
+    await writeFile(artifact, JSON.stringify(changedState))
+    const mismatch = runAcceptance(separateProject)
+    assert.notEqual(mismatch.status, 0, 'wrong scope must fail acceptance')
+    const failedChecks = [...`${mismatch.stdout}\n${mismatch.stderr}`.matchAll(/^not ok \d+ - (.+)$/gm)].map(match => match[1])
+    assert.deepEqual(failedChecks, ['long scenario handoff retains effective decisions, types, and scope'])
     await writeFile(artifact, '{broken-json')
     const broken = runAcceptance(separateProject)
     assert.notEqual(broken.status, 0, 'malformed deliverable must fail')

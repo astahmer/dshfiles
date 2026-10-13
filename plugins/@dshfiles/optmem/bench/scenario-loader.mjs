@@ -24,7 +24,7 @@ const scenarioSchema = z.object({
   fixture: z.string().optional(),
   truth: z.record(z.string(), z.unknown()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  acceptance: z.string().optional(),
+  acceptance: z.string().regex(/^acceptance\/[a-z0-9-]+\.test\.mjs$/).optional(),
   permissionMode: z.enum(['workspace-write', 'danger-full-access', 'read-only']).optional(),
   turnTimeoutMs: z.number().int().positive().optional(),
   compaction: z.object({ thresholdRatio: z.number().positive().max(1), retainTokens: z.number().int().nonnegative() }).optional(),
@@ -48,14 +48,17 @@ const scenarioSchema = z.object({
 
 export const loadScenario = async ({ path, rep = 1, variant = 'long' }) => {
   const absolutePath = resolve(path)
+  const benchRoot = dirname(fileURLToPath(import.meta.url))
   const source = await readFile(absolutePath, 'utf8')
   const input = absolutePath.endsWith('.mjs') ? await (await import(pathToFileURL(absolutePath).href)).createScenario({ rep, variant }) : JSON.parse(source)
   const scenario = scenarioSchema.parse(input)
   const probes = scenario.conversations.flatMap(conversation => conversation.turns.flatMap(turn => (turn.probe ? [turn.probe.id] : [])))
   if (new Set(probes).size !== probes.length) throw new Error('scenario probe ids must be unique')
+  const scenarioIdentity = createHash('sha256').update(JSON.stringify(scenario))
+  if (scenario.acceptance !== undefined) scenarioIdentity.update('\u0000acceptance\u0000').update(await readFile(resolve(benchRoot, scenario.acceptance)))
   return {
     scenario,
-    scenarioHash: createHash('sha256').update(JSON.stringify(scenario)).digest('hex'),
+    scenarioHash: scenarioIdentity.digest('hex'),
     sourceHash: createHash('sha256').update(source).digest('hex'),
     scenarioPath: absolutePath,
   }
