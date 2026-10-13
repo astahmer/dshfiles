@@ -56,8 +56,7 @@ export interface ThreadIsolationOptions {
   readonly registerWorkspace?: ((input: { readonly path: string; readonly sessionId: string }) => Promise<void>) | undefined
 }
 
-export const threadWorkspacesDirectory = (repositoryRoot: string): string =>
-  join(dirname(repositoryRoot), `${basename(repositoryRoot)}-threads`)
+export const threadWorkspacesDirectory = (repositoryRoot: string): string => join(dirname(repositoryRoot), `${basename(repositoryRoot)}-threads`)
 
 /**
  * Resolve the directory a new Session must own.
@@ -68,7 +67,7 @@ export const threadWorkspacesDirectory = (repositoryRoot: string): string =>
  * provisioning failure can never silently behave like `off`.
  */
 export const createThreadWorkspaceResolver = (options: ThreadIsolationOptions): SessionWorkspaceResolver => ({
-  resolve: async (request) => {
+  resolve: async request => {
     const mode = options.mode()
     if (mode === 'off') return { kind: 'passthrough' }
 
@@ -94,9 +93,10 @@ export const createThreadWorkspaceResolver = (options: ThreadIsolationOptions): 
       path: outcome.path,
       baseCommitId: outcome.baseCommitId,
     })
-    // Best effort: a registry that cannot take the directory must not fail
-    // provisioning, but a failure is reported so it is never silent.
-    await options.registerWorkspace?.({ path: outcome.path, sessionId: request.sessionId }).catch(() => undefined)
+    // Not best effort. The native contract keys discovery by workspace path, so
+    // a directory that could not be registered would leave a Session that exists
+    // and cannot be found. Refusing here is the honest outcome.
+    await options.registerWorkspace?.({ path: outcome.path, sessionId: request.sessionId })
     return { kind: 'resolved', cwd: outcome.path }
   },
 })

@@ -1,5 +1,5 @@
 import { homedir, hostname } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -81,6 +81,28 @@ const readConfig = (): JjIntegrationConfig => {
       dryRun: settings.workspaceCleanup.dryRun,
     },
   }
+}
+
+/**
+ * Serializes registration per canonical path. A read-then-write against the
+ * workspace registry is not atomic, so two concurrent provisions of the same
+ * directory would both see "absent" and both call create; chaining per path
+ * makes the second one observe the first. Cross-process races are handled by
+ * reconciling a rejected create instead.
+ */
+const registrationLocks = new Map<string, Promise<unknown>>()
+
+const withPathLock = async <Value>(path: string, operation: () => Promise<Value>): Promise<Value> => {
+  const previous = registrationLocks.get(path) ?? Promise.resolve()
+  const result = previous.then(operation, operation)
+  registrationLocks.set(
+    path,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
+  return result
 }
 
 /** Read at use, so a settings change applies to the next sweep and the next manual run. */
@@ -529,14 +551,32 @@ const setupHost = (context: Context): Effect<void> => {
     mode: () => isolationMode,
     /**
      * Register the provisioned directory so the Session attaches to it through
-     * the unmodified native contract. Idempotent: concurrent creation, a retry,
-     * a resume or a restart all find the existing registration first.
+     * the unmodified native contract.
+     *
+     * A read-then-write is not atomic, so registration is serialized per
+     * canonical path in this process and a rejected create is reconciled by
+     * re-reading: a concurrent creator that won the race is accepted, anything
+     * else is raised. A registry that is absent, or a create that fails without
+     * a reconcilable record, throws — a Session that would be undiscoverable
+     * must fail loudly rather than look created.
+     *
+     * The title is the directory's own name (`dshfiles-707ac8ac`), not the
+     * Session id, because this row is what the native workspace UI shows.
      */
-    registerWorkspace: async ({ path, sessionId }) => {
-      const registry = ctx.get('workspaceRegistry')
-      if (registry === undefined) return
-      if ((await registry.resolveByPath(path).catch(() => undefined)) !== undefined) return
-      await registry.create(path, sessionId)
+    registerWorkspace: async ({ path }) => {
+      const registry = context.get('workspaceRegistry')
+      if (registry === undefined) {
+        throw new Error('the workspace registry is unavailable, so a provisioned workspace cannot be registered')
+      }
+      await withPathLock(path, async () => {
+        if ((await registry.resolveByPath(path).catch(() => undefined)) !== undefined) return
+        try {
+          await registry.create(path, basename(path))
+        } catch (error) {
+          if ((await registry.resolveByPath(path).catch(() => undefined)) !== undefined) return
+          throw error
+        }
+      })
     },
     executor,
     spineRevision: config.spineBookmark,

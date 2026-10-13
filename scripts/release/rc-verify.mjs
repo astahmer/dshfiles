@@ -83,6 +83,22 @@ const after = jj('workspace', 'list', '--ignore-working-copy', '-T', 'name ++ "\
   .split('\n')
   .filter(n => n && n !== 'default')
 console.log('resume:', resumed.status, '| workspaces after:', after.length, '(was', before + ')')
+// Registration is observable through idempotence: re-creating the workspace for
+// a provisioned directory must return the SAME id, which only holds if the
+// resolver already registered it before the Session attached.
+const threadsDirectory = `${project}-threads`
+for (const name of provisioned) {
+  const again = await rpc('workspace', 'create', { request: { path: `${threadsDirectory}/${name}`, title: name } })
+  const id = again.value?.workspace?.workspaceId
+  console.log(
+    `registration ${name}:`,
+    again.status,
+    '| id:',
+    id ?? '(none)',
+    '| pre-existing:',
+    again.value?.workspace?.existing === true || again.value?.existing === true ? 'yes' : 'unknown',
+  )
+}
 console.log('activation failures:', /did not activate|failed to import/.test(output) ? 'YES' : 'none')
 try {
   process.kill(-child.pid, 'SIGTERM')
