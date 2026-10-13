@@ -16,6 +16,26 @@ export const calibrationVariants = [
   { id: 'low-effort', reasoningEffort: 'low', initialBudget: 2_048, maxBudget: 4_096, instructions: summaryInstructions },
   { id: 'low-effort-retry-8192', reasoningEffort: 'low', initialBudget: 2_048, maxBudget: 8_192, retryBudget: 8_192, instructions: summaryInstructions },
   { id: 'low-effort-larger-cap', reasoningEffort: 'low', initialBudget: 4_096, maxBudget: 8_192, instructions: summaryInstructions },
+  { id: 'thinking-off', reasoningEffort: 'off', initialBudget: 2_048, maxBudget: 4_096, instructions: summaryInstructions },
+  // The ChatGPT-plan account the user approved for this comparison; run-arm copies every account a variant names.
+  {
+    id: 'luna-off',
+    provider: 'codex-alex2',
+    model: 'gpt-6-luna',
+    reasoningEffort: 'off',
+    initialBudget: 2_048,
+    maxBudget: 4_096,
+    instructions: summaryInstructions,
+  },
+  {
+    id: 'luna-low',
+    provider: 'codex-alex2',
+    model: 'gpt-6-luna',
+    reasoningEffort: 'low',
+    initialBudget: 2_048,
+    maxBudget: 4_096,
+    instructions: summaryInstructions,
+  },
 ]
 
 export const calibrationCases = [

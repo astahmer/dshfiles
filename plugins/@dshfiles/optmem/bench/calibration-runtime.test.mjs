@@ -104,3 +104,43 @@ test('calibration counterbalances variant order between repetitions', async () =
     ],
   )
 })
+
+test('calibration sends a variant to its own summary route', async () => {
+  const calls = []
+  const records = []
+  await runCalibration({
+    cases: [{ id: 'route', kind: 'leaf', input: ['Mira Vale owns rollout'], maxBytes: 128, expect: ['Mira Vale'] }],
+    variants: [
+      { id: 'agent-route', initialBudget: 2_048, maxBudget: 4_096, instructions: () => 'summary only' },
+      {
+        id: 'luna-off',
+        provider: 'codex-alex2',
+        model: 'gpt-6-luna',
+        reasoningEffort: 'off',
+        initialBudget: 2_048,
+        maxBudget: 4_096,
+        instructions: () => 'summary only',
+      },
+    ],
+    sessionId: 'session-calibration-test',
+    provider: 'opencode-go-alex',
+    model: 'deepseek-v4.1-flash',
+    stream: async function* (call) {
+      calls.push(call)
+      for (const chunk of chunks({ text: 'Mira Vale owns rollout.' })) yield chunk
+    },
+    write: record => records.push(record),
+  })
+
+  assert.deepEqual(
+    calls.map(call => [call.provider, call.model, call.reasoningEffort]),
+    [
+      ['opencode-go-alex', 'deepseek-v4.1-flash', undefined],
+      ['codex-alex2', 'gpt-6-luna', 'off'],
+    ],
+  )
+  assert.deepEqual(
+    records.filter(record => record.kind === 'calibration-call-end').map(record => record.model),
+    ['deepseek-v4.1-flash', 'gpt-6-luna'],
+  )
+})

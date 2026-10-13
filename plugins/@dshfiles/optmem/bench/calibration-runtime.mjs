@@ -7,7 +7,9 @@ export const runCalibration = async ({ cases, variants, sessionId, provider, mod
     const orderedVariants = [...variants.slice((rep - 1) % variants.length), ...variants.slice(0, (rep - 1) % variants.length)]
     for (const item of cases) {
       for (const variant of orderedVariants) {
-        const identity = { caseId: item.id, variant: variant.id, rep, maxBytes: item.maxBytes, reasoningEffort: variant.reasoningEffort }
+        // A variant may name its own summary route (another account or model); otherwise it uses the agent's route.
+        const route = { provider: variant.provider ?? provider, model: variant.model ?? model }
+        const identity = { caseId: item.id, variant: variant.id, rep, maxBytes: item.maxBytes, reasoningEffort: variant.reasoningEffort, ...route }
         const started = Date.now()
         let physicalCalls = 0
         const totals = { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, reasoningTokens: 0 }
@@ -21,8 +23,7 @@ export const runCalibration = async ({ cases, variants, sessionId, provider, mod
               const assembler = new BlockAssembler()
               const textMetrics = { reasoningTextBytes: 0, answerTextBytes: 0 }
               const call = {
-                provider,
-                model,
+                ...route,
                 sessionId,
                 system: variant.instructions(request),
                 messages: [
@@ -73,6 +74,7 @@ export const runCalibration = async ({ cases, variants, sessionId, provider, mod
                 physicalCall: physicalCalls,
                 maxTokens,
                 finish: finish.kind,
+                failureCode: finish.failure?.code,
                 answerBytes: Buffer.byteLength(text),
                 ...textMetrics,
                 usage,
@@ -80,7 +82,7 @@ export const runCalibration = async ({ cases, variants, sessionId, provider, mod
               if (finish.kind === 'max-tokens' && maxTokens < last) continue
               if (finish.kind !== 'stop' || text.length === 0)
                 throw new Error(`calibration summary ended ${finish.kind} with ${Buffer.byteLength(text)} answer bytes`)
-              return { text, model: `${provider}/${model}` }
+              return { text, model: `${route.provider}/${route.model}` }
             }
             throw new Error('calibration exhausted its bounded token budgets')
           },

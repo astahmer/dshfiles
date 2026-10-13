@@ -12,8 +12,17 @@ import { scoreProbe } from './probes.mjs'
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: 'string' } } })
 const dir = positionals[0]
-// USD per million tokens, models.dev via AI Accounts' pricing cache: opencode-go deepseek-v4.1-flash.
-const PRICE = { input: 0.15, cacheRead: 0.003, output: 0.6 }
+// USD per million tokens from the installed pi-ai catalog. Luna runs on a ChatGPT-plan account, so its figure is a
+// list-price equivalent of plan quota, not billing.
+const PRICES = {
+  'deepseek-v4.1-flash': { input: 0.15, cacheRead: 0.003, output: 0.6 },
+  'gpt-6-luna': { input: 0.1, cacheRead: 0.01, output: 0.5 },
+}
+const priceOf = call => {
+  const price = PRICES[call.model]
+  if (price === undefined) throw new Error(`no list price for ${call.provider}/${call.model}; add it before reporting`)
+  return price
+}
 const ARM_NAMES = { A: 'A native compaction', B: 'B OptMem compat', C: 'C OptMem full' }
 
 const readJsonl = async file =>
@@ -36,6 +45,11 @@ const usageOf = calls => {
   const input = sum('inputTokens')
   const cacheRead = sum('cacheReadTokens')
   const output = sum('outputTokens')
+  const cost = calls.reduce((total, call) => {
+    const price = priceOf(call)
+    const usage = call.usage ?? {}
+    return total + ((usage.inputTokens ?? 0) * price.input + (usage.cacheReadTokens ?? 0) * price.cacheRead + (usage.outputTokens ?? 0) * price.output) / 1e6
+  }, 0)
   return {
     calls: calls.length,
     callsWithUsage: calls.filter(call => call.usage !== undefined).length,
@@ -48,7 +62,7 @@ const usageOf = calls => {
     cacheRead,
     output,
     prompt: input + cacheRead,
-    cost: (input * PRICE.input + cacheRead * PRICE.cacheRead + output * PRICE.output) / 1e6,
+    cost,
   }
 }
 
@@ -99,7 +113,10 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   const calibrationJournal = await readJsonl(join(dir, file.replace(/\.json$/, '.calibration.jsonl')))
   const calibrationOutcomes = calibrationJournal.filter(record => record.kind === 'calibration-end')
   const calibration = Object.entries(Object.groupBy(calibrationOutcomes, outcome => outcome.variant)).map(([variant, outcomes]) => {
-    const callRecords = calibrationJournal.filter(record => record.kind === 'calibration-call-end' && record.variant === variant)
+    // Journals written before variants named their route only ever called OpenCode Go DeepSeek V4.1 Flash.
+    const callRecords = calibrationJournal
+      .filter(record => record.kind === 'calibration-call-end' && record.variant === variant)
+      .map(record => ({ provider: 'opencode-go-alex', model: 'deepseek-v4.1-flash', ...record }))
     const usage = usageOf(callRecords)
     return {
       variant,
@@ -125,8 +142,6 @@ for (const file of (await readdir(dir)).filter(name => /-[ABC]-r\d+\.json$/.test
   const ended = new Set(calls.map(call => call.seq))
   for (const start of journal.filter(call => call.kind === 'call-start' && !ended.has(call.seq)))
     calls.push({ ...start, kind: undefined, error: 'unfinished call; cost unknown', incomplete: true })
-  if (calls.some(call => call.model !== 'deepseek-v4.1-flash' || !call.provider?.startsWith('opencode-go')))
-    throw new Error('list-price estimates require OpenCode Go DeepSeek V4.1 Flash; supply route-specific pricing before reporting another model')
   const byKind = Object.groupBy(calls, callKind)
   const agentCalls = byKind.agent ?? []
   const probes = await Promise.all(run.turns.filter(turn => turn.probe !== undefined).map(turn => rescore(run, turn)))

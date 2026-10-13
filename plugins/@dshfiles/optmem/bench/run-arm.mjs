@@ -6,12 +6,13 @@
 //      BENCH_HOME_ROOT (default /private/tmp/claude-501/optmem-bench-homes), BENCH_KEEP_HOME=1 keeps the home (credentials are always removed).
 // The API key is copied into the scratch home's own credentials file (mode 600) and never printed, logged or passed on a command line.
 import { spawn, spawnSync } from 'node:child_process'
-import { appendFile, chmod, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { appendFile, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { homedir, userInfo } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { z } from 'zod'
+import { calibrationVariants } from './calibration-cases.mjs'
 import { generateFixture } from './fixtures.mjs'
 import { fillTruth, scoreProbe } from './probes.mjs'
 import { loadScenario, runtimeFingerprint } from './scenario-loader.mjs'
@@ -62,7 +63,15 @@ const provider = process.env.BENCH_PROVIDER ?? 'opencode-go-alex'
 const model = process.env.BENCH_MODEL ?? 'deepseek-v4.1-flash'
 const effort = process.env.BENCH_EFFORT ?? ''
 const summaryEffort = process.env.BENCH_SUMMARY_EFFORT ?? ''
-if (!['', 'low', 'medium', 'high'].includes(summaryEffort)) throw new Error('unsupported BENCH_SUMMARY_EFFORT')
+if (!['', 'off', 'low', 'medium', 'high'].includes(summaryEffort)) throw new Error('unsupported BENCH_SUMMARY_EFFORT')
+// An explicit summary route overrides OptMem's cheap-model routing; the effort alone keeps the agent's account and model.
+const summaryProvider = process.env.BENCH_SUMMARY_PROVIDER ?? (summaryEffort === '' ? '' : provider)
+const summaryModel = process.env.BENCH_SUMMARY_MODEL ?? (summaryProvider === '' ? '' : model)
+if ((summaryProvider === '') !== (summaryModel === '')) throw new Error('BENCH_SUMMARY_PROVIDER and BENCH_SUMMARY_MODEL go together')
+const calibrationRoutes = args.calibration
+  ? calibrationSettings.variants.flatMap(id => calibrationVariants.find(variant => variant.id === id)?.provider ?? [])
+  : []
+const accountIds = [...new Set([provider, ...(summaryProvider === '' ? [] : [summaryProvider]), ...calibrationRoutes])]
 const runId = `${scenario.name}-${arm}-r${args.rep}`
 const outDir = resolve(args.out)
 await mkdir(outDir, { recursive: true })
@@ -104,6 +113,7 @@ const scratch = await createScratchProfile({
 })
 const home = scratch.home
 const credentialsFile = resolve(home, '.credentials.yaml')
+const codexHomes = []
 let child
 log('scratch home', home)
 
@@ -137,7 +147,7 @@ try {
 ${effort === '' ? '' : `    reasoningEffort: ${effort}\n`}- id: dshfiles-optmem-bench-probe
   config:
     file: ${JSON.stringify(probeFile)}
-${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.stringify(calibrationSettings.variants)}\n    calibrationLimit: ${calibrationSettings.limit}\n    calibrationReps: ${calibrationSettings.repetitions}\n` : ''}${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'full' : 'compat'}\n${summaryEffort === '' ? '' : `    summarizerProvider: ${provider}\n    summarizerModel: ${model}\n    summarizerEffort: ${summaryEffort}\n`}` : ''}`,
+${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.stringify(calibrationSettings.variants)}\n    calibrationLimit: ${calibrationSettings.limit}\n    calibrationReps: ${calibrationSettings.repetitions}\n` : ''}${withOptmem ? `- id: dshfiles-optmem\n  config:\n    mode: ${arm === 'C' ? 'full' : 'compat'}\n${summaryProvider === '' ? '' : `    summarizerProvider: ${summaryProvider}\n    summarizerModel: ${summaryModel}\n`}${summaryEffort === '' ? '' : `    summarizerEffort: ${summaryEffort}\n`}` : ''}`,
   )
 
   const project = resolve(home, 'project')
@@ -148,23 +158,46 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
       pathToFileURL(resolve(repoRoot, 'plugins/@dshfiles/ai-accounts/node_modules/yaml/dist/index.js')).href
     )
     const accounts = JSON.parse(await readFile(process.env.BENCH_ACCOUNTS ?? resolve(homedir(), '.dsh/plugins/ai-accounts/accounts.json'), 'utf8'))
-    const account = accounts.accounts.find(entry => entry.instanceId === provider)
-    if (account === undefined) throw new Error(`account ${provider} is not configured in AI Accounts`)
+    const sourceCredentials = parseYaml(await readFile(process.env.BENCH_CREDENTIALS ?? resolve(homedir(), '.dsh/.credentials.yaml'), 'utf8'))
+    const refs = {}
+    const copied = []
+    for (const id of accountIds) {
+      const account = accounts.accounts.find(entry => entry.instanceId === id)
+      if (account === undefined) throw new Error(`account ${id} is not configured in AI Accounts`)
+      if (account.kind === 'codex') {
+        // Codex homes must sit inside the OS user's home, so the copied login lives in a private directory there.
+        // Only auth.json is copied; the access token outlives a run, so nothing refreshes (or rotates) the copy.
+        const source = resolve((account.shadowHomePath ?? '') === '' ? account.homePath : account.shadowHomePath, 'auth.json')
+        await mkdir(resolve(userInfo().homedir, '.cache'), { recursive: true, mode: 0o700 })
+        const codexHome = await mkdtemp(resolve(userInfo().homedir, '.cache', 'optmem-bench-codex-'))
+        codexHomes.push(codexHome)
+        // An empty shadow path would default under the scratch home, outside the user's home, so both are explicit.
+        const shared = resolve(codexHome, 'home')
+        const shadow = resolve(codexHome, 'shadow')
+        await mkdir(shared, { mode: 0o700 })
+        await mkdir(shadow, { mode: 0o700 })
+        await cp(source, resolve(shadow, 'auth.json'))
+        await chmod(resolve(shadow, 'auth.json'), 0o600)
+        copied.push({ ...account, homePath: shared, shadowHomePath: shadow })
+        continue
+      }
+      const keyName = account.apiKeyEnv
+      const credentialReference = z.string().safeParse(sourceCredentials?.refs?.[keyName])
+      if (!credentialReference.success) throw new Error(`credential ${keyName} is not stored in DSH credentials`)
+      refs[keyName] = credentialReference.data
+      copied.push(account)
+    }
     await mkdir(resolve(home, 'plugins/ai-accounts'), { recursive: true, mode: 0o700 })
     await writeFile(
       resolve(home, 'plugins/ai-accounts/accounts.json'),
       JSON.stringify(
-        { distribution: accounts.distribution, cooldownMs: accounts.cooldownMs, shadowRoot: resolve(home, 'codex-shadow'), accounts: [account] },
+        { distribution: accounts.distribution, cooldownMs: accounts.cooldownMs, shadowRoot: resolve(home, 'codex-shadow'), accounts: copied },
         null,
         2,
       ),
       { mode: 0o600 },
     )
-    const sourceCredentials = parseYaml(await readFile(process.env.BENCH_CREDENTIALS ?? resolve(homedir(), '.dsh/.credentials.yaml'), 'utf8'))
-    const keyName = account.apiKeyEnv
-    const credentialReference = z.string().safeParse(sourceCredentials?.refs?.[keyName])
-    if (!credentialReference.success) throw new Error(`credential ${keyName} is not stored in DSH credentials`)
-    await writeFile(credentialsFile, stringifyYaml({ version: 1, records: {}, refs: { [keyName]: credentialReference.data } }), { mode: 0o600 })
+    await writeFile(credentialsFile, stringifyYaml({ version: 1, records: {}, refs }), { mode: 0o600 })
     await chmod(credentialsFile, 0o600)
 
     await mkdir(project, { recursive: true })
@@ -178,6 +211,7 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
   } catch (error) {
     if (credentialsFile !== resolve(scratch.home, '.credentials.yaml')) throw new Error('unexpected scratch credential path')
     await rm(credentialsFile, { force: true })
+    for (const codexHome of codexHomes) await rm(codexHome, { recursive: true, force: true })
     await scratch.cleanup()
     throw error
   }
@@ -234,6 +268,8 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
     model,
     effort,
     summaryEffort,
+    summaryProvider,
+    summaryModel,
     variant: args.variant,
     scenarioHash,
     sourceHash,
@@ -272,6 +308,7 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
     finishing = true
     await stopHost()
     await rm(credentialsFile, { force: true })
+    for (const codexHome of codexHomes) await rm(codexHome, { recursive: true, force: true })
     evidence.finishedAt = new Date().toISOString()
     evidence.hostWarnings = redactHostOutput(output)
       .split('\n')
@@ -493,6 +530,7 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
   }
   if (credentialsFile !== resolve(scratch.home, '.credentials.yaml')) throw new Error('unexpected scratch credential path')
   await rm(credentialsFile, { force: true })
+  for (const codexHome of codexHomes) await rm(codexHome, { recursive: true, force: true })
   await scratch.cleanup()
   const failure = {
     runId,
@@ -503,6 +541,8 @@ ${args.calibration ? `    calibration: true\n    calibrationVariants: ${JSON.str
     model,
     effort,
     summaryEffort,
+    summaryProvider,
+    summaryModel,
     variant: args.variant,
     scenarioHash,
     sourceHash,
