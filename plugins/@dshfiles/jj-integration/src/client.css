@@ -1,2 +1,7 @@
 @import '@dshfiles/plugin-ui/styles.css';
 @source './';
+
+/* The native project chip names a folder of this machine; while a remote host is chosen the remote folder chip replaces it. */
+div:has(> [data-slot='conversation.hero.workspace'] [data-remote-destination]) > button:first-child {
+  display: none;
+}

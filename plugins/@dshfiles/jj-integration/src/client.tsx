@@ -3,10 +3,12 @@ import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/cl
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
+import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import type { DestinationBarServices } from './destination-bar.js'
@@ -14,6 +16,7 @@ import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
+import { prepareRemoteFolder } from './remote-destination.js'
 import { jjIntegrationSettings } from './settings.js'
 import './client.css'
 
@@ -51,10 +54,38 @@ export default defineClient({
         )),
       ),
     )
+    const openRemoteThreadPanel = (): void => ctx.layout.selectPanel(REMOTE_THREAD_PANEL as MainPanelId)
+    const RemoteComposerBar = (): JSX.Element | null => {
+      const multiHost = useApi(multiHostApi)
+      const destination = hostDestination.useValue()
+      const directory = useQuery(multiHostQueries.directory(multiHost))
+      if (destination.kind !== 'runtime') return null
+      const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
+      return (
+        <RemoteComposer
+          api={multiHost}
+          runtimeId={destination.runtimeId}
+          hostName={directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'}
+          cwd={destination.folder}
+          prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
+          onStarted={openRemoteThreadPanel}
+        />
+      )
+    }
     const destinationServices: DestinationBarServices = {
       workspaces: ctx.workspaces,
       // SAFETY: every id passed here came back from the Host's workspace registry.
       openWorkspace: workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId as WorkspaceView['workspaceId']),
+      // A blank thread's composer would create a Session on this machine; while a remote host is chosen it sends there.
+      takeOverComposer: () =>
+        ctx.slots.register(
+          { name: 'conversation.composer.bar', priority: -100 },
+          decorate(() => (
+            <PluginQueryProvider>
+              <RemoteComposerBar />
+            </PluginQueryProvider>
+          )),
+        ),
     }
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     ctx.slots.inject('conversation.hero.workspace', () =>

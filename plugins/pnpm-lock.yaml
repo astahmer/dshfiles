@@ -846,6 +846,9 @@ importers:
 
   '@dshfiles/jj-integration':
     dependencies:
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -2326,6 +2329,9 @@ importers:
       '@dshfiles/jj-integration':
         specifier: workspace:*
         version: link:../jj-integration
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

@@ -4,10 +4,11 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { CheckIcon, GitBranchIcon, LaptopIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
+import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useState } from 'react'
 import { jjIntegrationApi } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -15,13 +16,22 @@ import type { JjIntegrationTranslate } from './locales.js'
 export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
   readonly openWorkspace: (workspaceId: string) => Promise<void>
+  /** Replace the blank thread's composer with the remote one; returns the undo. */
+  readonly takeOverComposer: () => () => void
 }
+
+/** The host chip leads the native row; `display: contents` lets each chip of the bar be an item of that row. */
+export const HostChipSlot = () => (
+  <span className="dshx-root dshx:inline-flex dshx:items-center" style={{ order: -1 }}>
+    <HostChip api={useApi(multiHostApi)} />
+  </span>
+)
 
 type Target = { readonly workspaceId: string; readonly isolate: boolean; readonly base?: string }
 
 /**
- * Where a new thread runs, chosen before its first message: the jj bookmark it starts from and whether it gets its
- * own jj workspace, rendered in the native New thread row beside its project chip (the host chip leads the row). A
+ * Where a new thread runs on this machine, chosen before its first message: the jj bookmark it starts from and
+ * whether it gets its own jj workspace, rendered in the native New thread row beside its project chip after the host chip. A
  * Session's directory is fixed once created, so each change opens a blank thread at the new destination.
  */
 export const DestinationBar = (props: {
@@ -67,10 +77,7 @@ export const DestinationBar = (props: {
   return (
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
     <div className="dshx-root dshx:contents" aria-label={t('destination')}>
-      <span className={`dshx:inline-flex dshx:items-center dshx:rounded-md dshx:text-foreground ${chip}`} style={{ order: -1 }} title={t('hostPlanned')}>
-        <LaptopIcon className="dshx:size-3.5" />
-        {t('hostLocal')}
-      </span>
+      <HostChipSlot />
       {isJj ? (
         <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
           <Popover open={branchOpen} onOpenChange={setBranchOpen}>
