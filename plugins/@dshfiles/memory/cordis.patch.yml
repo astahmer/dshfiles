@@ -1,0 +1,5 @@
+# The settings namespace is the Loader entry id, and top-level ids share one
+# namespace across bundles, so the scope stays in the id.
+- insert:
+    - id: dshfiles-memory
+      name: '@dshfiles/memory'

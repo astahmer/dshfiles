@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "thread-digests",
+      "title": "Digest idle threads from DSH's own session logs",
+      "summary": "Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and trivial threads get no digest, identical digests are stored once, and message text is indexed without being copied.",
+      "surfaces": ["host", "storage", "integration"],
+      "configuration": [
+        {
+          "key": "idleMs",
+          "defaultValue": "60000",
+          "constraints": "Integer from 1000 to 3600000 milliseconds; a new turn cancels the wait.",
+          "coveredBy": ["memory.digest-idle"]
+        },
+        {
+          "key": "summarizerProvider",
+          "defaultValue": "",
+          "constraints": "Override provider for model digests; empty uses the thread's provider.",
+          "coveredBy": ["memory.digest-model-fallback"]
+        },
+        {
+          "key": "summarizerModel",
+          "defaultValue": "",
+          "constraints": "Override model for model digests (with summarizerProvider).",
+          "coveredBy": ["memory.digest-model-fallback"]
+        },
+        {
+          "key": "summarizerEffort",
+          "defaultValue": "off",
+          "constraints": "Empty, off, low, medium or high.",
+          "choices": ["", "off", "low", "medium", "high"],
+          "coveredBy": ["memory.digest-model-fallback"]
+        },
+        {
+          "key": "cheapModels",
+          "defaultValue": "codex: gpt-6-luna (low); claude: claude-haiku-* (low); opencode-go: deepseek-v4.1-flash, deepseek-v4-flash, glm-5.3-flash (off); commandcode: deepseek-v4.1-flash, deepseek-v4-flash, gpt-6-luna; deepseek: deepseek-flash",
+          "constraints": "Same routing rules as OptMem (optmem-core summary-routes).",
+          "coveredBy": ["memory.digest-model-fallback"]
+        },
+        {
+          "key": "jevEnabled",
+          "defaultValue": "false",
+          "constraints": "Boolean; needs TYPESAFE_API_KEY in the Host environment, any failure falls back to the heuristics.",
+          "choices": ["true", "false"],
+          "coveredBy": ["memory.digest-signals"]
+        },
+        {
+          "key": "jevThreshold",
+          "defaultValue": "0.5",
+          "constraints": "Number from 0 to 1.",
+          "coveredBy": ["memory.digest-signals"]
+        },
+        {
+          "key": "retentionDays",
+          "defaultValue": "365",
+          "constraints": "Integer from 0 (keep everything) to 3650 days; notes stay until forgotten.",
+          "coveredBy": ["memory.retention"]
+        }
+      ],
+      "states": ["idle-wait", "digested", "trivial-skipped", "duplicate", "model-digest"],
+      "failureModes": [
+        "A digest is never built while a turn runs.",
+        "Without a cheap route, a no-trail thread keeps its deterministic digest.",
+        "Jev failures fall back to the phrasing heuristics."
+      ],
+      "externalDependencies": [
+        {
+          "id": "digest-model",
+          "boundary": "Optional cheap model call through DSH's llm service for threads without a trail.",
+          "deterministicFake": "Tests pass a summarize service returning fixed text; no paid call."
+        },
+        {
+          "id": "jev",
+          "boundary": "Optional TypeSafe Jev classifier over HTTPS.",
+          "deterministicFake": "Disabled by default; tests run without a key."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "memory.thread-digests-journey",
+          "reason": "Digests are built inside the Host from session logs and have no UI of their own; the Memory panel journey shows them, and the live scratch-DSH check exercises them end to end."
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-trail",
+          "file": "plugins/@dshfiles/memory/src/digest.test.ts",
+          "testName": "builds a digest from the thread record without a model call"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-trivial",
+          "file": "plugins/@dshfiles/memory/src/digest.test.ts",
+          "testName": "skips blank and trivial threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-signals",
+          "file": "plugins/@dshfiles/memory/src/digest.test.ts",
+          "testName": "keeps the user's corrections and decisions verbatim, apart from the agent's answer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-redaction",
+          "file": "plugins/@dshfiles/memory/src/digest.test.ts",
+          "testName": "redacts credentials before anything is indexed or digested"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-idle",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "digests a thread once it goes idle, never while a turn runs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-model-fallback",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "asks a cheap model only for a thread without a trail of its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.digest-catch-up",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "catches up on sessions it has never seen and skips trivial ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.dedupe",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "stores identical digests and notes once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.contentless-index",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "keeps only an index of message text, never the text itself"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.retention",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "drops digests and indexed messages past retention but keeps notes"
+        }
+      ]
+    },
+    {
+      "id": "start-block",
+      "title": "Start every thread with one frozen memory block",
+      "summary": "At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. The block is frozen per thread and identical across a project's threads until memory changes, so it stays in the cached prefix and is never re-emitted.",
+      "surfaces": ["host", "integration", "settings"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; off stops digests, the block and the tools.",
+          "choices": ["true", "false"],
+          "coveredBy": ["memory.block-frozen"]
+        },
+        {
+          "key": "blockBytes",
+          "defaultValue": "1600",
+          "constraints": "Integer from 256 to 8192 bytes.",
+          "coveredBy": ["memory.block-scale"]
+        },
+        {
+          "key": "blockStaleDays",
+          "defaultValue": "90",
+          "constraints": "Integer from 0 to 3650; never-cited threads older than this leave the block.",
+          "coveredBy": ["memory.block-frozen"]
+        },
+        {
+          "key": "crossProject",
+          "defaultValue": "true",
+          "constraints": "Boolean; reach other projects in the block (cited threads only) and in search.",
+          "choices": ["true", "false"],
+          "coveredBy": ["memory.block-frozen"]
+        }
+      ],
+      "states": ["empty", "frozen", "rebuilt-after-change"],
+      "failureModes": ["A failing block build leaves the system prompt unchanged.", "Memory changes only reach threads started afterwards."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "memory.start-block-journey",
+          "reason": "The block is model-facing system-prompt text with no UI; the live scratch-DSH check reads the provider requests to confirm it sits at the start and nowhere else."
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.block-frozen",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "gives every thread and subagent of a project the same frozen block until memory changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.block-scale",
+          "file": "plugins/@dshfiles/memory/src/scale.test.ts",
+          "testName": "keeps search latency and the start block bounded with 5,000 digests and notes"
+        }
+      ]
+    },
+    {
+      "id": "memory-tools",
+      "title": "Search, read and note memory from any agent",
+      "summary": "memory_search ranks digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use.",
+      "surfaces": ["host", "tool", "storage"],
+      "configuration": [],
+      "states": ["no-hits", "hits", "excerpt", "note-added", "note-superseded", "note-forgotten", "cited"],
+      "failureModes": ["Tools report a clear error when memory is off or failed to start.", "An excerpt omits tool output that names a credential file."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "memory.memory-tools-journey",
+          "reason": "The tools are model-facing; the live scratch-DSH check calls them from a real thread, and the panel journey covers the notes they write."
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.search-identifiers",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "finds exact identifiers by substring and words by stem"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.search-ranking",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "ranks the caller project first and keeps old exact matches findable"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.note-history",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "supersedes a note on update and hides it on forget, keeping the history"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.tools-flow",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "answers a later thread through search, read and an excerpt, and counts the citation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.note-tool",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "adds, supersedes and forgets notes through memory_note"
+        }
+      ]
+    },
+    {
+      "id": "memory-panel",
+      "title": "Browse and correct memory in the Memory panel",
+      "summary": "A sidebar Memory panel lists notes grouped by type (filter by project, scope and type; search), edits or forgets a note with a reason, shows its superseded history, lists thread digests by project with links, and shows usage per day.",
+      "surfaces": ["client", "api"],
+      "configuration": [],
+      "states": ["empty", "notes", "editing", "forgetting", "history", "threads", "usage"],
+      "failureModes": ["An edit of a note superseded meanwhile reports that it is no longer valid."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "memory.panel-notes",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        }
+      ],
+      "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
+    },
+    {
+      "id": "usage-telemetry",
+      "title": "Count whether memory earns its keep",
+      "summary": "Locally record memory tool calls, start blocks served and citations; a call counts as used when the reply cites one of its ids. Usage per day appears in the Memory panel.",
+      "surfaces": ["client", "storage"],
+      "configuration": [],
+      "states": ["no-activity", "counted"],
+      "failureModes": ["Counters never leave the machine; a failing write never fails the tool call it counts."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "memory.panel-usage",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.citation-counts",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "counts a citation as use of the tool call that returned the id and of the cited item"
+        }
+      ],
+      "reach": ["click button \"Memory\"", "click tab \"Usage\"", "expect table \"Memory usage per day\""]
+    }
+  ]
+}
