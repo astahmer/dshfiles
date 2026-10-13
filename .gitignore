@@ -15,9 +15,6 @@ playwright-report/
 .playwright-cli/
 .dsh-e2e-evidence/
 
-# Cached plugin gate results keyed by tree content (.jj-gates/<fingerprint>.json).
-.jj-gates/
-
 # Local reference checkouts and benchmark scratch.
 .references/
 .bench/
