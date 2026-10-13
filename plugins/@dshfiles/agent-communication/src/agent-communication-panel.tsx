@@ -23,7 +23,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import type { CommunicationDiagnosticAgent, CommunicationDiagnostics, CommunicationMessage } from '@dshfiles/dshx/communication'
 import { useState } from 'react'
 import { agentCommunicationApi, type AgentCommunicationPostInput } from './api.js'
-import { runHostRequest } from './host-request.js'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import type { AgentCommunicationTranslate } from './locales.js'
 
 const diagnosticsKey = ['agent-communication', 'diagnostics'] as const

@@ -21,6 +21,10 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/host-request": {
+      "types": "./src/lib/host-request.ts",
+      "default": "./src/lib/host-request.ts"
+    },
     "./icons": {
       "types": "./src/icons.ts",
       "default": "./src/icons.ts"

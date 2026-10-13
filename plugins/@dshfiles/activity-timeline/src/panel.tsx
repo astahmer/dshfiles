@@ -11,7 +11,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { activityTimelineApi } from './api.js'
-import { runHostRequest } from './host-request.js'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import type { ActivityTimelineTranslate } from './locales.js'
 
 const feedKey = ['activity-timeline', 'feed'] as const

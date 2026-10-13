@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runHostRequest } from './host-request.js'
+import { HostTimeoutError, runHostRequest } from './host-request.js'
 
 describe('runHostRequest', () => {
   it('aborts Host requests that do not respond before the timeout', async () => {
@@ -14,7 +14,7 @@ describe('runHostRequest', () => {
       },
     })
 
-    await expect(result).rejects.toThrow('Host request timed out.')
+    await expect(result).rejects.toBeInstanceOf(HostTimeoutError)
     expect(observedSignal?.aborted).toBe(true)
   })
 })
