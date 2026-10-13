@@ -9,6 +9,7 @@ and current workarounds are documented in each owning plugin's README.
 | Link an existing thread as a child; BB auto-handoff to the parent | thread-sidebar | No API to set or change a session's parent; no first-turn event hook | Patch the session controller to expose `setParent` + a turn-lifecycle event |
 | Undo a cascade archive (preserve-child-threads) | thread-sidebar | No archive event hook | Archive event on the session controller |
 | Jump from a settings-search result to its section | settings-search | Settings panel's active section is private state | Expose `settings.open({ section, key })` from the settings UI |
+| Open a search result in the native row that owns it (Editor `openFileLinks` → General switch) | settings-search, editor | 0.2.0-rc.2 `SettingsHeaderOwnerProps` / `SettingsSectionOwnerProps` carry no target and there is no `settingsTargets` registry, so results open the live editor | Settings target registry plus a `target` prop on `settings.general.item` |
 | Highlight matching nav rows / matches on the open settings page | settings-search | Plugins cannot decorate the Settings panel DOM | Settings nav decoration slot |
 | Collapse viewed files, "only unviewed" filter, auto-mark on scroll | diff-viewed | Review tab shows one file; plugins only add toolbar buttons | File-list slot / filter hook in the review tab |
 | Live MCP connection health ("Connected") | mcp-servers | DSH MCP client reports no connection status | Status events from `dsh-mcp-client` |

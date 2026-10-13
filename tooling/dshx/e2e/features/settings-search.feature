@@ -35,8 +35,14 @@ Feature: Settings Search
     Then the Appearance preference uses its native owner or typed fallback
 
   @scenario:editor.open-file-links-native-row
-  Scenario: Open the Editor file-link preference through Settings Search
+  Scenario: Find the Editor file-link preference through Settings Search and switch it in General
+    DSH 0.2.0-rc.2 gives Settings plugins no owner route (the header and section
+    owner props carry no target), so a search result for a field that has a native
+    row opens the live editor; the native row is reached through its section.
+
     Given the isolated plugin composition "@dshfiles/settings-search" and "@dshfiles/editor" is booted
     When the Settings navigation search opens and receives focus
     When the Editor openFileLinks setting is opened from navigation results
-    Then the Editor file-link preference uses its native General switch and is focused
+    Then the Editor file-link preference opens in the live editor, switched on
+    When the Editor file-link preference is switched off in the General section
+    Then Settings Search shows the Editor file-link preference switched off

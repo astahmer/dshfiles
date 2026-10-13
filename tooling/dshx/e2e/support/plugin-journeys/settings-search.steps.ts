@@ -125,17 +125,31 @@ Then('the Appearance preference uses its native owner or typed fallback', async 
   await finishJourneyAssertions(page)
 })
 
-Then('the Editor file-link preference uses its native General switch and is focused', async ({ page }: { page: Page }) => {
-  const fileLinksSwitch = page.getByRole('dialog').getByRole('switch', { name: 'Open file links in Editor' })
-  await recordAssertion(page, 'editor-file-links-search-opens-native-general-row', async () => {
-    await expect(fileLinksSwitch).toBeVisible()
-    await expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true')
-    await expect(fileLinksSwitch).toBeFocused()
+const fileLinksFallback = (page: Page) => page.getByRole('dialog').getByRole('region', { name: 'openFileLinks' }).last()
+
+Then('the Editor file-link preference opens in the live editor, switched on', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'editor-file-links-search-opens-live-editor', async () => {
+    await expect(fileLinksFallback(page)).toBeVisible()
+    await expect(fileLinksFallback(page).getByRole('switch', { name: 'Current value' })).toHaveAttribute('aria-checked', 'true')
   })
+})
+
+When('the Editor file-link preference is switched off in the General section', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog').getByRole('button', { name: 'General', exact: true }).click()
+  const fileLinksSwitch = page.getByRole('dialog').getByRole('switch', { name: 'Open file links in Editor' })
+  await recordAssertion(page, 'editor-file-links-native-general-row', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true'))
   await fileLinksSwitch.click()
-  await recordAssertion(page, 'editor-file-links-switch-persists-host-setting', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'false'))
-  await fileLinksSwitch.click()
-  await recordAssertion(page, 'editor-file-links-switch-restores-default', () => expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'true'))
+  await expect(fileLinksSwitch).toHaveAttribute('aria-checked', 'false')
+})
+
+Then('Settings Search shows the Editor file-link preference switched off', async ({ page }: { page: Page }) => {
+  const navigationSearch = page.getByRole('dialog').getByRole('navigation').getByRole('searchbox', { name: 'Search settings' })
+  await navigationSearch.fill('openFileLinks')
+  await page.getByRole('dialog').getByRole('navigation').getByRole('button', { name: /openFileLinks/i }).first().click()
+  await recordAssertion(page, 'editor-file-links-native-row-writes-the-host-setting', () =>
+    expect(fileLinksFallback(page).getByRole('switch', { name: 'Current value' })).toHaveAttribute('aria-checked', 'false'),
+  )
   await finishJourneyAssertions(page)
 })
 
