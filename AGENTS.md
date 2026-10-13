@@ -14,6 +14,7 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `verify-dsh` — launch, drive and screenshot a scratch DSH (`dshx dev up|doctor|open|shot|down`).
 - `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
+- `complete-plan` — when a plan's last task is done and verified: move its durable content into docs and delete it.
 
 ## Adopt, port, or build
 
@@ -84,9 +85,9 @@ Work lands on `main`; never `jj git push` without asking.
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.
 - Long runs: keep a `plans/<topic>/README.md` progress table with a "Resume
-  here" line and commit after each milestone. When the work lands, move its
-  durable behavior into the package docs and delete the plan in the same
-  revision (see `plans/README.md`).
+  here" line and commit after each milestone. When a plan's last task is done
+  and verified, run the `complete-plan` skill: its durable content moves into
+  the owning docs and the plan is deleted (see `plans/README.md`).
 
 ## Environment
 

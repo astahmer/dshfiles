@@ -1,33 +1,33 @@
-# Active plans and investigations
+# Plans
 
-Plans live here only while implementation or acceptance work remains. Shipped
-behavior belongs in the owning package's README (see the
-[package index](../README.md#owned-dsh-bundles)) or in the dshx docs.
+A plan lives here only while work remains. When its last task is done and
+verified, run the [`complete-plan`](../.agents/skills/complete-plan/SKILL.md)
+skill: the decisions, limits, final behavior and verification commands move
+into the docs that own the behavior (a package README or its `docs/`,
+`tooling/dshx/docs`, or [`docs/`](../docs/README.md) for cross-cutting topics),
+and the plan is deleted. A partly done plan is trimmed to its open items, with
+a link to where the finished part is documented. Shipped behavior is never
+documented only here.
+
+Checkboxes and receipts in a plan are history, not fresh verification.
 
 ## Product and plugin work
 
-| Plan | Scope |
+| Plan | Open work |
 |---|---|
-| [Agent communication observability](agent-communication-observability.md) | Operator report and inspector for `@dshfiles/agent-communication`; [tracker](agent-communication-observability/README.md). Real Agent use is still unverified. |
-| [Agent session history](agent-session-history.md) | Bounded, permission-scoped Session search and read tools for Agents; [tracker](agent-session-history/README.md). |
-| [Agent session observability](agent-session-observability/README.md) | Read-only cross-session visibility; workspace lookup landed, history access and all Session writes pending. |
-| [Async Agent questions](async-agent-questions.md) | Native timed-question acceptance; the child-question flow waits on a Host reply lifecycle. |
-| [Multi-host](multi-host/README.md) | Runtime federation architecture; [phase tracker](multi-host/implementation.md). UI and rollout phases are partial. |
-| [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. |
-| [Thread destination Host chip](thread-destination-host/README.md) | Shipped; only the proposed nixfiles change for Linux remote hosts awaits the owner. |
-| [Desktop shell](desktop-shell/README.md) | Desktop app lifecycle, signing and distribution gates. |
+| [Agent session history](agent-session-history.md) | Bounded, permission-scoped Session search and read tools for Agents; [tracker](agent-session-history/README.md). Not started on stock DSH: its route went through a core fork, and `dshx_comm_history` covers live descendants only. |
+| [Agent session observability](agent-session-observability/README.md) | Wider history access, JJ change associations, orchestration writes, a scratch check. |
+| [Async Agent questions](async-agent-questions.md) | Browser acceptance of root timed questions, a real-provider child run, element anchors. |
+| [Multi-host](multi-host/README.md) | Durable supervision and upgrades of a remote host; a browser journey. |
+| [Desktop shell](desktop-shell/README.md) | Relaunch on Host exit, lifecycle test, signing, updates. |
+| [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. To be superseded by the new memory plugin. |
+| [OptMem real-world evaluation](optmem-realworld/README.md) | Long-conversation pilots and calibration. To be superseded by the new memory plugin. |
 
-## Testing and research
+## Testing, research and housekeeping
 
-| Plan | Scope |
+| Plan | Open work |
 |---|---|
-| [DSH end-to-end testing](dsh-e2e-testing.md) | Test architecture: static checks, boot smoke, behavior journeys. |
-| [Exhaustive plugin E2E](plugin-e2e-coverage.md) | Feature catalogs and browser journeys for every owned package; [tracker](plugin-e2e-coverage/README.md). |
-| [Host gaps](dsh-host-gaps.md) | Behaviors our plugins cannot build until DSH exposes a capability. |
-| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption shortlist from reference products. |
-
-## Index maintenance
-
-When a plan's work lands, move its durable behavior and decisions into the
-owning package docs, delete the plan, and update this table in the same
-revision. Historical receipts in a plan are not fresh verification.
+| [Plugin E2E coverage](plugin-e2e-coverage.md) | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding. |
+| [Host gaps](dsh-host-gaps.md) | Behaviors our plugins cannot build until DSH exposes a capability. A standing list, not a task plan. |
+| [Reference feature additions](reference-feature-additions.md) | Evidence-gated feature and adoption backlog from reference products. |
+| [~/dev cleanup](dev-cleanup-audit.md) | 23 workspaces and repositories awaiting a keep/archive/remove decision. |
