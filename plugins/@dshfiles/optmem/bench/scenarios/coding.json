@@ -1,0 +1,99 @@
+{
+  "name": "coding",
+  "description": "Maintain a small invoicing library: fix bugs, add features under team conventions given early, then recall decisions.",
+  "fixture": "coding",
+  "acceptance": "acceptance/coding.test.mjs",
+  "compaction": {
+    "thresholdRatio": 0.032,
+    "retainTokens": 6400
+  },
+  "conversations": [
+    {
+      "name": "main",
+      "turns": [
+        {
+          "prompt": "I'm taking over the ledgerline package in this directory. Read every file under src/ and test/ and give me a five-bullet overview of how it is organised."
+        },
+        {
+          "prompt": "Team conventions you must follow for the rest of this session: (a) every thrown error is a LedgerError whose code starts with `LL_` followed by SCREAMING_SNAKE_CASE, e.g. LL_UNKNOWN_REGION; (b) money is always integer cents, never floats; (c) every new exported function gets a one-line JSDoc comment. Acknowledge in one sentence."
+        },
+        {
+          "prompt": "Run the test suite and tell me which tests fail and why."
+        },
+        {
+          "prompt": "Fix the failing tax test without changing the test itself, then run the tax tests again."
+        },
+        {
+          "prompt": "We now invoice customers in Luxembourg and Austria. Add LU with a VAT rate of 17% and AT with 20%."
+        },
+        {
+          "prompt": "taxFor silently returns 0 for regions we don't know, which hid a bug last month. Make it throw a LedgerError instead, following our error-code convention (unknown region)."
+        },
+        {
+          "prompt": "Show me how totals() in src/invoice.js computes the numbers, step by step, and point out anything that looks fragile."
+        },
+        {
+          "prompt": "The CSV export breaks when a customer name or description contains a comma or a double quote. Fix toCsv so it follows RFC 4180 quoting."
+        },
+        {
+          "prompt": "Add a test for the CSV quoting to test/csv.test.js (a customer with a comma and a description with double quotes) and run the whole suite."
+        },
+        {
+          "prompt": "Here is the finance team's spec. Compare our implementation against it and list the gaps; don't change code yet.\n\n{{truth.financeSpec}}"
+        },
+        {
+          "prompt": "Finance gave us two discount codes: WELCOME10 is 10% off and FIXED500 is a fixed 500 cents off. Create src/discounts.js exporting applyDiscount(invoice, code), which returns a new invoice with the code recorded on it. An unknown code must throw following our convention (unknown discount)."
+        },
+        {
+          "prompt": "Now update totals() so it returns { subtotal, discount, tax, total } per the finance spec: the discount applies before tax, VAT is computed per line on the discounted line amount, and a fixed discount is spread over the lines with allocate() from money.js. Keep existing callers working."
+        },
+        {
+          "prompt": "Run the suite and fix whatever broke."
+        },
+        {
+          "prompt": "Add tests for discounts: WELCOME10, FIXED500 on a multi-line invoice, and an unknown code."
+        },
+        {
+          "prompt": "Per the spec, quantities must be positive integers. Make createInvoice and addLine throw on anything else, using our convention with the code suffix INVALID_LINE, and add a test."
+        },
+        {
+          "prompt": "Add summary(invoice) to src/invoice.js returning { lines, subtotal, discount, tax, total, currency } and export it from src/index.js. Follow our documentation convention."
+        },
+        {
+          "prompt": "Quick check from memory: which VAT rate did we set for Luxembourg, and which prefix must our error codes use? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "lu-rate-prefix",
+            "expect": ["17", "LL_"]
+          }
+        },
+        {
+          "prompt": "From memory: list every file you created or modified in this session. Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "files-touched",
+            "expect": ["discounts.js", "csv.test.js", "tax.js", "csv.js", "invoice.js"]
+          }
+        },
+        {
+          "prompt": "Write a CHANGELOG.md with a 0.3.0 entry that covers everything we changed this session."
+        },
+        {
+          "prompt": "From memory: which code is the fixed discount and how many cents does it take off? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "fixed-code",
+            "expect": ["FIXED500", "500"]
+          }
+        },
+        {
+          "prompt": "Bump package.json to version 0.3.0, run the full test suite one last time and report the pass/fail counts."
+        },
+        {
+          "prompt": "From memory: which two existing bugs did we fix before adding features (one short phrase each)? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "early-bugs",
+            "expect": ["round", ["quot", "csv", "region"]]
+          }
+        }
+      ]
+    }
+  ]
+}

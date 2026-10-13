@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-optmem-bench-probe
+      name: '@dshfiles/optmem-bench-probe'

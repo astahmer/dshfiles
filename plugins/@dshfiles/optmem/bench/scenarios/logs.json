@@ -1,0 +1,165 @@
+{
+  "name": "logs",
+  "description": "Incident log analysis over ~880 KB of generated logs with large tool outputs, then recall of earlier findings.",
+  "fixture": "logs",
+  "compaction": {
+    "thresholdRatio": 0.032,
+    "retainTokens": 6400
+  },
+  "conversations": [
+    {
+      "name": "main",
+      "turns": [
+        {
+          "prompt": "We're investigating a billing incident on 2026-10-07 between 13:00 and 16:00 UTC. The logs are in logs/. Look at each file (size, line count, format) and describe each in two lines."
+        },
+        {
+          "prompt": "How many 5xx responses are in logs/api-gateway.log in total? Give the exact number.",
+          "probe": {
+            "id": "count-5xx",
+            "kind": "analysis",
+            "expect": ["{{truth.errors5xx}}"]
+          }
+        },
+        {
+          "prompt": "How many 503s happened during the 14:00 UTC hour?",
+          "probe": {
+            "id": "count-503-14h",
+            "kind": "analysis",
+            "expect": ["{{truth.errors503In14}}"]
+          }
+        },
+        {
+          "prompt": "Show me the 30 gateway log lines around the start of the 503 burst and tell me when it started."
+        },
+        {
+          "prompt": "Which tenant had the most 5xx responses, and which route?",
+          "probe": {
+            "id": "top-tenant-route",
+            "kind": "analysis",
+            "expect": ["{{truth.topErrorTenant}}", "{{truth.topErrorRoute}}"]
+          }
+        },
+        {
+          "prompt": "What was the single slowest request in the gateway log? Give its trace id and duration.",
+          "probe": {
+            "id": "slowest",
+            "kind": "analysis",
+            "expect": ["{{truth.slowestTrace}}", "{{truth.slowestMs}}"]
+          }
+        },
+        {
+          "prompt": "FYI from the payments team: 'At 14:19 UTC we rotated the PSP API credentials; the old key was revoked at 14:20, but two payment pods kept the cached key until they were restarted at 14:35.' Does that match what you see in the gateway log?"
+        },
+        {
+          "prompt": "Now logs/worker.log: how many retry lines are there, and did any job fail permanently? Which one and with what error?",
+          "probe": {
+            "id": "exhausted-job",
+            "kind": "analysis",
+            "expect": ["{{truth.exhaustedJob}}"]
+          }
+        },
+        {
+          "prompt": "Find any out-of-memory event in the worker log. Which job and at what time?",
+          "probe": {
+            "id": "oom",
+            "kind": "analysis",
+            "expect": ["{{truth.oomJob}}", "14:27"]
+          }
+        },
+        {
+          "prompt": "Print every worker log line between 14:25:00 and 14:30:00 UTC and comment on anything unusual."
+        },
+        {
+          "prompt": "logs/db-slow.log is a MySQL slow-query log. Which table has the most slow queries, and how many?",
+          "probe": {
+            "id": "top-slow-table",
+            "kind": "analysis",
+            "expect": ["{{truth.topSlowTable}}", "{{truth.topSlowTableCount}}"]
+          }
+        },
+        {
+          "prompt": "What was the slowest query's Query_time and which table did it hit?",
+          "probe": {
+            "id": "slowest-query",
+            "kind": "analysis",
+            "expect": ["{{truth.slowestQuerySeconds}}", "{{truth.slowestQueryTable}}"]
+          }
+        },
+        {
+          "prompt": "Is there a correlation between slow queries on payments and the 503 burst? Check the timestamps and answer briefly."
+        },
+        {
+          "prompt": "Write an incident timeline (UTC) with 6 to 10 entries."
+        },
+        {
+          "prompt": "Draft the 'Impact' section of the postmortem: error counts, affected tenants, duration."
+        },
+        {
+          "prompt": "Propose three alert rules (PromQL-style) that would have caught this earlier."
+        },
+        {
+          "prompt": "Write and run a one-off command that computes the p95 dur_ms per route from the gateway log, and show the result as a table."
+        },
+        {
+          "prompt": "Summarise the findings so far in six bullets."
+        },
+        {
+          "prompt": "What was the trace id of the slowest gateway request we found? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-slowest",
+            "expect": ["{{truth.slowestTrace}}"]
+          }
+        },
+        {
+          "prompt": "Which tenant had the most 5xx responses? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-tenant",
+            "expect": ["{{truth.topErrorTenant}}"]
+          }
+        },
+        {
+          "prompt": "Which worker job exhausted its retries, and with what error? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-exhausted",
+            "expect": ["{{truth.exhaustedJob}}", "deadlineexceeded"]
+          }
+        },
+        {
+          "prompt": "Which job was OOM-killed? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-oom",
+            "expect": ["{{truth.oomJob}}"]
+          }
+        },
+        {
+          "prompt": "What total 5xx count did we find in the gateway log? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-5xx",
+            "expect": ["{{truth.errors5xx}}"]
+          }
+        },
+        {
+          "prompt": "At what time did the payments team say they rotated the PSP credentials? Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "recall-rotation",
+            "expect": ["14:19"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "fresh-session",
+      "turns": [
+        {
+          "prompt": "New thread about the 2026-10-07 billing incident: which job ran out of memory, and what was the slowest request's trace id? If you don't know, say so. Do not open files or run shell commands for this; memory tools are fine if you have them. Answer in one line.",
+          "probe": {
+            "id": "cross-oom-trace",
+            "kind": "cross-session",
+            "expect": ["{{truth.oomJob}}", "{{truth.slowestTrace}}"]
+          }
+        }
+      ]
+    }
+  ]
+}
