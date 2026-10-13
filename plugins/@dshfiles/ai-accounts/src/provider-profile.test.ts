@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { ReasoningEffortId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
@@ -217,5 +217,69 @@ describe('Codex upstream replay overflow', () => {
       type: 'finish',
       reason: { kind: 'error', failure: { code: 'PI_AI_ERROR', message: 'unsupported parameter' } },
     })
+  })
+})
+
+describe('OpenCode Go DeepSeek thinking', () => {
+  const wireBody = async (model: string, reasoningEffort?: string): Promise<Record<string, unknown>> => {
+    const profile = buildProfile({ upstream: opencodeGoProvider(), provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['opencode-go-test', profile]]),
+        resolveApiKey: async () => 'test-key',
+        auth: {
+          credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map() },
+    )
+    const originalFetch = globalThis.fetch
+    let body: Record<string, unknown> = {}
+    globalThis.fetch = async (_input, init) => {
+      body = JSON.parse(String(init?.body))
+      return new Response('{"error":{"message":"stop here"}}', { status: 400 })
+    }
+    try {
+      for await (const _chunk of adapter.stream({
+        provider: 'opencode-go-test',
+        model,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(reasoningEffort) }),
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      })) {
+        // drain
+      }
+      return body
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  }
+
+  it('offers off on DeepSeek V4.1 Flash with high as its default effort', async () => {
+    const profile = buildProfile({ upstream: opencodeGoProvider(), provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['opencode-go-test', profile]]),
+        resolveApiKey: async () => undefined,
+        auth: {
+          credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map() },
+    )
+    const reasoning = (await adapter.resolveModel('opencode-go-test', 'deepseek-v4.1-flash')).reasoning
+    expect(reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'low', 'high', 'max'])
+    expect(reasoning?.defaultEffort).toBe('high')
+  })
+
+  it('disables thinking only when off is requested', async () => {
+    expect(await wireBody('deepseek-v4.1-flash', 'off')).toMatchObject({ thinking: { type: 'disabled' } })
+    const omitted = await wireBody('deepseek-v4.1-flash')
+    expect(omitted).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'high' })
+  })
+
+  it('leaves a DeepSeek model whose catalog already offered off unchanged', async () => {
+    expect(await wireBody('deepseek-v4-flash')).toMatchObject({ thinking: { type: 'disabled' } })
   })
 })

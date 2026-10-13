@@ -9,6 +9,32 @@ import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropi
 import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import type { createCommandCodeProvider } from './commandcode-provider.js'
 
+/** DeepSeek's documented default effort when thinking is on and the request names none. */
+const DEEPSEEK_DEFAULT_EFFORT = 'high'
+
+type ThinkingCatalogModel = {
+  readonly api: string
+  readonly compat?: { readonly thinkingFormat?: string } | undefined
+  readonly thinkingLevelMap?: Readonly<Record<string, string | null | undefined>> | undefined
+}
+
+/** Models offered `off` below; only they gain a default, so a model that already stopped thinking without one keeps doing so. */
+const thinkingOffOffered = new WeakSet<object>()
+
+/**
+ * OpenCode Go forwards DeepSeek's `thinking: {type: 'disabled'}` (verified against the live route on 2026-10-13), but
+ * pi-ai's catalog marks `off` unsupported there, so nothing could ask DeepSeek V4.1 not to think. Dropping the `null`
+ * offers `off`. pi-ai then sends `disabled` for every request without an effort, so {@link EffortPinnedAdapter} gives
+ * those requests DeepSeek's documented default to keep thinking exactly as before.
+ */
+const offerThinkingOff = <Model extends ThinkingCatalogModel>(model: Model): Model => {
+  if (model.api !== 'openai-completions' || model.compat?.thinkingFormat !== 'deepseek' || model.thinkingLevelMap?.off !== null) return model
+  const { off: _unsupported, ...levels } = model.thinkingLevelMap
+  const offered = { ...model, thinkingLevelMap: levels }
+  thinkingOffOffered.add(offered)
+  return offered
+}
+
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
   readonly reasoningDefaults?: Readonly<Record<string, string>>
@@ -39,7 +65,11 @@ export const buildProfile = (params: {
     return order.length + (favorites.has(id) ? 0 : 1)
   }
   const upstreamModels = params.upstream.getModels()
-  const models = upstreamModels.map(model => ({ ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }))
+  const offersThinkingOff = params.upstream.id === 'opencode-go'
+  const models = upstreamModels.map(model => {
+    const named = { ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }
+    return offersThinkingOff ? offerThinkingOff(named) : named
+  })
   for (const id of new Set(params.additionalModelIds)) {
     if (models.some(model => model.id === id)) continue
     // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
@@ -104,10 +134,14 @@ export const buildProfile = (params: {
   }
 }
 
-/** Apply the account's pin to one request whose caller did not choose an effort. */
-const pinnedCall = (options: GenerateOptions, pins: ReadonlyMap<string, Readonly<Record<string, string>>>): GenerateOptions => {
+/** Apply the account's pin, else the model's own thinking default, to one request whose caller did not choose an effort. */
+const pinnedCall = (
+  options: GenerateOptions,
+  pins: ReadonlyMap<string, Readonly<Record<string, string>>>,
+  defaultEffort: (provider: string, model: string) => string | undefined,
+): GenerateOptions => {
   if (options.reasoningEffort !== undefined) return options
-  const effort = pins.get(options.provider)?.[options.model]
+  const effort = pins.get(options.provider)?.[options.model] ?? defaultEffort(options.provider, options.model)
   if (effort === undefined) return options
   return { ...options, reasoningEffort: ReasoningEffortId(effort) }
 }
@@ -137,6 +171,7 @@ async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChun
  */
 export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+  private readonly profilesFor: ConstructorParameters<typeof PiAiAdapter>[0]['profiles']
   private readonly routeFor: (options: GenerateOptions) => string
   private readonly pricingFor: ((provider: string, model: string) => LlmImageRequestPricing | undefined) | undefined
 
@@ -155,6 +190,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     },
   ) {
     super(config)
+    this.profilesFor = config.profiles
     this.reasoningDefaults = deps.reasoningDefaults
     this.routeFor = deps.routeFor ?? (options => options.provider)
     this.pricingFor = deps.imageRequestPricing
@@ -164,8 +200,16 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     return this.pricingFor?.(provider, model) ?? super.imageRequestPricing(provider, model)
   }
 
+  private readonly thinkingDefault = (provider: string, model: string): string | undefined => {
+    const catalogModel = this.profilesFor()
+      .get(provider)
+      ?.piProvider?.getModels()
+      .find(candidate => candidate.id === model)
+    return catalogModel !== undefined && thinkingOffOffered.has(catalogModel) ? DEEPSEEK_DEFAULT_EFFORT : undefined
+  }
+
   private withModelDefault(model: LlmResolvedModelInfo): LlmResolvedModelInfo {
-    const defaultEffort = this.reasoningDefaults.get(model.provider)?.[model.id]
+    const defaultEffort = this.reasoningDefaults.get(model.provider)?.[model.id] ?? this.thinkingDefault(model.provider, model.id)
     if (defaultEffort === undefined || model.reasoning === undefined || !model.reasoning.efforts.some(effort => effort.id === defaultEffort)) return model
     return {
       ...model,
@@ -179,7 +223,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
 
   private wireCall(options: GenerateOptions): GenerateOptions {
     const provider = this.routeFor(options)
-    return pinnedCall(provider === options.provider ? options : { ...options, provider }, this.reasoningDefaults)
+    return pinnedCall(provider === options.provider ? options : { ...options, provider }, this.reasoningDefaults, this.thinkingDefault)
   }
 
   override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
