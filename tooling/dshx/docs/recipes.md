@@ -40,6 +40,12 @@ shows schema-backed server state and operations. Its
 quick-panel UI, while its [Host](../../../plugins/@dshfiles/mcp-servers/src/host.ts)
 owns credential resolution and native MCP client lifecycle.
 
+An API is served on a channel derived from the calling package, so by default
+only the owning plugin's Client reaches it. To let another plugin call it, set
+`owner` to the serving package (`defineApi({ id, version, owner: '@dshfiles/jj-integration', methods })`)
+and import the contract from that package; a Host that is not the owner refuses
+to register it.
+
 ```sh
 fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/mcp-servers typecheck
 fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/mcp-servers test

@@ -14,6 +14,7 @@ export type {
   SlotOptions,
 } from './types.js'
 export { useApi, useApiQuery } from '../api/client.js'
+export { createApiClient } from '../api/runtime.js'
 export { useSettings } from '../settings/client.js'
 export type { SettingsMutationState, SettingsReadError, SettingsState } from '../settings/types.js'
 export type { HandleOf } from '@deepseek-ai/dsh-client-ui-slots'

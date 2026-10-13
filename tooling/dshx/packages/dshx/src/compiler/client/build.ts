@@ -153,6 +153,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { defineClientPlugin } from ${JSON.stringify(CLIENT_SDK_PATH)}`,
           `export { declareLocaleNamespace, defineLocale } from ${JSON.stringify(CLIENT_LOCALE_PATH)}`,
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { createApiClient } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           '',
         ].join('\n')

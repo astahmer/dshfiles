@@ -63,6 +63,7 @@ export function apiHostRegistrationParts(value: ApiHostRegistration): ApiHostReg
 export function defineApi<const Methods extends Record<string, AnyApiMethodDefinition>>(definition: {
   readonly id: string
   readonly version: number
+  readonly owner?: string
   readonly methods: Methods
 }): ApiContract<Methods> {
   assertId(definition.id)

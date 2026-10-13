@@ -47,7 +47,7 @@ export function createApiClient<const Methods extends Record<string, AnyApiMetho
   packageId = 'plugin',
 ): ApiClient<Methods> {
   const connection = context === undefined || typeof context.get !== 'function' ? undefined : (context.get('connection') as ClientConnectionLike | undefined)
-  const channel = apiChannel(packageId, contract.id)
+  const channel = apiChannel(contract.owner ?? packageId, contract.id)
   const call = async (name: string, input: unknown, options?: ApiCallOptions): Promise<unknown> => {
     const rpc = connection?.rpc
     if (rpc?.call === undefined) throw error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)

@@ -31,6 +31,8 @@ export type AnyApiMethodDefinition = ApiMethodDefinition<any, any, any, any>
 export interface ApiContract<Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>> {
   readonly id: string
   readonly version: number
+  /** Package whose Host serves this API; set it so another plugin's Client can call it. Defaults to the caller's package. */
+  readonly owner?: string
   readonly methods: Methods
   readonly host: <const Handlers extends ApiHandlers<Methods>>(
     handlers: Handlers & Record<Exclude<keyof Handlers, keyof Methods>, never>,

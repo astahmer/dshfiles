@@ -129,6 +129,16 @@ describe('generic API runtime', () => {
     expect(fixture.remove).toHaveBeenCalledTimes(2)
   })
 
+  it('routes a Client of another package to the Host that owns the contract', async () => {
+    const fixture = connectionFixture()
+    const owned = defineApi({ id: 'status', version: 1, owner: '@scope/owner', methods: { get: method<void, { value: string }>() } })
+    await registerApi(fixture.context as never, '@scope/owner', owned.host({ get: async () => ({ value: 'from owner' }) }))
+    await expect(createApiClient(fixture.context, owned, '@scope/caller').get()).resolves.toEqual({ value: 'from owner' })
+    await expect(registerApi(fixture.context as never, '@scope/caller', owned.host({ get: async () => ({ value: 'impostor' }) }))).rejects.toThrow(
+      'owned by @scope/owner',
+    )
+  })
+
   it('provides typed calls and safe errors over Connection.call', async () => {
     const call = vi.fn(
       async (

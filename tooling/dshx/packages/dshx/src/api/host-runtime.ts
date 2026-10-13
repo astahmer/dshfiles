@@ -54,6 +54,9 @@ export async function registerApi(ctx: Context, packageId: string, registration:
     console.warn(`API ${contract.id} is unavailable because the DSH Connection provider is not loaded.`)
     return
   }
+  if (contract.owner !== undefined && contract.owner !== packageId) {
+    throw new Error(`API ${contract.id} is owned by ${contract.owner} and cannot be served by ${packageId}.`)
+  }
   const channel = apiChannel(packageId, contract.id)
   const root = ctx.root ?? ctx
   const owners = channelOwners.get(root) ?? new Map<string, string>()
