@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "kind": "infrastructure",
+  "kind": "bundle",
   "features": [
     {
       "id": "activity-feed",
@@ -30,9 +30,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "activity-timeline.feed-browser-journey",
-          "reason": "The browser feed journey is covered by host-side normalization and pagination tests in this revision; a Playwright scenario is deferred until the panel is composed in a profile."
+          "featureFile": "tooling/dshx/e2e/features/activity-timeline.feature"
         },
         {
           "kind": "unit-test",
@@ -105,9 +105,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "activity-timeline.condensation-browser-journey",
-          "reason": "Condensation is a pure function verified by unit tests; the browser expansion journey is deferred with the panel composition."
+          "featureFile": "tooling/dshx/e2e/features/activity-timeline.feature"
         },
         {
           "kind": "unit-test",
