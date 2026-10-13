@@ -39,6 +39,7 @@ const en = {
   noBookmarks: 'No bookmark matches.',
   isolateHint: 'Work in a separate jj workspace, so other threads never see this one’s edits until it lands.',
   workspace: 'workspace',
+  chooseProject: 'Choose a project',
 } as const
 
 const zh: Record<keyof typeof en, string> = {
@@ -77,6 +78,7 @@ const zh: Record<keyof typeof en, string> = {
   noBookmarks: '没有匹配的书签。',
   isolateHint: '在独立的 jj 工作区中工作，合入前其他会话看不到这里的修改。',
   workspace: '工作区',
+  chooseProject: '选择项目',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

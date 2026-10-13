@@ -1,13 +1,16 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { DestinationBar, type DestinationBarServices } from './destination-bar.js'
+import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
@@ -29,7 +32,7 @@ const useBookmark = (): string => useSettings(jjIntegrationSettings).value?.book
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
     ctx.slots.inject('sidebar.panellist', () =>
@@ -50,8 +53,18 @@ export default defineClient({
       workspaces: ctx.workspaces,
       // SAFETY: every id passed here came back from the Host's workspace registry.
       openWorkspace: workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId as WorkspaceView['workspaceId']),
-      pickDirectory: () => ctx.uiWorkspace.pickDirectory(),
     }
+    const pickerPorts = createWorkspacePickerPorts(ctx.remote)
+    ctx.slots.inject('conversation.hero.workspace', () =>
+      ctx.slots.register(
+        { name: 'conversation.hero.workspace', priority: -1000 },
+        decorate((props: EmptyWorkspaceOwnerProps) => (
+          <PluginQueryProvider>
+            <HeroWorkspacePicker {...props} ports={pickerPorts} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'dshfiles-jj-integration-destination', order: 10, inject: sessionId => ({ sessionId }) },

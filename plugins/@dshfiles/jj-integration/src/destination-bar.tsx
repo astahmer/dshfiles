@@ -3,17 +3,9 @@ import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { CheckIcon, FolderIcon, GitBranchIcon, LaptopIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, GitBranchIcon, LaptopIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -25,12 +17,9 @@ export interface DestinationBarServices {
   readonly sessions: ISessions
   readonly workspaces: IWorkspaces
   readonly openWorkspace: (workspaceId: string) => Promise<void>
-  readonly pickDirectory: () => Promise<string | null>
 }
 
-type Target = { readonly kind: 'project'; readonly workspaceId: string; readonly isolate: boolean; readonly base?: string } | { readonly kind: 'no-folder' } | { readonly kind: 'pick' }
-
-const RECENT_PROJECTS = 8
+type Target = { readonly workspaceId: string; readonly isolate: boolean; readonly base?: string }
 
 const useSessionView = (services: DestinationBarServices, sessionId: SessionSummary['id']) => {
   const subscribe = useCallback(
@@ -53,9 +42,9 @@ const useSessionView = (services: DestinationBarServices, sessionId: SessionSumm
 }
 
 /**
- * Where a new thread runs, chosen before its first message: folder (or none), the jj bookmark it starts from, and
- * whether it gets its own jj workspace. A Session's directory is fixed once created, so each change opens a blank
- * thread at the new destination instead of moving this one.
+ * Where a new thread runs, chosen before its first message: the jj bookmark it starts from and whether it gets its
+ * own jj workspace. The folder is the native project chip above, whose picker this plugin replaces. A Session's
+ * directory is fixed once created, so each change opens a blank thread at the new destination instead of moving it.
  */
 export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']; readonly services: DestinationBarServices; readonly t: JjIntegrationTranslate }) => {
   const { t, services } = props
@@ -70,21 +59,12 @@ export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']
     enabled: view.blank && workspaceId !== null,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
   })
-  const projects = useQuery({
-    queryKey: ['jj-integration', 'projects'],
-    enabled: view.blank,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
-  })
   const move = useMutation({
     mutationFn: async (target: Target): Promise<void> => {
       const leaving = destination.data?.isolated === true ? workspaceId : null
-      const next =
-        target.kind === 'no-folder'
-          ? (await api.noFolder({})).workspaceId
-          : target.kind === 'pick'
-            ? await services.pickDirectory().then(async path => (path === null ? null : (await services.workspaces.create({ path })).workspaceId))
-            : (await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) })).workspaceId
-      if (next === null || next === workspaceId) return
+      const next = (await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) }))
+        .workspaceId
+      if (next === workspaceId) return
       await services.openWorkspace(next)
       // The blank thread left behind had no message, so its fresh workspace holds nothing worth keeping.
       const leavingPath = leaving === null ? undefined : services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === leaving)?.path
@@ -98,7 +78,6 @@ export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']
   if (!view.blank || workspaceId === null) return null
   const current = destination.data
   const projectId = current?.projectWorkspaceId ?? workspaceId
-  const project = projects.data?.projects.find(candidate => candidate.workspaceId === projectId)
   const isJj = current?.vcs === 'jj'
   const isolated = current?.isolated === true
   const chip = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-normal'
@@ -109,31 +88,6 @@ export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']
         <LaptopIcon className="dshx:size-3.5" />
         {t('hostLocal')}
       </span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="secondary" className={chip} disabled={move.isPending}>
-            <FolderIcon className="dshx:size-3.5" />
-            {project?.title ?? t('noFolder')}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="dshx:min-w-56">
-          <DropdownMenuItem onSelect={() => move.mutate({ kind: 'no-folder' })}>{t('noFolder')}</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>{t('recent')}</DropdownMenuLabel>
-          {(projects.data?.projects ?? []).slice(0, RECENT_PROJECTS).map(candidate => (
-            <DropdownMenuItem
-              key={candidate.workspaceId}
-              title={candidate.path}
-              onSelect={() => move.mutate({ kind: 'project', workspaceId: candidate.workspaceId, isolate: isolated })}
-            >
-              <span className="dshx:flex-1 dshx:truncate">{candidate.title}</span>
-              {candidate.workspaceId === projectId ? <CheckIcon className="dshx:size-3.5" /> : null}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => move.mutate({ kind: 'pick' })}>{t('openFolder')}</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
       {isJj ? (
         <span className="dshx:inline-flex dshx:items-center dshx:rounded-md dshx:bg-secondary">
           <Popover open={branchOpen} onOpenChange={setBranchOpen}>
@@ -154,7 +108,7 @@ export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']
                       value={name}
                       onSelect={() => {
                         setBranchOpen(false)
-                        move.mutate({ kind: 'project', workspaceId: projectId, isolate: true, base: name })
+                        move.mutate({ workspaceId: projectId, isolate: true, base: name })
                       }}
                     >
                       <span className="dshx:flex-1 dshx:truncate">{name}</span>
@@ -170,7 +124,7 @@ export const DestinationBar = (props: { readonly sessionId: SessionSummary['id']
               checked={isolated}
               disabled={move.isPending}
               onCheckedChange={checked =>
-                move.mutate({ kind: 'project', workspaceId: projectId, isolate: checked === true, ...(current?.bookmark == null ? {} : { base: current.bookmark }) })
+                move.mutate({ workspaceId: projectId, isolate: checked === true, ...(current?.bookmark == null ? {} : { base: current.bookmark }) })
               }
             />
             {t('workspace')}
