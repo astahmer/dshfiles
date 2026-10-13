@@ -42,14 +42,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.capture-dedup",
-          "reason": "No browser journey exists yet for the capture-dedup scenario of \"Capture eligible conversation and tool activity\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.exclusions",
-          "reason": "No browser journey exists yet for the exclusions scenario of \"Capture eligible conversation and tool activity\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
           "kind": "unit-test",
@@ -174,24 +174,24 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.injection-bounds",
-          "reason": "No browser journey exists yet for the injection-bounds scenario of \"Inject bounded same-project memory context\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.full-fallback",
-          "reason": "No browser journey exists yet for the full-fallback scenario of \"Inject bounded same-project memory context\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.summarizer-failure",
-          "reason": "No browser journey exists yet for the summarizer-failure scenario of \"Inject bounded same-project memory context\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.barrier-cancel",
-          "reason": "No browser journey exists yet for the barrier-cancel scenario of \"Inject bounded same-project memory context\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
           "kind": "unit-test",
@@ -328,14 +328,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.recall-scope",
-          "reason": "No browser journey exists yet for the recall-scope scenario of \"Search and inspect scoped memory\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "optmem.database-failure",
-          "reason": "No browser journey exists yet for the database-failure scenario of \"Search and inspect scoped memory\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/optmem-memory.feature"
         },
         {
           "kind": "unit-test",
