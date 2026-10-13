@@ -23,24 +23,24 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "workbench.default-layout",
-          "reason": "No browser journey exists yet for the default-layout scenario of \"Arrange plugin panels in independent layouts\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "workbench.persisted-layout",
-          "reason": "No browser journey exists yet for the persisted-layout scenario of \"Arrange plugin panels in independent layouts\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "workbench.missing-plugin",
-          "reason": "No browser journey exists yet for the missing-plugin scenario of \"Arrange plugin panels in independent layouts\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "workbench.surface-layouts",
-          "reason": "No browser journey exists yet for the surface-layouts scenario of \"Arrange plugin panels in independent layouts\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
           "kind": "unit-test",
@@ -85,9 +85,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "workbench.early-open",
-          "reason": "No browser journey exists yet for the early-open scenario of \"Queue panel-open requests before mount\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
           "kind": "unit-test",
