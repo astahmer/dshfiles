@@ -44,7 +44,7 @@ const jjConfig = resolve(HOME, 'jj-config.toml')
 await writeFile(jjConfig, '[user]\nname = "Browser"\nemail = "b@example.com"\n', { mode: 0o600 })
 const jjEnv = { ...process.env, JJ_CONFIG: jjConfig }
 const jj = (...args) => execFileSync('jj', ['--color=never', '--no-pager', ...args], { cwd: project, env: jjEnv, encoding: 'utf8' })
-jj('git', 'init', '.')
+jj('git', 'init', '--colocate', '.')
 await writeFile(resolve(project, 'base.txt'), 'base\n')
 jj('describe', '-m', 'base')
 jj('bookmark', 'create', 'integration-spine', '-r', jj('log', '-r', '@', '--no-graph', '-T', 'commit_id').trim())
@@ -94,7 +94,40 @@ console.log('failed-to-load:', visible.includes('Failed to load plugins') ? 'PRE
 console.log('visible UI:', visible.replace(/\s+/g, ' ').slice(0, 400))
 console.log('console errors:', consoleErrors.length)
 for (const e of consoleErrors.slice(0, 6)) console.log('  -', e)
-// The journey: create a thread from the composer and see it reach the sidebar.
+// DSH's first-use Workspace is always <Documents>/deepseek-harness/default-workspace,
+// so register the scratch jj project as a Workspace and select it in the composer:
+// that is the real journey for a coding thread.
+const launchIndex = await fetch(launchUrl, { redirect: 'manual' })
+const cookie = launchIndex.headers.getSetCookie?.()[0] ?? launchIndex.headers.get('set-cookie')
+const origin = new URL(launchUrl).origin
+const rpc = async (ns, method, args) => {
+  const response = await fetch(`${origin}/api/${ns}/${method}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(cookie === undefined ? {} : { cookie }) },
+    body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: `${ns}/${method}`, payload: { args } }),
+  })
+  const body = await response.text()
+  const envelope = response.status === 200 ? JSON.parse(body) : undefined
+  return envelope?.result?.value ?? envelope?.result
+}
+const madeWorkspace = await rpc('workspace', 'create', { request: { path: project, title: 'project' } })
+console.log('registered project workspace:', madeWorkspace?.workspace?.workspaceId ?? '(none)')
+await page.reload({ waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(5000)
+// Select the project workspace in the composer's workspace control.
+await page
+  .getByText('Default workspace')
+  .first()
+  .click({ timeout: 15_000 })
+  .catch(error => console.log('workspace control click failed:', String(error).slice(0, 120)))
+await page.waitForTimeout(1200)
+await page
+  .getByText('project', { exact: true })
+  .first()
+  .click({ timeout: 10_000 })
+  .catch(error => console.log('project option click failed:', String(error).slice(0, 120)))
+await page.waitForTimeout(1200)
+
 const before = await page.evaluate(() => document.body.innerText)
 const composer = page.locator('textarea, [contenteditable="true"]').first()
 await composer.click({ timeout: 15_000 }).catch(() => {})
@@ -116,6 +149,11 @@ const cwdCheck = execFileSync('jj', ['--color=never', '--no-pager', 'workspace',
 })
   .split('\n')
   .filter(n => n && n !== 'default')
+for (const line of hostOutput
+  .split('\n')
+  .filter(l => l.includes('ADE-PROBE'))
+  .slice(0, 8))
+  console.log('HOST', line.trim().slice(0, 220))
 console.log('provisioned jj workspaces:', JSON.stringify(cwdCheck))
 await writeFile(`${SHOTS}/real-profile.json`, `${JSON.stringify({ failures, visible: visible.slice(0, 2000), consoleErrors }, null, 2)}\n`)
 await browser.close()
