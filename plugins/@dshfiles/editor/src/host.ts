@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { editorApi, MAX_SAVE_BYTES } from './api.js'
@@ -13,11 +14,12 @@ interface StoredSessions {
 
 /**
  * The Host `ctx.sessions` is the session store, but the Client `ISessions` face claims the same
- * `Context.sessions` name and wins the declaration merge, so the store shape is decoded here.
+ * `Context.sessions` name and wins the declaration merge, so the store shape is decoded here. `z.custom` keeps the
+ * store's own reference: `z.object` would hand back a copy whose `get` runs without the store as `this`.
  */
-const liveSessionsSchema = z.object({
-  get: z.custom<(sessionId: SessionId) => { readonly header?: { readonly cwd?: string } } | undefined>(value => typeof value === 'function'),
-})
+const liveSessionsSchema = z.custom<{ get(sessionId: SessionId): { readonly header?: { readonly cwd?: string } } | undefined }>(
+  value => typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function',
+)
 
 /** The same resolution `workspaceFiles` uses: the live session header first, then the persisted one. */
 const sessionRoot = async (ctx: Context, sessionId: string): Promise<string> => {
@@ -44,10 +46,10 @@ const editorHostApi = editorApi.host({
         maxBytes: MAX_SAVE_BYTES,
       })
     } catch (error) {
-      if (error instanceof WorkspaceWriteError) throw new Error(error.message)
-      if (error instanceof Error && error.message.startsWith('This session')) throw error
-      // Node fs messages carry absolute paths of unrelated directories; keep them out of the browser.
-      throw new Error('The file could not be saved.')
+      if (error instanceof WorkspaceWriteError) throw new PluginApiError(error.message, { code: error.code, cause: error })
+      if (error instanceof Error && error.message.startsWith('This session')) throw new PluginApiError(error.message, { cause: error })
+      // dshx logs an unexpected failure with its cause and sends the browser only a generic message, so Node fs paths stay on the Host.
+      throw error
     }
   },
 })
