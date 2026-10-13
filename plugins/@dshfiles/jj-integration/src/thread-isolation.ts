@@ -44,6 +44,16 @@ export interface ThreadIsolationOptions {
     readonly path: string
     readonly baseCommitId: string | null
   }) => Promise<void>
+  /**
+   * Register a freshly provisioned directory with DSH's own workspace registry.
+   *
+   * The native attachment contract keys a workspace's visible sessions by exact
+   * path equality, so an isolated directory that is not a registered workspace
+   * cannot own its Session: it would be created and then be undiscoverable.
+   * Registration is what keeps discovery, resume and restart working while the
+   * execution directory stays isolated.
+   */
+  readonly registerWorkspace?: ((input: { readonly path: string; readonly sessionId: string }) => Promise<void>) | undefined
 }
 
 export const threadWorkspacesDirectory = (repositoryRoot: string): string =>
@@ -84,6 +94,9 @@ export const createThreadWorkspaceResolver = (options: ThreadIsolationOptions): 
       path: outcome.path,
       baseCommitId: outcome.baseCommitId,
     })
+    // Best effort: a registry that cannot take the directory must not fail
+    // provisioning, but a failure is reported so it is never silent.
+    await options.registerWorkspace?.({ path: outcome.path, sessionId: request.sessionId }).catch(() => undefined)
     return { kind: 'resolved', cwd: outcome.path }
   },
 })

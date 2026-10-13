@@ -527,6 +527,17 @@ const setupHost = (context: Context): Effect<void> => {
   // workspace — or the Session is refused rather than handed the shared checkout.
   const resolver = createThreadWorkspaceResolver({
     mode: () => isolationMode,
+    /**
+     * Register the provisioned directory so the Session attaches to it through
+     * the unmodified native contract. Idempotent: concurrent creation, a retry,
+     * a resume or a restart all find the existing registration first.
+     */
+    registerWorkspace: async ({ path, sessionId }) => {
+      const registry = ctx.get('workspaceRegistry')
+      if (registry === undefined) return
+      if ((await registry.resolveByPath(path).catch(() => undefined)) !== undefined) return
+      await registry.create(path, sessionId)
+    },
     executor,
     spineRevision: config.spineBookmark,
     ...(config.workspaceIsolation.directory === undefined ? {} : { workspacesDirectory: config.workspaceIsolation.directory }),
