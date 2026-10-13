@@ -9,19 +9,22 @@ capabilities where the DSH APIs or product workflow need a focused extension.
 
 ### Owned DSH bundles
 
-Every owned bundle links to its package guide. This table is the package index; it covers all 23 bundle directories under `plugins/@dshfiles/`.
+Every bundle directory under `plugins/@dshfiles/` is listed here; shared libraries are in the next table.
 
 | Package | Capability |
 |---|---|
+| [`activity-timeline`](plugins/@dshfiles/activity-timeline/README.md) | One chronological timeline of agent, session, communication and jj workspace activity. |
 | [`agent-communication`](plugins/@dshfiles/agent-communication/README.md) | Durable topic and direct messages between independent Agents. |
 | [`agent-questions`](plugins/@dshfiles/agent-questions/README.md) | Parent-scoped questions, deferred answers, and revisioned Markdown feedback. |
-| [`ai-accounts`](plugins/@dshfiles/ai-accounts/README.md) | Account-aware provider setup and model routing. |
+| [`ai-accounts`](plugins/@dshfiles/ai-accounts/README.md) | Per-account Codex, Claude, OpenCode Go and Command Code providers, plus Cursor quota. |
 | [`command-palette`](plugins/@dshfiles/command-palette/README.md) | App-wide searchable command palette and action registry. |
 | [`diff-viewed`](plugins/@dshfiles/diff-viewed/README.md) | Track changed files reviewed per turn. |
 | [`editor`](plugins/@dshfiles/editor/README.md) | Monaco file tree, tabs, open-from-anywhere, and confined saves. |
 | [`goal-stall-guard`](plugins/@dshfiles/goal-stall-guard/README.md) | Pause goals whose rounds stop making progress. |
+| [`jj-integration`](plugins/@dshfiles/jj-integration/README.md) | One jj workspace per thread, chosen before the first message, and a Land button that rebases its work onto `main`. |
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
 | [`mcp-servers`](plugins/@dshfiles/mcp-servers/README.md) | Configure profile-wide MCP servers through native DSH clients. |
+| [`model-effort-picker`](plugins/@dshfiles/model-effort-picker/README.md) | Search provider-grouped model catalogs and tune reasoning effort in the composer. |
 | [`multi-host`](plugins/@dshfiles/multi-host/README.md) | Manage execution machines and runtimes through shared Host APIs. |
 | [`optmem`](plugins/@dshfiles/optmem/README.md) | Persistent project memory, tools, and compact context views. |
 | [`plugin-marketplace`](plugins/@dshfiles/plugin-marketplace/README.md) | Find and install plugins from the Framework Hub catalog. |
@@ -31,10 +34,12 @@ Every owned bundle links to its package guide. This table is the package index; 
 | [`request-messages`](plugins/@dshfiles/request-messages/README.md) | Dispatch `agent/request-messages` on stock DSH so plugins can replace a request's messages. |
 | [`secret-catalog`](plugins/@dshfiles/secret-catalog/README.md) | Browse project-scoped secret aliases without exposing values to Client. |
 | [`settings-search`](plugins/@dshfiles/settings-search/README.md) | Search Settings fields and edit matches in place. |
+| [`shared-runtime`](plugins/@dshfiles/shared-runtime/package.json) | One shared copy of third-party Client modules and the plugin stylesheet for `@dshfiles` UI plugins. |
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md) | Claim keyboard shortcuts before browser defaults. |
 | [`sidebar-commands`](plugins/@dshfiles/sidebar-commands/README.md) | Use `/goto` to open a sidebar panel or recent session. |
 | [`thread-sidebar`](plugins/@dshfiles/thread-sidebar/README.md) | Group project threads and customize DSH navigation. |
 | [`workbench`](plugins/@dshfiles/workbench/README.md) | Persisted docking workbench for registered panels. |
+| [`workspace-folder-picker`](plugins/@dshfiles/workspace-folder-picker/README.md) | Open Add Workspace directly in a Host-backed folder browser. |
 
 ### Shared libraries
 
@@ -59,8 +64,8 @@ runtime state stay local and are not copied.
 
 ### Toolchain
 
-`tooling/dshx` is the locally owned `@dshfiles/dshx` fork for DSH 0.2. It
-provides plugin scaffolding, build and profile checks, runtime inspection, and
+`tooling/dshx` is the locally owned `@dshfiles/dshx` fork for DSH 0.2, the
+only vendored toolchain in the repository. It provides plugin scaffolding, build and profile checks, runtime inspection, and
 the CLI used by owned plugins. See [`tooling/dshx/FORK.md`](tooling/dshx/FORK.md)
 for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.md).
 

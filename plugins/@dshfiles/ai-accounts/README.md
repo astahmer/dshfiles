@@ -3,8 +3,8 @@
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 OpenCode Go and Command Code accounts each become their own route in the model
 picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
-accounts only track identity and quota, because Cursor sessions run through the
-`@dshfiles/cursor-agent` runtime driver.
+accounts only track identity and quota: DSH has no Cursor agent runtime, so
+Cursor sessions run outside DSH.
 
 ## Providers
 

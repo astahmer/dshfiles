@@ -13,6 +13,13 @@ The chooser intentionally does not show registered projects or the
 choosing one that already exists. The existing workspace-selection UI remains
 unchanged.
 
+## Runtime requirement
+
+The `hybrid` picker backend is a DSH core change that stock 0.2.0-rc.2 does not
+ship. On that runtime the Add Workspace browser cannot list Host folders, so
+this bundle only works once a DSH release with the hybrid directory picker is
+installed.
+
 ## Boundaries
 
 - The header and sidebar workspace owners retain open/busy state and workspace
