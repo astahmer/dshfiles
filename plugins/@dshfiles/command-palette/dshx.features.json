@@ -203,6 +203,16 @@
           "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "command-palette.thread-tabs-and-escape",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "command-palette.session-link-search",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "command-palette.prefix-routing-unit-command-content-line",
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
