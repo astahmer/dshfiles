@@ -396,6 +396,7 @@ export default defineClient({
               if (!result.ok) throw new Error(result.error.code)
             },
             open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
+            openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
           }),
         },
         decorate(ThreadSidebar),

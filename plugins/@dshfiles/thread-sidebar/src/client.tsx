@@ -3,6 +3,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { RemoteThreadsSection } from './remote-threads-section.js'
 import { useApiQuery } from '@dshfiles/dshx/client'
 import {
   IconArchiveOutlineRegular,
@@ -136,6 +137,8 @@ type InjectedActions = {
   unarchiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
+  /** Show the remote thread view; set when the layout service is available. */
+  openRemoteThreads?: () => void
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -2141,6 +2144,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                   {group.threads.map(session => renderThreadRow(session, undefined))}
                 </section>
               ))}
+          {props.openRemoteThreads === undefined ? null : <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} />}
           {sessionState.phase === 'ready' &&
           groupedAttentionRows.approvalNeeded.length === 0 &&
           groupedAttentionRows.inputNeeded.length === 0 &&
