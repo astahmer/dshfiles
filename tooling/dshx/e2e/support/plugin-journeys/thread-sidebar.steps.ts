@@ -539,23 +539,6 @@ Then('no child rows or thread-link actions are offered for the blank session', a
   await finishJourneyAssertions(page)
 })
 
-When('a thread turn fails because provider credentials are missing', async ({ page }: { page: Page }) => {
-  if (currentThreadId(page) === null) await startBlankThread(page)
-  const composer = page.getByRole('textbox').first()
-  await composer.fill('Verify durable failure status in the thread sidebar.')
-  await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
-})
-
-Then('the selected thread row shows its failed status and time', async ({ page }: { page: Page }) => {
-  const selectedRow = threadSidebar(page).locator('article[data-selected="true"]')
-  await recordAssertion(page, 'thread-sidebar-latest-turn-failure-is-visible', async () => {
-    await expect(selectedRow.getByRole('img', { name: 'Failed', exact: true })).toBeVisible()
-    await expect(selectedRow.getByText(/^Failed · (now|\d+[mhdmoy]+)$/)).toBeVisible()
-  })
-  await finishJourneyAssertions(page)
-})
-
 interface ThreadMentionJourney {
   readonly targetPrompt: string
   readonly diagnostics: string[]

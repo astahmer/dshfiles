@@ -151,13 +151,11 @@
         "pinned",
         "parked",
         "inactive",
-        "archived",
-        "failed"
+        "archived"
       ],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
-        "Activity uses session metadata timestamps and may reflect metadata updates.",
-        "Latest durable turn failures stay visible until a later non-error turn; errors without a durable turn/end are omitted."
+        "Activity uses session metadata timestamps and may reflect metadata updates."
       ],
       "externalDependencies": [],
       "verification": [
@@ -175,23 +173,6 @@
           "kind": "gherkin",
           "id": "thread-sidebar.attention-colors",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "thread-sidebar.latest-turn-failure",
-          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.latest-turn-failure-unit-red-dot",
-          "file": "plugins/@dshfiles/thread-sidebar/src/attention-presentation.test.ts",
-          "testName": "marks a failed latest turn red, but lets current work take over"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.latest-turn-failure-unit-host-projection",
-          "file": "tooling/dsh-core/api-session-controller/tests/session-projections.host.spec.ts",
-          "testName": "projects latest turn failures into list metadata and clears them on later non-error turns"
         },
         {
           "kind": "unit-test",
@@ -633,21 +614,19 @@
     {
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
-      "summary": "Mark a thread unread independently of Host attention state, then clear both unread sources when that thread is opened.",
+      "summary": "Mark a thread unread from the sidebar and clear that marker when the thread is opened.",
       "surfaces": [
         "client",
-        "host",
         "storage"
       ],
       "configuration": [],
       "states": [
         "read",
-        "manual-unread",
-        "host-unread"
+        "manual-unread"
       ],
       "failureModes": [
-        "Manual unread state remains separate from Host-owned attention state.",
-        "Opening a thread clears its manual unread marker and marks Host attention read."
+        "Manual unread is a per-thread sidebar preference; it does not read or change Host attention state.",
+        "Opening a thread clears its manual unread marker without clearing another thread's marker."
       ],
       "externalDependencies": [],
       "verification": [
@@ -661,12 +640,6 @@
           "id": "thread-sidebar.manual-unread-unit-seen-clears-local-marker",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
           "testName": "opening a thread clears its needs-you and manual unread markers while keeping mute settings"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.manual-unread-unit-host-and-manual-unread-remain-distinct",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
-          "testName": "manual unread is separate from Host unread and clears when thread is opened"
         }
       ]
     },
@@ -1038,7 +1011,7 @@
       "failureModes": [
         "Blank sessions have no header actions.",
         "Running sessions cannot be parked or archived.",
-        "Failed Host mutations are reported in the menu."
+        "Failed Host mutations are reported beside the action."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1051,13 +1024,13 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-pin-and-park",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "pins and parks a thread from the header menu"
+          "testName": "renders pin and park as direct overflow actions without an inner ellipsis"
         },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-snooze",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "snoozes the current thread notifications"
+          "testName": "opens the notification action and snoozes the current thread"
         },
         {
           "kind": "unit-test",
@@ -1075,13 +1048,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-action-failure",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "reports failed Host mutations in the reopened menu"
-        },
-        {
-          "kind": "unit-test",
-          "id": "thread-sidebar.session-header-actions-unit-toolbar-placement",
-          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "renders a compact toolbar action when moved out of overflow"
+          "testName": "reports failed Host mutations beside the action"
         }
       ]
     },

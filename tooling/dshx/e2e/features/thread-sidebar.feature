@@ -64,12 +64,6 @@ Feature: Thread sidebar journeys
     When an attention status color is changed in Sidebar settings
     Then the selected attention color survives a browser reload
 
-  @scenario:thread-sidebar.latest-turn-failure
-  Scenario: Failed latest turn appears in thread row
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When a thread turn fails because provider credentials are missing
-    Then the selected thread row shows its failed status and time
-
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
