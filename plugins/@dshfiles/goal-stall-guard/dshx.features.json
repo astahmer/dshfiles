@@ -32,19 +32,19 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "goal-stall-guard.streak-reset",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the streak-reset scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "goal-stall-guard.threshold",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the threshold scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "goal-stall-guard.unavailable-goal",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the unavailable-goal scenario of \"Pause goals after consecutive empty rounds\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",

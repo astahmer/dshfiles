@@ -112,19 +112,19 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "project-checks.trusted-root",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the trusted-root scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "project-checks.receipt-freshness",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the receipt-freshness scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "project-checks.verify-retry",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the verify-retry scenario of \"Run trusted project checks\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",
@@ -180,9 +180,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "project-checks.native-hook-events",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the native-hook-events scenario of \"Show native hook invocation records\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",

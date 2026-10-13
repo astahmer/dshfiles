@@ -123,19 +123,19 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "mcp-servers.server-validation",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the server-validation scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "mcp-servers.lifecycle",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the lifecycle scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "mcp-servers.settings-boundary",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the settings-boundary scenario of \"Manage local and remote MCP server definitions\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -170,9 +170,9 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "mcp-servers.registry-search",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the registry-search scenario of \"Search curated providers and the MCP Registry\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -208,9 +208,9 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "mcp-servers.oauth-lifecycle",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the oauth-lifecycle scenario of \"Authorize remote OAuth servers\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",

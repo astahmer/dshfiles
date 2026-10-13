@@ -22,14 +22,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "diff-viewed.toggle-progress",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the toggle-progress scenario of \"Mark review files as viewed\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "diff-viewed.change-scope",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the change-scope scenario of \"Mark review files as viewed\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",
@@ -91,14 +91,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "diff-viewed.storage-retention",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the storage-retention scenario of \"Retain viewed marks across tabs\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "diff-viewed.cross-tab",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the cross-tab scenario of \"Retain viewed marks across tabs\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",

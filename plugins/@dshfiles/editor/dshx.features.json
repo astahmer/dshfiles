@@ -55,24 +55,24 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "editor.file-browse-open",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the file-browse-open scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "editor.save-conflict",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the save-conflict scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "editor.write-boundaries",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the write-boundaries scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "editor.placement",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the placement scenario of \"Browse and edit workspace files\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "gherkin",
@@ -151,9 +151,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "editor.file-index-bounds",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the file-index-bounds scenario of \"Index workspace files with bounded traversal\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",

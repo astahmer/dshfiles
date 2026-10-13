@@ -84,9 +84,9 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "ai-accounts.pool-failover",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the pool-failover scenario of \"Curate models and choose account routes\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "unit-test",
@@ -176,9 +176,9 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "ai-accounts.quota-display",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the quota-display scenario of \"Read provider quota and usage status\"; nothing automated verifies it yet."
         },
         {
           "kind": "gherkin",
@@ -285,9 +285,9 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "ai-accounts.luna-reserve",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the luna-reserve scenario of \"Route exhausted Luna accounts through Reserve\"; nothing automated verifies it yet."
         }
       ]
     },

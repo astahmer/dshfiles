@@ -82,14 +82,14 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.graph-filters",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the graph-filters scenario of \"Browse and filter the revision graph\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.refresh-behavior",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the refresh-behavior scenario of \"Browse and filter the revision graph\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -129,9 +129,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.diff-review",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the diff-review scenario of \"Inspect revisions and changed files\"; nothing automated verifies it yet."
         },
         {
           "kind": "gherkin",
@@ -182,14 +182,14 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.preview-confirm",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the preview-confirm scenario of \"Preview and confirm repository mutations\"; only the unit tests listed for this feature verify it."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.composer-context",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the composer-context scenario of \"Preview and confirm repository mutations\"; only the unit tests listed for this feature verify it."
         },
         {
           "kind": "gherkin",
@@ -232,14 +232,14 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.workspace-session",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the workspace-session scenario of \"Create workspaces and navigate session history\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "jujutsu.history-boundaries",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the history-boundaries scenario of \"Create workspaces and navigate session history\"; nothing automated verifies it yet."
         }
       ]
     }

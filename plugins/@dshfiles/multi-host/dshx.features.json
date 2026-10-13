@@ -36,14 +36,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.identity-profile",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the identity-profile scenario of \"Register and identify local DSH runtimes\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.directory-safety",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the directory-safety scenario of \"Register and identify local DSH runtimes\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -77,14 +77,14 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.ssh-connect",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the ssh-connect scenario of \"Connect to an SSH-managed runtime\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.ssh-identity-profile",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the ssh-identity-profile scenario of \"Connect to an SSH-managed runtime\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -118,14 +118,14 @@
       ],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.session-routing",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the session-routing scenario of \"Open workspaces and sessions on the selected runtime\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.uncertain-mutation",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the uncertain-mutation scenario of \"Open workspaces and sessions on the selected runtime\"; nothing automated verifies it yet."
         }
       ]
     },
@@ -153,14 +153,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.view-lease",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the view-lease scenario of \"Open and close runtime views safely\"; nothing automated verifies it yet."
         },
         {
-          "kind": "gherkin",
+          "kind": "not-applicable",
           "id": "multi-host.view-directory-safety",
-          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+          "reason": "No browser journey exists yet for the view-directory-safety scenario of \"Open and close runtime views safely\"; nothing automated verifies it yet."
         }
       ]
     }
