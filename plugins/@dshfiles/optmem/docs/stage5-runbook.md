@@ -6,11 +6,12 @@ scratch profiles and may run real provider turns; never point it at the `web` pr
 
 Tools (in `plugins/@dshfiles/optmem/scripts/`):
 
-- `drive.mjs <out.json> <full|compat> <scenario.json>` — creates a throwaway `optmem-full` scratch profile (fork core +
-  ai-accounts + optmem), boots `dsh` on a free port, runs the scenario's conversations turn by turn through the dshx
-  platform client, writes per-turn evidence (`usage`, `request/messages-override` counts, tool calls) + host log, then
-  kills the host. Env: `REAL_HOME=1` (optional: host on the real `~/.dsh` instead of the isolated scratch home), `STOCK=1` (stock core, no fork → compat only),
-  `PROVIDER/MODEL/EFFORT`.
+- `drive.mjs <out.json> <full|compat> <scenario.json>` — creates a throwaway `optmem-full` scratch profile
+  (request-messages + ai-accounts + optmem on stock DSH), boots `dsh` on a free port, runs the scenario's conversations
+  turn by turn through the dshx platform client, writes per-turn evidence (`usage`, full-mode override counts parsed
+  from OptMem's `optmem: full-mode request` Host log lines, tool calls) + host log, then kills the host. Env:
+  `REAL_HOME=1` (optional: host on the real `~/.dsh` instead of the isolated scratch home), `STOCK=1` (no
+  request-messages bundle → compat only), `PROVIDER/MODEL/EFFORT`.
 - `summarize.mjs <run.json>…` — per-turn table + totals (input incl. cache, cache read %, output).
 - `read-log.mjs <session.v5.jsonl> [type-filter] [width]` — dump events of a session log.
 - Scenarios: `scenario-smoke.json` (2 turns), `scenario-long.json` (24-turn build-up with code, an obscure fact, a
@@ -22,7 +23,7 @@ Tools (in `plugins/@dshfiles/optmem/scripts/`):
 cd /Users/astahmer/dev/dshfiles
 fnm use 22.23.3
 pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir tooling/dshx --filter @dshfiles/dshx build
-pnpm --dir plugins/@dshfiles/dsh-core-runtime run build
+pnpm --dir plugins/@dshfiles/request-messages run build
 pnpm --dir plugins/@dshfiles/optmem run build
 pnpm --dir plugins/@dshfiles/ai-accounts run build
 ```
@@ -81,6 +82,9 @@ model `gpt-6-luna` for the 2.5 KB paste and long code answers, some level ≥1 n
 - [x] S2 done — runtime-evidence.md "Stage 5": 54 LLM nodes, levels 0–4, all ≤ 512 bytes
 
 ## S3 — record actual request bytes (small code change) — paste to an agent
+
+Historical: S3 targeted the since-removed core fork's `request/messages-override` session event. On stock DSH,
+`lastFullRequest` in OptMem's status and its Host log line carry `originalCount`, `sentCount` and `sentBytes`.
 
 > In /Users/astahmer/dev/dshfiles (jj, shared working copy — touch only these paths), extend the fork event
 > `request/messages-override` (tooling/dsh-core/session/src/types.ts + agent-loop/src/agent.ts where it is appended)

@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../')
 // Usage: node drive.mjs <out.json> <full|compat> <scenario.json>
-// Env: REAL_HOME=1 (host on the real ~/.dsh instead of the isolated scratch home), STOCK=1 (no fork),
+// Env: REAL_HOME=1 (host on the real ~/.dsh instead of the isolated scratch home), STOCK=1 (no request-messages: compat only),
 //      ACCOUNTS_FILE (default ~/.dsh/plugins/ai-accounts/accounts.json), PROVIDER/MODEL/EFFORT overrides.
 const out = process.argv[2]
 const compatMode = process.argv[3] === 'compat'
@@ -18,40 +18,23 @@ const { createScratchProfile, isolatedHostEnvironment, redactHostOutput } = awai
   pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/project/scratch-profile.js')).href
 )
 const { connectDshPlatformClient } = await import(pathToFileURL(resolve(repoRoot, 'tooling/dshx/packages/dshx/dist/platform/index.js')).href)
-const coreRoot = resolve(repoRoot, 'tooling/dsh-core')
-const corePackages = [
-  'api-session-controller',
-  'agent',
-  'agent-loop',
-  'session',
-  'session-persistence',
-  'session-persistence-jsonl',
-  'session-format-catalog',
-  'session-format-v4-to-v5',
-]
 const plugin = name => `link:${resolve(repoRoot, 'plugins/@dshfiles', name)}`
-// CORE=narrow swaps the five-row core bridge for the two-row agent-runtime bundle, which
-// replaces only the agent registry and the agent loop and leaves the session controller native.
-const narrowCore = process.env.CORE === 'narrow'
-const coreBundleId = narrowCore ? '@dshfiles/dsh-core-agent-loop' : '@dshfiles/dsh-core-runtime'
+const stock = process.env.STOCK === '1'
 const scratch = await createScratchProfile({
   profileName: 'optmem-full',
   sourceProfileRoot: resolve(homedir(), '.dsh/profiles/probe'),
   bundleIds: [
     '@deepseek-ai/dsh-base',
     '@deepseek-ai/dsh-web-app',
-    ...(process.env.STOCK === '1' ? [] : [coreBundleId]),
+    ...(stock ? [] : ['@dshfiles/request-messages']),
     '@dshfiles/ai-accounts',
     '@dshfiles/optmem',
   ],
   excludedDependencyPrefixes: ['@dshfiles/', '@mars-sea/', 'dshmarket', 'dsh-our-free-model'],
   extraDependencies: {
-    [coreBundleId]: plugin(coreBundleId.slice('@dshfiles/'.length)),
+    ...(stock ? {} : { '@dshfiles/request-messages': plugin('request-messages') }),
     '@dshfiles/ai-accounts': plugin('ai-accounts'),
     '@dshfiles/optmem': plugin('optmem'),
-    ...Object.fromEntries(
-      (process.env.STOCK === '1' || narrowCore ? [] : corePackages).map(name => [`@deepseek-ai/dsh-${name}`, `link:${resolve(coreRoot, name)}`]),
-    ),
   },
 })
 const log = (...parts) => process.stdout.write(`${parts.join(' ')}\n`)
@@ -65,14 +48,7 @@ await writeFile(
   inject:
     - webRuntime
     - webServer
-${
-  process.env.STOCK === '1' || narrowCore
-    ? ''
-    : `- id: dshfiles-core-runtime
-  config:
-    sessionPersistenceRoot: ${scratch.home}/sessions
-`
-}- id: agent-default-model
+- id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: ${provider}
@@ -118,7 +94,7 @@ const evidence = { home: scratch.home, mode: compatMode ? 'compat' : 'full', tur
 const finish = async code => {
   evidence.hostLog = redactHostOutput(output)
     .split('\n')
-    .filter(line => /optmem|did not activate|failed to import|dshfiles-core|error/i.test(line))
+    .filter(line => /optmem|request-messages|did not activate|failed to import|error/i.test(line))
     .slice(-200)
   await writeFile(out, JSON.stringify(evidence, null, 2))
   await writeFile(`${out}.host.log`, redactHostOutput(output))
@@ -138,6 +114,7 @@ try {
   const events = async id => (await platform.sessions.history(id)).records.map(record => record.event ?? record)
   const turn = async (id, text) => {
     const before = (await events(id)).filter(event => event.type === 'turn/end').length
+    const logStart = output.length
     await platform.sessions.prompt(id, text, 'queue')
     const expires = Date.now() + 240_000
     while (Date.now() < expires) {
@@ -152,7 +129,13 @@ try {
           prompt: text,
           turn: turnNumber,
           end: ends.at(-1).data.reason,
-          overrides: all.filter(event => event.type === 'request/messages-override' && event.data.turn === turnNumber).map(event => event.data),
+          // OptMem logs each full-mode override; nothing reaches the session log.
+          overrides: output
+            .slice(logStart)
+            .split('\n')
+            .filter(line => line.includes('optmem: full-mode request {'))
+            .map(line => JSON.parse(line.slice(line.indexOf('{'), line.lastIndexOf('}') + 1)))
+            .filter(request => request.conversationId === id && request.turn === turnNumber),
           assistant: mine
             .filter(event => event.type === 'assistant/message')
             .map(event => ({

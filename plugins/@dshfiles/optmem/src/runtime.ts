@@ -515,7 +515,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
         pendingCount: snapshot?.pendingCount ?? lastFullRequest?.pendingCount ?? 0,
         reusedView,
       }
-      logger.info('optmem: full-mode request %o', lastFullRequest)
+      logger.info('optmem: full-mode request %s', JSON.stringify(lastFullRequest))
       return sent
     } catch (error) {
       if (input.signal.aborted) throw error
