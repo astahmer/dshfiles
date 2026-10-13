@@ -3,7 +3,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
 import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client/contracts'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStore } from '@deepseek-ai/dsh-session'
 import { slotContributionParts } from '../src/client/define.js'
 import { localeDefinitionParts } from '../src/client/locale.js'
