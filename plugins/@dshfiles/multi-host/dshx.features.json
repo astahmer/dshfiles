@@ -24,12 +24,12 @@
         {
           "kind": "not-applicable",
           "id": "multi-host.identity-profile",
-          "reason": "No browser journey exists yet for the identity-profile scenario of \"Register and identify local DSH runtimes\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         },
         {
           "kind": "not-applicable",
           "id": "multi-host.directory-safety",
-          "reason": "No browser journey exists yet for the directory-safety scenario of \"Register and identify local DSH runtimes\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         }
       ]
     },
@@ -55,12 +55,12 @@
         {
           "kind": "not-applicable",
           "id": "multi-host.ssh-connect",
-          "reason": "No browser journey exists yet for the ssh-connect scenario of \"Connect to an SSH-managed runtime\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         },
         {
           "kind": "not-applicable",
           "id": "multi-host.ssh-identity-profile",
-          "reason": "No browser journey exists yet for the ssh-identity-profile scenario of \"Connect to an SSH-managed runtime\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         }
       ]
     },
@@ -86,12 +86,12 @@
         {
           "kind": "not-applicable",
           "id": "multi-host.session-routing",
-          "reason": "No browser journey exists yet for the session-routing scenario of \"Open workspaces and sessions on the selected runtime\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         },
         {
           "kind": "not-applicable",
           "id": "multi-host.uncertain-mutation",
-          "reason": "No browser journey exists yet for the uncertain-mutation scenario of \"Open workspaces and sessions on the selected runtime\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         }
       ]
     },
@@ -108,12 +108,12 @@
         {
           "kind": "not-applicable",
           "id": "multi-host.view-lease",
-          "reason": "No browser journey exists yet for the view-lease scenario of \"Open and close runtime views safely\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         },
         {
           "kind": "not-applicable",
           "id": "multi-host.view-directory-safety",
-          "reason": "No browser journey exists yet for the view-directory-safety scenario of \"Open and close runtime views safely\"; nothing automated verifies it yet."
+          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
         }
       ]
     }
