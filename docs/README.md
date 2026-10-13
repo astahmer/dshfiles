@@ -5,6 +5,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | Document | Purpose |
 |---|---|
 | [`profile-installs.md`](profile-installs.md) | Local profile installs, pnpm behavior, peer dependencies, and composition. |
+| [`e2e-testing.md`](e2e-testing.md) | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence. |
 | [`scripts/README.md`](../scripts/README.md) | Repository-level scripts and their owning workflows. |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).
