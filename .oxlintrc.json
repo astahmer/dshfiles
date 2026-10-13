@@ -45,7 +45,8 @@
     {
       "files": [
         "tooling/dshx/packages/dshx/src/client/env.ts",
-        "tooling/dshx/packages/dshx/client/env.d.ts"
+        "tooling/dshx/packages/dshx/client/env.d.ts",
+        "tooling/dshx/packages/dshx/client/index.d.ts"
       ],
       "rules": {
         "typescript/triple-slash-reference": "off"

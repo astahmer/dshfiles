@@ -7,7 +7,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-u
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { ManagerSnapshot } from './api.js'
 import { endpointKey, filterProviders } from './catalog.js'
 import type { McpServersTranslate } from './locales.js'

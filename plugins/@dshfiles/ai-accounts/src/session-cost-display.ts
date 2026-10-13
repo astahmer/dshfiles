@@ -137,10 +137,10 @@ export class SessionCostDisplay {
   }
 
   private dialogPairs(host: HTMLDListElement): DialogPair[] {
-    const terms = host.querySelectorAll<HTMLElement>(':scope > dt')
+    const termCount = host.querySelectorAll<HTMLElement>(':scope > dt').length
     const details = host.querySelectorAll<HTMLElement>(':scope > dd')
     const pairs: DialogPair[] = []
-    for (const [index, term] of Array.from(terms).entries()) {
+    for (let index = 0; index < termCount; index++) {
       const detail = details.item(index)
       if (detail !== null) pairs.push({ detail })
     }

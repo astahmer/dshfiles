@@ -27,7 +27,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale, MarketplaceSort } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
 import { marketplaceLocale, type MarketplaceLocaleKey } from './locales.js'

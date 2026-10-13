@@ -551,7 +551,7 @@ const hostApi = mcpServersApi.host({
     await runtimes.get(currentContext(ctx))?.reconcile()
     return currentSnapshot(ctx)
   },
-  searchRegistry: async ({ ctx, input }) => {
+  searchRegistry: async ({ input }) => {
     if (!settingsFor().registrySearch) throw new Error('Public MCP Registry search is turned off in Settings.')
     return searchOfficialRegistry(input.query)
   },
