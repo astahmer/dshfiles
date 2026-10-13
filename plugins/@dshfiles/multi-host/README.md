@@ -116,5 +116,7 @@ title}` for threads started here, so the sidebar and view can list them.
 `pnpm build`, `pnpm test`, `pnpm typecheck` from this package. The live SSH
 suite runs when `MULTI_HOST_SSH_TARGET` and `MULTI_HOST_SSH_HOME` point at a
 host running DSH with this plugin. Runtime evidence is in
-[docs/validation.md](docs/validation.md); the federation research is in
+[docs/validation.md](docs/validation.md); why runtimes are federated rather
+than proxied, and the rules that follow, are in [docs/design.md](docs/design.md).
+Durable supervision of a remote host is still open:
 [plans/multi-host](../../../plans/multi-host/README.md).
