@@ -12,14 +12,14 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "sidebar-commands.panel-navigation",
-          "reason": "No browser journey exists yet for the panel-navigation scenario of \"Navigate to registered panels\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/sidebar-commands.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "sidebar-commands.stale-target",
-          "reason": "No browser journey exists yet for the stale-target scenario of \"Navigate to registered panels\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/sidebar-commands.feature"
         },
         {
           "kind": "unit-test",
@@ -52,9 +52,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "sidebar-commands.recent-sessions",
-          "reason": "No browser journey exists yet for the recent-sessions scenario of \"Navigate to a recent session\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/sidebar-commands.feature"
         },
         {
           "kind": "unit-test",
@@ -93,9 +93,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "sidebar-commands.palette-capability",
-          "reason": "No browser journey exists yet for the palette-capability scenario of \"Expose thread-sidebar actions when supported\"; only the unit tests listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/sidebar-commands.feature"
         },
         {
           "kind": "unit-test",
