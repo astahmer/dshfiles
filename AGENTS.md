@@ -1,7 +1,8 @@
 # dshfiles
 
 Personal DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
-plugins we own.
+plugins we own. The repository runs on stock DSH 0.2.0-rc.2; it carries no
+core patches.
 
 ## Skills
 
@@ -10,304 +11,72 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `plugin-ui` — any plugin UI or styling; adding shadcn components to the kit.
 - `plugin-state` — Query / Form / xstate / localStorage in plugin clients.
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
-- `jj-shared-workspace` — committing, conflicts, and long runs in the shared `@`.
 
-## What this repo is for
+## Adopt, port, or build
 
-Two kinds of work live here, and the distinction matters:
+- **Adopt** a plugin from [dshmarket.com](https://dshmarket.com) whenever one
+  covers the need — a maintained community plugin beats a thin one we maintain.
+- **Port** when an existing project already does the hard part: keep its
+  license and provenance, vendor the code here, and name the result for what it
+  does here. `../bb-plugins` is a source of behavior and working code, not a
+  spec; reimplement against the DSH API.
+- **Build with dshx** when a port would carry more debt than the feature is
+  worth.
 
-- **Adopting** a plugin that already exists on [dshmarket.com](https://dshmarket.com)
-  (4412 plugins, 23 categories). Preferred whenever something already covers the
-  need — a maintained community plugin beats a thin one we maintain.
-- **Owning** a plugin that does not exist anywhere. Justified when a capability
-  is genuinely unclaimed, not merely inconvenient to find.
+Say which option you chose and why. Two rules keep the choice honest:
 
-Reference material we have ported from lives in `../bb-plugins`. It is a
-**source of ideas and working code, not a spec** — DSH has different APIs,
-different boundaries, and a different plugin model. Do not assume that project's
-architecture carries over, and do not carry its product names into ours: our
-plugins are named for what they do here. Read its `README.md` for the
-_behavior_ worth keeping, then reimplement against the DSH API.
+- **Verify against the installed runtime, not the README.** Read a plugin's peer
+  ranges against our DSH version, resolve the imports it uses, and read the
+  Service contract it calls.
+- **Check the Host can do it before building UI.** If a Service has no such
+  method, a plugin cannot add one; record it in `plans/dsh-host-gaps.md` instead
+  of faking it client-side.
 
-### When no plugin covers the need
-
-Adopting is the default, not a mandate. When the survey finds nothing that
-covers what we actually want, do not stall, and do not settle for a plugin
-that covers part of it. Pick one of these three and say which:
-
-1. **Adopt anyway** — good enough, or the gap is cosmetic.
-2. **Fork or port** — an existing project already does the hard part. Preserve
-   its license and source provenance, then vendor the code inside this repo.
-   Keep an upstream remote only when ongoing sync is an explicit goal. A hard
-   fork has no remote dependency, remote bookmark, fetch, or rebase workflow.
-3. **Build it with dshx** — from scratch, when a fork would carry more debt
-   than the feature is worth.
-
-Two rules make the choice cheap to revisit:
-
-- **Verify against the installed runtime, not the README.** A plugin's claims
-  are not evidence. Read its peer ranges against our DSH version, resolve the
-  imports it actually uses, and read the Service contract it calls. Peer ranges
-  are usually honest: a plugin capped below our version is a real signal.
-- **Check whether the Host can do it at all before building UI for it.** Read
-  the Service and Event contracts first. If the seam has no such method — no
-  `reorder`, no `remove` — a plugin cannot add one, and the honest answer is a
-  Host change, not a clever client-side fake. Say so instead of shipping
-  something that mutates durable state to work around it.
-
-Report which option you chose and why. A fork nobody asked for is a liability;
-a workaround nobody flagged is worse.
-
-Do not stop at "dshx cannot express this". When the same wall shows up in one
-plugin, it is a missing abstraction rather than a one-off, so fix it in the
-toolchain first and let the plugin become ordinary: a change that removes a type
-cast, a hand-restated interface, or a workaround from every future plugin belongs
-in dshx. Reach for that before writing the second workaround. Keep it narrow — an
-abstraction that serves one caller is not one — and say which plugin forced it, so
-the next reader knows it was earned.
-
-A workaround is also a bug report about the toolchain. Two we shipped here were
-caused by dshx gaps and were invisible until the second one hurt: a declaration a
-UI plugin had to restate, and a `@deepseek-ai/*` dependency that resolves a second
-copy and fails only at boot. Both are now dshx's to refuse. When you catch
-yourself reaching for `as unknown as`, a local `declare module`, or a duplicated
-interface, ask which layer should own it before shipping the escape hatch.
+When dshx cannot express something a plugin needs, fix dshx rather than
+shipping a workaround: an `as unknown as`, a local `declare module`, or a
+restated interface is a toolchain bug report. Keep such abstractions narrow and
+name the plugin that forced them.
 
 ## Never restart the running DSH instance
 
-The web profile runs on `127.0.0.1:3080` and the user is almost always using it,
-often with other agents mid-turn. Never `kill` it, and never restart it to pick
-up a plugin change: a restart drops every in-flight turn and can kill sessions
-other agents are actively working in. Reloading the live instance is the user's
-decision.
-
-Verify a change on a **second instance on another port** instead:
-
-```sh
-dsh web --port 3199 --no-open
-```
-
-Give it a scratch `DSH_HOME` when the change touches stored state (accounts,
-usage history, plugins), so the second instance cannot rewrite the real one:
+The `web` profile runs on `127.0.0.1:3080`, usually with other agents mid-turn.
+Never kill or restart it; reloading it is the user's decision. Verify on a
+second instance instead, with a scratch `DSH_HOME` when the change touches
+stored state:
 
 ```sh
 DSH_HOME=/private/tmp/dsh-verify dsh web --port 3199 --no-open
 ```
 
-Report what the second instance shows, then let the user decide when to restart
-the real one. Test against the running application — but never by restarting it.
+Report what the second instance shows and let the user decide when to restart.
 
-## Never delete source while a build is serving
+A plugin's `dist/` keeps serving after its sources are gone, so a deleted source
+file looks harmless until the next rebuild. Confirm nothing serves a file before
+removing it; `jj file show -r <change> <path>` restores one from any revision.
 
-A plugin's `dist/` keeps working after its sources are gone, so deleting a file
-under a running build looks like a no-op until the next rebuild — which is how a
-whole plugin can be missing for hours while the served bundle still answers.
+## Version control
 
-Before removing a source file: confirm it is tracked, and confirm nothing serves
-it. When recovering, `jj file show -r <change> <path>` restores a file from any
-revision, which is faster and safer than rewriting it. Verify the build afterwards
-by importing the built entry, not by looking at it.
+This is a [Jujutsu](https://jj-vcs.github.io) repository colocated with git.
+Work lands on `main`; never `jj git push` without asking.
 
-## Git
-
-This is a [Jujutsu](https://jj-vcs.github.io) repo, colocated with git.
-
-- `jj status` before starting; `jj diff` to review; `jj describe` then `jj new`
-  for a change only when `@` holds nothing but your work. Never `git`-only commands, never `jj git push` without asking.
-- The working copy is always a commit — there is no separate staging area.
-- Shared checkout: if another agent's files are in `jj status`, they are not
-  yours. Commit only your own paths with `jj split -m "…" <paths>` (one
-  described revision per logical change, `Co-Authored-By` trailer); check
-  `jj log -r 'conflicts()'` after rebases. Skill: `jj-shared-workspace`.
-- **`@` is not always a head.** Run `jj log -r @` before editing files here: when
-  the checkout's working copy sits mid-history, writing any file amends that
-  revision and rebases its whole subtree under every other agent. Move `@` to the
-  tip first, or do the file work in a scratch `jj workspace add`. The `default`
-  checkout is folded exactly this way: its `@` sits on a duplicate side line
-  whose uncommitted work is already durable in the commit, so consolidate from a
-  fresh named workspace based on a frozen spine commit — never by rewriting
-  `default`'s `@` or rebasing it onto `main`.
-- **Never rewrite a revision another workspace holds as its `@`.** Describing,
-  squashing or abandoning it races that workspace's snapshot and leaves a
-  divergent copy of the same change (same change-id, second commit-id); that is
-  how this repo's spine once forked into three chains. Name only revisions you
-  created, and ask the owner otherwise.
-- **History-shape requests are jj surgery.** "Unify the history", "one branch",
-  "spine branch", "linear history", "too many heads": load `jj-shared-workspace`
-  (and the base `jj` skill) before touching anything, and expect the whole store
-  to be rewritten.
-- Pass `-m` to `jj describe` and `jj squash`, or `--use-destination-message` to
-  `jj squash`. A bare `jj squash` opens an editor and hangs the agent shell.
-- When finishing work in a named workspace, try to integrate its described
-  change into the latest relevant branch tip so other workspaces can build on
-  it. Preserve active writers; if integration risks rewriting unrelated work or
-  causing unresolved conflicts, keep the source revision intact and report the
-  exact integration handoff instead of silently leaving it stranded.
-- Long runs: commit and tick the plan's checkboxes after each milestone, and
-  keep a `plans/<topic>/README.md` progress table with a "Resume here" line.
-- A plan is a working document, not a record. The moment its acceptance work
-  lands, migrate its durable behavior, decisions, and evidence into the owning
-  package or toolchain doc, delete the plan and its resume-only notes, and add or
-  remove its row in `plans/README.md` — in the same revision that lands the work.
-  A plan that outlives the work it describes is a second source of truth and goes
-  stale silently.
-
-### Threads and JJ workspaces
-
-- This repository uses one shared JJ store. Parallel checkouts created with
-  `jj workspace add` may sit beside the repository directory; they are still
-  linked and versioned when `jj workspace list` shows them.
-- For independent code work, create a named workspace from this repository,
-  based on the intended local revision — normally the current spine tip:
-
-  ```sh
-  jj workspace add /Users/astahmer/dev/dshfiles-<topic> --name <topic> -r integration-spine
-  ```
-
-- **The canonical spine is one line; the workspaces around it are a fan.** `main`
-  and `integration-spine` point at the same tip, and every active workspace `@`
-  sits _off_ that tip as its own leaf. Branch off the tip; never stack one
-  workspace's `@` on another's. A second head is only a problem when it is a
-  _duplicate_ — the same change id twice — which is folded with
-  `jj rebase -r <stray-head> -d <tip>` plus abandoning the copy. Independent
-  leaves are the design, not a defect to unify.
-
-- **A workspace `@` is a leaf, never a link in the line.** Two agents rewriting
-  one change at once makes jj record a divergent change, and the next command in
-  the owning workspace merges it and checks out the sibling copy — deleting the
-  files that only the losing copy snapshotted (`Updated working copy to fresh
-commit`). Measured 20/20. The rules that remove the race:
-  - Base every workspace on a full commit id or on `integration-spine`, never on
-    `@`, `@-`, a change id, or another workspace's `@`. Never `jj workspace add`
-    without `-r`.
-  - Never fold a workspace `@` into the shared line: it must have no
-    descendants, and must not be an ancestor of `main` or a parent of another
-    workspace's `@`.
-  - Never rewrite a revision another workspace holds as `@` — including by
-    `describe -r`, `split -r`, `squash --into`, `rebase -s`, `abandon`, or
-    `restore --changes-in`. The guard refuses these; the override is for
-    authorized consolidations only.
-  - `jj log` therefore shows one head per workspace. That fan is deliberate: it
-    is what stops another agent's command from rebasing your working copy.
-  - Reads that monitor rather than edit pass `--ignore-working-copy`. Any jj
-    command without it snapshots its `cwd`, so a panel, a coordinator, or a
-    script becomes a second writer racing the agent that owns that workspace.
-  - `scripts/jj-isolation/` enforces this at the `jj` boundary; see
-    `docs/jj/concurrent-workspace-isolation.md`.
-
-- **Exclusive writer ownership and serialized integration** are implemented in
-  `plugins/@dshfiles/jj-integration`; `docs/ade/thread-workspace-isolation.md` is
-  the status page.
-  - A workspace this plugin provisioned for one thread (`isolated: true` in its
-    registry) has exactly **one writer**. The lease is durable
-    (`writerEpoch`/`writerLease`), and it is enforced on the core
-    `tools/pre-execute` waterfall: a Session whose cwd is a workspace it does not
-    own is refused **before the tool body runs**, and a check that cannot
-    complete denies. A discovered workspace is never migrated into this.
-  - Other sessions may be **observers**: they may run the read-only tools in
-    `ownership.readOnlyTools` and nothing else.
-  - A **structured write** (`write`, `edit`) whose absolute target resolves
-    inside another isolated workspace is refused at the same boundary with the
-    foreign workspace named. This is a cwd and tool-argument guard, **not** an OS
-    sandbox: a `bash` command can still write anywhere the process can, because
-    what a shell string writes is not a structured path. Never describe a thread
-    as filesystem-isolated.
-  - Workspace isolation and integration are configurable in the Host settings UI
-    under the `jj-integration` namespace (`workspaceIsolationMode`,
-    `integrationMode`), with every other option beside them. Integration mode
-    applies to the running service; isolation mode is read per Session, so a
-    change affects the next thread and never a running one.
-  - A lease quiet for `ownership.staleAfterSeconds` (default 900) is reclaimed by
-    the next caller and its holder is **fenced**: the epoch moved, so its writes
-    are denied (`writer-fenced`) while its reads continue. Transferring a live
-    lease needs `acknowledgeStopped`; the previous writer becomes an observer.
-    If a transfer cannot be shown safe, block it — do not force it.
-  - Integration is separate and serialized: one canonical spine writer at a time,
-    contract-checked in a dedicated staging workspace, spine advanced only after
-    validation succeeds. `integration.mode: off` refuses submit, run, and retry
-    in the service itself; a workspace the guard records as unavailable is
-    refused at submit and blocks at run **without moving the spine**.
-  - **Automation is configurable, safety is not.** `workspaceIsolation.mode` and
-    `integration.mode` are each `auto | manual | off` (defaults `auto` and
-    `manual`). Turning integration off leaves ownership enforcement and the jj
-    guard exactly as they were; disabling automation never disables a guard.
-- Before editing code in another repository, inspect its `jj root` and
-  `jj git remote list`. `jj workspace list` is scoped to one JJ store. DSH core
-  changes under `packages/**` belong in the canonical
-  `deepseek-ai/deepseek-harness` checkout (origin:
-  `https://github.com/deepseek-ai/deepseek-harness.git`); create a named
-  workspace in that existing store, not an ad-hoc clone, and record its root
-  and workspace path in the handoff.
-- Before editing, verify `jj root`, `jj status`, and `jj workspace list` from
-  that path. Record the thread ID, workspace name, and absolute path in the
-  task handoff. Do not use an ad-hoc copy or a T3-generated project directory
-  as a code checkout.
-- Create the JJ workspace before launching an independent top-level thread.
-  Keep the thread in this dshfiles project (`workspaceStrategy: { type: "root" }`)
-  and put the workspace name and absolute path in its task message. T3's
-  `existing_worktree` strategy is Git-worktree-oriented; do not pass it a JJ
-  workspace path unless `t3_worktree_status` confirms that exact path and
-  `jj root` confirms it belongs to this shared JJ repository. Do not use a
-  scratch thread or an unlinked project directory for repository code.
-- Run every edit and JJ command from the named workspace path. T3 metadata does
-  not record a plain JJ workspace, so record the thread ID, JJ workspace
-  name, and absolute path in the task handoff, then verify `jj root`,
-  `jj status`, and `jj workspace list` from that path before editing. Treat
-  `branch: null` / `worktreePath: null` in T3 metadata as unbound, not as proof
-  that the thread inherited a sibling workspace. If using a T3-managed Git
-  worktree, first verify with JJ that it shares this repository.
-- If a still-active task's named workspace has been forgotten, preserve its old
-  directory and shared operation history; do not roll back the forget operation
-  or try to add a workspace over a non-empty directory. Inspect `jj op log` /
-  `jj op show` and the shared spine, then create a fresh linked workspace at a
-  new path from the latest relevant clean spine revision that contains the
-  needed shared work (do not blindly choose `main` if the spine is ahead).
-  `jj workspace add` must materialize the checkout; omit `--ignore-working-copy`.
-  When this is a safe continuation, recover without asking the user to choose a
-  workspace path. Compare the new tree with the old task's owned revisions and
-  restore only missing owned changes; preserve sibling work and report both
-  paths and the selected base revision.
-- Keep active source workspaces untouched during consolidation. Duplicate a
-  fixed revision snapshot into an integration workspace, rebase that copy onto
-  `main`, and retain the source workspace until tree equality and status prove
-  it safe to forget.
-- A workspace `@` is its own leaf commit, so parked workspaces accumulate as
-  extra heads. `pnpm run jj:workspaces` prints the board — every workspace's
-  commit, whether it is on the spine, ahead of it or off-spine, plus conflicts
-  and empty slots. `pnpm run jj:sweep` dry-runs the stale ones through `jjw`
-  (every read passes `--ignore-working-copy`, so a dry run writes nothing);
-  `--apply --prove-clean` forgets only workspaces whose directory jjw actually
-  inspected and found clean (their directories stay on disk, and a recovery
-  record is printed), and `--abandon-empty` also drops their now-orphan slot.
-  Never sweep a workspace whose work has not landed, and never infer safety from
-  an idle session or from an empty `@`: `target.empty()` says nothing about the
-  files on disk.
-- History churn leaves abandoned revisions reachable from the operation log
-  until garbage collection. `jj util gc` reclaims them, but that removes the
-  op-log recovery path permanently — run it only once no rollback is still
-  wanted, and never `jj op restore` a shared store to clean up. Recover a
-  divergent change with `jj new <kept-commit>` inside its owner
-  (`pnpm run jj:isolation:recover` lists them non-destructively).
-
-### Integration closeout
-
-For a repository integration or history-consolidation task, record completed work,
-remaining acceptance gates, source revisions, tree-preservation proof, and the
-recovery operation in a focused, current closeout document. Preserve active
-writers and unrelated refs. Do not create permanent bookmarks for every attempted
-rewrite. Validation failures remain explicit; history cleanup does not imply
-release or live-profile acceptance.
-
-Classify the source working copies before transplanting: a file that is
-byte-identical to the target is already represented, not unique work, and a
-duplicate side line with the same descriptions and different change ids is a
-rebased equivalent. Transplant only verified-unique changes into the staging
-workspace, in separately described revisions. If combining a unique change
-regresses another package, do not force it onto the line: preserve its source
-workspace and leave it off the spine. A green test suite is never permission for
-an unsafe production history operation — it is not authorization to rewrite a
-live ancestor, advance a bookmark over an unreviewed leaf, or restart a Host
-that holds live sessions.
+- Do parallel work in your own workspace, never in someone else's checkout:
+  `jj workspace add ../dshfiles-<topic> --name <topic> -r main`, or a thread
+  workspace created by `@dshfiles/jj-integration` (see its
+  [README](plugins/@dshfiles/jj-integration/README.md); **Land** rebases it
+  onto `main`).
+- One described revision per logical change: Conventional Commit title, a body
+  that says why, and the `Co-Authored-By` trailer. `jj describe -m …`, then
+  `jj new` before the next change.
+- Never rewrite a revision another workspace holds as its `@` (describe,
+  squash, rebase, abandon): it leaves a divergent copy of the change. Touch
+  only revisions you created.
+- Always pass `-m` to `jj describe` and `jj squash` (or
+  `--use-destination-message`); a bare command opens an editor and hangs.
+- Check `jj log -r 'conflicts()'` after a rebase.
+- Long runs: keep a `plans/<topic>/README.md` progress table with a "Resume
+  here" line and commit after each milestone. When the work lands, move its
+  durable behavior into the package docs and delete the plan in the same
+  revision (see `plans/README.md`).
 
 ## Environment
 
@@ -316,344 +85,135 @@ Node comes from **fnm**, pinned by `.node-version`, not from Nix.
 ```sh
 nix develop      # or: direnv allow
 node -v          # must print the .node-version value
-dsh web
 ```
 
-**`dsh` must run on the official Node build.** Nix's `nodejs` package fails at
-boot with `node-addon-require-builtin unsupported: Unsupported/no-getter`
-because DSH's native loader probe cannot find its internal getter on the Nix
-build. `mkShell` puts `~/.nix-profile/bin` ahead of fnm's directory in `PATH`,
-so the `shellHook` strips that entry and re-prepends `FNM_DIR/bin`. If `node -v`
-prints a Nix version, the shell is misconfigured — stop and fix it before
-debugging anything else.
+`dsh` must run on the official Node build: Nix's `nodejs` fails at boot with
+`node-addon-require-builtin unsupported`. The dev shell strips
+`~/.nix-profile/bin` from `PATH` and puts fnm first; if `node -v` prints a Nix
+version, fix the shell before debugging anything else.
 
-## Installing plugins
+## Profiles
 
 Profiles live in `~/.dsh/profiles/<name>/`. Registry packages go through
 `dsh plugin --profile <name> add <package>`; owned bundles go through
 `pnpm profile:sync --profile <name>`, because `pnpm add <path>` cannot express a
-local bundle. `docs/profile-installs.md` has the pnpm and peer-dependency traps
-behind that rule; read it before touching a profile manifest.
+local bundle. Read [`docs/profile-installs.md`](docs/profile-installs.md)
+before touching a profile manifest.
 
-The checked-in web profile seed lives in `profiles/web/`. Home Manager reads
-it from `$HOME/dev/dshfiles/profiles/web` and seeds missing files into the
-writable `~/.dsh/profiles/web/` profile. On apply, it reconciles the plugin
-dependencies and marked Cordis region. Active DSH files remain writable;
-runtime edits outside that marked region stay local to the profile.
+The checked-in seed is `profiles/web/`. Home Manager seeds missing files into
+the writable `~/.dsh/profiles/web/` and reconciles the plugin dependencies and
+the marked Cordis region on apply; edits outside that region stay local.
 
-### Experiment in a scratch profile, promote on evidence
-
-Do not register a plugin in `~/.dsh/profiles/web/` to try it out. The `web`
-profile is the one every session runs; an experiment that boots badly, changes
-tool behavior, or turns out not to be worth it then has already contaminated the
-setup you actually use.
-
-`~/.dsh/profiles/probe/` exists for this and is deliberately **not** Nix-managed,
-so nothing in the Nix setup can pull an experiment back in. It has its own
-`node_modules` and its own port lifecycle.
-
-When the full `probe` composition has unrelated activation failures, isolate the
-target instead of treating those failures as the plugin's result. Prefer the
-dshx E2E `bootPluginProfile('@dshfiles/<name>')` fixture: it creates a
-disposable DSH home/profile with the base web bundles, required non-owned
-dependencies, and the selected owned bundle, runs it on a free port, then removes
-the scratch home. For manual runtime checks, use a fresh `DSH_HOME` under
-`/private/tmp` and a minimal dedicated profile so account, usage, and plugin data
-cannot touch real profiles. Check boot output and exercise the user-facing
-behavior in a browser; build/import checks alone do not prove the plugin works.
+Experiment in `probe` (or a disposable profile), never in `web`. `probe` is not
+Nix-managed, has its own `node_modules`, and gets its own port:
 
 ```sh
-# 1. write the plugin in this repo, under plugins/@dshfiles/<name>/
-# 2. verify it without touching web
 pnpm profile:sync --profile probe
 fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
-# 3. benchmark against the default it claims to beat
 pnpm --dir plugins/@dshfiles/<name> test
-# 4. only once it earns its place
-pnpm profile:sync --profile web
+pnpm profile:sync --profile web --bundle @dshfiles/<name>   # only once it earns its place
 ```
 
-`dsh web` binds `127.0.0.1:3080` **once per profile**, so `web` and `probe` can
-run side by side — the second boot gets its own port and its own tokenized URL.
-`profile:boot` stops the server it starts.
+When `probe` has unrelated activation failures, isolate the target with the
+dshx E2E `bootPluginProfile('@dshfiles/<name>')` fixture, which boots a
+disposable home with the base web bundles plus the selected bundle. Promote on
+measured evidence; remove abandoned experiments from every profile they reached.
 
-Promote on measured evidence, not on the idea sounding right. A plugin that
-cannot state the number it improves is not ready for `web`. When the experiment
-is abandoned, remove it from `probe` — and if it was ever added to `web`, remove
-it from there too.
+## Writing plugins
 
-## Writing our own plugins
-
-New plugins use our dshx fork (TypeScript, React, Vite). From the repository
-root, after building it:
+New plugins use our dshx hard fork at `tooling/dshx` (`@dshfiles/dshx`;
+provenance in [`FORK.md`](tooling/dshx/FORK.md)). It has no upstream remote and
+must not install `@becomeopc/dshx` from a registry. Build it, then scaffold:
 
 ```sh
+pnpm --dir tooling/dshx install --frozen-lockfile
+pnpm --dir tooling/dshx --filter create-dshx build
+pnpm --dir tooling/dshx --filter @dshfiles/dshx build
 node tooling/dshx/packages/dshx/dist/cli/bin.js create plugins/@dshfiles/my-plugin
-cd plugins/@dshfiles/my-plugin
-pnpm dev                              # client HMR + host auto-restart
-dshx inspect slots --root sidebar     # read the live composition
+dshx inspect slots --root sidebar     # read the live composition instead of guessing
 ```
 
-Its typed surface is a strong default, not a guarantee. Its most reliable value
-is `dshx inspect` — read the real runtime instead of guessing whether a slot or
-service exists. Every plugin joins the workspace contract
-(`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
-`typecheck` scripts, `strict` and `noUncheckedIndexedAccess`. Every plugin must
-also have at least one meaningful end-to-end journey that verifies its
-user-visible behavior in the running DSH client; unit tests and successful
-builds do not replace E2E coverage.
+Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
+[compatibility](tooling/dshx/docs/compatibility.md) (check before assuming a
+0.1 API exists).
+
+- Every plugin joins the workspace contract
+  (`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
+  `typecheck` scripts, `strict` and `noUncheckedIndexedAccess`. Every plugin
+  also needs at least one end-to-end journey in the running client.
+- Owned plugins are Cordis bundles: `cordis.patch.yml` inserts the package row,
+  `dist/index.js` is the Host half, `dist/client.js` the browser half.
+- Loader row ids share one namespace per profile: keep the scope in the id
+  (`@dshfiles/shortcuts` → `dshfiles-shortcuts`). `defineSettings.namespace`
+  must equal that row id, and one Host entry cannot declare both native
+  `Config` and dshx `settings`.
+- A plugin and dshx must resolve **one** `@deepseek-ai/cordis` (including
+  `cordis-plugin-include` and `cordis-plugin-loader`). Two copies make
+  `declare module` augmentations land on the wrong `Events`. The versions are
+  pinned in `plugins/pnpm-workspace.yaml` with `dedupePeerDependents: true`.
 
 ### Plugin UI and state
 
-Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4), not hand-rolled
-components or local Tailwind setups. Skills `plugin-ui` and `plugin-state` hold
-the details; the rules that break things silently:
+Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
+`plugin-ui` and `plugin-state` hold the details. The rules that break silently:
 
-- Every utility is `dshx:`-prefixed, written as a complete static string, merged
-  with `cn`; `dshx-root` on each surface root; semantic colors only.
+- Every utility is `dshx:`-prefixed, a complete static string, merged with
+  `cn`; `dshx-root` on each surface root; semantic colors only.
 - After **any** class change in **any** plugin, rebuild every plugin that
-  depends on plugin-ui, or the shared stylesheet stops deduping and variants
-  get overridden.
+  depends on plugin-ui, or the shared stylesheet stops deduping.
 - Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
-  `/machine`, localStorage → `createStoredValue`. See
-  `plugins/@dshfiles/plugin-ui/README.md`.
+  `/machine`, localStorage → `createStoredValue`.
 - Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
   `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
 
-### We maintain a local dshx hard fork
-
-The complete source lives at `tooling/dshx`, inside this repository's single
-Jujutsu/Git boundary. It is a maintained hard fork for DSH 0.2 compatibility;
-the original package peer range did not claim DSH 0.2, and reimplementing its
-build and inspection tools would duplicate useful work.
-
-The fork is owned here as `@dshfiles/dshx`. It must not fetch or install
-`@becomeopc/dshx` from a registry, and it has **no upstream remote at all**.
-Upstream went quiet for about a month and did not support the DSH generation
-this profile runs, so waiting on it cost more than owning the divergence. Do not
-add an upstream remote or bookmark, fetch, or merge. `tooling/dshx/FORK.md`
-records the source baseline, license, and attribution. Do not add a nested
-`.jj`/`.git`; review DSH changes manually when the native contracts move.
-
-Plugins link the local path, so the CLI a plugin builds with is always this tree.
-
-```sh
-cd tooling/dshx
-pnpm install --frozen-lockfile
-pnpm --filter create-dshx build    # the CLI imports it, so it builds first
-pnpm --filter @dshfiles/dshx build
-```
-
-The fork's own documentation is the source of truth for what it does:
-`tooling/dshx/docs/sdk/getting-started.md` for the authoring API,
-`tooling/dshx/docs/compatibility.md` for what a DSH generation changed, and
-`tooling/dshx/FORK.md` for provenance. There is no separate plan for it here —
-a plan that outgrows the code it describes is a second source of truth, and it
-goes stale silently. Check `compatibility.md` before assuming a 0.1 API still
-exists.
-
-Two cordis copies are the failure mode that makes this look like a dshx bug. A
-`declare module` augmentation lands on the `Events` of the copy that is
-resolved, so a plugin and the toolchain typing it must share **one** cordis
-identity — including its `cordis-plugin-include` and `cordis-plugin-loader`
-versions, which are part of the identity. Verify with:
-
-```sh
-node -e "const{createRequire}=require('module');\
-const r=createRequire('$PWD/src/x.ts');\
-console.log(r.resolve('@deepseek-ai/cordis').split('.pnpm/')[1])"
-```
-
-If those disagree, pin the versions and add `dedupePeerDependents: true`.
-
-The same trap bites the other `@deepseek-ai/dsh-*` packages this checkout
-vendors. `@deepseek-ai/dsh-api-session-controller` must resolve to
-`tooling/dsh-core/api-session-controller` in **both** `plugins/` and
-`tooling/dshx/`: the published `0.2.0-rc.2` lags the checkout's client contract,
-and pinning it there fails the plugins typecheck with `Property 'attention' does
-not exist on type 'SessionSummary'` (or `updateAttention`, or the
-workspace-restore methods). Keep the `link:` overrides in
-`plugins/pnpm-workspace.yaml`, `plugins/@dshfiles/dsh-core-runtime/package.json`,
-`tooling/dshx/pnpm-workspace.yaml`, and `tooling/dshx/packages/dshx/package.json`
-in step, then regenerate both lockfiles with
-`pnpm --dir plugins install --no-frozen-lockfile` and the same in `tooling/dshx`.
-`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` from a frozen install is exactly this drift.
-
-Owned plugins are plain cordis bundles: a `cordis.patch.yml` that inserts the
-package row, `dist/index.js` for the host half, `dist/client.js` for the browser
-half. That part is stable regardless of which build tool produced it.
-
-Top-level Loader ids share one namespace across every bundle in a profile.
-Keep a package's scope in its inserted row id (`@dshfiles/shortcuts` becomes
-`dshfiles-shortcuts`); using only the package leaf can silently replace the
-profile's index for a native row. A dshx `defineSettings.namespace` must equal
-that row id, and one Host entry cannot declare both native `Config` and dshx
-`settings`. DSHX scaffolds preserve the scope, and profile
-inspection runs DSH's offline `--dump-config` composition check before plugin
-development or a runtime check so duplicate top-level ids fail before boot.
-Point an owned plugin's `dshx.config.ts` at `profile: 'vanilla'` when debugging
-it without the rest of the adopted plugin set.
-
-Creator mode (DSH's in-app plugin authoring preset) is not declared on this
-profile.
-
-### Vendored DSH core packages
-
-`tooling/dsh-core/*` are vendored copies of DSH core packages, not plugins.
-`tooling/dsh-core/api-session-controller/lib` is generated build output the
-checkout does not track; refresh it from the canonical DSH checkout with
-
-```sh
-DSH_SOURCE_ROOT=<canonical deepseek-harness checkout> pnpm run sync:core-api-session-controller
-```
-
-When a typecheck reports that `SessionListMetadata`, `SessionSummary`, or
-`ISessions` is missing a field that `tooling/dsh-core/*/src` defines
-(`lastTurnFailureAt`, `updateAttention`, the workspace-restore methods), the
-stale `lib/` is the cause — refresh it instead of editing plugin code. Editing
-the local `.d.ts` by hand only unblocks this checkout: the runtime bundle stays
-old, so the projection behind the field keeps reporting nothing until the real
-sync runs.
-
 ## Shell command batching
 
-The `bash` tool is **exclusive**: the scheduler serializes it against every other
-tool call, so N `bash` calls in one assistant turn run one after another. Only
-tools that declare `isConcurrencySafe` join a parallel group — currently `read`,
-`read_image`, `web_search`, `web_fetch`, `subagent`, and `subagent_fork`.
-`glob`, `grep`, `write`, and `edit` are **not** concurrency-safe; each falls back
-to the exclusive path.
+DSH's `bash` tool is exclusive: several `bash` calls in one turn run one after
+another. Chain independent shell reads in one call (`;` for independent, `&&`
+for dependent, `echo "---LABEL---"` between sections) and pipe noisy output
+through `head`/`tail` inside that call. Prefer `read` for single files; it runs
+concurrently.
 
-Independent shell reads belong in **one** call, chained:
-
-```sh
-# bad: 3 tool calls, each paying the exclusive barrier
-jj file show -r @ a.ts
-jj file show -r @ b.ts
-diff -u /tmp/base.a a.ts
-
-# good: 1 tool call, 1 process
-jj file show -r @ a.ts > /tmp/base.a && jj file show -r @ b.ts > /tmp/base.b
-diff -u /tmp/base.a a.ts; diff -u /tmp/base.b b.ts
-```
-
-- `;` separates independent commands, `&&` chains dependent ones.
-- Put `echo "---LABEL---"` between sections when output needs attribution.
-- Pipe noisy commands into `head`/`tail` **inside** the same call, never in a
-  second call.
-- Prefer `read` for single-file lookups: it is concurrency-safe and never hits
-  the barrier. `glob` and `grep` do not, so batch them inside one `bash` call
-  when you have several to run.
-- Reserve several `bash` calls for work that genuinely must be separate, and
-  accept the serialization.
-
-Measured over 37 sessions of this repo's own history: 93.8% of steps already
-issued a single tool call, and 66% of the multi-call steps that did contain bash
-were already gated by bash being the slowest call — so parallelizing bash is
-worth less than batching it.
-
-## Verifying anything
+## Verifying
 
 A plugin that installs is not a plugin that works.
 
 - **Read the boot output.** `dsh web` prints one line per entry that failed to
-  activate, plus the tokenized URL. That line is the whole signal — check it
-  every time.
-- `dsh web` binds `127.0.0.1:3080` and answers **401** to a bare `curl`. The
-  usable URL is the tokenized one it prints at startup. Never conclude a plugin
-  is broken from a 401 alone.
-- Startup failures that are fatal write a diagnostic under
-  `~/.dsh/logs/startup-*.log`. Non-fatal "did not activate" warnings do **not**
-  — they only appear on stdout. Capture stdout.
-- Only `http://127.0.0.1:3080` may be started once per profile. A stale process
-  holding the port produces `EADDRINUSE` and masks the real error; check
-  `lsof -nP -iTCP:3080 -sTCP:LISTEN` before debugging a boot failure.
-- Prefer `dsh --profile web --dump-config` over reading installed plugin source
-  to learn what a profile actually loads.
+  activate, plus the tokenized URL. Fatal failures also write
+  `~/.dsh/logs/startup-*.log`; "did not activate" warnings only go to stdout.
+- A bare `curl` gets **401**; use the tokenized URL. `EADDRINUSE` means a stale
+  process holds the port (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).
+- `dsh --profile web --dump-config` shows what a profile actually loads.
+- After every build, import-check the Host bundle with the DSH Node:
+  `fnm exec --using="$(cat .node-version)" node -e "import('./dist/index.js')"`.
 
-### Repository check baseline
+### Repository checks
 
-The gates that matter for a plugin change, run from `plugins/`:
-`pnpm run contract`, `pnpm run build`, `pnpm run typecheck`, `pnpm run test` —
-the same order `check:plugins` uses. All four pass on a healthy tree; run them
-on the merged tree after any history surgery, because a linearized history can
-join two variants of one change and still merge cleanly.
-
-The root `pnpm run check` additionally runs `lint` and `fmt:check`, which fail
-across work that predates any single change (measured 2026-10-11: ~270 files with
-lint findings, ~148 unformatted). Do not read that as your regression:
+From `plugins/`: `pnpm run contract`, `pnpm run build`, `pnpm run typecheck`,
+`pnpm run test` (the order `check:plugins` uses). The root `pnpm run check`
+adds dshx, desktop, scripts, web-profile contract, `lint` and `fmt:check`;
 `pnpm run check:diff` lints and format-checks only the paths your revision
-touches (`jj diff --from @- --to @`, override with `--from`/`--to`), and
-`pnpm run check:green` runs every other gate without `lint`/`fmt:check`, so its
-result is not decided by baseline lint/format drift. `pnpm run check` stays the
-full superset.
-
-`pnpm run check:plugins:cached` runs the four plugin gates and records the
-outcome under `.jj-gates/<fingerprint>.json`, keyed by the revision's content —
-its full tree diff against the empty root, so it does not depend on where `main`
-points. A rebase, split or other rewrite that leaves the content identical
-reports the recorded result instead of rebuilding; `--force` re-runs, and a
-recorded failure still exits non-zero. This is the cheap way to answer "did the
-history surgery change the code?" without four suites.
-
-### Owned-plugin completion means live-profile verification
-
-Do not treat a successful source build or an edit to `profiles/web/` as proof
-that the running web profile has the bundle. Keep these stages distinct:
-source validated, web seed updated, installed profile synced, live runtime
-confirmed. Report which stages are complete.
-
-After scratch/probe validation and an intentional promotion to web, sync the
-specific owned bundle into the actual profile with
-`fnm exec --using=22.23.3 pnpm profile:sync --profile web --bundle @dshfiles/<name>`.
-Read `docs/profile-installs.md` first. Then verify the installed profile and
-run `dsh --profile web --dump-config`; where possible, inspect the live client
-slot or behavior too. If the active profile was not synced, say so plainly.
-
-For migrations that move a keybinding or event owner between plugins, do not
-HMR-remove the old owner until the replacement is available in the live client
-(or keep a compatibility fallback). Otherwise a source update can disable the
-feature before its new bundle is installed. If the bundle is synced but not
-present in the running runtime, explain that a user-controlled restart is
-needed; never restart the live web instance yourself.
+touches, and `pnpm run check:green` runs everything except lint/format.
 
 ### Rebuilt plugins reach the browser over HMR
 
-`dsh web` does **not** need a restart to pick up a rebuilt plugin.
-`@deepseek-ai/dsh-client-hmr` is in the default web profile; it polls each
-bundle's `mtime`/`ctime`/`size` every 500ms and pushes an SSE `graph` frame on
-`/plugins/events`, which the client applies without a reload. Verified on a live
-instance: rebuilding `dist/client.js` produced a fresh graph frame within one
-poll interval.
+`@deepseek-ai/dsh-client-hmr` polls each bundle every 500ms and pushes a graph
+frame, so a rebuilt `dist/client.js` reaches the browser without a restart.
+Changes to `cordis.patch.yml`, `package.json`, Host code, a settings namespace
+or the profile composition need a restart, which is the user's call.
 
-What a page refresh alone does **not** do is re-read the boot manifest. The
-bundle `rev` is a content hash computed when the server started, so a running
-server keeps serving the manifest it booted with. Confirmed by editing a served
-bundle twice on one server and reading the same `rev` back both times.
+Until then the live DSH runs the **old Host** under the **new client**: decode
+Host snapshots once at the boundary with defaults, never assume a new field or
+method exists, and fall back to defaults when the settings namespace is
+unregistered. Do not HMR-remove an old keybinding or event owner before its
+replacement is live.
 
-So the workflow is: rebuild, let the client receive the graph frame, and only
-restart when the change is to `cordis.patch.yml`, `package.json`, host code, a
-settings namespace, or the profile composition — anything the server resolves
-at boot rather than per request. That restart is the user's call.
-
-Until then the live DSH runs the **old host** under the **new client**. Clients
-must tolerate it: decode Host snapshots once at the boundary with defaults,
-never assume a new field or method exists, and fall back to defaults when the
-settings namespace is unregistered — never throw. After every build,
-import-check the host bundle with the DSH Node
-(`fnm exec --using=22.23.3 node -e "import('./dist/index.js')"`); a failure there
-is a "did not activate" at boot. Full checklist (probe/scratch profiles,
-`plugins/@dshfiles/optmem/scripts/drive.mjs`, console checks, perf budget in
-`plans/ade/perf-baseline.md`): skill `dsh-plugin-verify`.
+Report the stages separately: source validated, web seed updated, profile
+synced, live runtime confirmed. If the active profile was not synced, say so.
 
 ### Client boot failures are cross-plugin
 
-A `Failed to load plugins` card lists symptoms, not causes. The entry named first
-is frequently not the broken one: a plugin that throws during `apply` is the
-cause, and the entries listed as `pending (waiting for service: X)` are innocent
-dependents of the service it failed to publish. Fixing the failed entry is the
-only thing that clears the pending ones.
-
-`dshx check` and `tsc` both pass on a plugin with a colliding locale namespace
-or a missing runtime service, because both are defects only visible across the
-installed set. See `plans/plugin-boot-integrity.md`.
+A `Failed to load plugins` card lists symptoms. The first entry named is often
+not the broken one: a plugin that throws during `apply` is the cause, and the
+entries `pending (waiting for service: X)` are its innocent dependents. `dshx
+check --boot` catches these across the installed set; `tsc` alone does not.
