@@ -266,8 +266,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   return (
     <TooltipProvider>
-      <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background">
-        <header className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4">
+      <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background">
+        <header className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-4 dshx:border-b dshx:px-6 dshx:pt-5 dshx:pb-4 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:px-3 dshx:@max-pane-narrow:pt-4">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
             <div className="dshx:flex dshx:items-center dshx:gap-2">
               <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
@@ -296,10 +296,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
         </header>
         <section
           aria-label={t('catalogFilters')}
-          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3"
+          className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-6 dshx:py-3 dshx:@max-pane-narrow:px-3"
         >
           <Select disabled value={displayedMachineName}>
-            <SelectTrigger aria-label={t('machine')} className="dshx:w-56" title={t('machineSelectorHint')}>
+            <SelectTrigger aria-label={t('machine')} className="dshx:w-56 dshx:@max-pane-narrow:w-full" title={t('machineSelectorHint')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +307,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </SelectContent>
           </Select>
           <Button
-            className="dshx:min-w-48 dshx:flex-1 dshx:justify-start dshx:bg-muted/50 dshx:font-normal"
+            className="dshx:min-w-48 dshx:flex-1 dshx:justify-start dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:basis-full dshx:bg-muted/50 dshx:font-normal"
             onClick={() => setPickerOpen(true)}
             type="button"
             variant="outline"
@@ -340,7 +340,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             ))}
           </ToggleGroup>
         </section>
-        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3 dshx:px-6 dshx:pt-4 dshx:pb-3">
+        <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3 dshx:px-6 dshx:pt-4 dshx:pb-3 dshx:@max-pane-narrow:px-3">
           {cwd === null && (
             <Alert role="status" variant="info">
               <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
@@ -382,7 +382,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           )}
         </div>
         {showCatalog ? (
-          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6" onKeyDown={focusRowFromKey}>
+          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6 dshx:@max-pane-narrow:px-3" onKeyDown={focusRowFromKey}>
             <SecretCatalogTable
               actions={{
                 t,

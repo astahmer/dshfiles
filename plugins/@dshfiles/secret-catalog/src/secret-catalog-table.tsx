@@ -145,7 +145,7 @@ const column = createColumnHelper<typeof features, SecretMetadata>()
 
 const columnClassNames: Readonly<Record<string, string | undefined>> = {
   variable: 'dshx:w-[34%] dshx:max-w-0',
-  description: 'dshx:w-[30%] dshx:max-w-0',
+  description: 'dshx:w-[30%] dshx:max-w-0 dshx:@max-pane-compact:hidden',
   value: 'dshx:w-[16%]',
   reveal: 'dshx:w-px',
   actions: 'dshx:w-px dshx:text-right',

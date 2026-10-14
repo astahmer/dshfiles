@@ -5,6 +5,7 @@
       "id": "server-configuration",
       "title": "Manage local and remote MCP server definitions",
       "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references.",
+      "reach": ["click button \"MCP servers\"", "expect heading \"Global MCP servers\"", "expect combobox \"Transport\""],
       "surfaces": ["client", "host", "settings", "tool", "integration"],
       "configuration": [
         {

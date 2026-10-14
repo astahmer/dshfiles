@@ -250,7 +250,6 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
 
 /** Collapsed rail: one button with the most critical account, opening the usage popover. */
 const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
-  const { meterLabel, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
@@ -264,14 +263,29 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
       <PopoverTrigger asChild>
         <button
           aria-label={label}
-          className={cn(meterButtonClass, open && 'dshx:bg-accent dshx:text-foreground')}
+          className={cn(
+            meterButtonClass,
+            'dshx:h-auto dshx:min-h-8 dshx:flex-col dshx:gap-0.5 dshx:overflow-hidden dshx:py-1',
+            open && 'dshx:bg-accent dshx:text-foreground',
+          )}
           title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
+          {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
           {critical === undefined ? (
             <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
           ) : (
-            <SummaryItem item={critical} label={meterLabel} now={now} showShortName={usageShortNames} />
+            <>
+              <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
+              <span
+                className={cn(
+                  'dshx:text-[10px] dshx:leading-none dshx:font-semibold dshx:tabular-nums',
+                  critical.exhausted ? 'dshx:text-destructive' : QUOTA_TONE_TEXT[quotaTone(critical.percentRemaining)],
+                )}
+              >
+                {critical.exhausted ? '0%' : `${String(Math.round(critical.percentRemaining))}%`}
+              </span>
+            </>
           )}
         </button>
       </PopoverTrigger>

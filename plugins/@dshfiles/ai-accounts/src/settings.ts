@@ -47,8 +47,8 @@ export const aiAccountsSettings = defineSettings({
     usageShortNames: Schema.boolean().default(true),
     /** Account id → short name for the usage strip; an account without one uses its picker tag, then its initials. */
     usageShortNameOverrides: Schema.dict(Schema.string()).default({}),
-    /** The draggable usage tab pinned to a window edge. */
-    edgeWidget: Schema.boolean().default(true),
+    /** The draggable usage tab pinned to a window edge; off by default because it covers content in narrow panes. */
+    edgeWidget: Schema.boolean().default(false),
     /** Show the accounts block on Settings › Models. */
     modelsPageAccounts: Schema.boolean().default(true),
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
@@ -86,7 +86,7 @@ export const DEFAULT_CLIENT_SETTINGS = {
   autoSaveDelayMs: 800,
   usageRefreshSeconds: 60,
   footerButton: true,
-  edgeWidget: true,
+  edgeWidget: false,
   modelsPageAccounts: true,
   costEstimates: true,
   pricingRefreshHours: 24,

@@ -107,7 +107,8 @@ expands. Strip and popover share one order and one hidden list (Settings › AI
 Accounts): drag a meter or card onto another to reorder, or right-click it
 (Shift+F10 / the menu key) to move it, hide it, or show every hidden account.
 Banked Codex resets can be expanded; spending one stays a manual "Reset usage"
-in the Codex app. The draggable edge overlay opens the same popover.
+in the Codex app. The draggable edge overlay (off by default; it covers content in
+narrow panes, and stays hidden while no account is set up) opens the same popover.
 
 Codex Luna Reserve: the usage read asks for the reserve meter the way the
 official client does (`x-openai-codex-luna-reserve: 1`) and shows it as its own

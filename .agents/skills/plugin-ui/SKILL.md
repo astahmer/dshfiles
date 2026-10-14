@@ -53,6 +53,7 @@ Plugin surfaces render in 360–480 px panes, split layouts and the composer, so
   name), secondary chips hide, then the primary text truncates (`min-w-0 truncate`), and only then does a row wrap.
 - `min-w-0` on every flex child that holds text, and `shrink` on a `Button` (its base class is `shrink-0`).
 - A container's inline size cannot come from its content: give it a width (`w-80 max-w-full`) or let a parent size it.
+  It also cannot query itself: put `@max-*` classes on its children, not on the `@container` element.
 - The composer row is a native container: composer slots query it directly. Order there: Drafts and Prompts lose their
   labels (`@max-pane-compact`), the jj dock chips collapse to the working-copy chip, the model name truncates
   (`100cqw`), and the row's own `data-model-compact` hides the name only when even that does not fit; the effort

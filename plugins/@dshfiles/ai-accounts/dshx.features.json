@@ -160,8 +160,8 @@
         },
         {
           "key": "edgeWidget",
-          "defaultValue": "true",
-          "constraints": "Boolean; enable the edge quota overlay.",
+          "defaultValue": "false",
+          "constraints": "Boolean; enable the edge quota overlay (hidden while no account is set up).",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.quota-display"]
         }

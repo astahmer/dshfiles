@@ -17,7 +17,7 @@ import { mostCritical, stripItems } from './usage-overview-model.js'
  * A floating mark pinned to the nearest viewport edge: the tightest window per
  * account, always glanceable, never in the way. Drag it and it snaps back to
  * the closest edge of where it landed; click it and the account cards popover
- * opens. Position persists in localStorage, and the settings toggle turns it off.
+ * opens. Position persists in localStorage; it is off by default and hides while no account is set up.
  */
 
 const EDGE_USAGE_STORAGE_KEY = 'ai-accounts-edge-usage-position'
@@ -95,9 +95,10 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     return () => window.removeEventListener('resize', resize)
   }, [])
 
-  const primary = mostCritical(stripItems(usage, layout))?.percentRemaining
+  const items = stripItems(usage, layout)
+  const primary = mostCritical(items)?.percentRemaining
 
-  if (!edgeWidget) return null
+  if (!edgeWidget || items.length === 0) return null
 
   const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!event.isPrimary || event.button !== 0) return

@@ -71,7 +71,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
           }}
           value={field.state.value}
         >
-          <SelectTrigger aria-label={t('transport')} className="dshx:h-9 dshx:min-w-44">
+          <SelectTrigger aria-label={t('transport')} className="dshx:h-9 dshx:min-w-44 dshx:@max-pane-narrow:w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" position="popper">
@@ -97,7 +97,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
         {transport =>
           transport === 'streamable-http' ? (
             <>
-              <div className={cn('dshx:grid dshx:gap-4 dshx:md:grid-cols-2', placeholderOnlyLabels)}>
+              <div className={cn('dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2', placeholderOnlyLabels)}>
                 <form.AppField listeners={nameListeners} name="name">
                   {field => <field.TextField label={t('name')} placeholder={t('namePlaceholder')} required />}
                 </form.AppField>
@@ -117,7 +117,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                 <form.Subscribe selector={state => state.values.localStart}>
                   {localStart =>
                     localStart ? (
-                      <div className="dshx:grid dshx:gap-4 dshx:md:grid-cols-2">
+                      <div className="dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2">
                         <form.AppField name="startCommandLine">
                           {field => <field.TextField label={t('command')} monospace placeholder="npx -y @example/local-proxy" required />}
                         </form.AppField>
@@ -125,7 +125,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                         <form.AppField name="startEnvRefs">
                           {field => (
                             <field.TextAreaField
-                              className="dshx:md:col-span-2"
+                              className="dshx:@pane-compact:col-span-2"
                               label={t('localEnvRefs')}
                               monospace
                               placeholder={'{\n  "ACCESS_TOKEN": "LOCAL_PROXY_TOKEN"\n}'}
@@ -140,7 +140,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
             </>
           ) : (
             <>
-              <div className={cn('dshx:grid dshx:gap-4 dshx:md:grid-cols-2', placeholderOnlyLabels)}>
+              <div className={cn('dshx:grid dshx:gap-4 dshx:@pane-compact:grid-cols-2', placeholderOnlyLabels)}>
                 <form.AppField listeners={nameListeners} name="name">
                   {field => <field.TextField label={t('name')} placeholder={t('namePlaceholder')} required />}
                 </form.AppField>
@@ -203,10 +203,12 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
         </div>
       ) : (
         <Card>
-          <CardHeader>
+          <CardHeader className="dshx:@max-pane-narrow:has-data-[slot=card-action]:grid-cols-1">
             <CardTitle className="dshx:text-sm">{isEdit ? `${t('edit')} · ${values.name}` : t('add')}</CardTitle>
             <CardDescription className="dshx:text-xs">{t('addCardDescription')}</CardDescription>
-            <CardAction>{transportSelect}</CardAction>
+            <CardAction className="dshx:@max-pane-narrow:col-start-1 dshx:@max-pane-narrow:row-span-1 dshx:@max-pane-narrow:row-start-auto dshx:@max-pane-narrow:justify-self-stretch">
+              {transportSelect}
+            </CardAction>
           </CardHeader>
           <CardContent>{fields}</CardContent>
           <CardFooter className="dshx:justify-end dshx:gap-2">{actions}</CardFooter>

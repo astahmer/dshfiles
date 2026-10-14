@@ -67,14 +67,14 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
   }
 
   return (
-    <div className="dshx-root dshx:h-full dshx:min-h-0 dshx:overflow-y-auto">
-      <div className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1040px] dshx:flex-col dshx:gap-6 dshx:px-6 dshx:pt-8 dshx:pb-12">
-        <header className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
+    <div className="dshx-root dshx:@container dshx:h-full dshx:min-h-0 dshx:overflow-y-auto">
+      <div className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1040px] dshx:flex-col dshx:gap-6 dshx:px-6 dshx:pt-8 dshx:pb-12 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:px-3 dshx:@max-pane-narrow:pt-4">
+        <header className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:gap-3">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
             <h1 className="dshx:text-xl dshx:font-semibold">{t('pageTitle')}</h1>
             <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle')}</p>
           </div>
-          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
+          <div className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Button onClick={() => setBrowsing(true)} variant="outline">
               <LibraryIcon className="dshx:size-4" />
               {t('browseCatalog')}

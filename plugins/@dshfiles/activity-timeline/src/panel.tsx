@@ -2,7 +2,7 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
@@ -51,7 +51,7 @@ const ActivityRow = (props: {
   <button
     type="button"
     onClick={() => props.onSelect(props.item)}
-    className={`dshx:flex dshx:w-full dshx:items-start dshx:gap-3 dshx:rounded-md dshx:border dshx:px-3 dshx:py-2 dshx:text-left ${props.selected ? 'dshx:border-primary dshx:bg-accent/40' : 'dshx:border-transparent hover:dshx:bg-accent/30'}`}
+    className={`dshx:flex dshx:w-full dshx:items-start dshx:gap-3 dshx:rounded-md dshx:border dshx:px-3 dshx:py-2 dshx:text-left ${props.selected ? 'dshx:border-primary dshx:bg-accent/40' : 'dshx:border-transparent dshx:hover:bg-accent/30'}`}
   >
     <span className={`dshx:mt-1.5 dshx:h-2 dshx:w-2 dshx:shrink-0 dshx:rounded-full ${levelMarker(props.item.level)}`} aria-hidden />
     <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
@@ -198,157 +198,165 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
   const selectedEvent: ActivityEvent | undefined = detailQuery.data
 
   return (
-    <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3 dshx:sm:p-5">
-      <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
-        <div>
-          <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <Badge variant="secondary">
-            {statsQuery.data?.retained ?? 0} {t('retained')}
-          </Badge>
-          <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
-            {statsQuery.data?.attention ?? 0} {t('attention')}
-          </Badge>
-          <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
-            <RefreshCwIcon aria-hidden /> {t('refresh')}
-          </Button>
-        </div>
-      </header>
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <div className="dshx:relative dshx:min-w-56 dshx:flex-1">
-          <SearchIcon
-            aria-hidden
-            className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-1/2 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
-          />
-          <Input
-            aria-label={t('search')}
-            placeholder={t('searchPlaceholder')}
-            value={search}
-            onChange={event => setSearch(event.currentTarget.value)}
-            className="dshx:pl-8"
-          />
-        </div>
-        {(['session', 'communication', 'integration'] as const).map(source => (
-          <Button
-            key={source}
-            size="sm"
-            variant={sources.includes(source) ? 'secondary' : 'outline'}
-            aria-pressed={sources.includes(source)}
-            onClick={() => toggleSource(source)}
-          >
-            {t(source)}
-          </Button>
-        ))}
-        <Button size="sm" variant={attentionOnly ? 'destructive' : 'outline'} aria-pressed={attentionOnly} onClick={() => setAttentionOnly(value => !value)}>
-          {t('attentionOnly')}
-        </Button>
-        <Button size="sm" variant={detailed ? 'secondary' : 'outline'} aria-pressed={detailed} onClick={() => setDetailed(value => !value)}>
-          {t('detailed')}
-        </Button>
-      </div>
-      {feedQuery.error === null ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
-        </Alert>
-      )}
-      <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card className="dshx:min-w-0">
-          <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
-            <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
-            <div className="dshx:flex dshx:items-center dshx:gap-2">
-              {pendingNew > 0 ? (
-                <Button size="sm" variant="secondary" onClick={jumpToLatest}>
-                  {t('newEvents')} ({pendingNew})
-                </Button>
-              ) : null}
-              {cursor === null ? null : (
-                <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate()}>
-                  {olderMutation.isPending ? t('loadingOlder') : t('loadOlder')}
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="dshx:p-2">
-            <div
-              ref={scrollRef}
-              onScroll={event => {
-                const target = event.currentTarget
-                nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
-                if (nearBottomRef.current) setPendingNew(0)
-              }}
-              className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
+    <div className="dshx-root dshx:@container">
+      <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
+        <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
+          <div>
+            <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
+            <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">{t('subtitle')}</p>
+          </div>
+          <div className="dshx:flex dshx:items-center dshx:gap-2">
+            <Badge variant="secondary">
+              {statsQuery.data?.retained ?? 0} {t('retained')}
+            </Badge>
+            <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
+              {statsQuery.data?.attention ?? 0} {t('attention')}
+            </Badge>
+            <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
+              <RefreshCwIcon aria-hidden /> {t('refresh')}
+            </Button>
+          </div>
+        </header>
+        {/* Below the compact tier the search takes its own line and the filters scroll sideways instead of wrapping. */}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
+          <InputGroup className="dshx:min-w-56 dshx:flex-1 dshx:@max-pane-compact:min-w-0">
+            <InputGroupAddon>
+              <SearchIcon aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t('search')}
+              placeholder={t('searchPlaceholder')}
+              value={search}
+              onChange={event => setSearch(event.currentTarget.value)}
+            />
+          </InputGroup>
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:@max-pane-compact:overflow-x-auto dshx:@max-pane-compact:pb-1">
+            {(['session', 'communication', 'integration'] as const).map(source => (
+              <Button
+                key={source}
+                size="sm"
+                variant={sources.includes(source) ? 'secondary' : 'outline'}
+                aria-pressed={sources.includes(source)}
+                onClick={() => toggleSource(source)}
+              >
+                {t(source)}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant={attentionOnly ? 'destructive' : 'outline'}
+              aria-pressed={attentionOnly}
+              onClick={() => setAttentionOnly(value => !value)}
             >
-              {items.length === 0 && !feedQuery.isPending ? (
-                <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">
-                  {debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}
-                </p>
-              ) : null}
-              {items.map(item => (
-                <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} onSelect={setSelected} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="dshx:min-w-0">
-          <CardHeader className="dshx:pb-2">
-            <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
-          </CardHeader>
-          <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
-            {selected === null ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('emptyDetail')}</p> : null}
-            {selected !== null && selected.kind === 'group' ? (
-              <>
-                <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground">
-                  {t('groupMembers')}: {selected.eventIds.length} {t('events')}
-                </p>
-                <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
-                  {t('detailed')}
-                </Button>
-              </>
-            ) : null}
-            {selectedEvent === undefined ? null : (
-              <>
-                <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
-                <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
-                  {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
-                </p>
-                {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
-                <Separator />
-                <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
-                <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">
-                  {JSON.stringify(selectedEvent.metadata, null, 2)}
-                </pre>
-                <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
-                <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
-                  {selectedEvent.references.map(reference => (
-                    <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
-                      {reference.kind}: {reference.id.slice(0, 12)}
-                    </Badge>
-                  ))}
-                  {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
-                </div>
-                <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
-                {(relatedQuery.data?.events ?? []).length < 2 ? (
-                  <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
-                ) : (
-                  <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                    {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
-                      <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
-                        {formatTime(event.at)} · {event.summary}
-                      </span>
-                    ))}
-                  </div>
+              {t('attentionOnly')}
+            </Button>
+            <Button size="sm" variant={detailed ? 'secondary' : 'outline'} aria-pressed={detailed} onClick={() => setDetailed(value => !value)}>
+              {t('detailed')}
+            </Button>
+          </div>
+        </div>
+        {feedQuery.error === null ? null : (
+          <Alert variant="destructive">
+            <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
+          </Alert>
+        )}
+        <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <Card className="dshx:min-w-0">
+            <CardHeader className="dshx:flex dshx:flex-row dshx:items-center dshx:justify-between dshx:gap-2 dshx:pb-2">
+              <CardTitle className="dshx:text-sm">{t('title')}</CardTitle>
+              <div className="dshx:flex dshx:items-center dshx:gap-2">
+                {pendingNew > 0 ? (
+                  <Button size="sm" variant="secondary" onClick={jumpToLatest}>
+                    {t('newEvents')} ({pendingNew})
+                  </Button>
+                ) : null}
+                {cursor === null ? null : (
+                  <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate()}>
+                    {olderMutation.isPending ? t('loadingOlder') : t('loadOlder')}
+                  </Button>
                 )}
-                <p className="dshx:text-xs dshx:text-muted-foreground">
-                  {t('provenance')}: {t(selectedEvent.provenance)}
-                </p>
-              </>
-            )}
-            <p className="dshx:mt-auto dshx:text-[11px] dshx:text-muted-foreground">{t('routineHidden')}</p>
-          </CardContent>
-        </Card>
+              </div>
+            </CardHeader>
+            <CardContent className="dshx:p-2">
+              <div
+                ref={scrollRef}
+                onScroll={event => {
+                  const target = event.currentTarget
+                  nearBottomRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
+                  if (nearBottomRef.current) setPendingNew(0)
+                }}
+                className="dshx:flex dshx:h-[62vh] dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pr-1"
+              >
+                {items.length === 0 && !feedQuery.isPending ? (
+                  <p className="dshx:p-3 dshx:text-sm dshx:text-muted-foreground">
+                    {debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}
+                  </p>
+                ) : null}
+                {items.map(item => (
+                  <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} onSelect={setSelected} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="dshx:min-w-0">
+            <CardHeader className="dshx:pb-2">
+              <CardTitle className="dshx:text-sm">{t('detail')}</CardTitle>
+            </CardHeader>
+            <CardContent className="dshx:flex dshx:max-h-[62vh] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:text-sm">
+              {selected === null ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('emptyDetail')}</p> : null}
+              {selected !== null && selected.kind === 'group' ? (
+                <>
+                  <p className="dshx:text-sm dshx:font-medium">{selected.summary}</p>
+                  <p className="dshx:text-xs dshx:text-muted-foreground">
+                    {t('groupMembers')}: {selected.eventIds.length} {t('events')}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => setDetailed(true)}>
+                    {t('detailed')}
+                  </Button>
+                </>
+              ) : null}
+              {selectedEvent === undefined ? null : (
+                <>
+                  <p className="dshx:break-words dshx:text-sm dshx:font-medium">{selectedEvent.summary}</p>
+                  <p className="dshx:text-xs dshx:text-muted-foreground" title={formatExact(selectedEvent.at)}>
+                    {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
+                  </p>
+                  {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
+                  <Separator />
+                  <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
+                  <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">
+                    {JSON.stringify(selectedEvent.metadata, null, 2)}
+                  </pre>
+                  <p className="dshx:text-xs dshx:font-semibold">{t('references')}</p>
+                  <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
+                    {selectedEvent.references.map(reference => (
+                      <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
+                        {reference.kind}: {reference.id.slice(0, 12)}
+                      </Badge>
+                    ))}
+                    {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}
+                  </div>
+                  <p className="dshx:text-xs dshx:font-semibold">{t('related')}</p>
+                  {(relatedQuery.data?.events ?? []).length < 2 ? (
+                    <p className="dshx:text-xs dshx:text-muted-foreground">—</p>
+                  ) : (
+                    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+                      {(relatedQuery.data?.events ?? []).slice(0, 20).map(event => (
+                        <span key={event.id} className="dshx:text-xs" title={formatExact(event.at)}>
+                          {formatTime(event.at)} · {event.summary}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="dshx:text-xs dshx:text-muted-foreground">
+                    {t('provenance')}: {t(selectedEvent.provenance)}
+                  </p>
+                </>
+              )}
+              <p className="dshx:mt-auto dshx:text-[11px] dshx:text-muted-foreground">{t('routineHidden')}</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
