@@ -84,6 +84,7 @@ const offlineChecks = {
   resolveDsh: async () => profile(project()).dsh,
   checkMigrations: async () => [],
   checkPackageTargets: async () => [],
+  inspectRuntimePlugins: () => ({ plugins: [], diagnostics: [] }),
   typecheckProject: async (root: string) => ({ status: 'passed' as const, configFile: `${root}/tsconfig.json`, diagnostics: [] }),
 }
 
