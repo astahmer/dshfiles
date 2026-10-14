@@ -2,13 +2,13 @@ import { z } from 'zod'
 
 export const aliasSchema = z
   .string()
-  .min(1, 'Enter an alias.')
+  .min(1, { error: 'Enter an alias.', abort: true })
   .max(128, 'An alias is at most 128 characters.')
   .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/, 'Start with a letter or _, then use letters, digits, _ or -.')
 
 export const environmentSchema = z
   .string()
-  .min(1, 'Enter an environment.')
+  .min(1, { error: 'Enter an environment.', abort: true })
   .max(256, 'An environment is at most 256 characters.')
   .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, _ or -.')
 

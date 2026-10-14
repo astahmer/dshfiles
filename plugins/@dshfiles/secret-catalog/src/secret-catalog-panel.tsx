@@ -430,6 +430,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             onUpdate={input => updateMutation.mutate(input)}
             pending={mutationPending}
             row={'row' in dialog ? dialog.row : undefined}
+            rows={rows}
             t={t}
           />
         )}

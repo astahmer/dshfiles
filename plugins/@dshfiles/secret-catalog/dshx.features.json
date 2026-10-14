@@ -151,6 +151,14 @@
       "id": "alias-mutations",
       "title": "Create, edit, rename, and remove aliases safely",
       "summary": "Create generated or manual values, edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click button \"Secret Catalog\"",
+        "click button \"+ Add Secret\"",
+        "click radio \"Enter a value*\"",
+        "click button \"Advanced*\"",
+        "expect dialog \"Add secret\""
+      ],
       "surfaces": ["client", "host", "settings"],
       "configuration": [],
       "states": ["editing", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  defaultFieldForType,
   hasSecretUpdate,
   needsProjectFolder,
   secretCreateFormDefaults,
@@ -23,6 +24,11 @@ describe('Secret Catalog create form', () => {
       valueMode: 'manual',
     })
     expect(issuePaths(result)).toEqual(['alias', 'value'])
+  })
+
+  it('reports a missing alias once instead of also failing its format', () => {
+    const result = secretCreateFormSchema.safeParse(secretCreateFormDefaults({ scope: 'global', environment: 'prod' }))
+    expect(result.error?.issues.map(issue => issue.message)).toEqual(['Enter an alias.'])
   })
 
   it('accepts a generated value with the default environment', () => {
@@ -54,6 +60,7 @@ describe('Secret Catalog create form', () => {
       valueMode: 'generate',
       value: null,
       type: 'login',
+      field: 'password',
       name: 'Synthetic item',
     })
   })
@@ -66,6 +73,13 @@ describe('Secret Catalog create form', () => {
       value: 'synthetic-value',
     })
     expect(input.value).toBe('synthetic-value')
+  })
+
+  it('writes the password field of a login and the notes of a Secure Note unless the field is changed', () => {
+    const defaults = secretCreateFormDefaults({ scope: 'global', environment: 'prod' })
+    expect(defaults.field).toBe(defaultFieldForType(defaults.type))
+    expect(defaultFieldForType('secure-note')).toBe('notes')
+    expect(toSecretCreateInput({ ...defaults, alias: 'SYNTHETIC', field: '' })).not.toHaveProperty('field')
   })
 
   it('requires a project folder for project and local scopes only', () => {

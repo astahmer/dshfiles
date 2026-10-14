@@ -113,18 +113,23 @@ When('the scope filter is set to {string}', async ({ page }: { page: Page }, sco
 
 When('the alias {string} is added to the project with the value {string}', async ({ page }: { page: Page }, alias: string, value: string) => {
   await catalog(page).getByRole('button', { name: '+ Add Secret', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Add secret alias', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Add secret', exact: true })
   await dialog.getByRole('textbox', { name: 'Alias', exact: true }).fill(alias)
-  await dialog.getByRole('combobox', { name: 'Value creation', exact: true }).click()
-  await page.getByRole('option', { name: 'Enter value', exact: true }).click()
+  await expect(dialog.getByRole('combobox', { name: 'Save to', exact: true })).toHaveText('This project')
+  await expect(dialog.getByRole('textbox', { name: 'Environment', exact: true })).toHaveValue('prod')
+  await dialog.getByRole('radio', { name: /^Enter a value/ }).click()
   await dialog.getByRole('textbox', { name: 'Secret value', exact: true }).fill(value)
+  await dialog.getByRole('button', { name: /^Advanced/ }).click()
+  await expect(dialog.getByRole('textbox', { name: 'Field', exact: true })).toHaveValue('password')
   await dialog.getByRole('textbox', { name: 'Source URL', exact: true }).fill('https://api.example.test')
-  await dialog.getByRole('button', { name: 'Add alias', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Add secret', exact: true }).click()
   await expect(dialog).toBeHidden()
 })
 
 When('{string} gets the source {string} and the value {string}', async ({ page }: { page: Page }, alias: string, source: string, value: string) => {
-  await rowFor(page, alias, 'prod').getByRole('button', { name: `Edit ${alias}`, exact: true }).click()
+  await rowFor(page, alias, 'prod')
+    .getByRole('button', { name: `Edit ${alias}`, exact: true })
+    .click()
   const dialog = page.getByRole('dialog', { name: `Edit ${alias}`, exact: true })
   await dialog.getByRole('textbox', { name: 'Source URL', exact: true }).fill(source)
   await dialog.getByRole('textbox', { name: 'Replace value (optional)', exact: true }).fill(value)
@@ -134,7 +139,9 @@ When('{string} gets the source {string} and the value {string}', async ({ page }
 })
 
 When('{string} is renamed to {string}', async ({ page }: { page: Page }, alias: string, renamed: string) => {
-  await rowFor(page, alias, 'prod').getByRole('button', { name: `Edit ${alias}`, exact: true }).click()
+  await rowFor(page, alias, 'prod')
+    .getByRole('button', { name: `Edit ${alias}`, exact: true })
+    .click()
   const dialog = page.getByRole('dialog', { name: `Edit ${alias}`, exact: true })
   await dialog.getByRole('textbox', { name: 'Alias', exact: true }).fill(renamed)
   await dialog.getByRole('button', { name: 'Save changes', exact: true }).click()
@@ -142,7 +149,9 @@ When('{string} is renamed to {string}', async ({ page }: { page: Page }, alias: 
 })
 
 When('the alias {string} is removed while its vault item stays', async ({ page }: { page: Page }, alias: string) => {
-  await rowFor(page, alias, 'prod').getByRole('button', { name: `Remove ${alias}`, exact: true }).click()
+  await rowFor(page, alias, 'prod')
+    .getByRole('button', { name: `Remove ${alias}`, exact: true })
+    .click()
   const dialog = page.getByRole('alertdialog', { name: `Remove ${alias}`, exact: true })
   await dialog.getByRole('button', { name: 'Remove alias and all environment overrides', exact: true }).click()
   await dialog.getByRole('button', { name: 'Confirm remove alias', exact: true }).click()
@@ -150,7 +159,9 @@ When('the alias {string} is removed while its vault item stays', async ({ page }
 })
 
 When('the vault item behind {string} in {string} is deleted', async ({ page }: { page: Page }, alias: string, environment: string) => {
-  await rowFor(page, alias, environment).getByRole('button', { name: `Remove ${alias}`, exact: true }).click()
+  await rowFor(page, alias, environment)
+    .getByRole('button', { name: `Remove ${alias}`, exact: true })
+    .click()
   const dialog = page.getByRole('alertdialog', { name: `Remove ${alias}`, exact: true })
   await dialog.getByRole('button', { name: 'Delete the Bitwarden item…', exact: true }).click()
   await dialog.getByRole('button', { name: 'Confirm delete item', exact: true }).click()
@@ -222,17 +233,20 @@ Then('the dev DB_PASSWORD previews masked, reveals in full, then hides itself', 
   await finishJourneyAssertions(page)
 })
 
-Then('the store holds {string} with the value {string} and the source {string}', async ({ page }: { page: Page }, alias: string, value: string, source: string) => {
-  await recordAssertion(page, `secret-catalog-store-holds-${value}`, async () => {
-    await expect(rowFor(page, alias, 'prod')).toBeVisible()
-    const store = await readStore(page)
-    const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
-    expect(row?.scope).toBe('project')
-    expect(row?.source).toBe(source)
-    expect(store.vault[row?.item ?? '']).toBe(value)
-  })
-  if (value.includes('edited')) await finishJourneyAssertions(page)
-})
+Then(
+  'the store holds {string} with the value {string} and the source {string}',
+  async ({ page }: { page: Page }, alias: string, value: string, source: string) => {
+    await recordAssertion(page, `secret-catalog-store-holds-${value}`, async () => {
+      await expect(rowFor(page, alias, 'prod')).toBeVisible()
+      const store = await readStore(page)
+      const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
+      expect(row?.scope).toBe('project')
+      expect(row?.source).toBe(source)
+      expect(store.vault[row?.item ?? '']).toBe(value)
+    })
+    if (value.includes('edited')) await finishJourneyAssertions(page)
+  },
+)
 
 Then('the store renamed the alias, dropped GITHUB_TOKEN but kept its item, and deleted the dev item', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'secret-catalog-rename-remove-and-delete-reach-the-cli', async () => {

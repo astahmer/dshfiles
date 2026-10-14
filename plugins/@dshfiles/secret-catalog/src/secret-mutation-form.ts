@@ -61,8 +61,11 @@ export const secretCreateFormDefaults = (input: { readonly scope: SecretMutation
   source: '',
   tags: '',
   type: 'login',
-  field: '',
+  field: 'password',
 })
+
+/** The value field the CLI should write for an item type: a Secure Note keeps its value in notes. */
+export const defaultFieldForType = (type: SecretCreateFormValues['type']): string => (type === 'secure-note' ? 'notes' : 'password')
 
 export const toSecretCreateInput = (form: SecretCreateFormValues): SecretCreateForm => ({
   alias: form.alias,

@@ -9,13 +9,17 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { Field, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from '@dshfiles/plugin-ui/components/ui/field'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@dshfiles/plugin-ui/components/ui/radio-group'
+import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import {
+  defaultFieldForType,
   hasSecretUpdate,
   isSecretScope,
   needsProjectFolder,
@@ -42,6 +46,8 @@ import {
 interface SecretMutationDialogProps {
   readonly mode: 'create' | 'edit' | 'remove'
   readonly row?: SecretMetadata
+  /** Loaded aliases, to flag a duplicate alias and environment while typing. */
+  readonly rows: readonly SecretMetadata[]
   readonly hasProjectFolder: boolean
   readonly initialCreateScope: SecretMutationScope
   readonly defaultEnvironment: string
@@ -54,6 +60,12 @@ interface SecretMutationDialogProps {
   readonly t: SecretCatalogTranslate
 }
 
+const scopeHintKeys = {
+  project: 'targetProjectHint',
+  global: 'targetGlobalHint',
+  local: 'targetLocalHint',
+} satisfies Record<SecretMutationScope, Parameters<SecretCatalogTranslate>[0]>
+
 const submitWith =
   (handleSubmit: () => Promise<void>) =>
   (event: FormEvent<HTMLFormElement>): void => {
@@ -61,43 +73,65 @@ const submitWith =
     void handleSubmit()
   }
 
+const advancedCreateFields = ['name', 'source', 'tags', 'type', 'field'] as const
+
 const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: (submit: ReactNode) => ReactNode }): JSX.Element => {
   const t = props.t
+  const valueModeId = useId()
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const form = useAppForm({
     defaultValues: secretCreateFormDefaults({ scope: props.initialCreateScope, environment: props.defaultEnvironment }),
-    validationLogic: revalidateLogic(),
+    validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
     validators: { onDynamic: secretCreateFormSchema },
     onSubmit: ({ value }) => {
       if (needsProjectFolder({ scope: value.scope, hasProjectFolder: props.hasProjectFolder })) return
       props.onCreate(toSecretCreateInput(value))
     },
+    onSubmitInvalid: ({ formApi }) => {
+      if (advancedCreateFields.some(name => (formApi.getFieldMeta(name)?.errors.length ?? 0) > 0)) setAdvancedOpen(true)
+    },
   })
   return (
-    <form className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-2" noValidate onSubmit={submitWith(form.handleSubmit)}>
-      <form.AppField name="alias">{field => <field.TextField label={t('fieldAlias')} monospace required />}</form.AppField>
-      <form.AppField name="environment">{field => <field.TextField label={t('fieldEnvironment')} required />}</form.AppField>
-      <form.Subscribe selector={state => state.values.scope}>
-        {scope => (
-          <form.AppField name="scope">
-            {field => (
-              <field.SelectField
-                description={
-                  needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) ? (
-                    <span className="dshx:text-destructive">{t('needsProjectFolder')}</span>
-                  ) : undefined
-                }
-                label={t('fieldTargetScope')}
-                options={[
-                  { value: 'global', label: t('targetGlobal') },
-                  { value: 'project', label: t('targetProject') },
-                  { value: 'local', label: t('targetLocal'), disabled: !props.hasProjectFolder },
-                ]}
-              />
-            )}
-          </form.AppField>
-        )}
-      </form.Subscribe>
+    <form className="dshx:flex dshx:flex-col dshx:gap-5" noValidate onSubmit={submitWith(form.handleSubmit)}>
       <form.AppField
+        name="alias"
+        validators={{
+          onChangeListenTo: ['environment'],
+          onChange: ({ value, fieldApi }) => {
+            const environment = fieldApi.form.getFieldValue('environment')
+            return props.rows.some(row => row.alias === value && row.environment === environment) ? t('aliasExists', { alias: value, environment }) : undefined
+          },
+        }}
+      >
+        {field => <field.TextField description={t('aliasHint')} label={t('fieldAlias')} monospace placeholder={t('aliasPlaceholder')} required />}
+      </form.AppField>
+      <div className="dshx:grid dshx:gap-4 dshx:sm:grid-cols-[minmax(0,1fr)_10rem]">
+        <form.Subscribe selector={state => state.values.scope}>
+          {scope => (
+            <form.AppField name="scope">
+              {field => (
+                <field.SelectField
+                  description={
+                    needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) ? (
+                      <span className="dshx:text-destructive">{t('needsProjectFolder')}</span>
+                    ) : (
+                      t(scopeHintKeys[scope])
+                    )
+                  }
+                  label={t('fieldTargetScope')}
+                  options={[
+                    { value: 'project', label: t('targetProject'), disabled: !props.hasProjectFolder },
+                    { value: 'global', label: t('targetGlobal') },
+                    { value: 'local', label: t('targetLocal'), disabled: !props.hasProjectFolder },
+                  ]}
+                />
+              )}
+            </form.AppField>
+          )}
+        </form.Subscribe>
+        <form.AppField name="environment">{field => <field.TextField label={t('fieldEnvironment')} monospace required />}</form.AppField>
+      </div>
+      <form.Field
         listeners={{
           onChange: ({ value }) => {
             if (value === 'generate') form.setFieldValue('value', '')
@@ -106,54 +140,88 @@ const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: 
         name="valueMode"
       >
         {field => (
-          <field.SelectField
-            label={t('fieldValueCreation')}
-            options={[
-              { value: 'generate', label: t('valueGenerate') },
-              { value: 'manual', label: t('valueManual') },
-            ]}
-          />
+          <FieldSet className="dshx:gap-3">
+            <FieldLegend variant="label">{t('fieldValueCreation')}</FieldLegend>
+            <RadioGroup
+              className="dshx:grid dshx:gap-2 dshx:sm:grid-cols-2"
+              onValueChange={value => {
+                if (value === 'generate' || value === 'manual') field.handleChange(value)
+              }}
+              value={field.state.value}
+            >
+              {(['generate', 'manual'] as const).map(mode => (
+                <FieldLabel htmlFor={`${valueModeId}-${mode}`} key={mode}>
+                  <Field orientation="horizontal">
+                    <RadioGroupItem id={`${valueModeId}-${mode}`} value={mode} />
+                    <FieldContent>
+                      <FieldTitle>{mode === 'generate' ? t('valueGenerate') : t('valueManual')}</FieldTitle>
+                      <FieldDescription className="dshx:text-xs">{mode === 'generate' ? t('generateHint') : t('manualHint')}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              ))}
+            </RadioGroup>
+          </FieldSet>
         )}
-      </form.AppField>
+      </form.Field>
       <form.Subscribe selector={state => state.values.valueMode}>
         {valueMode =>
-          valueMode === 'generate' ? (
-            <p className="dshx:text-xs dshx:text-muted-foreground dshx:sm:col-span-2">{t('generateHint')}</p>
-          ) : (
+          valueMode === 'manual' && (
             <form.AppField name="value">
               {field => (
-                <field.TextField autoComplete="new-password" className="dshx:sm:col-span-2" label={t('fieldSecretValue')} monospace required type="password" />
+                <field.TextField
+                  autoComplete="new-password"
+                  description={t('manualValueHint')}
+                  label={t('fieldSecretValue')}
+                  monospace
+                  placeholder={t('valuePlaceholder')}
+                  required
+                  type="password"
+                />
               )}
             </form.AppField>
           )
         }
       </form.Subscribe>
-      <form.AppField name="name">{field => <field.TextField label={t('fieldItemName')} />}</form.AppField>
-      <form.AppField name="source">{field => <field.TextField label={t('fieldSourceUrl')} />}</form.AppField>
-      <form.AppField name="tags">{field => <field.TextField label={t('fieldTags')} placeholder={t('tagsPlaceholder')} />}</form.AppField>
-      <form.AppField name="type">
-        {field => (
-          <field.SelectField
-            label={t('fieldItemType')}
-            options={[
-              { value: 'login', label: t('itemTypeLogin') },
-              { value: 'secure-note', label: t('itemTypeSecureNote') },
-            ]}
-          />
-        )}
-      </form.AppField>
-      <form.AppField name="field">
-        {field => <field.TextField className="dshx:sm:col-span-2" label={t('fieldField')} placeholder={t('fieldPlaceholder')} />}
-      </form.AppField>
+      <Collapsible className="dshx:rounded-md dshx:border" onOpenChange={setAdvancedOpen} open={advancedOpen}>
+        <CollapsibleTrigger asChild>
+          <Button className="dshx:group dshx:w-full dshx:justify-start dshx:rounded-md dshx:px-3 dshx:font-normal" type="button" variant="ghost">
+            <ChevronRightIcon aria-hidden className="dshx:transition-transform dshx:group-data-[state=open]:rotate-90" />
+            <span className="dshx:font-medium">{t('advanced')}</span>
+            <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{t('advancedSummary')}</span>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="dshx:grid dshx:gap-4 dshx:border-t dshx:p-3 dshx:sm:grid-cols-2">
+          <form.AppField name="name">{field => <field.TextField description={t('itemNameHint')} label={t('fieldItemName')} />}</form.AppField>
+          <form.AppField name="source">{field => <field.TextField label={t('fieldSourceUrl')} placeholder="https://" type="url" />}</form.AppField>
+          <form.AppField name="tags">{field => <field.TextField label={t('fieldTags')} placeholder={t('tagsPlaceholder')} />}</form.AppField>
+          <form.AppField
+            listeners={{
+              onChange: ({ value }) => {
+                const field = form.getFieldValue('field')
+                if (field === defaultFieldForType('login') || field === defaultFieldForType('secure-note'))
+                  form.setFieldValue('field', defaultFieldForType(value))
+              },
+            }}
+            name="type"
+          >
+            {field => (
+              <field.SelectField
+                label={t('fieldItemType')}
+                options={[
+                  { value: 'login', label: t('itemTypeLogin') },
+                  { value: 'secure-note', label: t('itemTypeSecureNote') },
+                ]}
+              />
+            )}
+          </form.AppField>
+          <form.AppField name="field">{field => <field.TextField description={t('fieldHint')} label={t('fieldField')} monospace />}</form.AppField>
+        </CollapsibleContent>
+      </Collapsible>
       {props.footer(
-        <form.Subscribe selector={state => [state.values.scope, state.values.valueMode, state.values.value] as const}>
-          {([scope, valueMode, value]) => (
-            <Button
-              disabled={
-                props.pending || needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) || (valueMode === 'manual' && value.length === 0)
-              }
-              type="submit"
-            >
+        <form.Subscribe selector={state => [state.values.scope, state.isSubmitting] as const}>
+          {([scope, isSubmitting]) => (
+            <Button disabled={props.pending || isSubmitting || needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder })} type="submit">
               {props.pending ? t('adding') : t('addAlias')}
             </Button>
           )}
@@ -354,12 +422,10 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
 
   return (
     <Dialog onOpenChange={closeUnlessPending} open>
-      <DialogContent
-        {...(props.mode === 'create' ? { 'aria-describedby': undefined } : {})}
-        className="dshx-root dshx:max-h-[calc(100%-2rem)] dshx:overflow-y-auto dshx:sm:max-w-xl"
-      >
+      <DialogContent className="dshx-root dshx:max-h-[calc(100%-2rem)] dshx:overflow-y-auto dshx:sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="dshx:text-base">{title}</DialogTitle>
+          {props.mode === 'create' && <DialogDescription>{t('dialogAddDescription')}</DialogDescription>}
           {props.mode === 'edit' && row !== undefined && (
             <DialogDescription>
               {t('editAliasLabel')} <strong className="dshx:font-mono dshx:text-foreground">{row.alias}</strong> · {row.scope} · {row.environment}.{' '}
@@ -372,7 +438,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
           <CreateSecretForm
             {...props}
             footer={submit => (
-              <DialogFooter className="dshx:sm:col-span-2">
+              <DialogFooter>
                 {cancelButton}
                 {submit}
               </DialogFooter>
