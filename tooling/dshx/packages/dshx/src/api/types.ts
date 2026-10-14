@@ -205,15 +205,25 @@ export interface RegistryApiView {
   readonly methods: readonly RegistryMethodView[]
 }
 
-/** Where an agent tool comes from: a dshx API method, an MCP server, or a plugin's own `defineTool`. */
-export type RegistryToolSource = 'api' | 'mcp' | 'tool'
+/**
+ * Where an agent tool comes from: a dshx API method, an MCP server, a tool a dshx Host lists in `defineHost({ tools })`
+ * (`plugin`), or anything else, which is DSH's own tools and plugins not built with dshx (`tool`).
+ */
+export type RegistryToolSource = 'api' | 'mcp' | 'plugin' | 'tool'
 
 export interface RegistryToolView {
   readonly name: string
   readonly description: string
   readonly source: RegistryToolSource
-  /** Owning package for API tools. */
+  /** Owning package for API and plugin tools. */
   readonly owner?: string
+  /**
+   * Whether the tool declares itself safe beside sibling calls, DSH's read-only marker (dshx `readOnly: true`). Its
+   * classifier may still refuse some arguments. Absent from a registry served by a dshx older than this field.
+   */
+  readonly readOnly?: boolean
+  /** False for a global tool the viewing agent's preset restricts away. Absent from an older registry. */
+  readonly enabled?: boolean
 }
 
 export interface RegistrySkillView {
@@ -221,11 +231,18 @@ export interface RegistrySkillView {
   readonly description: string
   readonly provider: string
   readonly modelInvocable: boolean
+  /** Whether a person can invoke it as `/name`. Absent from an older registry. */
+  readonly userInvocable?: boolean
+  /** Absolute SKILL.md path when a filesystem provider supplied it. */
+  readonly path?: string
 }
 
 export interface RegistryListing {
   readonly apis: readonly RegistryApiView[]
-  /** Every tool the viewing agent sees (global tools when no agent is live); empty without a tools service. */
+  /**
+   * Every tool the viewing agent sees (global tools when no agent is live), plus the global tools its preset restricts
+   * away (`enabled: false`); empty without a tools service.
+   */
   readonly tools: readonly RegistryToolView[]
   /** The live Session whose tool view `tools` shows; absent for the global view. */
   readonly toolScope?: { readonly sessionId: string }

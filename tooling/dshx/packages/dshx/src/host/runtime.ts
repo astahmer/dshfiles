@@ -22,6 +22,7 @@ import type { DshCompatibility } from '../compat/types.js'
 import { loadRuntimePlugins } from './runtime-plugins.js'
 import { inspectBridgeEnabled, ownHostInspectBridge, startHostInspectBridge } from './inspect-bridge.js'
 import { registerApi } from '../api/host-runtime.js'
+import { apiRegistry } from '../api/registry.js'
 import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import {
@@ -361,7 +362,13 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
     inject,
     ...(config === undefined ? {} : { Config: config }),
     apply(ctx, config) {
-      for (const tool of definition.tools ?? []) ctx.tools.register(tool)
+      if ((definition.tools?.length ?? 0) > 0) {
+        const owners = (apiRegistry(ctx).toolOwners ??= new WeakMap())
+        for (const tool of definition.tools ?? []) {
+          ctx.tools.register(tool)
+          owners.set(tool, metadata.packageId)
+        }
+      }
       for (const command of definition.commands ?? []) ctx.commands.register(command)
       for (const prompt of definition.prompts ?? []) {
         const contribution = promptContributionParts(prompt)

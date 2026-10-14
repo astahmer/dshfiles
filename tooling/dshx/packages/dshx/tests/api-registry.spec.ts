@@ -170,6 +170,55 @@ describe('API registry', () => {
     await host.dispose()
   })
 
+  it('tags plugin tools with their package and read-only marker, and skills with how they can be invoked', async () => {
+    const host = await createTestHost()
+    const output = { schema: { description: 'text' }, render: () => [] }
+    const toolHost = defineHost({
+      tools: [
+        {
+          name: 'test_read',
+          description: 'Read.',
+          parameters: { type: 'object', properties: {} },
+          output,
+          isConcurrencySafe: () => true,
+          execute: async () => 'ok',
+        },
+        { name: 'test_write', description: 'Write.', parameters: { type: 'object', properties: {} }, output, execute: async () => 'ok' },
+      ],
+    })
+    await host.mount(toolHost, { packageId: '@test/tools' })
+    host.ctx.provide('skills', {
+      list: async () => [
+        {
+          name: 'verify',
+          description: 'Verify.',
+          provider: 'filesystem',
+          path: '/repo/.agents/skills/verify/SKILL.md',
+          invocation: { modelInvocable: false, userInvocable: true },
+        },
+      ],
+    })
+    await host.mount(callerHost, { packageId: '@test/caller' })
+    const response = await host.connection.requestApi({ packageId: dshxRegistryApi.owner!, apiId: dshxRegistryApi.id, method: 'list', version: 1, input: {} })
+    const listing = listingResponse.parse(await response.json()).result.value.output
+    expect(listing.tools.filter(tool => tool.name.startsWith('test_'))).toEqual([
+      { name: 'test_read', description: 'Read.', source: 'plugin', owner: '@test/tools', readOnly: true, enabled: true },
+      { name: 'test_write', description: 'Write.', source: 'plugin', owner: '@test/tools', readOnly: false, enabled: true },
+    ])
+    expect(listing.tools.find(tool => tool.name === 'dshx_capabilities')).toMatchObject({ source: 'tool', readOnly: true })
+    expect(listing.skills).toEqual([
+      {
+        name: 'verify',
+        description: 'Verify.',
+        provider: 'filesystem',
+        modelInvocable: false,
+        userInvocable: true,
+        path: '/repo/.agents/skills/verify/SKILL.md',
+      },
+    ])
+    await host.dispose()
+  })
+
   it('reports a Client call to an unloaded owner as owner-missing instead of a transport failure', async () => {
     const call = vi.fn(async () => {
       throw new Error('Connection request failed: HTTP 404')

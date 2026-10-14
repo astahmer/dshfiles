@@ -41,6 +41,11 @@ export interface ApiRegistry {
   readonly apis: Map<string, RegisteredApi>
   readonly members: RegistryMember[]
   leader: RegistryMember | undefined
+  /**
+   * Package of each tool definition a dshx Host registered from `defineHost({ tools })`, keyed by the definition so an
+   * unloaded tool needs no cleanup; absent when an older dshx created the registry.
+   */
+  toolOwners?: WeakMap<object, string>
 }
 
 const REGISTRY_KEY = Symbol.for('@dshfiles/dshx.api-registry.v1')

@@ -10,6 +10,7 @@ import type {
   RegistryApiView,
   RegistryMethodView,
   RegistryToolSource,
+  RegistryToolView,
   RegistryListInput,
   RegistryListing,
 } from './types.js'
@@ -248,11 +249,14 @@ interface AgentsLike {
 
 /** The slice of DSH's skill registry the listing reads. */
 interface SkillsLike {
-  list(options: {
-    readonly cwd?: string
-    readonly scope?: object
-  }): Promise<
-    ReadonlyArray<{ readonly name: string; readonly description: string; readonly provider: string; readonly invocation: { readonly modelInvocable: boolean } }>
+  list(options: { readonly cwd?: string; readonly scope?: object }): Promise<
+    ReadonlyArray<{
+      readonly name: string
+      readonly description: string
+      readonly provider: string
+      readonly path?: string
+      readonly invocation: { readonly modelInvocable: boolean; readonly userInvocable: boolean }
+    }>
   >
 }
 
@@ -274,21 +278,27 @@ async function listSkills(ctx: Context, options: { readonly cwd?: string; readon
   try {
     const skills: SkillsLike | undefined = ctx.get('skills')
     if (skills === undefined) return []
-    return (await skills.list(options)).map(skill => ({
-      name: skill.name,
-      description: skill.description,
-      provider: skill.provider,
-      modelInvocable: skill.invocation.modelInvocable,
-    }))
+    return (await skills.list(options)).map(skill => {
+      const view = {
+        name: skill.name,
+        description: skill.description,
+        provider: skill.provider,
+        modelInvocable: skill.invocation.modelInvocable,
+        userInvocable: skill.invocation.userInvocable,
+      }
+      if (skill.path !== undefined) Object.assign(view, { path: skill.path })
+      return view
+    })
   } catch (cause) {
     warn(ctx, `dshx registry: skill listing failed: ${describeFailure(cause)}`)
     return []
   }
 }
 
-const toolSource = (name: string, owner: string | undefined): RegistryToolSource => {
-  if (owner !== undefined) return 'api'
-  return name.startsWith('mcp__') ? 'mcp' : 'tool'
+const toolSource = (name: string, apiOwner: string | undefined, pluginOwner: string | undefined): RegistryToolSource => {
+  if (apiOwner !== undefined) return 'api'
+  if (name.startsWith('mcp__')) return 'mcp'
+  return pluginOwner === undefined ? 'tool' : 'plugin'
 }
 
 async function describeRegistry(ctx: Context, registry: ApiRegistry, input: RegistryListInput): Promise<RegistryListing> {
@@ -297,14 +307,23 @@ async function describeRegistry(ctx: Context, registry: ApiRegistry, input: Regi
     for (const definition of Object.values(api.methods)) if (definition.tool !== undefined) apiTools.set(definition.tool.name, api.owner)
   }
   const agent = viewingAgent(ctx, input.sessionId)
-  const tools = (toolsOf(ctx)?.schemas(agent) ?? [])
-    .map(schema => {
-      const owner = apiTools.get(schema.name)
-      const view = { name: schema.name, description: schema.description, source: toolSource(schema.name, owner) }
-      if (owner !== undefined) Object.assign(view, { owner })
-      return view
-    })
-    .sort((left, right) => left.name.localeCompare(right.name))
+  const runtime = toolsOf(ctx)
+  const visible = runtime?.schemas(agent) ?? []
+  const visibleNames = new Set(visible.map(schema => schema.name))
+  const restricted = agent === undefined ? [] : (runtime?.schemas() ?? []).filter(schema => !visibleNames.has(schema.name))
+  const describeTool = (schema: { readonly name: string; readonly description: string }, enabled: boolean): RegistryToolView => {
+    const apiOwner = apiTools.get(schema.name)
+    const definition = runtime?.get(schema.name, enabled ? agent : undefined)
+    const pluginOwner = definition === undefined ? undefined : registry.toolOwners?.get(definition)
+    const owner = apiOwner ?? pluginOwner
+    const readOnly = definition?.isConcurrencySafe !== undefined
+    const view = { name: schema.name, description: schema.description, source: toolSource(schema.name, apiOwner, pluginOwner), readOnly, enabled }
+    if (owner !== undefined) Object.assign(view, { owner })
+    return view
+  }
+  const tools = [...visible.map(schema => describeTool(schema, true)), ...restricted.map(schema => describeTool(schema, false))].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )
   const skillOptions = {}
   const cwd = input.cwd ?? (agent?.session.header.cwd || undefined)
   if (cwd !== undefined) Object.assign(skillOptions, { cwd })
