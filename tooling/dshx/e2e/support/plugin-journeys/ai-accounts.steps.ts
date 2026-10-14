@@ -54,7 +54,8 @@ When('a Codex account draft is edited in manual save mode', async ({ page }: { p
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   const manualSave = page.getByRole('radio', { name: /Manual/ })
-  await manualSave.check()
+  // The radio follows the stored setting, so it flips after the Host round trip rather than on click.
+  await manualSave.click()
   await expect(manualSave).toBeChecked()
   await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
@@ -70,7 +71,8 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
     const saveChanges = page.getByRole('button', { name: 'Save changes', exact: true })
     await saveChanges.click()
     await expect(saveChanges).toBeDisabled()
-    await expect(page.getByRole('status').filter({ hasText: 'Saved. New sessions use the updated route settings.' })).toBeVisible()
+    // The panel header and the account footer both announce the save.
+    await expect(page.getByRole('status').filter({ hasText: 'Saved. New sessions use the updated route settings.' }).first()).toBeVisible()
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
     await expect(page.getByRole('radio', { name: /Manual/ })).toBeChecked()

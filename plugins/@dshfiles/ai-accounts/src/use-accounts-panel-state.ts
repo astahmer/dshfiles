@@ -198,6 +198,12 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     await save(draft)
   }
 
+  // An edit supersedes the last notice (e.g. "Added Codex 1…"), which would otherwise hide the manual-mode "Unsaved changes." status.
+  const editDraft = (next: AccountDraft) => {
+    setNotice(null)
+    setDraft(next)
+  }
+
   const revert = () => {
     saver.cancel()
     setDraft(selected === null ? null : toDraft(selected))
@@ -284,7 +290,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     setSelectedId,
     selected,
     draft,
-    setDraft,
+    setDraft: editDraft,
     dirty,
     problem,
     credentialInfo: credentialInfoQuery.data ?? null,
