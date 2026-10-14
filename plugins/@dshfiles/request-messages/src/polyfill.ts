@@ -1,9 +1,9 @@
-import { symbols, type Context } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
 import {
   freezeMessage,
   isAgentLoopRequest,
-  LlmRuntime,
+  type LlmRuntime,
   markAgentLoopRequest,
   type GenerateOptions,
   type Message,
@@ -30,12 +30,6 @@ const isAdapterStream = (value: unknown): value is AdapterStream => typeof value
 const isInstallation = (value: unknown): value is Installation => typeof value === 'object' && value !== null && 'hosts' in value && value.hosts instanceof Map
 
 const isMessage = (message: RequestMessage): message is Message => message.id !== undefined
-
-/** Cordis hands out a tracing proxy; the patch must land on the instance the waterfall calls. */
-const rawService = (service: LlmRuntime): LlmRuntime => {
-  const original: unknown = Reflect.get(service, symbols.original)
-  return original instanceof LlmRuntime ? original : service
-}
 
 const requestOptions = async (ctx: Context, options: GenerateOptions): Promise<GenerateOptions> => {
   if (!isAgentLoopRequest(options) || options.sessionId === undefined || options.toolHistory === undefined) return options
@@ -72,12 +66,12 @@ const requestOptions = async (ctx: Context, options: GenerateOptions): Promise<G
   }
 }
 
-const release = (raw: LlmRuntime, installation: Installation, token: symbol): void => {
+const release = (runtime: LlmRuntime, installation: Installation, token: symbol): void => {
   installation.hosts.delete(token)
   if (installation.hosts.size > 0) return
-  if (installation.ownDescriptor === undefined) Reflect.deleteProperty(raw, 'adapterStream')
-  else Reflect.defineProperty(raw, 'adapterStream', installation.ownDescriptor)
-  Reflect.deleteProperty(raw, installationKey)
+  if (installation.ownDescriptor === undefined) Reflect.deleteProperty(runtime, 'adapterStream')
+  else Reflect.defineProperty(runtime, 'adapterStream', installation.ownDescriptor)
+  Reflect.deleteProperty(runtime, installationKey)
 }
 
 /**
@@ -90,29 +84,30 @@ const release = (raw: LlmRuntime, installation: Installation, token: symbol): vo
  * titles, compaction) pass through untouched.
  */
 export const installRequestMessages = (ctx: Context): RequestMessagesStatus => {
-  const raw = rawService(ctx.llm)
+  // Cordis hands out a tracing proxy without define, delete or `in` traps, so those land on the instance the waterfall calls.
+  const runtime = ctx.llm
   const token = Symbol('request-messages host')
-  const existing: unknown = Reflect.get(raw, installationKey)
+  const existing = installationKey in runtime ? runtime[installationKey] : undefined
   if (isInstallation(existing)) {
     ctx.effect(() => {
       existing.hosts.set(token, ctx)
-      return () => release(raw, existing, token)
+      return () => release(runtime, existing, token)
     }, 'request-messages host')
     return { active: true }
   }
-  const original: unknown = Reflect.get(raw, 'adapterStream')
+  const original: unknown = runtime['adapterStream']
   if (!isAdapterStream(original))
     return { active: false, reason: 'this DSH llm runtime has no adapterStream method, so agent/request-messages cannot be dispatched' }
-  const installation: Installation = { ownDescriptor: Reflect.getOwnPropertyDescriptor(raw, 'adapterStream'), hosts: new Map([[token, ctx]]) }
+  const installation: Installation = { ownDescriptor: Reflect.getOwnPropertyDescriptor(runtime, 'adapterStream'), hosts: new Map([[token, ctx]]) }
   const wrapped: AdapterStream = async function* (this: unknown, options, prepared) {
     const host = installation.hosts.values().next().value
     const sent = host === undefined ? options : await requestOptions(host, options)
     yield* original.call(this, sent, prepared)
   }
   ctx.effect(() => {
-    Reflect.defineProperty(raw, 'adapterStream', { value: wrapped, configurable: true, writable: true })
-    Reflect.defineProperty(raw, installationKey, { value: installation, configurable: true })
-    return () => release(raw, installation, token)
+    Reflect.defineProperty(runtime, 'adapterStream', { value: wrapped, configurable: true, writable: true })
+    Reflect.defineProperty(runtime, installationKey, { value: installation, configurable: true })
+    return () => release(runtime, installation, token)
   }, 'request-messages adapterStream wrap')
   return { active: true }
 }

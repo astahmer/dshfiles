@@ -1,4 +1,4 @@
-import { Context, symbols } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import { LlmAdapter, LlmRuntime, createUserMessage, markAgentLoopRequest, type GenerateOptions, type Message, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
@@ -32,8 +32,7 @@ const startHost = async () => {
     return (await next()).slice(-1)
   })
   const install = () => ctx.plugin({ name: 'request-messages', inject: ['llm', 'agents'], apply: (scope: Context) => void installRequestMessages(scope) })
-  const raw: unknown = Reflect.get(ctx.llm, symbols.original)
-  return { ctx, adapter, payloads, install, raw }
+  return { ctx, adapter, payloads, install }
 }
 
 const drain = async (stream: AsyncIterable<StreamChunk>): Promise<void> => {
@@ -66,18 +65,18 @@ describe('agent/request-messages polyfill', () => {
   })
 
   it('restores the runtime when the last copy unloads', async () => {
-    const { ctx, adapter, payloads, install, raw } = await startHost()
+    const { ctx, adapter, payloads, install } = await startHost()
     const fiber = await install()
-    expect(Object.hasOwn(Object(raw), 'adapterStream')).toBe(true)
+    expect(Object.hasOwn(ctx.llm, 'adapterStream')).toBe(true)
     await fiber.dispose()
-    expect(Object.hasOwn(Object(raw), 'adapterStream')).toBe(false)
+    expect(Object.hasOwn(ctx.llm, 'adapterStream')).toBe(false)
     await drain(ctx.llm.stream(loopRequest()))
     expect(adapter.seen).toEqual([['first turn', 'first answer', 'second turn']])
     expect(payloads).toEqual([])
   })
 
   it('dispatches once when two copies are loaded', async () => {
-    const { ctx, adapter, payloads, install, raw } = await startHost()
+    const { ctx, adapter, payloads, install } = await startHost()
     const first = await install()
     const second = await install()
     await drain(ctx.llm.stream(loopRequest()))
@@ -87,6 +86,6 @@ describe('agent/request-messages polyfill', () => {
     expect(payloads).toHaveLength(2)
     expect(adapter.seen.at(-1)).toEqual(['second turn'])
     await second.dispose()
-    expect(Object.hasOwn(Object(raw), 'adapterStream')).toBe(false)
+    expect(Object.hasOwn(ctx.llm, 'adapterStream')).toBe(false)
   })
 })

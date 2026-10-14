@@ -29,9 +29,8 @@ export class OptmemSettingsDraft {
       return optmemSettings.schema(source)
     } catch {
       const fields: Record<string, unknown> = {}
-      for (const key of settingsKeys) {
-        if (!(key in source)) continue
-        const value: unknown = Reflect.get(source, key)
+      for (const [key, value] of Object.entries(source)) {
+        if (!(key in defaults)) continue
         try {
           optmemSettings.schema({ [key]: value })
           fields[key] = value

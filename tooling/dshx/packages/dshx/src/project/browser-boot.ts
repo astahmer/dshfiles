@@ -76,17 +76,18 @@ const SlotFailureNamesSchema = z.array(z.string().nullable())
 export const readClientBootOutcome = async (page: Page, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
   const nativeReadiness = await page.evaluate(
     async ({ expectedClientEntries, timeoutMs, bootCardSelector, appOutletSelector }) => {
-      const readClientEntryIds = (): string[] => {
-        const boot = Reflect.get(globalThis, '__DSH_BOOT__')
-        if (boot === null || typeof boot !== 'object') return []
-        const entries = Reflect.get(boot, 'entries')
-        if (!Array.isArray(entries)) return []
-        return entries.flatMap(entry => {
-          if (entry === null || typeof entry !== 'object') return []
-          const id = Reflect.get(entry, 'id')
-          return typeof id === 'string' ? [id] : []
-        })
-      }
+      // The page publishes its boot graph and readiness promise as untyped globals; these guards read the parts used here.
+      const hasBootGraph = (scope: Window): scope is Window & { readonly __DSH_BOOT__: { readonly entries: ReadonlyArray<unknown> } } =>
+        '__DSH_BOOT__' in scope && scope.__DSH_BOOT__ instanceof Object && 'entries' in scope.__DSH_BOOT__ && Array.isArray(scope.__DSH_BOOT__.entries)
+      const isBootEntry = (entry: unknown): entry is { readonly id: string } => entry instanceof Object && 'id' in entry && typeof entry.id === 'string'
+      const hasReadySignal = (scope: Window): scope is Window & { readonly __DSH_BOOT_READY__: { readonly promise: PromiseLike<unknown> } } =>
+        '__DSH_BOOT_READY__' in scope &&
+        scope.__DSH_BOOT_READY__ instanceof Object &&
+        'promise' in scope.__DSH_BOOT_READY__ &&
+        scope.__DSH_BOOT_READY__.promise instanceof Object &&
+        'then' in scope.__DSH_BOOT_READY__.promise &&
+        typeof scope.__DSH_BOOT_READY__.promise.then === 'function'
+      const readClientEntryIds = (): string[] => (hasBootGraph(window) ? window.__DSH_BOOT__.entries.filter(isBootEntry).map(entry => entry.id) : [])
 
       const deadline = Date.now() + timeoutMs
       let readiness: Promise<'resolved' | 'rejected'> | undefined
@@ -106,12 +107,9 @@ export const readClientBootOutcome = async (page: Page, options: BrowserBootOpti
           return { ready: false, missingClientEntries, failureCardVisible, text, timedOut: false, evidence }
         }
 
-        const ready = Reflect.get(globalThis, '__DSH_BOOT_READY__')
-        const signal = ready !== null && typeof ready === 'object' ? Reflect.get(ready, 'promise') : undefined
-        const hasThen = signal !== null && (typeof signal === 'object' || typeof signal === 'function') && typeof Reflect.get(signal, 'then') === 'function'
-        if (hasThen) {
+        if (hasReadySignal(window)) {
           readinessAvailable = true
-          readiness ??= Promise.resolve(signal).then(
+          readiness ??= Promise.resolve(window.__DSH_BOOT_READY__.promise).then(
             () => 'resolved' as const,
             () => 'rejected' as const,
           )

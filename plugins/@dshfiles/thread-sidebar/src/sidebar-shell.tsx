@@ -672,8 +672,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
   useEffect(() => {
     const onNavigate = (event: Event): void => {
-      const direction: unknown =
-        event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null ? Reflect.get(event.detail, 'direction') : undefined
+      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
+      const direction = typeof detail === 'object' && detail !== null && 'direction' in detail ? detail.direction : undefined
       if (direction === -1 || direction === 1) latestStepNavigation.current(direction)
     }
     window.addEventListener(NAVIGATION_EVENT, onNavigate)

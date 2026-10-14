@@ -238,8 +238,8 @@ export default defineClient({
     ctx.effect(() => {
       const onRequest = (event: Event): void => {
         const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
-        const probe = typeof detail === 'object' && detail !== null && Reflect.get(detail, 'probe') === true
-        const requestedMode = typeof detail === 'object' && detail !== null ? Reflect.get(detail, 'mode') : undefined
+        const probe = typeof detail === 'object' && detail !== null && 'probe' in detail && detail.probe === true
+        const requestedMode = typeof detail === 'object' && detail !== null && 'mode' in detail ? detail.mode : undefined
         event.preventDefault()
         if (probe) return
         openPalette(requestedMode === 'threads' || requestedMode === 'files' ? requestedMode : 'all')

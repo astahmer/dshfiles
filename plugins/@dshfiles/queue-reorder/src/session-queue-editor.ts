@@ -6,6 +6,7 @@ import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, SessionIn
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiClient } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { z } from 'zod'
 import type { queueApi } from './api.js'
 import {
   createQueueEditor,
@@ -45,16 +46,20 @@ interface ConversationWithInput {
   readonly input: { for(ctx: Context): SessionInput }
 }
 
-const DRAFT_METHODS = ['createDrafts', 'releaseDraftAttachment', 'resolveDraftAttachments', 'serializeDraftAttachments'] as const
+const draftAttachmentApiShape = z.object({
+  createDrafts: z.function(),
+  releaseDraftAttachment: z.function(),
+  resolveDraftAttachments: z.function(),
+  serializeDraftAttachments: z.function(),
+  fileUploads: z.object({ subscribe: z.function() }),
+})
 
-const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi =>
-  typeof value === 'object' &&
-  value !== null &&
-  DRAFT_METHODS.every(name => typeof Reflect.get(value, name) === 'function') &&
-  typeof Reflect.get(Object(Reflect.get(value, 'fileUploads')), 'subscribe') === 'function'
+const sessionInputShape = z.object({ input: z.object({ for: z.function() }) })
 
-const hasSessionInput = (value: unknown): value is ConversationWithInput =>
-  typeof value === 'object' && value !== null && typeof Reflect.get(Object(Reflect.get(value, 'input')), 'for') === 'function'
+// Only the shape is checked; callers keep the original object, whose methods rely on their own `this`.
+const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => draftAttachmentApiShape.safeParse(value).success
+
+const hasSessionInput = (value: unknown): value is ConversationWithInput => sessionInputShape.safeParse(value).success
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0
