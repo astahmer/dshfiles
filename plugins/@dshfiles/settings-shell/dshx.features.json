@@ -5,22 +5,191 @@
     {
       "id": "settings-shell-port",
       "title": "Native Settings shell, ported",
-      "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
-      "reach": ["click button \"Settings\"", "expect dialog \"Settings\""],
+      "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
+      "reach": ["click button \"Settings\"", "expect button \"General\""],
       "surfaces": ["client", "settings", "integration"],
       "configuration": [],
       "states": ["closed", "open", "onboarding", "disconnected", "update-available"],
       "failureModes": [
-        "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows it, so the port is refreshed instead of drifting silently.",
-        "The native welcome notice stores its acknowledgement in the switched-off row's namespace; the step is skipped while that namespace is unserved."
+        "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
+        "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.native-port",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
         {
           "kind": "unit-test",
           "id": "settings-shell.upstream-version",
           "file": "plugins/@dshfiles/settings-shell/src/upstream-version.test.ts",
           "testName": "matches the native Settings package this workspace builds against"
+        }
+      ]
+    },
+    {
+      "id": "settings-tab",
+      "title": "Settings as a main-view tab",
+      "summary": "With main-tabs loaded, Settings fills the main view and gets a tab like any other panel; picking that tab or reloading onto it reopens Settings, leaving the panel closes it.",
+      "reach": [
+        "click button \"Settings\"",
+        "click button \"Settings shell\"",
+        "click radio \"Automatic\"",
+        "press Escape",
+        "click button \"Settings\"",
+        "expect tab \"Settings\""
+      ],
+      "surfaces": ["client", "settings", "integration"],
+      "configuration": [
+        {
+          "key": "openIn",
+          "defaultValue": "auto",
+          "constraints": "Where Settings opens: auto (a tab when main-tabs is loaded), tab, or modal.",
+          "choices": ["auto", "tab", "modal"],
+          "coveredBy": ["settings-shell.tab", "settings-shell.preference-unit"]
+        }
+      ],
+      "states": ["tab", "panel-hidden", "restored-on-reload"],
+      "failureModes": ["With no other tab left, main-tabs keeps showing Settings: it cannot show an empty main view."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.tab",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.machine-unit-tab",
+          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
+          "testName": "opens as a main-view tab and closes when the main view leaves it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.preference-unit",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
+          "testName": "opens a tab when main-tabs is loaded, the dialog otherwise, unless the user chose"
+        }
+      ]
+    },
+    {
+      "id": "settings-dialog-expand",
+      "title": "Settings dialog, expandable",
+      "summary": "Without main-tabs (or with openIn set to the dialog), Settings opens as the native dialog, which expands to the full window and back, or moves into a tab keeping its section. Walk its reach on a scratch DSH without @dshfiles/main-tabs: with it, Settings opens as a tab and main-tabs restores the Settings tab on reload.",
+      "reach": ["click button \"Settings\"", "click button \"Expand to the full window\"", "expect button \"Restore the dialog size\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["modal", "expanded", "moved-to-tab"],
+      "failureModes": ["Escape clears a non-empty search before it closes the dialog."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.dialog-expand",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.machine-unit-dialog",
+          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
+          "testName": "opens the dialog on a section, expands it, and forgets the section on close"
+        }
+      ]
+    },
+    {
+      "id": "settings-search",
+      "title": "Search Settings inline",
+      "summary": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions and key paths match; hidden and secret fields never do.",
+      "reach": ["click button \"Settings\"", "fill searchbox \"Search settings\" \"max tabs\"", "expect text \"1 Setting Found\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["empty-query", "results", "no-results"],
+      "failureModes": [
+        "Native sections draw their own rows: a match on a section's name offers to open it, and their settings are reached through the namespaces under More settings."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.search",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-match",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-search.test.ts",
+          "testName": "finds settings by title, description and key, never hidden ones, and counts them per page"
+        }
+      ]
+    },
+    {
+      "id": "plugin-settings-controls",
+      "title": "Plugin settings with real controls",
+      "summary": "Every plugin's settings render from its schema with titles, descriptions, grouping and a control per type (switch, segments or select, bounded number with unit, list and key/value editors, JSON only as a fallback), in Settings and on its Plugins page.",
+      "reach": ["click button \"Settings\"", "click button \"Main tabs\"", "expect spinbutton \"Max tabs\""],
+      "surfaces": ["client", "settings", "integration"],
+      "configuration": [],
+      "states": ["ready", "read-only", "unavailable", "refused"],
+      "failureModes": ["A namespace whose plugin is not loaded shows its fields disabled with an explanation."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.plugin-controls",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.schema-unit-controls",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/schema-model.test.ts",
+          "testName": "turns each visible setting into a titled field with the control its type calls for"
+        }
+      ]
+    },
+    {
+      "id": "modified-settings",
+      "title": "Modified settings and reset to default",
+      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override.",
+      "reach": [
+        "click button \"Settings\"",
+        "click button \"Main tabs\"",
+        "fill spinbutton \"Max tabs\" \"8\"",
+        "press Enter",
+        "expect button \"Reset to default\""
+      ],
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["default", "modified", "pending"],
+      "failureModes": ["A refused value shows under its row and the row returns to the stored value."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.modified-reset",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ]
+    },
+    {
+      "id": "open-config-menu",
+      "title": "Open the configuration file elsewhere",
+      "summary": "Open configuration file is a split button: the native action plus a menu that opens the file with each associated app, in the Editor plugin, copies its path or reveals it in Finder.",
+      "reach": ["click button \"Settings\"", "click button \"More ways to open the configuration file\"", "expect menuitem \"Copy path\""],
+      "surfaces": ["client", "settings", "integration"],
+      "configuration": [],
+      "states": ["no-document", "document", "copied", "failed"],
+      "failureModes": [
+        "Until the native action creates the document, only its path can be copied.",
+        "Remote (non-loopback) browsers get neither the action nor the path."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.open-config-menu",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         }
       ]
     }
