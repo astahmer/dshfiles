@@ -2,7 +2,7 @@
   "oxlint": {
     "antislop(no-broad-object-parameters)": 8,
     "antislop(no-chained-type-assertions)": 42,
-    "antislop(no-conditional-empty-object-spread)": 499,
+    "antislop(no-conditional-empty-object-spread)": 492,
     "antislop(no-known-value-widening)": 168,
     "antislop(no-passthrough-variable)": 38,
     "antislop(no-reflect-apply)": 10,
@@ -17,8 +17,8 @@
   },
   "ast-grep": {
     "no-deeply-nested-ternary": 12,
-    "no-deeply-nested-ternary-tsx": 3,
-    "no-direct-json-parse": 186,
+    "no-deeply-nested-ternary-tsx": 2,
+    "no-direct-json-parse": 185,
     "no-direct-json-parse-tsx": 1,
     "no-export-from": 172,
     "no-wildcard-export": 1
