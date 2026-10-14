@@ -13,6 +13,7 @@ import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
@@ -308,13 +309,8 @@ const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyn
   })
   await handle.done
   const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
-  let decoded: unknown
-  try {
-    decoded = JSON.parse(stdout)
-  } catch {
-    return failed(`dshx checkout sync printed no result: ${(handle.collected.stderr?.readFrom(0)?.text ?? '').trim().slice(-400)}`)
-  }
-  const output = checkoutSyncOutputSchema.safeParse(decoded)
+  const output = JsonText.decode(checkoutSyncOutputSchema, stdout)
+  if (output === undefined) return failed(`dshx checkout sync printed no result: ${(handle.collected.stderr?.readFrom(0)?.text ?? '').trim().slice(-400)}`)
   if (!output.success) return failed('dshx checkout sync printed a result this plugin cannot read; rebuild dshx.')
   const data = output.data.data
   if (data === undefined)

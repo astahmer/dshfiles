@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
+import { JsonText } from './json-text.js'
 
 export interface JjResult {
   readonly exitCode: number
@@ -126,8 +127,9 @@ export const createThreads = (options: {
   const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
   const readRebaseTimestamps = async (repoRoot: string): Promise<Readonly<Record<string, number>>> => {
     try {
-      const parsed = rebaseTimestampSchema.parse(JSON.parse(await readFile(timestampFile(repoRoot), 'utf8')))
-      return Object.fromEntries(Object.entries(parsed).filter(([name]) => name.startsWith('thread-')))
+      const parsed = JsonText.decode(rebaseTimestampSchema, await readFile(timestampFile(repoRoot), 'utf8'))
+      if (parsed?.success !== true) return {}
+      return Object.fromEntries(Object.entries(parsed.data).filter(([name]) => name.startsWith('thread-')))
     } catch {
       return {}
     }
