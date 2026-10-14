@@ -2,7 +2,7 @@
 
 ## One development workspace
 
-The root pnpm workspace includes plugins, SDK packages, workspace check packages and desktop. Run `pnpm install --frozen-lockfile` once. Plugin SDK dependencies use `workspace:*`; external installed DSH profiles retain `link:` because they live outside this workspace. The checked-in web profile seed remains a standalone deployment manifest.
+The root pnpm workspace includes plugins, SDK packages, workspace check packages and desktop. Run `pnpm install --frozen-lockfile` once. Plugin SDK dependencies use `workspace:*`; external installed DSH profiles retain `link:` because they live outside this workspace. The checked-in web profile seed remains a standalone deployment manifest. Scratch installation retains its separate [pnpm policy](../tooling/dshx/scratch-pnpm-policy.yaml) so a disposable profile never inherits development workspace discovery.
 
 Turborepo 2.11.8 is pinned as a development dependency and uses its official platform binary. Vitest stays on 4.1.11. Local caches live in `.turbo/cache`; remote caching is disabled. Neither install nor verification changes the active web profile.
 
@@ -46,7 +46,9 @@ Dependency migration replaced 34 SDK link specifications; one root install disco
 - SDK scratch-profile regression file: 10 passing tests.
 - `pnpm run test:related plugins/@dshfiles/shared-streams/src/shim.ts`: 32 successful build prerequisites followed by only 8 related tests.
 - Repeated `turbo run build test typecheck --filter=@dshfiles/shared-streams`: all 7 tasks cached, 414ms warm run.
-- Sibling CSS hash probe invalidated plugin-ui and an unrelated UI consumer without changing the SDK build hash.
+- Sibling CSS and Markdown hash probes invalidated UI consumers without changing the SDK build hash.
+- Missing build output was restored byte-for-byte from cache without compilation.
+- `pnpm run typecheck`: all 77 package/build/typecheck tasks passed.
 - Repository lint ratchets passed; changed orchestration scripts have zero Oxlint findings; formatting passed.
 - Scratch DSH loaded the shortcuts bundle with 158 active entries, healthy authentication/process checks and no Host error lines. It was shut down; the live web instance and profile were not changed.
 
