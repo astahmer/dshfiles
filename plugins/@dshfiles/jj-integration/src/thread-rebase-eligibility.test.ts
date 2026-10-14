@@ -29,9 +29,9 @@ describe('thread rebase eligibility', () => {
   })
 
   it('reads unanswered questions from the user-question projection', () => {
-    expect(hasPendingUserQuestion({ userQuestions: { active: [{ callId: 'call' }], settled: [] } })).toBe(true)
-    expect(hasPendingUserQuestion({ userQuestions: { active: [], settled: [] } })).toBe(false)
-    expect(hasPendingUserQuestion({ userQuestions: { active: 'invalid' } })).toBeUndefined()
+    expect(hasPendingUserQuestion({ userQuestions: { active: [{ callId: 'call' }] } })).toBe(true)
+    expect(hasPendingUserQuestion({ userQuestions: { active: [] } })).toBe(false)
+    expect(hasPendingUserQuestion({})).toBeUndefined()
     expect(hasPendingUserQuestion(undefined)).toBeUndefined()
   })
 })

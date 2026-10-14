@@ -1,16 +1,15 @@
-import { z } from 'zod'
-
-const sessionProjectionValuesSchema = z.object({ userQuestions: z.object({ active: z.array(z.unknown()) }).passthrough() }).passthrough()
+interface UserQuestionProjectionValues {
+  readonly userQuestions?: { readonly active: readonly unknown[] }
+}
 
 export interface ThreadSessionActivity {
   readonly running: boolean | undefined
   readonly pendingUserQuestion: boolean | undefined
 }
 
-export const hasPendingUserQuestion = (projectionValues: unknown): boolean | undefined => {
-  if (projectionValues === undefined) return undefined
-  const parsed = sessionProjectionValuesSchema.safeParse(projectionValues)
-  return parsed.success ? parsed.data.userQuestions.active.length > 0 : undefined
+export const hasPendingUserQuestion = (projectionValues: UserQuestionProjectionValues | undefined): boolean | undefined => {
+  const userQuestions = projectionValues?.userQuestions
+  return userQuestions === undefined ? undefined : userQuestions.active.length > 0
 }
 
 export const canRebaseThread = (sessionIds: readonly string[], getActivity: (sessionId: string) => ThreadSessionActivity | undefined): boolean =>
