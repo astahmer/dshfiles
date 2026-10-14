@@ -197,7 +197,7 @@
           "kind": "unit-test",
           "id": "memory.block-scale",
           "file": "plugins/@dshfiles/memory/src/scale.test.ts",
-          "testName": "keeps search latency and the start block bounded with 5,000 digests and notes"
+          "testName": "keeps the start block within its byte budget once a project outgrows it"
         }
       ]
     },

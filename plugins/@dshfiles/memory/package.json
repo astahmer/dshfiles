@@ -18,6 +18,7 @@
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
+    "test:scale": "MEMORY_SCALE_TESTS=1 vitest run src/search-latency.scale.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "bench": "node bench/scale.mjs"
   },
