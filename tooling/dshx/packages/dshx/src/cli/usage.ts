@@ -448,6 +448,7 @@ const helpCommands: Record<CliCommand, CommandDef> = {
   build: simpleHelpCommand('build'),
   check: simpleHelpCommand('check', { boot: true, fix: true }),
   dev: simpleHelpCommand('dev'),
+  checkout: simpleHelpCommand('checkout'),
   inspect: inspectHelp,
   add: addHelp,
   status: simpleHelpCommand('status'),

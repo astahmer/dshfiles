@@ -53,6 +53,7 @@ import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../plat
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
+import { runCheckoutCli } from './checkout.js'
 import { SCRATCH_ACTIONS, runScratchCli } from './scratch.js'
 
 export interface CliIO {
@@ -1512,6 +1513,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
     })
   }
   if (argv[0] === 'dev' && SCRATCH_ACTIONS.has(argv[1] ?? '')) return runScratchCli(argv.slice(1), io)
+  if (argv[0] === 'checkout') return runCheckoutCli(argv.slice(1), io)
   let args: CliArgs
   try {
     args = parseCliArgs(argv)
