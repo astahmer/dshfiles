@@ -36,6 +36,41 @@ describe('ai-accounts queries', () => {
     expect(usage).toBeNull()
   })
 
+  it('keeps the last good quota of each account through a failed or unreadable poll', async () => {
+    const goodCard = { ...usageCard, windows: [{ label: 'Weekly limit', percentRemaining: 40, resetsAt: 9 }] }
+    const answers = [
+      {
+        readAt: 1,
+        hostName: 'mac',
+        cards: [
+          { instanceId: 'work', kind: 'codex', enabled: true, usage: goodCard },
+          { instanceId: 'home', kind: 'claude', enabled: true, usage: goodCard },
+        ],
+      },
+      {
+        readAt: 2,
+        hostName: 'mac',
+        cards: [
+          { instanceId: 'work', kind: 'codex', enabled: true, usage: { ...usageCard, status: 'error', message: 'Codex returned 502 for usage.' } },
+          { instanceId: 'home', kind: 'claude', enabled: true, usage: { ...usageCard, status: 'unauthenticated' } },
+        ],
+      },
+      { cards: 'nope' },
+    ]
+    const client = new QueryClient()
+    const options = aiAccountsQueries.usage({ usage: async () => overTheWire(answers.shift()) }, 60_000)
+    await client.fetchQuery(options)
+
+    const afterFailure = await client.fetchQuery(options)
+    expect(afterFailure?.cards.map(card => [card.instanceId, card.usage.status, card.usage.windows.length])).toEqual([
+      ['work', 'ok', 1],
+      ['home', 'unauthenticated', 0],
+    ])
+
+    const afterUnreadable = await client.fetchQuery(options)
+    expect(afterUnreadable?.readAt).toBe(2)
+  })
+
   it('falls back to the cached usage read when the Host has no refreshUsage', async () => {
     const usage = await aiAccountsQueries.readFreshUsage({
       refreshUsage: async () => {

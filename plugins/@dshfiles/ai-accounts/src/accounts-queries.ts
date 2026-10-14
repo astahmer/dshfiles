@@ -62,6 +62,29 @@ const normalizeUsage = (raw: unknown): AccountsUsage | null => {
   return { ...parsed.data, cards: parsed.data.cards.map(card => ({ ...card, displayName: card.displayName ?? card.instanceId })) }
 }
 
+/** A provider read that failed or was throttled says nothing new about the quota; the last good windows still stand. */
+const TRANSIENT_USAGE_STATUS = new Set<AccountsUsage['cards'][number]['usage']['status']>(['error', 'rate-limited'])
+
+/**
+ * Keeps each account's last good quota through a failed read, so a meter does
+ * not vanish between polls: an unreadable answer keeps the whole snapshot, and
+ * a card whose provider read failed keeps its previous windows. Removed
+ * accounts and real state changes (signed out, unsupported) still apply.
+ */
+const keepLastGoodUsage = (previous: AccountsUsage | null | undefined, next: AccountsUsage | null): AccountsUsage | null => {
+  if (next === null) return previous ?? null
+  if (previous === null || previous === undefined) return next
+  const previousById = new Map(previous.cards.map(card => [card.instanceId, card]))
+  return {
+    ...next,
+    cards: next.cards.map(card => {
+      const last = previousById.get(card.instanceId)
+      if (!TRANSIENT_USAGE_STATUS.has(card.usage.status) || last?.usage.status !== 'ok') return card
+      return { ...card, usage: last.usage }
+    }),
+  }
+}
+
 const hasPendingLiveReload = (state: NativeProviders | undefined): boolean =>
   state?.liveReload === true && state.providers.some(provider => provider.enabled !== provider.running && provider.lockedReason === null)
 
@@ -80,13 +103,16 @@ export const aiAccountsQueries = {
   usage: (accounts: Pick<AccountsClient, 'usage'>, refetchInterval: number) =>
     queryOptions({
       queryKey: aiAccountsKeys.usage,
-      queryFn: async ({ signal }) => normalizeUsage(await accounts.usage(undefined, { signal })),
+      queryFn: async ({ signal, client }) =>
+        keepLastGoodUsage(client.getQueryData<AccountsUsage | null>(aiAccountsKeys.usage), normalizeUsage(await accounts.usage(undefined, { signal }))),
       refetchInterval,
     }),
 
   /** Bypasses the Host's shared sweep cache; an older Host without `refreshUsage` falls back to the cached read. */
   readFreshUsage: async (accounts: Pick<AccountsClient, 'usage' | 'refreshUsage'>): Promise<AccountsUsage | null> =>
     normalizeUsage(await accounts.refreshUsage().catch(() => accounts.usage())),
+
+  keepLastGoodUsage,
 
   catalog: (accounts: Pick<AccountsClient, 'catalog'>, instanceId: string) =>
     queryOptions({

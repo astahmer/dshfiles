@@ -1,4 +1,5 @@
 import type { AccountKind, AccountsUsage } from './api.js'
+import { badgeFromName } from './account-draft.js'
 import { KIND_GROUPS } from './account-labels.js'
 
 /**
@@ -88,6 +89,8 @@ export const overviewSections = (
 export interface QuotaSummaryItem {
   readonly instanceId: string
   readonly displayName: string
+  /** The account's tag on narrow surfaces ("CA", "EM"): its picker tag, or its initials. */
+  readonly shortName: string
   readonly kind: AccountKind
   readonly windowLabel: string
   readonly percentRemaining: number
@@ -112,6 +115,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
     return {
       instanceId: card.instanceId,
       displayName: card.displayName,
+      shortName: badgeFromName(card.displayName),
       kind: card.kind,
       windowLabel: reserve.label,
       percentRemaining: Math.max(0, reserve.percentRemaining),
@@ -133,6 +137,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
   return {
     instanceId: card.instanceId,
     displayName: card.displayName,
+    shortName: badgeFromName(card.displayName),
     kind: card.kind,
     windowLabel: binding.label,
     percentRemaining: Math.max(0, binding.percentRemaining),
@@ -192,7 +197,7 @@ export const meterLines = (
 ): { readonly percent: string | null; readonly reset: string | null } => {
   const short = formatResetShort(item.resetsAt, now)
   const reset = short === null || label === 'percent' ? null : short === 'now' ? 'resetting' : `↻ ${short}`
-  const percent = item.exhausted ? 'Limit reached' : `${item.onReserve ? '☾ ' : ''}${String(Math.round(item.percentRemaining))}%`
+  const percent = item.exhausted ? `${item.shortName} limit reached` : `${item.onReserve ? '☾ ' : ''}${String(Math.round(item.percentRemaining))}%`
   return { percent: label === 'reset' && reset !== null ? null : percent, reset }
 }
 

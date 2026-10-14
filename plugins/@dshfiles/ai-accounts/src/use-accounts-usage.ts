@@ -1,7 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { aiAccountsApi } from './api.js'
+import { aiAccountsApi, type AccountsUsage } from './api.js'
 import { usePreferences } from './use-preferences.js'
 
 /**
@@ -15,7 +15,7 @@ export const useAccountsUsage = (options: { readonly enabled?: boolean } = {}) =
   const usageQuery = useQuery({ ...aiAccountsQueries.usage(accounts, usageRefreshMs), enabled: options.enabled ?? true })
   const refreshMutation = useMutation({
     mutationFn: () => aiAccountsQueries.readFreshUsage(accounts),
-    onSuccess: next => queryClient.setQueryData(aiAccountsKeys.usage, next),
+    onSuccess: next => queryClient.setQueryData<AccountsUsage | null>(aiAccountsKeys.usage, previous => aiAccountsQueries.keepLastGoodUsage(previous, next)),
   })
   // A failed refresh stays visible until a later read succeeds.
   const refreshFailed = refreshMutation.isError && refreshMutation.submittedAt > usageQuery.dataUpdatedAt

@@ -115,7 +115,8 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Render account quota windows, reset times, status indicators, and configurable footer or edge meters with hidden and ordered accounts.",
+      "summary": "Render account quota windows, reset times, status indicators, and configurable footer or edge meters with hidden and ordered accounts. Each strip meter carries the account's picker tag (\"CA\", \"EM\"), names it when its limit is reached, shows name, every window and the next reset on hover, and keeps its last good value through a failed poll.",
+      "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
@@ -166,7 +167,11 @@
         }
       ],
       "states": ["loading", "available", "limited", "reset-known", "failed", "hidden"],
-      "failureModes": ["A quota provider failure is displayed without persisting a fake success.", "Missing or stale accounts do not crash the quota strip."],
+      "failureModes": [
+        "A quota provider failure is displayed without persisting a fake success.",
+        "Missing or stale accounts do not crash the quota strip.",
+        "A failed or unreadable poll keeps each account's last good quota instead of dropping it from the strip."
+      ],
       "externalDependencies": [
         {
           "id": "provider-quota-apis",
@@ -184,6 +189,12 @@
           "kind": "gherkin",
           "id": "ai-accounts.usage-window-layout",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.usage-keeps-last-good",
+          "file": "plugins/@dshfiles/ai-accounts/src/accounts-queries.test.ts",
+          "testName": "keeps the last good quota of each account through a failed or unreadable poll"
         }
       ]
     },

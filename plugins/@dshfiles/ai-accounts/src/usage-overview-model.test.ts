@@ -89,6 +89,7 @@ describe('usage overview', () => {
     const item = {
       instanceId: 'codex',
       displayName: 'Codex',
+      shortName: 'CA',
       kind: 'codex',
       windowLabel: 'Weekly',
       percentRemaining: 41.6,
@@ -100,7 +101,7 @@ describe('usage overview', () => {
     expect(meterLines(item, 0, 'percent')).toEqual({ percent: '42%', reset: null })
     expect(meterLines(item, 0, 'reset')).toEqual({ percent: null, reset: '↻ 2h 0m' })
     expect(meterLines({ ...item, resetsAt: null }, 0, 'reset')).toEqual({ percent: '42%', reset: null })
-    expect(meterLines({ ...item, exhausted: true }, 3 * 3_600_000, 'both')).toEqual({ percent: 'Limit reached', reset: 'resetting' })
+    expect(meterLines({ ...item, exhausted: true }, 3 * 3_600_000, 'both')).toEqual({ percent: 'CA limit reached', reset: 'resetting' })
   })
 })
 

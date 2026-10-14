@@ -86,7 +86,7 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
             />
           )}
         </LabelledControl>
-        <LabelledControl hint="Up to 3 characters, shown on the provider mark." label="Picker tag">
+        <LabelledControl hint="Up to 3 characters, shown on the provider mark and the sidebar usage strip." label="Picker tag">
           {id => (
             <Input
               id={id}

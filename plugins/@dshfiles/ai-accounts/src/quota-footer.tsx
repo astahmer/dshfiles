@@ -1,14 +1,58 @@
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useApi } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChartColumnIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useRef, useState, type RefObject } from 'react'
+import { aiAccountsQueries } from './accounts-queries.js'
+import { aiAccountsApi } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences, type MeterLabel, type UsageWindowLayout } from './use-preferences.js'
 import { UsageOverview, useNow } from './usage-overview.js'
-import { formatResetShort, meterLines, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
+import { formatResetShort, isExhausted, meterLines, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
+
+const RESET_UNIT = { now: 'now', minutes: 'min', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
+
+/** Each account's picker tag from the accounts file; an account without one keeps its initials. */
+const useShortNames = (): ((item: QuotaSummaryItem) => QuotaSummaryItem) => {
+  const accounts = useApi(aiAccountsApi)
+  const file = useQuery({ ...aiAccountsQueries.file(accounts), retry: false })
+  const tags = new Map((file.data?.accounts ?? []).map(account => [account.instanceId, account.badge.trim()]))
+  return item => {
+    const tag = tags.get(item.instanceId) ?? ''
+    return tag === '' ? item : { ...item, shortName: tag }
+  }
+}
+
+/** Name, every quota window and the soonest reset of one strip account. */
+const AccountUsageTooltip = (props: { readonly item: QuotaSummaryItem; readonly now: number }): JSX.Element => {
+  const windows = props.item.windows ?? [{ label: props.item.windowLabel, percentRemaining: props.item.percentRemaining, resetsAt: props.item.resetsAt }]
+  const nextReset = windows
+    .flatMap(window => (window.resetsAt === null || window.resetsAt <= props.now ? [] : [window.resetsAt]))
+    .sort((left, right) => left - right)[0]
+  const resetIn = nextReset === undefined ? null : relativeTime(props.now, nextReset)
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
+      <span className="dshx:font-semibold">{props.item.displayName}</span>
+      {windows.map(window => (
+        <span className="dshx:tabular-nums" key={window.label}>
+          {window.label}: {isExhausted(window.percentRemaining) ? 'limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
+        </span>
+      ))}
+      {resetIn === null || nextReset === undefined ? null : (
+        <span className="dshx:tabular-nums">
+          Next reset {resetIn.unit === 'now' ? 'now' : `in ${String(resetIn.n)}${RESET_UNIT[resetIn.unit]}`} (
+          {new Date(nextReset).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })})
+        </span>
+      )}
+    </div>
+  )
+}
 
 const describeItem = (item: QuotaSummaryItem, now: number, windowLayout: UsageWindowLayout = 'binding'): string => {
   const accountWindows = item.windows ?? [{ label: item.windowLabel, percentRemaining: item.percentRemaining, resetsAt: item.resetsAt }]
@@ -44,6 +88,9 @@ const SummaryItem = (props: {
       )}
     >
       <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
+      {props.item.exhausted && windowLayout === 'binding' ? null : (
+        <span className="dshx:text-[10px] dshx:font-semibold dshx:tracking-wide dshx:text-foreground">{props.item.shortName}</span>
+      )}
       {windowLayout === 'binding' ? (
         <span className="dshx:flex dshx:flex-col dshx:items-start dshx:leading-none">
           {lines.percent === null ? null : (
@@ -131,55 +178,70 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage({ enabled: footerButton })
+  const withShortName = useShortNames()
   const now = useNow()
   const stripRef = useRef<HTMLDivElement>(null)
 
   if (!footerButton) return null
-  const items = stripItems(usage, arrangement.layout)
+  const items = stripItems(usage, arrangement.layout).map(withShortName)
   const shownIds = items.map(item => item.instanceId)
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverAnchor asChild>
-        <div
-          aria-label={label}
-          className="dshx-root dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-x-1 dshx:gap-y-0.5 dshx:border-t dshx:px-2 dshx:py-1"
-          ref={stripRef}
-          role="group"
-        >
-          {items.length === 0 ? (
-            <button aria-label={label} className={meterButtonClass} onClick={() => setOpen(current => !current)} type="button">
-              <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
-              <span>Usage</span>
-            </button>
-          ) : (
-            items.map(item => (
-              <ArrangeableAccount
-                arrangement={arrangement}
-                direction="row"
-                id={item.instanceId}
-                key={item.instanceId}
-                name={item.displayName}
-                shownIds={shownIds}
-              >
-                <button
-                  aria-expanded={open}
-                  aria-label={describeItem(item, now, usageWindowLayout)}
-                  className={cn(meterButtonClass, usageWindowLayout === 'vertical' && 'dshx:h-auto dshx:min-h-8 dshx:py-1', open && 'dshx:text-foreground')}
-                  onClick={() => setOpen(current => !current)}
-                  title={describeItem(item, now, usageWindowLayout)}
-                  type="button"
+    <TooltipProvider delayDuration={300}>
+      <Popover onOpenChange={setOpen} open={open}>
+        <PopoverAnchor asChild>
+          <div
+            aria-label={label}
+            className="dshx-root dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-x-1 dshx:gap-y-0.5 dshx:border-t dshx:px-2 dshx:py-1"
+            ref={stripRef}
+            role="group"
+          >
+            {items.length === 0 ? (
+              <button aria-label={label} className={meterButtonClass} onClick={() => setOpen(current => !current)} type="button">
+                <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+                <span>Usage</span>
+              </button>
+            ) : (
+              items.map(item => (
+                <ArrangeableAccount
+                  arrangement={arrangement}
+                  direction="row"
+                  id={item.instanceId}
+                  key={item.instanceId}
+                  name={item.displayName}
+                  shownIds={shownIds}
                 >
-                  <SummaryItem item={item} label={meterLabel} now={now} windowLayout={usageWindowLayout} />
-                </button>
-              </ArrangeableAccount>
-            ))
-          )}
-        </div>
-      </PopoverAnchor>
-      <UsagePopoverContent close={() => setOpen(false)} keepOpenWithin={stripRef} onOpenUsageHistory={props.onOpenUsageHistory} />
-    </Popover>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-expanded={open}
+                        aria-label={describeItem(item, now, usageWindowLayout)}
+                        className={cn(
+                          meterButtonClass,
+                          usageWindowLayout === 'vertical' && 'dshx:h-auto dshx:min-h-8 dshx:py-1',
+                          open && 'dshx:text-foreground',
+                        )}
+                        onClick={() => setOpen(current => !current)}
+                        type="button"
+                      >
+                        <SummaryItem item={item} label={meterLabel} now={now} windowLayout={usageWindowLayout} />
+                      </button>
+                    </TooltipTrigger>
+                    {open ? null : (
+                      <TooltipContent className="dshx-root" side="top" sideOffset={6}>
+                        <AccountUsageTooltip item={item} now={now} />
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </ArrangeableAccount>
+              ))
+            )}
+          </div>
+        </PopoverAnchor>
+        <UsagePopoverContent close={() => setOpen(false)} keepOpenWithin={stripRef} onOpenUsageHistory={props.onOpenUsageHistory} />
+      </Popover>
+    </TooltipProvider>
   )
 }
 
@@ -189,8 +251,9 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
+  const withShortName = useShortNames()
   const now = useNow()
-  const items = stripItems(usage, arrangement.layout)
+  const items = stripItems(usage, arrangement.layout).map(withShortName)
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
   const critical = mostCritical(items)
   return (
