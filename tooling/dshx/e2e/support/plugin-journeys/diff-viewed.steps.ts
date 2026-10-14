@@ -23,7 +23,11 @@ const reviewFile = async (page: Page, file: string): Promise<void> => {
   const chooser = page.getByRole('button', { name: 'Choose the file to review', exact: true })
   if ((await chooser.textContent())?.includes(file) === true) return
   await chooser.click()
-  await page.getByRole('option', { name: new RegExp(`^${file.replace('.', '\\.')}`) }).or(page.getByRole('menuitem', { name: new RegExp(`^${file.replace('.', '\\.')}`) })).first().click()
+  await page
+    .getByRole('option', { name: new RegExp(`^${file.replace('.', '\\.')}`) })
+    .or(page.getByRole('menuitem', { name: new RegExp(`^${file.replace('.', '\\.')}`) }))
+    .first()
+    .click()
   await expect(chooser).toContainText(file)
 }
 
@@ -32,7 +36,11 @@ const openReview = async (page: Page, turn: number): Promise<void> => {
   const reviewButtons = page.getByRole('button', { name: 'Review this turn’s changes in the sidebar', exact: true })
   await expect(page.getByText(/^Edited /).nth(turn - 1)).toBeVisible()
   if (turn <= (await reviewButtons.count())) await reviewButtons.nth(turn - 1).click()
-  else await page.getByText(/^Edited [\w.-]+$/).last().click()
+  else
+    await page
+      .getByText(/^Edited [\w.-]+$/)
+      .last()
+      .click()
   await expect(page.getByRole('tab', { name: `Review · turn ${String(turn)} Close`, exact: true })).toHaveAttribute('aria-selected', 'true')
 }
 
@@ -66,7 +74,11 @@ When('{string} is marked as not viewed', async ({ page }: { page: Page }, file: 
 
 When('the viewed marks already hold {int} older marks', async ({ page }: { page: Page }, count: number) => {
   await page.evaluate(
-    ({ key, total }) => localStorage.setItem(key, JSON.stringify(Array.from({ length: total }, (_, index) => JSON.stringify(['older-session', index, `old-${String(index)}.txt`])))),
+    ({ key, total }) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify(Array.from({ length: total }, (_, index) => JSON.stringify(['older-session', index, `old-${String(index)}.txt`]))),
+      ),
     { key: STORAGE_KEY, total: count },
   )
 })
@@ -111,7 +123,10 @@ Then('a mark made in another tab shows here without a reload', async ({ page }: 
     await otherTab.goto(page.url())
     const preview = otherTab.getByRole('dialog', { name: 'Preview Notice', exact: true })
     if (await preview.isVisible()) await preview.getByRole('button', { name: 'Continue', exact: true }).click()
-    await otherTab.getByRole('treeitem', { name: /^Fake thread title/ }).first().click()
+    await otherTab
+      .getByRole('treeitem', { name: /^Fake thread title/ })
+      .first()
+      .click()
     await openReview(otherTab, 1)
     await reviewFile(otherTab, 'beta.txt')
     await viewedBox(otherTab, 'beta.txt').check()

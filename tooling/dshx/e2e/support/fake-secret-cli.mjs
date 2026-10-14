@@ -32,13 +32,25 @@ const scopeOf = () => {
   if (flags.config !== undefined) fail(`unknown config ${flags.config}`)
   return { scope: 'project', root: cwd }
 }
-const inScope = ({ scope, root }) => row => row.scope === scope && (scope === 'global' || row.root === root)
+const inScope =
+  ({ scope, root }) =>
+  row =>
+    row.scope === scope && (scope === 'global' || row.root === root)
 const environment = flags.env ?? 'prod'
 const readStdin = () => readFileSync(0, 'utf8')
-const rowView = row => ({ alias: row.alias, scope: row.scope, environment: row.environment, item: row.item, field: row.field, source: row.source, description: row.name ?? '' })
+const rowView = row => ({
+  alias: row.alias,
+  scope: row.scope,
+  environment: row.environment,
+  item: row.item,
+  field: row.field,
+  source: row.source,
+  description: row.name ?? '',
+})
 
 if (command === 'print') {
-  const rows = positional[0] === 'global' ? store.rows.filter(row => row.scope === 'global') : store.rows.filter(row => row.scope === 'global' || row.root === cwd)
+  const rows =
+    positional[0] === 'global' ? store.rows.filter(row => row.scope === 'global') : store.rows.filter(row => row.scope === 'global' || row.root === cwd)
   process.stdout.write(JSON.stringify(rows.map(rowView)))
 } else if (command === 'get') {
   const matches = store.rows.filter(row => row.alias === positional[0] && row.environment === environment && inScope(scopeOf())(row))
@@ -56,7 +68,16 @@ if (command === 'print') {
   const item = existing?.item ?? `item-${positional[0]}-${environment}-${target.scope}`
   store.vault[item] = value
   if (existing === undefined) {
-    store.rows.push({ alias: positional[0], scope: target.scope, root: target.root, environment, item, field: flags.field ?? 'password', source: flags.source ?? '', name: flags.name })
+    store.rows.push({
+      alias: positional[0],
+      scope: target.scope,
+      root: target.root,
+      environment,
+      item,
+      field: flags.field ?? 'password',
+      source: flags.source ?? '',
+      name: flags.name,
+    })
   }
   save()
 } else if (command === 'mv') {

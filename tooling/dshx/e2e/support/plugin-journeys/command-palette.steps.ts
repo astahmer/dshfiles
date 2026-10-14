@@ -138,9 +138,7 @@ Then('thread content search finds the message and opens its thread', async ({ pa
   if (journey === undefined) throw new Error('No user-message thread was recorded for this content-search journey.')
 
   const matchingResult = paletteDialog(page).getByRole('option').filter({ hasText: journey.marker })
-  await recordAssertion(page, 'thread-content-search-settles-with-matching-snippet', () =>
-    expect(matchingResult).toBeVisible({ timeout: 30_000 }),
-  )
+  await recordAssertion(page, 'thread-content-search-settles-with-matching-snippet', () => expect(matchingResult).toBeVisible({ timeout: 30_000 }))
   await matchingResult.click()
   await recordAssertion(page, 'thread-content-search-opens-the-matching-session', async () => {
     await expect(paletteDialog(page)).not.toBeVisible()

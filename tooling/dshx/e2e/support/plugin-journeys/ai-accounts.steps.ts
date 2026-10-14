@@ -227,7 +227,9 @@ When('a second Command Code account whose billing read fails is added', async ({
 })
 
 Then('the account shows the session and weekly windows the provider reports', async ({ page }: { page: Page }) => {
-  await providerAccounts(page).getByRole('button', { name: /^Command Code 1 / }).click()
+  await providerAccounts(page)
+    .getByRole('button', { name: /^Command Code 1 / })
+    .click()
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
     await expect(page.getByText('75% left', { exact: true })).toBeVisible()
@@ -250,8 +252,7 @@ Then('the failed account reports the provider error instead of a quota', async (
   await finishJourneyAssertions(page)
 })
 
-const stripMeter = (page: Page) =>
-  page.getByRole('group', { name: /^AI accounts usage/ }).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
+const stripMeter = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ }).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
 
 Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
@@ -282,7 +283,7 @@ When('a rate-limited and a healthy Command Code account share a local fake provi
   await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BRAVO2' })
 })
 
-When('a new thread asks the first account\'s model a question', async ({ page }: { page: Page }) => {
+When("a new thread asks the first account's model a question", async ({ page }: { page: Page }) => {
   await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitem', { name: /^Model / }).click()

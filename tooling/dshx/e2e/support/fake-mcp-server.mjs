@@ -15,7 +15,11 @@ createInterface({ input: process.stdin }).on('line', line => {
   if (request.method === 'initialize') {
     return send({
       id: request.id,
-      result: { protocolVersion: request.params?.protocolVersion ?? '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'dshx-e2e-mcp', version: '1.0.0' } },
+      result: {
+        protocolVersion: request.params?.protocolVersion ?? '2025-06-18',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'dshx-e2e-mcp', version: '1.0.0' },
+      },
     })
   }
   if (request.method === 'tools/list') {

@@ -20,13 +20,19 @@ When('{string} is sent from the thread composer', async ({ page }: { page: Page 
   await composer.press('Enter')
 })
 
-Then('a side chat tab answers on the thread\'s model while the thread keeps one message', async ({ page }: { page: Page }) => {
+Then("a side chat tab answers on the thread's model while the thread keeps one message", async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'btw-side-chat-answers', async () => {
     await expect(sideChatTab(page)).toContainText('btw · what was my first question?')
     await expect(sideChat(page).getByText('what was my first question?', { exact: true })).toBeVisible()
-    await expect(sideChat(page).getByText(/^Answered by /).last()).toBeVisible()
+    await expect(
+      sideChat(page)
+        .getByText(/^Answered by /)
+        .last(),
+    ).toBeVisible()
     // The fork carries the thread's history, so the provider saw the first question before the side one.
-    const btwRequest = fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn').at(-1)
+    const btwRequest = fakeCommandCodeFor(page)
+      .requests.filter(request => request.kind === 'turn')
+      .at(-1)
     expect(btwRequest?.messages.map(message => message.text).join('\n')).toContain('first question')
   })
   await recordAssertion(page, 'btw-side-chat-keeps-the-model', async () => {

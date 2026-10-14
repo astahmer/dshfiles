@@ -89,7 +89,9 @@ Then('it never claims a remote health ping', async ({ page }: { page: Page }) =>
 Then('removing the Echo server after confirmation empties the list', async ({ page }: { page: Page }) => {
   await serverRow(page, 'Echo server').getByRole('button', { name: 'Remove', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Remove', exact: true }).click()
-  await recordAssertion(page, 'mcp-servers-remove-drops-the-server', () => expect(servers(page).getByText('No MCP servers configured yet.', { exact: true })).toBeVisible())
+  await recordAssertion(page, 'mcp-servers-remove-drops-the-server', () =>
+    expect(servers(page).getByText('No MCP servers configured yet.', { exact: true })).toBeVisible(),
+  )
   await finishJourneyAssertions(page)
 })
 

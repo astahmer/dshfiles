@@ -15,9 +15,7 @@ const MAX_RETAINED_RUNS = 10
 const MAX_RETAINED_BYTES = 20 * 1024 * 1024
 const stepIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
 const assertionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
-const evidenceAssertionSchema = z
-  .object({ assertionId: assertionIdSchema, outcome: z.enum(['passed', 'failed']) })
-  .strict()
+const evidenceAssertionSchema = z.object({ assertionId: assertionIdSchema, outcome: z.enum(['passed', 'failed']) }).strict()
 const frameSchema = z
   .object({
     frameId: z.string().regex(/^frame-[0-9]{3}$/),
@@ -181,7 +179,10 @@ export const renderEvidenceReport = (manifest: EvidenceManifest): string => {
     manifest.assertions.length === 0
       ? '<p>No individual assertion results were recorded for this run.</p>'
       : `<ol class="assertions">${manifest.assertions
-          .map(assertion => `<li><span class="assertion-state ${assertion.outcome}">${assertion.outcome}</span><code>${escapeHtml(assertion.assertionId)}</code></li>`)
+          .map(
+            assertion =>
+              `<li><span class="assertion-state ${assertion.outcome}">${assertion.outcome}</span><code>${escapeHtml(assertion.assertionId)}</code></li>`,
+          )
           .join('\n')}</ol>`
   const frames = manifest.frames
     .map((frame, index) => {
@@ -193,19 +194,18 @@ export const renderEvidenceReport = (manifest: EvidenceManifest): string => {
       const previous = manifest.frames[index - 1]
       const next = manifest.frames[index + 1]
       const previousControl =
-        previous === undefined
-          ? '<span aria-disabled="true">Previous frame</span>'
-          : `<a rel="prev" href="#${escapeHtml(previous.frameId)}">Previous frame</a>`
+        previous === undefined ? '<span aria-disabled="true">Previous frame</span>' : `<a rel="prev" href="#${escapeHtml(previous.frameId)}">Previous frame</a>`
       const nextControl =
-        next === undefined
-          ? '<span aria-disabled="true">Next frame</span>'
-          : `<a rel="next" href="#${escapeHtml(next.frameId)}">Next frame</a>`
+        next === undefined ? '<span aria-disabled="true">Next frame</span>' : `<a rel="next" href="#${escapeHtml(next.frameId)}">Next frame</a>`
       const controls = `<nav class="frame-controls" aria-label="Screenshot replay controls">${previousControl}<span>Frame ${String(index + 1)} of ${String(manifest.frames.length)}</span>${nextControl}</nav>`
       return `<figure id="${escapeHtml(frame.frameId)}"><figcaption><strong>${escapeHtml(frame.frameId)}</strong> · ${label} · ${escapeHtml(frame.capturedAt)}</figcaption>${controls}${image}</figure>`
     })
     .join('\n')
   const timeline = manifest.frames
-    .map((frame, index) => `<li><a href="#${escapeHtml(frame.frameId)}"><code>${escapeHtml(frame.frameId)}</code> · ${escapeHtml(frame.stepId)} (${String(index + 1)} of ${String(manifest.frames.length)})</a></li>`)
+    .map(
+      (frame, index) =>
+        `<li><a href="#${escapeHtml(frame.frameId)}"><code>${escapeHtml(frame.frameId)}</code> · ${escapeHtml(frame.stepId)} (${String(index + 1)} of ${String(manifest.frames.length)})</a></li>`,
+    )
     .join('\n')
   const replayStart = manifest.frames.length === 0 ? '' : '<p><a class="replay-start" href="#frame-001">Start screenshot replay</a></p>'
 
@@ -315,11 +315,7 @@ export const completeEvidenceStep = (run: EvidenceRun, stepId: string): void => 
   if (run.expectedStepIds.includes(stepId)) run.completedStepIds.add(stepId)
 }
 
-export const recordEvidenceAssertion = (
-  run: EvidenceRun,
-  assertionId: string,
-  outcome: EvidenceAssertion['outcome'],
-): void => {
+export const recordEvidenceAssertion = (run: EvidenceRun, assertionId: string, outcome: EvidenceAssertion['outcome']): void => {
   const assertion = evidenceAssertionSchema.safeParse({ assertionId, outcome })
   if (!assertion.success) throw new Error('The evidence assertion must use a static id and a pass/fail outcome.')
   if (run.assertions.length >= MAX_ASSERTIONS) throw new Error('The E2E evidence run exceeded its assertion limit.')

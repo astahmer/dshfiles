@@ -213,30 +213,32 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
-Given('the isolated plugin profile {string} is booted with the autocomplete skill fixture', async (
-  { page }: { page: Page },
-  packageId: string,
-) => {
+const seedAutocompleteSkill = async (homeRoot: string): Promise<void> => {
+  const skillDirectory = join(homeRoot, 'skills', 'e2e-skill-mentions')
+  await mkdir(skillDirectory, { recursive: true })
+  await writeFile(
+    join(skillDirectory, 'SKILL.md'),
+    `---\nname: e2e-skill-mentions\ndescription: Deterministic fixture for @ skill autocomplete.\nuser-invocable: true\ndisable-model-invocation: true\n---\nUsed only by the autocomplete browser journey.\n`,
+  )
+}
+
+Given('the isolated plugin profile {string} is booted with the autocomplete skill fixture', async ({ page }: { page: Page }, packageId: string) => {
+  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: `${packageId}-skill-mentions`, seedHome: seedAutocompleteSkill })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
+Given('the isolated plugin composition of {string} is booted with the autocomplete skill fixture', async ({ page }: { page: Page }, packageList: string) => {
+  const [packageId, ...companionPackageIds] = packageList.split(',').map(listed => listed.trim())
+  if (packageId === undefined || packageId === '') throw new Error('The plugin composition names no package.')
   const profile = await bootComposedPluginProfile({
-    packageIds: [packageId],
-    profileLabel: `${packageId}-skill-mentions`,
-    seedHome: async homeRoot => {
-      const skillDirectory = join(homeRoot, 'skills', 'e2e-skill-mentions')
-      await mkdir(skillDirectory, { recursive: true })
-      await writeFile(
-        join(skillDirectory, 'SKILL.md'),
-        `---\nname: e2e-skill-mentions\ndescription: Deterministic fixture for @ skill autocomplete.\nuser-invocable: true\ndisable-model-invocation: true\n---\nUsed only by the autocomplete browser journey.\n`,
-      )
-    },
+    packageIds: [packageId, ...companionPackageIds],
+    profileLabel: `${packageList}-skill-mentions`,
+    seedHome: seedAutocompleteSkill,
   })
   await visitIsolatedPluginProfile(page, profile)
 })
 
-Given('the isolated plugin composition {string} and {string} is booted', async (
-  { page }: { page: Page },
-  packageId: string,
-  companionPackageId: string,
-) => {
+Given('the isolated plugin composition {string} and {string} is booted', async ({ page }: { page: Page }, packageId: string, companionPackageId: string) => {
   const profile = await bootComposedPluginProfile({
     packageIds: [packageId, companionPackageId],
     profileLabel: `${packageId}+${companionPackageId}`,
@@ -251,19 +253,17 @@ Given('the isolated plugin composition of {string} is booted', async ({ page }: 
   await visitIsolatedPluginProfile(page, profile)
 })
 
-Given('the isolated plugin composition {string} and {string} with external bundle {string} is booted', async (
-  { page }: { page: Page },
-  packageId: string,
-  companionPackageId: string,
-  externalBundleId: string,
-) => {
-  const profile = await bootComposedPluginProfile({
-    packageIds: [packageId, companionPackageId],
-    profileLabel: `${packageId}+${companionPackageId}+${externalBundleId}`,
-    additionalBundleIds: [externalBundleId],
-  })
-  await visitIsolatedPluginProfile(page, profile)
-})
+Given(
+  'the isolated plugin composition {string} and {string} with external bundle {string} is booted',
+  async ({ page }: { page: Page }, packageId: string, companionPackageId: string, externalBundleId: string) => {
+    const profile = await bootComposedPluginProfile({
+      packageIds: [packageId, companionPackageId],
+      profileLabel: `${packageId}+${companionPackageId}+${externalBundleId}`,
+      additionalBundleIds: [externalBundleId],
+    })
+    await visitIsolatedPluginProfile(page, profile)
+  },
+)
 
 Then('the Web UI mounts without a plugin failure card', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)

@@ -12,7 +12,11 @@ const threadHeader = (page: Page, title: string) => page.locator('[data-conversa
 // A click while the previous turn settles can be dropped, so the New-thread screen is awaited and the click retried.
 const openNewThread = async (page: Page): Promise<void> => {
   await expect(async () => {
-    await page.getByRole('button', { name: /^New (thread|session)$/i }).filter({ visible: true }).first().click()
+    await page
+      .getByRole('button', { name: /^New (thread|session)$/i })
+      .filter({ visible: true })
+      .first()
+      .click()
     await expect(newThreadComposer(page)).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
 }
@@ -117,6 +121,30 @@ Then('the thread {string} is shown in a tab of its own', async ({ page }: { page
     await expect(threadHeader(page, title)).toBeVisible()
     await expect(page.getByRole('tab').filter({ hasText: new RegExp(`^${title}$`) })).toHaveCount(1)
     await expect(page.getByRole('tab').filter({ hasText: 'what changed' })).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const skillRow = (page: Page, name: string) => mentionRows(page).filter({ hasText: name })
+
+Then('the skill {string} and the thread {string} are both offered', async ({ page }: { page: Page }, skill: string, thread: string) => {
+  await recordAssertion(page, 'mentions-skill-beside-threads', async () => {
+    await expect(skillRow(page, skill)).toHaveCount(1)
+    await expect(mentionRows(page).filter({ hasText: thread })).toHaveCount(1)
+  })
+})
+
+Then('only the skill {string} is offered', async ({ page }: { page: Page }, skill: string) => {
+  await recordAssertion(page, 'mentions-skill-scope', async () => {
+    await expect(skillRow(page, skill)).toHaveCount(1)
+    await expect(mentionRows(page)).toHaveCount(1)
+  })
+})
+
+Then('the thread {string} is offered without the skill', async ({ page }: { page: Page }, thread: string) => {
+  await recordAssertion(page, 'mentions-thread-scope-hides-skills', async () => {
+    await expect(mentionRows(page).filter({ hasText: thread })).toHaveCount(1)
+    await expect(skillRow(page, 'e2e-skill-mentions')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

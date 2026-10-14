@@ -69,6 +69,16 @@ const decodeMentionValue = (value: unknown): MentionValue | null => {
 
 const mentionClipboardText = (value: MentionValue): string => (value.kind === 'server' ? `MCP server: ${value.serverName}` : `MCP tool: ${value.name}`)
 
+// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:` and `@mcp:`.
+const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp):/iu
+
+/** The query this source ranks: the text after its own scope prefix, or undefined while another scope is typed. */
+export const scopedMentionQuery = (query: string, ownScope: 'skill' | 'mcp'): string | undefined => {
+  const scope = MENTION_SCOPE.exec(query)?.[1]
+  if (scope === undefined) return query
+  return scope.toLowerCase() === ownScope ? query.slice(scope.length + 1) : undefined
+}
+
 export const decodeMcpMentionTools = (value: unknown): readonly MentionTool[] => {
   const parsedListing = registryListingSchema.safeParse(value)
   if (!parsedListing.success) return []
@@ -179,7 +189,8 @@ export const createMcpMentionSource = (options: MentionSourceOptions) => {
     order: 20,
     showGroupTitle: false,
     async candidates(session, request) {
-      if (request.quoted === true) return []
+      const query = scopedMentionQuery(request.query, 'mcp')
+      if (query === undefined || request.quoted === true) return []
       try {
         const catalog = await fetchCatalog(session.sessionId).promise
         if (request.signal.aborted) return []
@@ -188,9 +199,9 @@ export const createMcpMentionSource = (options: MentionSourceOptions) => {
           serverName: server.serverName,
           name: `${server.serverName} ${server.name}`,
         }))
-        const rankedTools = options.rank(catalog.tools, request.query)
+        const rankedTools = options.rank(catalog.tools, query)
         const candidates = mcpMentionCandidates({
-          rankedServers: options.rank(serverSearchRows, request.query),
+          rankedServers: options.rank(serverSearchRows, query),
           rankedTools,
           serverSection: options.serverSection,
           toolSection: options.toolSection,

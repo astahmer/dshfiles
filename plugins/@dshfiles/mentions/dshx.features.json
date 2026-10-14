@@ -5,7 +5,7 @@
     {
       "id": "ranked-mentions",
       "title": "Ranked @ mentions for files and threads",
-      "summary": "One @ menu that interleaves files and threads by match quality (exact title or basename, prefix, substring or fuzzy), then recency, then workspace or project, hides blank threads, and narrows with @thread: / @t: or @file: / @f:. Picks insert the native reference chips.",
+      "summary": "One @ menu that interleaves files and threads by match quality (exact title or basename, prefix, substring or fuzzy), then recency, then workspace or project, hides blank threads, and narrows with @thread: / @t: or @file: / @f:; @skill: and @mcp: hand the menu to the skill (thread-sidebar) and MCP (mcp-servers) sources, which stay out of the thread and file scopes. Picks insert the native reference chips.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
@@ -26,6 +26,11 @@
         {
           "kind": "gherkin",
           "id": "mentions.ranked-mentions",
+          "featureFile": "tooling/dshx/e2e/features/mentions.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "mentions.skill-and-mcp-scopes",
           "featureFile": "tooling/dshx/e2e/features/mentions.feature"
         },
         {

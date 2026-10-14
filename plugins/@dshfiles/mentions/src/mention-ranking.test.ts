@@ -20,6 +20,8 @@ describe('MentionRanking.parseQuery', () => {
     expect(MentionRanking.parseQuery('f:src/')).toEqual({ scope: 'file', text: 'src/', prefix: 'f:' })
     expect(MentionRanking.parseQuery('file:')).toEqual({ scope: 'file', text: '', prefix: 'file:' })
     expect(MentionRanking.parseQuery('readme')).toEqual({ scope: 'all', text: 'readme', prefix: '' })
+    expect(MentionRanking.parseQuery('skill:rev')).toEqual({ scope: 'skill', text: 'rev', prefix: 'skill:' })
+    expect(MentionRanking.parseQuery('MCP:figma')).toEqual({ scope: 'mcp', text: 'figma', prefix: 'MCP:' })
   })
 })
 

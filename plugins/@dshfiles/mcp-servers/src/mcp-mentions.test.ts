@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { decodeMcpMentionTools, mcpMentionCandidates, mcpMentionPick, serializeMcpMention } from './mcp-mentions.js'
+import { decodeMcpMentionTools, mcpMentionCandidates, mcpMentionPick, scopedMentionQuery, serializeMcpMention } from './mcp-mentions.js'
 
 test('decodes MCP tools without letting unrelated long descriptions hide them', () => {
   assert.deepEqual(
@@ -75,4 +75,11 @@ test('serializes selected MCP entities as explicit, non-path prompt references',
     }),
     /MCP autocomplete reference is invalid/u,
   )
+})
+
+test('ranks @mcp: queries by their text and stays empty under another scope', () => {
+  assert.equal(scopedMentionQuery('figma', 'mcp'), 'figma')
+  assert.equal(scopedMentionQuery('mcp:figma', 'mcp'), 'figma')
+  assert.equal(scopedMentionQuery('f:src/', 'mcp'), undefined)
+  assert.equal(scopedMentionQuery('skill:review', 'mcp'), undefined)
 })

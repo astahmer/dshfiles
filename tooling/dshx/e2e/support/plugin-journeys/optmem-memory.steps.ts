@@ -12,7 +12,11 @@ const MEMORY_HEADER = 'Persistent memory (OptMem), full mode'
 const scratchRoots = new WeakMap<Page, string>()
 
 const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true })
-const statusValue = (page: Page, term: string) => settingsDialog(page).getByRole('term').filter({ hasText: new RegExp(`^${term}$`) }).locator('xpath=following-sibling::*[1]')
+const statusValue = (page: Page, term: string) =>
+  settingsDialog(page)
+    .getByRole('term')
+    .filter({ hasText: new RegExp(`^${term}$`) })
+    .locator('xpath=following-sibling::*[1]')
 
 const openMemorySettings = async (page: Page): Promise<void> => {
   if (!(await settingsDialog(page).isVisible())) await page.getByRole('button', { name: 'Settings', exact: true }).click()
@@ -190,7 +194,12 @@ When('{string} is sent and stopped while OptMem waits for pending summaries', as
   const stop = page.getByRole('button', { name: /^Stop/ }).first()
   await expect(stop).toBeVisible()
   await stop.click()
-  await expect(page.getByRole('status').filter({ hasText: /^(Stopped|Cancelled|Interrupted)$/ }).last()).toBeVisible({ timeout: 30_000 })
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: /^(Stopped|Cancelled|Interrupted)$/ })
+      .last(),
+  ).toBeVisible({ timeout: 30_000 })
   expect(turnRequests(page).length).toBe(before)
 })
 

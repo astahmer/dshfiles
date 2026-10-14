@@ -27,7 +27,9 @@ const saveState = (page: Page) => editorPanel(page).getByText(/^(Saved|Unsaved|N
 const openGoToFile = async (page: Page): Promise<void> => {
   await page.keyboard.press('Meta+Shift+P')
   await expect(paletteDialog(page)).toBeVisible()
-  await paletteDialog(page).getByRole('option', { name: /Go to file/ }).click()
+  await paletteDialog(page)
+    .getByRole('option', { name: /Go to file/ })
+    .click()
   await expect(paletteDialog(page).getByText('Go to file in this thread’s workspace…', { exact: true })).toBeVisible()
 }
 
@@ -68,8 +70,12 @@ When('a disposable workspace with source, dependency and version-control files h
 
 When('{string} is opened with Go to file', async ({ page }: { page: Page }, fileName: string) => {
   await openGoToFile(page)
-  await paletteDialog(page).getByRole('combobox').fill(fileName.replace(/\.\w+$/, ''))
-  await paletteDialog(page).getByRole('option', { name: new RegExp(`^${fileName.replace('.', '\\.')}`) }).click()
+  await paletteDialog(page)
+    .getByRole('combobox')
+    .fill(fileName.replace(/\.\w+$/, ''))
+  await paletteDialog(page)
+    .getByRole('option', { name: new RegExp(`^${fileName.replace('.', '\\.')}`) })
+    .click()
   await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -149,7 +155,9 @@ Then('{string} opens in the {string} editor with its disk content', async ({ pag
     await expect(workbenchEditor).toHaveCount(0)
   })
   await recordAssertion(page, `editor-shows-${fileName.replaceAll('.', '-').toLowerCase()}-from-disk`, async () => {
-    await expect(editorPanel(page).locator('[data-editor-surface] .view-lines')).toContainText(fileName === 'hello.ts' ? 'export const greeting' : 'Editor workspace')
+    await expect(editorPanel(page).locator('[data-editor-surface] .view-lines')).toContainText(
+      fileName === 'hello.ts' ? 'export const greeting' : 'Editor workspace',
+    )
     await expect(saveState(page)).toHaveText('Saved')
   })
 })
@@ -161,9 +169,7 @@ Then('the first save asks for approval and writes the edit to disk', async ({ pa
   await recordAssertion(page, 'editor-save-writes-the-buffer', async () => {
     await expect(saveState(page)).toHaveText('Saved')
     await expect(editorPanel(page).getByLabel('Unsaved changes', { exact: true })).toHaveCount(0)
-    await expect
-      .poll(() => readFile(join(workspaceFor(page), 'editor-workspace', 'src', 'hello.ts'), 'utf8'))
-      .toBe(`${helloSource}export const saved = true`)
+    await expect.poll(() => readFile(join(workspaceFor(page), 'editor-workspace', 'src', 'hello.ts'), 'utf8')).toBe(`${helloSource}export const saved = true`)
   })
 })
 

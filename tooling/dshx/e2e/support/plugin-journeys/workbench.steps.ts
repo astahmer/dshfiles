@@ -76,7 +76,9 @@ Then('the closed panel stays closed and can be added back', async ({ page }: { p
   await recordAssertion(page, 'workbench-layout-survives-reload', () => expect.poll(() => regionNames(page)).toEqual([]))
   await page.getByRole('button', { name: 'Add panel', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Editor', exact: true }).click()
-  await recordAssertion(page, 'workbench-add-panel-restores-the-closed-panel', () => expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible())
+  await recordAssertion(page, 'workbench-add-panel-restores-the-closed-panel', () =>
+    expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible(),
+  )
   await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
   await page.getByRole('button', { name: 'Reset layout', exact: true }).click()
   await recordAssertion(page, 'workbench-reset-restores-the-default-layout', () => expect.poll(() => regionNames(page)).toEqual(['Editor']))
@@ -90,7 +92,11 @@ Then('the Workbench falls back to its default layout', async ({ page }: { page: 
 Then('the Editor tab stays as a closable placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-missing-plugin-keeps-a-placeholder', async () => {
     await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toBeVisible()
-    await expect(page.getByText('“dshfiles-editor.main” is not available. Its plugin may be disabled or removed; it comes back here once it registers again.', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('“dshfiles-editor.main” is not available. Its plugin may be disabled or removed; it comes back here once it registers again.', {
+        exact: true,
+      }),
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Close panel', exact: true })).toBeVisible()
   })
 })

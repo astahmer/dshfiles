@@ -27,7 +27,11 @@ const releaseUploads = async (page: Page): Promise<void> => {
 }
 
 When('a thread is started and its file upload is held', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: /^New (thread|session)$/i }).filter({ visible: true }).first().click()
+  await page
+    .getByRole('button', { name: /^New (thread|session)$/i })
+    .filter({ visible: true })
+    .first()
+    .click()
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.fill('upload thread')
   await composer.press('Enter')

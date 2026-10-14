@@ -21,7 +21,12 @@ export interface FakeOAuthMcp {
 }
 
 const registrationSchema = z.object({ client_name: z.string(), redirect_uris: z.array(z.string().url()).min(1) })
-const jsonRpcSchema = z.object({ jsonrpc: z.literal('2.0'), id: z.union([z.string(), z.number()]).optional(), method: z.string(), params: z.unknown().optional() })
+const jsonRpcSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.union([z.string(), z.number()]).optional(),
+  method: z.string(),
+  params: z.unknown().optional(),
+})
 const initializeParamsSchema = z.object({ protocolVersion: z.string() })
 
 const fakes = new WeakMap<Page, FakeOAuthMcp>()
@@ -77,7 +82,12 @@ export const startFakeOAuthMcp = async (page: Page): Promise<FakeOAuthMcp> => {
         const clientId = `fake-client-${randomUUID()}`
         clients.set(clientId, registration.data.redirect_uris)
         registeredClientNames.push(registration.data.client_name)
-        return json(response, 201, { client_id: clientId, client_name: registration.data.client_name, redirect_uris: registration.data.redirect_uris, token_endpoint_auth_method: 'none' })
+        return json(response, 201, {
+          client_id: clientId,
+          client_name: registration.data.client_name,
+          redirect_uris: registration.data.redirect_uris,
+          token_endpoint_auth_method: 'none',
+        })
       }
       if (url.pathname === '/authorize') {
         const clientId = url.searchParams.get('client_id') ?? ''

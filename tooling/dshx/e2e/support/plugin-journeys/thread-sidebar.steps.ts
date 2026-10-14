@@ -322,7 +322,12 @@ When('a thread is snoozed until tomorrow morning from its sidebar row', async ({
   const marker = targetRow.getByRole('img', { name: 'Muted', exact: true })
   await expect(marker).toBeVisible()
   await marker.hover()
-  await expect(page.getByRole('tooltip').filter({ hasText: /Muted · wakes in \d+ [hd] / }).first()).toBeVisible()
+  await expect(
+    page
+      .getByRole('tooltip')
+      .filter({ hasText: /Muted · wakes in \d+ [hd] / })
+      .first(),
+  ).toBeVisible()
 })
 
 Then('it stays snoozed after reload and the Muted filter lists it', async ({ page }: { page: Page }) => {

@@ -50,7 +50,14 @@ const packTarget = async (root: string): Promise<string> => {
   await mkdir(packs, { recursive: true })
   await writeFile(
     join(target, 'package.json'),
-    JSON.stringify({ name: TARGET_PACKAGE, version: '1.0.0', type: 'module', main: './index.js', files: ['index.js', 'cordis.patch.yml'], dsh: { bundle: { patch: './cordis.patch.yml' } } }),
+    JSON.stringify({
+      name: TARGET_PACKAGE,
+      version: '1.0.0',
+      type: 'module',
+      main: './index.js',
+      files: ['index.js', 'cordis.patch.yml'],
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }),
   )
   await writeFile(join(target, 'index.js'), "export const name = 'marketplace-e2e-target'\nexport function apply() {}\n")
   await writeFile(join(target, 'cordis.patch.yml'), `- insert:\n    - id: marketplace-e2e-target\n      name: "${TARGET_PACKAGE}"\n`)
@@ -144,7 +151,9 @@ Then('the Tools tab lists the registry tool and the marketplace API', async ({ p
 })
 
 When('{string} is downloaded through both confirmations', async ({ page }: { page: Page }, name: string) => {
-  await settingsDialog(page).getByRole('button', { name: new RegExp(`^(Download|Retry download) ${name}$`) }).click()
+  await settingsDialog(page)
+    .getByRole('button', { name: new RegExp(`^(Download|Retry download) ${name}$`) })
+    .click()
   const dialog = page.getByRole('dialog', { name: /^(Install plugin|Confirm the risk)$/ })
   await expect(dialog).toContainText(TARGET_PACKAGE)
   await dialog.getByRole('button', { name: 'Continue', exact: true }).click()
@@ -158,7 +167,10 @@ Then('the catalog lists the Hub plugins and narrows by search, sort and compatib
     await expect(pluginCards(page)).toHaveCount(3)
     await expect(settingsDialog(page).getByText('3 plugins', { exact: true })).toBeVisible()
   })
-  await settingsDialog(page).getByRole('searchbox', { name: 'Search plugins', exact: true }).or(settingsDialog(page).getByRole('textbox', { name: 'Search plugins', exact: true })).fill('starred')
+  await settingsDialog(page)
+    .getByRole('searchbox', { name: 'Search plugins', exact: true })
+    .or(settingsDialog(page).getByRole('textbox', { name: 'Search plugins', exact: true }))
+    .fill('starred')
   await recordAssertion(page, 'plugin-marketplace-searches-the-hub', async () => {
     await expect(pluginCards(page)).toHaveCount(1)
     await expect(pluginCards(page).first()).toContainText('Starred helper')
@@ -180,7 +192,9 @@ Then('the catalog lists the Hub plugins and narrows by search, sort and compatib
 
 Then('the catalog reports the Hub failure and recovers on Retry without inventing plugins', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'plugin-marketplace-catalog-failure-has-a-retry', async () => {
-    await expect(settingsDialog(page).getByText('The plugin marketplace is unavailable. Check the Framework Hub URL or network connection.', { exact: true })).toBeVisible()
+    await expect(
+      settingsDialog(page).getByText('The plugin marketplace is unavailable. Check the Framework Hub URL or network connection.', { exact: true }),
+    ).toBeVisible()
     await expect(pluginCards(page)).toHaveCount(0)
   })
   hubFor(page).failList = false
@@ -195,7 +209,9 @@ Then('the catalog reports the Hub failure and recovers on Retry without inventin
 Then('the bundle is installed into the Profile with a restart notice', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   await recordAssertion(page, 'plugin-marketplace-install-activates-the-bundle', async () => {
-    await expect(page.getByText('The plugin was added to the current Profile. Restart the Profile to activate it.', { exact: true })).toBeVisible({ timeout: 180_000 })
+    await expect(page.getByText('The plugin was added to the current Profile. Restart the Profile to activate it.', { exact: true })).toBeVisible({
+      timeout: 180_000,
+    })
     const manifest: unknown = JSON.parse(await readFile(join(profile.homeRoot, 'profiles', profile.profile, 'package.json'), 'utf8'))
     expect(JSON.stringify(manifest)).toContain(TARGET_PACKAGE)
   })
@@ -213,7 +229,10 @@ Then('the install fails visibly and leaves the Profile unchanged', async ({ page
 
 When('the failed install is retried through both confirmations again', async ({ page }: { page: Page }) => {
   await page.getByRole('dialog').getByRole('button', { name: 'Retry', exact: true }).click()
-  await page.getByRole('dialog', { name: /^(Install plugin|Confirm the risk)$/ }).getByRole('button', { name: 'Continue', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: /^(Install plugin|Confirm the risk)$/ })
+    .getByRole('button', { name: 'Continue', exact: true })
+    .click()
   await page.getByRole('dialog', { name: 'Confirm the risk', exact: true }).getByRole('button', { name: 'Download and install', exact: true }).click()
 })
 

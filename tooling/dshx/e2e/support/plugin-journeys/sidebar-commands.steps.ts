@@ -55,18 +55,25 @@ Then('\\/goto offers palette actions, registered panels and only the nonblank re
 })
 
 Then('picking a panel, the thread and the palette action each opens its target', async ({ page }: { page: Page }) => {
-  await goToGroup(page, 'Panels').getByRole('option', { name: /^Plugins/ }).click()
+  await goToGroup(page, 'Panels')
+    .getByRole('option', { name: /^Plugins/ })
+    .click()
   await recordAssertion(page, 'sidebar-commands-panel-row-opens-the-panel', () =>
     expect(page.getByRole('heading', { name: 'Plugins', exact: true, level: 1 })).toBeVisible(),
   )
-  await page.getByRole('treeitem', { name: /^New Session/ }).first().click()
+  await page
+    .getByRole('treeitem', { name: /^New Session/ })
+    .first()
+    .click()
   await openGoTo(page)
   await goToGroup(page, 'Sessions').getByRole('option').first().click()
   await recordAssertion(page, 'sidebar-commands-session-row-opens-the-thread', () =>
     expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('goto session alpha'),
   )
   await openGoTo(page)
-  await goToGroup(page, 'Actions').getByRole('option', { name: /^Open command palette/ }).click()
+  await goToGroup(page, 'Actions')
+    .getByRole('option', { name: /^Open command palette/ })
+    .click()
   await recordAssertion(page, 'sidebar-commands-palette-row-opens-the-palette', () =>
     expect(page.getByRole('dialog', { name: 'Command palette', exact: true })).toBeVisible(),
   )
@@ -82,7 +89,9 @@ Then('\\/goto offers no palette actions', async ({ page }: { page: Page }) => {
 })
 
 Then('picking the AI Accounts row reports a stale panel and stays put', async ({ page }: { page: Page }) => {
-  await goToGroup(page, 'Panels').getByRole('option', { name: /^AI Accounts/ }).click()
+  await goToGroup(page, 'Panels')
+    .getByRole('option', { name: /^AI Accounts/ })
+    .click()
   await recordAssertion(page, 'sidebar-commands-stale-panel-is-reported', async () => {
     await expect(page.getByRole('alert').filter({ hasText: 'That panel is no longer registered.' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Plugins', exact: true, level: 1 })).toHaveCount(0)

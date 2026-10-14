@@ -74,6 +74,8 @@ Then('routine events stay condensed while the error stays visible on its own', a
   })
   await page.getByRole('button', { name: 'Detailed (no condensation)', exact: true }).click()
   await page.getByRole('button', { name: 'Attention only', exact: true }).click()
-  await recordAssertion(page, 'activity-timeline-attention-filter-keeps-only-the-error', () => expect.poll(() => rowTitles(page)).toEqual(['Agent reported an error']))
+  await recordAssertion(page, 'activity-timeline-attention-filter-keeps-only-the-error', () =>
+    expect.poll(() => rowTitles(page)).toEqual(['Agent reported an error']),
+  )
   await finishJourneyAssertions(page)
 })

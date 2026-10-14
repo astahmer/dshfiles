@@ -13,7 +13,7 @@ const primaryModifierFor = async (page: Page): Promise<ModifierKey> => {
   return 'Control'
 }
 
-const alternateModifierFor = async (page: Page): Promise<ModifierKey> => (await primaryModifierFor(page)) === 'Meta' ? 'Control' : 'Meta'
+const alternateModifierFor = async (page: Page): Promise<ModifierKey> => ((await primaryModifierFor(page)) === 'Meta' ? 'Control' : 'Meta')
 
 const pressPrimaryB = async (page: Page): Promise<void> => {
   await page.keyboard.press(`${await primaryModifierFor(page)}+b`)

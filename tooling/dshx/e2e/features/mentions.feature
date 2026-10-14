@@ -9,7 +9,7 @@ Feature: Ranked @ mentions and thread links
     Given the isolated plugin profile "@dshfiles/mentions" is booted
     When threads named "deploy" and "fix the deploy script" are started
     And a new thread composer types "@deploy"
-    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files"
+    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @skill: · @mcp:"
     When a new thread composer types "@t:"
     Then only thread rows are listed under the heading "Threads · @f: files"
     When a new thread composer types "@f:"
@@ -27,3 +27,14 @@ Feature: Ranked @ mentions and thread links
     Then the thread "Mention target" is shown
     When the sending thread is shown again and its thread chip is Cmd-clicked
     Then the thread "Mention target" is shown in a tab of its own
+
+  @scenario:mentions.skill-and-mcp-scopes
+  Scenario: Skills share the @ menu with threads and files, and each scope keeps its own rows
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/thread-sidebar" is booted with the autocomplete skill fixture
+    When threads named "e2e skill notes" and "unrelated work" are started
+    And a new thread composer types "@e2e"
+    Then the skill "e2e-skill-mentions" and the thread "e2e skill notes" are both offered
+    When a new thread composer types "@skill:e2e"
+    Then only the skill "e2e-skill-mentions" is offered
+    When a new thread composer types "@t:e2e"
+    Then the thread "e2e skill notes" is offered without the skill

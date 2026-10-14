@@ -10,6 +10,16 @@ const skillNameSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)
 type SkillSessionId = ClientSessionContext['sessionId']
 
+// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:` and `@mcp:`.
+const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp):/iu
+
+/** The query this source ranks: the text after its own scope prefix, or undefined while another scope is typed. */
+export const scopedMentionQuery = (query: string, ownScope: 'skill' | 'mcp'): string | undefined => {
+  const scope = MENTION_SCOPE.exec(query)?.[1]
+  if (scope === undefined) return query
+  return scope.toLowerCase() === ownScope ? query.slice(scope.length + 1) : undefined
+}
+
 type SkillCatalogEntry = {
   readonly abort: AbortController
   readonly promise: Promise<readonly SkillEntry[]>
@@ -70,12 +80,13 @@ export const createSkillMentionSource = (options: SkillMentionSourceOptions) => 
     order: -10,
     showGroupTitle: false,
     async candidates(session, request) {
-      if (request.quoted === true || options.isSubagent(session.sessionId)) return []
+      const query = scopedMentionQuery(request.query, 'skill')
+      if (query === undefined || request.quoted === true || options.isSubagent(session.sessionId)) return []
       try {
         const skills = await fetchCatalog(session.sessionId).promise
         if (request.signal.aborted) return []
         return skillMentionCandidates({
-          skills: options.rank(skills, request.query),
+          skills: options.rank(skills, query),
           section: options.section,
           userOnlyLabel: options.userOnlyLabel,
         })

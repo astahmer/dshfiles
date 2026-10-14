@@ -41,7 +41,10 @@ const openChecks = async (page: Page): Promise<void> => {
   await expect(checksPanel(page)).toBeVisible()
 }
 
-const trustAction = async (page: Page, action: { readonly id: string; readonly label: string; readonly script: string; readonly verify: boolean }): Promise<void> => {
+const trustAction = async (
+  page: Page,
+  action: { readonly id: string; readonly label: string; readonly script: string; readonly verify: boolean },
+): Promise<void> => {
   const profile = profileFor(page)
   const patch = join(profile.homeRoot, 'profiles', profile.profile, 'cordis.patch.yml')
   await appendFile(

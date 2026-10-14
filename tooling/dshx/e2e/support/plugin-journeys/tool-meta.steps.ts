@@ -18,7 +18,11 @@ const revealSettledToolCard = async (page: Page): Promise<void> => {
   const group = page.getByText('Ran commands', { exact: true }).last()
   // The transcript re-renders while it reconnects after a settings save, so a fold toggle can land on a stale row.
   await expect(async () => {
-    if (!(await group.isVisible())) await page.getByText(/^Completed in /).last().click()
+    if (!(await group.isVisible()))
+      await page
+        .getByText(/^Completed in /)
+        .last()
+        .click()
     await expect(group.or(card).first()).toBeVisible({ timeout: 2_000 })
     if (!(await card.isVisible())) await group.click()
     await expect(card).toBeVisible({ timeout: 2_000 })
@@ -59,7 +63,12 @@ Then('once the turn settles the tool card shows how long the call took and when 
 })
 
 const openToolMetaSettings = async (page: Page): Promise<void> => {
-  await page.getByRole('navigation', { name: 'Sidebar navigation' }).or(page.getByRole('navigation', { name: 'Global panels' })).getByRole('button', { name: 'Plugins', exact: true }).first().click()
+  await page
+    .getByRole('navigation', { name: 'Sidebar navigation' })
+    .or(page.getByRole('navigation', { name: 'Global panels' }))
+    .getByRole('button', { name: 'Plugins', exact: true })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'View @dshfiles/tool-meta', exact: true }).click()
 }
 
@@ -67,7 +76,10 @@ const saveAndReturnToThread = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await expect(async () => {
-    await page.getByRole('treeitem', { name: /^Fake thread title/ }).first().click()
+    await page
+      .getByRole('treeitem', { name: /^Fake thread title/ })
+      .first()
+      .click()
     await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Fake thread title', { timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
 }
