@@ -26,8 +26,9 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
 | [`mcp-servers`](plugins/@dshfiles/mcp-servers/README.md) | Configure profile-wide MCP servers through native DSH clients. |
 | [`model-effort-picker`](plugins/@dshfiles/model-effort-picker/README.md) | Search provider-grouped model catalogs and tune reasoning effort in the composer. |
+| [`memory`](plugins/@dshfiles/memory/README.md) | Cross-thread memory from DSH's session logs: thread digests, a frozen start block, memory tools and a Memory panel. In the `web` profile. |
 | [`multi-host`](plugins/@dshfiles/multi-host/README.md) | Run new threads on other machines over SSH: host chip, hosts dialog, remote thread view. |
-| [`optmem`](plugins/@dshfiles/optmem/README.md) | Persistent project memory, tools, and compact context views. |
+| [`optmem`](plugins/@dshfiles/optmem/README.md) | Persistent project memory with compact context views; superseded by `memory` in the `web` profile ([findings](plugins/@dshfiles/optmem/docs/findings.md)). |
 | [`plugin-marketplace`](plugins/@dshfiles/plugin-marketplace/README.md) | Find and install plugins from the Framework Hub catalog. |
 | [`project-checks`](plugins/@dshfiles/project-checks/README.md) | Run trusted project actions and inspect completion receipts. |
 | [`prompt-stash`](plugins/@dshfiles/prompt-stash/README.md) | Save reusable prompts and bounded composer drafts locally. |
