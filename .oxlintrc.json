@@ -1,7 +1,8 @@
 {
   "plugins": [
     "typescript",
-    "oxc"
+    "oxc",
+    "react"
   ],
   "jsPlugins": [
     {
@@ -13,6 +14,16 @@
     "correctness": "error"
   },
   "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react/immutability": "off",
+    "react/incompatible-library": "off",
+    "react/exhaustive-effect-dependencies": "off",
+    "react/no-deriving-state-in-effects": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/exhaustive-deps": "warn",
+    "react/purity": "warn",
     "antislop/no-chained-type-assertions": "warn",
     "antislop/no-broad-object-parameters": "warn",
     "antislop/no-conditional-empty-object-spread": "warn",

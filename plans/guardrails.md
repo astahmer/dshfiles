@@ -65,7 +65,17 @@ pandwind and emilint already enforce. Audited 2026-10-14 against `main`.
 Steps 1–5 do not touch the plugins other workspaces are changing. Steps 6–12
 wait for the `memory` and `usage` plugins to land.
 
-- [ ] 1. `chore(lint)`: react plugin, per-rule warning ratchet, unused-directive report.
+- [x] 1. `chore(lint)`: react plugin, per-rule warning ratchet, unused-directive report.
+      `pnpm lint` runs `scripts/lint-ratchet.ts`: any error, or any rule above
+      its cap in `scripts/lint-ratchet.json`, fails; an unknown rule has cap 0.
+      React uses emisoup's off-list (which also turns off `refs` and
+      `set-state-in-effect`); `exhaustive-deps` and `purity` are warnings.
+      Caps at landing (2166 warnings): conditional-empty-object-spread 483,
+      safety-comment-for-type-assertion 419, runtime-typeof 357,
+      unsafe-dictionary-type 255, unknown-parameters 211, known-value-widening
+      159, unknown-returns 120, chained-type-assertions 42, passthrough-variable
+      38, reflect-get 28, exhaustive-deps 26, reflect-apply 10, purity 10,
+      broad-object-parameters 8.
 - [ ] 2. `refactor`: fix the 126 low-count antislop sites (broad-object 8,
       reflect-apply 10, reflect-get 28, passthrough 38, chained assertions 42),
       one revision per rule, then promote each to `error`.

@@ -11,7 +11,7 @@
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
     "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop",
     "check:diff": "node scripts/check-diff.mjs",
-    "lint": "oxlint tooling/dshx/packages plugins scripts apps/desktop/src --config .oxlintrc.json",
+    "lint": "node scripts/lint-ratchet.ts",
     "fmt": "oxfmt tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "check:plugin-boot": "pnpm --dir tooling/dshx run test:boot",
