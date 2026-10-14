@@ -51,7 +51,7 @@ export const HeroWorkspacePicker = (
     const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
     const hostName = directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'
     return (
-      // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (client.css).
+      // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
       <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
         <HostChipSlot />
         <RemoteDestinationChips

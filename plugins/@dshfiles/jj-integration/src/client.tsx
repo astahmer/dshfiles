@@ -39,6 +39,11 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 const useBookmark = (): string => useSettings(jjIntegrationSettings).value?.bookmark ?? 'main'
 
+// The native project chip names a folder of this machine; while a remote host is chosen the remote folder chip replaces
+// it. This rule lives outside client.css so the Tailwind sheet stays byte-identical to every other plugin's and is
+// injected once.
+const remoteDestinationSheet = `div:has(> [data-slot='conversation.hero.workspace'] [data-remote-destination]) > button:first-child{display:none}`
+
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
@@ -57,6 +62,13 @@ export default defineClient({
   ],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
+    ctx.effect(() => {
+      const sheet = document.createElement('style')
+      sheet.dataset.dshfilesRemoteDestination = ''
+      sheet.textContent = remoteDestinationSheet
+      document.head.appendChild(sheet)
+      return () => sheet.remove()
+    })
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
         { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
