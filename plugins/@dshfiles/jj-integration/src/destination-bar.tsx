@@ -1,4 +1,6 @@
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ComposerBlocks } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
@@ -6,15 +8,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
-import { useState } from 'react'
-import { jjIntegrationApi } from './api.js'
+import { useEffect, useMemo, useState } from 'react'
+import { z } from 'zod'
+import { jjIntegrationApi, threadWorkspaceName } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { workspaceToggleMachine, type SpareWorkspace, type ToggleRequest, type WorkspaceToggleClient } from './workspace-toggle-machine.js'
 
 export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
+  readonly sessions: ISessions
+  readonly blocks: ComposerBlocks
   readonly openWorkspace: (workspaceId: string) => Promise<void>
   /** Replace the blank thread's composer with the remote one; returns the undo. */
   readonly takeOverComposer: () => () => void
@@ -47,12 +55,74 @@ export const workspaceListed = (workspaces: IWorkspaces, workspaceId: string): P
     })
   })
 
-type Target = { readonly workspaceId: string; readonly isolate: boolean; readonly base?: string }
+const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
+
+const storedSpares = createStoredValue({
+  key: 'dshfiles-jj-integration.spare-workspaces',
+  schema: z.record(z.string(), z.object({ workspaceId: z.string(), name: threadWorkspaceName })),
+  fallback: noSpares,
+})
+
+const randomThreadName = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(3))
+  return `thread-${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`
+}
+
+const threadNameOf = (path: string | undefined): string | null => {
+  const name = path?.split('/').at(-1)
+  return threadWorkspaceName.safeParse(name).success && name !== undefined ? name : null
+}
+
+const useWorkspaceToggle = (services: DestinationBarServices, t: JjIntegrationTranslate) => {
+  const api = useApi(jjIntegrationApi)
+  const queryClient = useQueryClient()
+  const client = useMemo(
+    (): WorkspaceToggleClient => ({
+      provision: (input, signal) => api.provision(input, { signal }),
+      listed: workspaceId => workspaceListed(services.workspaces, workspaceId),
+      open: workspaceId => services.openWorkspace(workspaceId),
+      findSpare: key => {
+        const spare = storedSpares.get()[key]
+        if (spare === undefined) return undefined
+        const workspace = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === spare.workspaceId)
+        const sessions = services.sessions.list.getSnapshot().byId
+        const blank = workspace?.sessionIds.every(sessionId => sessions[sessionId]?.blank === true) ?? false
+        return blank ? spare : undefined
+      },
+      keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
+      blockComposer: reason => {
+        const sessions = services.sessions.list.getSnapshot()
+        const current = sessions.ids.find(sessionId => (sessions.byId[sessionId]?.retainedBy.mainView ?? 0) > 0)
+        if (current === undefined) return () => undefined
+        services.blocks.set(current, { reason })
+        return () => services.blocks.set(current, undefined)
+      },
+      generateName: randomThreadName,
+      preparingReason: name => (name === null ? t('switchingDestination') : t('preparingWorkspace', { name })),
+    }),
+    [api, services, t],
+  )
+  const [snapshot, send, actor] = useMachine(workspaceToggleMachine, { input: { client } })
+  useEffect(() => {
+    const subscription = actor.on('switched', event => {
+      if (event.destination !== undefined) queryClient.setQueryData(['jj-integration', 'destination', event.workspaceId], event.destination)
+      else void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', event.workspaceId] })
+      void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
+    })
+    return () => subscription.unsubscribe()
+  }, [actor, queryClient])
+  return {
+    pending: snapshot.context.pending,
+    error: snapshot.context.error,
+    busy: snapshot.matches('switching'),
+    toggle: (request: ToggleRequest) => send({ type: 'toggle', request }),
+  }
+}
 
 /**
  * Where a new thread runs on this machine, chosen before its first message: the jj bookmark it starts from and
- * whether it gets its own jj workspace, rendered in the native New thread row beside its project chip after the host chip. A
- * Session's directory is fixed once created, so each change opens a blank thread at the new destination.
+ * whether it gets its own jj workspace, rendered in the native New thread row beside its project chip after the host chip.
+ * The toggle flips at once and names the thread workspace while the Host creates it; the composer waits until it is ready.
  */
 export const DestinationBar = (props: {
   readonly workspaceId: string | undefined
@@ -61,9 +131,7 @@ export const DestinationBar = (props: {
 }) => {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
-  const queryClient = useQueryClient()
   const [branchOpen, setBranchOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const workspaceId = props.workspaceId ?? null
   const destination = useQuery({
     queryKey: ['jj-integration', 'destination', workspaceId ?? ''],
@@ -71,39 +139,47 @@ export const DestinationBar = (props: {
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
   })
-  const move = useMutation({
-    mutationFn: async (target: Target): Promise<void> => {
-      const leaving = destination.data?.isolated === true ? workspaceId : null
-      const next = (
-        await api.provision({ workspaceId: target.workspaceId, isolate: target.isolate, ...(target.base === undefined ? {} : { base: target.base }) })
-      ).workspaceId
-      if (next === workspaceId) return
-      await workspaceListed(services.workspaces, next)
-      await services.openWorkspace(next)
-      // The blank thread left behind had no message, so its fresh workspace holds nothing worth keeping.
-      const leavingPath = leaving === null ? undefined : services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === leaving)?.path
-      if (leavingPath !== undefined) void api.discard({ path: leavingPath, force: false }).catch(() => undefined)
-    },
-    onMutate: () => setError(null),
-    onError: cause => setError(errorMessage(cause, t('loadFailed'))),
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['jj-integration'] }),
-  })
+  const toggle = useWorkspaceToggle(services, t)
 
   const current = destination.data
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const isJj = current?.vcs === 'jj'
-  const isolated = current?.isolated === true
+  const isolated = toggle.pending?.isolate ?? current?.isolated === true
+  const move = (request: { readonly isolate: boolean; readonly base?: string | undefined }): void => {
+    const leavingPath =
+      current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
+    const leavingName = threadNameOf(leavingPath)
+    toggle.toggle({
+      ...request,
+      projectWorkspaceId: projectId,
+      leaving: workspaceId !== null && leavingName !== null ? { workspaceId, name: leavingName } : null,
+      leavingBase: current?.bookmark ?? null,
+    })
+  }
   const chip = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
 
   return (
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
     <div className="dshx-root dshx:contents" aria-label={t('destination')}>
       <HostChipSlot />
+      {toggle.busy ? (
+        // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
+        <span
+          data-pending=""
+          role="status"
+          aria-label={toggle.pending?.name ?? t('switchingDestination')}
+          className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:font-mono! dshx:text-xs dshx:text-muted-foreground"
+          style={{ order: 0 }}
+        >
+          <Spinner className="dshx:size-3.5" />
+          {toggle.pending?.name ?? t('switchingDestination')}
+        </span>
+      ) : null}
       {isJj ? (
         <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
           <Popover open={branchOpen} onOpenChange={setBranchOpen}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" className={chip} disabled={move.isPending} title={isolated ? undefined : t('bookmarkIsolates')}>
+              <Button variant="ghost" className={chip} disabled={toggle.busy} title={isolated ? undefined : t('bookmarkIsolates')}>
                 <GitBranchIcon className="dshx:size-3.5" />
                 {current?.bookmark ?? '—'}
               </Button>
@@ -119,7 +195,7 @@ export const DestinationBar = (props: {
                       value={name}
                       onSelect={() => {
                         setBranchOpen(false)
-                        move.mutate({ workspaceId: projectId, isolate: true, base: name })
+                        move({ isolate: true, base: name })
                       }}
                     >
                       <span className="dshx:flex-1 dshx:truncate">{name}</span>
@@ -133,17 +209,14 @@ export const DestinationBar = (props: {
           <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm" title={t('isolateHint')}>
             <Checkbox
               checked={isolated}
-              disabled={move.isPending}
-              onCheckedChange={checked =>
-                move.mutate({ workspaceId: projectId, isolate: checked === true, ...(current?.bookmark == null ? {} : { base: current.bookmark }) })
-              }
+              disabled={toggle.busy}
+              onCheckedChange={checked => move({ isolate: checked === true, base: current?.bookmark ?? undefined })}
             />
             {t('workspace')}
           </label>
         </span>
       ) : null}
-      {move.isPending ? <Spinner className="dshx:size-3.5" /> : null}
-      {error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{error}</span>}
+      {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
     </div>
   )
 }

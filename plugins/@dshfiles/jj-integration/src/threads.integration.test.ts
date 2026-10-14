@@ -49,6 +49,12 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
   })
 
+  it('creates the thread workspace under the name the client already shows', async () => {
+    const thread = await threads.provision(repo, undefined, 'thread-c0ffee')
+    expect(thread).toEqual({ name: 'thread-c0ffee', path: join(`${repo}-threads`, 'thread-c0ffee') })
+    expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
+  })
+
   it('lists local bookmarks and starts a thread from the chosen one', async () => {
     jj(repo, 'bookmark', 'create', 'feature', '-r', '@')
     jj(repo, 'describe', '-m', 'feature base')

@@ -140,9 +140,9 @@ export const createThreads = (options: {
     return threads
   }
 
-  const provision = (repoRoot: string, base?: string): Promise<{ readonly name: string; readonly path: string }> =>
+  const provision = (repoRoot: string, base?: string, requestedName?: string): Promise<{ readonly name: string; readonly path: string }> =>
     serialized(repoRoot, async () => {
-      const name = `thread-${randomBytes(3).toString('hex')}`
+      const name = requestedName ?? `thread-${randomBytes(3).toString('hex')}`
       const directory = options.threadsDirectory(repoRoot)
       const path = join(directory, name)
       await mkdir(directory, { recursive: true })

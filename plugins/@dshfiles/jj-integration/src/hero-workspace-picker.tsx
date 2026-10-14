@@ -1,6 +1,6 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
@@ -21,6 +21,7 @@ export const HeroWorkspacePicker = (
   props: EmptyWorkspaceOwnerProps & { readonly ports: WorkspacePickerPorts; readonly services: DestinationBarServices; readonly t: JjIntegrationTranslate },
 ) => {
   const api = useApi(jjIntegrationApi)
+  const queryClient = useQueryClient()
   const multiHost = useApi(multiHostApi)
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
@@ -70,6 +71,9 @@ export const HeroWorkspacePicker = (
           : selection.workspaceId
         : (await props.ports.registerWorkspace(selection.canonicalPath)).workspaceId
     const destination = selection.kind === 'workspace' && selection.workspaceId === NO_FOLDER_ID ? { workspaceId } : await api.provision({ workspaceId })
+    if ('destination' in destination && destination.destination !== undefined) {
+      queryClient.setQueryData(['jj-integration', 'destination', destination.workspaceId], destination.destination)
+    }
     await workspaceListed(props.services.workspaces, destination.workspaceId)
     // SAFETY: both ids come from the Host's workspace registry.
     props.onPick(destination.workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])

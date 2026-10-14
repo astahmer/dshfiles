@@ -65,14 +65,25 @@ const destinationSchema = z
   .strict()
 export type DestinationView = z.infer<typeof destinationSchema>
 
+export const threadWorkspaceName = z.string().regex(/^thread-[0-9a-f]{6}$/u)
+
 export const jjIntegrationApi = defineApi({
   id: 'jj-threads',
   version: 1,
   owner: '@dshfiles/jj-integration',
   methods: {
     provision: method({
-      input: z.object({ workspaceId: z.string().min(1), isolate: z.boolean().optional(), base: z.string().min(1).max(256).optional() }).strict(),
-      output: z.object({ workspaceId: z.string(), isolated: z.boolean() }).strict(),
+      input: z
+        .object({
+          workspaceId: z.string().min(1),
+          isolate: z.boolean().optional(),
+          base: z.string().min(1).max(256).optional(),
+          /** Chosen by the client so it can show the thread workspace before the Host created it. */
+          name: threadWorkspaceName.optional(),
+        })
+        .strict(),
+      // A Host from before the destination field omits it; the client then reads the destination itself.
+      output: z.object({ workspaceId: z.string(), isolated: z.boolean(), destination: destinationSchema.optional() }).strict(),
     }),
     destination: method({ input: z.object({ workspaceId: z.string().min(1) }).strict(), output: destinationSchema }),
     projects: method({

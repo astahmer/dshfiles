@@ -12,7 +12,7 @@ import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
-import { jjIntegrationApi, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
 
@@ -417,6 +417,27 @@ const threadLandTool = defineTool({
   },
 })
 
+const noDestination = (isolateByDefault: boolean): DestinationView => ({
+  vcs: 'none',
+  isolated: false,
+  projectWorkspaceId: null,
+  bookmark: null,
+  bookmarks: [],
+  isolateByDefault,
+})
+
+const destinationAt = async (workspaceRoot: string, isolated: boolean, projectWorkspaceId: string | null): Promise<DestinationView> => {
+  const bookmarks = await requireThreads().bookmarks(workspaceRoot)
+  return {
+    vcs: 'jj',
+    isolated,
+    projectWorkspaceId,
+    bookmark: bookmarks.current,
+    bookmarks: [...bookmarks.names],
+    isolateByDefault: readSettings().isolateByDefault,
+  }
+}
+
 const api = jjIntegrationApi.host({
   provision: async ({ input }) => {
     const registry = registryOf()
@@ -426,22 +447,21 @@ const api = jjIntegrationApi.host({
     const location = await requireThreads()
       .locate(source.path)
       .catch(() => undefined)
-    if (location === undefined) return { workspaceId: source.id, isolated: false }
+    if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(settings.isolateByDefault) }
+    const project = await registry.resolveByPath(location.repoRoot)
     if (!(input.isolate ?? settings.isolateByDefault)) {
-      const project = await registry.resolveByPath(location.repoRoot)
-      return { workspaceId: project?.id ?? source.id, isolated: false }
+      const projectId = project?.id ?? source.id
+      return { workspaceId: projectId, isolated: false, destination: await destinationAt(location.repoRoot, false, project?.id ?? null) }
     }
-    const thread = await requireThreads().provision(location.repoRoot, input.base)
-    const owner = await registry.resolveByPath(location.repoRoot)
-    const workspace = await registry.create(thread.path, `${owner?.title ?? basename(location.repoRoot)} · ${thread.name}`)
+    const thread = await requireThreads().provision(location.repoRoot, input.base, input.name)
+    const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
     emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
     const command = settings.setupCommand.trim()
     if (command !== '') void runSetupCommand(requireContext(), command, thread.path).catch(() => undefined)
-    return { workspaceId: workspace.id, isolated: true }
+    return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
   },
   destination: async ({ input }) => {
     const registry = registryOf()
-    const isolateByDefault = readSettings().isolateByDefault
     const source = registry.get(WorkspaceId(input.workspaceId))
     const location =
       source === undefined
@@ -449,16 +469,8 @@ const api = jjIntegrationApi.host({
         : await requireThreads()
             .locate(source.path)
             .catch(() => undefined)
-    if (location === undefined) return { vcs: 'none', isolated: false, projectWorkspaceId: null, bookmark: null, bookmarks: [], isolateByDefault }
-    const bookmarks = await requireThreads().bookmarks(location.workspaceRoot)
-    return {
-      vcs: 'jj',
-      isolated: location.threadName !== undefined,
-      projectWorkspaceId: (await registry.resolveByPath(location.repoRoot))?.id ?? null,
-      bookmark: bookmarks.current,
-      bookmarks: [...bookmarks.names],
-      isolateByDefault,
-    }
+    if (location === undefined) return noDestination(readSettings().isolateByDefault)
+    return destinationAt(location.workspaceRoot, location.threadName !== undefined, (await registry.resolveByPath(location.repoRoot))?.id ?? null)
   },
   projects: async () => {
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
