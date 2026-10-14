@@ -10,10 +10,9 @@ import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh
 import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { defineClient } from '@dshfiles/dshx/client'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useEffect, useRef } from 'react'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { archivedViewMachine } from './archived-view-machine.js'
@@ -291,22 +290,18 @@ export default defineClient({
     ctx.effect(() => ctx.locale.subscribe(syncPanels), 'thread-sidebar: panel labels')
     syncPanels()
 
-    const jjThreads = createApiClient(ctx, jjIntegrationApi)
     const currentWorkspaceId = (): WorkspaceView['workspaceId'] | undefined => {
       const sessions = ctx.sessions.list.getSnapshot()
       const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
       return current === undefined ? undefined : ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(current))?.workspaceId
     }
     const rootProps = (): SidebarRootInjected => ({
+      // The composer opens at once; jj-integration's destination bar then moves the blank thread to its own jj
+      // workspace (or the project checkout) in the background, so New thread never waits on jj.
       startSession: workspaceId => {
         const target = workspaceId ?? currentWorkspaceId()
         if (target === undefined) return ctx.uiWorkspace.startSession()
-        // jj-integration decides whether the new thread gets its own jj workspace; without it, start where asked.
-        void jjThreads
-          .provision({ workspaceId: target })
-          // SAFETY: the Host returned this id from its workspace registry.
-          .then(result => ctx.uiWorkspace.startSession(result.workspaceId as WorkspaceView['workspaceId']))
-          .catch(() => ctx.uiWorkspace.startSession(target))
+        ctx.uiWorkspace.startSession(target)
       },
       toggleSidebar: () => ctx.layout.toggleSidebar(),
       selectPanel: id => ctx.layout.selectPanel(id),

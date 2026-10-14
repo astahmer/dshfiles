@@ -159,6 +159,47 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
 })
 
+When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).last().click()
+  await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
+  const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
+  await isolateByDefault.click()
+  await expect(isolateByDefault).toBeChecked()
+  await page.keyboard.press('Escape')
+})
+
+When('a first message is sent from the shared checkout', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
+  await composer.fill('background new thread e2e')
+  await composer.press('Enter')
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('background new thread e2e')
+})
+
+When('New thread is clicked in the sidebar', async ({ page }: { page: Page }) => {
+  await page.getByRole('region', { name: 'Threads' }).waitFor()
+  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+})
+
+Then('the New thread composer opens before its workspace exists', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-new-thread-composer-opens-at-once', async () => {
+    await expect(page.getByRole('textbox', { name: newThreadComposerName, exact: true })).toBeVisible({ timeout: 1_000 })
+  })
+})
+
+Then('the New thread moves to its own jj workspace on {string} in the background', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = repositoryFor(page)
+  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
+  const threadName = await currentThreadName(page)
+  await recordAssertion(page, 'jj-integration-new-thread-moves-to-its-own-workspace', async () => {
+    await expect(workspaceToggle(page)).toBeChecked()
+    await expect(workspaceToggle(page)).toBeEnabled()
+    await expect(page.getByRole('button', { name: bookmark, exact: true })).toBeVisible()
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
+    expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the thread workspace gains a revision described {string}', async ({ page }: { page: Page }, description: string) => {
   const repository = repositoryFor(page)
   const threadPath = join(repository.threadsPath, provisionedThreadName(page))

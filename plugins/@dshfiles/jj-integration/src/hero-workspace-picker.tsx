@@ -1,12 +1,12 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
 import { useEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
-import { DestinationBar, HostChipSlot, type DestinationBarServices, workspaceListed } from './destination-bar.js'
+import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor, workspaceListed } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { RemoteDestinationChips } from './remote-destination.js'
 
@@ -18,10 +18,14 @@ const NO_FOLDER_ID = 'dshfiles:no-folder'
  * isolate-by-default setting applies here too.
  */
 export const HeroWorkspacePicker = (
-  props: EmptyWorkspaceOwnerProps & { readonly ports: WorkspacePickerPorts; readonly services: DestinationBarServices; readonly t: JjIntegrationTranslate },
+  props: EmptyWorkspaceOwnerProps & {
+    readonly ports: WorkspacePickerPorts
+    readonly services: DestinationBarServices
+    readonly toggle: WorkspaceToggleActor
+    readonly t: JjIntegrationTranslate
+  },
 ) => {
   const api = useApi(jjIntegrationApi)
-  const queryClient = useQueryClient()
   const multiHost = useApi(multiHostApi)
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
@@ -55,7 +59,7 @@ export const HeroWorkspacePicker = (
       </div>
     )
   }
-  const bar = <DestinationBar workspaceId={props.selectedId} services={props.services} t={props.t} />
+  const bar = <DestinationBar workspaceId={props.selectedId} services={props.services} toggle={props.toggle} t={props.t} />
   if (!props.open) return bar
 
   const registered: RegisteredProject[] = [
@@ -63,6 +67,8 @@ export const HeroWorkspacePicker = (
     ...(projects.data?.projects ?? []).map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
   ]
 
+  // The composer moves to the chosen project at once; the destination bar then gives the thread its own workspace in
+  // the background when isolation is the default, so nothing here waits on jj.
   const choose = async (selection: ProjectFolderSelection): Promise<void> => {
     const workspaceId =
       selection.kind === 'workspace'
@@ -70,13 +76,9 @@ export const HeroWorkspacePicker = (
           ? (await api.noFolder({})).workspaceId
           : selection.workspaceId
         : (await props.ports.registerWorkspace(selection.canonicalPath)).workspaceId
-    const destination = selection.kind === 'workspace' && selection.workspaceId === NO_FOLDER_ID ? { workspaceId } : await api.provision({ workspaceId })
-    if ('destination' in destination && destination.destination !== undefined) {
-      queryClient.setQueryData(['jj-integration', 'destination', destination.workspaceId], destination.destination)
-    }
-    await workspaceListed(props.services.workspaces, destination.workspaceId)
-    // SAFETY: both ids come from the Host's workspace registry.
-    props.onPick(destination.workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
+    await workspaceListed(props.services.workspaces, workspaceId)
+    // SAFETY: the id comes from the Host's workspace registry.
+    props.onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
   }
 
   return (

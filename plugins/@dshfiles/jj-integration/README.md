@@ -21,10 +21,20 @@ A blank thread shows a destination bar above its composer:
   `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
 
 A Session's directory is fixed once created, so each change opens a blank
-thread at the new destination; the blank thread left behind is discarded with
-its empty workspace. The thread sidebar's **New thread** asks this plugin first,
-so `isolateByDefault` decides whether a new thread starts isolated. The thread
-sidebar shows a thread workspace's sessions under its project.
+thread at the new destination. Leaving an unused thread workspace keeps it as
+the project's spare for that bookmark, so toggling back reuses it and its blank
+Session.
+
+**New thread never waits on jj.** The sidebar button, the palette and the
+project picker open the composer at once in the project (or current) checkout,
+and the destination bar then moves the blank thread to where new threads start
+by default: with `isolateByDefault` on, its own workspace (the spare when there
+is one, else a new one named by the client and created in the background);
+with it off, the project checkout when the thread landed in another thread's
+workspace. The chip shows the workspace name with a spinner and Send waits
+until it is ready; typing does not. Each new thread is moved at most once, so a
+manual toggle sticks. The thread sidebar shows a thread workspace's sessions
+under its project.
 
 ## Landing
 

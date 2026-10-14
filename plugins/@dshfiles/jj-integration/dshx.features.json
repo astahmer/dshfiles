@@ -84,6 +84,58 @@
       ]
     },
     {
+      "id": "new-thread-background",
+      "title": "New thread never waits on jj",
+      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread then moves to its own jj workspace (the spare when there is one) in the background while the chip names it and Send waits, and a thread left in another thread's workspace moves back to the project checkout when isolation is off.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect checkbox \"workspace\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["opening", "preparing", "switching", "settled"],
+      "failureModes": [
+        "The native composer cannot carry a typed draft to another Session, so it stays blocked (typing included) until the thread workspace is open.",
+        "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.new-thread-background-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-preparing",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "holds Send for a new thread while its destination loads, then moves it to its own workspace in the background"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-spare",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "reuses the spare workspace for a new thread instead of provisioning one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-settled-once",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "never moves a thread again once the user toggled it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-eager",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "gives a new thread its own workspace without waiting for the Host, unless it already sits alone in one"
+        }
+      ]
+    },
+    {
       "id": "land",
       "title": "Land a thread onto the bookmark",
       "summary": "Rebase a thread's described work onto the landing bookmark and move the bookmark forward; conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",

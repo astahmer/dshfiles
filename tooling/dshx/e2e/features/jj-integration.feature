@@ -18,6 +18,16 @@ Feature: jj thread workspaces
     When No folder is chosen as the New thread project
     Then the destination bar offers neither a bookmark nor a workspace toggle
 
+  @scenario:jj-integration.new-thread-background-browser-journey
+  Scenario: New thread opens its composer at once and gets its own workspace in the background
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And a first message is sent from the shared checkout
+    And new threads start in their own jj workspace by default
+    And New thread is clicked in the sidebar
+    Then the New thread composer opens before its workspace exists
+    And the New thread moves to its own jj workspace on "main" in the background
+
   @scenario:jj-integration.land-browser-journey
   Scenario: Land a thread's described work onto main
     Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted

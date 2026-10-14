@@ -9,15 +9,27 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useApi } from '@dshfiles/dshx/client'
+import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
+import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { jjIntegrationApi, threadWorkspaceName } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
-import { workspaceToggleMachine, type SpareWorkspace, type ToggleRequest, type WorkspaceToggleClient } from './workspace-toggle-machine.js'
+import { jjIntegrationSettings } from './settings.js'
+import {
+  defaultDestinationMove,
+  eagerDestinationMove,
+  workspaceToggleMachine,
+  type ProvisionedDestination,
+  type ProvisionInput,
+  type SpareWorkspace,
+  type ToggleRequest,
+  type WorkspaceToggleClient,
+} from './workspace-toggle-machine.js'
+
+export type WorkspaceToggleActor = ActorRefFrom<typeof workspaceToggleMachine>
 
 export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
@@ -73,50 +85,83 @@ const threadNameOf = (path: string | undefined): string | null => {
   return threadWorkspaceName.safeParse(name).success && name !== undefined ? name : null
 }
 
-const useWorkspaceToggle = (services: DestinationBarServices, t: JjIntegrationTranslate) => {
-  const api = useApi(jjIntegrationApi)
-  const queryClient = useQueryClient()
-  const client = useMemo(
-    (): WorkspaceToggleClient => ({
-      provision: (input, signal) => api.provision(input, { signal }),
-      listed: workspaceId => workspaceListed(services.workspaces, workspaceId),
-      open: workspaceId => services.openWorkspace(workspaceId),
-      findSpare: key => {
-        const spare = storedSpares.get()[key]
-        if (spare === undefined) return undefined
-        const workspace = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === spare.workspaceId)
-        const sessions = services.sessions.list.getSnapshot().byId
-        const blank = workspace?.sessionIds.every(sessionId => sessions[sessionId]?.blank === true) ?? false
-        return blank ? spare : undefined
-      },
-      keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
-      blockComposer: reason => {
-        const sessions = services.sessions.list.getSnapshot()
-        const current = sessions.ids.find(sessionId => (sessions.byId[sessionId]?.retainedBy.mainView ?? 0) > 0)
-        if (current === undefined) return () => undefined
-        services.blocks.set(current, { reason })
-        return () => services.blocks.set(current, undefined)
-      },
-      generateName: randomThreadName,
-      preparingReason: name => (name === null ? t('switchingDestination') : t('preparingWorkspace', { name })),
-    }),
-    [api, services, t],
-  )
-  const [snapshot, send, actor] = useMachine(workspaceToggleMachine, { input: { client } })
-  useEffect(() => {
-    const subscription = actor.on('switched', event => {
-      if (event.destination !== undefined) queryClient.setQueryData(['jj-integration', 'destination', event.workspaceId], event.destination)
-      else void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', event.workspaceId] })
-      void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
-    })
-    return () => subscription.unsubscribe()
-  }, [actor, queryClient])
-  return {
-    pending: snapshot.context.pending,
-    error: snapshot.context.error,
-    busy: snapshot.matches('switching'),
-    toggle: (request: ToggleRequest) => send({ type: 'toggle', request }),
+/**
+ * The workspace toggle outlives the New-thread screen: opening the new destination remounts it, and a per-mount
+ * machine would forget the thread it just moved and move it again. The plugin starts one actor in its setup.
+ */
+export const startWorkspaceToggle = (input: {
+  readonly provision: (input: ProvisionInput, options: { readonly signal: AbortSignal }) => Promise<ProvisionedDestination>
+  readonly services: DestinationBarServices
+  readonly t: JjIntegrationTranslate
+  readonly queryClient: QueryClient
+}): WorkspaceToggleActor => {
+  const { services, t, queryClient } = input
+  const client: WorkspaceToggleClient = {
+    provision: (provisionInput, signal) => input.provision(provisionInput, { signal }),
+    listed: workspaceId => workspaceListed(services.workspaces, workspaceId),
+    open: workspaceId => services.openWorkspace(workspaceId),
+    findSpare: key => {
+      const spare = storedSpares.get()[key]
+      if (spare === undefined) return undefined
+      const workspace = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === spare.workspaceId)
+      const sessions = services.sessions.list.getSnapshot().byId
+      const blank = workspace?.sessionIds.every(sessionId => sessions[sessionId]?.blank === true) ?? false
+      return blank ? spare : undefined
+    },
+    keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
+    blockComposer: reason => {
+      const sessions = services.sessions.list.getSnapshot()
+      const current = sessions.ids.find(sessionId => (sessions.byId[sessionId]?.retainedBy.mainView ?? 0) > 0)
+      if (current === undefined) return () => undefined
+      services.blocks.set(current, { reason })
+      return () => services.blocks.set(current, undefined)
+    },
+    generateName: randomThreadName,
+    preparingReason: name => (name === null ? t('switchingDestination') : t('preparingWorkspace', { name })),
   }
+  const actor = createActor(workspaceToggleMachine, { input: { client } })
+  // Seeding the new destination spares the next mount a Host round trip before it can decide anything.
+  actor.on('switched', event => {
+    if (event.destination !== undefined) queryClient.setQueryData(['jj-integration', 'destination', event.workspaceId], event.destination)
+    else void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', event.workspaceId] })
+    void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
+  })
+  return actor.start()
+}
+
+const useWorkspaceToggle = (actor: WorkspaceToggleActor) => {
+  const pending = useSelector(actor, snapshot => snapshot.context.pending)
+  const error = useSelector(actor, snapshot => snapshot.context.error)
+  const busy = useSelector(actor, snapshot => !snapshot.matches('idle'))
+  const events = useMemo(
+    () => ({
+      toggle: (request: ToggleRequest, visitId: string | undefined) => actor.send({ type: 'toggle', request, visitId }),
+      arrive: (input: { readonly visitId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }) =>
+        actor.send({ type: 'arrive', ...input }),
+      resolved: (visitId: string, request: ToggleRequest | null) => actor.send({ type: 'resolved', visitId, request }),
+    }),
+    [actor],
+  )
+  return { ...events, pending, error, busy }
+}
+
+/** The blank New-thread Session in the main view, and whether its workspace already holds another thread's work. */
+const useNewThread = (services: DestinationBarServices, workspaceId: string | null) => {
+  // Read each store through the service on every call, as the rest of this file does; a detached store loses its owner.
+  const sessions = useSyncExternalStore(
+    useCallback((listener: () => void) => services.sessions.list.subscribe(listener), [services]),
+    useCallback(() => services.sessions.list.getSnapshot(), [services]),
+  )
+  const workspaces = useSyncExternalStore(
+    useCallback((listener: () => void) => services.workspaces.list.subscribe(listener), [services]),
+    useCallback(() => services.workspaces.list.getSnapshot(), [services]),
+  )
+  const sessionId = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+  const session = sessionId === undefined ? undefined : sessions.byId[sessionId]
+  if (session === undefined || !session.blank || workspaceId === null) return null
+  const workspace = workspaces.items.find(item => item.workspaceId === workspaceId)
+  const occupied = (workspace?.sessionIds ?? []).some(id => id !== session.id && sessions.byId[id]?.blank === false)
+  return { sessionId: session.id, occupied, path: workspace?.path }
 }
 
 /**
@@ -127,19 +172,45 @@ const useWorkspaceToggle = (services: DestinationBarServices, t: JjIntegrationTr
 export const DestinationBar = (props: {
   readonly workspaceId: string | undefined
   readonly services: DestinationBarServices
+  readonly toggle: WorkspaceToggleActor
   readonly t: JjIntegrationTranslate
 }) => {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
   const [branchOpen, setBranchOpen] = useState(false)
   const workspaceId = props.workspaceId ?? null
+  const toggle = useWorkspaceToggle(props.toggle)
   const destination = useQuery({
     queryKey: ['jj-integration', 'destination', workspaceId ?? ''],
-    enabled: workspaceId !== null,
+    // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down.
+    enabled: workspaceId !== null && !toggle.busy,
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
   })
-  const toggle = useWorkspaceToggle(services, t)
+  const settings = useSettings(jjIntegrationSettings).value
+  const isolateByDefault = settings?.isolateByDefault ?? false
+  const bookmark = settings?.bookmark ?? 'main'
+  const newThread = useNewThread(services, workspaceId)
+  // One visit per showing of the New-thread screen: DSH hands the same blank Session to the next New thread.
+  const [mountId] = useState(() => crypto.randomUUID())
+  const newThreadId = newThread === null ? null : `${mountId}:${newThread.sessionId}`
+  const occupied = newThread?.occupied ?? false
+  const inThreadWorkspace = newThread?.path === undefined ? null : threadNameOf(newThread.path) !== null
+
+  // A New thread opens its composer at once wherever it was started; the machine then moves it, in the background,
+  // to where new threads start by default (its own jj workspace, or the project checkout).
+  const { arrive, resolved } = toggle
+  useEffect(() => {
+    if (newThreadId === null || workspaceId === null) return
+    arrive({ visitId: newThreadId, workspaceId, isolateByDefault })
+    if (!isolateByDefault || inThreadWorkspace === null) return
+    // Isolation on: decide from the workspace path at once instead of waiting for the Host's destination.
+    resolved(newThreadId, eagerDestinationMove({ workspaceId, inThreadWorkspace, occupied, bookmark }))
+  }, [arrive, bookmark, inThreadWorkspace, isolateByDefault, newThreadId, occupied, resolved, workspaceId])
+  useEffect(() => {
+    if (newThreadId === null || workspaceId === null || destination.data === undefined) return
+    resolved(newThreadId, defaultDestinationMove({ destination: destination.data, workspaceId, occupied }))
+  }, [destination.data, newThreadId, occupied, resolved, workspaceId])
 
   const current = destination.data
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
@@ -149,12 +220,16 @@ export const DestinationBar = (props: {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
     const leavingName = threadNameOf(leavingPath)
-    toggle.toggle({
-      ...request,
-      projectWorkspaceId: projectId,
-      leaving: workspaceId !== null && leavingName !== null ? { workspaceId, name: leavingName } : null,
-      leavingBase: current?.bookmark ?? null,
-    })
+    toggle.toggle(
+      {
+        ...request,
+        projectWorkspaceId: projectId,
+        // Another thread's workspace is not a spare: only an unused one is kept for reuse.
+        leaving: workspaceId !== null && leavingName !== null && !occupied ? { workspaceId, name: leavingName } : null,
+        leavingBase: current?.bookmark ?? null,
+      },
+      newThreadId ?? undefined,
+    )
   }
   const chip = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
 

@@ -6,12 +6,13 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import type { DestinationBarServices } from './destination-bar.js'
+import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
+import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
@@ -89,13 +90,21 @@ export default defineClient({
           )),
         ),
     }
+    const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    const workspaceToggle = startWorkspaceToggle({
+      provision: (input, options) => jjThreads.provision(input, options),
+      services: destinationServices,
+      t: translate,
+      queryClient: pluginQueryClient(),
+    })
+    ctx.effect(() => () => workspaceToggle.stop(), 'jj-integration: workspace toggle')
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     ctx.slots.inject('conversation.hero.workspace', () =>
       ctx.slots.register(
         { name: 'conversation.hero.workspace', priority: -1000 },
         decorate((props: EmptyWorkspaceOwnerProps) => (
           <PluginQueryProvider>
-            <HeroWorkspacePicker {...props} ports={pickerPorts} services={destinationServices} t={translate} />
+            <HeroWorkspacePicker {...props} ports={pickerPorts} services={destinationServices} toggle={workspaceToggle} t={translate} />
           </PluginQueryProvider>
         )),
       ),

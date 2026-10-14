@@ -95,6 +95,9 @@ const HomeStrip = (props: {
   const unlanded = useQuery({
     queryKey: ['home', 'unlanded', project?.path ?? ''],
     enabled: blank && settings.showUnlandedWork && project !== undefined,
+    // Reading every thread workspace is the costliest jj call on this screen; each New thread remounts it, and a
+    // fresh read per mount competed with creating the thread's own workspace.
+    staleTime: 60_000,
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 30_000, request: () => props.repositories() }).then(
         result =>
