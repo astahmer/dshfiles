@@ -48,7 +48,9 @@ Goes to the app root, dismisses Preview Notice and "Add an API key", then runs
 the feature's `reach` steps. A `seed` step first sets up state no short UI path
 creates, once per instance: `landable-thread` (a jj workspace thread with a
 described revision, for Land) and `pending-restart` (changes thread-sidebar's
-`dist/index.js`; `down` restores it). `attach "<repo file>"` hands a fixture
+`dist/index.js`; `down` restores it) and `tool-call-thread` (an AI Accounts
+Command Code account on a loopback fake provider, which `down` stops, and a
+thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
@@ -94,7 +96,9 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
   load (e.g. `/api/dshx-9ca8a5fa/list`): the chip and sidebar see an
   owner-missing error and stop polling. Load multi-host or discount it.
 - No provider is configured, so turns end immediately; anything needing a model
-  reply needs a credential (see Safety).
+  reply needs a credential (see Safety) or the `tool-call-thread` seed's fake provider.
+- Several workspaces run `dshx dev` at once and the state dir is keyed by name only:
+  pass `--name <topic>` to every command.
 
 ## Safety
 

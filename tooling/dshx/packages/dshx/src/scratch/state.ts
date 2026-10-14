@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { closeSync, openSync } from 'node:fs'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -45,6 +46,8 @@ export const ScratchStateSchema = z
     evidenceDir: z.string(),
     /** Seeds `dshx dev open` already applied to this instance, with the checkout file one changed for `down` to restore. */
     seeds: z.array(z.object({ seed: z.enum(REACH_SEEDS), changedFile: z.string().optional() }).strict()).optional(),
+    /** The loopback model provider the `tool-call-thread` seed started; `down` stops it. */
+    fakeProvider: ownedProcessSchema.optional(),
   })
   .strict()
 
@@ -116,3 +119,21 @@ export const ownedProcessStatus = (owned: { readonly pid: number; readonly signa
 
 export const redactUrls = (text: string): string =>
   text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
+
+/** Start a process in its own group, logging to `log`, so `down` can stop it and everything it spawned. */
+export const spawnDetached = (
+  command: string,
+  args: readonly string[],
+  options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly log: string },
+): number => {
+  const output = openSync(options.log, 'a', 0o600)
+  try {
+    const child = spawn(command, args, { cwd: options.cwd, env: options.env, detached: true, stdio: ['ignore', output, output] })
+    child.unref()
+    if (child.pid === undefined)
+      throw new ScratchError('spawn-failed', `${command} did not start.`, `Check that ${command} is on PATH (run dshx through fnm exec --using=22.23.3).`)
+    return child.pid
+  } finally {
+    closeSync(output)
+  }
+}

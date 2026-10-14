@@ -133,6 +133,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
   try {
     await openAppRoot()
     let seeded = state.seeds ?? []
+    let fakeProvider = state.fakeProvider
     // A key press right after fill goes to that field as a locator action, so a dialog that opened in between is dismissed first.
     let filled: ReturnType<typeof locate> | undefined
     for (const [index, step] of feature.reach.entries()) {
@@ -144,10 +145,13 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed.action === 'seed') {
           if (!seeded.some(applied => applied.seed === parsed.seed)) {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
-            const changedFile = await applySeed({ state, seed: parsed.seed, page, timeoutMs })
-            if (changedFile !== undefined) applied.changedFile = changedFile
+            const outcome = await applySeed({ state, seed: parsed.seed, page, timeoutMs })
+            if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
+            if (outcome.fakeProvider !== undefined) fakeProvider = outcome.fakeProvider
             seeded = [...seeded, applied]
-            await writeScratchState({ ...state, seeds: seeded })
+            const next: ScratchState = { ...state, seeds: seeded }
+            if (fakeProvider !== undefined) next.fakeProvider = fakeProvider
+            await writeScratchState(next)
           }
           if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')

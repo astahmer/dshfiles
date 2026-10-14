@@ -179,4 +179,45 @@ describe('dshx dev scratch commands', () => {
     await expect(stat(home)).rejects.toThrow()
     await expect(stat(join(stateDir, 'state.json'))).rejects.toThrow()
   })
+
+  it('stops the fake model provider a tool-call-thread seed started', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'dshx-dev-spec-'))
+    const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
+    cleanups.push(
+      () => rm(stateDir, { recursive: true, force: true }),
+      () => rm(home, { recursive: true, force: true }),
+    )
+    const fakeProviderPid = await startProcess(['fake-provider-main.js', join(stateDir, 'fake-provider.ready')])
+    const state: ScratchState = {
+      schemaVersion: 1,
+      name: 'default',
+      createdAt: new Date().toISOString(),
+      stateDir,
+      home,
+      profile: 'dshx-boot',
+      port: 45127,
+      origin: 'http://127.0.0.1:45127',
+      launchUrl: 'http://127.0.0.1:45127/?token=secret',
+      bundles: ['@dshfiles/tool-meta', '@dshfiles/ai-accounts'],
+      expectedClientEntries: ['@dshfiles/tool-meta', '@dshfiles/ai-accounts'],
+      project: { path: join(home, 'projects/sample'), workspaceId: 'workspace', ownedByScratch: true },
+      host: { pid: 999_999, signature: ['--profile dshx-boot', '--port 45127'] },
+      browser: { pid: 999_998, signature: ['browser-host.js'], cdpPort: 45128 },
+      hostLog: join(stateDir, 'host.log'),
+      browserLog: join(stateDir, 'browser.log'),
+      browserEvents: join(stateDir, 'browser-events.jsonl'),
+      evidenceDir: join(stateDir, 'evidence'),
+      seeds: [{ seed: 'tool-call-thread' }],
+      fakeProvider: { pid: fakeProviderPid, signature: ['fake-provider-main.js', join(stateDir, 'fake-provider.ready')] },
+    }
+    await writeFile(join(stateDir, 'state.json'), JSON.stringify(state), { mode: 0o600 })
+
+    const dryRun = await run(['dev', 'down', '--dry-run', '--state-dir', stateDir, '--json'])
+    expect(dryRun.stdout).toContain(`fake model provider pid ${String(fakeProviderPid)}`)
+    expect(alive(fakeProviderPid)).toBe(true)
+
+    const down = await run(['dev', 'down', '--state-dir', stateDir, '--json'])
+    expect(down.code).toBe(0)
+    expect(alive(fakeProviderPid)).toBe(false)
+  })
 })

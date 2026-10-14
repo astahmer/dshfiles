@@ -1,6 +1,4 @@
-import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { openSync, closeSync } from 'node:fs'
 import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +15,7 @@ import {
   ownedProcessStatus,
   readScratchState,
   redactUrls,
+  spawnDetached,
   writeScratchState,
   type ScratchState,
 } from './state.js'
@@ -82,23 +81,6 @@ const stopGroup = async (pid: number): Promise<void> => {
     process.kill(-pid, 'SIGKILL')
   } catch {
     /* already gone */
-  }
-}
-
-const spawnDetached = (
-  command: string,
-  args: readonly string[],
-  options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly log: string },
-): number => {
-  const output = openSync(options.log, 'a', 0o600)
-  try {
-    const child = spawn(command, args, { cwd: options.cwd, env: options.env, detached: true, stdio: ['ignore', output, output] })
-    child.unref()
-    if (child.pid === undefined)
-      throw new ScratchError('spawn-failed', `${command} did not start.`, `Check that ${command} is on PATH (run dshx through fnm exec --using=22.23.3).`)
-    return child.pid
-  } finally {
-    closeSync(output)
   }
 }
 

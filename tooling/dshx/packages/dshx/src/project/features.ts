@@ -33,9 +33,10 @@ const externalDependencySchema = z
 /**
  * State a reach needs that one short UI path cannot create, set up once per scratch instance by `dshx dev open`:
  * `landable-thread` is a thread in its own jj workspace whose described revision is ready to land (the agent's edit is
- * stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would.
+ * stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would;
+ * `tool-call-thread` is a thread whose model (a loopback fake provider) ran a few-second `bash` tool call.
  */
-export const REACH_SEEDS = ['landable-thread', 'pending-restart'] as const
+export const REACH_SEEDS = ['landable-thread', 'pending-restart', 'tool-call-thread'] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 
 /**

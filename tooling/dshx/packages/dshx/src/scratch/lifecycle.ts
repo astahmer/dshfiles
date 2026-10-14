@@ -129,6 +129,7 @@ export const scratchDown = async (
   for (const [label, owned] of [
     ['browser', state.browser],
     ['dsh', state.host],
+    ...(state.fakeProvider === undefined ? [] : ([['fake model provider', state.fakeProvider]] as const)),
   ] as const) {
     const status = ownedProcessStatus(owned)
     if (status === 'gone') {
@@ -150,11 +151,23 @@ export const scratchDown = async (
   } else {
     actions.push({ action: 'skip', target: state.home, reason: 'not a dshx scratch home under the temp directory; left alone' })
   }
-  for (const file of [state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready'), join(state.stateDir, 'state.json')]) {
+  const fakeProviderFiles = state.fakeProvider === undefined ? [] : [join(state.stateDir, 'fake-provider.ready'), join(state.stateDir, 'fake-provider.log')]
+  for (const file of [
+    state.hostLog,
+    state.browserLog,
+    state.browserEvents,
+    join(state.stateDir, 'browser.ready'),
+    ...fakeProviderFiles,
+    join(state.stateDir, 'state.json'),
+  ]) {
     actions.push({ action: 'remove', target: file, reason: 'scratch state (the host log and state hold the launch token)' })
   }
   if (!dryRun) {
-    await Promise.all([state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready')].map(file => rm(file, { force: true })))
+    await Promise.all(
+      [state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready'), ...fakeProviderFiles].map(file =>
+        rm(file, { force: true }),
+      ),
+    )
     await removeScratchStateFile(state.stateDir)
   }
   if (!state.project.ownedByScratch) actions.push({ action: 'keep', target: state.project.path, reason: 'project passed with --project' })
