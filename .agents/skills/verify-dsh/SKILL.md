@@ -87,8 +87,13 @@ runs only the `@smoke` subset (`pnpm check:e2e:smoke`); landing a plugin change
 needs its full journeys green:
 
 ```sh
-pnpm check:e2e <plugin>   # its feature files, headless, serial; no filter = whole suite
+pnpm check:e2e <plugin>           # its journeys, headless, serial; no filter = whole suite
+pnpm check:e2e <plugin> --force   # ignore the Turbo cache
 ```
+
+Results are cached per package on the built bundles each journey boots, so a
+rerun without changes replays in seconds. A replayed pass is not a new run:
+pass `--force` when a binary outside the repository changed (other than jj).
 
 A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
 

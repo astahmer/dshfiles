@@ -28,7 +28,7 @@ Put each check at the earliest layer that can see the defect:
 | Expressible in types | Typecheck | `tsc` |
 | Decidable across packages without running them | Static contract | `dshx check` (reserved or colliding locale namespaces, undeclared Client services) |
 | Pure logic, no DOM or Host | Unit | Vitest |
-| Breaks at boot | Boot smoke | `test:boot`, one real browser over a composed profile |
+| Breaks at boot | Boot smoke | `check:plugin-boot`, one real browser per bundle and over the composed profile |
 | Breaks during use | Journey | Gherkin scenarios via `playwright-bdd` |
 
 Boot smoke and journeys share one harness (`e2e/support/boot.ts`): a browser
@@ -41,7 +41,8 @@ conversation, so entries waiting on `sessions` or `remote.*` cannot become
 `active` there. Bundles are discovered from their DSH manifests, so a new
 bundle is tested without editing a registry. `scripts/boot-ignore.json` may
 skip one, but each entry needs a known package id, a reason, an owner and a
-removal condition, and an expired entry fails the check.
+removal condition, and an expired entry fails the check (validated uncached on
+every run, since no cache key sees the date).
 
 ## Choices
 
@@ -106,23 +107,68 @@ From `tooling/dshx`:
 ```sh
 pnpm run features:check     # catalogs consistent, every feature verified or justified
 pnpm run features:report    # coverage report by package and kind
-pnpm run test:boot          # build, then boot the composed web profile in a browser
-pnpm run test:e2e           # build, generate with bddgen, run every journey
+pnpm run test:boot          # uncached: build, boot each bundle alone, then the composed web profile
+pnpm run test:e2e           # uncached: build, generate with bddgen, run every journey
 pnpm run test:e2e:gen && pnpm exec playwright test --config=playwright.e2e.config.ts -g "<scenario>"
 ```
 
-Root `pnpm check:plugin-boot` runs `test:boot`. Root `pnpm check:e2e [filter]`
-builds every bundle once, then runs the journeys headless on one worker
-(`DSHX_E2E_PREBUILT=1` stops each scenario from rebuilding the bundles it boots)
-and ends with a summary: totals, wall time, one line per failure and the
-slowest feature files. A filter is a feature-file name such as `thread-sidebar`.
-`pnpm check` ends with `pnpm check:e2e:smoke`: the same command filtered to
-scenarios tagged `@smoke`, about ten journeys spanning boot, the shared
-stylesheet and the most used plugins, so the harness and its shared steps cannot
-rot unnoticed. Keep the subset under four minutes; tag a scenario `@smoke` only
-when it covers a surface no other smoke scenario does. Smoke is a tripwire, not
-coverage: landing a plugin change still needs `pnpm check:e2e <plugin>` green. A fresh clone gets the pinned
-Chromium from `pnpm install:all` (`setup:browser`).
+Root `pnpm check:e2e [plugin|feature ...] [--force]`, `pnpm check:e2e:smoke` and
+`pnpm check:plugin-boot` are the cached entry points (`scripts/check-browser.mjs`):
+they build every bundle once, then run per-package Turbo tasks one at a time
+(`--concurrency=1`: each boots a Host and a Chromium, and parallel boots make
+journeys flaky), headless, with `DSHX_E2E_PREBUILT=1`. Each task prints the
+journey summary (totals, wall time, one line per failure, slowest files). A
+filter is a plugin (`mcp-servers`) or a feature-file name (`ai-accounts-copilot`
+runs its owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
+`pnpm install:all` (`setup:browser`).
+
+`pnpm check` runs `check:plugin-boot` and then `check:e2e:smoke`: the
+`@smoke` scenarios, about ten journeys spanning boot, the shared stylesheet and
+the most used plugins, so the harness and its shared steps cannot rot
+unnoticed. Keep the subset under four minutes on a cold cache; tag a scenario
+`@smoke` only when it covers a surface no other smoke scenario does. Smoke is a
+tripwire, not coverage: landing a plugin change still needs
+`pnpm check:e2e <plugin>` green.
+
+## Cached browser tasks
+
+Each package that owns feature files has `test:e2e` (and `test:e2e:smoke` when
+it owns `@smoke` scenarios); each bundle has `test:boot`; the `plugins`
+workspace (`dshfiles-plugins`) owns the untagged cross-plugin features and the
+composed web-profile boot. A feature belongs to the package most of its
+`@scenario:` tags name. `tooling/dshx/scripts/browser-tasks.mjs --write`
+generates those scripts and each package's `turbo.json` from the feature files;
+`dshx check` runs it without `--write` and fails on drift, so add or retag a
+feature, then regenerate.
+
+A task's key is what it actually runs, never a build hash: plugin-ui's build
+reads every plugin's sources for the shared stylesheet, so every build hash
+moves together while most bundles' `dist` does not. The inputs are:
+
+- a digest of the runtime `dist` (no source maps or declarations), the
+  `package.json` and the `cordis.patch.yml` of every bundle the package's
+  journeys boot (the packages their Given steps name, every bundle
+  for a step that boots the web profile) and of their workspace dependencies;
+- its feature files and the step files their steps match (plus the step files
+  those import); a step no expression matches makes the package depend on every
+  step file and bundle, and the planner test fails on it;
+- the shared harness (`e2e/support/*`, fixtures, the Playwright config, dshx
+  `src`/`dist`), `pnpm-lock.yaml` (DSH, Playwright and Chromium versions) and
+  the `profiles/web` seed;
+- env `CI` and `DSHX_TOOL_VERSIONS` (the `jj --version` the Host runs).
+
+Journeys and boots copy registry dependencies from the checked-in
+`profiles/web` seed, not the live `~/.dsh` profile, so nothing outside the
+repository changes a result. Turbo drops gitignored files under a task's own
+package directory, even through a `$TURBO_ROOT$` glob, so a package would not
+see its own `dist` and the `plugins` workspace would see none: the entry points
+write each package's digest to `.turbo/browser-dist/` after building, and
+tasks key on those files.
+
+To bust the cache: `--force` reruns everything (do it after changing anything
+the inputs above cannot see, such as a system binary other than jj), and
+deleting `.turbo/cache` clears it for every task. A result is only as fresh as
+the built bundles, which is why the entry points always build first.
 
 In CI, `check.yml` runs `pnpm check`, which includes `features:check`, the
 web-profile boot and the `@smoke` journeys. `plugin-e2e-coverage.yml` runs the

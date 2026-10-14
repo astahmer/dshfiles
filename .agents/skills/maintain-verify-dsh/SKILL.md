@@ -12,6 +12,7 @@ to what the change touched. `dshx` is defined in `verify-dsh`.
 
 Run it when the change touched any of:
 
+- `tooling/dshx/scripts/{browser-tasks,run-e2e,boot-check-web}.mjs` or `scripts/check-browser.mjs`;
 - `tooling/dshx/e2e/support/*` or `packages/dshx/src/project/{boot-profile,scratch-profile,local-bundles,startup-dialogs,owned-process}.ts`;
 - `packages/dshx/src/scratch/*` or `src/cli/scratch.ts` (`dshx dev`);
 - `packages/dshx/src/project/features.ts` (catalog schema, `reach` grammar);
@@ -49,7 +50,10 @@ If none applies, stop: **Clean**.
    Then `pnpm check:e2e <plugin>` for each touched plugin: its journeys must be
    green before landing (`pnpm check` runs only the `@smoke` subset). A shared
    step (`steps.ts`, a boot or navigation helper) can break plugins it does not
-   name: also run `pnpm check:e2e:smoke`.
+   name: also run `pnpm check:e2e:smoke`. A new or retagged feature file, or a
+   step moved between step files, needs
+   `node tooling/dshx/scripts/browser-tasks.mjs --write` (`dshx check` fails
+   on drift).
 5. **Triage each failure** (look at the failure screenshot, `shot` summary or
    the journey's `test-results/*/error-context.md`):
    - **Doc drift** (a name or step changed, the feature works by hand): fix

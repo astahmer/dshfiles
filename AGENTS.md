@@ -234,9 +234,14 @@ rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap when
 you fix sites, never raise it.
 `pnpm run check:diff` lints and format-checks only the paths your revision
 touches, and `pnpm run check:green` runs everything except lint/format.
-`pnpm check` ends with `check:e2e:smoke`, the `@smoke` journeys only; before
-landing a plugin change, also run `pnpm check:e2e <plugin>` (its feature files,
-headless, serial) green.
+`check:green` ends with `check:plugin-boot` and `check:e2e:smoke` (the `@smoke`
+journeys only); before landing a plugin change, also run
+`pnpm check:e2e <plugin>` (its journeys, headless, serial) green. All three are
+Turbo tasks keyed on the built bundles they boot, so an unchanged package
+replays from cache in seconds; `--force` reruns everything (see
+[`docs/e2e-testing.md`](docs/e2e-testing.md#cached-browser-tasks)). After
+adding or retagging a feature file, run
+`node tooling/dshx/scripts/browser-tasks.mjs --write`.
 
 ### Rebuilt plugins reach the browser over HMR
 
