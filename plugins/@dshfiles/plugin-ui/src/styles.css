@@ -57,6 +57,13 @@
   /* Categorical hues the Host theme lacks (graph lanes, workspace and divergence chips). */
   --color-teal: var(--dshx-kit-teal);
   --color-violet: var(--dshx-kit-violet);
+  /* Revision-graph branch hues, distinct from each other and from `info` (the trunk) in both themes. */
+  --color-graph-1: var(--dshx-kit-graph-1);
+  --color-graph-2: var(--dshx-kit-graph-2);
+  --color-graph-3: var(--dshx-kit-graph-3);
+  --color-graph-4: var(--dshx-kit-graph-4);
+  --color-graph-5: var(--dshx-kit-graph-5);
+  --color-graph-6: var(--dshx-kit-graph-6);
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -78,10 +85,22 @@
   :root {
     --dshx-kit-teal: oklch(0.58 0.1 185);
     --dshx-kit-violet: oklch(0.55 0.19 295);
+    --dshx-kit-graph-1: oklch(0.6 0.11 185);
+    --dshx-kit-graph-2: oklch(0.56 0.18 300);
+    --dshx-kit-graph-3: oklch(0.66 0.15 55);
+    --dshx-kit-graph-4: oklch(0.58 0.19 350);
+    --dshx-kit-graph-5: oklch(0.6 0.15 145);
+    --dshx-kit-graph-6: oklch(0.68 0.14 90);
   }
   body[data-ds-dark-theme] {
     --dshx-kit-teal: oklch(0.76 0.11 182);
     --dshx-kit-violet: oklch(0.72 0.15 300);
+    --dshx-kit-graph-1: oklch(0.76 0.11 182);
+    --dshx-kit-graph-2: oklch(0.73 0.14 300);
+    --dshx-kit-graph-3: oklch(0.78 0.13 60);
+    --dshx-kit-graph-4: oklch(0.74 0.15 350);
+    --dshx-kit-graph-5: oklch(0.77 0.15 145);
+    --dshx-kit-graph-6: oklch(0.82 0.13 92);
   }
 }
 
