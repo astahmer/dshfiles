@@ -7,9 +7,9 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
-import { defineHost, defineTool } from '@dshfiles/dshx/host'
+import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -372,51 +372,11 @@ const sweepFinishedThreads = async (): Promise<void> => {
   }
 }
 
-const threadOfAgent = (execution: ToolRunContext): string => {
-  const cwd = execution.agent?.session.header.cwd
-  if (cwd === undefined || cwd.length === 0) throw new Error('This Session has no working directory.')
-  return cwd
+const threadPath = (input: { readonly path?: string | undefined }, caller: ApiCaller): string => {
+  const path = input.path ?? (caller.kind === 'agent' ? caller.cwd : undefined)
+  if (path === undefined) throw new PluginApiError('Pass the thread workspace path; this caller has no working directory.', { code: 'no-path' })
+  return path
 }
-
-const summaryOutputSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: { summary: { type: 'string', required: true } },
-} satisfies ValueSchemaSpec
-
-const summaryOutput = {
-  schema: summaryOutputSchema,
-  render(_args: {}, value: InferValue<typeof summaryOutputSchema>) {
-    return [{ type: 'text' as const, text: value.summary }]
-  },
-}
-
-const threadStatusTool = defineTool({
-  name: 'jj_thread_status',
-  description:
-    'Show this thread’s jj workspace: its revisions not yet on the landing bookmark (main by default), conflicts, and whether the bookmark moved since the thread last rebased. Read-only.',
-  parameters: {},
-  output: summaryOutput,
-  execute: async (_args, execution) => {
-    const found = await findThread((await requireThreads().locate(threadOfAgent(execution))).workspaceRoot)
-    if (found === undefined) return { summary: 'This Session does not run in a thread workspace; it works directly in the repository checkout.' }
-    return { summary: JSON.stringify({ bookmark: readSettings().bookmark, ...found.thread }) }
-  },
-})
-
-const threadLandTool = defineTool({
-  name: 'jj_thread_land',
-  description:
-    'Land this thread’s described work: rebase it onto the landing bookmark (main by default) and move the bookmark to it. Refuses undescribed revisions and reports conflicts to resolve; it never pushes. Call only when the user asked to land, merge or integrate this thread’s work.',
-  parameters: {},
-  output: summaryOutput,
-  execute: async (_args, execution) => {
-    const location = await requireThreads().locate(threadOfAgent(execution))
-    if (location.threadName === undefined) return { summary: 'This Session does not run in a thread workspace; nothing to land.' }
-    const result = await landThread({ path: location.workspaceRoot, sessionId: execution.agent?.id, fromAgent: true })
-    return { summary: landingMessage(result) ?? JSON.stringify(result) }
-  },
-})
 
 const noDestination = (isolateByDefault: boolean): DestinationView => ({
   vcs: 'none',
@@ -502,6 +462,20 @@ const api = jjIntegrationApi.host({
     return { thread: (await findThread(location.workspaceRoot))?.thread ?? null }
   },
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  threadStatus: async ({ input, caller }) => {
+    const found = await findThread((await requireThreads().locate(threadPath(input, caller))).workspaceRoot)
+    return { bookmark: readSettings().bookmark, thread: found?.thread ?? null }
+  },
+  landThread: async ({ input, caller }) => {
+    const location = await requireThreads().locate(threadPath(input, caller))
+    if (location.threadName === undefined) return { summary: 'This Session does not run in a thread workspace; nothing to land.', result: null }
+    const result = await landThread({
+      path: location.workspaceRoot,
+      sessionId: caller.kind === 'agent' ? caller.sessionId : undefined,
+      fromAgent: caller.kind === 'agent',
+    })
+    return { summary: landingMessage(result) ?? JSON.stringify(result), result }
+  },
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
 })
@@ -544,6 +518,5 @@ export default defineHost({
   inject: ['subprocess'],
   settings: [ownedSettings],
   apis: [api],
-  tools: [threadStatusTool, threadLandTool],
   setup: setupHost,
 })

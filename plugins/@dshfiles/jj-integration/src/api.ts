@@ -69,6 +69,10 @@ export type DestinationView = z.infer<typeof destinationSchema>
 
 export const threadWorkspaceName = z.string().regex(/^thread-[0-9a-f]{6}$/u)
 
+const threadPathInput = z
+  .object({ path: z.string().min(1).optional().describe('Thread workspace path; defaults to the calling Session’s working directory.') })
+  .strict()
+
 export const jjIntegrationApi = defineApi({
   id: 'jj-threads',
   version: 1,
@@ -94,9 +98,42 @@ export const jjIntegrationApi = defineApi({
     }),
     noFolder: method({ input: z.object({}).strict(), output: z.object({ workspaceId: z.string() }).strict() }),
     repositories: method({ input: z.object({}).strict(), output: z.object({ repositories: z.array(repositorySchema) }).strict() }),
-    threadAt: method({ input: z.object({ path: z.string().min(1) }).strict(), output: z.object({ thread: threadSchema.nullable() }).strict() }),
-    land: method({ input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(), output: landResultSchema }),
-    workspaceSync: method({ input: z.object({}).strict(), output: z.object({ sync: workspaceSyncSchema.nullable() }).strict() }),
+    threadAt: method({
+      input: z.object({ path: z.string().min(1) }).strict(),
+      output: z.object({ thread: threadSchema.nullable() }).strict(),
+      description: 'The thread workspace at a path (unlanded revisions, conflicts, whether main moved), or null when the path is not a thread.',
+    }),
+    land: method({
+      input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
+      output: landResultSchema,
+      description: 'Land the thread at a path: rebase its described revisions onto the landing bookmark and move the bookmark. Never pushes.',
+    }),
+    threadStatus: method({
+      input: threadPathInput,
+      output: z.object({ bookmark: z.string(), thread: threadSchema.nullable() }).strict(),
+      description:
+        'Show this thread’s jj workspace: its revisions not yet on the landing bookmark (main by default), conflicts, and whether the bookmark moved since the thread last rebased. Read-only.',
+      tool: {
+        name: 'jj_thread_status',
+        readOnly: true,
+        render: output =>
+          output.thread === null
+            ? 'This Session does not run in a thread workspace; it works directly in the repository checkout.'
+            : JSON.stringify({ bookmark: output.bookmark, ...output.thread }),
+      },
+    }),
+    landThread: method({
+      input: threadPathInput,
+      output: z.object({ summary: z.string(), result: landResultSchema.nullable() }).strict(),
+      description:
+        'Land this thread’s described work: rebase it onto the landing bookmark (main by default) and move the bookmark to it. Refuses undescribed revisions and reports conflicts to resolve; it never pushes. Call only when the user asked to land, merge or integrate this thread’s work.',
+      tool: { name: 'jj_thread_land', render: output => output.summary },
+    }),
+    workspaceSync: method({
+      input: z.object({}).strict(),
+      output: z.object({ sync: workspaceSyncSchema.nullable() }).strict(),
+      description: 'State of the last sync of the DSH checkout onto main after a Land: status, rebuilt plugins, and whether a restart is needed.',
+    }),
     discard: method({
       input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
       output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(revisionSchema) }).strict(),
