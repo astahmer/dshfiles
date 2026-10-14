@@ -85,14 +85,14 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.palette-search
   Scenario: Thread search reports an empty result from a fresh Host profile
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
     When the sidebar thread-search destination is opened with a nonmatching query
     Then the thread-sidebar palette shows no matching sessions
 
   @scenario:thread-sidebar.navigation-history
-  Scenario: Back and Forward follow Host-created blank threads
+  Scenario: Back and Forward follow Host-created threads
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When two blank Host threads are opened
+    When two Host threads are opened one after the other
     Then Back and Forward return to the corresponding Host sessions
 
   @scenario:thread-sidebar.children-links
@@ -109,7 +109,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.restart-confirmation
   Scenario: No restart action is offered without pending Host changes
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
     When the thread-sidebar command palette is searched for restart
     Then no restart action or confirmation appears without pending Host changes
 

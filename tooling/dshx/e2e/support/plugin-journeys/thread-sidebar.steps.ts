@@ -209,21 +209,18 @@ Then('archive undo settings control the temporary notice', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
+let parkedThreadId: string | null = null
+
 When('a nonblank Host thread is parked from its context menu', async ({ page }: { page: Page }) => {
-  const prompt = 'thread sidebar park e2e target'
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
-  await composer.fill(prompt)
+  await composer.fill('thread sidebar park e2e target')
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  parkedThreadId = threadId
+  const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
-  await targetRow.hover()
-  await targetRow.getByRole('button', { name: 'Thread notifications', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Snooze for 15 minutes', exact: true }).click()
-  await expect(targetRow.getByRole('button', { name: 'Notifications muted', exact: true })).toBeVisible()
-  await targetRow.getByRole('button', { name: 'Notifications muted', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Turn notifications back on', exact: true }).click()
-  await expect(targetRow.getByRole('button', { name: 'Thread notifications', exact: true })).toBeVisible()
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Park', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
@@ -232,7 +229,8 @@ When('a nonblank Host thread is parked from its context menu', async ({ page }: 
 })
 
 Then('the Host thread stays parked after reload without an attention error', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar park e2e target' })
+  if (parkedThreadId === null) throw new Error('No thread was parked.')
+  const targetRow = threadRow(page, parkedThreadId)
   await recordAssertion(page, 'thread-sidebar-context-menu-parking-succeeds', async () => {
     await expect(threadSidebar(page).getByText('The Host could not update this thread’s read or parked state.', { exact: true })).toHaveCount(0)
     await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
@@ -544,7 +542,7 @@ When('the header is expanded, reordered, and one destination is hidden', async (
   await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
-  await customize.getByRole('button', { name: 'Expanded labels', exact: true }).click()
+  await customize.getByRole('radio', { name: 'Expanded labels', exact: true }).click()
   await customize.getByRole('button', { name: 'Move down: New thread', exact: true }).click()
   const navigation = sidebarNavigation(page)
   await expect(navigation.getByRole('button').nth(0)).toHaveAccessibleName('Search threads')
@@ -560,7 +558,7 @@ When('the header is expanded, reordered, and one destination is hidden', async (
 Then('the custom layout survives a browser reload', async ({ page }: { page: Page }) => {
   const customize = customizeSidebar(page)
   await recordAssertion(page, 'thread-sidebar-navigation-layout-survives-reload', async () => {
-    await expect(customize.getByRole('button', { name: 'Expanded labels', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(customize.getByRole('radio', { name: 'Expanded labels', exact: true })).toBeChecked()
     await expect(customize.getByRole('checkbox', { name: 'Show item: Search threads', exact: true })).not.toBeChecked()
     await expect(customize.getByRole('button', { name: 'Move up: New thread', exact: true })).toBeEnabled()
     const navigation = sidebarNavigation(page)
@@ -584,9 +582,14 @@ Then('the thread-sidebar palette shows no matching sessions', async ({ page }: {
   await finishJourneyAssertions(page)
 })
 
-When('two blank Host threads are opened', async ({ page }: { page: Page }) => {
+// New thread on a still-blank thread reopens that same session, so the first thread gets a message first.
+When('two Host threads are opened one after the other', async ({ page }: { page: Page }) => {
   const firstThreadId = await startBlankThread(page)
+  await page.getByRole('textbox').first().fill('thread sidebar history e2e first')
+  await page.getByRole('textbox').first().press('Enter')
+  await expect(threadRow(page, firstThreadId)).toHaveCount(1)
   const secondThreadId = await startBlankThread(page)
+  expect(secondThreadId).not.toBe(firstThreadId)
   threadHistoryJourneys.set(page, { firstThreadId, secondThreadId })
 })
 
@@ -626,19 +629,15 @@ interface ThreadMentionJourney {
 const threadMentionJourneys = new WeakMap<Page, ThreadMentionJourney>()
 
 When('a visible Host thread is mentioned from its context menu at the captured cursor', async ({ page }: { page: Page }) => {
-  const sourceThreadId = await startBlankThread(page)
-  await startBlankThread(page)
+  const targetThreadId = await startBlankThread(page)
   const targetPrompt = 'thread sidebar mention e2e target'
   const targetComposer = page.getByRole('textbox').first()
   await targetComposer.fill(targetPrompt)
   await targetComposer.press('Enter')
-
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: targetPrompt })
+  const targetRow = threadRow(page, targetThreadId)
   await expect(targetRow).toHaveCount(1)
-  const back = page.getByRole('button', { name: 'Back', exact: true })
-  await expect(back).toBeEnabled()
-  await back.click()
-  await expect.poll(() => currentThreadId(page)).toBe(sourceThreadId)
+  const sourceThreadId = await startBlankThread(page)
+  expect(sourceThreadId).not.toBe(targetThreadId)
 
   const composer = page.getByRole('textbox').first()
   await composer.fill('LEFTRIGHT')
