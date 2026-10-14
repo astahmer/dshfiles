@@ -46,13 +46,29 @@ config:
 
 Minimum 2, maximum 50, default 3. One empty round is ordinary provider noise.
 
+## Two ways it used to miss every stall
+
+- The pause ran inside the `session/event` listener for `turn/end`, and a goal
+  change cannot be appended while the session is still publishing that event
+  ("session append cannot reenter"). The pause now runs once the publish has
+  returned.
+- DSH appends a runtime-context snapshot as a second `user/message` after the
+  round prompt; reading it as a new prompt dropped the round. It is skipped.
+
+On AI Accounts routes an empty completion is retried as `EMPTY_RESPONSE` and
+then fails the turn, which leaves the goal inactive rather than looping; each
+resume runs one more empty round, and the third pauses the goal.
+
 ## Verification
 
-27 tests. `src/stall.test.ts` covers the detector, including a replay of the
+28 tests. `src/stall.test.ts` covers the detector, including a replay of the
 recorded 164-round sequence that stops at round 56. `src/host.test.ts` drives
-the built bundle's `apply` against the real session-event shapes, with controls
-for a speaking round, a tool-only round, a non-goal empty turn, an agent with no
-goal, a goal that is not active, and a `pause` that throws.
+the built bundle's `apply` against the real session-event shapes (a session
+that refuses a reentrant append, a runtime-context snapshot after the round
+prompt), with controls for a speaking round, a tool-only round, a non-goal empty
+turn, an agent with no goal, a goal that is not active, and a `pause` that
+throws. `tooling/dshx/e2e/features/goal-stall-guard.feature` drives it in the
+browser against a loopback Command Code fake.
 
 Boot-verified on a second instance (`dsh --profile probe --port 3199`), never on
 `3080`. `dsh --profile probe --dump-config` shows the row with its config, and

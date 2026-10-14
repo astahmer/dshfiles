@@ -28,6 +28,8 @@ interface ContentBlock {
   readonly text?: string
 }
 
+const runtimeContextSource = z.object({ source: z.object({ kind: z.literal('runtime-context') }) })
+
 const promptText = (data: unknown): string => {
   const content = (data as { readonly content?: readonly ContentBlock[] } | undefined)?.content
   if (content === undefined || !Array.isArray(content)) return ''
@@ -69,6 +71,9 @@ export default definePlugin({
           detector.turnStarted()
           return
         case 'user/message': {
+          // DSH appends its runtime-context snapshot after the turn's prompt; it is bookkeeping, not a new prompt, and
+          // reading it as one dropped the goal round it follows.
+          if (runtimeContextSource.safeParse(event.data).success) return
           const text = promptText(event.data)
           if (text.length > 0) detector.promptEntered(text)
           return
@@ -84,19 +89,23 @@ export default definePlugin({
           if (!decision.stalled) return
           const agent = ctx.agents.get(session.id)
           if (agent === undefined || agent.session !== session) return
-          const goal = ctx.goals.get(agent)
-          if (goal === undefined || goal.phase !== 'active') return
-          try {
-            ctx.goals.pause(agent, { id: goal.id, revision: goal.revision })
-            ctx.logger.warn(
-              'goal-stall-guard: paused goal "%s" after %d consecutive rounds produced no output (round %d)',
-              goal.id,
-              decision.consecutiveEmptyRounds,
-              decision.round ?? 0,
-            )
-          } catch (error) {
-            ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goal.id, error)
-          }
+          // Pausing appends a goal change to this session, which it refuses while it is still publishing this
+          // turn/end ("session append cannot reenter"), so the pause runs once the publish has returned.
+          setTimeout(() => {
+            const goal = ctx.goals.get(agent)
+            if (goal === undefined || goal.phase !== 'active') return
+            try {
+              ctx.goals.pause(agent, { id: goal.id, revision: goal.revision })
+              ctx.logger.warn(
+                'goal-stall-guard: paused goal "%s" after %d consecutive rounds produced no output (round %d)',
+                goal.id,
+                decision.consecutiveEmptyRounds,
+                decision.round ?? 0,
+              )
+            } catch (error) {
+              ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goal.id, error)
+            }
+          }, 0)
           return
         }
         default:

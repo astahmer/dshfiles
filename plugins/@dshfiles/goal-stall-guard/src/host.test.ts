@@ -46,7 +46,11 @@ const bindableContext = (listeners: Map<string, (session: unknown, event: unknow
 }
 
 const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {}): Harness => {
-  const pause = vi.fn()
+  let publishing = false
+  // Like the real session, a goal change cannot be appended while a session event is still being published.
+  const pause = vi.fn(() => {
+    if (publishing) throw new Error('session append cannot reenter while another append is being published')
+  })
   const agent = { id: 'agent-1', session: { id: 'session-1' } }
   const goal = { id: 'goal-1', revision: 4, phase: 'active' as const }
   const listeners = new Map<string, (session: unknown, event: unknown) => void>()
@@ -62,7 +66,12 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
   const dispatch = (event: { type: string; data?: unknown }): void => {
     const handler = listeners.get('session/event')
     if (handler === undefined) throw new Error('plugin registered no session/event listener')
-    handler(agent.session, event)
+    publishing = true
+    try {
+      handler(agent.session, event)
+    } finally {
+      publishing = false
+    }
   }
   return { pause, dispatch }
 }
@@ -80,8 +89,31 @@ describe('goal-stall-guard wiring', () => {
       dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
     }
 
-    expect(pause).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
     expect(pause).toHaveBeenCalledWith(expect.objectContaining({ session: expect.anything() }), { id: 'goal-1', revision: 4 })
+  })
+
+  it('counts a round whose prompt is followed by a runtime-context snapshot and whose turn failed empty', async () => {
+    const plugin = await loadPlugin()
+    const { pause, dispatch } = startHarness(plugin)
+
+    // The shape AI Accounts produces: DSH appends its runtime-context snapshot after the round prompt, and an empty
+    // completion is retried as EMPTY_RESPONSE until the turn fails, with no assistant/message at all.
+    for (const round of [1, 2, 3]) {
+      dispatch({ type: 'turn/start', data: { turn: round } })
+      dispatch({ type: 'step/start', data: { turn: round, step: 1 } })
+      dispatch({ type: 'user/message', data: { content: [{ type: 'text', text: roundPrompt(round) }], source: { kind: 'goal', round } } })
+      dispatch({
+        type: 'user/message',
+        data: {
+          content: [{ type: 'text', text: 'Current runtime context. This snapshot supersedes earlier runtime-context snapshots.' }],
+          source: { kind: 'runtime-context' },
+        },
+      })
+      dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'error', error: { code: 'EMPTY_RESPONSE', message: 'no content' } } } })
+    }
+
+    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
   })
 
   it('the control: two empty rounds are not enough', async () => {
@@ -156,7 +188,7 @@ describe('goal-stall-guard wiring', () => {
       dispatch({ type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
     }
 
-    expect(pause).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(pause).toHaveReturnedTimes(1))
   })
 
   it('ignores an agent with no goal', async () => {
@@ -233,6 +265,6 @@ describe('goal-stall-guard wiring', () => {
       listeners.get('session/event')?.(agent.session, { type: 'turn/end', data: { turn: round, reason: { kind: 'completed' } } })
     }
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not pause stalled goal'), 'goal-1', expect.anything())
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not pause stalled goal'), 'goal-1', expect.anything()))
   })
 })

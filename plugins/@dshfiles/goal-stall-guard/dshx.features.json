@@ -5,7 +5,7 @@
       "id": "pause-stalled-goals",
       "title": "Pause goals after consecutive empty rounds",
       "summary": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
-      "surfaces": ["host", "integration"],
+      "surfaces": ["client", "host", "integration"],
       "configuration": [
         {
           "key": "stallThreshold",
@@ -21,17 +21,17 @@
         {
           "kind": "not-applicable",
           "id": "goal-stall-guard.streak-reset",
-          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
+          "reason": "Resetting the streak needs a goal round that answers between empty ones; the fake provider answers every later round too, so an armed goal would keep running answered rounds up to its budget. The reset is covered by the spoken-round and tool-progress controls in src/host.test.ts and src/stall.test.ts."
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "goal-stall-guard.threshold",
-          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/goal-stall-guard.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "goal-stall-guard.unavailable-goal",
-          "reason": "A stalled goal round is a completion with no visible content; every provider a browser journey can drive without a real subscription goes through AI Accounts, whose adapters (settleEmptyAsFailure in commandcode-provider.ts) turn such a completion into EMPTY_RESPONSE, which DSH retries and then fails the turn before the guard sees an empty round. The guard is reachable only through a native DeepSeek route with a real key, so the host.test.ts cases listed for this feature verify it."
+          "featureFile": "tooling/dshx/e2e/features/goal-stall-guard.feature"
         },
         {
           "kind": "unit-test",

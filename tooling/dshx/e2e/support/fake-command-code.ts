@@ -9,7 +9,7 @@ import { z } from 'zod'
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
  * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[read PATH]]` calls the read tool and
- * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, and `[[hold]]`
+ * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, `[[empty]]` settles with reasoning and no answer (a stalled round), and `[[hold]]`
  * keeps the turn running until `releaseHeldTurns`; the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
  */
@@ -110,6 +110,7 @@ export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode>
       // DSH appends its runtime-context snapshot after the user's message.
       const last = messages.filter(message => !message.text.startsWith(RUNTIME_CONTEXT)).at(-1)
       if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })
+      if (last?.text.includes('[[empty]]') === true) return streamAnswer(response, { reasoning_content: 'Thinking without an answer.' })
       if (last?.text.includes('[[hold]]') === true) {
         held.add(response)
         return
