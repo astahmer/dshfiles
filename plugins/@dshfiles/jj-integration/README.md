@@ -90,6 +90,7 @@ The confirmation dialog explains these effects before removal.
 
 ## Agent tools
 
+- `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the current working-copy revision. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
 - `jj_thread_status`: this thread's revisions not yet on the target bookmark and whether it moved.
 - `jj_thread_rebase`: rebase this thread's work onto the target bookmark.
 

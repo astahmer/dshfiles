@@ -17,7 +17,7 @@ import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
-import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
+import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, ThreadError, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -39,6 +39,7 @@ const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
 let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
 let hostContext: Context | undefined
 let threads: Threads | undefined
+const isolatedSessionWorkspaces = new Map<string, { readonly name: string; readonly path: string }>()
 let workspaceSync: WorkspaceSyncView | null = null
 let workspaceSyncQueued = false
 let workspaceSyncQueue: Promise<void> = Promise.resolve()
@@ -139,8 +140,10 @@ const runSetupCommand = async (context: Context, command: string, cwd: string): 
   })
 }
 
-const isFinished = (workspace: Workspace | undefined, archived: ReadonlySet<string>): boolean =>
-  workspace === undefined || workspace.sessionIds.every(sessionId => archived.has(sessionId))
+const isolatedSessionIdsAt = (path: string): readonly string[] =>
+  [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
+
+const isFinished = (sessionIds: readonly string[], archived: ReadonlySet<string>): boolean => sessionIds.every(sessionId => archived.has(sessionId))
 
 const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
   const controller = requireContext().get('sessionController')
@@ -169,13 +172,13 @@ const threadView = (
   archived: ReadonlySet<string>,
   activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
 ): ThreadView => {
-  const sessionIds = [...(workspace?.sessionIds ?? [])]
+  const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
   const view: ThreadView = {
     name: status.name,
     path: status.path,
     workspaceId: workspace?.id ?? null,
     sessionIds,
-    finished: isFinished(workspace, archived),
+    finished: isFinished(sessionIds, archived),
     canRebase: canRebaseWorkspace(sessionIds, activity),
     missing: status.missing,
     behind: status.behind,
@@ -398,6 +401,9 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
   const outcome = await requireThreads().discard({ repoRoot: found.repository.repoRoot, name: found.thread.name, force: input.force })
   if (outcome.status === 'discarded') {
     if (found.thread.workspaceId !== null) await registryOf().delete(WorkspaceId(found.thread.workspaceId))
+    for (const [sessionId, workspace] of isolatedSessionWorkspaces) {
+      if (workspace.path === found.thread.path) isolatedSessionWorkspaces.delete(sessionId)
+    }
     emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path })
   }
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
@@ -419,9 +425,50 @@ const sweepFinishedThreads = async (): Promise<void> => {
 }
 
 const threadPath = (input: { readonly path?: string | undefined }, caller: ApiCaller): string => {
-  const path = input.path ?? (caller.kind === 'agent' ? caller.cwd : undefined)
+  const isolatedPath = caller.kind === 'agent' && caller.sessionId !== undefined ? isolatedSessionWorkspaces.get(caller.sessionId)?.path : undefined
+  const path = input.path ?? isolatedPath ?? (caller.kind === 'agent' ? caller.cwd : undefined)
   if (path === undefined) throw new PluginApiError('Pass the thread workspace path; this caller has no working directory.', { code: 'no-path' })
   return path
+}
+
+const isolateSession = async (caller: ApiCaller) => {
+  if (caller.kind !== 'agent') throw new PluginApiError('Only an agent Session can isolate its working directory.', { code: 'agent-only' })
+  if (caller.sessionId === undefined || caller.cwd === undefined) {
+    throw new PluginApiError('This agent Session has no working directory to isolate.', { code: 'no-path' })
+  }
+
+  const existing = isolatedSessionWorkspaces.get(caller.sessionId)
+  if (existing !== undefined) return { ...existing, created: false }
+
+  let location: Awaited<ReturnType<Threads['locate']>>
+  try {
+    location = await requireThreads().locate(caller.cwd)
+  } catch (error) {
+    if (error instanceof ThreadError && error.code === 'not-a-repository') {
+      throw new PluginApiError('Workspace isolation requires a Session inside a local jj repository.', { code: 'not-a-repository' })
+    }
+    throw error
+  }
+
+  if (location.threadName !== undefined) {
+    const workspace = { name: location.threadName, path: location.workspaceRoot }
+    isolatedSessionWorkspaces.set(caller.sessionId, workspace)
+    return { ...workspace, created: false }
+  }
+
+  const activeThreads = requireThreads()
+  const base = await activeThreads.workingCopyCommitId(location.workspaceRoot)
+  const thread = await activeThreads.provision(location.repoRoot, base)
+  const registry = registryOf()
+  const project = await registry.resolveByPath(location.repoRoot)
+  const registered = await registry.resolveByPath(thread.path)
+  if (registered === undefined) await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
+
+  isolatedSessionWorkspaces.set(caller.sessionId, thread)
+  emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
+  const command = readSettings().setupCommand.trim()
+  if (command !== '') void runSetupCommand(requireContext(), command, thread.path).catch(() => undefined)
+  return { ...thread, created: true }
 }
 
 const noDestination = (isolateByDefault: boolean): DestinationView => ({
@@ -467,6 +514,7 @@ const api = jjIntegrationApi.host({
     if (command !== '') void runSetupCommand(requireContext(), command, thread.path).catch(() => undefined)
     return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
   },
+  isolate: ({ caller }) => isolateSession(caller),
   destination: async ({ input }) => {
     const registry = registryOf()
     const source = registry.get(WorkspaceId(input.workspaceId))

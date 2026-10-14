@@ -58,6 +58,16 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
   })
 
+  it('can isolate from the current working-copy revision before the first edit', async () => {
+    writeFileSync(join(repo, 'local-context.txt'), 'existing context\n')
+    const base = await threads.workingCopyCommitId(repo)
+    const thread = await threads.provision(repo, base)
+
+    expect(readFileSync(join(thread.path, 'local-context.txt'), 'utf8')).toBe('existing context\n')
+    expect(readFileSync(join(repo, 'local-context.txt'), 'utf8')).toBe('existing context\n')
+    expect((await threads.locate(thread.path)).threadName).toBe(thread.name)
+  })
+
   it('lists local bookmarks and starts a thread from the chosen one', async () => {
     jj(repo, 'bookmark', 'create', 'feature', '-r', '@')
     jj(repo, 'describe', '-m', 'feature base')

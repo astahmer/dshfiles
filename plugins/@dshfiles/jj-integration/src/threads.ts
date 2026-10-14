@@ -123,6 +123,12 @@ export const createThreads = (options: {
     return { ...location, threadName: location.threadName }
   }
 
+  const workingCopyCommitId = async (path: string): Promise<string> => {
+    const commitId = (await jj(['log', '--no-graph', '-r', '@', '-T', 'commit_id'], path)).trim()
+    if (commitId.length === 0) throw new ThreadError('jj-failed', 'Could not resolve the current working-copy revision.')
+    return commitId
+  }
+
   const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${options.bookmark()}) ~ empty()`
   const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
   const readRebaseTimestamps = async (repoRoot: string): Promise<Readonly<Record<string, number>>> => {
@@ -257,7 +263,7 @@ export const createThreads = (options: {
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(names)] }
   }
 
-  return { locate, list, provision, land, discard, bookmarks }
+  return { locate, list, provision, land, discard, bookmarks, workingCopyCommitId }
 }
 
 export type Threads = ReturnType<typeof createThreads>

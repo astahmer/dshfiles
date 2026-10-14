@@ -72,8 +72,12 @@ export type DestinationView = z.infer<typeof destinationSchema>
 
 export const threadWorkspaceName = z.string().regex(/^thread-[0-9a-f]{6}$/u)
 
+const isolatedWorkspaceSchema = z.object({ name: z.string().min(1), path: z.string().min(1), created: z.boolean() }).strict()
+
 const threadPathInput = z
-  .object({ path: z.string().min(1).optional().describe('Thread workspace path; defaults to the calling Session’s working directory.') })
+  .object({
+    path: z.string().min(1).optional().describe('Thread workspace path; defaults to this Session’s working directory or its on-demand isolated workspace.'),
+  })
   .strict()
 
 export const jjIntegrationApi = defineApi({
@@ -109,6 +113,17 @@ export const jjIntegrationApi = defineApi({
       output: z.object({ thread: threadSchema.nullable() }).strict(),
       description:
         'The thread workspace at a path (revisions not yet on the bookmark, conflicts, whether main moved, and whether it is safe to rebase), or null when the path is not a thread.',
+    }),
+    isolate: method({
+      input: z.object({}).strict(),
+      output: isolatedWorkspaceSchema,
+      description:
+        'Before the first code edit, call when this task needs code changes and the current Session is not already in a dedicated thread workspace. Creates one from the current working-copy revision. The Session cwd does not change: use the returned absolute path for every subsequent file operation and shell workdir. No commit or rebase occurs.',
+      tool: {
+        name: 'jj_thread_isolate',
+        render: output =>
+          `${output.created ? 'Created' : 'Already in'} isolated jj workspace ${output.name} at ${output.path}. Use that absolute path for all subsequent file operations and shell workdir. Thread status and rebase tools will target this workspace automatically.`,
+      },
     }),
     land: method({
       input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
