@@ -30,6 +30,14 @@ const shellEn = {
   'form.unavailable': 'This plugin is not loaded, so its settings cannot be edited now.',
   'nav.plugins': 'Plugins',
   'nav.more': 'More settings',
+  'search.placeholder': 'Search settings',
+  'search.clear': 'Clear search',
+  'search.found': '{count} Settings Found',
+  'search.foundOne': '1 Setting Found',
+  'search.none': 'No Settings Found',
+  'search.sections': 'Sections',
+  'search.openSection': 'Open {section}',
+  'search.matches': '{count} matching settings',
 }
 
 const shellZh = {
@@ -54,6 +62,14 @@ const shellZh = {
   'form.unavailable': '此插件未加载，暂时无法编辑其设置。',
   'nav.plugins': '插件',
   'nav.more': '更多设置',
+  'search.placeholder': '搜索设置',
+  'search.clear': '清除搜索',
+  'search.found': '找到 {count} 项设置',
+  'search.foundOne': '找到 1 项设置',
+  'search.none': '未找到设置',
+  'search.sections': '设置分区',
+  'search.openSection': '打开{section}',
+  'search.matches': '{count} 项匹配的设置',
 } satisfies Record<keyof typeof shellEn, string>
 
 // Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT), lib/client.js `zh` and `en`.

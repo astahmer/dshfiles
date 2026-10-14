@@ -2210,64 +2210,6 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
-  plugins/@dshfiles/settings-search:
-    dependencies:
-      '@deepseek-ai/dsh-client-ui-conversation':
-        specifier: '>=0.2.0-rc.1 <0.3.0-0'
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@deepseek-ai/dsh-tools':
-        specifier: '>=0.2.0-rc.1 <0.3.0-0'
-        version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
-      '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
-        version: 3.18.4
-      '@dshfiles/plugin-ui':
-        specifier: workspace:*
-        version: link:../plugin-ui
-      '@dshfiles/shared-runtime':
-        specifier: workspace:*
-        version: link:../shared-runtime
-      zod:
-        specifier: ^4.4.3
-        version: 4.6.5
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: 4.0.4
-        version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
-      '@deepseek-ai/dsh':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(386fe4c626f3bfed6e95f3a2736455df)
-      '@deepseek-ai/dsh-api-remotes':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
-      '@deepseek-ai/dsh-client-locale':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@deepseek-ai/dsh-client-ui-primitives':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@deepseek-ai/dsh-client-ui-settings':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@deepseek-ai/dsh-client-ui-slots':
-        specifier: 0.2.0-rc.2
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@dshfiles/dshx':
-        specifier: workspace:*
-        version: link:../../../tooling/dshx/packages/dshx
-      '@types/react':
-        specifier: ~18.3.31
-        version: 18.3.31
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
-
   plugins/@dshfiles/settings-shell:
     dependencies:
       '@deepseek-ai/dsh-tools':

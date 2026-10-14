@@ -7,15 +7,15 @@ const provider = {
   dsh: { client: { external: [] } },
 }
 const consumer = {
-  name: '@dshfiles/settings-search',
+  name: '@dshfiles/settings-shell',
   dsh: { client: { external: ['@dshfiles/shared-runtime'] } },
 }
 const profile = {
   dependencies: {
     '@dshfiles/shared-runtime': 'link:../../plugins/@dshfiles/shared-runtime',
-    '@dshfiles/settings-search': 'link:../../plugins/@dshfiles/settings-search',
+    '@dshfiles/settings-shell': 'link:../../plugins/@dshfiles/settings-shell',
   },
-  dsh: { profile: { bundles: ['@dshfiles/shared-runtime', '@dshfiles/settings-search'] } },
+  dsh: { profile: { bundles: ['@dshfiles/shared-runtime', '@dshfiles/settings-shell'] } },
 }
 
 test('accepts local external providers registered as profile dependencies and bundles', () => {
@@ -28,13 +28,13 @@ test('reports a local external provider missing from profile dependencies', () =
 
   assert.deepEqual(webProfileContractErrors({ ...profile, dependencies }, [provider, consumer]), [
     '@dshfiles/shared-runtime: profile bundle has no dependency entry.',
-    '@dshfiles/settings-search: external provider @dshfiles/shared-runtime is missing from profiles/web dependencies.',
+    '@dshfiles/settings-shell: external provider @dshfiles/shared-runtime is missing from profiles/web dependencies.',
   ])
 })
 
 test('reports a local external provider missing from profile bundles', () => {
-  assert.deepEqual(webProfileContractErrors({ ...profile, dsh: { profile: { bundles: ['@dshfiles/settings-search'] } } }, [provider, consumer]), [
-    '@dshfiles/settings-search: external provider @dshfiles/shared-runtime is missing from dsh.profile.bundles.',
+  assert.deepEqual(webProfileContractErrors({ ...profile, dsh: { profile: { bundles: ['@dshfiles/settings-shell'] } } }, [provider, consumer]), [
+    '@dshfiles/settings-shell: external provider @dshfiles/shared-runtime is missing from dsh.profile.bundles.',
     '@dshfiles/shared-runtime: profile dependency is not registered in dsh.profile.bundles.',
   ])
 })

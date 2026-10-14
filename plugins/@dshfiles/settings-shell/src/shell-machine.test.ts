@@ -52,6 +52,20 @@ describe('settings shell machine', () => {
     expect(actor.getSnapshot().context.field).toBeUndefined()
   })
 
+  it('keeps the query across sections opened without one, and drops it on close or a picked section', () => {
+    const { actor } = start()
+    actor.send({ type: 'open', surface: 'modal', query: 'archive' })
+    expect(actor.getSnapshot().context.query).toBe('archive')
+    actor.send({ type: 'search', query: 'tabs' })
+    actor.send({ type: 'open', surface: 'modal' })
+    expect(actor.getSnapshot().context.query).toBe('tabs')
+    actor.send({ type: 'open', surface: 'modal', sectionId: 'models' })
+    expect(actor.getSnapshot().context.query).toBe('')
+    actor.send({ type: 'search', query: 'tabs' })
+    actor.send({ type: 'close' })
+    expect(actor.getSnapshot().context.query).toBe('')
+  })
+
   it('moves an open dialog into a tab, keeping its section', () => {
     const { actor, calls } = start()
     actor.send({ type: 'open', surface: 'modal', sectionId: 'plugins' })

@@ -26,6 +26,7 @@ import { useObservable } from './native/use-observable.js'
 import { settingsShellApi } from './shell-api.js'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
+import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { localizedTextReader, pluginPageId, pluginSettingsPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { preferredSurface } from './settings-preference.js'
@@ -270,6 +271,7 @@ export default defineClient({
     }
 
     const fieldTarget: ObservableSnapshot<FieldTarget | undefined> = { getSnapshot: () => actor.getSnapshot().context.field, subscribe: subscribeActor }
+    const searchQuery: ObservableSnapshot<string> = { getSnapshot: () => actor.getSnapshot().context.query, subscribe: subscribeActor }
     // Sections get the native `close` plus the navigation the dshx Settings-target contract describes.
     const sectionOwner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
@@ -306,6 +308,7 @@ export default defineClient({
       const host = useObservable(mainPanelHost)
       const pages = useObservable(pluginPages)
       const field = useObservable(fieldTarget)
+      const query = useObservable(searchQuery)
       useEffect(() => {
         void describe.ensure()
       }, [])
@@ -328,6 +331,11 @@ export default defineClient({
         sectionOwner,
         t: props.t,
         onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
+        query,
+        onSearch: (next: string) => actor.send({ type: 'search', query: next }),
+        renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], highlight: string) => (
+          <SettingsForm fields={fields} form={ctx.configForms.get<unknown>(page.ns)} highlight={highlight} key={page.ns} t={props.t} />
+        ),
         onExpand: () => actor.send({ type: 'expand' }),
         onRestore: () => actor.send({ type: 'restore' }),
         onMoveToTab: () => actor.send({ type: 'moveToTab' }),
@@ -400,6 +408,7 @@ export default defineClient({
       const requested = request.surface ?? surface()
       if (request.setting !== undefined && openSettingsTarget(request.setting, requested)) return
       actor.send(request.section === undefined ? { type: 'open', surface: requested } : { type: 'open', surface: requested, sectionId: request.section })
+      if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 
     const PanelHost = (): JSX.Element => {

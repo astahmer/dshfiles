@@ -76,14 +76,14 @@ parallel settings model. Resolve a user's edit to a stable entry and field path,
 parse it against the schema, and call the native set or unset operation. Hide
 secret paths and their descendants from search results.
 
-The [settings index](../../../plugins/@dshfiles/settings-search/src/settings-index.ts)
-and [editor model](../../../plugins/@dshfiles/settings-search/src/settings-editor-model.ts)
-separate search and input parsing from the Client view. Their tests cover
-described entries, nested reads, typed values, and exact settings operations.
+The [schema model](../../../plugins/@dshfiles/settings-shell/src/schema-form/schema-model.ts)
+and [search](../../../plugins/@dshfiles/settings-shell/src/settings-search.ts)
+separate field description, input parsing and matching from the Client view.
+Their tests cover described entries, nested reads, typed values, and matching.
 
 ```sh
-fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/settings-search typecheck
-fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/settings-search test
+fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/settings-shell typecheck
+fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/settings-shell test
 ```
 
 ## Host state, lifecycle, and local processes

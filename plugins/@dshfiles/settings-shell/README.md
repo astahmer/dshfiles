@@ -13,6 +13,20 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
 - Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
   other tab left, main-tabs keeps showing Settings (it cannot show an empty main view).
 
+### Search
+
+One field at the top of Settings searches every setting the shell can draw: their titles, descriptions and key paths
+(`thread sidebar children` finds `maxChildren` on the Thread Sidebar page), plus the names of native sections. Every
+word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
+flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
+stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
+query before it closes the dialog. Native sections draw their own rows, so a match on a section's name offers to open
+it; the namespaces behind native rows (theme, language, …) are searchable under _More settings_.
+
+This replaces `@dshfiles/settings-search`, which was **folded** in: its popup under the navigation and its separate
+search section are gone, and the schema walking and ranking it did now live in `src/schema-form/schema-model.ts` and
+`src/settings-search.ts`.
+
 ### Plugin settings
 
 Every settings namespace with a visible field gets a page under **Plugins** in the Settings navigation (namespaces

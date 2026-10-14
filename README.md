@@ -35,7 +35,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`queue-reorder`](plugins/@dshfiles/queue-reorder/README.md) | Reorder queued messages through DSH's durable inbox splice. |
 | [`request-messages`](plugins/@dshfiles/request-messages/README.md) | Dispatch `agent/request-messages` on stock DSH so plugins can replace a request's messages. |
 | [`secret-catalog`](plugins/@dshfiles/secret-catalog/README.md) | Browse project-scoped secret aliases without exposing values to Client. |
-| [`settings-search`](plugins/@dshfiles/settings-search/README.md) | Search Settings fields and edit matches in place. |
+| [`settings-shell`](plugins/@dshfiles/settings-shell/README.md) | VS Code-style Settings: a tab or dialog, every plugin's settings with real controls, inline search. |
 | [`shared-runtime`](plugins/@dshfiles/shared-runtime/package.json) | One shared copy of third-party Client modules and the plugin stylesheet for `@dshfiles` UI plugins. |
 | [`shared-streams`](plugins/@dshfiles/shared-streams/README.md) | One EventSource per URL across tabs, so several DSH tabs never exhaust the browser's per-origin connections. |
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md) | Claim keyboard shortcuts before browser defaults. |

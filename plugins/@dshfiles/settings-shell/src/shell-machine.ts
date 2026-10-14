@@ -17,7 +17,8 @@ export interface FieldTarget {
 }
 
 export type ShellEvent =
-  | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget }
+  | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget; readonly query?: string }
+  | { readonly type: 'search'; readonly query: string }
   | { readonly type: 'close' }
   | { readonly type: 'select'; readonly sectionId: string }
   | { readonly type: 'expand' }
@@ -31,12 +32,15 @@ interface ShellContext {
   /** The selected nav section; undefined shows the first one. */
   readonly sectionId: string | undefined
   readonly field: FieldTarget | undefined
+  /** The search field's text; non-empty replaces the section with matching settings. */
+  readonly query: string
 }
 
 const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ context, event }) => {
   if (event.type !== 'open') return {}
-  if (event.field !== undefined) return { sectionId: event.field.sectionId, field: event.field }
-  return { sectionId: event.sectionId ?? context.sectionId, field: undefined }
+  const query = event.query ?? (event.field === undefined && event.sectionId === undefined ? context.query : '')
+  if (event.field !== undefined) return { sectionId: event.field.sectionId, field: event.field, query }
+  return { sectionId: event.sectionId ?? context.sectionId, field: undefined, query }
 })
 
 /**
@@ -51,17 +55,18 @@ export const shellMachine = setup({
     showPanel: ({ context }) => context.ports.showPanel(),
     leavePanel: ({ context }) => context.ports.leavePanel(),
     selectRequested,
-    forgetSection: assign({ sectionId: undefined, field: undefined }),
+    forgetSection: assign({ sectionId: undefined, field: undefined, query: '' }),
+    search: assign({ query: ({ event }) => (event.type === 'search' ? event.query : '') }),
   },
   guards: {
     wantsTab: ({ event }) => event.type === 'open' && event.surface === 'tab',
   },
 }).createMachine({
   id: 'settings-shell',
-  context: ({ input }) => ({ ports: input.ports, sectionId: undefined, field: undefined }),
+  context: ({ input }) => ({ ports: input.ports, sectionId: undefined, field: undefined, query: '' }),
   initial: 'closed',
   on: {
-    select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined }) },
+    select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined, query: '' }) },
   },
   states: {
     closed: {
@@ -83,6 +88,7 @@ export const shellMachine = setup({
       on: {
         open: [{ guard: 'wantsTab', target: 'tab', actions: ['selectRequested', 'showPanel'] }, { actions: 'selectRequested' }],
         close: { target: 'closed' },
+        search: { actions: 'search' },
         moveToTab: { target: 'tab', actions: 'showPanel' },
         'panel.shown': { target: 'tab' },
       },
@@ -92,6 +98,7 @@ export const shellMachine = setup({
         // Settings already fills the main view: a request for the dialog only changes the section.
         open: { actions: ['selectRequested', 'showPanel'] },
         close: { target: 'closed', actions: 'leavePanel' },
+        search: { actions: 'search' },
         'panel.hidden': { target: 'closed' },
       },
     },

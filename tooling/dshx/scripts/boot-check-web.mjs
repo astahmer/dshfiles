@@ -130,7 +130,7 @@ const main = async () => {
   const profileManifest = JSON.parse(await readFile(resolve(sourceProfileRoot, 'package.json'), 'utf8'))
   const profilePluginIds = profileManifest.dsh.profile.bundles.filter(packageId => packageId.startsWith('@dshfiles/'))
   const pluginById = new Map(plugins.map(plugin => [plugin.id, plugin]))
-  const providerPairIds = ['@dshfiles/shared-runtime', '@dshfiles/settings-search']
+  const providerPairIds = ['@dshfiles/shared-runtime', '@dshfiles/settings-shell']
   const providerPair = providerPairIds.map(packageId => {
     const plugin = pluginById.get(packageId)
     if (plugin === undefined) throw new Error(`Web profile provider smoke is missing ${packageId}.`)

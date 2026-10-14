@@ -57,7 +57,7 @@
         {
           "kind": "gherkin",
           "id": "editor.open-file-links-native-row",
-          "featureFile": "tooling/dshx/e2e/features/settings-search.feature"
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         },
         {
           "kind": "unit-test",
