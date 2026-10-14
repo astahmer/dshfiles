@@ -17,7 +17,13 @@ const UNICODE_PATH = 'dir with space/ünïcode file.txt'
 const jj = (repository: Repository, args: readonly string[], author = { name: 'Ada Author', email: 'ada@example.invalid' }): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...args], {
     cwd: repository.path,
-    env: { PATH: process.env.PATH ?? '', HOME: repository.root, XDG_CONFIG_HOME: join(repository.root, '.config'), JJ_USER: author.name, JJ_EMAIL: author.email },
+    env: {
+      PATH: process.env.PATH ?? '',
+      HOME: repository.root,
+      XDG_CONFIG_HOME: join(repository.root, '.config'),
+      JJ_USER: author.name,
+      JJ_EMAIL: author.email,
+    },
     encoding: 'utf8',
     shell: false,
     timeout: 20_000,
@@ -121,7 +127,9 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
     await expect(revisionRow(page, 'Base fixture')).toHaveCount(0)
   })
   await page.getByRole('textbox', { name: 'Filter author', exact: true }).fill('')
-  const rootRow = revisionsRegion(page).locator('article').filter({ hasText: 'zzzzzzzz' })
+  const rootRow = revisionsRegion(page)
+    .locator('article')
+    .filter({ has: page.locator('[title^="zzzzzzzz"]') })
   await expect(rootRow).toHaveCount(1)
   const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
   await hideImmutable.click()

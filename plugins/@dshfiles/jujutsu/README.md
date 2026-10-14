@@ -15,18 +15,20 @@ contracts.
   no other lane, and frees that lane when it ends; without a visible trunk
   bookmark, branches simply stack by their newest head. Lanes
   bend with rounded corners in the lower half of the row, so every row keeps
-  one height (24 px Comfortable, 20 px Compact). The trunk uses the accent
+  one height (28 px Comfortable, 22 px Compact). The trunk uses the accent
   colour and each side branch one of six hues (`graph-1..6` in the kit),
-  never the same as the branch above it or its parent; divergent copies
-  (`changeid/N`) get a violet node. Nodes are small: filled for changes, hollow for
-  empty ones, a filled ring for @, dim diamonds for immutable revisions (whose
-  text is dimmed too), and conflicts get a warning glyph. Each row reads like
-  VisualJJ: the change ID (unique prefix bold, rest dim), workspace (`name@`),
-  bookmark and tag names as coloured text, then the description or a muted
-  italic `(empty)` / `(no description)`, and the relative time as a dim
-  trailing column. Describe appears on hover for undescribed revisions, and
-  the expand chevron on hover. In the side panel the change ID and labels move
-  under the description and the time column is dropped. Collapsible day
+  different from the branch above it and from its parent. Lanes are 2 px;
+  nodes are filled circles, hollow rings for empty revisions, a ring with a
+  dot for @, dimmed for immutable revisions (whose text is dimmed too); a
+  divergent copy gets a violet outline and conflicts a warning glyph. Every
+  row is one line at any width: workspace pills (teal, blue for this
+  checkout's @) and boxed bookmark and tag labels on the branch's head row,
+  then the description or a muted italic `(empty)` / `(no description)`
+  truncated with an ellipsis, then fixed right-aligned columns for the
+  relative time (dropped below ~320 px) and the change ID as a small pill
+  (`changeid/N` for divergent copies). Describe appears on hover for
+  undescribed revisions, and the expand chevron on hover. Optional
+  collapsible day
   groups, author-name, text, mine, immutable and date filters, and a
   Comfortable / Compact density setting. The ideas (straight first-parent
   lanes, rounded corners, node styles) come from studying the jj-view VS Code
