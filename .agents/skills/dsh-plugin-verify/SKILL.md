@@ -46,6 +46,9 @@ So the live DSH keeps running the **old host** while new clients hot-reload. Cli
 - The settings namespace may be unregistered on the old host (`namespace-unregistered`, `writable: false`) → fall
   back to defaults, never throw.
 
+Once the change is on `main`, `dshx checkout sync` moves the live checkout, rebuilds the changed plugins and reports
+which row applies to each.
+
 ## 3. Host contract rules
 
 - `useApi` / `useSettings` only in components registered through dshx `decorate(...)` (or `defineSlot`); otherwise

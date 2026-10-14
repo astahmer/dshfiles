@@ -81,6 +81,11 @@ Work lands on `main`; never `jj git push` without asking.
 - To move a checkout that may hold someone's uncommitted edits (e.g.
   `~/dev/dshfiles`) onto `main`, use `jj rebase -r @ -d main`; `jj new main`
   leaves those edits behind in the old revision.
+- After moving `main` by hand (`jj bookmark set main …`), bring the checkout
+  DSH runs from along: `node tooling/dshx/packages/dshx/dist/cli/bin.js
+  checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
+  keeping its local edits, rebuilds what changed and says whether DSH needs a
+  restart; it never restarts DSH. Land does this itself.
 - Always pass `-m` to `jj describe` and `jj squash` (or
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.
